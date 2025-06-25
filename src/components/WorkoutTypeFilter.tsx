@@ -52,7 +52,7 @@ const WorkoutTypeFilter: React.FC<WorkoutTypeFilterProps> = ({
               <SelectItem value="ride">
                 <div className="flex items-center gap-2">
                   <Bike className="h-4 w-4 text-orange-500" />
-                  Cycling
+                  Riding
                 </div>
               </SelectItem>
               <SelectItem value="strength">

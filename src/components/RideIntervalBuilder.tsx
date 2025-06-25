@@ -6,32 +6,33 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Plus, Copy, Trash2, GripVertical, Repeat } from 'lucide-react';
 
-export interface RunInterval {
+export interface RideInterval {
   id: string;
   time?: string;
   distance?: string;
-  paceTarget?: string;
+  powerTarget?: string;
   bpmTarget?: string;
+  cadenceTarget?: string;
   repeat?: boolean;
   repeatCount?: number;
   duration?: number;
   selected?: boolean;
 }
 
-interface RunIntervalBuilderProps {
-  intervals: RunInterval[];
-  onChange: (intervals: RunInterval[]) => void;
+interface RideIntervalBuilderProps {
+  intervals: RideInterval[];
+  onChange: (intervals: RideInterval[]) => void;
   isMetric: boolean;
 }
 
-export default function RunIntervalBuilder({ intervals, onChange, isMetric }: RunIntervalBuilderProps) {
+export default function RideIntervalBuilder({ intervals, onChange, isMetric }: RideIntervalBuilderProps) {
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
   const [blockRepeatCount, setBlockRepeatCount] = useState(2);
 
   const addInterval = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    const newInterval: RunInterval = {
+    const newInterval: RideInterval = {
       id: Date.now().toString(),
       time: '',
       distance: '',
@@ -40,7 +41,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
     onChange([...intervals, newInterval]);
   };
 
-  const updateInterval = (id: string, updates: Partial<RunInterval>) => {
+  const updateInterval = (id: string, updates: Partial<RideInterval>) => {
     onChange(intervals.map(interval => 
       interval.id === id ? { ...interval, ...updates } : interval
     ));
@@ -76,11 +77,11 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
     const selectedIntervalsData = intervals.filter(i => selectedIntervals.includes(i.id));
     const blockSummary = selectedIntervalsData.map(i => {
       const timeStr = i.time ? i.time : '';
-      const target = i.paceTarget ? `@ ${i.paceTarget}` : '';
+      const target = i.powerTarget ? `@ ${i.powerTarget}` : '';
       return `${timeStr} ${target}`.trim();
     }).join(' + ');
     
-    const blockInterval: RunInterval = {
+    const blockInterval: RideInterval = {
       id: Date.now().toString(),
       time: `[${blockSummary}]`,
       repeatCount: blockRepeatCount,
@@ -97,7 +98,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Run Intervals
+            Ride Intervals
             <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
               <Plus className="h-4 w-4 mr-2" />
               Add Interval
@@ -141,17 +142,17 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                 <div>
                   <Label>Distance ({isMetric ? 'km' : 'mi'})</Label>
                   <Input
-                    placeholder="5.0"
+                    placeholder="10.0"
                     value={interval.distance || ''}
                     onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
                   />
                 </div>
                 <div>
-                  <Label>Pace Target (per {isMetric ? 'km' : 'mi'})</Label>
+                  <Label>Power Target (watts or %FTP)</Label>
                   <Input
-                    placeholder="min/avg/max"
-                    value={interval.paceTarget || ''}
-                    onChange={(e) => updateInterval(interval.id, { paceTarget: e.target.value })}
+                    placeholder="250W or 85%"
+                    value={interval.powerTarget || ''}
+                    onChange={(e) => updateInterval(interval.id, { powerTarget: e.target.value })}
                   />
                 </div>
               </div>
@@ -165,27 +166,36 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                     onChange={(e) => updateInterval(interval.id, { bpmTarget: e.target.value })}
                   />
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`repeat-${interval.id}`}
-                    checked={interval.repeat || false}
-                    onCheckedChange={(checked) => updateInterval(interval.id, { repeat: !!checked })}
+                <div>
+                  <Label>Cadence Target (rpm)</Label>
+                  <Input
+                    placeholder="85-95"
+                    value={interval.cadenceTarget || ''}
+                    onChange={(e) => updateInterval(interval.id, { cadenceTarget: e.target.value })}
                   />
-                  <Label htmlFor={`repeat-${interval.id}`}>Repeat?</Label>
-                  {interval.repeat && (
-                    <Input
-                      type="number"
-                      min="1"
-                      className="w-20"
-                      placeholder="2"
-                      value={interval.repeatCount || ''}
-                      onChange={(e) => updateInterval(interval.id, { repeatCount: parseInt(e.target.value) || 1 })}
-                    />
-                  )}
                 </div>
               </div>
               
-              <Button type="button" onClick={addInterval} size="sm" variant="outline" className="w-full mt-4 border-gray-400 hover:bg-gray-100">
+              <div className="flex items-center space-x-2 mb-4">
+                <Checkbox
+                  id={`repeat-${interval.id}`}
+                  checked={interval.repeat || false}
+                  onCheckedChange={(checked) => updateInterval(interval.id, { repeat: !!checked })}
+                />
+                <Label htmlFor={`repeat-${interval.id}`}>Repeat?</Label>
+                {interval.repeat && (
+                  <Input
+                    type="number"
+                    min="1"
+                    className="w-20"
+                    placeholder="2"
+                    value={interval.repeatCount || ''}
+                    onChange={(e) => updateInterval(interval.id, { repeatCount: parseInt(e.target.value) || 1 })}
+                  />
+                )}
+              </div>
+              
+              <Button type="button" onClick={addInterval} size="sm" variant="outline" className="w-full border-gray-400 hover:bg-gray-100">
                 <Plus className="h-4 w-4 mr-2" />
                 New Interval
               </Button>

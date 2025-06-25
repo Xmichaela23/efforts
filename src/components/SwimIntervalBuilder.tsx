@@ -14,6 +14,7 @@ export interface SwimInterval {
   recoveryType: 'time' | 'distance';
   recovery: string;
   repeatCount: number;
+  duration?: number;
 }
 
 interface SwimIntervalBuilderProps {
@@ -23,14 +24,17 @@ interface SwimIntervalBuilderProps {
 }
 
 export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: SwimIntervalBuilderProps) {
-  const addInterval = () => {
+  const addInterval = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const newInterval: SwimInterval = {
       id: Date.now().toString(),
       distance: '',
       equipment: 'None',
       recoveryType: 'time',
       recovery: '',
-      repeatCount: 1
+      repeatCount: 1,
+      duration: 0
     };
     onChange([...intervals, newInterval]);
   };
@@ -41,7 +45,9 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
     ));
   };
 
-  const duplicateInterval = (id: string) => {
+  const duplicateInterval = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     const interval = intervals.find(i => i.id === id);
     if (interval) {
       const duplicate = { ...interval, id: Date.now().toString() };
@@ -49,7 +55,9 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
     }
   };
 
-  const deleteInterval = (id: string) => {
+  const deleteInterval = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     onChange(intervals.filter(interval => interval.id !== id));
   };
 
@@ -69,7 +77,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           Swimming Intervals
-          <Button onClick={addInterval} size="sm">
+          <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
             <Plus className="h-4 w-4 mr-2" />
             Add Interval
           </Button>
@@ -84,10 +92,10 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 <h4 className="font-medium">Interval {index + 1}</h4>
               </div>
               <div className="flex gap-2">
-                <Button onClick={() => duplicateInterval(interval.id)} size="sm" variant="outline">
+                <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
                   <Copy className="h-4 w-4" />
                 </Button>
-                <Button onClick={() => deleteInterval(interval.id)} size="sm" variant="outline">
+                <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -97,6 +105,8 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
               <div>
                 <Label>Distance ({isMetric ? 'meters' : 'yards'})</Label>
                 <Input
+                  name={`swim-distance-${interval.id}`}
+                  autoComplete="off"
                   placeholder="200"
                   value={interval.distance}
                   onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
@@ -108,6 +118,8 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                   type="number"
                   min="1"
                   max="10"
+                  name={`swim-rpe-${interval.id}`}
+                  autoComplete="off"
                   placeholder="5"
                   value={interval.targetRPE || ''}
                   onChange={(e) => updateInterval(interval.id, { targetRPE: parseInt(e.target.value) || undefined })}
@@ -118,7 +130,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 <Select value={interval.equipment} onValueChange={(value) => 
                   updateInterval(interval.id, { equipment: value })
                 }>
-                  <SelectTrigger>
+                  <SelectTrigger name={`swim-equipment-${interval.id}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -136,6 +148,8 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 <Input
                   type="number"
                   min="1"
+                  name={`swim-repeat-${interval.id}`}
+                  autoComplete="off"
                   value={interval.repeatCount}
                   onChange={(e) => updateInterval(interval.id, { repeatCount: parseInt(e.target.value) || 1 })}
                 />
@@ -148,7 +162,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 <Select value={interval.recoveryType} onValueChange={(value: 'time' | 'distance') => 
                   updateInterval(interval.id, { recoveryType: value })
                 }>
-                  <SelectTrigger>
+                  <SelectTrigger name={`swim-recovery-type-${interval.id}`}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -165,6 +179,8 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                   }
                 </Label>
                 <Input
+                  name={`swim-recovery-${interval.id}`}
+                  autoComplete="off"
                   placeholder={interval.recoveryType === 'time' ? '1:00' : '50'}
                   value={interval.recovery}
                   onChange={(e) => updateInterval(interval.id, { recovery: e.target.value })}

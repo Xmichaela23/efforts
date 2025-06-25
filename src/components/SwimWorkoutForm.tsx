@@ -47,10 +47,12 @@ const SwimWorkoutForm: React.FC<SwimWorkoutFormProps> = ({ swimData, onChange })
       </CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label htmlFor="totalDistance">Total Distance (meters)</Label>
+          <Label htmlFor="swim-total-distance">Total Distance (meters)</Label>
           <Input
-            id="totalDistance"
+            id="swim-total-distance"
+            name="swim-total-distance"
             type="number"
+            autoComplete="off"
             value={swimData.totalDistance}
             onChange={(e) => onChange({ 
               ...swimData, 
@@ -62,9 +64,11 @@ const SwimWorkoutForm: React.FC<SwimWorkoutFormProps> = ({ swimData, onChange })
         </div>
 
         <div>
-          <Label htmlFor="targetPace">Target Pace per 100m</Label>
+          <Label htmlFor="swim-target-pace">Target Pace per 100m</Label>
           <Input
-            id="targetPace"
+            id="swim-target-pace"
+            name="swim-target-pace"
+            autoComplete="off"
             value={swimData.targetPacePer100}
             onChange={(e) => onChange({ 
               ...swimData, 
@@ -75,14 +79,14 @@ const SwimWorkoutForm: React.FC<SwimWorkoutFormProps> = ({ swimData, onChange })
         </div>
 
         <div>
-          <Label htmlFor="strokeType">Stroke Type</Label>
+          <Label htmlFor="swim-stroke-type">Stroke Type</Label>
           <Select 
             value={swimData.strokeType} 
             onValueChange={(value: typeof STROKE_TYPES[number]) => 
               onChange({ ...swimData, strokeType: value })
             }
           >
-            <SelectTrigger>
+            <SelectTrigger id="swim-stroke-type" name="swim-stroke-type">
               <SelectValue placeholder="Select stroke type" />
             </SelectTrigger>
             <SelectContent>

@@ -3,10 +3,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Upload, Activity, Dumbbell } from 'lucide-react';
 import WorkoutMetrics from './WorkoutMetrics';
-import WorkoutCharts from './WorkoutCharts';
-import StrengthTracker from './StrengthTracker';
+import CompletedTab from './CompletedTab';
+import StrengthExerciseBuilder from './StrengthExerciseBuilder';
 
 interface WorkoutDetailProps {
   workout: {
@@ -38,57 +41,31 @@ interface WorkoutDetailProps {
     calories?: number;
     tss?: number;
     intensity_factor?: number;
+    comments?: string;
   };
   onUpdateWorkout: (workoutId: string, updates: any) => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout }) => {
-  const [garminFile, setGarminFile] = useState<File | null>(null);
+const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout, activeTab = 'summary', onTabChange }) => {
+  const [comments, setComments] = useState(workout.comments || '');
+  const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
 
-  const handleGarminUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setGarminFile(file);
-      // Simulate parsing Garmin data
-      const mockGarminData = {
-        distance: 10.5,
-        elapsed_time: 3600,
-        moving_time: 3500,
-        avg_heart_rate: 145,
-        max_heart_rate: 178,
-        avg_power: 250,
-        max_power: 450,
-        calories: 650,
-        elevation_gain: 200
-      };
-      onUpdateWorkout(workout.id, mockGarminData);
-    }
+  const handleCommentsChange = (value: string) => {
+    setComments(value);
+    onUpdateWorkout(workout.id, { comments: value });
   };
 
-  const handleStrengthUpdate = (exerciseId: string, setIndex: number, data: { reps: number; weight: number }) => {
-    const updatedExercises = workout.strength_exercises?.map(ex => {
-      if (ex.id === exerciseId) {
-        const updatedSets = [...(ex.completed_sets || [])];
-        updatedSets[setIndex] = { ...data, completed: false };
-        return { ...ex, completed_sets: updatedSets };
-      }
-      return ex;
-    }) || [];
-    onUpdateWorkout(workout.id, { strength_exercises: updatedExercises });
+  const handleStrengthExercisesChange = (exercises: any[]) => {
+    setStrengthExercises(exercises);
+    onUpdateWorkout(workout.id, { strength_exercises: exercises });
   };
 
-  const handleCompleteSet = (exerciseId: string, setIndex: number) => {
-    const updatedExercises = workout.strength_exercises?.map(ex => {
-      if (ex.id === exerciseId) {
-        const updatedSets = [...(ex.completed_sets || [])];
-        if (updatedSets[setIndex]) {
-          updatedSets[setIndex].completed = true;
-        }
-        return { ...ex, completed_sets: updatedSets };
-      }
-      return ex;
-    }) || [];
-    onUpdateWorkout(workout.id, { strength_exercises: updatedExercises });
+  const getWorkoutType = () => {
+    if (workout.name.toLowerCase().includes('run')) return 'running';
+    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'cycling';
+    return 'cycling'; // default
   };
 
   return (
@@ -110,62 +87,43 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout 
         </CardHeader>
       </Card>
 
-      <Tabs defaultValue={workout.type === 'endurance' ? 'metrics' : 'exercises'} className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="metrics">Metrics</TabsTrigger>
-          <TabsTrigger value="charts">Charts</TabsTrigger>
-          <TabsTrigger value="exercises">Exercises</TabsTrigger>
+      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="summary">Summary</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="metrics" className="space-y-4">
-          {workout.type === 'endurance' && !workout.distance && (
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-4">
-                  <Upload className="h-8 w-8 text-muted-foreground" />
-                  <div className="flex-1">
-                    <h3 className="font-medium">Upload Garmin Data</h3>
-                    <p className="text-sm text-muted-foreground">Upload your .fit or .tcx file from Garmin</p>
-                  </div>
-                  <Button asChild>
-                    <label htmlFor="garmin-upload" className="cursor-pointer">
-                      Choose File
-                      <input
-                        id="garmin-upload"
-                        type="file"
-                        accept=".fit,.tcx,.gpx"
-                        onChange={handleGarminUpload}
-                        className="hidden"
-                      />
-                    </label>
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+        <TabsContent value="summary" className="space-y-4">
           <WorkoutMetrics workout={workout} />
+          
+          <Card>
+            <CardHeader>
+              <CardTitle>Comments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Textarea
+                placeholder="Add your comments about this workout..."
+                value={comments}
+                onChange={(e) => handleCommentsChange(e.target.value)}
+                rows={4}
+              />
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="charts" className="space-y-4">
-          <WorkoutCharts 
-            timeSeriesData={workout.time_series_data}
-            heartRateZones={workout.heart_rate_zones}
-          />
-        </TabsContent>
-
-        <TabsContent value="exercises" className="space-y-4">
-          {workout.type === 'strength' && workout.strength_exercises ? (
-            <StrengthTracker
-              exercises={workout.strength_exercises}
-              onUpdateExercise={handleStrengthUpdate}
-              onCompleteSet={handleCompleteSet}
+        <TabsContent value="completed" className="space-y-4">
+          {workout.type === 'endurance' ? (
+            <CompletedTab 
+              workoutType={getWorkoutType()}
+              workoutData={workout}
             />
           ) : (
-            <Card>
-              <CardContent className="pt-6 text-center text-muted-foreground">
-                No exercises defined for this workout
-              </CardContent>
-            </Card>
+            <StrengthExerciseBuilder
+              exercises={strengthExercises}
+              onChange={handleStrengthExercisesChange}
+              isMetric={true}
+              isCompleted={true}
+            />
           )}
         </TabsContent>
       </Tabs>

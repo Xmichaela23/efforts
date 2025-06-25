@@ -75,103 +75,113 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
 
   return (
     <div className="w-full max-w-4xl mx-auto">
-      <Tabs defaultValue="basic" className="w-full">
-        {getTabsList()}
-        
-        <TabsContent value="basic">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Plus className="h-5 w-5" />
-                New Workout
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Workout Name</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Morning Run or Swim Session"
-                    required
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="type">Type</Label>
-                  <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') => 
-                    setFormData(prev => ({ ...prev, type: value }))
-                  }>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="run">Run</SelectItem>
-                      <SelectItem value="ride">Ride</SelectItem>
-                      <SelectItem value="strength">Strength</SelectItem>
-                      <SelectItem value="swim">Swim</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      <form autoComplete="off">
+        <Tabs defaultValue="basic" className="w-full">
+          {getTabsList()}
+          
+          <TabsContent value="basic">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Plus className="h-5 w-5" />
+                  New Workout
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="workout-name">Workout Name</Label>
+                    <Input
+                      id="workout-name"
+                      name="workout-name"
+                      autoComplete="off"
+                      value={formData.name}
+                      onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                      placeholder="Morning Run or Swim Session"
+                      required
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="workout-type">Type</Label>
+                    <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') => 
+                      setFormData(prev => ({ ...prev, type: value }))
+                    }>
+                      <SelectTrigger id="workout-type" name="workout-type">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="run">Run</SelectItem>
+                        <SelectItem value="ride">Ride</SelectItem>
+                        <SelectItem value="strength">Strength</SelectItem>
+                        <SelectItem value="swim">Swim</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-                <div>
-                  <Label htmlFor="duration">Duration (minutes)</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    value={formData.duration}
-                    onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
-                    min="1"
-                    required
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="workout-duration">Duration (minutes)</Label>
+                    <Input
+                      id="workout-duration"
+                      name="workout-duration"
+                      type="number"
+                      autoComplete="off"
+                      value={formData.duration}
+                      onChange={(e) => setFormData(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
+                      min="1"
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="date">Date</Label>
-                  <Input
-                    id="date"
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                    required
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="workout-date">Date</Label>
+                    <Input
+                      id="workout-date"
+                      name="workout-date"
+                      type="date"
+                      autoComplete="off"
+                      value={formData.date}
+                      onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                      required
+                    />
+                  </div>
 
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Workout details..."
-                  />
-                </div>
+                  <div>
+                    <Label htmlFor="workout-description">Description</Label>
+                    <Textarea
+                      id="workout-description"
+                      name="workout-description"
+                      autoComplete="off"
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Workout details..."
+                    />
+                  </div>
 
-                <div className="flex gap-2">
-                  <Button type="submit" className="flex-1">Create Workout</Button>
-                  <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                  <div className="flex gap-2">
+                    <Button type="button" onClick={handleSubmit} className="flex-1">Create Workout</Button>
+                    <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                  </div>
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-        </TabsContent>
-        
-        {formData.type === 'swim' ? (
-          <TabsContent value="swim">
-            <SwimWorkoutForm swimData={swimData} onChange={setSwimData} />
+              </CardContent>
+            </Card>
           </TabsContent>
-        ) : (
-          <TabsContent value="intervals">
-            <WorkoutIntervals intervals={intervals} onChange={setIntervals} />
+          
+          {formData.type === 'swim' ? (
+            <TabsContent value="swim">
+              <SwimWorkoutForm swimData={swimData} onChange={setSwimData} />
+            </TabsContent>
+          ) : (
+            <TabsContent value="intervals">
+              <WorkoutIntervals intervals={intervals} onChange={setIntervals} />
+            </TabsContent>
+          )}
+          
+          <TabsContent value="export">
+            <GarminExport workoutName={formData.name} intervals={intervals} />
           </TabsContent>
-        )}
-        
-        <TabsContent value="export">
-          <GarminExport workoutName={formData.name} intervals={intervals} />
-        </TabsContent>
-      </Tabs>
+        </Tabs>
+      </form>
     </div>
   );
 }

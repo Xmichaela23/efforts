@@ -37,6 +37,8 @@ interface AppContextType {
   loading: boolean;
   addWorkout: (workout: Omit<Workout, 'id'>) => Promise<any>;
   deleteWorkout: (id: string) => Promise<void>;
+  useImperial: boolean;
+  toggleUnits: () => void;
 }
 
 const defaultAppContext: AppContextType = {
@@ -46,6 +48,8 @@ const defaultAppContext: AppContextType = {
   loading: false,
   addWorkout: async () => {},
   deleteWorkout: async () => {},
+  useImperial: true,
+  toggleUnits: () => {},
 };
 
 const AppContext = createContext<AppContextType>(defaultAppContext);
@@ -54,10 +58,15 @@ export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [useImperial, setUseImperial] = useState(true);
   const { workouts, loading, addWorkout, deleteWorkout } = useWorkouts();
 
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
+  };
+
+  const toggleUnits = () => {
+    setUseImperial(prev => !prev);
   };
 
   return (
@@ -69,6 +78,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         loading,
         addWorkout,
         deleteWorkout,
+        useImperial,
+        toggleUnits,
       }}
     >
       {children}

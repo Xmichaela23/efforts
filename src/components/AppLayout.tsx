@@ -1,17 +1,19 @@
 import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
-import { Menu } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Menu, User, Upload, Settings } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 
 const AppLayout: React.FC = () => {
-  const { workouts, loading } = useAppContext();
+  const { workouts, loading, useImperial, toggleUnits } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<string>('planned');
 
   const handleWorkoutSelect = (workout: any) => {
     setSelectedWorkout(workout);
@@ -25,6 +27,7 @@ const AppLayout: React.FC = () => {
     setShowBuilder(false);
     setSelectedWorkout(null);
     setBuilderType('');
+    setActiveTab('planned');
   };
 
   const handleAddEffort = () => {
@@ -36,35 +39,59 @@ const AppLayout: React.FC = () => {
     setShowBuilder(true);
   };
 
+  const handleViewCompleted = () => {
+    setActiveTab('completed');
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p style={{fontFamily: 'Helvetica, Arial, sans-serif'}}>Loading workouts...</p>
+          <div className="animate-spin h-8 w-8 border-b-2 border-black mx-auto mb-4" style={{borderRadius: 0}}></div>
+          <p className="font-medium text-black" style={{fontFamily: 'Inter, sans-serif', letterSpacing: '0.02em'}}>Loading workouts...</p>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-white">
+      <header className="bg-white border-b border-[#E5E5E5]">
+        <div className="max-w-7xl mx-auto px-6">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Menu className="h-6 w-6 mr-3" />
-              <img 
-                src="https://d64gsuwffb70l.cloudfront.net/685966bdc8eab861425f2afc_1750787561575_b9cfca50.png" 
-                alt="Efforts Logo" 
-                className="h-36 w-auto max-w-[576px] object-contain"
-              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    className="p-2 bg-white text-black border border-black hover:bg-black hover:text-white" 
+                    style={{borderRadius: 0, fontFamily: 'Inter, sans-serif', fontWeight: 500}}
+                  >
+                    <Menu className="h-6 w-6" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="bg-white border border-black" style={{borderRadius: 0}}>
+                  <DropdownMenuItem className="hover:bg-black hover:text-white">
+                    <User className="mr-2 h-4 w-4" />
+                    Profile
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="hover:bg-black hover:text-white">
+                    <Upload className="mr-2 h-4 w-4" />
+                    Import
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="hover:bg-black hover:text-white" onClick={toggleUnits}>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Units: {useImperial ? 'Imperial' : 'Metric'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <div className="ml-6">
+                <h1 className="text-black lowercase" style={{fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '28px', letterSpacing: '0.03em'}}>efforts</h1>
+              </div>
               {(selectedWorkout || showBuilder) && (
                 <Button 
-                  variant="ghost" 
                   onClick={handleBackToDashboard}
-                  className="ml-4"
-                  style={{fontFamily: 'Helvetica, Arial, sans-serif'}}
+                  className="ml-8 bg-white text-black border border-black hover:bg-black hover:text-white"
+                  style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, borderRadius: 0, padding: '12px 24px'}}
                 >
                   ← Back
                 </Button>
@@ -74,20 +101,23 @@ const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {showBuilder ? (
           <WorkoutBuilder onClose={handleBackToDashboard} initialType={builderType} />
         ) : selectedWorkout ? (
           <WorkoutDetail 
             workout={selectedWorkout} 
             onUpdateWorkout={handleUpdateWorkout}
+            activeTab={activeTab}
+            onTabChange={setActiveTab}
           />
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-8">
             <WorkoutCalendar 
               onAddEffort={handleAddEffort}
               onSelectType={handleSelectEffortType}
               onSelectWorkout={handleWorkoutSelect}
+              onViewCompleted={handleViewCompleted}
             />
             <div className="flex justify-end">
               <div className="w-64">

@@ -19,9 +19,10 @@ interface WorkoutCalendarProps {
   onAddEffort: () => void;
   onSelectType: (type: string) => void;
   onSelectWorkout: (workout: any) => void;
+  onViewCompleted: () => void;
 }
 
-export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWorkout }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWorkout, onViewCompleted }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
@@ -71,25 +72,34 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
         onAddEffort={onAddEffort}
         onSelectType={onSelectType}
         onSelectWorkout={onSelectWorkout}
+        onViewCompleted={onViewCompleted}
       />
       
-      <Card className="w-full">
+      <Card className="w-full border border-black" style={{borderRadius: 0}}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
-            <Button variant="outline" size="sm" onClick={() => navigateMonth(-1)}>
-              <ChevronLeft className="h-4 w-4" />
+            <Button 
+              className="bg-white text-black border-none hover:bg-black hover:text-white p-3"
+              style={{borderRadius: 0, minWidth: '44px', minHeight: '44px'}}
+              onClick={() => navigateMonth(-1)}
+            >
+              <ChevronLeft className="h-5 w-5" strokeWidth={1} />
             </Button>
-            <h3 className="text-lg font-normal" style={{fontFamily: 'Helvetica, Arial, sans-serif'}}>
+            <h3 className="text-lg font-normal" style={{fontFamily: 'Inter, sans-serif'}}>
               {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
             </h3>
-            <Button variant="outline" size="sm" onClick={() => navigateMonth(1)}>
-              <ChevronRight className="h-4 w-4" />
+            <Button 
+              className="bg-white text-black border-none hover:bg-black hover:text-white p-3"
+              style={{borderRadius: 0, minWidth: '44px', minHeight: '44px'}}
+              onClick={() => navigateMonth(1)}
+            >
+              <ChevronRight className="h-5 w-5" strokeWidth={1} />
             </Button>
           </div>
           
           <div className="grid grid-cols-7 gap-1">
             {DAYS.map(day => (
-              <div key={day} className="p-2 text-center font-normal text-sm text-muted-foreground" style={{fontFamily: 'Helvetica, Arial, sans-serif'}}>
+              <div key={day} className="p-2 text-center font-normal text-sm text-[#666666]" style={{fontFamily: 'Inter, sans-serif'}}>
                 {day}
               </div>
             ))}
@@ -98,21 +108,22 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
               return (
                 <div
                   key={index}
-                  className={`min-h-[80px] p-1 border rounded-sm ${
-                    day ? 'bg-background hover:bg-muted cursor-pointer' : ''
+                  className={`min-h-[40px] p-1 border border-black ${
+                    day ? 'bg-white hover:bg-black hover:text-white cursor-pointer' : ''
                   }`}
+                  style={{borderRadius: 0}}
                 >
                   {day && (
                     <>
-                      <div className="text-sm font-normal mb-1" style={{fontFamily: 'Helvetica, Arial, sans-serif'}}>{day}</div>
+                      <div className="text-sm font-normal mb-1" style={{fontFamily: 'Inter, sans-serif'}}>{day}</div>
                       <div className="space-y-1">
                         {dayWorkouts.map(workout => (
                           <div
                             key={workout.id}
-                            className={`text-xs p-1 rounded text-white truncate ${
+                            className={`text-xs p-1 text-white truncate ${
                               DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS]
                             } ${workout.completed_manually ? 'opacity-60' : ''}`}
-                            style={{fontFamily: 'Helvetica, Arial, sans-serif'}}
+                            style={{fontFamily: 'Inter, sans-serif', borderRadius: 0}}
                             onClick={() => onSelectWorkout(workout)}
                           >
                             {workout.name}
@@ -125,6 +136,29 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
                 </div>
               );
             })}
+          </div>
+          
+          <div className="flex justify-center mt-4">
+            <div className="flex" style={{gap: 0}}>
+              <Button
+                className={`text-xs px-3 py-1 h-8 border border-black ${
+                  viewMode === 'month' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white'
+                }`}
+                onClick={() => setViewMode('month')}
+                style={{fontFamily: 'Inter, sans-serif', borderRadius: 0, borderRight: 'none'}}
+              >
+                Month
+              </Button>
+              <Button
+                className={`text-xs px-3 py-1 h-8 border border-black ${
+                  viewMode === 'week' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white'
+                }`}
+                onClick={() => setViewMode('week')}
+                style={{fontFamily: 'Inter, sans-serif', borderRadius: 0}}
+              >
+                Week
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>
