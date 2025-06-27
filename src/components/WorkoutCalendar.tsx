@@ -20,9 +20,10 @@ interface WorkoutCalendarProps {
   onSelectType: (type: string) => void;
   onSelectWorkout: (workout: any) => void;
   onViewCompleted: () => void;
+  onEditEffort: (workout: any) => void;
 }
 
-export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWorkout, onViewCompleted }: WorkoutCalendarProps) {
+export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWorkout, onViewCompleted, onEditEffort }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week'>('month');
@@ -42,17 +43,17 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
     const startingDayOfWeek = firstDay.getDay();
-    
+
     const days = [];
-    
+
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
-    
+
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(day);
     }
-    
+
     return days;
   };
 
@@ -66,29 +67,32 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
 
   return (
     <div className="w-full">
-      <CalendarHeader 
+      <CalendarHeader
         viewMode={viewMode}
         onViewModeChange={setViewMode}
         onAddEffort={onAddEffort}
         onSelectType={onSelectType}
         onSelectWorkout={onSelectWorkout}
         onViewCompleted={onViewCompleted}
+        onEditEffort={onEditEffort}
       />
-      
+
       <Card className="w-full border border-black" style={{borderRadius: 0}}>
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
-            <Button 
+            <Button
               className="bg-white text-black border-none hover:bg-black hover:text-white p-3"
               style={{borderRadius: 0, minWidth: '44px', minHeight: '44px'}}
               onClick={() => navigateMonth(-1)}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={1} />
             </Button>
+            
             <h3 className="text-lg font-normal" style={{fontFamily: 'Inter, sans-serif'}}>
               {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
             </h3>
-            <Button 
+            
+            <Button
               className="bg-white text-black border-none hover:bg-black hover:text-white p-3"
               style={{borderRadius: 0, minWidth: '44px', minHeight: '44px'}}
               onClick={() => navigateMonth(1)}
@@ -96,13 +100,14 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
               <ChevronRight className="h-5 w-5" strokeWidth={1} />
             </Button>
           </div>
-          
+
           <div className="grid grid-cols-7 gap-1">
             {DAYS.map(day => (
               <div key={day} className="p-2 text-center font-normal text-sm text-[#666666]" style={{fontFamily: 'Inter, sans-serif'}}>
                 {day}
               </div>
             ))}
+            
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
               return (
@@ -137,7 +142,7 @@ export default function WorkoutCalendar({ onAddEffort, onSelectType, onSelectWor
               );
             })}
           </div>
-          
+
           <div className="flex justify-center mt-4">
             <div className="flex" style={{gap: 0}}>
               <Button

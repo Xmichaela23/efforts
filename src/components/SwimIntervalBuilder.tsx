@@ -40,7 +40,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
   };
 
   const updateInterval = (id: string, updates: Partial<SwimInterval>) => {
-    onChange(intervals.map(interval => 
+    onChange(intervals.map(interval =>
       interval.id === id ? { ...interval, ...updates } : interval
     ));
   };
@@ -65,8 +65,8 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
     const rpe = interval.targetRPE ? ` @ RPE ${interval.targetRPE}` : '';
     const equipment = interval.equipment !== 'None' ? ` w/ ${interval.equipment.toLowerCase()}` : '';
     const distanceUnit = isMetric ? 'm' : 'yd';
-    const recovery = interval.recoveryType === 'time' ? 
-      `${interval.recovery} rest` : 
+    const recovery = interval.recoveryType === 'time' ?
+      `${interval.recovery} rest` :
       `${interval.recovery}${distanceUnit} recovery`;
     
     return `${interval.repeatCount} x ${interval.distance}${distanceUnit}${rpe}${equipment} + ${recovery}`;
@@ -76,10 +76,10 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          Swimming Intervals
+          Segments
           <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
             <Plus className="h-4 w-4 mr-2" />
-            Add Interval
+            Add Segment
           </Button>
         </CardTitle>
       </CardHeader>
@@ -89,7 +89,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-medium">Interval {index + 1}</h4>
+                <h4 className="font-medium">Segment {index + 1}</h4>
               </div>
               <div className="flex gap-2">
                 <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
@@ -127,7 +127,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
               </div>
               <div>
                 <Label>Equipment</Label>
-                <Select value={interval.equipment} onValueChange={(value) => 
+                <Select value={interval.equipment} onValueChange={(value) =>
                   updateInterval(interval.id, { equipment: value })
                 }>
                   <SelectTrigger name={`swim-equipment-${interval.id}`}>
@@ -159,7 +159,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
               <div>
                 <Label>Recovery Type</Label>
-                <Select value={interval.recoveryType} onValueChange={(value: 'time' | 'distance') => 
+                <Select value={interval.recoveryType} onValueChange={(value: 'time' | 'distance') =>
                   updateInterval(interval.id, { recoveryType: value })
                 }>
                   <SelectTrigger name={`swim-recovery-type-${interval.id}`}>
@@ -173,8 +173,8 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
               </div>
               <div>
                 <Label>
-                  {interval.recoveryType === 'time' 
-                    ? 'Recovery Time (mm:ss)' 
+                  {interval.recoveryType === 'time'
+                    ? 'Recovery Time (mm:ss)'
                     : `Recovery Distance (${isMetric ? 'm' : 'yd'})`
                   }
                 </Label>
@@ -196,7 +196,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
         
         {intervals.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
-            No intervals added yet. Click "Add Interval" to get started.
+            No segments added yet. Click "Add Segment" to get started.
           </div>
         )}
       </CardContent>

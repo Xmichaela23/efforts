@@ -1,10 +1,8 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import React from 'react';
+import { useAppContext } from '@/contexts/AppContext';
+import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
+import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
+import StrengthExerciseBuilder, { StrengthExercise } from './StrengthExerciseBuilder';
 
 export interface WorkoutInterval {
   id: string;
@@ -20,161 +18,146 @@ export interface WorkoutInterval {
 interface WorkoutIntervalsProps {
   intervals: WorkoutInterval[];
   onChange: (intervals: WorkoutInterval[]) => void;
+  workoutType?: 'run' | 'ride' | 'strength' | 'swim';
 }
 
-const WorkoutIntervals: React.FC<WorkoutIntervalsProps> = ({ intervals, onChange }) => {
-  const [newInterval, setNewInterval] = useState<Partial<WorkoutInterval>>({
-    name: '',
-    duration: 0,
-    durationType: 'time',
-    intensityType: 'heartRate',
-    intensityMin: 0,
-    intensityMax: 0,
-  });
-
-  const addInterval = () => {
-    if (newInterval.name && newInterval.duration && newInterval.intensityMin && newInterval.intensityMax) {
-      const interval: WorkoutInterval = {
-        id: Date.now().toString(),
-        name: newInterval.name,
-        duration: newInterval.duration,
-        durationType: newInterval.durationType || 'time',
-        intensityType: newInterval.intensityType || 'heartRate',
-        intensityMin: newInterval.intensityMin,
-        intensityMax: newInterval.intensityMax,
-        description: newInterval.description,
+const WorkoutIntervals: React.FC<WorkoutIntervalsProps> = ({ intervals, onChange, workoutType = 'run' }) => {
+  const { useImperial } = useAppContext();
+  
+  // Convert generic intervals to specific types
+  const runIntervals: RunInterval[] = intervals.map(interval => ({
+    id: interval.id,
+    time: interval.durationType === 'time' ? `${Math.floor(interval.duration / 60)}:${(interval.duration % 60).toString().padStart(2, '0')}` : '',
+    distance: interval.durationType === 'distance' ? interval.duration.toString() : '',
+    paceTarget: interval.intensityType === 'pace' ? `${interval.intensityMin}-${interval.intensityMax}` : '',
+    bpmTarget: interval.intensityType === 'heartRate' ? `${interval.intensityMin}-${interval.intensityMax}` : '',
+    rpeTarget: interval.intensityType === 'rpe' ? `${interval.intensityMin}-${interval.intensityMax}` : '',
+    duration: interval.duration
+  }));
+  
+  const rideIntervals: RideInterval[] = intervals.map(interval => ({
+    id: interval.id,
+    time: interval.durationType === 'time' ? `${Math.floor(interval.duration / 60)}:${(interval.duration % 60).toString().padStart(2, '0')}` : '',
+    distance: interval.durationType === 'distance' ? interval.duration.toString() : '',
+    powerTarget: interval.intensityType === 'power' ? `${interval.intensityMin}-${interval.intensityMax}` : '',
+    bpmTarget: interval.intensityType === 'heartRate' ? `${interval.intensityMin}-${interval.intensityMax}` : '',
+    rpeTarget: interval.intensityType === 'rpe' ? `${interval.intensityMin}-${interval.intensityMax}` : '',
+    cadenceTarget: '',
+    duration: interval.duration
+  }));
+  
+  const strengthExercises: StrengthExercise[] = [
+    {
+      id: '1',
+      name: 'Squats',
+      sets: 3,
+      reps: 10,
+      weight: useImperial ? 185 : 85,
+      weightMode: 'same',
+      completed_sets: Array(3).fill({ reps: 0, weight: 0, rir: 0, completed: false })
+    }
+  ];
+  
+  const handleRunIntervalsChange = (newIntervals: RunInterval[]) => {
+    const converted: WorkoutInterval[] = newIntervals.map(interval => {
+      const duration = interval.duration || 0;
+      let intensityMin = 0, intensityMax = 0, intensityType: 'heartRate' | 'power' | 'pace' | 'rpe' = 'heartRate';
+      
+      if (interval.bpmTarget) {
+        const [min, max] = interval.bpmTarget.split('-').map(Number);
+        intensityMin = min || 0;
+        intensityMax = max || min || 0;
+        intensityType = 'heartRate';
+      } else if (interval.paceTarget) {
+        intensityType = 'pace';
+      } else if (interval.rpeTarget) {
+        intensityType = 'rpe';
+      }
+      
+      return {
+        id: interval.id,
+        name: `Interval ${interval.id}`,
+        duration,
+        durationType: interval.distance ? 'distance' : 'time',
+        intensityType,
+        intensityMin,
+        intensityMax
       };
-      onChange([...intervals, interval]);
-      setNewInterval({
-        name: '',
-        duration: 0,
-        durationType: 'time',
-        intensityType: 'heartRate',
-        intensityMin: 0,
-        intensityMax: 0,
-      });
-    }
+    });
+    onChange(converted);
   };
-
-  const removeInterval = (id: string) => {
-    onChange(intervals.filter(interval => interval.id !== id));
+  
+  const handleRideIntervalsChange = (newIntervals: RideInterval[]) => {
+    const converted: WorkoutInterval[] = newIntervals.map(interval => {
+      const duration = interval.duration || 0;
+      let intensityMin = 0, intensityMax = 0, intensityType: 'heartRate' | 'power' | 'pace' | 'rpe' = 'power';
+      
+      if (interval.powerTarget) {
+        const [min, max] = interval.powerTarget.split('-').map(Number);
+        intensityMin = min || 0;
+        intensityMax = max || min || 0;
+        intensityType = 'power';
+      } else if (interval.bpmTarget) {
+        const [min, max] = interval.bpmTarget.split('-').map(Number);
+        intensityMin = min || 0;
+        intensityMax = max || min || 0;
+        intensityType = 'heartRate';
+      } else if (interval.rpeTarget) {
+        intensityType = 'rpe';
+      }
+      
+      return {
+        id: interval.id,
+        name: `Interval ${interval.id}`,
+        duration,
+        durationType: interval.distance ? 'distance' : 'time',
+        intensityType,
+        intensityMin,
+        intensityMax
+      };
+    });
+    onChange(converted);
   };
-
-  const getIntensityUnit = (type: string) => {
-    switch (type) {
-      case 'heartRate': return 'BPM';
-      case 'power': return 'W';
-      case 'pace': return 'min/km';
-      case 'rpe': return 'RPE';
-      default: return '';
-    }
+  
+  const handleStrengthExercisesChange = (exercises: StrengthExercise[]) => {
+    // For strength, we don't need to convert to intervals
+    // This will be handled separately in the parent component
   };
-
+  
+  if (workoutType === 'run') {
+    return (
+      <RunIntervalBuilder 
+        intervals={runIntervals} 
+        onChange={handleRunIntervalsChange} 
+        isMetric={!useImperial}
+      />
+    );
+  }
+  
+  if (workoutType === 'ride') {
+    return (
+      <RideIntervalBuilder 
+        intervals={rideIntervals} 
+        onChange={handleRideIntervalsChange} 
+        isMetric={!useImperial}
+      />
+    );
+  }
+  
+  if (workoutType === 'strength') {
+    return (
+      <StrengthExerciseBuilder 
+        exercises={strengthExercises} 
+        onChange={handleStrengthExercisesChange} 
+        isMetric={!useImperial}
+      />
+    );
+  }
+  
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Workout Intervals</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {intervals.map((interval) => (
-          <div key={interval.id} className="p-3 border rounded-lg">
-            <div className="flex justify-between items-start">
-              <div>
-                <h4 className="font-medium">{interval.name}</h4>
-                <p className="text-sm text-gray-600">
-                  {interval.duration} {interval.durationType === 'time' ? 'min' : 'km'} | 
-                  {interval.intensityMin}-{interval.intensityMax} {getIntensityUnit(interval.intensityType)}
-                </p>
-                {interval.description && (
-                  <p className="text-sm text-gray-500 mt-1">{interval.description}</p>
-                )}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => removeInterval(interval.id)}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
-
-        <div className="border-t pt-4">
-          <h4 className="font-medium mb-3">Add Interval</h4>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={newInterval.name || ''}
-                onChange={(e) => setNewInterval(prev => ({ ...prev, name: e.target.value }))}
-                placeholder="Warm up"
-              />
-            </div>
-            <div>
-              <Label>Duration</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  value={newInterval.duration || ''}
-                  onChange={(e) => setNewInterval(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
-                />
-                <Select
-                  value={newInterval.durationType}
-                  onValueChange={(value: 'time' | 'distance') => setNewInterval(prev => ({ ...prev, durationType: value }))}
-                >
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="time">min</SelectItem>
-                    <SelectItem value="distance">km</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div>
-              <Label>Intensity Type</Label>
-              <Select
-                value={newInterval.intensityType}
-                onValueChange={(value: any) => setNewInterval(prev => ({ ...prev, intensityType: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="heartRate">Heart Rate</SelectItem>
-                  <SelectItem value="power">Power</SelectItem>
-                  <SelectItem value="pace">Pace</SelectItem>
-                  <SelectItem value="rpe">RPE</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>Intensity Range</Label>
-              <div className="flex gap-2">
-                <Input
-                  type="number"
-                  value={newInterval.intensityMin || ''}
-                  onChange={(e) => setNewInterval(prev => ({ ...prev, intensityMin: parseInt(e.target.value) || 0 }))}
-                  placeholder="Min"
-                />
-                <Input
-                  type="number"
-                  value={newInterval.intensityMax || ''}
-                  onChange={(e) => setNewInterval(prev => ({ ...prev, intensityMax: parseInt(e.target.value) || 0 }))}
-                  placeholder="Max"
-                />
-              </div>
-            </div>
-          </div>
-          <Button onClick={addInterval} className="mt-3" size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Interval
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="text-center py-8 text-muted-foreground">
+      Select a workout type to configure details.
+    </div>
   );
 };
 

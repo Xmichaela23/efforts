@@ -14,6 +14,7 @@ const AppLayout: React.FC = () => {
   const [builderType, setBuilderType] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('planned');
+  const [editingWorkout, setEditingWorkout] = useState<any>(null); // Add this line
 
   const handleWorkoutSelect = (workout: any) => {
     setSelectedWorkout(workout);
@@ -28,19 +29,29 @@ const AppLayout: React.FC = () => {
     setSelectedWorkout(null);
     setBuilderType('');
     setActiveTab('planned');
+    setEditingWorkout(null); // Add this line
   };
 
   const handleAddEffort = () => {
+    setEditingWorkout(null); // Clear any existing workout
     setShowBuilder(true);
   };
 
   const handleSelectEffortType = (type: string) => {
     setBuilderType(type);
+    setEditingWorkout(null); // Clear any existing workout
     setShowBuilder(true);
   };
 
   const handleViewCompleted = () => {
     setActiveTab('completed');
+  };
+
+  // Add this new function
+  const handleEditEffort = (workout: any) => {
+    setEditingWorkout(workout);
+    setBuilderType(workout.type);
+    setShowBuilder(true);
   };
 
   if (loading) {
@@ -103,7 +114,11 @@ const AppLayout: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {showBuilder ? (
-          <WorkoutBuilder onClose={handleBackToDashboard} initialType={builderType} />
+          <WorkoutBuilder 
+            onClose={handleBackToDashboard} 
+            initialType={builderType}
+            existingWorkout={editingWorkout} // Add this line
+          />
         ) : selectedWorkout ? (
           <WorkoutDetail 
             workout={selectedWorkout} 
@@ -118,6 +133,7 @@ const AppLayout: React.FC = () => {
               onSelectType={handleSelectEffortType}
               onSelectWorkout={handleWorkoutSelect}
               onViewCompleted={handleViewCompleted}
+              onEditEffort={handleEditEffort} // Add this line
             />
             <div className="flex justify-end">
               <div className="w-64">

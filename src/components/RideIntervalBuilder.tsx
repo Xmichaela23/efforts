@@ -10,8 +10,10 @@ export interface RideInterval {
   id: string;
   time?: string;
   distance?: string;
+  speedTarget?: string;
   powerTarget?: string;
   bpmTarget?: string;
+  rpeTarget?: string;
   cadenceTarget?: string;
   repeat?: boolean;
   repeatCount?: number;
@@ -42,7 +44,7 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
   };
 
   const updateInterval = (id: string, updates: Partial<RideInterval>) => {
-    onChange(intervals.map(interval => 
+    onChange(intervals.map(interval =>
       interval.id === id ? { ...interval, ...updates } : interval
     ));
   };
@@ -63,8 +65,22 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
     onChange(intervals.filter(interval => interval.id !== id));
   };
 
+  const handleRepeatChange = (id: string, checked: boolean) => {
+    if (checked) {
+      const interval = intervals.find(i => i.id === id);
+      if (interval) {
+        const duplicate = { ...interval, id: (Date.now() + 1).toString(), repeat: false };
+        const intervalIndex = intervals.findIndex(i => i.id === id);
+        const newIntervals = [...intervals];
+        newIntervals.splice(intervalIndex + 1, 0, duplicate);
+        onChange(newIntervals);
+      }
+    }
+    updateInterval(id, { repeat: checked });
+  };
+
   const toggleIntervalSelection = (id: string) => {
-    setSelectedIntervals(prev => 
+    setSelectedIntervals(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -98,10 +114,10 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
-            Ride Intervals
-            <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
+            Segments
+            <Button type="button" onClick={addInterval} size="sm" className="bg-black text-white hover:bg-gray-800">
               <Plus className="h-4 w-4 mr-2" />
-              Add Interval
+              Add Segment
             </Button>
           </CardTitle>
         </CardHeader>
@@ -116,16 +132,16 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
                 <h4 className="font-medium flex-1">Segment {index + 1}</h4>
                 <div className="flex gap-2">
-                  <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
+                  <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
                     <Copy className="h-4 w-4" />
                   </Button>
-                  <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
+                  <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+              <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <Label>Time (mm:ss)</Label>
                   <Input
@@ -145,6 +161,17 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                     placeholder="10.0"
                     value={interval.distance || ''}
                     onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <Label>Speed Target ({isMetric ? 'km/h' : 'mph'})</Label>
+                  <Input
+                    placeholder={isMetric ? "25-30" : "18-20"}
+                    value={interval.speedTarget || ''}
+                    onChange={(e) => updateInterval(interval.id, { speedTarget: e.target.value })}
                   />
                 </div>
                 <div>
@@ -167,6 +194,17 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                   />
                 </div>
                 <div>
+                  <Label>RPE Target</Label>
+                  <Input
+                    placeholder="1-10 or easy/moderate/hard"
+                    value={interval.rpeTarget || ''}
+                    onChange={(e) => updateInterval(interval.id, { rpeTarget: e.target.value })}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4 mb-4">
+                <div>
                   <Label>Cadence Target (rpm)</Label>
                   <Input
                     placeholder="85-95"
@@ -180,31 +218,21 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                 <Checkbox
                   id={`repeat-${interval.id}`}
                   checked={interval.repeat || false}
-                  onCheckedChange={(checked) => updateInterval(interval.id, { repeat: !!checked })}
+                  onCheckedChange={(checked) => handleRepeatChange(interval.id, !!checked)}
                 />
                 <Label htmlFor={`repeat-${interval.id}`}>Repeat?</Label>
-                {interval.repeat && (
-                  <Input
-                    type="number"
-                    min="1"
-                    className="w-20"
-                    placeholder="2"
-                    value={interval.repeatCount || ''}
-                    onChange={(e) => updateInterval(interval.id, { repeatCount: parseInt(e.target.value) || 1 })}
-                  />
-                )}
               </div>
               
-              <Button type="button" onClick={addInterval} size="sm" variant="outline" className="w-full border-gray-400 hover:bg-gray-100">
+              <Button type="button" onClick={addInterval} size="sm" variant="outline" className="w-full border-black hover:bg-gray-100">
                 <Plus className="h-4 w-4 mr-2" />
-                New Interval
+                New Segment
               </Button>
             </Card>
           ))}
           
           {intervals.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
-              No intervals added yet. Click "Add Interval" to get started.
+              No segments added yet. Click "Add Segment" to get started.
             </div>
           )}
         </CardContent>
@@ -212,7 +240,7 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
       
       {selectedIntervals.length > 0 && (
         <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-background border rounded-lg shadow-lg p-4 flex items-center gap-4">
-          <span className="text-sm">{selectedIntervals.length} intervals selected</span>
+          <span className="text-sm">{selectedIntervals.length} segments selected</span>
           <Input
             type="number"
             min="2"
@@ -220,7 +248,7 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
             value={blockRepeatCount}
             onChange={(e) => setBlockRepeatCount(parseInt(e.target.value) || 2)}
           />
-          <Button type="button" onClick={createBlock} size="sm" className="bg-gray-500 hover:bg-gray-600">
+          <Button type="button" onClick={createBlock} size="sm" className="bg-black text-white hover:bg-gray-800">
             <Repeat className="h-4 w-4 mr-2" />
             Repeat this block
           </Button>

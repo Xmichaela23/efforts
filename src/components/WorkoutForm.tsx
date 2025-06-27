@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import WorkoutIntervals, { WorkoutInterval } from './WorkoutIntervals';
 import SwimWorkoutForm from './SwimWorkoutForm';
 import GarminExport from './GarminExport';
@@ -18,13 +19,14 @@ interface WorkoutFormProps {
 }
 
 export default function WorkoutForm({ onClose }: WorkoutFormProps) {
-  const { addWorkout } = useAppContext();
+  const { addWorkout, useImperial } = useAppContext();
   const [formData, setFormData] = useState({
     name: '',
     type: 'run' as 'run' | 'ride' | 'strength' | 'swim',
     duration: 0,
     date: new Date().toISOString().split('T')[0],
     description: '',
+    comments: ''
   });
   const [intervals, setIntervals] = useState<WorkoutInterval[]>([]);
   const [swimData, setSwimData] = useState<SwimWorkoutData>({
@@ -34,10 +36,35 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
     equipmentUsed: []
   });
   const [strengthExercises, setStrengthExercises] = useState([
-    { id: '1', name: 'Squats', sets: 5, reps: 5, weight: 100, completed_sets: Array(5).fill({ reps: 0, weight: 0, completed: false }) },
-    { id: '2', name: 'Overhead Press', sets: 5, reps: 5, weight: 60, completed_sets: Array(5).fill({ reps: 0, weight: 0, completed: false }) },
-    { id: '3', name: 'Barbell Rows', sets: 5, reps: 5, weight: 80, completed_sets: Array(5).fill({ reps: 0, weight: 0, completed: false }) }
+    { id: '1', name: 'Squats', sets: 5, reps: 5, weight: 100, weightMode: 'same', completed_sets: Array(5).fill({ reps: 0, weight: 0, rir: 0, completed: false }) },
+    { id: '2', name: 'Overhead Press', sets: 5, reps: 5, weight: 60, weightMode: 'same', completed_sets: Array(5).fill({ reps: 0, weight: 0, rir: 0, completed: false }) },
+    { id: '3', name: 'Barbell Rows', sets: 5, reps: 5, weight: 80, weightMode: 'same', completed_sets: Array(5).fill({ reps: 0, weight: 0, rir: 0, completed: false }) }
   ]);
+
+  const handleSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const workoutData = {
+      ...formData,
+      intervals: (formData.type === 'run' || formData.type === 'ride') ? intervals : undefined,
+      swimData: formData.type === 'swim' ? swimData : undefined,
+      strength_exercises: formData.type === 'strength' ? strengthExercises : undefined,
+      workout_status: 'planned'
+    };
+    
+    // Save to localStorage
+    const storageKey = `workout_${formData.date}`;
+    localStorage.setItem(storageKey, JSON.stringify(workoutData));
+    
+    toast({
+      title: "Success!",
+      description: "Effort saved successfully!",
+    });
+    
+    // Also add to context for immediate UI update
+    addWorkout(workoutData);
+    onClose();
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,17 +84,19 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
   const getTabsList = () => {
     if (formData.type === 'swim') {
       return (
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="swim">Swim Details</TabsTrigger>
+          <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="export">Export</TabsTrigger>
         </TabsList>
       );
     }
     return (
-      <TabsList className="grid w-full grid-cols-3">
+      <TabsList className="grid w-full grid-cols-4">
         <TabsTrigger value="basic">Basic Info</TabsTrigger>
-        <TabsTrigger value="intervals">Intervals</TabsTrigger>
+        <TabsTrigger value="intervals">Details</TabsTrigger>
+        <TabsTrigger value="completed">Completed</TabsTrigger>
         <TabsTrigger value="export">Export</TabsTrigger>
       </TabsList>
     );
@@ -158,9 +187,21 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
                     />
                   </div>
 
+                  <div>
+                    <Label htmlFor="workout-comments">Comments</Label>
+                    <Textarea
+                      id="workout-comments"
+                      name="workout-comments"
+                      autoComplete="off"
+                      value={formData.comments}
+                      onChange={(e) => setFormData(prev => ({ ...prev, comments: e.target.value }))}
+                      placeholder="How did it feel? Notes..."
+                    />
+                  </div>
+
                   <div className="flex gap-2">
-                    <Button type="button" onClick={handleSubmit} className="flex-1">Create Workout</Button>
-                    <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+                    <Button type="button" onClick={handleSave} className="flex-1 bg-black text-white hover:bg-gray-800">Save</Button>
+                    <Button type="button" variant="outline" onClick={onClose} className="border-black hover:bg-gray-100">Cancel</Button>
                   </div>
                 </div>
               </CardContent>
@@ -173,9 +214,22 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
             </TabsContent>
           ) : (
             <TabsContent value="intervals">
-              <WorkoutIntervals intervals={intervals} onChange={setIntervals} />
+              <WorkoutIntervals intervals={intervals} onChange={setIntervals} workoutType={formData.type} />
             </TabsContent>
           )}
+          
+          <TabsContent value="completed">
+            <Card>
+              <CardHeader>
+                <CardTitle>Completed Workout</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-8 text-muted-foreground">
+                  Complete your workout and track your results here.
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
           
           <TabsContent value="export">
             <GarminExport workoutName={formData.name} intervals={intervals} />
