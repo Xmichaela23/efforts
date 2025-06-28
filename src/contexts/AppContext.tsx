@@ -36,6 +36,7 @@ interface AppContextType {
   workouts: Workout[];
   loading: boolean;
   addWorkout: (workout: Omit<Workout, 'id'>) => Promise<any>;
+  updateWorkout: (id: string, updates: Partial<Workout>) => Promise<any>; // ADD THIS
   deleteWorkout: (id: string) => Promise<void>;
   useImperial: boolean;
   toggleUnits: () => void;
@@ -47,6 +48,7 @@ const defaultAppContext: AppContextType = {
   workouts: [],
   loading: false,
   addWorkout: async () => {},
+  updateWorkout: async () => {}, // ADD THIS
   deleteWorkout: async () => {},
   useImperial: true,
   toggleUnits: () => {},
@@ -59,7 +61,7 @@ export const useAppContext = () => useContext(AppContext);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
-  const { workouts, loading, addWorkout, deleteWorkout } = useWorkouts();
+  const { workouts, loading, addWorkout, updateWorkout, deleteWorkout } = useWorkouts(); // ADD updateWorkout
 
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
@@ -77,6 +79,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         workouts,
         loading,
         addWorkout,
+        updateWorkout, // ADD THIS
         deleteWorkout,
         useImperial,
         toggleUnits,

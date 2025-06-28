@@ -14,8 +14,12 @@ const AppLayout: React.FC = () => {
   const [builderType, setBuilderType] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('planned');
+  
+  // Track workout being edited in builder
+  const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
 
   const handleWorkoutSelect = (workout: any) => {
+    console.log('❌ WRONG: handleWorkoutSelect called - going to detail view');
     setSelectedWorkout(workout);
   };
 
@@ -28,14 +32,38 @@ const AppLayout: React.FC = () => {
     setSelectedWorkout(null);
     setBuilderType('');
     setActiveTab('planned');
+    setWorkoutBeingEdited(null);
   };
 
   const handleAddEffort = () => {
+    console.log('🆕 Adding new effort');
+    setWorkoutBeingEdited(null);
+    setBuilderType('');
+    setSelectedWorkout(null); // FIXED: Clear selected workout
     setShowBuilder(true);
   };
 
   const handleSelectEffortType = (type: string) => {
+    console.log('🎯 Selecting effort type:', type);
+    setWorkoutBeingEdited(null);
     setBuilderType(type);
+    setSelectedWorkout(null); // FIXED: Clear selected workout
+    setShowBuilder(true);
+  };
+
+  // FIXED: Handle editing existing workout
+  const handleEditEffort = (workout: any) => {
+    console.log('✅ CORRECT: handleEditEffort called - going to builder');
+    console.log('✏️ Editing effort:', workout);
+    console.log('📋 Workout data being passed to builder:', workout);
+    
+    // FIXED: Clear all other states first
+    setSelectedWorkout(null);
+    setActiveTab('planned');
+    
+    // Then set edit states
+    setWorkoutBeingEdited(workout);
+    setBuilderType('');
     setShowBuilder(true);
   };
 
@@ -103,7 +131,11 @@ const AppLayout: React.FC = () => {
 
       <main className="max-w-7xl mx-auto px-6 py-8">
         {showBuilder ? (
-          <WorkoutBuilder onClose={handleBackToDashboard} initialType={builderType} />
+          <WorkoutBuilder 
+            onClose={handleBackToDashboard} 
+            initialType={builderType}
+            existingWorkout={workoutBeingEdited}
+          />
         ) : selectedWorkout ? (
           <WorkoutDetail 
             workout={selectedWorkout} 
@@ -118,6 +150,7 @@ const AppLayout: React.FC = () => {
               onSelectType={handleSelectEffortType}
               onSelectWorkout={handleWorkoutSelect}
               onViewCompleted={handleViewCompleted}
+              onEditEffort={handleEditEffort}
             />
             <div className="flex justify-end">
               <div className="w-64">

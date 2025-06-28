@@ -15,7 +15,7 @@ interface AllEffortsDropdownProps {
 
 const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout }) => {
   const { workouts } = useAppContext();
-  
+
   const getIcon = (type: string) => {
     switch (type) {
       case 'swim': return <Waves className="h-4 w-4 mr-2" />;
@@ -29,23 +29,23 @@ const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button 
-          className="flex items-center gap-2 bg-white text-black border border-black hover:bg-black hover:text-white" 
+        <Button
+          className="flex items-center gap-2 bg-white text-black border border-black hover:bg-black hover:text-white"
           style={{
-            fontFamily: 'Inter, sans-serif', 
+            fontFamily: 'Inter, sans-serif',
             fontWeight: 500,
             padding: '12px 24px',
             borderRadius: 0
           }}
         >
-          All Efforts ({workouts.length})
+          All efforts ({workouts.length})
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="max-h-64 overflow-y-auto bg-white border border-black" style={{borderRadius: 0}}>
         {workouts.map((workout) => (
-          <DropdownMenuItem 
-            key={workout.id} 
+          <DropdownMenuItem
+            key={workout.id}
             onClick={() => onSelectWorkout(workout)}
             className="hover:bg-black hover:text-white"
             style={{fontFamily: 'Inter, sans-serif', fontWeight: 500}}
