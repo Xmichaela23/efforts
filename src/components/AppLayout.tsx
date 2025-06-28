@@ -7,6 +7,7 @@ import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
+import TodaysEffort from './TodaysEffort';
 
 const AppLayout: React.FC = () => {
   const { workouts, loading, useImperial, toggleUnits } = useAppContext();
@@ -17,6 +18,9 @@ const AppLayout: React.FC = () => {
   
   // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
+  
+  // Track selected date for calendar interactions
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
   const handleWorkoutSelect = (workout: any) => {
     console.log('❌ WRONG: handleWorkoutSelect called - going to detail view');
@@ -36,10 +40,10 @@ const AppLayout: React.FC = () => {
   };
 
   const handleAddEffort = () => {
-    console.log('🆕 Adding new effort');
+    console.log('🆕 Adding new effort for date:', selectedDate);
     setWorkoutBeingEdited(null);
     setBuilderType('');
-    setSelectedWorkout(null); // FIXED: Clear selected workout
+    setSelectedWorkout(null);
     setShowBuilder(true);
   };
 
@@ -47,17 +51,16 @@ const AppLayout: React.FC = () => {
     console.log('🎯 Selecting effort type:', type);
     setWorkoutBeingEdited(null);
     setBuilderType(type);
-    setSelectedWorkout(null); // FIXED: Clear selected workout
+    setSelectedWorkout(null);
     setShowBuilder(true);
   };
 
-  // FIXED: Handle editing existing workout
+  // Handle editing existing workout
   const handleEditEffort = (workout: any) => {
     console.log('✅ CORRECT: handleEditEffort called - going to builder');
     console.log('✏️ Editing effort:', workout);
-    console.log('📋 Workout data being passed to builder:', workout);
     
-    // FIXED: Clear all other states first
+    // Clear all other states first
     setSelectedWorkout(null);
     setActiveTab('planned');
     
@@ -65,6 +68,12 @@ const AppLayout: React.FC = () => {
     setWorkoutBeingEdited(workout);
     setBuilderType('');
     setShowBuilder(true);
+  };
+
+  // Handle calendar date selection
+  const handleDateSelect = (dateString: string) => {
+    console.log('📅 Calendar date selected:', dateString);
+    setSelectedDate(dateString);
   };
 
   const handleViewCompleted = () => {
@@ -135,6 +144,7 @@ const AppLayout: React.FC = () => {
             onClose={handleBackToDashboard} 
             initialType={builderType}
             existingWorkout={workoutBeingEdited}
+            initialDate={selectedDate}
           />
         ) : selectedWorkout ? (
           <WorkoutDetail 
@@ -145,13 +155,23 @@ const AppLayout: React.FC = () => {
           />
         ) : (
           <div className="space-y-8">
+            {/* FIXED: Only render ONE TodaysEffort component */}
+            <TodaysEffort 
+              selectedDate={selectedDate}
+              onAddEffort={handleAddEffort}
+              onViewCompleted={handleViewCompleted}
+              onEditEffort={handleEditEffort}
+            />
+            
             <WorkoutCalendar 
               onAddEffort={handleAddEffort}
               onSelectType={handleSelectEffortType}
               onSelectWorkout={handleWorkoutSelect}
               onViewCompleted={handleViewCompleted}
               onEditEffort={handleEditEffort}
+              onDateSelect={handleDateSelect}
             />
+            
             <div className="flex justify-end">
               <div className="w-64">
                 <GarminAutoSync />

@@ -5,37 +5,55 @@ import { Button } from '@/components/ui/button';
 import { Plus, ChevronDown, ChevronRight, ChevronLeft, Clock } from 'lucide-react';
 
 interface TodaysEffortProps {
+  selectedDate?: string;
   onAddEffort: () => void;
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
 }
 
-const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewCompleted, onEditEffort }) => {
+const TodaysEffort: React.FC<TodaysEffortProps> = ({ 
+  selectedDate, 
+  onAddEffort, 
+  onViewCompleted, 
+  onEditEffort 
+}) => {
   const { useImperial, workouts, loading } = useAppContext();
-  const [todaysWorkouts, setTodaysWorkouts] = useState<any[]>([]);
+  const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showIntervals, setShowIntervals] = useState(false);
 
-  const today = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD format
+  const today = new Date().toLocaleDateString('en-CA');
+  const activeDate = selectedDate || today;
 
-  // Function to load today's workouts from Supabase via AppContext
-  const loadTodaysWorkouts = () => {
+  // FIXED: Consistent date formatting with timezone fix
+  const formatDateDisplay = (dateStr: string) => {
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    
+    return `${date.toLocaleDateString('en-US', { 
+      weekday: 'short',
+      month: 'short', 
+      day: 'numeric' 
+    })} effort`.replace(',', '');
+  };
+
+  const loadWorkoutsForDate = () => {
     if (workouts && workouts.length > 0) {
-      const todayWorkouts = workouts.filter((w: any) => w.date === today);
-      setTodaysWorkouts(todayWorkouts);
-      setCurrentIndex(0); // Reset to first workout
+      const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
+      setDisplayWorkouts(dateWorkouts);
+      setCurrentIndex(0);
     } else {
-      setTodaysWorkouts([]);
+      setDisplayWorkouts([]);
       setCurrentIndex(0);
     }
   };
 
   useEffect(() => {
-    loadTodaysWorkouts();
-  }, [workouts, today]);
+    loadWorkoutsForDate();
+  }, [workouts, activeDate]);
 
-  const currentWorkout = todaysWorkouts[currentIndex] || null;
-  const totalWorkouts = todaysWorkouts.length;
+  const currentWorkout = displayWorkouts[currentIndex] || null;
+  const totalWorkouts = displayWorkouts.length;
 
   const formatWorkoutType = (type: string) => {
     return type.charAt(0).toUpperCase() + type.slice(1);
@@ -57,7 +75,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
 
     if (currentWorkout.type === 'strength' && currentWorkout.strength_exercises) {
       return currentWorkout.strength_exercises.map((ex: any, idx: number) => (
-        <div key={idx} className="text-sm text-gray-600 ml-4">
+        <div key={idx} className="text-xs md:text-sm text-gray-600 ml-3 md:ml-4 leading-snug">
           {ex.name}: {ex.sets}x{ex.reps} @ {ex.weight} {useImperial ? 'lbs' : 'kg'}
         </div>
       ));
@@ -65,7 +83,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
 
     if (currentWorkout.intervals) {
       return currentWorkout.intervals.map((interval: any, idx: number) => (
-        <div key={idx} className="text-sm text-gray-600 ml-4">
+        <div key={idx} className="text-xs md:text-sm text-gray-600 ml-3 md:ml-4 leading-snug">
           {interval.time && `${interval.time}`}
           {interval.distance && ` ${interval.distance} ${useImperial ? 'mi' : 'km'}`}
           {interval.effortLabel && ` @ ${interval.effortLabel}`}
@@ -76,21 +94,34 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
       ));
     }
 
-    return <p className="text-sm text-gray-500 ml-4">No segments</p>;
+    return <p className="text-xs md:text-sm text-gray-500 ml-3 md:ml-4">No segments</p>;
   };
 
-  // Show loading state if data is still being fetched
   if (loading) {
     return (
       <Card className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-normal text-black">
-            Today's effort
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-normal text-black flex items-center gap-2">
+            {formatDateDisplay(activeDate)}
+            {activeDate !== today && workouts && workouts.length > 0 && (
+              (() => {
+                const todaysWorkouts = workouts.filter((w: any) => w.date === today);
+                if (todaysWorkouts.length > 0) {
+                  const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
+                  return (
+                    <span className="text-xs md:text-sm text-gray-500 font-normal">
+                      · today: {types.join(' ')}
+                    </span>
+                  );
+                }
+                return null;
+              })()
+            )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">
-            <p className="text-[#666666]">Loading...</p>
+        <CardContent className="py-3 md:py-4">
+          <div className="text-center py-3 md:py-4">
+            <p className="text-[#666666] text-sm">Loading...</p>
           </div>
         </CardContent>
       </Card>
@@ -100,17 +131,38 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
   if (!currentWorkout) {
     return (
       <Card className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg font-normal text-black">
-            Today's effort
+        <CardHeader className="pb-2 md:pb-3">
+          <CardTitle className="text-base md:text-lg font-normal text-black flex items-center gap-2">
+            {formatDateDisplay(activeDate)}
+            {activeDate !== today && workouts && workouts.length > 0 && (
+              (() => {
+                const todaysWorkouts = workouts.filter((w: any) => w.date === today);
+                if (todaysWorkouts.length > 0) {
+                  const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
+                  return (
+                    <span className="text-xs md:text-sm text-gray-500 font-normal">
+                      · today: {types.join(' ')}
+                    </span>
+                  );
+                }
+                return null;
+              })()
+            )}
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">
-            <p className="text-[#666666] mb-3">
-              No effort scheduled for today
+        <CardContent className="py-3 md:py-4">
+          <div className="text-center py-3 md:py-4">
+            <p className="text-[#666666] mb-3 text-sm">
+              No effort scheduled for this date
             </p>
-            <Button onClick={onAddEffort} size="sm" className="gap-2 bg-black text-white hover:bg-gray-800">
+            <Button 
+              onClick={() => {
+                console.log('🆕 Add effort clicked for date:', activeDate);
+                onAddEffort();
+              }} 
+              size="sm" 
+              className="gap-2 bg-gray-600 text-white hover:bg-gray-700 border-gray-600 hover:border-gray-700 rounded-md transition-all duration-150 hover:transform hover:-translate-y-0.5 hover:shadow-md font-medium text-sm px-4 py-2 min-h-[36px]"
+            >
               <Plus className="h-4 w-4" />
               Add effort
             </Button>
@@ -130,30 +182,41 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
       style={{fontFamily: 'Inter, sans-serif'}}
       onClick={() => {
         console.log('🔧 TodaysEffort clicked:', currentWorkout);
-        console.log('🔧 onEditEffort function:', !!onEditEffort);
-        console.log('🔧 Workout ID:', currentWorkout?.id);
-        console.log('🔧 Workout type:', currentWorkout?.type);
         onEditEffort && onEditEffort(currentWorkout);
       }}
     >
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2 md:pb-3">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <CardTitle className="text-lg font-normal text-black">
-              Today's effort
+          <div className="flex items-center gap-3 md:gap-4">
+            <CardTitle className="text-base md:text-lg font-normal text-black flex items-center gap-2">
+              {formatDateDisplay(activeDate)}
+              {activeDate !== today && workouts && workouts.length > 0 && (
+                (() => {
+                  const todaysWorkouts = workouts.filter((w: any) => w.date === today);
+                  if (todaysWorkouts.length > 0) {
+                    const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
+                    return (
+                      <span className="text-xs md:text-sm text-gray-500 font-normal">
+                        · today: {types.join(' ')}
+                      </span>
+                    );
+                  }
+                  return null;
+                })()
+              )}
             </CardTitle>
             {totalWorkouts > 1 && (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 md:gap-2">
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
                     setCurrentIndex(prev => prev > 0 ? prev - 1 : totalWorkouts - 1);
                   }}
-                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded"
+                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded min-w-[32px] min-h-[32px] flex items-center justify-center"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </button>
-                <span className="text-sm font-normal text-gray-500 px-2">
+                <span className="text-xs md:text-sm font-normal text-gray-500 px-1 md:px-2">
                   {currentIndex + 1} of {totalWorkouts}
                 </span>
                 <button
@@ -161,7 +224,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
                     e.stopPropagation();
                     setCurrentIndex(prev => prev < totalWorkouts - 1 ? prev + 1 : 0);
                   }}
-                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded"
+                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded min-w-[32px] min-h-[32px] flex items-center justify-center"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </button>
@@ -170,17 +233,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 md:space-y-4 py-3 md:py-4">
         {/* Workout Title and Type */}
-        <div>
-          <h3 className="font-medium text-lg">{currentWorkout.name || formatWorkoutType(currentWorkout.type)}</h3>
-          <p className="text-sm text-gray-600">{formatWorkoutType(currentWorkout.type)}</p>
+        <div className="space-y-1">
+          <h3 className="font-medium text-base md:text-lg leading-tight">{currentWorkout.name || formatWorkoutType(currentWorkout.type)}</h3>
+          <p className="text-xs md:text-sm text-gray-600">{formatWorkoutType(currentWorkout.type)}</p>
         </div>
 
         {/* Total Time Display */}
         {currentWorkout.duration && currentWorkout.duration > 0 && (
-          <div className="flex items-center gap-2 text-sm text-gray-600">
-            <Clock className="h-4 w-4" />
+          <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
+            <Clock className="h-3 w-3 md:h-4 md:w-4" />
             <span className="font-medium">Total Time:</span>
             <span>{formatTime(currentWorkout.duration)}</span>
           </div>
@@ -194,13 +257,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
                 e.stopPropagation();
                 setShowIntervals(!showIntervals);
               }}
-              className="flex items-center gap-2 text-sm font-medium hover:text-gray-600 transition-colors"
+              className="flex items-center gap-2 text-xs md:text-sm font-medium hover:text-gray-600 transition-colors"
             >
-              {showIntervals ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              {showIntervals ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
               {currentWorkout.type === 'strength' ? 'Exercises' : 'Segments'} ({intervalCount})
             </button>
             {showIntervals && (
-              <div className="mt-2">
+              <div className="mt-1 md:mt-2 space-y-1">
                 {formatIntervals()}
               </div>
             )}
@@ -209,9 +272,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({ onAddEffort, onViewComplete
 
         {/* Notes */}
         {currentWorkout.userComments && (
-          <div>
-            <p className="text-sm font-medium mb-1">Notes</p>
-            <p className="text-sm text-gray-600">{currentWorkout.userComments}</p>
+          <div className="space-y-1">
+            <p className="text-xs md:text-sm font-medium">Notes</p>
+            <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{currentWorkout.userComments}</p>
           </div>
         )}
       </CardContent>

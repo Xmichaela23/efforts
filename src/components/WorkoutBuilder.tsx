@@ -21,9 +21,10 @@ interface WorkoutBuilderProps {
   onClose: () => void;
   initialType?: string;
   existingWorkout?: any;
+  initialDate?: string; // NEW: Add initialDate prop
 }
 
-export default function WorkoutBuilder({ onClose, initialType, existingWorkout }: WorkoutBuilderProps) {
+export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate }: WorkoutBuilderProps) {
   const { addWorkout, updateWorkout, deleteWorkout } = useAppContext();
   const [showCompleted, setShowCompleted] = useState(false);
   const [showSaveOptions, setShowSaveOptions] = useState(false);
@@ -41,10 +42,21 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout }
     return `${year}-${month}-${day}`;
   };
 
+  // FIXED: Initialize date properly with initialDate prop
+  const getInitialDate = () => {
+    if (existingWorkout?.date) {
+      return existingWorkout.date;
+    }
+    if (initialDate) {
+      return initialDate;
+    }
+    return getLocalDateString();
+  };
+
   const [formData, setFormData] = useState({
     name: '',
     type: (initialType as 'run' | 'ride' | 'strength' | 'swim') || 'run',
-    date: getLocalDateString(),
+    date: getInitialDate(), // FIXED: Use proper date initialization
     description: '',
     userComments: '',
     completedManually: false
@@ -57,9 +69,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout }
   const [isMetric, setIsMetric] = useState(false);
   const [syncStatus, setSyncStatus] = useState(true);
 
-  // Initialize with existing workout data
+  // Initialize with existing workout data OR initialDate
   useEffect(() => {
-    console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType });
+    console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType, initialDate });
     
     if (existingWorkout) {
       console.log('📝 Loading existing workout into form');
@@ -85,10 +97,15 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout }
         setStrengthExercises(existingWorkout.strength_exercises);
       }
     } else {
-      console.log('✨ Creating new workout');
+      console.log('✨ Creating new workout for date:', initialDate || 'today');
       setCurrentWorkout(null);
+      
+      // FIXED: Set date from initialDate prop for new workouts
+      if (initialDate) {
+        setFormData(prev => ({ ...prev, date: initialDate }));
+      }
     }
-  }, [existingWorkout]);
+  }, [existingWorkout, initialDate]);
 
   useEffect(() => {
     if (initialType) {
@@ -167,7 +184,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout }
       setFormData({
         name: '',
         type: 'run',
-        date: getLocalDateString(),
+        date: initialDate || getLocalDateString(), // FIXED: Maintain selected date when clearing
         description: '',
         userComments: '',
         completedManually: false

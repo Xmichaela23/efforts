@@ -20,7 +20,8 @@ interface WorkoutCalendarProps {
   onSelectType: (type: string) => void;
   onSelectWorkout: (workout: any) => void;
   onViewCompleted: () => void;
-  onEditEffort: (workout: any) => void; // FIXED: Added missing prop
+  onEditEffort: (workout: any) => void;
+  onDateSelect?: (dateString: string) => void;
 }
 
 export default function WorkoutCalendar({ 
@@ -28,7 +29,8 @@ export default function WorkoutCalendar({
   onSelectType, 
   onSelectWorkout, 
   onViewCompleted,
-  onEditEffort // FIXED: Accept the prop
+  onEditEffort,
+  onDateSelect
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -45,49 +47,76 @@ export default function WorkoutCalendar({
   const getDaysInMonth = () => {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
     
-    const days = [];
-    
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
+    if (viewMode === 'week') {
+      // Week view: show current week
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay()); // Start on Sunday
+      
+      const days = [];
+      for (let i = 0; i < 7; i++) {
+        const day = new Date(startOfWeek);
+        day.setDate(startOfWeek.getDate() + i);
+        days.push(day.getDate());
+      }
+      return days;
+    } else {
+      // Month view: existing logic
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const daysInMonth = lastDay.getDate();
+      const startingDayOfWeek = firstDay.getDay();
+      
+      const days = [];
+      
+      for (let i = 0; i < startingDayOfWeek; i++) {
+        days.push(null);
+      }
+      
+      for (let day = 1; day <= daysInMonth; day++) {
+        days.push(day);
+      }
+      
+      return days;
     }
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(day);
-    }
-    
-    return days;
   };
 
   const getWorkoutsForDate = (day: number) => {
     if (!day) return [];
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const dateStr = `${year}-${month}-${dayStr}`;
     return workouts.filter(w => w.date === dateStr);
   };
 
-  // FIXED: Handle clicking on calendar dates
   const handleDateClick = (day: number) => {
     if (!day) return;
     
-    const dayWorkouts = getWorkoutsForDate(day);
-    console.log('📅 Date clicked:', day, 'Workouts found:', dayWorkouts);
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const dateStr = `${year}-${month}-${dayStr}`;
     
-    if (dayWorkouts.length === 1) {
-      // Single workout - open it for editing
-      console.log('✏️ Opening workout for editing:', dayWorkouts[0]);
-      onEditEffort(dayWorkouts[0]);
-    } else if (dayWorkouts.length > 1) {
-      // Multiple workouts - show picker (for now, open first one)
-      console.log('📝 Multiple workouts, opening first:', dayWorkouts[0]);
-      onEditEffort(dayWorkouts[0]);
+    console.log('📅 Calendar date clicked:', day, 'Date string:', dateStr);
+    
+    if (onDateSelect) {
+      onDateSelect(dateStr);
     } else {
-      // No workouts - create new one for this date
-      console.log('➕ No workouts, creating new one for date');
-      onAddEffort();
+      const dayWorkouts = getWorkoutsForDate(day);
+      console.log('📅 Date clicked:', day, 'Workouts found:', dayWorkouts);
+      
+      if (dayWorkouts.length === 1) {
+        console.log('✏️ Opening workout for editing:', dayWorkouts[0]);
+        onEditEffort(dayWorkouts[0]);
+      } else if (dayWorkouts.length > 1) {
+        console.log('📝 Multiple workouts, opening first:', dayWorkouts[0]);
+        onEditEffort(dayWorkouts[0]);
+      } else {
+        console.log('➕ No workouts, creating new one for date');
+        onAddEffort();
+      }
     }
   };
 
@@ -102,34 +131,40 @@ export default function WorkoutCalendar({
         onSelectType={onSelectType}
         onSelectWorkout={onSelectWorkout}
         onViewCompleted={onViewCompleted}
-        onEditEffort={onEditEffort} // FIXED: Pass onEditEffort to CalendarHeader
+        onEditEffort={onEditEffort}
       />
       
       <Card className="w-full border border-black" style={{borderRadius: 0}}>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between mb-4">
+        <CardContent className="p-2 md:p-3">
+          {/* DRAMATIC: Much closer arrows and darker styling */}
+          <div className="flex items-center justify-center gap-4 mb-2 md:mb-3">
             <Button 
-              className="bg-white text-black border-none hover:bg-black hover:text-white p-3"
-              style={{borderRadius: 0, minWidth: '44px', minHeight: '44px'}}
+              className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-1 transition-all duration-150" 
+              style={{borderRadius: '4px', minWidth: '24px', minHeight: '24px'}}
               onClick={() => navigateMonth(-1)}
             >
-              <ChevronLeft className="h-5 w-5" strokeWidth={1} />
+              <ChevronLeft className="h-4 w-4" strokeWidth={2.5} />
             </Button>
-            <h3 className="text-lg font-normal" style={{fontFamily: 'Inter, sans-serif'}}>
+            <h3 className="text-sm md:text-base font-medium mx-1" style={{fontFamily: 'Inter, sans-serif'}}>
               {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
             </h3>
             <Button 
-              className="bg-white text-black border-none hover:bg-black hover:text-white p-3"
-              style={{borderRadius: 0, minWidth: '44px', minHeight: '44px'}}
+              className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-1 transition-all duration-150"
+              style={{borderRadius: '4px', minWidth: '24px', minHeight: '24px'}}
               onClick={() => navigateMonth(1)}
             >
-              <ChevronRight className="h-5 w-5" strokeWidth={1} />
+              <ChevronRight className="h-4 w-4" strokeWidth={2.5} />
             </Button>
           </div>
           
-          <div className="grid grid-cols-7 gap-1">
-            {DAYS.map(day => (
-              <div key={day} className="p-2 text-center font-normal text-sm text-[#666666]" style={{fontFamily: 'Inter, sans-serif'}}>
+          <div className={`grid gap-px md:gap-0.5 ${viewMode === 'week' ? 'grid-cols-7' : 'grid-cols-7'}`}>
+            {viewMode === 'month' && DAYS.map(day => (
+              <div key={day} className="p-1 md:p-2 text-center font-medium text-xs text-gray-500" style={{fontFamily: 'Inter, sans-serif'}}>
+                {day}
+              </div>
+            ))}
+            {viewMode === 'week' && DAYS.map(day => (
+              <div key={day} className="p-1 md:p-2 text-center font-medium text-xs text-gray-500" style={{fontFamily: 'Inter, sans-serif'}}>
                 {day}
               </div>
             ))}
@@ -138,41 +173,37 @@ export default function WorkoutCalendar({
               return (
                 <div
                   key={index}
-                  className={`min-h-[60px] p-2 border border-black ${
-                    day ? 'bg-white hover:bg-black hover:text-white cursor-pointer' : ''
+                  className={`${viewMode === 'week' ? 'min-h-[80px] md:min-h-[100px]' : 'min-h-[42px] md:min-h-[56px]'} p-1 md:p-2 border border-black ${
+                    day ? 'bg-white hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-all duration-150' : ''
                   }`}
                   style={{borderRadius: 0}}
-                  onClick={() => day && handleDateClick(day)} // FIXED: Click handler for dates
+                  onClick={() => day && handleDateClick(day)}
                 >
                   {day && (
                     <>
-                      <div className="text-sm font-normal mb-2" style={{fontFamily: 'Inter, sans-serif'}}>{day}</div>
+                      <div className="text-xs font-medium mb-1" style={{fontFamily: 'Inter, sans-serif'}}>{day}</div>
                       
-                      {/* FIXED: Show colored dots with click functionality */}
                       {dayWorkouts.length > 0 && (
-                        <div className="flex justify-center items-center space-x-1 mt-1">
-                          {dayWorkouts.slice(0, 4).map((workout, idx) => (
+                        <div className={`flex ${viewMode === 'week' ? 'flex-col space-y-1' : 'justify-center items-center space-x-1'} mt-1`}>
+                          {dayWorkouts.slice(0, viewMode === 'week' ? 4 : 3).map((workout, idx) => (
                             <div
                               key={workout.id}
-                              className={`w-2.5 h-2.5 rounded-full cursor-pointer hover:scale-110 transition-transform ${
-                                DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS]
-                              }`}
+                              className={`${viewMode === 'week' 
+                                ? 'w-full h-4 rounded-sm text-xs text-white font-medium flex items-center justify-center' 
+                                : 'w-1 h-1 md:w-1.5 md:h-1.5 rounded-full'
+                              } ${DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS]}`}
                               title={workout.name}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onEditEffort(workout);
-                              }}
-                            />
-                          ))}
-                          {dayWorkouts.length > 4 && (
-                            <div 
-                              className="text-xs text-gray-500 cursor-pointer hover:text-gray-700"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDateClick(day);
-                              }}
                             >
-                              +{dayWorkouts.length - 4}
+                              {viewMode === 'week' && (
+                                <span className="truncate px-1">
+                                  {workout.name || workout.type}
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {dayWorkouts.length > (viewMode === 'week' ? 4 : 3) && (
+                            <div className="text-xs text-gray-400 font-medium">
+                              +{dayWorkouts.length - (viewMode === 'week' ? 4 : 3)}
                             </div>
                           )}
                         </div>
@@ -184,27 +215,31 @@ export default function WorkoutCalendar({
             })}
           </div>
           
-          <div className="flex justify-center mt-4">
-            <div className="flex" style={{gap: 0}}>
-              <Button
-                className={`text-xs px-3 py-1 h-8 border border-black ${
-                  viewMode === 'month' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white'
-                }`}
-                onClick={() => setViewMode('month')}
-                style={{fontFamily: 'Inter, sans-serif', borderRadius: 0, borderRight: 'none'}}
-              >
-                Month
-              </Button>
-              <Button
-                className={`text-xs px-3 py-1 h-8 border border-black ${
-                  viewMode === 'week' ? 'bg-black text-white' : 'bg-white text-black hover:bg-black hover:text-white'
-                }`}
-                onClick={() => setViewMode('week')}
-                style={{fontFamily: 'Inter, sans-serif', borderRadius: 0}}
-              >
-                Week
-              </Button>
-            </div>
+          {/* NEW APPROACH: Simple text-based toggle */}
+          <div className="text-center mt-4 md:mt-6">
+            <button
+              className={`text-sm mx-2 px-2 py-1 transition-colors ${
+                viewMode === 'month' 
+                  ? 'text-gray-900 font-medium underline' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setViewMode('month')}
+              style={{fontFamily: 'Inter, sans-serif', background: 'none', border: 'none'}}
+            >
+              Month
+            </button>
+            <span className="text-gray-300">|</span>
+            <button
+              className={`text-sm mx-2 px-2 py-1 transition-colors ${
+                viewMode === 'week' 
+                  ? 'text-gray-900 font-medium underline' 
+                  : 'text-gray-600 hover:text-gray-800'
+              }`}
+              onClick={() => setViewMode('week')}
+              style={{fontFamily: 'Inter, sans-serif', background: 'none', border: 'none'}}
+            >
+              Week
+            </button>
           </div>
         </CardContent>
       </Card>
