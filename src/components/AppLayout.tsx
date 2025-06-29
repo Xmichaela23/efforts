@@ -124,7 +124,8 @@ const AppLayout: React.FC = () => {
               <div className="ml-6">
                 <h1 className="text-black lowercase" style={{fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '28px', letterSpacing: '0.03em'}}>efforts</h1>
               </div>
-              {(selectedWorkout || showBuilder) && (
+              {/* FIXED: Only show Back button for WorkoutDetail, not WorkoutBuilder */}
+              {selectedWorkout && (
                 <Button 
                   onClick={handleBackToDashboard}
                   className="ml-8 bg-white text-black border border-black hover:bg-black hover:text-white"
@@ -155,7 +156,6 @@ const AppLayout: React.FC = () => {
           />
         ) : (
           <div className="space-y-8">
-            {/* FIXED: Only render ONE TodaysEffort component */}
             <TodaysEffort 
               selectedDate={selectedDate}
               onAddEffort={handleAddEffort}

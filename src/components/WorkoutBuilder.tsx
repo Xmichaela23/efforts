@@ -5,23 +5,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Save, Wifi, WifiOff, Clock, Trash2, Check } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { ArrowLeft, Save, Clock, Trash2, Check } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
 import StrengthExerciseBuilder, { StrengthExercise } from './StrengthExerciseBuilder';
-import WorkoutSummaryChart from './WorkoutSummaryChart';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface WorkoutBuilderProps {
   onClose: () => void;
   initialType?: string;
   existingWorkout?: any;
-  initialDate?: string; // NEW: Add initialDate prop
+  initialDate?: string;
 }
 
 export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate }: WorkoutBuilderProps) {
@@ -30,10 +26,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   
-  // CRITICAL: Track current workout to maintain state after save
   const [currentWorkout, setCurrentWorkout] = useState<any>(existingWorkout || null);
 
-  // Helper function for reliable local date formatting
   const getLocalDateString = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -42,7 +36,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return `${year}-${month}-${day}`;
   };
 
-  // FIXED: Initialize date properly with initialDate prop
   const getInitialDate = () => {
     if (existingWorkout?.date) {
       return existingWorkout.date;
@@ -56,7 +49,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [formData, setFormData] = useState({
     name: '',
     type: (initialType as 'run' | 'ride' | 'strength' | 'swim') || 'run',
-    date: getInitialDate(), // FIXED: Use proper date initialization
+    date: getInitialDate(),
     description: '',
     userComments: '',
     completedManually: false
@@ -67,9 +60,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [swimIntervals, setSwimIntervals] = useState<SwimInterval[]>([]);
   const [strengthExercises, setStrengthExercises] = useState<StrengthExercise[]>([]);
   const [isMetric, setIsMetric] = useState(false);
-  const [syncStatus, setSyncStatus] = useState(true);
 
-  // Initialize with existing workout data OR initialDate
   useEffect(() => {
     console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType, initialDate });
     
@@ -86,7 +77,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         completedManually: existingWorkout.completedManually || false
       });
 
-      // Load intervals/exercises based on type
       if (existingWorkout.type === 'run' && existingWorkout.intervals) {
         setRunIntervals(existingWorkout.intervals);
       } else if (existingWorkout.type === 'ride' && existingWorkout.intervals) {
@@ -100,7 +90,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       console.log('✨ Creating new workout for date:', initialDate || 'today');
       setCurrentWorkout(null);
       
-      // FIXED: Set date from initialDate prop for new workouts
       if (initialDate) {
         setFormData(prev => ({ ...prev, date: initialDate }));
       }
@@ -113,13 +102,12 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     }
   }, [initialType]);
 
-  // Update description in real-time as intervals change
   useEffect(() => {
-    if (!formData.description) {
-      const autoDescription = generateWorkoutDescription();
+    const autoDescription = generateWorkoutDescription();
+    if (autoDescription && autoDescription !== formData.description) {
       setFormData(prev => ({ ...prev, description: autoDescription }));
     }
-  }, [runIntervals, rideIntervals, swimIntervals, strengthExercises, formData.description]);
+  }, [runIntervals, rideIntervals, swimIntervals, strengthExercises]);
 
   const calculateTotalTime = () => {
     let total = 0;
@@ -163,43 +151,30 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // FIXED: Trash button with Supabase
   const handleTrashClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (currentWorkout && currentWorkout.id) {
-      if (!confirm('Delete this workout permanently?')) return;
+    if (!confirm('Clear all workout data and start fresh?')) return;
 
-      try {
-        await deleteWorkout(currentWorkout.id);
-        onClose();
-      } catch (error) {
-        console.error('Error deleting workout:', error);
-        alert('Error deleting workout. Please try again.');
-      }
-    } else {
-      if (!confirm('Clear all workout data and start fresh?')) return;
+    // Always clear everything and stay in builder
+    setFormData({
+      name: '',
+      type: 'run',
+      date: initialDate || getLocalDateString(),
+      description: '',
+      userComments: '',
+      completedManually: false
+    });
 
-      setFormData({
-        name: '',
-        type: 'run',
-        date: initialDate || getLocalDateString(), // FIXED: Maintain selected date when clearing
-        description: '',
-        userComments: '',
-        completedManually: false
-      });
-
-      setRunIntervals([]);
-      setRideIntervals([]);
-      setSwimIntervals([]);
-      setStrengthExercises([]);
-      setShowNotes(false);
-      setCurrentWorkout(null);
-    }
+    setRunIntervals([]);
+    setRideIntervals([]);
+    setSwimIntervals([]);
+    setStrengthExercises([]);
+    setShowNotes(false);
+    setCurrentWorkout(null);
   };
 
-  // Auto-generate workout description from intervals
   const generateWorkoutDescription = () => {
     const parts: string[] = [];
     switch (formData.type) {
@@ -294,7 +269,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return parts.length > 0 ? parts.join(' + ') : '';
   };
 
-  // CRITICAL FIX: Save function that maintains state after save
   const handleSave = async (navigateAfterSave: boolean = false) => {
     console.log('🚀 Save function called!');
     console.log('📊 Form data:', formData);
@@ -312,7 +286,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       const workoutData = {
         ...formData,
         name: workoutTitle,
-        description: finalDescription,
+        description: formData.description || generateWorkoutDescription(),
         duration: calculateTotalTime(),
         intervals: formData.type === 'run' ? runIntervals :
                   formData.type === 'ride' ? rideIntervals :
@@ -336,7 +310,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
       console.log('✅ Workout saved successfully! Result:', savedWorkout);
 
-      // CRITICAL: Update current workout to maintain state
       setCurrentWorkout(savedWorkout);
 
       setShowSaveOptions(true);
@@ -354,8 +327,17 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     }
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
+    }).replace(',', '');
+  };
+
   return (
-    <div className="w-full max-w-6xl mx-auto p-4">
+    <div className="min-h-screen bg-white">
       {/* Save Success Banner */}
       {showSaveOptions && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-4">
@@ -382,166 +364,162 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         </div>
       )}
 
-      {/* Header */}
-      <div className="flex items-center gap-4 mb-6">
-        <Button onClick={onClose} variant="outline" size="sm" className="bg-gray-500 hover:bg-gray-600 text-white border-gray-500">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back
-        </Button>
-        <h1 className="text-2xl font-bold">
-          {existingWorkout || currentWorkout ? 
-            (existingWorkout?.name || currentWorkout?.name || 'Edit effort') : 
-            (formData.name.trim() || 'New effort')
-          }
-        </h1>
-        <div className="flex items-center gap-4 ml-auto">
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger>
-                {syncStatus ? (
-                  <Wifi className="h-5 w-5 text-green-500" />
-                ) : (
-                  <WifiOff className="h-5 w-5 text-red-500" />
-                )}
-              </TooltipTrigger>
-              <TooltipContent>
-                <p>{syncStatus ? 'Auto-sync enabled' : 'Auto-sync disabled'}</p>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <div className="flex items-center gap-2">
-            <Label htmlFor="units" className="text-sm">Imperial</Label>
-            <Switch
-              id="units"
-              checked={isMetric}
-              onCheckedChange={setIsMetric}
-            />
-            <Label htmlFor="units" className="text-sm">Metric</Label>
+      {/* Clean Header - matches calendar style */}
+      <header className="bg-white border-b border-[#E5E5E5]">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="flex justify-end items-center h-8">
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-gray-600">Imperial</span>
+              <Switch
+                checked={isMetric}
+                onCheckedChange={setIsMetric}
+              />
+              <span className="text-xs text-gray-600">Metric</span>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Tab Toggle for Build/Completed */}
-      <div className="flex gap-2 mb-6">
-        <Button
-          variant={!showCompleted ? "default" : "outline"}
-          onClick={() => setShowCompleted(false)}
-          className={!showCompleted ? "bg-black text-white" : ""}
-        >
-          Build effort
-        </Button>
-        <Button
-          variant={showCompleted ? "default" : "outline"}
-          onClick={() => setShowCompleted(true)}
-          className={showCompleted ? "bg-black text-white" : ""}
-        >
-          Completed
-        </Button>
-      </div>
+      <main className="max-w-7xl mx-auto px-6 py-2">
+        {/* Back Button */}
+        <div className="mb-4">
+          <button 
+            onClick={onClose}
+            className="flex items-center text-black hover:text-gray-600 text-base font-medium transition-colors"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            <ArrowLeft className="h-5 w-5 mr-2" />
+            Back
+          </button>
+        </div>
 
-      {!showCompleted ? (
-        <div className="space-y-6">
-          {/* Basic Info Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                Effort details
-                <Button
+        {/* Tab Toggle - simplified */}
+        <div className="flex gap-1 mb-4">
+          <button
+            onClick={() => setShowCompleted(false)}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              !showCompleted 
+                ? 'text-black border-b-2 border-black' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            Build effort
+          </button>
+          <button
+            onClick={() => setShowCompleted(true)}
+            className={`px-4 py-2 text-sm font-medium transition-colors ${
+              showCompleted 
+                ? 'text-black border-b-2 border-black' 
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            Completed
+          </button>
+        </div>
+
+        {!showCompleted ? (
+          <div className="space-y-4">
+            {/* Simplified Form - cleaner layout */}
+            <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
+              <div className="flex justify-end mb-2">
+                <button
                   onClick={handleTrashClick}
-                  variant="ghost"
-                  size="sm"
-                  className="text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                  className="text-gray-400 hover:text-red-500 transition-colors"
                 >
                   <Trash2 className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 <div className="md:col-span-2">
-                  <Label htmlFor="effort-name">Effort title (optional)</Label>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Effort title</Label>
                   <Input
-                    id="effort-name"
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="e.g., Morning Run, Hill Intervals"
-                    className="min-h-[44px]"
+                    placeholder=""
+                    className="border-gray-300 min-h-[44px]"
+                    style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="effort-date">Date</Label>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Date</Label>
                   <Input
-                    id="effort-date"
                     type="date"
                     value={formData.date}
                     onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                    className="min-h-[44px]"
+                    className="border-gray-300 min-h-[44px]"
+                    style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
                   />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="effort-type">Discipline</Label>
-                <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') =>
-                  setFormData(prev => ({ ...prev, type: value }))
-                }>
-                  <SelectTrigger className="min-h-[44px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="run">Run</SelectItem>
-                    <SelectItem value="ride">Ride</SelectItem>
-                    <SelectItem value="swim">Swim</SelectItem>
-                    <SelectItem value="strength">Strength</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="effort-description">Description</Label>
-                <Textarea
-                  id="effort-description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Brief effort description (leave empty for auto-generated)..."
-                  rows={2}
-                  className="min-h-[44px]"
-                />
-              </div>
 
-              {/* Collapsible Notes Section */}
-              <div className="border-t pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowNotes(!showNotes)}
-                  className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900"
-                >
-                  <span className={`transform transition-transform ${showNotes ? 'rotate-90' : ''}`}>
-                    ▶
-                  </span>
-                  Notes
-                </button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Discipline</Label>
+                  <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') =>
+                    setFormData(prev => ({ ...prev, type: value }))
+                  }>
+                    <SelectTrigger className="border-gray-300 min-h-[44px]" style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="run">Run</SelectItem>
+                      <SelectItem value="ride">Ride</SelectItem>
+                      <SelectItem value="swim">Swim</SelectItem>
+                      <SelectItem value="strength">Strength</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  {/* Notes right under Discipline */}
+                  <div className="mt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowNotes(!showNotes)}
+                      className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+                    >
+                      <span className={`transform transition-transform ${showNotes ? 'rotate-90' : ''}`}>
+                        ▶
+                      </span>
+                      Notes
+                    </button>
 
-                {showNotes && (
-                  <div className="mt-3">
-                    <Textarea
-                      id="effort-comments"
-                      value={formData.userComments}
-                      onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
-                      placeholder="add Notes for your coach..."
-                      rows={3}
-                      className="min-h-[44px]"
-                    />
+                    {showNotes && (
+                      <Textarea
+                        value={formData.userComments}
+                        onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
+                        placeholder=""
+                        rows={2}
+                        className="border-gray-300 min-h-[44px] mt-1"
+                        style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                      />
+                    )}
                   </div>
-                )}
+                </div>
+                <div>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
+                  <div className="relative">
+                    <Textarea
+                      value={formData.description}
+                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder=""
+                      rows={3}
+                      className="border-gray-300 min-h-[44px] pb-8"
+                      style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                    />
+                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
+                      <Clock className="h-3 w-3" />
+                      <span>Total Time: {formatTime(calculateTotalTime())}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Workout Content */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Structure</CardTitle>
-            </CardHeader>
-            <CardContent>
+            {/* Structure Section - clean container */}
+            <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
+              <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Structure</h3>
+              
               {formData.type === 'run' && (
                 <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
               )}
@@ -554,95 +532,58 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               {formData.type === 'strength' && (
                 <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} isMetric={isMetric} />
               )}
-            </CardContent>
-          </Card>
+            </div>
 
-          {/* Live Description Preview */}
-          {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Workout Summary</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="bg-muted p-4 rounded-lg">
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Auto-generated description:</p>
-                  <p className="font-medium">{generateWorkoutDescription() || 'Add segments to see workout summary...'}</p>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    This description will be saved with your workout if no custom description is provided above.
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      ) : (
-        /* Completed Tab Content */
-        formData.type === 'strength' ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>Log Completed Strength Training</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <StrengthExerciseBuilder
-                exercises={strengthExercises}
-                onChange={setStrengthExercises}
-                isMetric={isMetric}
-                isCompleted={true}
-              />
-            </CardContent>
-          </Card>
-        ) : (
-          <Card>
-            <CardHeader>
-              <CardTitle>Completed Session Data</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Completed session data from Garmin or smart devices will appear here.
+            {/* Auto-generated Preview - if content exists */}
+            {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
+              <div className="bg-gray-50 p-3 border border-[#E5E5E5]" style={{borderRadius: 0}}>
+                <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+                  {generateWorkoutDescription() || 'Add segments to see workout summary...'}
                 </p>
-                <div className="border-2 border-dashed border-muted rounded-lg p-8 text-center">
-                  <p className="text-muted-foreground">No completed session data available</p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Connect your device or manually mark as completed
+                {calculateTotalTime() > 0 && (
+                  <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'Inter, sans-serif'}}>
+                    Total Time: {formatTime(calculateTotalTime())}
                   </p>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Completed Tab Content - simplified */
+          <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
+            {formData.type === 'strength' ? (
+              <div>
+                <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Log Completed Strength Training</h3>
+                <StrengthExerciseBuilder
+                  exercises={strengthExercises}
+                  onChange={setStrengthExercises}
+                  isMetric={isMetric}
+                  isCompleted={true}
+                />
+              </div>
+            ) : (
+              <div>
+                <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Completed Session Data</h3>
+                <div className="text-center py-12">
+                  <p className="text-gray-500 mb-2">No completed session data available</p>
+                  <p className="text-sm text-gray-400">Connect your device or manually mark as completed</p>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        )
-      )}
-
-      {/* Total Timer Bar */}
-      <div className="mt-6 bg-muted rounded-lg p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span className="font-medium">Total effort Time</span>
+            )}
           </div>
-          <span className="text-lg font-bold">{formatTime(calculateTotalTime())}</span>
-        </div>
-      </div>
+        )}
 
-      {/* Save Button */}
-      <div className="mt-4 flex justify-end gap-2">
-        <Button
-          onClick={() => handleSave(false)}
-          size="lg"
-          className="bg-gray-500 hover:bg-gray-600 min-h-[44px]"
-        >
-          <Save className="h-4 w-4 mr-2" />
-          Save
-        </Button>
-        <Button
-          onClick={() => handleSave(true)}
-          size="lg"
-          variant="outline"
-          className="border-gray-500 text-gray-700 hover:bg-gray-50 min-h-[44px]"
-        >
-          Save & Close
-        </Button>
-      </div>
+        {/* Clean Save Button */}
+        <div className="flex justify-end mt-6">
+          <button
+            onClick={() => handleSave(false)}
+            className="text-black hover:text-gray-600 text-sm font-medium transition-colors"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            Save
+          </button>
+        </div>
+      </main>
     </div>
   );
 }
