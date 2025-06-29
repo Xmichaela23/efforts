@@ -16,7 +16,7 @@ export interface StrengthExercise {
   notes?: string;
   weightMode: 'same' | 'individual';
   individualWeights?: number[];
-  completed_sets?: Array<{ reps: number; weight: number; completed: boolean }>;
+  completed_sets?: Array<{ reps: number; weight: number; rir?: number; completed: boolean }>;
 }
 
 interface StrengthExerciseBuilderProps {
@@ -27,7 +27,7 @@ interface StrengthExerciseBuilderProps {
 }
 
 export default function StrengthExerciseBuilder({ exercises, onChange, isMetric, isCompleted = false }: StrengthExerciseBuilderProps) {
-  const addExercise = (e: React.MouseEvent) => {
+  const addExercise = (e: React.MouseEvent, afterIndex?: number) => {
     e.preventDefault();
     e.stopPropagation();
     const newExercise: StrengthExercise = {
@@ -38,7 +38,14 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
       weightMode: 'same',
       completed_sets: []
     };
-    onChange([...exercises, newExercise]);
+    
+    if (afterIndex !== undefined) {
+      const newExercises = [...exercises];
+      newExercises.splice(afterIndex + 1, 0, newExercise);
+      onChange(newExercises);
+    } else {
+      onChange([...exercises, newExercise]);
+    }
   };
 
   const updateExercise = (id: string, updates: Partial<StrengthExercise>) => {
@@ -47,7 +54,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
         const updated = { ...exercise, ...updates };
         if (updates.sets && updates.sets !== exercise.sets) {
           updated.individualWeights = Array(updates.sets).fill(exercise.weight || 0);
-          updated.completed_sets = Array(updates.sets).fill({ reps: 0, weight: 0, completed: false });
+          updated.completed_sets = Array(updates.sets).fill({ reps: 0, weight: 0, rir: 0, completed: false });
         }
         return updated;
       }
@@ -80,7 +87,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
     onChange(exercises.filter(exercise => exercise.id !== id));
   };
 
-  const updateCompletedSet = (exerciseId: string, setIndex: number, updates: { reps?: number; weight?: number }) => {
+  const updateCompletedSet = (exerciseId: string, setIndex: number, updates: { reps?: number; weight?: number; rir?: number }) => {
     const exercise = exercises.find(e => e.id === exerciseId);
     if (exercise && exercise.completed_sets) {
       const newCompletedSets = [...exercise.completed_sets];
@@ -132,14 +139,24 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
                           className="w-20 h-8"
                         />
                         <span className="text-sm">{isMetric ? 'kg' : 'lbs'}</span>
+                        <Input
+                          type="number"
+                          name={`completed-rir-${exercise.id}-${setIndex}`}
+                          autoComplete="off"
+                          placeholder="0-5"
+                          value={completedSet?.rir || ''}
+                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || 0 })}
+                          className="w-16 h-8"
+                        />
                       </div>
                     </div>
                   );
                 })}
+                <div className="text-xs text-muted-foreground mt-2">RIR = Reps left in tank</div>
               </div>
             </Card>
           ))}
-          <Button type="button" className="w-full bg-gray-400 hover:bg-gray-500">
+          <Button type="button" className="w-full bg-black text-white hover:bg-gray-800">
             Save
           </Button>
         </CardContent>
@@ -152,7 +169,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           Strength
-          <Button type="button" onClick={addExercise} size="sm" className="bg-gray-500 hover:bg-gray-600">
+          <Button type="button" onClick={(e) => addExercise(e)} size="sm" className="bg-black text-white hover:bg-gray-800">
             <Plus className="h-4 w-4 mr-2" />
             Add Exercise
           </Button>
@@ -167,10 +184,10 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
                 <h4 className="font-medium">Exercise {index + 1}</h4>
               </div>
               <div className="flex gap-2">
-                <Button type="button" onClick={(e) => duplicateExercise(exercise.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
+                <Button type="button" onClick={(e) => duplicateExercise(exercise.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
                   <Copy className="h-4 w-4" />
                 </Button>
-                <Button type="button" onClick={(e) => deleteExercise(exercise.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
+                <Button type="button" onClick={(e) => deleteExercise(exercise.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -278,6 +295,11 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
                 rows={2}
               />
             </div>
+            
+            <Button type="button" onClick={(e) => addExercise(e, index)} size="sm" variant="outline" className="w-full border-black hover:bg-gray-100">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Exercise
+            </Button>
           </Card>
         ))}
         
