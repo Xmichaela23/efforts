@@ -269,6 +269,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return parts.length > 0 ? parts.join(' + ') : '';
   };
 
+  const handleSaveAsRoutine = async () => {
+    console.log('💾 Saving as routine...');
+    // TODO: Implement routine saving logic
+    // This would save the workout structure as a reusable template
+    alert('Save as routine feature coming soon!');
+  };
+
   const handleSave = async (navigateAfterSave: boolean = false) => {
     console.log('🚀 Save function called!');
     console.log('📊 Form data:', formData);
@@ -340,27 +347,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     <div className="min-h-screen bg-white">
       {/* Save Success Banner */}
       {showSaveOptions && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black text-white px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-4">
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 border border-gray-200 z-50 flex items-center gap-4">
           <Check className="h-5 w-5" />
-          <span>{currentWorkout ? 'effort updated' : 'effort saved'}</span>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => handleSave(true)}
-              className="bg-white text-black hover:bg-gray-100"
-            >
-              Go to Dashboard
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowSaveOptions(false)}
-              className="bg-white border-white text-black hover:bg-gray-50"
-            >
-              Keep Editing
-            </Button>
-          </div>
+          <span>{currentWorkout ? 'effort Updated' : 'effort saved'}</span>
         </div>
       )}
 
@@ -573,15 +562,31 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
         )}
 
-        {/* Clean Save Button */}
+        {/* Enhanced Save Button with Hover */}
         <div className="flex justify-end mt-6">
-          <button
-            onClick={() => handleSave(false)}
-            className="text-black hover:text-gray-600 text-sm font-medium transition-colors"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            Save
-          </button>
+          <div className="relative group">
+            <button
+              onClick={() => handleSave(false)}
+              className="px-8 py-4 text-black hover:text-gray-600 text-lg font-medium transition-colors"
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              Save
+            </button>
+            
+            {/* Hover reveal for "Save as routine" - light gray and clickable */}
+            <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSaveAsRoutine();
+                }}
+                className="whitespace-nowrap px-4 py-2 bg-gray-100 text-gray-700 text-sm border border-gray-200 hover:bg-gray-200 transition-colors pointer-events-auto"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              >
+                Save as routine
+              </button>
+            </div>
+          </div>
         </div>
       </main>
     </div>

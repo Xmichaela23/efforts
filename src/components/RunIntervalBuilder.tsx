@@ -12,7 +12,7 @@ export interface RunInterval {
   time?: string;
   distance?: string;
   paceTarget?: string;
-  effortLabel?: string; // NEW: Effort level dropdown
+  effortLabel?: string;
   bpmTarget?: string;
   rpeTarget?: string;
   repeat?: boolean;
@@ -20,7 +20,7 @@ export interface RunInterval {
   duration?: number;
   selected?: boolean;
   isRepeatBlock?: boolean;
-  originalSegments?: RunInterval[]; // Store original segments for unblocking
+  originalSegments?: RunInterval[];
 }
 
 interface RunIntervalBuilderProps {
@@ -29,18 +29,39 @@ interface RunIntervalBuilderProps {
   isMetric: boolean;
 }
 
-// MOBILE SAFARI FIX: Aggressive fix for number input issues
+// Smart time input handler
+const handleTimeInput = (value: string, onChange: (timeStr: string, duration: number) => void) => {
+  let timeStr = value;
+  
+  // Smart time conversion: "4" -> "4:00", "45" -> "45:00", "4:30" stays "4:30"
+  if (timeStr && !timeStr.includes(':') && timeStr.length <= 2) {
+    timeStr = `${timeStr}:00`;
+  }
+  
+  if (timeStr === '') {
+    onChange('', 0);
+    return;
+  }
+  
+  const parts = timeStr.split(':');
+  const min = parseInt(parts[0]) || 0;
+  const sec = parseInt(parts[1]) || 0;
+  
+  // Validate seconds
+  if (sec >= 60) return;
+  
+  const duration = min * 60 + sec;
+  onChange(timeStr, duration);
+};
+
+// Mobile Safari numeric input fix
 const handleNumericInput = (value: string, onChange: (num: number) => void) => {
-  // Allow empty string for clearing
   if (value === '') {
     onChange(0);
     return;
   }
   
-  // Only allow digits
   const numericValue = value.replace(/\D/g, '');
-  
-  // Convert to number, default to 1 if empty after cleaning
   const parsed = parseInt(numericValue, 10);
   const finalValue = isNaN(parsed) || parsed < 1 ? 1 : parsed;
   
@@ -93,7 +114,6 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
     );
   };
 
-  // FIXED: Better block summary generation
   const createBlock = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -102,14 +122,11 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
     const selectedIntervalsData = intervals.filter(i =>
       selectedIntervals.includes(i.id));
 
-    // FIXED: More robust block summary generation
     const blockSummary = selectedIntervalsData.map(i => {
       let segmentDesc = '';
-      // Primary descriptor (time is most important)
       if (i.time) {
         segmentDesc += i.time;
       }
-      // Add effort label (prioritized)
       if (i.effortLabel) {
         segmentDesc += ` @ ${i.effortLabel}`;
       } else if (i.paceTarget) {
@@ -120,7 +137,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
         segmentDesc += ` @ RPE ${i.rpeTarget}`;
       }
       return segmentDesc.trim();
-    }).filter(desc => desc.length > 0).join(' + '); // Filter out empty descriptions
+    }).filter(desc => desc.length > 0).join(' + ');
 
     const totalDuration = selectedIntervalsData.reduce((sum, i) => sum + (i.duration || 0), 0);
 
@@ -132,8 +149,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
       duration: totalDuration * blockRepeatCount,
       originalSegments: selectedIntervalsData.map(seg => ({
         ...seg,
-        originalSegments: undefined // Prevent circular references
-      })) // Store copies for unblocking
+        originalSegments: undefined
+      }))
     };
 
     const remainingIntervals = intervals.filter(i =>
@@ -142,20 +159,17 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
     setSelectedIntervals([]);
   };
 
-  // NEW: Unblock feature to break apart repeat blocks
   const unblockInterval = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const blockInterval = intervals.find(i => i.id === id);
     if (!blockInterval || !blockInterval.isRepeatBlock || !blockInterval.originalSegments) return;
 
-    // Restore original segments with new IDs
     const restoredSegments = blockInterval.originalSegments.map(seg => ({
       ...seg,
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
     }));
 
-    // Replace the block with the restored segments
     const updatedIntervals = intervals.filter(i => i.id !== id);
     onChange([...updatedIntervals, ...restoredSegments]);
   };
@@ -163,55 +177,54 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
   const renderInterval = (interval: RunInterval, index: number) => {
     if (interval.isRepeatBlock) {
       return (
-        <Card key={interval.id} className="p-4 bg-blue-50 border-blue-200">
-          <div className="flex items-center gap-4 mb-4">
+        <Card key={interval.id} className="p-3 bg-blue-50 border-blue-200">
+          <div className="flex items-center gap-3 mb-3">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
-            <h4 className="font-medium flex-1">
+            <h4 className="font-medium flex-1 text-sm">
               <Repeat className="h-4 w-4 inline mr-2" />
               Repeat Block {intervals.filter(i => i.isRepeatBlock).findIndex(i => i.id === interval.id) + 1}
             </h4>
             <div className="flex gap-2">
-              {/* NEW: Unblock button */}
               <Button
                 type="button"
                 onClick={(e) => unblockInterval(interval.id, e)}
                 size="sm"
                 variant="outline"
-                className="border-blue-400 hover:bg-blue-100"
-                title="Break apart this repeat block for editing"
+                className="h-8 w-8 p-0 border-blue-400 hover:bg-blue-100"
+                title="Break apart block"
               >
-                <Edit className="h-4 w-4" />
+                <Edit className="h-3 w-3" />
               </Button>
               <Button
                 type="button"
                 onClick={(e) => duplicateInterval(interval.id, e)}
                 size="sm"
                 variant="outline"
-                className="border-blue-400 hover:bg-blue-100"
+                className="h-8 w-8 p-0 border-blue-400 hover:bg-blue-100"
               >
-                <Copy className="h-4 w-4" />
+                <Copy className="h-3 w-3" />
               </Button>
               <Button
                 type="button"
                 onClick={(e) => deleteInterval(interval.id, e)}
                 size="sm"
                 variant="outline"
-                className="border-blue-400 hover:bg-blue-100"
+                className="h-8 w-8 p-0 border-blue-400 hover:bg-blue-100"
               >
-                <Trash2 className="h-4 w-4" />
+                <Trash2 className="h-3 w-3" />
               </Button>
             </div>
           </div>
 
-          <div className="bg-white p-4 rounded border">
-            <div className="text-sm font-medium text-blue-700 mb-2">
+          <div className="bg-white p-3 rounded border">
+            <div className="text-xs font-medium text-blue-700 mb-1">
               Repeat Structure:
             </div>
-            <div className="text-lg font-mono">
+            <div className="text-sm font-mono">
               {interval.time}
             </div>
-            <div className="text-sm text-muted-foreground mt-2">
-              Total Duration: {Math.floor((interval.duration || 0) / 60)}:{((interval.duration || 0) % 60).toString().padStart(2, '0')}
+            <div className="text-xs text-muted-foreground mt-1">
+              Total: {Math.floor((interval.duration || 0) / 60)}:{((interval.duration || 0) % 60).toString().padStart(2, '0')}
             </div>
           </div>
         </Card>
@@ -219,8 +232,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
     }
 
     return (
-      <Card key={interval.id} className="p-4">
-        <div className="flex items-center gap-4 mb-4">
+      <div key={interval.id} className="p-3 border rounded-lg">
+        <div className="flex items-center gap-3 mb-3">
           <Checkbox
             checked={selectedIntervals.includes(interval.id)}
             onCheckedChange={() => toggleIntervalSelection(interval.id)}
@@ -233,7 +246,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                 updateInterval(interval.id, { effortLabel: value });
               }}
             >
-              <SelectTrigger className="border-none shadow-none p-0 h-auto font-medium">
+              <SelectTrigger className="border-none shadow-none p-0 h-auto font-medium text-sm">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -249,90 +262,94 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
             </Select>
           </div>
           <div className="flex gap-2">
-            <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
-              <Copy className="h-4 w-4" />
+            <Button 
+              type="button" 
+              onClick={(e) => duplicateInterval(interval.id, e)} 
+              size="sm" 
+              variant="outline" 
+              className="h-8 w-8 p-0 border-gray-400 hover:bg-gray-100"
+            >
+              <Copy className="h-3 w-3" />
             </Button>
-            <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
-              <Trash2 className="h-4 w-4" />
+            <Button 
+              type="button" 
+              onClick={(e) => deleteInterval(interval.id, e)} 
+              size="sm" 
+              variant="outline" 
+              className="h-8 w-8 p-0 border-gray-400 hover:bg-gray-100"
+            >
+              <Trash2 className="h-3 w-3" />
             </Button>
           </div>
         </div>
 
-        {/* MOBILE-FIRST: 5-field responsive grid - CLEANED UP */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+        {/* Compact 3-column responsive grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
           <div>
-            <Label>Time (mm:ss)</Label>
+            <Label className="text-xs text-muted-foreground">Time</Label>
             <Input
-              placeholder="5:00"
+              placeholder="4:00"
               value={interval.time || ''}
               onChange={(e) => {
-                const timeStr = e.target.value;
-                // Better time parsing with error handling
-                if (timeStr === '') {
-                  updateInterval(interval.id, { time: '', duration: 0 });
-                  return;
-                }
-                const parts = timeStr.split(':');
-                const min = parseInt(parts[0]) || 0;
-                const sec = parseInt(parts[1]) || 0;
-                // Validate time input
-                if (sec >= 60) return; // Don't allow invalid seconds
-                const duration = min * 60 + sec;
-                updateInterval(interval.id, { time: timeStr, duration });
+                handleTimeInput(e.target.value, (timeStr, duration) => {
+                  updateInterval(interval.id, { time: timeStr, duration });
+                });
               }}
-              className="min-h-[44px]"
+              className="h-9 text-sm"
             />
           </div>
           <div>
-            <Label>Pace Target (per {isMetric ? 'km' : 'mi'})</Label>
+            <Label className="text-xs text-muted-foreground">Pace (per {isMetric ? 'km' : 'mi'})</Label>
             <Input
               placeholder="8:30"
               value={interval.paceTarget || ''}
               onChange={(e) => updateInterval(interval.id, { paceTarget: e.target.value })}
-              className="min-h-[44px]"
+              className="h-9 text-sm"
             />
           </div>
           <div>
-            <Label>BPM Target</Label>
-            <Input
-              placeholder="150-160"
-              value={interval.bpmTarget || ''}
-              onChange={(e) => updateInterval(interval.id, { bpmTarget: e.target.value })}
-              className="min-h-[44px]"
-            />
-          </div>
-          <div>
-            <Label>Distance ({isMetric ? 'km' : 'mi'})</Label>
+            <Label className="text-xs text-muted-foreground">Distance ({isMetric ? 'km' : 'mi'})</Label>
             <Input
               placeholder="5.0"
               value={interval.distance || ''}
               onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
-              className="min-h-[44px]"
+              className="h-9 text-sm"
             />
           </div>
           <div>
-            <Label>RPE Target</Label>
+            <Label className="text-xs text-muted-foreground">BPM</Label>
+            <Input
+              placeholder="150-160"
+              value={interval.bpmTarget || ''}
+              onChange={(e) => updateInterval(interval.id, { bpmTarget: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">RPE</Label>
             <Input
               placeholder="6-7"
               value={interval.rpeTarget || ''}
               onChange={(e) => updateInterval(interval.id, { rpeTarget: e.target.value })}
-              className="min-h-[44px]"
+              className="h-9 text-sm"
             />
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 mb-4">
-          <Checkbox
-            id={`repeat-${interval.id}`}
-            checked={interval.repeat || false}
-            onCheckedChange={(checked) => updateInterval(interval.id, { repeat: !!checked })}
-          />
-          <Label htmlFor={`repeat-${interval.id}`}>Repeat?</Label>
+        {/* Compact repeat section */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={`repeat-${interval.id}`}
+              checked={interval.repeat || false}
+              onCheckedChange={(checked) => updateInterval(interval.id, { repeat: !!checked })}
+            />
+            <Label htmlFor={`repeat-${interval.id}`} className="text-xs">Repeat?</Label>
+          </div>
           {interval.repeat && (
-            // MOBILE SAFARI FIX: Completely custom numeric input handling
             <Input
               type="text"
-              className="w-20 h-10 min-h-[44px]"
+              className="w-14 h-8 text-center text-sm"
               placeholder="2"
               value={interval.repeatCount === undefined ? '' : interval.repeatCount.toString()}
               onChange={(e) => {
@@ -345,81 +362,61 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                   });
                 }
               }}
-              onFocus={(e) => {
-                // Select all text on focus to make it easy to replace
-                e.target.select();
-              }}
+              onFocus={(e) => e.target.select()}
             />
           )}
         </div>
-
-        {/* REMOVED: Individual "New Segment" buttons from each interval */}
-      </Card>
+      </div>
     );
   };
 
   return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Segments
-            <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600 min-h-[44px]">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Segment
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {intervals.map((interval, index) => renderInterval(interval, index))}
+    <div className="space-y-3">
+      {/* Left-aligned Add Effort button only */}
+      <div className="mb-3 text-center">
+        <button 
+          type="button" 
+          onClick={addInterval} 
+          className="px-4 py-2 text-black text-sm"
+        >
+          <Plus className="h-4 w-4 mr-2 inline" />
+          Add effort
+        </button>
+      </div>
 
-          {intervals.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No segments added yet. Click "Add Segment" to get started.
-            </div>
-          )}
+      {/* Segments */}
+      <div className="space-y-3">
+        {intervals.map((interval, index) => renderInterval(interval, index))}
 
-          {/* FIXED: Add global "Add Segment" button at bottom, always visible */}
-          {intervals.length > 0 && (
-            <div className="pt-4 border-t">
-              <Button 
-                type="button" 
-                onClick={addInterval} 
-                size="sm" 
-                variant="outline" 
-                className="w-full border-gray-400 hover:bg-gray-100 min-h-[44px]"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Segment
-              </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        {intervals.length === 0 && (
+          <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-muted rounded-lg">
+            <p className="text-sm">No segments yet</p>
+            <p className="text-xs mt-1">            Click "Add effort" to get started</p>
+          </div>
+        )}
 
-      {/* FIXED: Better positioned floating repeat menu with mobile Safari fixes */}
+
+      </div>
+
+      {/* Floating repeat menu - more compact */}
       {selectedIntervals.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border-2 border-gray-300 rounded-lg shadow-xl p-4 flex flex-col items-center gap-3 z-[60] max-w-sm w-full mx-4">
-          <span className="text-sm font-medium text-gray-700">
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border-2 border-gray-300 rounded-lg shadow-xl p-3 flex flex-col items-center gap-2 z-[60] max-w-xs w-full mx-4">
+          <span className="text-xs font-medium text-gray-700">
             {selectedIntervals.length} segment{selectedIntervals.length > 1 ? 's' : ''} selected
           </span>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600">Repeat</span>
-            {/* MOBILE SAFARI FIX: Block repeat count input with aggressive handling */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-600">Repeat</span>
             <Input
               type="text"
-              className="w-16 h-12 text-center text-lg font-semibold border-2 min-h-[44px]"
+              className="w-12 h-8 text-center text-sm font-semibold border-2"
               value={blockRepeatCount.toString()}
               onChange={(e) => {
                 handleNumericInput(e.target.value, setBlockRepeatCount);
               }}
-              onFocus={(e) => {
-                // Select all text on focus for easy replacement
-                e.target.select();
-              }}
+              onFocus={(e) => e.target.select()}
               placeholder="1"
             />
-            <span className="text-sm text-gray-600">times</span>
+            <span className="text-xs text-gray-600">times</span>
           </div>
           <div className="flex gap-2 w-full">
             <Button
@@ -427,7 +424,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               onClick={() => setSelectedIntervals([])}
               size="sm"
               variant="outline"
-              className="flex-1 min-h-[44px]"
+              className="flex-1 h-8 text-xs"
             >
               Cancel
             </Button>
@@ -435,10 +432,10 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               type="button"
               onClick={createBlock}
               size="sm"
-              className="bg-gray-500 hover:bg-gray-600 flex-1 min-h-[44px]"
+              className="bg-gray-500 hover:bg-gray-600 flex-1 h-8 text-xs"
             >
-              <Repeat className="h-4 w-4 mr-2" />
-              Create Block
+              <Repeat className="h-3 w-3 mr-1" />
+              Create
             </Button>
           </div>
         </div>

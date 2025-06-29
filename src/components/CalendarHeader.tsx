@@ -1,5 +1,6 @@
 import React from 'react';
 import NewEffortDropdown from './NewEffortDropdown';
+import RoutinesDropdown from './RoutinesDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 
 interface CalendarHeaderProps {
@@ -10,6 +11,7 @@ interface CalendarHeaderProps {
   onSelectWorkout: (workout: any) => void;
   onViewCompleted: () => void;
   onEditEffort: (workout: any) => void;
+  onSelectRoutine?: (type: string) => void;
 }
 
 const CalendarHeader: React.FC<CalendarHeaderProps> = ({
@@ -19,7 +21,8 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onSelectType,
   onSelectWorkout,
   onViewCompleted,
-  onEditEffort
+  onEditEffort,
+  onSelectRoutine
 }) => {
   console.log('🔧 CalendarHeader received onEditEffort:', !!onEditEffort);
   
@@ -27,6 +30,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
     <div className="flex justify-end items-center mb-4 md:mb-6 gap-2 md:gap-3">
       {/* REFINED: Beautiful ghost buttons with perfect proportions */}
       <NewEffortDropdown onSelectType={onSelectType} />
+      <RoutinesDropdown onSelectRoutine={onSelectRoutine} />
       <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
     </div>
   );
