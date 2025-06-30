@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Copy, Trash2 } from 'lucide-react';
+import { Plus, Copy, Trash2, Dumbbell } from 'lucide-react';
 
 export interface StrengthExercise {
   id: string;
@@ -61,8 +61,8 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
     const newExercise: StrengthExercise = {
       id: Date.now().toString(),
       name: '',
-      sets: 1,
-      reps: 1,
+      sets: 0,
+      reps: 0,
       weightMode: 'same',
       completed_sets: []
     };
@@ -80,9 +80,15 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
     onChange(exercises.map(exercise => {
       if (exercise.id === id) {
         const updated = { ...exercise, ...updates };
+        // Update completed_sets array when sets change
         if (updates.sets && updates.sets !== exercise.sets) {
           updated.individualWeights = Array(updates.sets).fill(exercise.weight || 0);
-          updated.completed_sets = Array(updates.sets).fill({ reps: 0, weight: 0, rir: 0, completed: false });
+          updated.completed_sets = Array(updates.sets).fill(null).map(() => ({ 
+            reps: 0, 
+            weight: 0, 
+            rir: 0, 
+            completed: false 
+          }));
         }
         return updated;
       }
@@ -138,40 +144,71 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
 
   if (isCompleted) {
     return (
-      <div className="space-y-4">
-        <h3 className="text-lg font-medium">Strength Session</h3>
+      <div className="space-y-4 -mx-4 px-0">
         {exercises.map((exercise, index) => (
-          <div key={exercise.id} className="p-4 border border-gray-200 rounded">
-            <h4 className="font-medium mb-4">{exercise.name || `Exercise ${index + 1}`}</h4>
-            <div className="space-y-2">
-              {Array.from({ length: exercise.sets }).map((_, setIndex) => {
+          <div key={exercise.id} className="px-4 py-4 border-b border-gray-200">
+            <h4 className="font-semibold text-lg mb-4 text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+              {exercise.name || `Exercise ${index + 1}`}
+            </h4>
+            
+            <div className="space-y-3">
+              {Array.from({ length: exercise.sets || 0 }).map((_, setIndex) => {
                 const plannedWeight = exercise.weightMode === 'same' 
                   ? exercise.weight 
                   : exercise.individualWeights?.[setIndex];
                 const completedSet = exercise.completed_sets?.[setIndex];
                 
                 return (
-                  <div key={setIndex} className="flex items-center gap-4 p-3 bg-gray-50 rounded">
-                    <span className="font-medium w-16">Set {setIndex + 1}:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">{exercise.reps} reps @ {plannedWeight || 0} lbs</span>
-                      <span className="text-gray-500">→</span>
-                      <Input
-                        type="number"
-                        placeholder="Reps"
-                        value={completedSet?.reps || ''}
-                        onChange={(e) => updateCompletedSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                        className="w-20 h-8"
-                      />
-                      <span className="text-sm">reps @</span>
-                      <Input
-                        type="number"
-                        placeholder="Weight"
-                        value={completedSet?.weight || ''}
-                        onChange={(e) => updateCompletedSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                        className="w-20 h-8"
-                      />
-                      <span className="text-sm">lbs</span>
+                  <div key={setIndex} className="bg-gray-50 p-3 -mx-4 px-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-semibold text-base text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+                        Set {setIndex + 1}
+                      </span>
+                      <span className="text-sm text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+                        Planned: {exercise.reps || 0} reps @ {plannedWeight || 0} lbs
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                          Reps
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder={exercise.reps?.toString() || "0"}
+                          value={completedSet?.reps || ''}
+                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{fontFamily: 'Inter, sans-serif'}}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                          Weight (lbs)
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder={plannedWeight?.toString() || "0"}
+                          value={completedSet?.weight || ''}
+                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{fontFamily: 'Inter, sans-serif'}}
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                          RIR
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder="0-5"
+                          value={completedSet?.rir || ''}
+                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || 0 })}
+                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{fontFamily: 'Inter, sans-serif'}}
+                        />
+                      </div>
                     </div>
                   </div>
                 );
@@ -179,47 +216,48 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
             </div>
           </div>
         ))}
-        <Button type="button" className="w-full bg-black text-white hover:bg-gray-800">
-          Save
-        </Button>
+        <div className="px-4 pt-4">
+          <Button type="button" className="w-full bg-black text-white hover:bg-gray-800 h-12 text-base font-semibold">
+            Save Workout
+          </Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-3">
-      <button 
-        type="button" 
-        onClick={(e) => addExercise(e)} 
-        className="p-2 text-gray-700 hover:bg-gray-50 bg-white focus:outline-none flex items-center"
-      >
-        <Plus className="h-5 w-5 mr-2" />
-        Exercise
-      </button>
-      
       {exercises.map((exercise, index) => (
-        <div key={exercise.id} className="space-y-3 py-2">
+        <div key={exercise.id} className="space-y-3 py-3 border-t border-gray-100 first:border-t-0">
           <div className="flex items-center justify-between">
-            <Label className="text-base font-medium">Exercise</Label>
-            <div className="flex gap-2">
+            <button 
+              type="button" 
+              onClick={(e) => addExercise(e, index)} 
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-start transition-colors"
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              <span className="text-lg font-medium">Exercise</span>
+            </button>
+            <div className="flex gap-3">
               <button 
                 type="button" 
                 onClick={(e) => duplicateExercise(exercise.id, e)} 
-                className="p-2 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded focus:outline-none"
+                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded-lg focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
               >
                 <Copy className="h-4 w-4" />
               </button>
               <button 
                 type="button" 
                 onClick={(e) => deleteExercise(exercise.id, e)} 
-                className="p-2 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded focus:outline-none"
+                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded-lg focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
             <div className="md:col-span-2 relative">
               <Input
                 placeholder="Start typing exercise name..."
@@ -227,15 +265,18 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                 onChange={(e) => handleExerciseNameChange(exercise.id, e.target.value)}
                 onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
                 onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
+                className="min-h-[48px] text-base border-gray-300"
+                style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
               />
               {showSuggestions[exercise.id] && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
                   {getFilteredExercises(exercise.name).map((exerciseName) => (
                     <button
                       key={exerciseName}
                       type="button"
-                      className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none text-base min-h-[44px] flex items-center"
                       onClick={() => selectExercise(exercise.id, exerciseName)}
+                      style={{fontFamily: 'Inter, sans-serif'}}
                     >
                       {exerciseName}
                     </button>
@@ -244,27 +285,57 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               )}
             </div>
             <div>
-              <Label>Sets</Label>
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Sets
+              </Label>
               <Input
                 type="number"
-                min="1"
-                value={exercise.sets}
-                onChange={(e) => updateExercise(exercise.id, { sets: parseInt(e.target.value) || 1 })}
+                value={exercise.sets || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    updateExercise(exercise.id, { sets: 0 });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                      updateExercise(exercise.id, { sets: numValue });
+                    }
+                  }
+                }}
+                className="min-h-[48px] text-base border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                placeholder="5"
               />
             </div>
             <div>
-              <Label>Reps</Label>
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Reps
+              </Label>
               <Input
                 type="number"
-                min="1"
-                value={exercise.reps}
-                onChange={(e) => updateExercise(exercise.id, { reps: parseInt(e.target.value) || 1 })}
+                value={exercise.reps || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    updateExercise(exercise.id, { reps: 0 });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                      updateExercise(exercise.id, { reps: numValue });
+                    }
+                  }
+                }}
+                className="min-h-[48px] text-base border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                placeholder="5"
               />
             </div>
           </div>
 
-          <div className="mb-3">
-            <Label>Weight Structure</Label>
+          <div className="mb-5">
+            <Label className="text-lg font-semibold text-gray-800 mb-5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+              Weight Structure
+            </Label>
             <RadioGroup
               value={exercise.weightMode}
               onValueChange={(value: 'same' | 'individual') => {
@@ -273,41 +344,75 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                   individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
                 });
               }}
-              className="mt-2"
+              className="mt-3 space-y-3"
             >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="same" id={`same-${exercise.id}`} />
-                <Label htmlFor={`same-${exercise.id}`}>Same weight for all sets</Label>
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[20px] min-w-[20px]" />
+                <Label htmlFor={`same-${exercise.id}`} className="text-lg font-medium text-gray-800" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Same weight for all sets
+                </Label>
               </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="individual" id={`individual-${exercise.id}`} />
-                <Label htmlFor={`individual-${exercise.id}`}>Different weight for each set</Label>
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[20px] min-w-[20px]" />
+                <Label htmlFor={`individual-${exercise.id}`} className="text-lg font-medium text-gray-800" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Different weight for each set
+                </Label>
               </div>
             </RadioGroup>
           </div>
 
           {exercise.weightMode === 'same' ? (
-            <div className="mb-3">
-              <Label>Weight (lbs)</Label>
+            <div className="mb-5">
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Weight (lbs)
+              </Label>
               <Input
                 type="number"
                 placeholder="185"
                 value={exercise.weight || ''}
-                onChange={(e) => updateExercise(exercise.id, { weight: parseInt(e.target.value) || undefined })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    updateExercise(exercise.id, { weight: undefined });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue)) {
+                      updateExercise(exercise.id, { weight: numValue });
+                    }
+                  }
+                }}
+                className="min-h-[48px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
               />
             </div>
           ) : (
-            <div className="mb-3">
-              <Label>Weight per Set (lbs)</Label>
-              <div className="grid grid-cols-2 gap-2 mt-2">
+            <div className="mb-5">
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Weight per Set (lbs)
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
                 {Array.from({ length: exercise.sets }).map((_, setIndex) => (
-                  <div key={setIndex} className="flex items-center gap-2">
-                    <span className="text-sm w-12">Set {setIndex + 1}:</span>
+                  <div key={setIndex} className="flex items-center gap-3">
+                    <span className="text-lg font-semibold w-20 text-gray-800" style={{fontFamily: 'Inter, sans-serif'}}>
+                      Set {setIndex + 1}:
+                    </span>
                     <Input
                       type="number"
                       placeholder="185"
                       value={exercise.individualWeights?.[setIndex] || ''}
-                      onChange={(e) => updateIndividualWeight(exercise.id, setIndex, parseInt(e.target.value) || 0)}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          updateIndividualWeight(exercise.id, setIndex, 0);
+                        } else {
+                          const numValue = parseInt(value);
+                          if (!isNaN(numValue)) {
+                            updateIndividualWeight(exercise.id, setIndex, numValue);
+                          }
+                        }
+                      }}
+                      className="min-h-[44px] text-base border-gray-300 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
                     />
                   </div>
                 ))}
@@ -315,30 +420,49 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
             </div>
           )}
 
-          <div className="mb-3">
-            <Label>Notes</Label>
+          <div className="mb-5">
+            <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+              Notes
+            </Label>
             <Textarea
               placeholder="Form cues, rest time, etc."
               value={exercise.notes || ''}
               onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
-              rows={2}
+              rows={3}
+              className="min-h-[80px] text-base border-gray-300"
+              style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
             />
           </div>
-          
-          <button 
-            type="button" 
-            onClick={(e) => addExercise(e, index)} 
-            className="w-full p-2 text-gray-700 hover:bg-gray-50 bg-white focus:outline-none flex items-center justify-center"
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            Exercise
-          </button>
         </div>
       ))}
+      
+      {/* Bottom + Exercise button for continuous building */}
+      {exercises.length > 0 && (
+        <button 
+          type="button" 
+          onClick={(e) => addExercise(e)} 
+          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-start transition-colors"
+          style={{fontFamily: 'Inter, sans-serif'}}
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          <span className="text-lg font-medium">Exercise</span>
+        </button>
+      )}
         
       {exercises.length === 0 && (
-        <div className="text-center py-8 text-gray-500">
-          No exercises added yet. Click "Add Exercise" to get started.
+        <div className="text-center py-10 text-gray-500">
+          <button 
+            type="button" 
+            onClick={(e) => addExercise(e)} 
+            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-center transition-colors mx-auto"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            <span className="text-lg font-medium">Exercise</span>
+          </button>
+          <p className="text-lg text-gray-500 mt-4" style={{fontFamily: 'Inter, sans-serif'}}>
+            No exercises added yet.
+          </p>
         </div>
       )}
     </div>
