@@ -114,13 +114,13 @@ const AppLayout: React.FC = () => {
       {/* Header with navigation */}
       <header className="border-b border-border/40 bg-card/30 backdrop-blur-sm sticky top-0 z-40">
         {/* 🚨 FIXED: Mobile centering container */}
-        <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
+        <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
             {/* Left: Hamburger menu and efforts title */}
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-1 pl-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="p-0.5">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -169,7 +169,7 @@ const AppLayout: React.FC = () => {
             <div></div>
 
             {/* Right: Date (only when on dashboard) */}
-            <div className="flex items-center">
+            <div className="flex items-center pr-4">
               {!(selectedWorkout || showStrengthLogger || showBuilder) && (
                 <span className="text-lg font-normal text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
