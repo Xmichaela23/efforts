@@ -1,5 +1,6 @@
 import React from 'react';
 import NewEffortDropdown from './NewEffortDropdown';
+import LogEffortDropdown from './LogEffortDropdown';
 import RoutinesDropdown from './RoutinesDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 
@@ -25,11 +26,12 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
   onSelectRoutine
 }) => {
   console.log('🔧 CalendarHeader received onEditEffort:', !!onEditEffort);
-  
+
   return (
-    <div className="flex justify-end items-center mb-4 md:mb-6 gap-2 md:gap-3">
-      {/* REFINED: Beautiful ghost buttons with perfect proportions */}
+    <div className="w-full flex justify-start items-center mb-6 md:mb-8 gap-1 flex-nowrap -ml-4">
+      {/* 🚨 MORE LEFT: Bigger negative margin to shift further left */}
       <NewEffortDropdown onSelectType={onSelectType} />
+      <LogEffortDropdown onSelectType={onSelectType} />
       <RoutinesDropdown onSelectRoutine={onSelectRoutine} />
       <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
     </div>

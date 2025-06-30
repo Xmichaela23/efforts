@@ -7,7 +7,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Activity, Bike, Waves, Dumbbell } from 'lucide-react';
+import { ChevronDown, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
 
 interface AllEffortsDropdownProps {
   onSelectWorkout: (workout: any) => void;
@@ -15,19 +15,19 @@ interface AllEffortsDropdownProps {
 
 const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout }) => {
   const { workouts } = useAppContext();
-  
-  // Filter for completed workouts only
-  const completedWorkouts = workouts.filter(workout => 
+
+  const completedWorkouts = workouts.filter(workout =>
     workout.workout_status === 'completed' || workout.completedManually
   );
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'swim': return <Waves className="h-4 w-4 mr-2" />;
-      case 'ride': return <Bike className="h-4 w-4 mr-2" />;
-      case 'run': return <Activity className="h-4 w-4 mr-2" />;
-      case 'strength': return <Dumbbell className="h-4 w-4 mr-2" />;
-      default: return <Activity className="h-4 w-4 mr-2" />;
+      case 'swim': return <Waves className="h-5 w-5 mr-3" />;
+      case 'ride': return <Bike className="h-5 w-5 mr-3" />;
+      case 'run': return <Activity className="h-5 w-5 mr-3" />;
+      case 'strength': return <Dumbbell className="h-5 w-5 mr-3" />;
+      case 'mobility': return <Move className="h-5 w-5 mr-3" />;
+      default: return <Activity className="h-5 w-5 mr-3" />;
     }
   };
 
@@ -35,26 +35,29 @@ const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          className="flex items-center gap-2 bg-transparent text-gray-600 border border-gray-300 hover:bg-gray-50 hover:text-gray-800 hover:border-gray-400 transition-all duration-150"
+          className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
           style={{
             fontFamily: 'Inter, sans-serif',
-            fontWeight: 500,
-            padding: '8px 14px',
-            borderRadius: '6px',
-            fontSize: '14px'
+            fontWeight: 600,
+            padding: '14px 12px',
+            borderRadius: '8px',
+            fontSize: '15px',
+            minHeight: '48px',
+            flex: 1,
+            maxWidth: '140px'
           }}
         >
-          Completed efforts ({completedWorkouts.length})
-          <ChevronDown className="h-3.5 w-3.5" />
+          Completed ({completedWorkouts.length})
+          <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent 
-        align="start" 
-        className="max-h-64 overflow-y-auto bg-white border border-gray-200 shadow-lg" 
-        style={{borderRadius: '8px', padding: '4px', minWidth: '220px'}}
+      <DropdownMenuContent
+        align="start"
+        className="max-h-80 overflow-y-auto bg-white border border-gray-200 shadow-xl"
+        style={{borderRadius: '12px', padding: '8px', minWidth: '280px'}}
       >
         {completedWorkouts.length === 0 ? (
-          <div className="px-3 py-2 text-sm text-gray-500 text-center">
+          <div className="px-4 py-6 text-sm text-gray-500 text-center">
             No completed efforts yet
           </div>
         ) : (
@@ -62,15 +65,15 @@ const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout
             <DropdownMenuItem
               key={workout.id}
               onClick={() => onSelectWorkout(workout)}
-              className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-md flex items-start gap-2"
-              style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '8px 12px'}}
+              className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg flex items-start gap-3 cursor-pointer"
+              style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '56px'}}
             >
               {getIcon(workout.type)}
               <div className="flex-1 min-w-0">
-                <div className="font-medium text-sm truncate">
+                <div className="font-semibold text-sm truncate text-gray-900">
                   {workout.name || `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}`}
                 </div>
-                <div className="text-xs text-gray-500 mt-0.5">
+                <div className="text-xs text-gray-500 mt-1">
                   {workout.date ? new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
                     month: 'short',
                     day: 'numeric'

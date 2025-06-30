@@ -1,8 +1,7 @@
+/* 🚨 FIXED: Remove problematic global container styles */
 #root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+  /* Removed: max-width, margin, padding that broke mobile centering */
+  /* Let AppLayout handle responsive container sizing instead */
 }
 
 .logo {

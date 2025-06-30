@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Plus, ChevronDown, ChevronRight, ChevronLeft, Clock } from 'lucide-react';
 
 interface TodaysEffortProps {
   selectedDate?: string;
-  onAddEffort: () => void;
+  onAddEffort: (type: string, date?: string) => void; // FIXED: Now matches AppLayout
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
 }
@@ -99,9 +98,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   if (loading) {
     return (
-      <Card className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-        <CardHeader className="pb-2 md:pb-3">
-          <CardTitle className="text-base md:text-lg font-normal text-black flex items-center gap-2">
+      <div className="w-full bg-white p-2 sm:p-3" style={{fontFamily: 'Inter, sans-serif'}}>
+        <div className="pb-2 md:pb-3">
+          <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
             {formatDateDisplay(activeDate)}
             {activeDate !== today && workouts && workouts.length > 0 && (
               (() => {
@@ -117,22 +116,22 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 return null;
               })()
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="py-3 md:py-4">
+          </h2>
+        </div>
+        <div className="py-3 md:py-4">
           <div className="text-center py-3 md:py-4">
             <p className="text-[#666666] text-sm">Loading...</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   if (!currentWorkout) {
     return (
-      <Card className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-        <CardHeader className="pb-2 md:pb-3">
-          <CardTitle className="text-base md:text-lg font-normal text-black flex items-center gap-2">
+      <div className="w-full bg-white p-4 sm:p-6" style={{fontFamily: 'Inter, sans-serif'}}>
+        <div className="pb-2 md:pb-3">
+          <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
             {formatDateDisplay(activeDate)}
             {activeDate !== today && workouts && workouts.length > 0 && (
               (() => {
@@ -148,9 +147,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 return null;
               })()
             )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="py-3 md:py-4">
+          </h2>
+        </div>
+        <div className="py-3 md:py-4">
           <div className="text-center py-3 md:py-4">
             <p className="text-[#666666] mb-3 text-sm">
               No effort scheduled for this date
@@ -158,7 +157,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <Button 
               onClick={() => {
                 console.log('🆕 Add effort clicked for date:', activeDate);
-                onAddEffort();
+                // FIXED: Pass a default type and the selected date
+                onAddEffort('run', activeDate);
               }} 
               size="sm" 
               className="gap-2 bg-gray-600 text-white hover:bg-gray-700 border-gray-600 hover:border-gray-700 rounded-md transition-all duration-150 hover:transform hover:-translate-y-0.5 hover:shadow-md font-medium text-sm px-4 py-2 min-h-[36px]"
@@ -167,8 +167,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               Add effort
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
@@ -177,18 +177,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     : (currentWorkout.intervals?.length || 0);
 
   return (
-    <Card
-      className="w-full cursor-pointer hover:shadow-md transition-shadow"
+    <div
+      className="w-full bg-white p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
       style={{fontFamily: 'Inter, sans-serif'}}
       onClick={() => {
         console.log('🔧 TodaysEffort clicked:', currentWorkout);
         onEditEffort && onEditEffort(currentWorkout);
       }}
     >
-      <CardHeader className="pb-2 md:pb-3">
+      <div className="pb-2 md:pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 md:gap-4">
-            <CardTitle className="text-base md:text-lg font-normal text-black flex items-center gap-2">
+            <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
               {formatDateDisplay(activeDate)}
               {activeDate !== today && workouts && workouts.length > 0 && (
                 (() => {
@@ -204,7 +204,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return null;
                 })()
               )}
-            </CardTitle>
+            </h2>
             {totalWorkouts > 1 && (
               <div className="flex items-center gap-1 md:gap-2">
                 <button
@@ -232,16 +232,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             )}
           </div>
         </div>
-      </CardHeader>
-      <CardContent className="space-y-3 md:space-y-4 py-3 md:py-4">
+      </div>
+      <div className="space-y-3 md:space-y-4 py-3 md:py-4">
         {/* Workout Title and Type */}
         <div className="space-y-1">
           <h3 className="font-medium text-base md:text-lg leading-tight">{currentWorkout.name || formatWorkoutType(currentWorkout.type)}</h3>
           <p className="text-xs md:text-sm text-gray-600">{formatWorkoutType(currentWorkout.type)}</p>
         </div>
 
-        {/* Total Time Display */}
-        {currentWorkout.duration && currentWorkout.duration > 0 && (
+        {/* Total Time Display - ONLY for non-strength workouts */}
+        {currentWorkout.type !== 'strength' && currentWorkout.duration && currentWorkout.duration > 0 && (
           <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
             <Clock className="h-3 w-3 md:h-4 md:w-4" />
             <span className="font-medium">Total Time:</span>
@@ -249,7 +249,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
 
-        {/* Collapsible Segments */}
+        {/* Collapsible Segments/Exercises */}
         {intervalCount > 0 && (
           <div>
             <button
@@ -277,8 +277,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{currentWorkout.userComments}</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };
 

@@ -8,11 +8,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move } from 'lucide-react';
 
-interface NewEffortDropdownProps {
+interface LogEffortDropdownProps {
   onSelectType: (type: string) => void;
 }
 
-const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) => {
+const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -29,7 +29,7 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
             maxWidth: '90px'
           }}
         >
-          Build
+          Log
           <ChevronDown className="h-4 w-4" />
         </Button>
       </DropdownMenuTrigger>
@@ -39,48 +39,48 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
         style={{borderRadius: '12px', padding: '8px', minWidth: '160px'}}
       >
         <DropdownMenuItem
-          onClick={() => onSelectType('run')}
-          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <Activity className="h-5 w-5 mr-3" />
-          Run
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onSelectType('ride')}
-          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <Bike className="h-5 w-5 mr-3" />
-          Ride
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onSelectType('swim')}
-          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <Waves className="h-5 w-5 mr-3" />
-          Swim
-        </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => onSelectType('strength')}
+          onClick={() => onSelectType('log-strength')}
           className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
           <Dumbbell className="h-5 w-5 mr-3" />
-          Strength
+          Log Strength
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => onSelectType('mobility')}
+          onClick={() => onSelectType('log-run')}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <Activity className="h-5 w-5 mr-3" />
+          Log Run
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onSelectType('log-ride')}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <Bike className="h-5 w-5 mr-3" />
+          Log Ride
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onSelectType('log-swim')}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <Waves className="h-5 w-5 mr-3" />
+          Log Swim
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={() => onSelectType('log-mobility')}
           className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
           <Move className="h-5 w-5 mr-3" />
-          Mobility
+          Log Mobility
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 };
 
-export default NewEffortDropdown;
+export default LogEffortDropdown;

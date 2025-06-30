@@ -8,17 +8,19 @@ import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
+import StrengthLogger from './StrengthLogger';
 
 const AppLayout: React.FC = () => {
   const { workouts, loading, useImperial, toggleUnits } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
+  const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('planned');
-  
+
   // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
-  
+
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
@@ -32,153 +34,172 @@ const AppLayout: React.FC = () => {
   };
 
   const handleBackToDashboard = () => {
+    // Check if we have unsaved exercises in StrengthLogger
+    if (showStrengthLogger) {
+      if (confirm('Leave without saving? All progress will be lost.')) {
+        setShowStrengthLogger(false);
+      }
+      return;
+    }
+
+    // Regular builder close
     setShowBuilder(false);
-    setSelectedWorkout(null);
     setBuilderType('');
-    setActiveTab('planned');
+    setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
   };
 
-  const handleAddEffort = () => {
-    console.log('🆕 Adding new effort for date:', selectedDate);
+  const handleAddEffort = (type: string, date?: string) => {
+    setBuilderType(type);
     setWorkoutBeingEdited(null);
-    setBuilderType('');
-    setSelectedWorkout(null);
-    setShowBuilder(true);
+    
+    if (date) {
+      setSelectedDate(date);
+    }
+    
+    // 🚨 FIXED: Handle both 'strength_logger' and 'log-strength'
+    if (type === 'strength_logger' || type === 'log-strength') {
+      setShowStrengthLogger(true);
+    } else {
+      setShowBuilder(true);
+    }
   };
 
   const handleSelectEffortType = (type: string) => {
-    console.log('🎯 Selecting effort type:', type);
-    setWorkoutBeingEdited(null);
     setBuilderType(type);
-    setSelectedWorkout(null);
-    setShowBuilder(true);
+    setWorkoutBeingEdited(null);
+    
+    // 🚨 FIXED: Handle both 'strength_logger' and 'log-strength'
+    if (type === 'strength_logger' || type === 'log-strength') {
+      setShowStrengthLogger(true);
+    } else {
+      setShowBuilder(true);
+    }
   };
 
-  // Handle editing existing workout
   const handleEditEffort = (workout: any) => {
-    console.log('✅ CORRECT: handleEditEffort called - going to builder');
-    console.log('✏️ Editing effort:', workout);
-    
-    // Clear all other states first
-    setSelectedWorkout(null);
-    setActiveTab('planned');
-    
-    // Then set edit states
     setWorkoutBeingEdited(workout);
-    setBuilderType('');
+    setBuilderType(workout.type);
     setShowBuilder(true);
   };
 
-  // Handle calendar date selection
-  const handleDateSelect = (dateString: string) => {
-    console.log('📅 Calendar date selected:', dateString);
-    setSelectedDate(dateString);
+  const handleDateSelect = (date: string) => {
+    setSelectedDate(date);
   };
 
   const handleViewCompleted = () => {
-    setActiveTab('completed');
+    console.log('View completed workouts');
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin h-8 w-8 border-b-2 border-black mx-auto mb-4" style={{borderRadius: 0}}></div>
-          <p className="font-medium text-black" style={{fontFamily: 'Inter, sans-serif', letterSpacing: '0.02em'}}>Loading workouts...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-lg">Loading...</div>
       </div>
     );
-  };
+  }
 
   return (
-    <div className="min-h-screen bg-white">
-      <header className="bg-white border-b border-[#E5E5E5]">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
+    <div className="min-h-screen bg-background">
+      {/* Header with navigation */}
+      <header className="border-b border-border/40 bg-card/30 backdrop-blur-sm sticky top-0 z-40">
+        {/* 🚨 FIXED: Mobile centering container */}
+        <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <h1 className="text-2xl font-bold text-primary">Efforts</h1>
+              
+              {/* 🚨 ADDED: Missing Dashboard button */}
+              {(selectedWorkout || showStrengthLogger || showBuilder) && (
+                <Button
+                  onClick={handleBackToDashboard}
+                  variant="ghost"
+                  className="text-sm font-medium hover:bg-gray-50"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                >
+                  Dashboard
+                </Button>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-3">
+              {/* 🎯 IMPERIAL BUTTON DELETED - Units toggle now only in WorkoutBuilder */}
+              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button 
-                    className="p-2 bg-white text-black border border-black hover:bg-black hover:text-white" 
-                    style={{borderRadius: 0, fontFamily: 'Inter, sans-serif', fontWeight: 500}}
-                  >
-                    <Menu className="h-6 w-6" />
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="bg-white border border-black" style={{borderRadius: 0}}>
-                  <DropdownMenuItem className="hover:bg-black hover:text-white">
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-black hover:text-white">
+                  <DropdownMenuItem>
+                    <Settings className="mr-2 h-4 w-4" />
+                    Connect Devices
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
                     <Upload className="mr-2 h-4 w-4" />
                     Import
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="hover:bg-black hover:text-white" onClick={toggleUnits}>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Units: {useImperial ? 'Imperial' : 'Metric'}
+                  <DropdownMenuItem>
+                    <Upload className="mr-2 h-4 w-4" />
+                    Export Data
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    Help & Support
+                  </DropdownMenuItem>
+                  <DropdownMenuItem>
+                    Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              <div className="ml-6">
-                <h1 className="text-black lowercase" style={{fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '28px', letterSpacing: '0.03em'}}>efforts</h1>
-              </div>
-              {/* FIXED: Only show Back button for WorkoutDetail, not WorkoutBuilder */}
-              {selectedWorkout && (
-                <Button 
-                  onClick={handleBackToDashboard}
-                  className="ml-8 bg-white text-black border border-black hover:bg-black hover:text-white"
-                  style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, borderRadius: 0, padding: '12px 24px'}}
-                >
-                  ← Back
-                </Button>
-              )}
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        {showBuilder ? (
-          <WorkoutBuilder 
-            onClose={handleBackToDashboard} 
-            initialType={builderType}
-            existingWorkout={workoutBeingEdited}
-            initialDate={selectedDate}
-          />
-        ) : selectedWorkout ? (
-          <WorkoutDetail 
-            workout={selectedWorkout} 
-            onUpdateWorkout={handleUpdateWorkout}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-          />
-        ) : (
-          <div className="space-y-8">
-            <TodaysEffort 
-              selectedDate={selectedDate}
-              onAddEffort={handleAddEffort}
-              onViewCompleted={handleViewCompleted}
-              onEditEffort={handleEditEffort}
+      {/* Main content */}
+      <main className="flex-1">
+        {/* 🚨 FIXED: Mobile centering container */}
+        <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
+          {showStrengthLogger ? (
+            <StrengthLogger onClose={handleBackToDashboard} />
+          ) : showBuilder ? (
+            <WorkoutBuilder
+              onClose={handleBackToDashboard}
+              initialType={builderType}
+              existingWorkout={workoutBeingEdited}
+              initialDate={selectedDate}
             />
-            
-            <WorkoutCalendar 
-              onAddEffort={handleAddEffort}
-              onSelectType={handleSelectEffortType}
-              onSelectWorkout={handleWorkoutSelect}
-              onViewCompleted={handleViewCompleted}
-              onEditEffort={handleEditEffort}
-              onDateSelect={handleDateSelect}
+          ) : selectedWorkout ? (
+            <WorkoutDetail
+              workout={selectedWorkout}
+              onUpdateWorkout={handleUpdateWorkout}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
             />
-            
-            <div className="flex justify-end">
-              <div className="w-64">
-                <GarminAutoSync />
-              </div>
+          ) : (
+            <div className="space-y-1">
+              <TodaysEffort
+                selectedDate={selectedDate}
+                onAddEffort={handleAddEffort}
+                onViewCompleted={handleViewCompleted}
+                onEditEffort={handleEditEffort}
+              />
+              <WorkoutCalendar
+                onAddEffort={handleAddEffort}
+                onSelectType={handleSelectEffortType}
+                onSelectWorkout={handleWorkoutSelect}
+                onViewCompleted={handleViewCompleted}
+                onEditEffort={handleEditEffort}
+                onDateSelect={handleDateSelect}
+              />
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </main>
     </div>
   );

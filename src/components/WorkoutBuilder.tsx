@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Save, Clock, Trash2, Check } from 'lucide-react';
+import { Save, Clock, Trash2, Check } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
@@ -21,7 +21,7 @@ interface WorkoutBuilderProps {
 }
 
 export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate }: WorkoutBuilderProps) {
-  const { addWorkout, updateWorkout, deleteWorkout } = useAppContext();
+  const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
   const [showCompleted, setShowCompleted] = useState(false);
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -59,7 +59,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [rideIntervals, setRideIntervals] = useState<RideInterval[]>([]);
   const [swimIntervals, setSwimIntervals] = useState<SwimInterval[]>([]);
   const [strengthExercises, setStrengthExercises] = useState<StrengthExercise[]>([]);
-  const [isMetric, setIsMetric] = useState(false);
+
+  // Use global Imperial setting instead of local isMetric
+  const isMetric = !useImperial;
 
   useEffect(() => {
     console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType, initialDate });
@@ -259,7 +261,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               exerciseDesc += ` ${exercise.sets}x${exercise.reps}`;
             }
             if (exercise.weight) {
-              exerciseDesc += ` @ ${exercise.weight}${isMetric ? 'kg' : 'lbs'}`;
+              exerciseDesc += ` @ ${exercise.weight}lbs`;
             }
             parts.push(exerciseDesc);
           }
@@ -353,65 +355,63 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         </div>
       )}
 
-      {/* Clean Header - matches calendar style */}
-      <header className="bg-white border-b border-[#E5E5E5]">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-end items-center h-8">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-600">Imperial</span>
-              <Switch
-                checked={isMetric}
-                onCheckedChange={setIsMetric}
-              />
-              <span className="text-xs text-gray-600">Metric</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
       <main className="max-w-7xl mx-auto px-6 py-2">
-        {/* Back Button */}
-        <div className="mb-4">
-          <button 
-            onClick={onClose}
-            className="flex items-center text-black hover:text-gray-600 text-base font-medium transition-colors"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
-          </button>
-        </div>
-
-        {/* Tab Toggle - simplified */}
-        <div className="flex gap-1 mb-4">
-          <button
-            onClick={() => setShowCompleted(false)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              !showCompleted 
-                ? 'text-black border-b-2 border-black' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            Build effort
-          </button>
-          <button
-            onClick={() => setShowCompleted(true)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              showCompleted 
-                ? 'text-black border-b-2 border-black' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            Completed
-          </button>
+        {/* Tab Toggle with Strength indicator - simplified */}
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setShowCompleted(false)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                !showCompleted 
+                  ? 'text-black border-b-2 border-black' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              Build effort
+            </button>
+            <button
+              onClick={() => setShowCompleted(true)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                showCompleted 
+                  ? 'text-black border-b-2 border-black' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              Completed
+            </button>
+          </div>
+          
+          {/* Imperial/Metric Toggle - Only for Run and Ride */}
+          {(formData.type === 'run' || formData.type === 'ride') && (
+            <div className="flex items-center gap-2">
+              <Label htmlFor="units" className="text-sm font-medium text-gray-700">
+                Imperial
+              </Label>
+              <Switch
+                id="units"
+                checked={!useImperial} // Switch shows Metric when checked
+                onCheckedChange={toggleUnits}
+                className="data-[state=checked]:bg-black data-[state=unchecked]:bg-gray-200"
+              />
+              <Label htmlFor="units" className="text-sm font-medium text-gray-700">
+                Metric
+              </Label>
+            </div>
+          )}
+          
+          {formData.type === 'strength' && (
+            <div className="text-lg font-medium text-black" style={{fontFamily: 'Inter, sans-serif'}}>
+              Strength
+            </div>
+          )}
         </div>
 
         {!showCompleted ? (
-          <div className="space-y-4">
+          <div className="space-y-2">
             {/* Simplified Form - cleaner layout */}
-            <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
+            <div className="p-3">
               <div className="flex justify-end mb-2">
                 <button
                   onClick={handleTrashClick}
@@ -422,7 +422,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
                 <div className="md:col-span-2">
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Effort title</Label>
+                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Focus</Label>
                   <Input
                     value={formData.name}
                     onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
@@ -444,47 +444,77 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Discipline</Label>
-                  <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') =>
-                    setFormData(prev => ({ ...prev, type: value }))
-                  }>
-                    <SelectTrigger className="border-gray-300 min-h-[44px]" style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="run">Run</SelectItem>
-                      <SelectItem value="ride">Ride</SelectItem>
-                      <SelectItem value="swim">Swim</SelectItem>
-                      <SelectItem value="strength">Strength</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  {/* Notes right under Discipline */}
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowNotes(!showNotes)}
-                      className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
-                    >
-                      <span className={`transform transition-transform ${showNotes ? 'rotate-90' : ''}`}>
-                        ▶
-                      </span>
-                      Notes
-                    </button>
+                {formData.type !== 'strength' && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700 mb-2 block">Discipline</Label>
+                    <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') =>
+                      setFormData(prev => ({ ...prev, type: value }))
+                    }>
+                      <SelectTrigger className="border-gray-300 min-h-[44px]" style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="run">Run</SelectItem>
+                        <SelectItem value="ride">Ride</SelectItem>
+                        <SelectItem value="swim">Swim</SelectItem>
+                        <SelectItem value="strength">Strength</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    
+                    {/* Notes right under Discipline */}
+                    <div className="mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowNotes(!showNotes)}
+                        className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+                      >
+                        <span className={`transform transition-transform ${showNotes ? 'rotate-90' : ''}`}>
+                          ▶
+                        </span>
+                        Notes
+                      </button>
 
-                    {showNotes && (
-                      <Textarea
-                        value={formData.userComments}
-                        onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
-                        placeholder=""
-                        rows={2}
-                        className="border-gray-300 min-h-[44px] mt-1"
-                        style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
-                      />
-                    )}
+                      {showNotes && (
+                        <Textarea
+                          value={formData.userComments}
+                          onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
+                          placeholder=""
+                          rows={2}
+                          className="border-gray-300 min-h-[44px] mt-1"
+                          style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
+                {formData.type === 'strength' && (
+                  <div>
+                    {/* Notes for strength - full width */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotes(!showNotes)}
+                        className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
+                      >
+                        <span className={`transform transition-transform ${showNotes ? 'rotate-90' : ''}`}>
+                          ▶
+                        </span>
+                        Notes
+                      </button>
+
+                      {showNotes && (
+                        <Textarea
+                          value={formData.userComments}
+                          onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
+                          placeholder=""
+                          rows={2}
+                          className="border-gray-300 min-h-[44px] mt-1"
+                          style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                        />
+                      )}
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
                   <div className="relative">
@@ -493,21 +523,23 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       placeholder=""
                       rows={3}
-                      className="border-gray-300 min-h-[44px] pb-8"
+                      className={`border-gray-300 min-h-[44px] ${formData.type === 'strength' ? '' : 'pb-8'}`}
                       style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
                     />
-                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
-                      <Clock className="h-3 w-3" />
-                      <span>Total Time: {formatTime(calculateTotalTime())}</span>
-                    </div>
+                    {formData.type !== 'strength' && (
+                      <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
+                        <Clock className="h-3 w-3" />
+                        <span>Total Time: {formatTime(calculateTotalTime())}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Structure Section - clean container */}
-            <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
-              <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Structure</h3>
+            <div className="p-3 pt-1">
+              <h3 className="text-lg font-medium text-black mb-2" style={{fontFamily: 'Inter, sans-serif'}}>Structure</h3>
               
               {formData.type === 'run' && (
                 <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
@@ -519,13 +551,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
               )}
               {formData.type === 'strength' && (
-                <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} isMetric={isMetric} />
+                <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
               )}
             </div>
 
             {/* Auto-generated Preview - if content exists */}
             {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
-              <div className="bg-gray-50 p-3 border border-[#E5E5E5]" style={{borderRadius: 0}}>
+              <div className="bg-gray-50 p-3">
                 <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
                   {generateWorkoutDescription() || 'Add segments to see workout summary...'}
                 </p>
@@ -539,14 +571,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
         ) : (
           /* Completed Tab Content - simplified */
-          <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
+          <div className="p-3">
             {formData.type === 'strength' ? (
               <div>
                 <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Log Completed Strength Training</h3>
                 <StrengthExerciseBuilder
                   exercises={strengthExercises}
                   onChange={setStrengthExercises}
-                  isMetric={isMetric}
                   isCompleted={true}
                 />
               </div>

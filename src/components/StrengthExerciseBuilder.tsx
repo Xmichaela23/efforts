@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Copy, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Copy, Trash2 } from 'lucide-react';
 
 export interface StrengthExercise {
   id: string;
@@ -22,11 +21,40 @@ export interface StrengthExercise {
 interface StrengthExerciseBuilderProps {
   exercises: StrengthExercise[];
   onChange: (exercises: StrengthExercise[]) => void;
-  isMetric: boolean;
   isCompleted?: boolean;
 }
 
-export default function StrengthExerciseBuilder({ exercises, onChange, isMetric, isCompleted = false }: StrengthExerciseBuilderProps) {
+// Common exercise names for autopopulation
+const commonExercises = [
+  'Deadlift', 'Squat', 'Bench Press', 'Overhead Press', 'Barbell Row',
+  'Romanian Deadlift', 'Front Squat', 'Incline Bench Press', 'Decline Bench Press',
+  'Barbell Curl', 'Close Grip Bench Press', 'Bent Over Row', 'Sumo Deadlift',
+  'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
+  'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
+  'Shoulder Press', 'Single Arm Row', 'Bulgarian Split Squats',
+  'Push-ups', 'Pull-ups', 'Chin-ups', 'Dips', 'Planks', 'Burpees',
+  'Mountain Climbers', 'Lunges', 'Jump Squats', 'Pike Push-ups',
+  'Handstand Push-ups', 'L-Sits', 'Pistol Squats', 'Ring Dips',
+  'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
+  'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
+  'Kettlebell Swings', 'Turkish Get-ups', 'Kettlebell Snatches',
+  'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
+];
+
+export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false }: StrengthExerciseBuilderProps) {
+  const [exerciseSearchTerms, setExerciseSearchTerms] = useState<{[key: string]: string}>({});
+  const [showSuggestions, setShowSuggestions] = useState<{[key: string]: boolean}>({});
+
+  const getFilteredExercises = (searchTerm: string) => {
+    return searchTerm.length > 0
+      ? commonExercises
+          .filter(exercise =>
+            exercise.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+          .slice(0, 8)
+      : [];
+  };
+
   const addExercise = (e: React.MouseEvent, afterIndex?: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -96,219 +124,223 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
     }
   };
 
+  const handleExerciseNameChange = (exerciseId: string, value: string) => {
+    setExerciseSearchTerms(prev => ({ ...prev, [exerciseId]: value }));
+    setShowSuggestions(prev => ({ ...prev, [exerciseId]: value.length > 0 }));
+    updateExercise(exerciseId, { name: value });
+  };
+
+  const selectExercise = (exerciseId: string, exerciseName: string) => {
+    updateExercise(exerciseId, { name: exerciseName });
+    setExerciseSearchTerms(prev => ({ ...prev, [exerciseId]: exerciseName }));
+    setShowSuggestions(prev => ({ ...prev, [exerciseId]: false }));
+  };
+
   if (isCompleted) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Strength Session</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {exercises.map((exercise, index) => (
-            <Card key={exercise.id} className="p-4">
-              <h4 className="font-medium mb-4">{exercise.name || `Exercise ${index + 1}`}</h4>
-              <div className="space-y-2">
-                {Array.from({ length: exercise.sets }).map((_, setIndex) => {
-                  const plannedWeight = exercise.weightMode === 'same' 
-                    ? exercise.weight 
-                    : exercise.individualWeights?.[setIndex];
-                  const completedSet = exercise.completed_sets?.[setIndex];
-                  
-                  return (
-                    <div key={setIndex} className="flex items-center gap-4 p-3 bg-muted rounded">
-                      <span className="font-medium w-16">Set {setIndex + 1}:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{exercise.reps} reps @ {plannedWeight || 0} {isMetric ? 'kg' : 'lbs'}</span>
-                        <span className="text-muted-foreground">→</span>
-                        <Input
-                          type="number"
-                          name={`completed-reps-${exercise.id}-${setIndex}`}
-                          autoComplete="off"
-                          placeholder="Reps"
-                          value={completedSet?.reps || ''}
-                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="w-20 h-8"
-                        />
-                        <span className="text-sm">reps @</span>
-                        <Input
-                          type="number"
-                          name={`completed-weight-${exercise.id}-${setIndex}`}
-                          autoComplete="off"
-                          placeholder="Weight"
-                          value={completedSet?.weight || ''}
-                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                          className="w-20 h-8"
-                        />
-                        <span className="text-sm">{isMetric ? 'kg' : 'lbs'}</span>
-                        <Input
-                          type="number"
-                          name={`completed-rir-${exercise.id}-${setIndex}`}
-                          autoComplete="off"
-                          placeholder="0-5"
-                          value={completedSet?.rir || ''}
-                          onChange={(e) => updateCompletedSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || 0 })}
-                          className="w-16 h-8"
-                        />
-                      </div>
+      <div className="space-y-4">
+        <h3 className="text-lg font-medium">Strength Session</h3>
+        {exercises.map((exercise, index) => (
+          <div key={exercise.id} className="p-4 border border-gray-200 rounded">
+            <h4 className="font-medium mb-4">{exercise.name || `Exercise ${index + 1}`}</h4>
+            <div className="space-y-2">
+              {Array.from({ length: exercise.sets }).map((_, setIndex) => {
+                const plannedWeight = exercise.weightMode === 'same' 
+                  ? exercise.weight 
+                  : exercise.individualWeights?.[setIndex];
+                const completedSet = exercise.completed_sets?.[setIndex];
+                
+                return (
+                  <div key={setIndex} className="flex items-center gap-4 p-3 bg-gray-50 rounded">
+                    <span className="font-medium w-16">Set {setIndex + 1}:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">{exercise.reps} reps @ {plannedWeight || 0} lbs</span>
+                      <span className="text-gray-500">→</span>
+                      <Input
+                        type="number"
+                        placeholder="Reps"
+                        value={completedSet?.reps || ''}
+                        onChange={(e) => updateCompletedSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                        className="w-20 h-8"
+                      />
+                      <span className="text-sm">reps @</span>
+                      <Input
+                        type="number"
+                        placeholder="Weight"
+                        value={completedSet?.weight || ''}
+                        onChange={(e) => updateCompletedSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                        className="w-20 h-8"
+                      />
+                      <span className="text-sm">lbs</span>
                     </div>
-                  );
-                })}
-                <div className="text-xs text-muted-foreground mt-2">RIR = Reps left in tank</div>
-              </div>
-            </Card>
-          ))}
-          <Button type="button" className="w-full bg-black text-white hover:bg-gray-800">
-            Save
-          </Button>
-        </CardContent>
-      </Card>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <Button type="button" className="w-full bg-black text-white hover:bg-gray-800">
+          Save
+        </Button>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Strength
-          <Button type="button" onClick={(e) => addExercise(e)} size="sm" className="bg-black text-white hover:bg-gray-800">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Exercise
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {exercises.map((exercise, index) => (
-          <Card key={exercise.id} className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-medium">Exercise {index + 1}</h4>
-              </div>
-              <div className="flex gap-2">
-                <Button type="button" onClick={(e) => duplicateExercise(exercise.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button type="button" onClick={(e) => deleteExercise(exercise.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="md:col-span-2">
-                <Label>Exercise Name</Label>
-                <Input
-                  name={`exercise-name-${exercise.id}`}
-                  autoComplete="off"
-                  placeholder="e.g., Deadlift, Squats, Pull-ups"
-                  value={exercise.name}
-                  onChange={(e) => updateExercise(exercise.id, { name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Sets</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  name={`exercise-sets-${exercise.id}`}
-                  autoComplete="off"
-                  value={exercise.sets}
-                  onChange={(e) => updateExercise(exercise.id, { sets: parseInt(e.target.value) || 1 })}
-                />
-              </div>
-              <div>
-                <Label>Reps</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  name={`exercise-reps-${exercise.id}`}
-                  autoComplete="off"
-                  value={exercise.reps}
-                  onChange={(e) => updateExercise(exercise.id, { reps: parseInt(e.target.value) || 1 })}
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <Label>Weight Configuration</Label>
-              <RadioGroup
-                value={exercise.weightMode}
-                onValueChange={(value: 'same' | 'individual') => {
-                  updateExercise(exercise.id, { 
-                    weightMode: value,
-                    individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
-                  });
-                }}
-                className="mt-2"
+    <div className="space-y-3">
+      <button 
+        type="button" 
+        onClick={(e) => addExercise(e)} 
+        className="p-2 text-gray-700 hover:bg-gray-50 bg-white focus:outline-none flex items-center"
+      >
+        <Plus className="h-5 w-5 mr-2" />
+        Exercise
+      </button>
+      
+      {exercises.map((exercise, index) => (
+        <div key={exercise.id} className="space-y-3 py-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-base font-medium">Exercise</Label>
+            <div className="flex gap-2">
+              <button 
+                type="button" 
+                onClick={(e) => duplicateExercise(exercise.id, e)} 
+                className="p-2 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded focus:outline-none"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="same" id={`same-${exercise.id}`} />
-                  <Label htmlFor={`same-${exercise.id}`}>Same weight for all sets</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="individual" id={`individual-${exercise.id}`} />
-                  <Label htmlFor={`individual-${exercise.id}`}>Different weight for each set</Label>
-                </div>
-              </RadioGroup>
+                <Copy className="h-4 w-4" />
+              </button>
+              <button 
+                type="button" 
+                onClick={(e) => deleteExercise(exercise.id, e)} 
+                className="p-2 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded focus:outline-none"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-
-            {exercise.weightMode === 'same' ? (
-              <div className="mb-4">
-                <Label>Weight ({isMetric ? 'kg' : 'lbs'})</Label>
-                <Input
-                  type="number"
-                  name={`exercise-weight-${exercise.id}`}
-                  autoComplete="off"
-                  placeholder={isMetric ? '85' : '185'}
-                  value={exercise.weight || ''}
-                  onChange={(e) => updateExercise(exercise.id, { weight: parseInt(e.target.value) || undefined })}
-                />
-              </div>
-            ) : (
-              <div className="mb-4">
-                <Label>Weight per Set ({isMetric ? 'kg' : 'lbs'})</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {Array.from({ length: exercise.sets }).map((_, setIndex) => (
-                    <div key={setIndex} className="flex items-center gap-2">
-                      <span className="text-sm w-12">Set {setIndex + 1}:</span>
-                      <Input
-                        type="number"
-                        name={`exercise-weight-set-${exercise.id}-${setIndex}`}
-                        autoComplete="off"
-                        placeholder={isMetric ? '85' : '185'}
-                        value={exercise.individualWeights?.[setIndex] || ''}
-                        onChange={(e) => updateIndividualWeight(exercise.id, setIndex, parseInt(e.target.value) || 0)}
-                      />
-                    </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div className="md:col-span-2 relative">
+              <Input
+                placeholder="Start typing exercise name..."
+                value={exercise.name}
+                onChange={(e) => handleExerciseNameChange(exercise.id, e.target.value)}
+                onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
+                onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
+              />
+              {showSuggestions[exercise.id] && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {getFilteredExercises(exercise.name).map((exerciseName) => (
+                    <button
+                      key={exerciseName}
+                      type="button"
+                      className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none"
+                      onClick={() => selectExercise(exercise.id, exerciseName)}
+                    >
+                      {exerciseName}
+                    </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <Label>Notes</Label>
-              <Textarea
-                name={`exercise-notes-${exercise.id}`}
-                autoComplete="off"
-                placeholder="Form cues, rest time, etc."
-                value={exercise.notes || ''}
-                onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
-                rows={2}
+              )}
+            </div>
+            <div>
+              <Label>Sets</Label>
+              <Input
+                type="number"
+                min="1"
+                value={exercise.sets}
+                onChange={(e) => updateExercise(exercise.id, { sets: parseInt(e.target.value) || 1 })}
               />
             </div>
-            
-            <Button type="button" onClick={(e) => addExercise(e, index)} size="sm" variant="outline" className="w-full border-black hover:bg-gray-100">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Exercise
-            </Button>
-          </Card>
-        ))}
-        
-        {exercises.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            No exercises added yet. Click "Add Exercise" to get started.
+            <div>
+              <Label>Reps</Label>
+              <Input
+                type="number"
+                min="1"
+                value={exercise.reps}
+                onChange={(e) => updateExercise(exercise.id, { reps: parseInt(e.target.value) || 1 })}
+              />
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="mb-3">
+            <Label>Weight Structure</Label>
+            <RadioGroup
+              value={exercise.weightMode}
+              onValueChange={(value: 'same' | 'individual') => {
+                updateExercise(exercise.id, { 
+                  weightMode: value,
+                  individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
+                });
+              }}
+              className="mt-2"
+            >
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="same" id={`same-${exercise.id}`} />
+                <Label htmlFor={`same-${exercise.id}`}>Same weight for all sets</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="individual" id={`individual-${exercise.id}`} />
+                <Label htmlFor={`individual-${exercise.id}`}>Different weight for each set</Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {exercise.weightMode === 'same' ? (
+            <div className="mb-3">
+              <Label>Weight (lbs)</Label>
+              <Input
+                type="number"
+                placeholder="185"
+                value={exercise.weight || ''}
+                onChange={(e) => updateExercise(exercise.id, { weight: parseInt(e.target.value) || undefined })}
+              />
+            </div>
+          ) : (
+            <div className="mb-3">
+              <Label>Weight per Set (lbs)</Label>
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                {Array.from({ length: exercise.sets }).map((_, setIndex) => (
+                  <div key={setIndex} className="flex items-center gap-2">
+                    <span className="text-sm w-12">Set {setIndex + 1}:</span>
+                    <Input
+                      type="number"
+                      placeholder="185"
+                      value={exercise.individualWeights?.[setIndex] || ''}
+                      onChange={(e) => updateIndividualWeight(exercise.id, setIndex, parseInt(e.target.value) || 0)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-3">
+            <Label>Notes</Label>
+            <Textarea
+              placeholder="Form cues, rest time, etc."
+              value={exercise.notes || ''}
+              onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
+              rows={2}
+            />
+          </div>
+          
+          <button 
+            type="button" 
+            onClick={(e) => addExercise(e, index)} 
+            className="w-full p-2 text-gray-700 hover:bg-gray-50 bg-white focus:outline-none flex items-center justify-center"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Exercise
+          </button>
+        </div>
+      ))}
+        
+      {exercises.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No exercises added yet. Click "Add Exercise" to get started.
+        </div>
+      )}
+    </div>
   );
 }
