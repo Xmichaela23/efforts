@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
-import { Plus, ChevronDown, ChevronRight, ChevronLeft, Clock } from 'lucide-react';
+import { Plus, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
 
 interface TodaysEffortProps {
   selectedDate?: string;
-  onAddEffort: (type: string, date?: string) => void; // FIXED: Now matches AppLayout
+  onAddEffort: (type: string, date?: string) => void;
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
 }
@@ -18,32 +18,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const { useImperial, workouts, loading } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showIntervals, setShowIntervals] = useState(false);
 
   const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
-
-  // FIXED: Consistent date formatting with timezone fix
-  const formatDateDisplay = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    
-    return `${date.toLocaleDateString('en-US', { 
-      weekday: 'short',
-      month: 'short', 
-      day: 'numeric' 
-    })} effort`.replace(',', '');
-  };
 
   const loadWorkoutsForDate = () => {
     if (workouts && workouts.length > 0) {
       const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
       setDisplayWorkouts(dateWorkouts);
-      setCurrentIndex(0);
     } else {
       setDisplayWorkouts([]);
-      setCurrentIndex(0);
     }
   };
 
@@ -51,11 +35,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     loadWorkoutsForDate();
   }, [workouts, activeDate]);
 
-  const currentWorkout = displayWorkouts[currentIndex] || null;
-  const totalWorkouts = displayWorkouts.length;
-
   const formatWorkoutType = (type: string) => {
     return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'swim': return <Waves className="h-4 w-4" />;
+      case 'ride': return <Bike className="h-4 w-4" />;
+      case 'run': return <Activity className="h-4 w-4" />;
+      case 'strength': return <Dumbbell className="h-4 w-4" />;
+      case 'mobility': return <Move className="h-4 w-4" />;
+      default: return <Activity className="h-4 w-4" />;
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -69,215 +61,125 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatIntervals = () => {
-    if (!currentWorkout) return null;
-
-    if (currentWorkout.type === 'strength' && currentWorkout.strength_exercises) {
-      return currentWorkout.strength_exercises.map((ex: any, idx: number) => (
-        <div key={idx} className="text-xs md:text-sm text-gray-600 ml-3 md:ml-4 leading-snug">
-          {ex.name}: {ex.sets}x{ex.reps} @ {ex.weight} {useImperial ? 'lbs' : 'kg'}
-        </div>
-      ));
+  const getWorkoutSummary = (workout: any) => {
+    if (workout.type === 'strength' && workout.strength_exercises) {
+      const exerciseNames = workout.strength_exercises
+        .slice(0, 3) // Show first 3 exercises
+        .map((ex: any) => ex.name)
+        .join(', ');
+      const remaining = workout.strength_exercises.length > 3 ? ` +${workout.strength_exercises.length - 3} more` : '';
+      return exerciseNames + remaining;
     }
-
-    if (currentWorkout.intervals) {
-      return currentWorkout.intervals.map((interval: any, idx: number) => (
-        <div key={idx} className="text-xs md:text-sm text-gray-600 ml-3 md:ml-4 leading-snug">
-          {interval.time && `${interval.time}`}
-          {interval.distance && ` ${interval.distance} ${useImperial ? 'mi' : 'km'}`}
-          {interval.effortLabel && ` @ ${interval.effortLabel}`}
-          {!interval.effortLabel && interval.powerTarget && ` @ ${interval.powerTarget}`}
-          {!interval.effortLabel && !interval.powerTarget && interval.paceTarget && ` @ ${interval.paceTarget}`}
-          {interval.rpeTarget && `, RPE ${interval.rpeTarget}`}
-        </div>
-      ));
+    
+    if (workout.intervals && workout.intervals.length > 0) {
+      const segmentNames = workout.intervals
+        .slice(0, 2) // Show first 2 segments
+        .map((interval: any) => {
+          if (interval.effortLabel && interval.effortLabel !== `Segment ${workout.intervals.indexOf(interval) + 1}`) {
+            return interval.effortLabel;
+          }
+          if (interval.time) return interval.time;
+          if (interval.distance) return `${interval.distance}${useImperial ? 'mi' : 'km'}`;
+          return 'Segment';
+        })
+        .join(', ');
+      const remaining = workout.intervals.length > 2 ? ` +${workout.intervals.length - 2} more` : '';
+      return segmentNames + remaining;
     }
-
-    return <p className="text-xs md:text-sm text-gray-500 ml-3 md:ml-4">No segments</p>;
+    
+    const duration = workout.duration ? formatTime(workout.duration) : '';
+    return duration || 'Workout';
   };
 
   if (loading) {
     return (
-      <div className="w-full bg-white p-2 sm:p-3" style={{fontFamily: 'Inter, sans-serif'}}>
-        <div className="pb-2 md:pb-3">
-          <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
-            {formatDateDisplay(activeDate)}
-            {activeDate !== today && workouts && workouts.length > 0 && (
-              (() => {
-                const todaysWorkouts = workouts.filter((w: any) => w.date === today);
-                if (todaysWorkouts.length > 0) {
-                  const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
-                  return (
-                    <span className="text-xs md:text-sm text-gray-500 font-normal">
-                      · today: {types.join(' ')}
-                    </span>
-                  );
-                }
-                return null;
-              })()
-            )}
-          </h2>
-        </div>
-        <div className="py-3 md:py-4">
-          <div className="text-center py-3 md:py-4">
-            <p className="text-[#666666] text-sm">Loading...</p>
-          </div>
+      <div className="w-full py-4">
+        <div className="text-center">
+          <p className="text-gray-500 text-sm">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!currentWorkout) {
+  if (displayWorkouts.length === 0) {
     return (
-      <div className="w-full bg-white p-4 sm:p-6" style={{fontFamily: 'Inter, sans-serif'}}>
-        <div className="pb-2 md:pb-3">
-          <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
-            {formatDateDisplay(activeDate)}
-            {activeDate !== today && workouts && workouts.length > 0 && (
-              (() => {
-                const todaysWorkouts = workouts.filter((w: any) => w.date === today);
-                if (todaysWorkouts.length > 0) {
-                  const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
-                  return (
-                    <span className="text-xs md:text-sm text-gray-500 font-normal">
-                      · today: {types.join(' ')}
-                    </span>
-                  );
-                }
-                return null;
-              })()
-            )}
-          </h2>
-        </div>
-        <div className="py-3 md:py-4">
-          <div className="text-center py-3 md:py-4">
-            <p className="text-[#666666] mb-3 text-sm">
-              No effort scheduled for this date
-            </p>
-            <Button 
-              onClick={() => {
-                console.log('🆕 Add effort clicked for date:', activeDate);
-                // FIXED: Pass a default type and the selected date
-                onAddEffort('run', activeDate);
-              }} 
-              size="sm" 
-              className="gap-2 bg-gray-600 text-white hover:bg-gray-700 border-gray-600 hover:border-gray-700 rounded-md transition-all duration-150 hover:transform hover:-translate-y-0.5 hover:shadow-md font-medium text-sm px-4 py-2 min-h-[36px]"
-            >
-              <Plus className="h-4 w-4" />
-              Add effort
-            </Button>
-          </div>
+      <div className="w-full py-6 px-4" style={{fontFamily: 'Inter, sans-serif'}}>
+        <div className="text-center">
+          <p className="text-gray-500 mb-4 text-sm">
+            No effort scheduled for today
+          </p>
+          <Button 
+            onClick={() => {
+              console.log('🆕 Add effort clicked for date:', activeDate);
+              onAddEffort('run', activeDate);
+            }} 
+            size="sm" 
+            className="gap-2 text-black hover:text-gray-600 px-4 py-2 text-sm"
+          >
+            <Plus className="h-4 w-4" />
+            Add effort
+          </Button>
         </div>
       </div>
     );
   }
-
-  const intervalCount = currentWorkout.type === 'strength'
-    ? (currentWorkout.strength_exercises?.length || 0)
-    : (currentWorkout.intervals?.length || 0);
 
   return (
-    <div
-      className="w-full bg-white p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-      style={{fontFamily: 'Inter, sans-serif'}}
-      onClick={() => {
-        console.log('🔧 TodaysEffort clicked:', currentWorkout);
-        onEditEffort && onEditEffort(currentWorkout);
-      }}
-    >
-      <div className="pb-2 md:pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 md:gap-4">
-            <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
-              {formatDateDisplay(activeDate)}
-              {activeDate !== today && workouts && workouts.length > 0 && (
-                (() => {
-                  const todaysWorkouts = workouts.filter((w: any) => w.date === today);
-                  if (todaysWorkouts.length > 0) {
-                    const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
-                    return (
-                      <span className="text-xs md:text-sm text-gray-500 font-normal">
-                        · today: {types.join(' ')}
-                      </span>
-                    );
-                  }
-                  return null;
-                })()
-              )}
-            </h2>
-            {totalWorkouts > 1 && (
-              <div className="flex items-center gap-1 md:gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(prev => prev > 0 ? prev - 1 : totalWorkouts - 1);
-                  }}
-                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded min-w-[32px] min-h-[32px] flex items-center justify-center"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="text-xs md:text-sm font-normal text-gray-500 px-1 md:px-2">
-                  {currentIndex + 1} of {totalWorkouts}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(prev => prev < totalWorkouts - 1 ? prev + 1 : 0);
-                  }}
-                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded min-w-[32px] min-h-[32px] flex items-center justify-center"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="space-y-3 md:space-y-4 py-3 md:py-4">
-        {/* Workout Title and Type */}
-        <div className="space-y-1">
-          <h3 className="font-medium text-base md:text-lg leading-tight">{currentWorkout.name || formatWorkoutType(currentWorkout.type)}</h3>
-          <p className="text-xs md:text-sm text-gray-600">{formatWorkoutType(currentWorkout.type)}</p>
-        </div>
-
-        {/* Total Time Display - ONLY for non-strength workouts */}
-        {currentWorkout.type !== 'strength' && currentWorkout.duration && currentWorkout.duration > 0 && (
-          <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
-            <Clock className="h-3 w-3 md:h-4 md:w-4" />
-            <span className="font-medium">Total Time:</span>
-            <span>{formatTime(currentWorkout.duration)}</span>
-          </div>
-        )}
-
-        {/* Collapsible Segments/Exercises */}
-        {intervalCount > 0 && (
-          <div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowIntervals(!showIntervals);
+    <div className="w-full relative" style={{fontFamily: 'Inter, sans-serif'}}>
+      {/* Horizontal scrollable workout cards - aggressive edge-to-edge positioning */}
+      <div className="overflow-x-auto scrollbar-hide -mx-4">
+        <div className="flex snap-x snap-mandatory">
+          {displayWorkouts.map((workout, index) => (
+            <div
+              key={workout.id || index}
+              className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2"
+              onClick={() => {
+                console.log('🔧 Workout clicked:', workout);
+                onEditEffort && onEditEffort(workout);
               }}
-              className="flex items-center gap-2 text-xs md:text-sm font-medium hover:text-gray-600 transition-colors"
             >
-              {showIntervals ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
-              {currentWorkout.type === 'strength' ? 'Exercises' : 'Segments'} ({intervalCount})
-            </button>
-            {showIntervals && (
-              <div className="mt-1 md:mt-2 space-y-1">
-                {formatIntervals()}
+              <div className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                {/* Workout title and summary */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-base leading-tight">
+                    {workout.name || formatWorkoutType(workout.type)}
+                  </h3>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    {getIcon(workout.type)}
+                    <span>{getWorkoutSummary(workout)}</span>
+                  </div>
+                  
+                  {/* Notes if present */}
+                  {workout.userComments && (
+                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                      {workout.userComments}
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Notes */}
-        {currentWorkout.userComments && (
-          <div className="space-y-1">
-            <p className="text-xs md:text-sm font-medium">Notes</p>
-            <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{currentWorkout.userComments}</p>
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Clean fade overlay for right edge */}
+      {displayWorkouts.length > 1 && (
+        <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
+      )}
+
+      {/* Scroll indicator for multiple workouts */}
+      {displayWorkouts.length > 1 && (
+        <div className="flex justify-center mt-2">
+          <div className="flex gap-1">
+            {displayWorkouts.map((_, index) => (
+              <div
+                key={index}
+                className="w-1.5 h-1.5 rounded-full bg-gray-300"
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

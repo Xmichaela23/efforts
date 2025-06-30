@@ -6,7 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
@@ -356,20 +357,60 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       )}
 
       <main className="max-w-7xl mx-auto px-3 py-2">
-        {/* Tab Toggle with discipline icon and date - new top line */}
+        {/* Tab Toggle with Build dropdown */}
         <div className="flex justify-between items-center mb-1">
           <div className="flex gap-1 items-center">
-            <button
-              onClick={() => setShowCompleted(false)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                !showCompleted 
-                  ? 'text-black border-b-2 border-black' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              Build effort
-            </button>
+            {!showCompleted ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="px-4 py-2 text-sm font-medium text-black border-b-2 border-black transition-colors flex items-center gap-2"
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  >
+                    Build effort
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'run' }))}
+                    className="cursor-pointer"
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    Run
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'ride' }))}
+                    className="cursor-pointer"
+                  >
+                    <Bike className="h-4 w-4 mr-2" />
+                    Ride
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'swim' }))}
+                    className="cursor-pointer"
+                  >
+                    <Waves className="h-4 w-4 mr-2" />
+                    Swim
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'strength' }))}
+                    className="cursor-pointer"
+                  >
+                    <Dumbbell className="h-4 w-4 mr-2" />
+                    Strength
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <button
+                onClick={() => setShowCompleted(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              >
+                Build effort
+              </button>
+            )}
             <button
               onClick={() => setShowCompleted(true)}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
@@ -384,12 +425,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Dynamic discipline icon */}
-            {formData.type === 'run' && <span className="text-xl">🏃</span>}
-            {formData.type === 'ride' && <span className="text-xl">🚴</span>}
-            {formData.type === 'swim' && <span className="text-xl">🏊</span>}
-            {formData.type === 'strength' && <Dumbbell className="h-5 w-5 text-gray-700" />}
-            
             {/* Date moved to top line */}
             <Input
               type="date"
@@ -468,14 +503,12 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 )}
                 <div>
                   <div className="relative">
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder=""
-                      rows={3}
-                      className={`border-0 bg-transparent min-h-[44px] ${formData.type === 'strength' ? '' : 'pb-8'}`}
+                    <div
+                      className={`min-h-[44px] w-full text-sm text-gray-900 p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
                       style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
-                    />
+                    >
+                      {generateWorkoutDescription()}
+                    </div>
                     {formData.type !== 'strength' && (
                       <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
                         <Clock className="h-3 w-3" />
@@ -508,7 +541,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
             {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
               <div className="bg-gray-50 p-2">
                 <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
-                  {generateWorkoutDescription() || 'Add segments to see workout summary...'}
+                  {generateWorkoutDescription()}
                 </p>
                 {calculateTotalTime() > 0 && (
                   <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'Inter, sans-serif'}}>

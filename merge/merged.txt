@@ -1,57 +1,3 @@
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/App.css
-/* 🚨 FIXED: Remove problematic global container styles */
-#root {
-  /* Removed: max-width, margin, padding that broke mobile centering */
-  /* Let AppLayout handle responsive container sizing instead */
-}
-
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-
-.logo:hover {
-  filter: drop-shadow(0 0 2em rgba(20, 184, 166, 0.6));
-}
-
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em rgba(20, 184, 166, 0.6));
-}
-
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
-}
-
-.card {
-  padding: 2em;
-  border-radius: 0.5rem;
-  border: 1px solid rgba(20, 184, 166, 0.1);
-  background-color: rgba(20, 184, 166, 0.02);
-  transition: all 0.3s ease;
-}
-
-.card:hover {
-  border-color: rgba(20, 184, 166, 0.3);
-  box-shadow: 0 4px 12px rgba(20, 184, 166, 0.1);
-}
-
-.read-the-docs {
-  color: #5f7676;
-}
-
 // File: /Users/michaelambp/Documents/efforts_App/Efforts/src/App.tsx
 
 import './index.css'
@@ -306,15 +252,8 @@ const AppLayout: React.FC = () => {
             </div>
 
             <div className="flex items-center space-x-3">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={toggleUnits}
-                className="text-xs"
-              >
-                {useImperial ? 'Imperial' : 'Metric'}
-              </Button>
-
+              {/* 🎯 IMPERIAL BUTTON DELETED - Units toggle now only in WorkoutBuilder */}
+              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -2967,13 +2906,12 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
 
 // File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthExerciseBuilder.tsx
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Copy, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Copy, Trash2, Dumbbell } from 'lucide-react';
 
 export interface StrengthExercise {
   id: string;
@@ -2990,19 +2928,48 @@ export interface StrengthExercise {
 interface StrengthExerciseBuilderProps {
   exercises: StrengthExercise[];
   onChange: (exercises: StrengthExercise[]) => void;
-  isMetric: boolean;
   isCompleted?: boolean;
 }
 
-export default function StrengthExerciseBuilder({ exercises, onChange, isMetric, isCompleted = false }: StrengthExerciseBuilderProps) {
+// Common exercise names for autopopulation
+const commonExercises = [
+  'Deadlift', 'Squat', 'Bench Press', 'Overhead Press', 'Barbell Row',
+  'Romanian Deadlift', 'Front Squat', 'Incline Bench Press', 'Decline Bench Press',
+  'Barbell Curl', 'Close Grip Bench Press', 'Bent Over Row', 'Sumo Deadlift',
+  'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
+  'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
+  'Shoulder Press', 'Single Arm Row', 'Bulgarian Split Squats',
+  'Push-ups', 'Pull-ups', 'Chin-ups', 'Dips', 'Planks', 'Burpees',
+  'Mountain Climbers', 'Lunges', 'Jump Squats', 'Pike Push-ups',
+  'Handstand Push-ups', 'L-Sits', 'Pistol Squats', 'Ring Dips',
+  'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
+  'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
+  'Kettlebell Swings', 'Turkish Get-ups', 'Kettlebell Snatches',
+  'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
+];
+
+export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false }: StrengthExerciseBuilderProps) {
+  const [exerciseSearchTerms, setExerciseSearchTerms] = useState<{[key: string]: string}>({});
+  const [showSuggestions, setShowSuggestions] = useState<{[key: string]: boolean}>({});
+
+  const getFilteredExercises = (searchTerm: string) => {
+    return searchTerm.length > 0
+      ? commonExercises
+          .filter(exercise =>
+            exercise.toLowerCase().includes(searchTerm.toLowerCase())
+          )
+          .slice(0, 8)
+      : [];
+  };
+
   const addExercise = (e: React.MouseEvent, afterIndex?: number) => {
     e.preventDefault();
     e.stopPropagation();
     const newExercise: StrengthExercise = {
       id: Date.now().toString(),
       name: '',
-      sets: 1,
-      reps: 1,
+      sets: 0,
+      reps: 0,
       weightMode: 'same',
       completed_sets: []
     };
@@ -3020,9 +2987,15 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
     onChange(exercises.map(exercise => {
       if (exercise.id === id) {
         const updated = { ...exercise, ...updates };
+        // Update completed_sets array when sets change
         if (updates.sets && updates.sets !== exercise.sets) {
           updated.individualWeights = Array(updates.sets).fill(exercise.weight || 0);
-          updated.completed_sets = Array(updates.sets).fill({ reps: 0, weight: 0, rir: 0, completed: false });
+          updated.completed_sets = Array(updates.sets).fill(null).map(() => ({ 
+            reps: 0, 
+            weight: 0, 
+            rir: 0, 
+            completed: false 
+          }));
         }
         return updated;
       }
@@ -3064,220 +3037,342 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isMetric,
     }
   };
 
+  const handleExerciseNameChange = (exerciseId: string, value: string) => {
+    setExerciseSearchTerms(prev => ({ ...prev, [exerciseId]: value }));
+    setShowSuggestions(prev => ({ ...prev, [exerciseId]: value.length > 0 }));
+    updateExercise(exerciseId, { name: value });
+  };
+
+  const selectExercise = (exerciseId: string, exerciseName: string) => {
+    updateExercise(exerciseId, { name: exerciseName });
+    setExerciseSearchTerms(prev => ({ ...prev, [exerciseId]: exerciseName }));
+    setShowSuggestions(prev => ({ ...prev, [exerciseId]: false }));
+  };
+
   if (isCompleted) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Strength Session</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {exercises.map((exercise, index) => (
-            <Card key={exercise.id} className="p-4">
-              <h4 className="font-medium mb-4">{exercise.name || `Exercise ${index + 1}`}</h4>
-              <div className="space-y-2">
-                {Array.from({ length: exercise.sets }).map((_, setIndex) => {
-                  const plannedWeight = exercise.weightMode === 'same' 
-                    ? exercise.weight 
-                    : exercise.individualWeights?.[setIndex];
-                  const completedSet = exercise.completed_sets?.[setIndex];
-                  
-                  return (
-                    <div key={setIndex} className="flex items-center gap-4 p-3 bg-muted rounded">
-                      <span className="font-medium w-16">Set {setIndex + 1}:</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">{exercise.reps} reps @ {plannedWeight || 0} {isMetric ? 'kg' : 'lbs'}</span>
-                        <span className="text-muted-foreground">→</span>
+      <div className="space-y-4 -mx-4 px-0">
+        {exercises.map((exercise, index) => (
+          <div key={exercise.id} className="px-4 py-4 border-b border-gray-200">
+            <h4 className="font-semibold text-lg mb-4 text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+              {exercise.name || `Exercise ${index + 1}`}
+            </h4>
+            
+            <div className="space-y-3">
+              {Array.from({ length: exercise.sets || 0 }).map((_, setIndex) => {
+                const plannedWeight = exercise.weightMode === 'same' 
+                  ? exercise.weight 
+                  : exercise.individualWeights?.[setIndex];
+                const completedSet = exercise.completed_sets?.[setIndex];
+                
+                return (
+                  <div key={setIndex} className="bg-gray-50 p-3 -mx-4 px-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="font-semibold text-base text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+                        Set {setIndex + 1}
+                      </span>
+                      <span className="text-sm text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+                        Planned: {exercise.reps || 0} reps @ {plannedWeight || 0} lbs
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                          Reps
+                        </Label>
                         <Input
                           type="number"
-                          name={`completed-reps-${exercise.id}-${setIndex}`}
-                          autoComplete="off"
-                          placeholder="Reps"
+                          placeholder={exercise.reps?.toString() || "0"}
                           value={completedSet?.reps || ''}
                           onChange={(e) => updateCompletedSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="w-20 h-8"
+                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{fontFamily: 'Inter, sans-serif'}}
                         />
-                        <span className="text-sm">reps @</span>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                          Weight (lbs)
+                        </Label>
                         <Input
                           type="number"
-                          name={`completed-weight-${exercise.id}-${setIndex}`}
-                          autoComplete="off"
-                          placeholder="Weight"
+                          placeholder={plannedWeight?.toString() || "0"}
                           value={completedSet?.weight || ''}
                           onChange={(e) => updateCompletedSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                          className="w-20 h-8"
+                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{fontFamily: 'Inter, sans-serif'}}
                         />
-                        <span className="text-sm">{isMetric ? 'kg' : 'lbs'}</span>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                          RIR
+                        </Label>
                         <Input
                           type="number"
-                          name={`completed-rir-${exercise.id}-${setIndex}`}
-                          autoComplete="off"
                           placeholder="0-5"
                           value={completedSet?.rir || ''}
                           onChange={(e) => updateCompletedSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || 0 })}
-                          className="w-16 h-8"
+                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          style={{fontFamily: 'Inter, sans-serif'}}
                         />
                       </div>
                     </div>
-                  );
-                })}
-                <div className="text-xs text-muted-foreground mt-2">RIR = Reps left in tank</div>
-              </div>
-            </Card>
-          ))}
-          <Button type="button" className="w-full bg-black text-white hover:bg-gray-800">
-            Save
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+        <div className="px-4 pt-4">
+          <Button type="button" className="w-full bg-black text-white hover:bg-gray-800 h-12 text-base font-semibold">
+            Save Workout
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Strength
-          <Button type="button" onClick={(e) => addExercise(e)} size="sm" className="bg-black text-white hover:bg-gray-800">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Exercise
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {exercises.map((exercise, index) => (
-          <Card key={exercise.id} className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-medium">Exercise {index + 1}</h4>
-              </div>
-              <div className="flex gap-2">
-                <Button type="button" onClick={(e) => duplicateExercise(exercise.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
-                  <Copy className="h-4 w-4" />
-                </Button>
-                <Button type="button" onClick={(e) => deleteExercise(exercise.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-              <div className="md:col-span-2">
-                <Label>Exercise Name</Label>
-                <Input
-                  name={`exercise-name-${exercise.id}`}
-                  autoComplete="off"
-                  placeholder="e.g., Deadlift, Squats, Pull-ups"
-                  value={exercise.name}
-                  onChange={(e) => updateExercise(exercise.id, { name: e.target.value })}
-                />
-              </div>
-              <div>
-                <Label>Sets</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  name={`exercise-sets-${exercise.id}`}
-                  autoComplete="off"
-                  value={exercise.sets}
-                  onChange={(e) => updateExercise(exercise.id, { sets: parseInt(e.target.value) || 1 })}
-                />
-              </div>
-              <div>
-                <Label>Reps</Label>
-                <Input
-                  type="number"
-                  min="1"
-                  name={`exercise-reps-${exercise.id}`}
-                  autoComplete="off"
-                  value={exercise.reps}
-                  onChange={(e) => updateExercise(exercise.id, { reps: parseInt(e.target.value) || 1 })}
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <Label>Weight Configuration</Label>
-              <RadioGroup
-                value={exercise.weightMode}
-                onValueChange={(value: 'same' | 'individual') => {
-                  updateExercise(exercise.id, { 
-                    weightMode: value,
-                    individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
-                  });
-                }}
-                className="mt-2"
+    <div className="space-y-3">
+      {exercises.map((exercise, index) => (
+        <div key={exercise.id} className="space-y-3 py-3 border-t border-gray-100 first:border-t-0">
+          <div className="flex items-center justify-between">
+            <button 
+              type="button" 
+              onClick={(e) => addExercise(e, index)} 
+              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-start transition-colors"
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              <span className="text-lg font-medium">Exercise</span>
+            </button>
+            <div className="flex gap-3">
+              <button 
+                type="button" 
+                onClick={(e) => duplicateExercise(exercise.id, e)} 
+                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded-lg focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
               >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="same" id={`same-${exercise.id}`} />
-                  <Label htmlFor={`same-${exercise.id}`}>Same weight for all sets</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="individual" id={`individual-${exercise.id}`} />
-                  <Label htmlFor={`individual-${exercise.id}`}>Different weight for each set</Label>
-                </div>
-              </RadioGroup>
+                <Copy className="h-4 w-4" />
+              </button>
+              <button 
+                type="button" 
+                onClick={(e) => deleteExercise(exercise.id, e)} 
+                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded-lg focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </div>
-
-            {exercise.weightMode === 'same' ? (
-              <div className="mb-4">
-                <Label>Weight ({isMetric ? 'kg' : 'lbs'})</Label>
-                <Input
-                  type="number"
-                  name={`exercise-weight-${exercise.id}`}
-                  autoComplete="off"
-                  placeholder={isMetric ? '85' : '185'}
-                  value={exercise.weight || ''}
-                  onChange={(e) => updateExercise(exercise.id, { weight: parseInt(e.target.value) || undefined })}
-                />
-              </div>
-            ) : (
-              <div className="mb-4">
-                <Label>Weight per Set ({isMetric ? 'kg' : 'lbs'})</Label>
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {Array.from({ length: exercise.sets }).map((_, setIndex) => (
-                    <div key={setIndex} className="flex items-center gap-2">
-                      <span className="text-sm w-12">Set {setIndex + 1}:</span>
-                      <Input
-                        type="number"
-                        name={`exercise-weight-set-${exercise.id}-${setIndex}`}
-                        autoComplete="off"
-                        placeholder={isMetric ? '85' : '185'}
-                        value={exercise.individualWeights?.[setIndex] || ''}
-                        onChange={(e) => updateIndividualWeight(exercise.id, setIndex, parseInt(e.target.value) || 0)}
-                      />
-                    </div>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
+            <div className="md:col-span-2 relative">
+              <Input
+                placeholder="Start typing exercise name..."
+                value={exercise.name}
+                onChange={(e) => handleExerciseNameChange(exercise.id, e.target.value)}
+                onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
+                onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
+                className="min-h-[48px] text-base border-gray-300"
+                style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+              />
+              {showSuggestions[exercise.id] && (
+                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  {getFilteredExercises(exercise.name).map((exerciseName) => (
+                    <button
+                      key={exerciseName}
+                      type="button"
+                      className="w-full px-4 py-3 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none text-base min-h-[44px] flex items-center"
+                      onClick={() => selectExercise(exercise.id, exerciseName)}
+                      style={{fontFamily: 'Inter, sans-serif'}}
+                    >
+                      {exerciseName}
+                    </button>
                   ))}
                 </div>
-              </div>
-            )}
-
-            <div className="mb-4">
-              <Label>Notes</Label>
-              <Textarea
-                name={`exercise-notes-${exercise.id}`}
-                autoComplete="off"
-                placeholder="Form cues, rest time, etc."
-                value={exercise.notes || ''}
-                onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
-                rows={2}
+              )}
+            </div>
+            <div>
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Sets
+              </Label>
+              <Input
+                type="number"
+                value={exercise.sets || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    updateExercise(exercise.id, { sets: 0 });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                      updateExercise(exercise.id, { sets: numValue });
+                    }
+                  }
+                }}
+                className="min-h-[48px] text-base border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                placeholder="5"
               />
             </div>
-            
-            <Button type="button" onClick={(e) => addExercise(e, index)} size="sm" variant="outline" className="w-full border-black hover:bg-gray-100">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Exercise
-            </Button>
-          </Card>
-        ))}
-        
-        {exercises.length === 0 && (
-          <div className="text-center py-8 text-muted-foreground">
-            No exercises added yet. Click "Add Exercise" to get started.
+            <div>
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Reps
+              </Label>
+              <Input
+                type="number"
+                value={exercise.reps || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    updateExercise(exercise.id, { reps: 0 });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue) && numValue >= 0) {
+                      updateExercise(exercise.id, { reps: numValue });
+                    }
+                  }
+                }}
+                className="min-h-[48px] text-base border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                placeholder="5"
+              />
+            </div>
           </div>
-        )}
-      </CardContent>
-    </Card>
+
+          <div className="mb-5">
+            <Label className="text-lg font-semibold text-gray-800 mb-5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+              Weight Structure
+            </Label>
+            <RadioGroup
+              value={exercise.weightMode}
+              onValueChange={(value: 'same' | 'individual') => {
+                updateExercise(exercise.id, { 
+                  weightMode: value,
+                  individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
+                });
+              }}
+              className="mt-3 space-y-3"
+            >
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[20px] min-w-[20px]" />
+                <Label htmlFor={`same-${exercise.id}`} className="text-lg font-medium text-gray-800" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Same weight for all sets
+                </Label>
+              </div>
+              <div className="flex items-center space-x-3">
+                <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[20px] min-w-[20px]" />
+                <Label htmlFor={`individual-${exercise.id}`} className="text-lg font-medium text-gray-800" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Different weight for each set
+                </Label>
+              </div>
+            </RadioGroup>
+          </div>
+
+          {exercise.weightMode === 'same' ? (
+            <div className="mb-5">
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Weight (lbs)
+              </Label>
+              <Input
+                type="number"
+                placeholder="185"
+                value={exercise.weight || ''}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value === '') {
+                    updateExercise(exercise.id, { weight: undefined });
+                  } else {
+                    const numValue = parseInt(value);
+                    if (!isNaN(numValue)) {
+                      updateExercise(exercise.id, { weight: numValue });
+                    }
+                  }
+                }}
+                className="min-h-[48px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+              />
+            </div>
+          ) : (
+            <div className="mb-5">
+              <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Weight per Set (lbs)
+              </Label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+                {Array.from({ length: exercise.sets }).map((_, setIndex) => (
+                  <div key={setIndex} className="flex items-center gap-3">
+                    <span className="text-lg font-semibold w-20 text-gray-800" style={{fontFamily: 'Inter, sans-serif'}}>
+                      Set {setIndex + 1}:
+                    </span>
+                    <Input
+                      type="number"
+                      placeholder="185"
+                      value={exercise.individualWeights?.[setIndex] || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          updateIndividualWeight(exercise.id, setIndex, 0);
+                        } else {
+                          const numValue = parseInt(value);
+                          if (!isNaN(numValue)) {
+                            updateIndividualWeight(exercise.id, setIndex, numValue);
+                          }
+                        }
+                      }}
+                      className="min-h-[44px] text-base border-gray-300 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="mb-5">
+            <Label className="text-lg font-semibold text-gray-800 mb-4 block" style={{fontFamily: 'Inter, sans-serif'}}>
+              Notes
+            </Label>
+            <Textarea
+              placeholder="Form cues, rest time, etc."
+              value={exercise.notes || ''}
+              onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
+              rows={3}
+              className="min-h-[80px] text-base border-gray-300"
+              style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+            />
+          </div>
+        </div>
+      ))}
+      
+      {/* Bottom + Exercise button for continuous building */}
+      {exercises.length > 0 && (
+        <button 
+          type="button" 
+          onClick={(e) => addExercise(e)} 
+          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-start transition-colors"
+          style={{fontFamily: 'Inter, sans-serif'}}
+        >
+          <Plus className="h-5 w-5 mr-2" />
+          <span className="text-lg font-medium">Exercise</span>
+        </button>
+      )}
+        
+      {exercises.length === 0 && (
+        <div className="text-center py-10 text-gray-500">
+          <button 
+            type="button" 
+            onClick={(e) => addExercise(e)} 
+            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-center transition-colors mx-auto"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            <span className="text-lg font-medium">Exercise</span>
+          </button>
+          <p className="text-lg text-gray-500 mt-4" style={{fontFamily: 'Inter, sans-serif'}}>
+            No exercises added yet.
+          </p>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -4163,7 +4258,7 @@ import { Plus, ChevronDown, ChevronRight, ChevronLeft, Clock } from 'lucide-reac
 
 interface TodaysEffortProps {
   selectedDate?: string;
-  onAddEffort: () => void;
+  onAddEffort: (type: string, date?: string) => void; // FIXED: Now matches AppLayout
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
 }
@@ -4315,7 +4410,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             <Button 
               onClick={() => {
                 console.log('🆕 Add effort clicked for date:', activeDate);
-                onAddEffort();
+                // FIXED: Pass a default type and the selected date
+                onAddEffort('run', activeDate);
               }} 
               size="sm" 
               className="gap-2 bg-gray-600 text-white hover:bg-gray-700 border-gray-600 hover:border-gray-700 rounded-md transition-all duration-150 hover:transform hover:-translate-y-0.5 hover:shadow-md font-medium text-sm px-4 py-2 min-h-[36px]"
@@ -4397,8 +4493,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <p className="text-xs md:text-sm text-gray-600">{formatWorkoutType(currentWorkout.type)}</p>
         </div>
 
-        {/* Total Time Display */}
-        {currentWorkout.duration && currentWorkout.duration > 0 && (
+        {/* Total Time Display - ONLY for non-strength workouts */}
+        {currentWorkout.type !== 'strength' && currentWorkout.duration && currentWorkout.duration > 0 && (
           <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
             <Clock className="h-3 w-3 md:h-4 md:w-4" />
             <span className="font-medium">Total Time:</span>
@@ -4406,7 +4502,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         )}
 
-        {/* Collapsible Segments */}
+        {/* Collapsible Segments/Exercises */}
         {intervalCount > 0 && (
           <div>
             <button
@@ -4450,7 +4546,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { ArrowLeft, Save, Clock, Trash2, Check } from 'lucide-react';
+import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
@@ -4465,7 +4561,7 @@ interface WorkoutBuilderProps {
 }
 
 export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate }: WorkoutBuilderProps) {
-  const { addWorkout, updateWorkout, deleteWorkout } = useAppContext();
+  const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
   const [showCompleted, setShowCompleted] = useState(false);
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -4503,7 +4599,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [rideIntervals, setRideIntervals] = useState<RideInterval[]>([]);
   const [swimIntervals, setSwimIntervals] = useState<SwimInterval[]>([]);
   const [strengthExercises, setStrengthExercises] = useState<StrengthExercise[]>([]);
-  const [isMetric, setIsMetric] = useState(false);
+
+  // Use global Imperial setting instead of local isMetric
+  const isMetric = !useImperial;
 
   useEffect(() => {
     console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType, initialDate });
@@ -4703,7 +4801,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               exerciseDesc += ` ${exercise.sets}x${exercise.reps}`;
             }
             if (exercise.weight) {
-              exerciseDesc += ` @ ${exercise.weight}${isMetric ? 'kg' : 'lbs'}`;
+              exerciseDesc += ` @ ${exercise.weight}lbs`;
             }
             parts.push(exerciseDesc);
           }
@@ -4797,66 +4895,82 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         </div>
       )}
 
-      {/* Clean Header - matches calendar style */}
-      <header className="bg-white border-b border-[#E5E5E5]">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-end items-center h-8">
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-gray-600">Imperial</span>
-              <Switch
-                checked={isMetric}
-                onCheckedChange={setIsMetric}
-              />
-              <span className="text-xs text-gray-600">Metric</span>
-            </div>
+      <main className="max-w-7xl mx-auto px-3 py-2">
+        {/* Tab Toggle with discipline icon and date - new top line */}
+        <div className="flex justify-between items-center mb-1">
+          <div className="flex gap-1 items-center">
+            <button
+              onClick={() => setShowCompleted(false)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                !showCompleted 
+                  ? 'text-black border-b-2 border-black' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              Build effort
+            </button>
+            <button
+              onClick={() => setShowCompleted(true)}
+              className={`px-4 py-2 text-sm font-medium transition-colors ${
+                showCompleted 
+                  ? 'text-black border-b-2 border-black' 
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              Completed
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Dynamic discipline icon */}
+            {formData.type === 'run' && <span className="text-xl">🏃</span>}
+            {formData.type === 'ride' && <span className="text-xl">🚴</span>}
+            {formData.type === 'swim' && <span className="text-xl">🏊</span>}
+            {formData.type === 'strength' && <Dumbbell className="h-5 w-5 text-gray-700" />}
+            
+            {/* Date moved to top line */}
+            <Input
+              type="date"
+              value={formData.date}
+              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              className="min-h-[44px] border-0 bg-transparent w-auto"
+              style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+            />
           </div>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-2">
-        {/* Back Button */}
-        <div className="mb-4">
-          <button 
-            onClick={onClose}
-            className="flex items-center text-black hover:text-gray-600 text-base font-medium transition-colors"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back
-          </button>
-        </div>
-
-        {/* Tab Toggle - simplified */}
-        <div className="flex gap-1 mb-4">
-          <button
-            onClick={() => setShowCompleted(false)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              !showCompleted 
-                ? 'text-black border-b-2 border-black' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            Build effort
-          </button>
-          <button
-            onClick={() => setShowCompleted(true)}
-            className={`px-4 py-2 text-sm font-medium transition-colors ${
-              showCompleted 
-                ? 'text-black border-b-2 border-black' 
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            Completed
-          </button>
-        </div>
+        {/* Imperial/Metric Toggle - Only for Run and Ride */}
+        {(formData.type === 'run' || formData.type === 'ride') && (
+          <div className="flex justify-end items-center gap-2 mb-1">
+            <Label htmlFor="units" className="text-sm font-medium text-gray-700">
+              Imperial
+            </Label>
+            <Switch
+              id="units"
+              checked={!useImperial} // Switch shows Metric when checked
+              onCheckedChange={toggleUnits}
+              className="data-[state=checked]:bg-black data-[state=unchecked]:bg-gray-200"
+            />
+            <Label htmlFor="units" className="text-sm font-medium text-gray-700">
+              Metric
+            </Label>
+          </div>
+        )}
 
         {!showCompleted ? (
-          <div className="space-y-4">
-            {/* Simplified Form - cleaner layout */}
-            <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
-              <div className="flex justify-end mb-2">
+          <div className="space-y-1">
+            {/* Simplified Form - Focus input full width with trash */}
+            <div className="p-2 pt-1">
+              <div className="flex items-center gap-4 mb-3">
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Focus"
+                  className="border-gray-300 min-h-[44px] flex-1"
+                  style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                />
                 <button
                   onClick={handleTrashClick}
                   className="text-gray-400 hover:text-red-500 transition-colors"
@@ -4864,94 +4978,57 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-                <div className="md:col-span-2">
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Effort title</Label>
-                  <Input
-                    value={formData.name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder=""
-                    className="border-gray-300 min-h-[44px]"
-                    style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
-                  />
-                </div>
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Date</Label>
-                  <Input
-                    type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                    className="border-gray-300 min-h-[44px]"
-                    style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
-                  />
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Discipline</Label>
-                  <Select value={formData.type} onValueChange={(value: 'run' | 'ride' | 'strength' | 'swim') =>
-                    setFormData(prev => ({ ...prev, type: value }))
-                  }>
-                    <SelectTrigger className="border-gray-300 min-h-[44px]" style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="run">Run</SelectItem>
-                      <SelectItem value="ride">Ride</SelectItem>
-                      <SelectItem value="swim">Swim</SelectItem>
-                      <SelectItem value="strength">Strength</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  {/* Notes right under Discipline */}
-                  <div className="mt-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowNotes(!showNotes)}
-                      className="flex items-center gap-1 text-xs font-medium text-gray-700 hover:text-gray-900"
-                    >
-                      <span className={`transform transition-transform ${showNotes ? 'rotate-90' : ''}`}>
-                        ▶
-                      </span>
-                      Notes
-                    </button>
+                {formData.type === 'strength' && (
+                  <div>
+                    {/* Notes for strength */}
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowNotes(!showNotes)}
+                        className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
+                      >
+                        <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes ? 'rotate-90' : ''}`} />
+                        Notes
+                      </button>
 
-                    {showNotes && (
-                      <Textarea
-                        value={formData.userComments}
-                        onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
-                        placeholder=""
-                        rows={2}
-                        className="border-gray-300 min-h-[44px] mt-1"
-                        style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
-                      />
-                    )}
+                      {showNotes && (
+                        <Textarea
+                          value={formData.userComments}
+                          onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
+                          placeholder=""
+                          rows={2}
+                          className="border-gray-300 min-h-[44px]"
+                          style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                        />
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
                 <div>
-                  <Label className="text-sm font-medium text-gray-700 mb-2 block">Description</Label>
                   <div className="relative">
                     <Textarea
                       value={formData.description}
                       onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                       placeholder=""
                       rows={3}
-                      className="border-gray-300 min-h-[44px] pb-8"
+                      className={`border-0 bg-transparent min-h-[44px] ${formData.type === 'strength' ? '' : 'pb-8'}`}
                       style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
                     />
-                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
-                      <Clock className="h-3 w-3" />
-                      <span>Total Time: {formatTime(calculateTotalTime())}</span>
-                    </div>
+                    {formData.type !== 'strength' && (
+                      <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
+                        <Clock className="h-3 w-3" />
+                        <span>Total Time: {formatTime(calculateTotalTime())}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
             </div>
 
             {/* Structure Section - clean container */}
-            <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
-              <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Structure</h3>
+            <div className="p-2 pt-0">
               
               {formData.type === 'run' && (
                 <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
@@ -4963,13 +5040,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
               )}
               {formData.type === 'strength' && (
-                <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} isMetric={isMetric} />
+                <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
               )}
             </div>
 
             {/* Auto-generated Preview - if content exists */}
             {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
-              <div className="bg-gray-50 p-3 border border-[#E5E5E5]" style={{borderRadius: 0}}>
+              <div className="bg-gray-50 p-2">
                 <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
                   {generateWorkoutDescription() || 'Add segments to see workout summary...'}
                 </p>
@@ -4983,17 +5060,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
         ) : (
           /* Completed Tab Content - simplified */
-          <div className="border border-[#E5E5E5] p-3" style={{borderRadius: 0}}>
+          <div className="p-2">
             {formData.type === 'strength' ? (
-              <div>
-                <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Log Completed Strength Training</h3>
-                <StrengthExerciseBuilder
-                  exercises={strengthExercises}
-                  onChange={setStrengthExercises}
-                  isMetric={isMetric}
-                  isCompleted={true}
-                />
-              </div>
+              <StrengthExerciseBuilder
+                exercises={strengthExercises}
+                onChange={setStrengthExercises}
+                isCompleted={true}
+              />
             ) : (
               <div>
                 <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Completed Session Data</h3>
@@ -5059,7 +5132,7 @@ const DISCIPLINE_COLORS = {
 };
 
 interface WorkoutCalendarProps {
-  onAddEffort: () => void;
+  onAddEffort: (type: string, date?: string) => void; // FIXED: Match AppLayout interface
   onSelectType: (type: string) => void;
   onSelectWorkout: (workout: any) => void;
   onViewCompleted: () => void;
@@ -5079,7 +5152,6 @@ export default function WorkoutCalendar({
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
-
 
   const navigateMonth = (direction: number) => {
     setCurrentDate(prev => {
@@ -5112,12 +5184,20 @@ export default function WorkoutCalendar({
   };
 
   const getWorkoutsForDate = (day: number) => {
-    if (!day) return [];
+    if (!day || !workouts) return [];
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
-    return workouts.filter(w => w.date === dateStr);
+    
+    // DEBUG: Log what workouts exist
+    console.log('🔍 All workouts:', workouts);
+    console.log('🔍 Looking for date:', dateStr);
+    
+    const filtered = workouts.filter(w => w && w.date === dateStr) || [];
+    console.log('🔍 Found workouts for', dateStr, ':', filtered);
+    
+    return filtered;
   };
 
   const handleDateClick = (day: number) => {
@@ -5129,24 +5209,17 @@ export default function WorkoutCalendar({
     const dateStr = `${year}-${month}-${dayStr}`;
     
     console.log('📅 Calendar date clicked:', day, 'Date string:', dateStr);
+    console.log('📅 Year:', year, 'Month:', month, 'Day:', dayStr);
+    console.log('📅 Full date string length:', dateStr.length, 'Content:', JSON.stringify(dateStr));
     
+    // FIXED: ONLY select the date - don't automatically open workouts
     if (onDateSelect) {
       onDateSelect(dateStr);
-    } else {
-      const dayWorkouts = getWorkoutsForDate(day);
-      console.log('📅 Date clicked:', day, 'Workouts found:', dayWorkouts);
-      
-      if (dayWorkouts.length === 1) {
-        console.log('✏️ Opening workout for editing:', dayWorkouts[0]);
-        onEditEffort(dayWorkouts[0]);
-      } else if (dayWorkouts.length > 1) {
-        console.log('📝 Multiple workouts, opening first:', dayWorkouts[0]);
-        onEditEffort(dayWorkouts[0]);
-      } else {
-        console.log('➕ No workouts, creating new one for date');
-        onAddEffort();
-      }
     }
+    
+    // Don't automatically open workouts for editing
+    // Let the user interact with TodaysEffort component to edit workouts
+    // Or click "Add effort" to create new ones
   };
 
   const days = getDaysInMonth();
@@ -5204,9 +5277,9 @@ export default function WorkoutCalendar({
                         <div className="flex justify-center items-center space-x-1 mt-1">
                           {dayWorkouts.slice(0, 4).map((workout, idx) => (
                             <div
-                              key={workout.id}
-                              className={`w-2 h-2 rounded-full shadow-sm ${DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS]}`}
-                              title={workout.name}
+                              key={workout.id || idx} // FIXED: Fallback key in case id is missing
+                              className={`w-2 h-2 rounded-full shadow-sm ${DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS] || 'bg-gray-500'}`}
+                              title={workout.name || workout.type}
                             />
                           ))}
                           {dayWorkouts.length > 4 && (
@@ -11511,12 +11584,6 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/use-toast.ts
-import { useToast, toast } from "@/hooks/use-toast";
-
-export { useToast, toast };
-
-
 // File: /Users/michaelambp/Documents/efforts_App/Efforts/src/contexts/AppContext.tsx
 import React, { createContext, useContext, useState } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
@@ -11631,532 +11698,6 @@ export function useIsMobile() {
   }, []);
 
   return !!isMobile;
-}
-
-
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/hooks/use-toast.ts
-import * as React from "react";
-
-import type {
-  ToastActionElement,
-  ToastProps,
-} from "@/components/ui/toast";
-
-const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
-
-type ToasterToast = ToastProps & {
-  id: string;
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  action?: ToastActionElement;
-};
-
-const actionTypes = {
-  ADD_TOAST: "ADD_TOAST",
-  UPDATE_TOAST: "UPDATE_TOAST",
-  DISMISS_TOAST: "DISMISS_TOAST",
-  REMOVE_TOAST: "REMOVE_TOAST",
-} as const;
-
-let count = 0;
-
-function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER;
-  return count.toString();
-}
-
-type ActionType = typeof actionTypes;
-
-type Action =
-  | {
-      type: ActionType["ADD_TOAST"];
-      toast: ToasterToast;
-    }
-  | {
-      type: ActionType["UPDATE_TOAST"];
-      toast: Partial<ToasterToast>;
-    }
-  | {
-      type: ActionType["DISMISS_TOAST"];
-      toastId?: ToasterToast["id"];
-    }
-  | {
-      type: ActionType["REMOVE_TOAST"];
-      toastId?: ToasterToast["id"];
-    };
-
-interface State {
-  toasts: ToasterToast[];
-}
-
-const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>();
-
-const addToRemoveQueue = (toastId: string) => {
-  if (toastTimeouts.has(toastId)) {
-    return;
-  }
-
-  const timeout = setTimeout(() => {
-    toastTimeouts.delete(toastId);
-    dispatch({
-      type: "REMOVE_TOAST",
-      toastId: toastId,
-    });
-  }, TOAST_REMOVE_DELAY);
-
-  toastTimeouts.set(toastId, timeout);
-};
-
-export const reducer = (state: State, action: Action): State => {
-  switch (action.type) {
-    case "ADD_TOAST":
-      return {
-        ...state,
-        toasts: [action.toast, ...state.toasts].slice(0, TOAST_LIMIT),
-      }
-
-    case "UPDATE_TOAST":
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === action.toast.id ? { ...t, ...action.toast } : t
-        ),
-      }
-
-    case "DISMISS_TOAST": {
-      const { toastId } = action;
-
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
-      if (toastId) {
-        addToRemoveQueue(toastId)
-      } else {
-        state.toasts.forEach((toast) => {
-          addToRemoveQueue(toast.id)
-        })
-      }
-
-      return {
-        ...state,
-        toasts: state.toasts.map((t) =>
-          t.id === toastId || toastId === undefined
-            ? {
-                ...t,
-                open: false,
-              }
-            : t
-        ),
-      }
-    }
-    case "REMOVE_TOAST":
-      if (action.toastId === undefined) {
-        return {
-          ...state,
-          toasts: [],
-        }
-      }
-      return {
-        ...state,
-        toasts: state.toasts.filter((t) => t.id !== action.toastId),
-      }
-  }
-}
-
-const listeners: Array<(state: State) => void> = [];
-
-let memoryState: State = { toasts: [] };
-
-function dispatch(action: Action) {
-  memoryState = reducer(memoryState, action);
-  listeners.forEach((listener) => {
-    listener(memoryState);
-  });
-}
-
-type Toast = Omit<ToasterToast, "id">;
-
-function toast({ ...props }: Toast) {
-  const id = genId();
-
-  const update = (props: ToasterToast) =>
-    dispatch({
-      type: "UPDATE_TOAST",
-      toast: { ...props, id },
-    });
-  const dismiss = () => dispatch({ type: "DISMISS_TOAST", toastId: id });
-
-  dispatch({
-    type: "ADD_TOAST",
-    toast: {
-      ...props,
-      id,
-      open: true,
-      onOpenChange: (open) => {
-        if (!open) dismiss()
-      },
-    },
-  });
-
-  return {
-    id: id,
-    dismiss,
-    update,
-  };
-}
-
-function useToast() {
-  const [state, setState] = React.useState<State>(memoryState);
-
-  React.useEffect(() => {
-    listeners.push(setState);
-    return () => {
-      const index = listeners.indexOf(setState);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
-    };
-  }, [state]);
-
-  return {
-    ...state,
-    toast,
-    dismiss: (toastId?: string) =>
-      dispatch({ type: "DISMISS_TOAST", toastId }),
-  };
-}
-
-export { useToast, toast };
-
-
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/hooks/useWorkouts.ts
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-
-// Interval Interfaces
-export interface RunInterval {
-  id: string;
-  time?: string;
-  distance?: string;
-  paceTarget?: string;
-  effortLabel?: string;
-  bpmTarget?: string;
-  rpeTarget?: string;
-  repeat?: boolean;
-  repeatCount?: number;
-  duration?: number;
-  selected?: boolean;
-  isRepeatBlock?: boolean;
-  originalSegments?: RunInterval[];
-}
-
-export interface RideInterval {
-  id: string;
-  time?: string;
-  distance?: string;
-  speedTarget?: string;
-  powerTarget?: string;
-  bpmTarget?: string;
-  rpeTarget?: string;
-  cadenceTarget?: string;
-  repeat?: boolean;
-  repeatCount?: number;
-  duration?: number;
-  selected?: boolean;
-  isRepeatBlock?: boolean;
-}
-
-export interface SwimInterval {
-  id: string;
-  distance: string;
-  targetRPE?: number;
-  equipment: string;
-  recoveryType: "time" | "distance";
-  recovery: string;
-  repeatCount: number;
-  duration?: number;
-}
-
-export interface StrengthExercise {
-  id: string;
-  name: string;
-  sets: number;
-  reps: number;
-  weight?: number;
-  notes?: string;
-  weightMode: "same" | "individual";
-  individualWeights?: number[];
-  completed_sets?: Array<{
-    reps: number;
-    weight: number;
-    rir?: number;
-    completed: boolean;
-  }>;
-}
-
-// Workout Interface
-export interface Workout {
-  id: string;
-  name: string;
-  type: "run" | "ride" | "swim" | "strength";
-  duration: number;
-  date: string;
-  description?: string;
-  userComments?: string;
-  completedManually?: boolean;
-  intervals?: RunInterval[] | RideInterval[] | SwimInterval[];
-  strength_exercises?: StrengthExercise[];
-  workout_status?: "planned" | "completed" | "skipped" | "in_progress";
-  created_at?: string;
-  updated_at?: string;
-}
-
-export const useWorkouts = () => {
-  const [workouts, setWorkouts] = useState<Workout[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Fetch - ONLY use loading for initial fetch
-  const fetchWorkouts = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from("workouts")
-        .select("*")
-        .order("date", { ascending: false });
-      if (error) throw error;
-
-      const mapped = data.map((w) => ({
-        id: w.id,
-        name: w.name,
-        type: w.type,
-        duration: w.duration,
-        date: w.date,
-        description: w.description,
-        userComments: w.usercomments ?? "",
-        completedManually: w.completedmanually ?? false,
-        workout_status: w.workout_status ?? "planned",
-        created_at: w.created_at,
-        updated_at: w.updated_at,
-        intervals: w.intervals ? JSON.parse(w.intervals) : [],
-        strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
-      }));
-      setWorkouts(mapped);
-    } catch (err) {
-      console.error("Error in fetchWorkouts:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Add - NO LOADING STATES
-  const addWorkout = async (workoutData: Omit<Workout, "id">) => {
-    try {
-      // 🔥 REMOVED: setLoading(true);
-      const toSave = {
-        name: workoutData.name,
-        type: workoutData.type,
-        date: workoutData.date,
-        duration: workoutData.duration,
-        description: workoutData.description ?? "",
-        usercomments: workoutData.userComments ?? "",
-        completedmanually: workoutData.completedManually ?? false,
-        workout_status: workoutData.workout_status ?? "planned",
-        intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
-        strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
-      };
-      const { data, error } = await supabase
-        .from("workouts")
-        .insert([toSave])
-        .select()
-        .single();
-      if (error) throw error;
-
-      const newWorkout: Workout = {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        duration: data.duration,
-        date: data.date,
-        description: data.description,
-        userComments: data.usercomments ?? "",
-        completedManually: data.completedmanually ?? false,
-        workout_status: data.workout_status ?? "planned",
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        intervals: data.intervals ? JSON.parse(data.intervals) : [],
-        strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-      };
-      setWorkouts((prev) => [newWorkout, ...prev]);
-      return newWorkout;
-    } catch (err) {
-      console.error("Error in addWorkout:", err);
-      throw err;
-    }
-    // 🔥 REMOVED: finally { setLoading(false); }
-  };
-
-  // Update - NO LOADING STATES
-  const updateWorkout = async (id: string, updates: Partial<Workout>) => {
-    try {
-      // 🔥 REMOVED: setLoading(true);
-      const updateObject: any = {};
-      if (updates.name !== undefined) updateObject.name = updates.name;
-      if (updates.type !== undefined) updateObject.type = updates.type;
-      if (updates.date !== undefined) updateObject.date = updates.date;
-      if (updates.duration !== undefined) updateObject.duration = updates.duration;
-      if (updates.description !== undefined) updateObject.description = updates.description;
-      if (updates.userComments !== undefined) updateObject.usercomments = updates.userComments;
-      if (updates.completedManually !== undefined) updateObject.completedmanually = updates.completedManually;
-      if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
-      if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
-      if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
-
-      const { data, error } = await supabase
-        .from("workouts")
-        .update(updateObject)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-
-      const updated: Workout = {
-        id: data.id,
-        name: data.name,
-        type: data.type,
-        duration: data.duration,
-        date: data.date,
-        description: data.description,
-        userComments: data.usercomments ?? "",
-        completedManually: data.completedmanually ?? false,
-        workout_status: data.workout_status ?? "planned",
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        intervals: data.intervals ? JSON.parse(data.intervals) : [],
-        strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-      };
-      setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
-      return updated;
-    } catch (err) {
-      console.error("Error in updateWorkout:", err);
-      throw err;
-    }
-    // 🔥 REMOVED: finally { setLoading(false); }
-  };
-
-  // Delete - NO LOADING STATES  
-  const deleteWorkout = async (id: string) => {
-    try {
-      // 🔥 REMOVED: setLoading(true);
-      const { error } = await supabase.from("workouts").delete().eq("id", id);
-      if (error) throw error;
-      setWorkouts((prev) => prev.filter((w) => w.id !== id));
-    } catch (err) {
-      console.error("Error in deleteWorkout:", err);
-      throw err;
-    }
-    // 🔥 REMOVED: finally { setLoading(false); }
-  };
-
-  const getWorkoutsForDate = (date: string) => workouts.filter((w) => w.date === date);
-  const getWorkoutsByType = (type: Workout["type"]) => workouts.filter((w) => w.type === type);
-
-  useEffect(() => {
-    fetchWorkouts();
-  }, []);
-
-  return {
-    workouts,
-    loading, // Only true during initial fetch
-    addWorkout,
-    updateWorkout,
-    deleteWorkout,
-    getWorkoutsForDate,
-    getWorkoutsByType,
-    refetch: fetchWorkouts,
-  };
-};
-
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/index.css
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
-    --primary: 0 0% 0%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 96%;
-    --secondary-foreground: 0 0% 0%;
-    --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 40%;
-    --accent: 0 0% 0%;
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 90%;
-    --input: 0 0% 90%;
-    --ring: 0 0% 0%;
-    --radius: 0rem;
-  }
-}
-
-@layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: 'Inter', sans-serif;
-    letter-spacing: 0.02em;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Inter', sans-serif;
-    font-weight: 600;
-  }
-}
-
-@layer components {
-  .font-mono {
-    font-variant-numeric: tabular-nums;
-  }
-}
-
-/* Remove all border radius */
-* {
-  border-radius: 0 !important;
-}
-
-/* Remove all shadows */
-* {
-  box-shadow: none !important;
-}
-
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/lib/supabase.ts
-import { createClient } from '@supabase/supabase-js';
-
-
-// Initialize Supabase client
-// Using direct values from project configuration
-const supabaseUrl = 'https://yyriamwvtvzlkumqrvpm.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY';
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-
-export { supabase };
-
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/lib/utils.ts
-import { clsx, type ClassValue } from "clsx"
-import { twMerge } from "tailwind-merge"
-
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
 }
 
 

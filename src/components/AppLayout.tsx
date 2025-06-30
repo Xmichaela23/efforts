@@ -24,6 +24,16 @@ const AppLayout: React.FC = () => {
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
+  // Format date for header display (June 30 2025 format)
+  const formatHeaderDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
   const handleWorkoutSelect = (workout: any) => {
     console.log('❌ WRONG: handleWorkoutSelect called - going to detail view');
     setSelectedWorkout(workout);
@@ -105,33 +115,16 @@ const AppLayout: React.FC = () => {
       <header className="border-b border-border/40 bg-card/30 backdrop-blur-sm sticky top-0 z-40">
         {/* 🚨 FIXED: Mobile centering container */}
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-primary">Efforts</h1>
-              
-              {/* 🚨 ADDED: Missing Dashboard button */}
-              {(selectedWorkout || showStrengthLogger || showBuilder) && (
-                <Button
-                  onClick={handleBackToDashboard}
-                  variant="ghost"
-                  className="text-sm font-medium hover:bg-gray-50"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                >
-                  Dashboard
-                </Button>
-              )}
-            </div>
-
+          <div className="flex items-center justify-between h-16 w-full">
+            {/* Left: Hamburger menu and efforts title */}
             <div className="flex items-center space-x-3">
-              {/* 🎯 IMPERIAL BUTTON DELETED - Units toggle now only in WorkoutBuilder */}
-              
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="start" className="w-56">
                   <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     Profile
@@ -156,6 +149,32 @@ const AppLayout: React.FC = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              
+              <h1 className="text-2xl font-bold text-primary">efforts</h1>
+              
+              {/* Dashboard button when in builder/logger */}
+              {(selectedWorkout || showStrengthLogger || showBuilder) && (
+                <Button
+                  onClick={handleBackToDashboard}
+                  variant="ghost"
+                  className="text-sm font-medium hover:bg-gray-50"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                >
+                  Dashboard
+                </Button>
+              )}
+            </div>
+
+            {/* Center: Empty for spacing */}
+            <div></div>
+
+            {/* Right: Date (only when on dashboard) */}
+            <div className="flex items-center">
+              {!(selectedWorkout || showStrengthLogger || showBuilder) && (
+                <span className="text-lg font-normal text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+                  {formatHeaderDate()}
+                </span>
+              )}
             </div>
           </div>
         </div>

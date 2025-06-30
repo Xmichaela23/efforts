@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Copy, Trash2, GripVertical, Repeat, Edit } from 'lucide-react';
+import { Plus, Copy, Trash2, GripVertical, Repeat, Edit, Activity } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface RunInterval {
@@ -29,29 +29,43 @@ interface RunIntervalBuilderProps {
   isMetric: boolean;
 }
 
-// Smart time input handler
+// Fixed time input handler - properly calculates duration
 const handleTimeInput = (value: string, onChange: (timeStr: string, duration: number) => void) => {
-  let timeStr = value;
-  
-  // Smart time conversion: "4" -> "4:00", "45" -> "45:00", "4:30" stays "4:30"
-  if (timeStr && !timeStr.includes(':') && timeStr.length <= 2) {
-    timeStr = `${timeStr}:00`;
-  }
-  
-  if (timeStr === '') {
+  if (value === '') {
     onChange('', 0);
     return;
   }
   
-  const parts = timeStr.split(':');
-  const min = parseInt(parts[0]) || 0;
-  const sec = parseInt(parts[1]) || 0;
+  const timeStr = value;
+  let duration = 0;
   
-  // Validate seconds
-  if (sec >= 60) return;
+  // Calculate duration for any valid time format
+  if (timeStr.includes(':')) {
+    const parts = timeStr.split(':');
+    const min = parseInt(parts[0]) || 0;
+    const sec = parseInt(parts[1]) || 0;
+    
+    // Validate seconds
+    if (sec >= 60) return;
+    
+    duration = min * 60 + sec;
+  } else {
+    // For inputs without colon, treat as minutes
+    const min = parseInt(timeStr) || 0;
+    duration = min * 60;
+  }
   
-  const duration = min * 60 + sec;
   onChange(timeStr, duration);
+};
+
+// Smart time formatting on blur
+const handleTimeBlur = (value: string, onChange: (timeStr: string, duration: number) => void) => {
+  const timeStr = value;
+  if (timeStr && !timeStr.includes(':') && timeStr.length <= 2) {
+    const formattedTime = `${timeStr}:00`;
+    const duration = (parseInt(timeStr) || 0) * 60;
+    onChange(formattedTime, duration);
+  }
 };
 
 // Mobile Safari numeric input fix
@@ -295,6 +309,11 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                   updateInterval(interval.id, { time: timeStr, duration });
                 });
               }}
+              onBlur={(e) => {
+                handleTimeBlur(e.target.value, (timeStr, duration) => {
+                  updateInterval(interval.id, { time: timeStr, duration });
+                });
+              }}
               className="h-9 text-sm"
             />
           </div>
@@ -372,15 +391,15 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
 
   return (
     <div className="space-y-3">
-      {/* Left-aligned Add Effort button only */}
+      {/* Left-aligned Add Effort button with runner emoji */}
       <div className="mb-3 text-center">
         <button 
           type="button" 
           onClick={addInterval} 
           className="px-4 py-2 text-black text-sm"
         >
-          <Plus className="h-4 w-4 mr-2 inline" />
-          Add effort
+          <Activity className="h-4 w-4 mr-2 inline" />
+          Add Segment
         </button>
       </div>
 
@@ -391,11 +410,23 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
         {intervals.length === 0 && (
           <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-muted rounded-lg">
             <p className="text-sm">No segments yet</p>
-            <p className="text-xs mt-1">            Click "Add effort" to get started</p>
+            <p className="text-xs mt-1">Click "Add Segment" to get started</p>
           </div>
         )}
 
-
+        {/* Bottom Add Effort button when segments exist */}
+        {intervals.length > 0 && (
+          <div className="text-center pt-4">
+            <button 
+              type="button" 
+              onClick={addInterval} 
+              className="px-4 py-2 text-black text-sm"
+            >
+              <Activity className="h-4 w-4 mr-2 inline" />
+              Add Segment
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Floating repeat menu - more compact */}
