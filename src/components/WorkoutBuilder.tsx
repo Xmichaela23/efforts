@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move } from 'lucide-react';
@@ -350,7 +348,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     <div className="min-h-screen bg-white">
       {/* Save Success Banner */}
       {showSaveOptions && (
-        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 border border-gray-200 z-50 flex items-center gap-4">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 z-50 flex items-center gap-4">
           <Check className="h-5 w-5" />
           <span>{currentWorkout ? 'effort Updated' : 'effort saved'}</span>
         </div>
@@ -364,14 +362,14 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
-                    className="px-4 py-2 text-sm font-medium text-black border-b-2 border-black transition-colors flex items-center gap-2"
+                    className="px-4 py-2 text-sm font-medium text-black transition-colors flex items-center gap-2"
                     style={{fontFamily: 'Inter, sans-serif'}}
                   >
                     Build effort
                     <ChevronDown className="h-4 w-4" />
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start">
+                <DropdownMenuContent align="start" className="bg-white border border-gray-200 shadow-xl rounded-lg">
                   <DropdownMenuItem
                     onClick={() => setFormData(prev => ({ ...prev, type: 'run' }))}
                     className="cursor-pointer"
@@ -415,7 +413,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               onClick={() => setShowCompleted(true)}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
                 showCompleted 
-                  ? 'text-black border-b-2 border-black' 
+                  ? 'text-black' 
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               style={{fontFamily: 'Inter, sans-serif'}}
@@ -430,8 +428,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               type="date"
               value={formData.date}
               onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-              className="min-h-[44px] border-0 bg-transparent w-auto"
-              style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+              className="min-h-[44px] bg-transparent w-auto border border-gray-300"
+              style={{fontFamily: 'Inter, sans-serif'}}
             />
           </div>
         </div>
@@ -464,7 +462,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Focus"
                   className="border-gray-300 min-h-[44px] flex-1"
-                  style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                  style={{fontFamily: 'Inter, sans-serif'}}
                 />
                 <button
                   onClick={handleTrashClick}
@@ -495,7 +493,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                           placeholder=""
                           rows={2}
                           className="border-gray-300 min-h-[44px]"
-                          style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                          style={{fontFamily: 'Inter, sans-serif'}}
                         />
                       )}
                     </div>
@@ -505,7 +503,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   <div className="relative">
                     <div
                       className={`min-h-[44px] w-full text-sm text-gray-900 p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
-                      style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                      style={{fontFamily: 'Inter, sans-serif'}}
                     >
                       {generateWorkoutDescription()}
                     </div>
@@ -572,8 +570,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
         )}
 
-        {/* Enhanced Save Button with Hover */}
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-gray-200 flex justify-center">
+        {/* Fixed Save Button */}
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
           <Button
             onClick={() => handleSave(false)}
             className="w-full h-10 bg-black text-white hover:bg-gray-800"

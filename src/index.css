@@ -49,12 +49,13 @@
   }
 }
 
-/* Remove all border radius */
-* {
-  border-radius: 0 !important;
+/* Hide scrollbar for Chrome, Safari and Opera */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
-/* Remove all shadows */
-* {
-  box-shadow: none !important;
+/* Hide scrollbar for IE, Edge and Firefox */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
 }

@@ -22,6 +22,7 @@ interface StrengthExerciseBuilderProps {
   exercises: StrengthExercise[];
   onChange: (exercises: StrengthExercise[]) => void;
   isCompleted?: boolean;
+  isMetric?: boolean;
 }
 
 // Common exercise names for autopopulation
@@ -41,7 +42,7 @@ const commonExercises = [
   'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
 ];
 
-export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false }: StrengthExerciseBuilderProps) {
+export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false, isMetric = false }: StrengthExerciseBuilderProps) {
   const [exerciseSearchTerms, setExerciseSearchTerms] = useState<{[key: string]: string}>({});
   const [showSuggestions, setShowSuggestions] = useState<{[key: string]: boolean}>({});
 
@@ -146,7 +147,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
     return (
       <div className="space-y-4 -mx-4 px-0">
         {exercises.map((exercise, index) => (
-          <div key={exercise.id} className="px-4 py-4 border-b border-gray-200">
+          <div key={exercise.id} className="px-4 py-4">
             <h4 className="font-semibold text-lg mb-4 text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
               {exercise.name || `Exercise ${index + 1}`}
             </h4>
@@ -179,7 +180,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                           placeholder={exercise.reps?.toString() || "0"}
                           value={completedSet?.reps || ''}
                           onChange={(e) => updateCompletedSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="h-12 text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           style={{fontFamily: 'Inter, sans-serif'}}
                         />
                       </div>
@@ -192,7 +193,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                           placeholder={plannedWeight?.toString() || "0"}
                           value={completedSet?.weight || ''}
                           onChange={(e) => updateCompletedSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="h-12 text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           style={{fontFamily: 'Inter, sans-serif'}}
                         />
                       </div>
@@ -205,7 +206,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                           placeholder="0-5"
                           value={completedSet?.rir || ''}
                           onChange={(e) => updateCompletedSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || 0 })}
-                          className="h-12 text-base [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          className="h-12 text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           style={{fontFamily: 'Inter, sans-serif'}}
                         />
                       </div>
@@ -228,7 +229,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
   return (
     <div className="space-y-3">
       {exercises.map((exercise, index) => (
-        <div key={exercise.id} className="space-y-3 py-3 border-t border-gray-100 first:border-t-0">
+        <div key={exercise.id} className="space-y-3 py-3 first:pt-0">
           <div className="flex items-center justify-between">
             <button 
               type="button" 
@@ -243,14 +244,14 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               <button 
                 type="button" 
                 onClick={(e) => duplicateExercise(exercise.id, e)} 
-                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded-lg focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
               >
                 <Copy className="h-4 w-4" />
               </button>
               <button 
                 type="button" 
                 onClick={(e) => deleteExercise(exercise.id, e)} 
-                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white rounded-lg focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                className="p-3 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white focus:outline-none min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -266,10 +267,10 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                 onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
                 onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
                 className="min-h-[48px] text-base border-gray-300"
-                style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+                style={{fontFamily: 'Inter, sans-serif'}}
               />
               {showSuggestions[exercise.id] && (
-                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 shadow-lg max-h-48 overflow-y-auto">
                   {getFilteredExercises(exercise.name).map((exerciseName) => (
                     <button
                       key={exerciseName}
@@ -302,8 +303,8 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                     }
                   }
                 }}
-                className="min-h-[48px] text-base border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                className="min-h-[48px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{fontFamily: 'Inter, sans-serif'}}
                 placeholder="5"
               />
             </div>
@@ -325,8 +326,8 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                     }
                   }
                 }}
-                className="min-h-[48px] text-base border-0 bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
+                className="min-h-[48px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                style={{fontFamily: 'Inter, sans-serif'}}
                 placeholder="5"
               />
             </div>
@@ -382,7 +383,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                   }
                 }}
                 className="min-h-[48px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+                style={{fontFamily: 'Inter, sans-serif'}}
               />
             </div>
           ) : (
@@ -412,7 +413,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                         }
                       }}
                       className="min-h-[44px] text-base border-gray-300 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+                      style={{fontFamily: 'Inter, sans-serif'}}
                     />
                   </div>
                 ))}
@@ -430,7 +431,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
               rows={3}
               className="min-h-[80px] text-base border-gray-300"
-              style={{borderRadius: '8px', fontFamily: 'Inter, sans-serif'}}
+              style={{fontFamily: 'Inter, sans-serif'}}
             />
           </div>
         </div>

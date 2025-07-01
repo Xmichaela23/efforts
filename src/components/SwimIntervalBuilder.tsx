@@ -1,5 +1,4 @@
 import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -73,29 +72,28 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          Segments
-          <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Segment
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-medium">Segments</h3>
+        <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
+          <Plus className="h-4 w-4 mr-2" />
+          Add Segment
+        </Button>
+      </div>
+      
+      <div className="space-y-4">
         {intervals.map((interval, index) => (
-          <Card key={interval.id} className="p-4">
+          <div key={interval.id} className="p-4 border border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
                 <h4 className="font-medium">Segment {index + 1}</h4>
               </div>
               <div className="flex gap-2">
-                <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
+                <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-300 hover:bg-gray-100">
                   <Copy className="h-4 w-4" />
                 </Button>
-                <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-400 hover:bg-gray-100">
+                <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-300 hover:bg-gray-100">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
@@ -110,6 +108,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                   placeholder="200"
                   value={interval.distance}
                   onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
+                  className="border-gray-300"
                 />
               </div>
               <div>
@@ -123,6 +122,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                   placeholder="5"
                   value={interval.targetRPE || ''}
                   onChange={(e) => updateInterval(interval.id, { targetRPE: parseInt(e.target.value) || undefined })}
+                  className="border-gray-300"
                 />
               </div>
               <div>
@@ -130,10 +130,10 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 <Select value={interval.equipment} onValueChange={(value) =>
                   updateInterval(interval.id, { equipment: value })
                 }>
-                  <SelectTrigger name={`swim-equipment-${interval.id}`}>
+                  <SelectTrigger name={`swim-equipment-${interval.id}`} className="border-gray-300">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-xl">
                     <SelectItem value="None">None</SelectItem>
                     <SelectItem value="Fins">Fins</SelectItem>
                     <SelectItem value="Pull Buoy">Pull Buoy</SelectItem>
@@ -152,6 +152,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                   autoComplete="off"
                   value={interval.repeatCount}
                   onChange={(e) => updateInterval(interval.id, { repeatCount: parseInt(e.target.value) || 1 })}
+                  className="border-gray-300"
                 />
               </div>
             </div>
@@ -162,10 +163,10 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 <Select value={interval.recoveryType} onValueChange={(value: 'time' | 'distance') =>
                   updateInterval(interval.id, { recoveryType: value })
                 }>
-                  <SelectTrigger name={`swim-recovery-type-${interval.id}`}>
+                  <SelectTrigger name={`swim-recovery-type-${interval.id}`} className="border-gray-300">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-white border border-gray-200 shadow-xl">
                     <SelectItem value="time">Time</SelectItem>
                     <SelectItem value="distance">Distance</SelectItem>
                   </SelectContent>
@@ -184,14 +185,15 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                   placeholder={interval.recoveryType === 'time' ? '1:00' : '50'}
                   value={interval.recovery}
                   onChange={(e) => updateInterval(interval.id, { recovery: e.target.value })}
+                  className="border-gray-300"
                 />
               </div>
             </div>
             
-            <div className="bg-muted p-3 rounded text-sm">
+            <div className="bg-gray-50 p-3 text-sm">
               <strong>Preview:</strong> {generatePreview(interval)}
             </div>
-          </Card>
+          </div>
         ))}
         
         {intervals.length === 0 && (
@@ -199,7 +201,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
             No segments added yet. Click "Add Segment" to get started.
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

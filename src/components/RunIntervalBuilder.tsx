@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -191,7 +190,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
   const renderInterval = (interval: RunInterval, index: number) => {
     if (interval.isRepeatBlock) {
       return (
-        <Card key={interval.id} className="p-3 bg-blue-50 border-blue-200">
+        <div key={interval.id} className="p-3 bg-blue-50">
           <div className="flex items-center gap-3 mb-3">
             <GripVertical className="h-4 w-4 text-muted-foreground" />
             <h4 className="font-medium flex-1 text-sm">
@@ -230,7 +229,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
             </div>
           </div>
 
-          <div className="bg-white p-3 rounded border">
+          <div className="bg-white p-3 border border-blue-200">
             <div className="text-xs font-medium text-blue-700 mb-1">
               Repeat Structure:
             </div>
@@ -241,12 +240,12 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               Total: {Math.floor((interval.duration || 0) / 60)}:{((interval.duration || 0) % 60).toString().padStart(2, '0')}
             </div>
           </div>
-        </Card>
+        </div>
       );
     }
 
     return (
-      <div key={interval.id} className="p-3 border rounded-lg">
+      <div key={interval.id} className="p-3">
         <div className="flex items-center gap-3 mb-3">
           <Checkbox
             checked={selectedIntervals.includes(interval.id)}
@@ -260,10 +259,10 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                 updateInterval(interval.id, { effortLabel: value });
               }}
             >
-              <SelectTrigger className="border-none shadow-none p-0 h-auto font-medium text-sm">
+              <SelectTrigger className="bg-transparent p-0 h-auto font-medium text-sm border-gray-200">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="bg-white border border-gray-200 shadow-xl">
                 <SelectItem value={`Segment ${index + 1}`}>Segment {index + 1}</SelectItem>
                 <SelectItem value="Warm up">Warm up</SelectItem>
                 <SelectItem value="Easy">Easy</SelectItem>
@@ -314,7 +313,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                   updateInterval(interval.id, { time: timeStr, duration });
                 });
               }}
-              className="h-9 text-sm"
+              className="h-9 text-sm border-gray-300"
             />
           </div>
           <div>
@@ -323,7 +322,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               placeholder="8:30"
               value={interval.paceTarget || ''}
               onChange={(e) => updateInterval(interval.id, { paceTarget: e.target.value })}
-              className="h-9 text-sm"
+              className="h-9 text-sm border-gray-300"
             />
           </div>
           <div>
@@ -332,7 +331,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               placeholder="5.0"
               value={interval.distance || ''}
               onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
-              className="h-9 text-sm"
+              className="h-9 text-sm border-gray-300"
             />
           </div>
           <div>
@@ -341,7 +340,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               placeholder="150-160"
               value={interval.bpmTarget || ''}
               onChange={(e) => updateInterval(interval.id, { bpmTarget: e.target.value })}
-              className="h-9 text-sm"
+              className="h-9 text-sm border-gray-300"
             />
           </div>
           <div>
@@ -350,7 +349,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               placeholder="6-7"
               value={interval.rpeTarget || ''}
               onChange={(e) => updateInterval(interval.id, { rpeTarget: e.target.value })}
-              className="h-9 text-sm"
+              className="h-9 text-sm border-gray-300"
             />
           </div>
         </div>
@@ -368,7 +367,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
           {interval.repeat && (
             <Input
               type="text"
-              className="w-14 h-8 text-center text-sm"
+              className="w-14 h-8 text-center text-sm border-gray-300"
               placeholder="2"
               value={interval.repeatCount === undefined ? '' : interval.repeatCount.toString()}
               onChange={(e) => {
@@ -408,7 +407,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
         {intervals.map((interval, index) => renderInterval(interval, index))}
 
         {intervals.length === 0 && (
-          <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-muted rounded-lg">
+          <div className="text-center py-6 text-muted-foreground">
             <p className="text-sm">No segments yet</p>
             <p className="text-xs mt-1">Click "Add Segment" to get started</p>
           </div>
@@ -431,7 +430,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
 
       {/* Floating repeat menu - more compact */}
       {selectedIntervals.length > 0 && (
-        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border-2 border-gray-300 rounded-lg shadow-xl p-3 flex flex-col items-center gap-2 z-[60] max-w-xs w-full mx-4">
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border border-gray-300 shadow-xl p-3 flex flex-col items-center gap-2 z-[60] max-w-xs w-full mx-4">
           <span className="text-xs font-medium text-gray-700">
             {selectedIntervals.length} segment{selectedIntervals.length > 1 ? 's' : ''} selected
           </span>
@@ -439,7 +438,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
             <span className="text-xs text-gray-600">Repeat</span>
             <Input
               type="text"
-              className="w-12 h-8 text-center text-sm font-semibold border-2"
+              className="w-12 h-8 text-center text-sm font-semibold border-gray-300"
               value={blockRepeatCount.toString()}
               onChange={(e) => {
                 handleNumericInput(e.target.value, setBlockRepeatCount);

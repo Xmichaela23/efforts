@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -91,7 +90,7 @@ const PlateMath: React.FC<{
   const plateCalc = calculatePlates();
 
   return (
-    <div className="mt-1 p-2 bg-gray-50 rounded text-xs">
+    <div className="mt-1 p-2 bg-gray-50 text-xs">
       <div className="text-gray-600 mb-1">{barWeight}{unit} bar + per side:</div>
       {plateCalc.plates.length > 0 ? (
         <div className="space-y-1">
@@ -315,8 +314,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
 
   return (
     <>
-      {/* Header - Dashboard button handled by AppLayout */}
-      <div className="bg-white border-b border-gray-200 pb-4 mb-4">
+      {/* Header */}
+      <div className="bg-white pb-4 mb-4">
         <div className="flex items-center w-full">
           <h1 className="text-xl font-medium text-gray-700">Log Strength</h1>
         </div>
@@ -325,8 +324,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
       {/* Mobile-first responsive container */}
       <div className="space-y-4 w-full max-w-full overflow-hidden">
         {exercises.map((exercise, exerciseIndex) => (
-          <Card key={exercise.id} className="mx-0 overflow-hidden">
-            <div className="p-3 border-b border-gray-100">
+          <div key={exercise.id} className="mx-0 overflow-hidden bg-white">
+            <div className="p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
                   <Input
@@ -350,7 +349,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                     autoFocus={exerciseIndex === 0 && !exercise.name}
                   />
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
-                    <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-32 overflow-y-auto">
+                    <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
                       {getFilteredExercises(exercise.name).map((suggestion, index) => (
                         <button
                           key={index}
@@ -392,7 +391,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
             {(expandedExercises[exercise.id] !== false) && (
               <div className="px-3 py-2">
                 {exercise.sets.map((set, setIndex) => (
-                  <div key={setIndex} className="mb-3 pb-3 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
+                  <div key={setIndex} className="mb-3 pb-3 last:mb-0 last:pb-0">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
                     </div>
@@ -407,7 +406,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           pattern="[0-9]*"
                           value={set.reps || ''}
                           onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-base"
+                          className="h-9 text-center text-base border-gray-300"
                           style={{ fontSize: '16px' }}
                         />
                       </div>
@@ -419,7 +418,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           pattern="[0-9]*"
                           value={set.weight || ''}
                           onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-base"
+                          className="h-9 text-center text-base border-gray-300"
                           style={{ fontSize: '16px' }}
                         />
                       </div>
@@ -431,7 +430,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           pattern="[0-9]*"
                           value={set.rir || ''}
                           onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                          className="h-9 text-center text-base"
+                          className="h-9 text-center text-base border-gray-300"
                           min="0"
                           max="5"
                           style={{ fontSize: '16px' }}
@@ -457,10 +456,10 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           value={set.barType || 'standard'}
                           onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
                         >
-                          <SelectTrigger className="h-6 text-xs border-none bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto">
+                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border border-gray-200">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="bg-white border border-gray-200 shadow-xl">
                             <SelectItem value="standard">Barbell (45lb)</SelectItem>
                             <SelectItem value="womens">Women's (33lb)</SelectItem>
                             <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
@@ -494,12 +493,12 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                 </Button>
               </div>
             )}
-          </Card>
+          </div>
         ))}
 
         {/* Exercise search with suggestions */}
         <div className="relative">
-          <div className="flex items-center border border-gray-200 rounded bg-white">
+          <div className="flex items-center border border-gray-200 bg-white">
             <div className="pl-3 text-gray-400">
               <Search className="h-4 w-4" />
             </div>
@@ -508,7 +507,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
               value={currentExercise}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="h-10 border-0 text-sm"
+              className="h-10 text-sm border-gray-300"
               style={{ fontSize: '16px' }}
             />
             {currentExercise && (
@@ -522,13 +521,13 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-64 overflow-y-auto">
+            <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-10 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => handleSuggestionClick(exercise)}
-                  className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 text-sm min-h-[40px]"
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm min-h-[40px]"
                 >
                   {exercise}
                 </button>
@@ -538,7 +537,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
         </div>
 
         {/* Save button */}
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-gray-200 flex justify-center">
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
           <Button 
             onClick={saveWorkout}
             className="w-full h-10 bg-black text-white hover:bg-gray-800"

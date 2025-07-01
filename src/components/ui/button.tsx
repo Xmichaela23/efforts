@@ -13,12 +13,12 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-black bg-white text-black hover:bg-black hover:text-white",
+          "border border-gray-300 bg-white text-black hover:bg-gray-50 hover:text-black",
         secondary:
-          "bg-white text-black border border-black hover:bg-black hover:text-white",
-        ghost: "bg-white text-black hover:bg-black hover:text-white",
+          "bg-white text-black border border-gray-300 hover:bg-gray-50 hover:text-black",
+        ghost: "bg-white text-black hover:bg-gray-50 hover:text-black",
         link: "text-black underline-offset-4 hover:underline",
-        toggle: "bg-white text-black border border-black hover:bg-black hover:text-white",
+        toggle: "bg-white text-black border border-gray-300 hover:bg-gray-50 hover:text-black",
         "toggle-active": "bg-black text-white border border-black",
       },
       size: {
@@ -50,8 +50,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(buttonVariants({ variant, size, className }))}
         ref={ref}
         style={{ 
-          borderRadius: 0, 
-          boxShadow: 'none', 
           fontFamily: 'Inter, sans-serif', 
           fontWeight: 500,
           letterSpacing: '0.02em',
