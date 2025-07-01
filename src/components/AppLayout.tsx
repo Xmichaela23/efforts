@@ -211,8 +211,8 @@ const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content */}
-      <main className="flex-1">
+      {/* Main content - 🚨 FIXED: Added pt-16 to prevent sticky header overlap */}
+      <main className="flex-1 pt-16">
         {/* 🚨 FIXED: Mobile centering container */}
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showStrengthLogger ? (
