@@ -47,7 +47,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return getLocalDateString();
   };
 
-  // 🚨 FIXED: Don't default to 'run' if no initialType provided
   const [formData, setFormData] = useState({
     name: '',
     type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' : ''),
@@ -347,8 +346,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     }).replace(',', '');
   };
 
-  // 🚨 REMOVED: The scary type selection screen - now handled by TodaysEffort
-
   return (
     <div className="min-h-screen bg-white">
       {/* Save Success Banner */}
@@ -576,31 +573,17 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         )}
 
         {/* Enhanced Save Button with Hover */}
-        <div className="flex justify-end mt-6">
-          <div className="relative group">
-            <button
-              onClick={() => handleSave(false)}
-              className="px-8 py-4 text-black hover:text-gray-600 text-lg font-medium transition-colors"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              Save
-            </button>
-            
-            {/* Hover reveal for "Save as routine" - light gray and clickable */}
-            <div className="absolute bottom-full right-0 mb-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSaveAsRoutine();
-                }}
-                className="whitespace-nowrap px-4 py-2 bg-gray-100 text-gray-700 text-sm border border-gray-200 hover:bg-gray-200 transition-colors pointer-events-auto"
-                style={{fontFamily: 'Inter, sans-serif'}}
-              >
-                Save as routine
-              </button>
-            </div>
-          </div>
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-gray-200 flex justify-center">
+          <Button
+            onClick={() => handleSave(false)}
+            className="w-full h-10 bg-black text-white hover:bg-gray-800"
+          >
+            Save
+          </Button>
         </div>
+        
+        {/* Bottom padding to account for fixed save button */}
+        <div className="h-16"></div>
       </main>
     </div>
   );
