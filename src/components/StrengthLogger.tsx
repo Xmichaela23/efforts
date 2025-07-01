@@ -328,26 +328,32 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
             <div className="p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
-                  <Input
-                    placeholder="Exercise name"
-                    value={exercise.name}
-                    onChange={(e) => {
-                      updateExerciseName(exercise.id, e.target.value);
-                      setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
-                    }}
-                    onFocus={() => {
-                      if (exercise.name.length > 0) {
-                        setActiveDropdown(exercise.id);
-                      }
-                    }}
-                    onBlur={() => {
-                      // Delay closing to allow click on suggestions
-                      setTimeout(() => setActiveDropdown(null), 150);
-                    }}
-                    className="h-10 text-base font-medium border-gray-200"
-                    style={{ fontSize: '16px' }}
-                    autoFocus={exerciseIndex === 0 && !exercise.name}
-                  />
+                  {/* Updated exercise input to match the bottom input */}
+                  <div className="flex items-center border border-gray-200 bg-white">
+                    <div className="pl-3 text-gray-400">
+                      <Search className="h-4 w-4" />
+                    </div>
+                    <Input
+                      placeholder="Add exercise..."
+                      value={exercise.name}
+                      onChange={(e) => {
+                        updateExerciseName(exercise.id, e.target.value);
+                        setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
+                      }}
+                      onFocus={() => {
+                        if (exercise.name.length > 0) {
+                          setActiveDropdown(exercise.id);
+                        }
+                      }}
+                      onBlur={() => {
+                        // Delay closing to allow click on suggestions
+                        setTimeout(() => setActiveDropdown(null), 150);
+                      }}
+                      className="h-10 text-base font-medium border-gray-300"
+                      style={{ fontSize: '16px' }}
+                      autoFocus={exerciseIndex === 0 && !exercise.name}
+                    />
+                  </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
                     <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
                       {getFilteredExercises(exercise.name).map((suggestion, index) => (
@@ -452,11 +458,12 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           }
                         </button>
                         
+                        {/* Updated Select component with removed frame */}
                         <Select
                           value={set.barType || 'standard'}
                           onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
                         >
-                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border border-gray-200">
+                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-gray-200 shadow-xl">
@@ -496,7 +503,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           </div>
         ))}
 
-        {/* Exercise search with suggestions */}
+        {/* Exercise search with suggestions - matches the top input styling */}
         <div className="relative">
           <div className="flex items-center border border-gray-200 bg-white">
             <div className="pl-3 text-gray-400">
