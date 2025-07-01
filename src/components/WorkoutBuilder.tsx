@@ -569,14 +569,20 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
         )}
 
-        {/* Fixed Save Button */}
+        {/* Fixed Save Button - Updated to use clean styling */}
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
-          <button
+          <Button
             onClick={() => handleSave(false)}
-            className="w-full h-12 text-white bg-black hover:bg-gray-900 transition-colors text-center"
+            variant="clean"
+            className="w-full h-12 text-gray-700 hover:text-gray-900"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              fontSize: '15px'
+            }}
           >
             Save
-          </button>
+          </Button>
         </div>
         
         {/* Bottom padding to account for fixed save button */}

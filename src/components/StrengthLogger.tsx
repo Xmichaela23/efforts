@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -139,7 +139,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
   ];
 
   // Automatically add a starter exercise when component mounts
-  useEffect(() => {
+  React.useEffect(() => {
     const starterExercise: LoggedExercise = {
       id: Date.now().toString(),
       name: '',
@@ -536,11 +536,17 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           )}
         </div>
 
-        {/* Save button */}
+        {/* Save button - Updated to use clean styling */}
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
           <Button 
             onClick={saveWorkout}
-            className="w-full h-10 bg-black text-white hover:bg-gray-800"
+            variant="clean"
+            className="w-full h-10 text-gray-700 hover:text-gray-900"
+            style={{
+              fontFamily: 'Inter, sans-serif',
+              fontWeight: 600,
+              fontSize: '15px'
+            }}
           >
             Save
           </Button>
