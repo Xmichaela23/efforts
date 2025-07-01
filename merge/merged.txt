@@ -153,6 +153,16 @@ const AppLayout: React.FC = () => {
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
+  // Format date for header display (June 30 2025 format)
+  const formatHeaderDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
   const handleWorkoutSelect = (workout: any) => {
     console.log('❌ WRONG: handleWorkoutSelect called - going to detail view');
     setSelectedWorkout(workout);
@@ -233,34 +243,17 @@ const AppLayout: React.FC = () => {
       {/* Header with navigation */}
       <header className="border-b border-border/40 bg-card/30 backdrop-blur-sm sticky top-0 z-40">
         {/* 🚨 FIXED: Mobile centering container */}
-        <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-primary">Efforts</h1>
-              
-              {/* 🚨 ADDED: Missing Dashboard button */}
-              {(selectedWorkout || showStrengthLogger || showBuilder) && (
-                <Button
-                  onClick={handleBackToDashboard}
-                  variant="ghost"
-                  className="text-sm font-medium hover:bg-gray-50"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                >
-                  Dashboard
-                </Button>
-              )}
-            </div>
-
-            <div className="flex items-center space-x-3">
-              {/* 🎯 IMPERIAL BUTTON DELETED - Units toggle now only in WorkoutBuilder */}
-              
+        <div className="w-full">
+          <div className="flex items-center justify-between h-16 w-full">
+            {/* Left: Hamburger menu and efforts title */}
+            <div className="flex items-center space-x-1 pl-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
+                  <Button variant="ghost" size="icon" className="p-0.5">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align="start" className="w-56">
                   <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     Profile
@@ -285,6 +278,32 @@ const AppLayout: React.FC = () => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+              
+              <h1 className="text-2xl font-bold text-primary">efforts</h1>
+              
+              {/* Dashboard button when in builder/logger */}
+              {(selectedWorkout || showStrengthLogger || showBuilder) && (
+                <Button
+                  onClick={handleBackToDashboard}
+                  variant="ghost"
+                  className="text-sm font-medium hover:bg-gray-50"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                >
+                  Dashboard
+                </Button>
+              )}
+            </div>
+
+            {/* Center: Empty for spacing */}
+            <div></div>
+
+            {/* Right: Date (only when on dashboard) */}
+            <div className="flex items-center pr-4">
+              {!(selectedWorkout || showStrengthLogger || showBuilder) && (
+                <span className="text-lg font-normal text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+                  {formatHeaderDate()}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -2121,12 +2140,12 @@ export default NewEffortDropdown;
 
 // File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/RideIntervalBuilder.tsx
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Copy, Trash2, GripVertical, Repeat } from 'lucide-react';
+import { Copy, Trash2, GripVertical, Repeat, Edit, Bike } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface RideInterval {
   id: string;
@@ -2137,10 +2156,13 @@ export interface RideInterval {
   bpmTarget?: string;
   rpeTarget?: string;
   cadenceTarget?: string;
+  effortLabel?: string;
   repeat?: boolean;
   repeatCount?: number;
   duration?: number;
   selected?: boolean;
+  isRepeatBlock?: boolean;
+  originalSegments?: RideInterval[];
 }
 
 interface RideIntervalBuilderProps {
@@ -2149,13 +2171,86 @@ interface RideIntervalBuilderProps {
   isMetric: boolean;
 }
 
+// Fixed time input handler - no auto-conversion during typing
+const handleTimeInput = (value: string, onChange: (timeStr: string, duration: number) => void) => {
+  if (value === '') {
+    onChange('', 0);
+    return;
+  }
+  
+  // Allow direct input without auto-conversion
+  const timeStr = value;
+  
+  // Calculate duration for any valid time format
+  if (timeStr.includes(':')) {
+    const parts = timeStr.split(':');
+    const min = parseInt(parts[0]) || 0;
+    const sec = parseInt(parts[1]) || 0;
+    
+    // Validate seconds
+    if (sec >= 60) return;
+    
+    const duration = min * 60 + sec;
+    onChange(timeStr, duration);
+  } else {
+    // For inputs without colon, treat as minutes and calculate duration
+    const min = parseInt(timeStr) || 0;
+    const duration = min * 60;
+    onChange(timeStr, duration);
+  }
+};
+
+// Smart time formatting on blur
+const handleTimeBlur = (value: string, onChange: (timeStr: string, duration: number) => void) => {
+  if (!value) return;
+  
+  let timeStr = value;
+  
+  // Auto-format only on blur: "4" -> "4:00", "45" -> "45:00"
+  if (!timeStr.includes(':') && timeStr.length <= 2) {
+    timeStr = `${timeStr}:00`;
+    
+    const min = parseInt(timeStr.split(':')[0]) || 0;
+    const duration = min * 60;
+    onChange(timeStr, duration);
+    return;
+  }
+  
+  // Handle existing formatted time
+  const parts = timeStr.split(':');
+  const min = parseInt(parts[0]) || 0;
+  const sec = parseInt(parts[1]) || 0;
+  
+  // Validate and format
+  if (sec >= 60) return;
+  
+  const duration = min * 60 + sec;
+  onChange(timeStr, duration);
+};
+
+// Mobile Safari numeric input fix
+const handleNumericInput = (value: string, onChange: (num: number) => void) => {
+  if (value === '') {
+    onChange(0);
+    return;
+  }
+  
+  const numericValue = value.replace(/\D/g, '');
+  const parsed = parseInt(numericValue, 10);
+  const finalValue = isNaN(parsed) || parsed < 1 ? 1 : parsed;
+  
+  onChange(finalValue);
+};
+
 export default function RideIntervalBuilder({ intervals, onChange, isMetric }: RideIntervalBuilderProps) {
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
-  const [blockRepeatCount, setBlockRepeatCount] = useState(2);
+  const [blockRepeatCount, setBlockRepeatCount] = useState(1);
 
-  const addInterval = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+  const addInterval = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     const newInterval: RideInterval = {
       id: Date.now().toString(),
       time: '',
@@ -2187,20 +2282,6 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
     onChange(intervals.filter(interval => interval.id !== id));
   };
 
-  const handleRepeatChange = (id: string, checked: boolean) => {
-    if (checked) {
-      const interval = intervals.find(i => i.id === id);
-      if (interval) {
-        const duplicate = { ...interval, id: (Date.now() + 1).toString(), repeat: false };
-        const intervalIndex = intervals.findIndex(i => i.id === id);
-        const newIntervals = [...intervals];
-        newIntervals.splice(intervalIndex + 1, 0, duplicate);
-        onChange(newIntervals);
-      }
-    }
-    updateInterval(id, { repeat: checked });
-  };
-
   const toggleIntervalSelection = (id: string) => {
     setSelectedIntervals(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
@@ -2211,169 +2292,366 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
     e.preventDefault();
     e.stopPropagation();
     if (selectedIntervals.length === 0) return;
-    
-    const selectedIntervalsData = intervals.filter(i => selectedIntervals.includes(i.id));
+
+    const selectedIntervalsData = intervals.filter(i =>
+      selectedIntervals.includes(i.id));
+
     const blockSummary = selectedIntervalsData.map(i => {
-      const timeStr = i.time ? i.time : '';
-      const target = i.powerTarget ? `@ ${i.powerTarget}` : '';
-      return `${timeStr} ${target}`.trim();
-    }).join(' + ');
-    
+      let segmentDesc = '';
+      if (i.time) {
+        segmentDesc += i.time;
+      }
+      if (i.effortLabel) {
+        segmentDesc += ` @ ${i.effortLabel}`;
+      } else if (i.powerTarget) {
+        segmentDesc += ` @ ${i.powerTarget}`;
+      } else if (i.speedTarget) {
+        segmentDesc += ` @ ${i.speedTarget}`;
+      } else if (i.bpmTarget) {
+        segmentDesc += ` @ ${i.bpmTarget}`;
+      } else if (i.rpeTarget) {
+        segmentDesc += ` @ RPE ${i.rpeTarget}`;
+      }
+      return segmentDesc.trim();
+    }).filter(desc => desc.length > 0).join(' + ');
+
+    const totalDuration = selectedIntervalsData.reduce((sum, i) => sum + (i.duration || 0), 0);
+
     const blockInterval: RideInterval = {
       id: Date.now().toString(),
-      time: `[${blockSummary}]`,
+      time: `${blockRepeatCount}x(${blockSummary})`,
+      isRepeatBlock: true,
       repeatCount: blockRepeatCount,
-      duration: selectedIntervalsData.reduce((sum, i) => sum + (i.duration || 0), 0) * blockRepeatCount
+      duration: totalDuration * blockRepeatCount,
+      originalSegments: selectedIntervalsData.map(seg => ({
+        ...seg,
+        originalSegments: undefined
+      }))
     };
-    
-    const remainingIntervals = intervals.filter(i => !selectedIntervals.includes(i.id));
+
+    const remainingIntervals = intervals.filter(i =>
+      !selectedIntervals.includes(i.id));
     onChange([...remainingIntervals, blockInterval]);
     setSelectedIntervals([]);
   };
 
-  return (
-    <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Segments
-            <Button type="button" onClick={addInterval} size="sm" className="bg-black text-white hover:bg-gray-800">
-              <Plus className="h-4 w-4 mr-2" />
-              Add Segment
-            </Button>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {intervals.map((interval, index) => (
-            <Card key={interval.id} className="p-4">
-              <div className="flex items-center gap-4 mb-4">
-                <Checkbox
-                  checked={selectedIntervals.includes(interval.id)}
-                  onCheckedChange={() => toggleIntervalSelection(interval.id)}
-                />
-                <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-medium flex-1">Segment {index + 1}</h4>
-                <div className="flex gap-2">
-                  <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                  <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-black hover:bg-gray-100">
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <Label>Time (mm:ss)</Label>
-                  <Input
-                    placeholder="5:00"
-                    value={interval.time || ''}
-                    onChange={(e) => {
-                      const timeStr = e.target.value;
-                      const [min, sec] = timeStr.split(':').map(Number);
-                      const duration = (min || 0) * 60 + (sec || 0);
-                      updateInterval(interval.id, { time: timeStr, duration });
-                    }}
-                  />
-                </div>
-                <div>
-                  <Label>Distance ({isMetric ? 'km' : 'mi'})</Label>
-                  <Input
-                    placeholder="10.0"
-                    value={interval.distance || ''}
-                    onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <Label>Speed Target ({isMetric ? 'km/h' : 'mph'})</Label>
-                  <Input
-                    placeholder={isMetric ? "25-30" : "18-20"}
-                    value={interval.speedTarget || ''}
-                    onChange={(e) => updateInterval(interval.id, { speedTarget: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>Power Target (watts or %FTP)</Label>
-                  <Input
-                    placeholder="250W or 85%"
-                    value={interval.powerTarget || ''}
-                    onChange={(e) => updateInterval(interval.id, { powerTarget: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <Label>BPM Target</Label>
-                  <Input
-                    placeholder="150-160 or zone"
-                    value={interval.bpmTarget || ''}
-                    onChange={(e) => updateInterval(interval.id, { bpmTarget: e.target.value })}
-                  />
-                </div>
-                <div>
-                  <Label>RPE Target</Label>
-                  <Input
-                    placeholder="1-10 or easy/moderate/hard"
-                    value={interval.rpeTarget || ''}
-                    onChange={(e) => updateInterval(interval.id, { rpeTarget: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-4 mb-4">
-                <div>
-                  <Label>Cadence Target (rpm)</Label>
-                  <Input
-                    placeholder="85-95"
-                    value={interval.cadenceTarget || ''}
-                    onChange={(e) => updateInterval(interval.id, { cadenceTarget: e.target.value })}
-                  />
-                </div>
-              </div>
-              
-              <div className="flex items-center space-x-2 mb-4">
-                <Checkbox
-                  id={`repeat-${interval.id}`}
-                  checked={interval.repeat || false}
-                  onCheckedChange={(checked) => handleRepeatChange(interval.id, !!checked)}
-                />
-                <Label htmlFor={`repeat-${interval.id}`}>Repeat?</Label>
-              </div>
-              
-              <Button type="button" onClick={addInterval} size="sm" variant="outline" className="w-full border-black hover:bg-gray-100">
-                <Plus className="h-4 w-4 mr-2" />
-                New Segment
+  const unblockInterval = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const blockInterval = intervals.find(i => i.id === id);
+    if (!blockInterval || !blockInterval.isRepeatBlock || !blockInterval.originalSegments) return;
+
+    const restoredSegments = blockInterval.originalSegments.map(seg => ({
+      ...seg,
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9)
+    }));
+
+    const updatedIntervals = intervals.filter(i => i.id !== id);
+    onChange([...updatedIntervals, ...restoredSegments]);
+  };
+
+  const renderInterval = (interval: RideInterval, index: number) => {
+    if (interval.isRepeatBlock) {
+      return (
+        <div key={interval.id} className="p-3 space-y-3">
+          <div className="flex items-center gap-3 mb-3">
+            <GripVertical className="h-4 w-4 text-muted-foreground" />
+            <h4 className="font-medium flex-1 text-sm">
+              <Repeat className="h-4 w-4 inline mr-2" />
+              Repeat Block {intervals.filter(i => i.isRepeatBlock).findIndex(i => i.id === interval.id) + 1}
+            </h4>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                onClick={(e) => unblockInterval(interval.id, e)}
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+                title="Break apart block"
+              >
+                <Edit className="h-3 w-3" />
               </Button>
-            </Card>
-          ))}
-          
-          {intervals.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              No segments added yet. Click "Add Segment" to get started.
+              <Button
+                type="button"
+                onClick={(e) => duplicateInterval(interval.id, e)}
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+              <Button
+                type="button"
+                onClick={(e) => deleteInterval(interval.id, e)}
+                size="sm"
+                variant="outline"
+                className="h-8 w-8 p-0"
+              >
+                <Trash2 className="h-3 w-3" />
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
-      
-      {selectedIntervals.length > 0 && (
-        <div className="fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-background border rounded-lg shadow-lg p-4 flex items-center gap-4">
-          <span className="text-sm">{selectedIntervals.length} segments selected</span>
-          <Input
-            type="number"
-            min="2"
-            className="w-20"
-            value={blockRepeatCount}
-            onChange={(e) => setBlockRepeatCount(parseInt(e.target.value) || 2)}
+          </div>
+
+          <div className="p-3 rounded">
+            <div className="text-xs font-medium mb-1">
+              Repeat Structure:
+            </div>
+            <div className="text-sm font-mono">
+              {interval.time}
+            </div>
+            <div className="text-xs text-muted-foreground mt-1">
+              Total: {Math.floor((interval.duration || 0) / 60)}:{((interval.duration || 0) % 60).toString().padStart(2, '0')}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div key={interval.id} className="p-3 border rounded-lg">
+        <div className="flex items-center gap-3 mb-3">
+          <Checkbox
+            checked={selectedIntervals.includes(interval.id)}
+            onCheckedChange={() => toggleIntervalSelection(interval.id)}
           />
-          <Button type="button" onClick={createBlock} size="sm" className="bg-black text-white hover:bg-gray-800">
-            <Repeat className="h-4 w-4 mr-2" />
-            Repeat this block
-          </Button>
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+          <div className="flex-1">
+            <Select
+              value={interval.effortLabel || `Segment ${index + 1}`}
+              onValueChange={(value) => {
+                updateInterval(interval.id, { effortLabel: value });
+              }}
+            >
+              <SelectTrigger className="border-none shadow-none p-0 h-auto font-medium text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={`Segment ${index + 1}`}>Segment {index + 1}</SelectItem>
+                <SelectItem value="Warm up">Warm up</SelectItem>
+                <SelectItem value="Easy">Easy</SelectItem>
+                <SelectItem value="Tempo">Tempo</SelectItem>
+                <SelectItem value="Threshold">Threshold</SelectItem>
+                <SelectItem value="Hard">Hard</SelectItem>
+                <SelectItem value="Recovery">Recovery</SelectItem>
+                <SelectItem value="Cool down">Cool down</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              type="button" 
+              onClick={(e) => duplicateInterval(interval.id, e)} 
+              size="sm" 
+              variant="outline" 
+              className="h-8 w-8 p-0"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+            <Button 
+              type="button" 
+              onClick={(e) => deleteInterval(interval.id, e)} 
+              size="sm" 
+              variant="outline" 
+              className="h-8 w-8 p-0"
+            >
+              <Trash2 className="h-3 w-3" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Compact responsive grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+          <div>
+            <Label className="text-xs text-muted-foreground">Time</Label>
+            <Input
+              placeholder="5:00"
+              value={interval.time || ''}
+              onChange={(e) => {
+                handleTimeInput(e.target.value, (timeStr, duration) => {
+                  updateInterval(interval.id, { time: timeStr, duration });
+                });
+              }}
+              onBlur={(e) => {
+                const value = e.target.value;
+                if (value && !value.includes(':') && value.length <= 2) {
+                  const formattedTime = `${value}:00`;
+                  const duration = (parseInt(value) || 0) * 60;
+                  updateInterval(interval.id, { time: formattedTime, duration });
+                }
+              }}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Distance ({isMetric ? 'km' : 'mi'})</Label>
+            <Input
+              placeholder="10.0"
+              value={interval.distance || ''}
+              onChange={(e) => updateInterval(interval.id, { distance: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Speed ({isMetric ? 'km/h' : 'mph'})</Label>
+            <Input
+              placeholder={isMetric ? "25-30" : "18-20"}
+              value={interval.speedTarget || ''}
+              onChange={(e) => updateInterval(interval.id, { speedTarget: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Power (watts or %FTP)</Label>
+            <Input
+              placeholder="250W or 85%"
+              value={interval.powerTarget || ''}
+              onChange={(e) => updateInterval(interval.id, { powerTarget: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">BPM</Label>
+            <Input
+              placeholder="150-160"
+              value={interval.bpmTarget || ''}
+              onChange={(e) => updateInterval(interval.id, { bpmTarget: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">RPE</Label>
+            <Input
+              placeholder="6-7"
+              value={interval.rpeTarget || ''}
+              onChange={(e) => updateInterval(interval.id, { rpeTarget: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Cadence (rpm)</Label>
+            <Input
+              placeholder="85-95"
+              value={interval.cadenceTarget || ''}
+              onChange={(e) => updateInterval(interval.id, { cadenceTarget: e.target.value })}
+              className="h-9 text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Compact repeat section */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={`repeat-${interval.id}`}
+              checked={interval.repeat || false}
+              onCheckedChange={(checked) => updateInterval(interval.id, { repeat: !!checked })}
+            />
+            <Label htmlFor={`repeat-${interval.id}`} className="text-xs">Repeat?</Label>
+          </div>
+          {interval.repeat && (
+            <Input
+              type="text"
+              className="w-14 h-8 text-center text-sm"
+              placeholder="2"
+              value={interval.repeatCount === undefined ? '' : interval.repeatCount.toString()}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  updateInterval(interval.id, { repeatCount: undefined });
+                } else {
+                  handleNumericInput(value, (num) => {
+                    updateInterval(interval.id, { repeatCount: num });
+                  });
+                }
+              }}
+              onFocus={(e) => e.target.select()}
+            />
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Clean Add Segment button */}
+      <div className="mb-3 text-center">
+        <button 
+          type="button" 
+          onClick={addInterval} 
+          className="px-4 py-2 text-black text-sm"
+        >
+          <Bike className="h-4 w-4 mr-2 inline" />
+          Add Segment
+        </button>
+      </div>
+
+      {/* Segments */}
+      <div className="space-y-3">
+        {intervals.map((interval, index) => renderInterval(interval, index))}
+
+        {intervals.length === 0 && (
+          <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-muted rounded-lg">
+            <p className="text-sm">No segments yet</p>
+            <p className="text-xs mt-1">Click "Add Segment" to get started</p>
+          </div>
+        )}
+
+        {/* Bottom Add Segment button when segments exist */}
+        {intervals.length > 0 && (
+          <div className="text-center pt-4">
+            <button 
+              type="button" 
+              onClick={addInterval} 
+              className="px-4 py-2 text-black text-sm"
+            >
+              <Bike className="h-4 w-4 mr-2 inline" />
+              Add Segment
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Floating repeat menu */}
+      {selectedIntervals.length > 0 && (
+        <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white border-2 border-gray-300 rounded-lg shadow-xl p-3 flex flex-col items-center gap-2 z-[60] max-w-xs w-full mx-4">
+          <span className="text-xs font-medium text-gray-700">
+            {selectedIntervals.length} segment{selectedIntervals.length > 1 ? 's' : ''} selected
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-600">Repeat</span>
+            <Input
+              type="text"
+              className="w-12 h-8 text-center text-sm font-semibold border-2"
+              value={blockRepeatCount.toString()}
+              onChange={(e) => {
+                handleNumericInput(e.target.value, setBlockRepeatCount);
+              }}
+              onFocus={(e) => e.target.select()}
+              placeholder="1"
+            />
+            <span className="text-xs text-gray-600">times</span>
+          </div>
+          <div className="flex gap-2 w-full">
+            <Button
+              type="button"
+              onClick={() => setSelectedIntervals([])}
+              size="sm"
+              variant="outline"
+              className="flex-1 h-8 text-xs"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={createBlock}
+              size="sm"
+              className="bg-gray-500 hover:bg-gray-600 flex-1 h-8 text-xs"
+            >
+              <Repeat className="h-3 w-3 mr-1" />
+              Create
+            </Button>
+          </div>
         </div>
       )}
     </div>
@@ -2464,7 +2742,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Copy, Trash2, GripVertical, Repeat, Edit } from 'lucide-react';
+import { Plus, Copy, Trash2, GripVertical, Repeat, Edit, Activity } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface RunInterval {
@@ -2489,29 +2767,43 @@ interface RunIntervalBuilderProps {
   isMetric: boolean;
 }
 
-// Smart time input handler
+// Fixed time input handler - properly calculates duration
 const handleTimeInput = (value: string, onChange: (timeStr: string, duration: number) => void) => {
-  let timeStr = value;
-  
-  // Smart time conversion: "4" -> "4:00", "45" -> "45:00", "4:30" stays "4:30"
-  if (timeStr && !timeStr.includes(':') && timeStr.length <= 2) {
-    timeStr = `${timeStr}:00`;
-  }
-  
-  if (timeStr === '') {
+  if (value === '') {
     onChange('', 0);
     return;
   }
   
-  const parts = timeStr.split(':');
-  const min = parseInt(parts[0]) || 0;
-  const sec = parseInt(parts[1]) || 0;
+  const timeStr = value;
+  let duration = 0;
   
-  // Validate seconds
-  if (sec >= 60) return;
+  // Calculate duration for any valid time format
+  if (timeStr.includes(':')) {
+    const parts = timeStr.split(':');
+    const min = parseInt(parts[0]) || 0;
+    const sec = parseInt(parts[1]) || 0;
+    
+    // Validate seconds
+    if (sec >= 60) return;
+    
+    duration = min * 60 + sec;
+  } else {
+    // For inputs without colon, treat as minutes
+    const min = parseInt(timeStr) || 0;
+    duration = min * 60;
+  }
   
-  const duration = min * 60 + sec;
   onChange(timeStr, duration);
+};
+
+// Smart time formatting on blur
+const handleTimeBlur = (value: string, onChange: (timeStr: string, duration: number) => void) => {
+  const timeStr = value;
+  if (timeStr && !timeStr.includes(':') && timeStr.length <= 2) {
+    const formattedTime = `${timeStr}:00`;
+    const duration = (parseInt(timeStr) || 0) * 60;
+    onChange(formattedTime, duration);
+  }
 };
 
 // Mobile Safari numeric input fix
@@ -2755,6 +3047,11 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                   updateInterval(interval.id, { time: timeStr, duration });
                 });
               }}
+              onBlur={(e) => {
+                handleTimeBlur(e.target.value, (timeStr, duration) => {
+                  updateInterval(interval.id, { time: timeStr, duration });
+                });
+              }}
               className="h-9 text-sm"
             />
           </div>
@@ -2832,15 +3129,15 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
 
   return (
     <div className="space-y-3">
-      {/* Left-aligned Add Effort button only */}
+      {/* Left-aligned Add Effort button with runner emoji */}
       <div className="mb-3 text-center">
         <button 
           type="button" 
           onClick={addInterval} 
           className="px-4 py-2 text-black text-sm"
         >
-          <Plus className="h-4 w-4 mr-2 inline" />
-          Add effort
+          <Activity className="h-4 w-4 mr-2 inline" />
+          Add Segment
         </button>
       </div>
 
@@ -2851,11 +3148,23 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
         {intervals.length === 0 && (
           <div className="text-center py-6 text-muted-foreground border-2 border-dashed border-muted rounded-lg">
             <p className="text-sm">No segments yet</p>
-            <p className="text-xs mt-1">            Click "Add effort" to get started</p>
+            <p className="text-xs mt-1">Click "Add Segment" to get started</p>
           </div>
         )}
 
-
+        {/* Bottom Add Effort button when segments exist */}
+        {intervals.length > 0 && (
+          <div className="text-center pt-4">
+            <button 
+              type="button" 
+              onClick={addInterval} 
+              className="px-4 py-2 text-black text-sm"
+            >
+              <Activity className="h-4 w-4 mr-2 inline" />
+              Add Segment
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Floating repeat menu - more compact */}
@@ -3377,18 +3686,20 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
 }
 
 // File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthLogger.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Plus, Trash2 } from 'lucide-react';
-import { useAppContext } from '@/contexts/AppContext';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Plus, Trash2, Calculator, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface LoggedSet {
   reps: number;
   weight: number;
   rir?: number;
   completed: boolean;
+  barType?: string; // Add bar type to each set
 }
 
 interface LoggedExercise {
@@ -3401,15 +3712,120 @@ interface StrengthLoggerProps {
   onClose: () => void;
 }
 
+// Inline Plate Math Component
+const PlateMathMini: React.FC<{ 
+  weight: number; 
+  barType: string;
+  useImperial?: boolean;
+  isExpanded: boolean;
+  onToggle: () => void;
+}> = ({ weight, barType, useImperial = true, isExpanded, onToggle }) => {
+  const imperialPlates = [
+    { weight: 45, count: 4, color: 'bg-blue-500' },
+    { weight: 35, count: 2, color: 'bg-yellow-500' },
+    { weight: 25, count: 2, color: 'bg-green-500' },
+    { weight: 10, count: 2, color: 'bg-gray-500' },
+    { weight: 5, count: 2, color: 'bg-red-500' },
+    { weight: 2.5, count: 2, color: 'bg-purple-500' },
+  ];
+
+  // Bar types with their weights
+  const barTypes = {
+    'standard': { weight: 45, name: 'Standard Olympic (45lb)' },
+    'womens': { weight: 33, name: 'Women\'s Olympic (33lb)' },
+    'safety': { weight: 45, name: 'Safety Squat Bar (45lb)' },
+    'ez': { weight: 25, name: 'EZ Curl Bar (25lb)' },
+    'trap': { weight: 60, name: 'Trap/Hex Bar (60lb)' },
+    'cambered': { weight: 55, name: 'Cambered Bar (55lb)' },
+    'swiss': { weight: 35, name: 'Swiss/Football Bar (35lb)' },
+    'technique': { weight: 15, name: 'Technique Bar (15lb)' }
+  };
+
+  const currentBar = barTypes[barType as keyof typeof barTypes] || barTypes.standard;
+  const barWeight = currentBar.weight;
+  const unit = useImperial ? 'lbs' : 'kg';
+
+  const calculatePlates = () => {
+    if (!weight || weight <= barWeight) {
+      return { plates: [], possible: false };
+    }
+
+    const weightToLoad = weight - barWeight;
+    const weightPerSide = weightToLoad / 2;
+
+    if (weightPerSide <= 0) {
+      return { plates: [], possible: true };
+    }
+
+    const result: Array<{weight: number, count: number, color: string}> = [];
+    let remaining = weightPerSide;
+
+    for (const plate of imperialPlates) {
+      const maxUsable = Math.floor(remaining / plate.weight);
+      const actualUse = Math.min(maxUsable, plate.count);
+      
+      if (actualUse > 0) {
+        result.push({
+          weight: plate.weight,
+          count: actualUse,
+          color: plate.color
+        });
+        remaining = Math.round((remaining - (actualUse * plate.weight)) * 100) / 100;
+      }
+    }
+
+    return { plates: result, possible: remaining <= 0.1 };
+  };
+
+  const plateCalc = calculatePlates();
+
+  return (
+    <div className="mt-2">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 w-full leading-none p-0"
+      >
+        <span>Plates</span>
+        <ChevronDown className="h-3 w-3" />
+      </button>
+      
+      {isExpanded && plateCalc.possible && (
+        <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+          <div className="text-gray-600 mb-1">{barWeight}lb bar + per side:</div>
+          {plateCalc.plates.length > 0 ? (
+            <div className="space-y-1">
+              {plateCalc.plates.map((plate, index) => (
+                <div key={index} className="flex items-center justify-between text-gray-600">
+                  <span>{plate.weight}{unit}</span>
+                  <span>{plate.count}x</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-500">Empty bar only</span>
+          )}
+        </div>
+      )}
+      
+      {isExpanded && !plateCalc.possible && (
+        <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-600">
+          Can't make exactly {weight}{unit} with standard plates
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
 
   // Comprehensive exercise database
   const commonExercises = [
-    'Deadlift', 'Squat', 'Bench Press', 'Overhead Press', 'Barbell Row',
-    'Romanian Deadlift', 'Front Squat', 'Incline Bench Press', 'Decline Bench Press',
+    'Deadlift', 'Squat', 'Back Squat', 'Front Squat', 'Bench Press', 'Overhead Press', 'Barbell Row',
+    'Romanian Deadlift', 'Incline Bench Press', 'Decline Bench Press',
     'Barbell Curl', 'Close Grip Bench Press', 'Bent Over Row', 'Sumo Deadlift',
     'Dumbbell Press', 'Dumbbell Row', 'Dumbbell Curls', 'Dumbbell Flyes',
     'Lateral Raises', 'Tricep Extensions', 'Hammer Curls', 'Chest Flyes',
@@ -3422,6 +3838,30 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     'Kettlebell Swings', 'Turkish Get-ups', 'Kettlebell Snatches',
     'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
   ];
+
+  // Automatically add a starter exercise when component mounts
+  useEffect(() => {
+    const starterExercise: LoggedExercise = {
+      id: Date.now().toString(),
+      name: '',
+      sets: [{
+        reps: 0,
+        weight: 0,
+        barType: 'standard',
+        rir: undefined,
+        completed: false
+      }]
+    };
+    setExercises([starterExercise]);
+  }, []);
+
+  const togglePlateCalc = (exerciseId: string, setIndex: number) => {
+    const key = `${exerciseId}-${setIndex}`;
+    setExpandedPlates(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
 
   const getFilteredExercises = (searchTerm: string) => {
     return searchTerm.length > 0 
@@ -3441,7 +3881,13 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     const newExercise: LoggedExercise = {
       id: Date.now().toString(),
       name: nameToAdd,
-      sets: []
+      sets: [{
+        reps: 0,
+        weight: 0,
+        barType: 'standard',
+        rir: undefined,
+        completed: false
+      }]
     };
     
     setExercises([...exercises, newExercise]);
@@ -3449,8 +3895,37 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     setShowSuggestions(false);
   };
 
+  const updateExerciseName = (exerciseId: string, name: string, fromSuggestion = false) => {
+    setExercises(exercises.map(exercise => 
+      exercise.id === exerciseId 
+        ? { ...exercise, name }
+        : exercise
+    ));
+    
+    // If selected from suggestion, clear any active suggestions
+    if (fromSuggestion) {
+      // Clear suggestions by resetting the current exercise if it matches
+      // This prevents the dropdown from showing for other exercises
+    }
+  };
+
   const deleteExercise = (exerciseId: string) => {
-    setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
+    if (exercises.length === 1) {
+      // Don't delete the last exercise, just reset it
+      setExercises([{
+        id: Date.now().toString(),
+        name: '',
+        sets: [{
+          reps: 0,
+          weight: 0,
+          barType: 'standard',
+          rir: undefined,
+          completed: false
+        }]
+      }]);
+    } else {
+      setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
+    }
   };
 
   const updateSet = (exerciseId: string, setIndex: number, updates: Partial<LoggedSet>) => {
@@ -3471,6 +3946,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
         const newSet: LoggedSet = {
           reps: lastSet?.reps || 0,
           weight: lastSet?.weight || 0,
+          barType: lastSet?.barType || 'standard',
           rir: undefined,
           completed: false
         };
@@ -3486,9 +3962,12 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
       name: `Strength - ${new Date().toLocaleDateString()}`,
       type: 'strength',
       date: new Date().toISOString().split('T')[0],
-      description: exercises.map(ex => `${ex.name}: ${ex.sets.length} sets`).join(', '),
+      description: exercises
+        .filter(ex => ex.name.trim() && ex.sets.length > 0)
+        .map(ex => `${ex.name}: ${ex.sets.length} sets`)
+        .join(', '),
       duration: 0,
-      completed_exercises: exercises.filter(ex => ex.sets.length > 0),
+      completed_exercises: exercises.filter(ex => ex.name.trim() && ex.sets.length > 0),
       workout_status: 'completed'
     };
 
@@ -3523,78 +4002,82 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     }
   };
 
+  const handleExerciseNameSuggestions = (exerciseId: string, value: string) => {
+    const filtered = getFilteredExercises(value);
+    return filtered.length > 0 ? filtered.slice(0, 3) : [];
+  };
+
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+
+
   return (
     <>
       {/* Header - Dashboard button handled by AppLayout */}
       <div className="bg-white border-b border-gray-200 pb-4 mb-4">
         <div className="flex items-center w-full">
-          <h1 className="text-xl font-semibold">Strength Log</h1>
+          <h1 className="text-xl font-medium text-gray-700">Strength Log</h1>
         </div>
       </div>
 
       {/* Mobile-first responsive container */}
       <div className="space-y-4 w-full max-w-full overflow-hidden">
-        {exercises.length === 0 && (
-          <div className="text-center px-4">
-            <div className="w-full max-w-sm mx-auto">
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <Input
-                  placeholder="Exercise name (type to search)"
-                  value={currentExercise}
-                  onChange={(e) => handleInputChange(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="h-12 w-full text-base"
-                  autoFocus
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                  data-form-type="other"
-                  style={{ fontSize: '16px' }} // Prevents zoom on iOS
-                />
-                <Button 
-                  onClick={handleAddClick}
-                  disabled={!currentExercise.trim()} 
-                  className="h-12 w-full sm:w-auto min-w-[44px]"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-            
-            {showSuggestions && filteredExercises.length > 0 && (
-              <div className="absolute left-4 right-4 sm:left-1/2 sm:right-auto sm:transform sm:-translate-x-1/2 sm:w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto mt-2">
-                {filteredExercises.map((exercise, index) => (
-                  <button
-                    key={index}
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => handleSuggestionClick(exercise)}
-                    className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 text-sm min-h-[44px]"
-                  >
-                    {exercise}
-                  </button>
-                ))}
-              </div>
-            )}
-            
-            <p className="text-gray-600 mt-4 text-sm">Add an exercise to begin your workout</p>
-          </div>
-        )}
-
-        {exercises.map((exercise) => (
+        {exercises.map((exercise, exerciseIndex) => (
           <Card key={exercise.id} className="mx-0">
             <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg break-words pr-2">{exercise.name}</CardTitle>
-                <Button 
-                  onClick={() => deleteExercise(exercise.id)} 
-                  variant="ghost" 
-                  size="sm"
-                  className="text-gray-600 hover:text-gray-800 min-w-[44px] min-h-[44px] flex-shrink-0"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 relative">
+                  <Input
+                    placeholder="Exercise name (e.g., Squat, Bench Press)"
+                    value={exercise.name}
+                    onChange={(e) => {
+                      updateExerciseName(exercise.id, e.target.value);
+                      setActiveDropdown(e.target.value.length > 0 ? exercise.id : null);
+                    }}
+                    onFocus={() => {
+                      if (exercise.name.length > 0) {
+                        setActiveDropdown(exercise.id);
+                      }
+                    }}
+                    onBlur={() => {
+                      // Delay closing to allow click on suggestions
+                      setTimeout(() => setActiveDropdown(null), 150);
+                    }}
+                    className="h-12 text-base font-medium"
+                    style={{ fontSize: '16px' }}
+                    autoFocus={exerciseIndex === 0 && !exercise.name}
+                  />
+                  {activeDropdown === exercise.id && exercise.name.length > 0 && (
+                    <div className="absolute top-14 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-32 overflow-y-auto">
+                      {handleExerciseNameSuggestions(exercise.id, exercise.name).map((suggestion, index) => (
+                        <button
+                          key={index}
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => {
+                            updateExerciseName(exercise.id, suggestion, true);
+                            setActiveDropdown(null);
+                          }}
+                          className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 text-sm min-h-[44px]"
+                        >
+                          {suggestion}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {exercises.length > 1 && (
+                  <Button 
+                    onClick={() => deleteExercise(exercise.id)} 
+                    variant="ghost" 
+                    size="sm"
+                    className="text-gray-600 hover:text-gray-800 min-w-[44px] min-h-[44px] flex-shrink-0"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
               </div>
+
+
             </CardHeader>
             <CardContent className="space-y-3">
               {exercise.sets.map((set, setIndex) => (
@@ -3604,8 +4087,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                   </div>
                   
                   {/* Mobile-optimized grid with proper spacing */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                    <div>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="flex flex-col items-center">
                       <label className="text-sm text-gray-600 mb-1 block">Reps</label>
                       <Input
                         type="number"
@@ -3613,11 +4096,11 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                         pattern="[0-9]*"
                         value={set.reps || ''}
                         onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                        className="h-12 text-center text-base sm:text-lg"
-                        style={{ fontSize: '16px' }} // Prevents zoom on iOS
+                        className="h-12 text-center text-base sm:text-lg w-20"
+                        style={{ fontSize: '16px' }}
                       />
                     </div>
-                    <div>
+                    <div className="flex flex-col items-center">
                       <label className="text-sm text-gray-600 mb-1 block">Weight (lbs)</label>
                       <Input
                         type="number"
@@ -3625,11 +4108,39 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                         pattern="[0-9]*"
                         value={set.weight || ''}
                         onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                        className="h-12 text-center text-base sm:text-lg"
-                        style={{ fontSize: '16px' }} // Prevents zoom on iOS
+                        className="h-12 text-center text-base sm:text-lg w-24"
+                        style={{ fontSize: '16px' }}
                       />
+                      {/* Plate Math and Bar Type Side by Side - Left aligned on desktop */}
+                      <div className="flex items-baseline justify-center sm:justify-start gap-2 mt-2 w-full">
+                        <PlateMathMini
+                          weight={set.weight}
+                          barType={set.barType || 'standard'}
+                          useImperial={true}
+                          isExpanded={expandedPlates[`${exercise.id}-${setIndex}`] || false}
+                          onToggle={() => togglePlateCalc(exercise.id, setIndex)}
+                        />
+                        <Select
+                          value={set.barType || 'standard'}
+                          onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
+                        >
+                                                      <SelectTrigger className="h-auto text-xs border-none bg-transparent p-0 m-0 text-gray-600 hover:text-gray-800 gap-1 w-auto leading-none">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="standard">Standard (45lb)</SelectItem>
+                            <SelectItem value="womens">Women's (33lb)</SelectItem>
+                            <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
+                            <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
+                            <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
+                            <SelectItem value="cambered">Cambered (55lb)</SelectItem>
+                            <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
+                            <SelectItem value="technique">Technique (15lb)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
-                    <div>
+                    <div className="flex flex-col items-center">
                       <label className="text-sm text-gray-600 mb-1 block">RIR</label>
                       <Input
                         type="number"
@@ -3637,10 +4148,10 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                         pattern="[0-9]*"
                         value={set.rir || ''}
                         onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                        className="h-12 text-center text-base sm:text-lg"
+                        className="h-12 text-center text-base sm:text-lg w-16"
                         min="0"
                         max="5"
-                        style={{ fontSize: '16px' }} // Prevents zoom on iOS
+                        style={{ fontSize: '16px' }}
                       />
                     </div>
                   </div>
@@ -3660,63 +4171,27 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           </Card>
         ))}
 
-        {exercises.length > 0 && (
-          <Card className="mx-0">
-            <CardContent className="pt-4">
-              <div className="relative">
-                <div className="flex flex-col gap-2 sm:flex-row">
-                  <Input
-                    placeholder="Next exercise name"
-                    value={currentExercise}
-                    onChange={(e) => handleInputChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    className="flex-1 h-12 text-base"
-                    autoComplete="off"
-                    autoCorrect="off"
-                    autoCapitalize="off"
-                    spellCheck="false"
-                    data-form-type="other"
-                    style={{ fontSize: '16px' }} // Prevents zoom on iOS
-                  />
-                  <Button 
-                    onClick={handleAddClick}
-                    disabled={!currentExercise.trim()} 
-                    className="h-12 w-full sm:w-auto min-w-[44px]"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </Button>
-                </div>
-                
-                {showSuggestions && filteredExercises.length > 0 && (
-                  <div className="absolute top-14 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-64 overflow-y-auto">
-                    {filteredExercises.map((exercise, index) => (
-                      <button
-                        key={index}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => handleSuggestionClick(exercise)}
-                        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 text-sm min-h-[44px]"
-                      >
-                        {exercise}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Simple + button to add new exercise */}
+        <div className="text-center">
+          <button
+            onClick={handleAddClick}
+            disabled={!currentExercise.trim()}
+            className="w-full h-12 text-2xl text-gray-400 hover:text-gray-600 bg-transparent rounded-lg transition-colors"
+          >
+            +
+          </button>
+        </div>
 
-        {exercises.length > 0 && (
-          <div className="pt-4 text-center sm:text-right px-4">
-            <button 
-              onClick={saveWorkout}
-              className="text-lg font-medium text-black hover:text-gray-600 min-h-[44px] px-4 py-2"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              Completed
-            </button>
-          </div>
-        )}
+        {/* Save workout button */}
+        <div className="pt-4 text-center sm:text-right px-4">
+          <button 
+            onClick={saveWorkout}
+            className="text-lg font-medium text-black hover:text-gray-600 min-h-[44px] px-4 py-2"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            Completed
+          </button>
+        </div>
       </div>
     </>
   );
@@ -4253,12 +4728,11 @@ export default SwimWorkoutForm;
 // File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/TodaysEffort.tsx
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Button } from '@/components/ui/button';
-import { Plus, ChevronDown, ChevronRight, ChevronLeft, Clock } from 'lucide-react';
+import { Plus, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
 
 interface TodaysEffortProps {
   selectedDate?: string;
-  onAddEffort: (type: string, date?: string) => void; // FIXED: Now matches AppLayout
+  onAddEffort: (type: string, date?: string) => void;
   onViewCompleted: () => void;
   onEditEffort?: (workout: any) => void;
 }
@@ -4271,32 +4745,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const { useImperial, workouts, loading } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [showIntervals, setShowIntervals] = useState(false);
 
   const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
-
-  // FIXED: Consistent date formatting with timezone fix
-  const formatDateDisplay = (dateStr: string) => {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
-    
-    return `${date.toLocaleDateString('en-US', { 
-      weekday: 'short',
-      month: 'short', 
-      day: 'numeric' 
-    })} effort`.replace(',', '');
-  };
 
   const loadWorkoutsForDate = () => {
     if (workouts && workouts.length > 0) {
       const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
       setDisplayWorkouts(dateWorkouts);
-      setCurrentIndex(0);
     } else {
       setDisplayWorkouts([]);
-      setCurrentIndex(0);
     }
   };
 
@@ -4304,11 +4762,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     loadWorkoutsForDate();
   }, [workouts, activeDate]);
 
-  const currentWorkout = displayWorkouts[currentIndex] || null;
-  const totalWorkouts = displayWorkouts.length;
-
   const formatWorkoutType = (type: string) => {
     return type.charAt(0).toUpperCase() + type.slice(1);
+  };
+
+  const getIcon = (type: string) => {
+    switch (type) {
+      case 'swim': return <Waves className="h-4 w-4" />;
+      case 'ride': return <Bike className="h-4 w-4" />;
+      case 'run': return <Activity className="h-4 w-4" />;
+      case 'strength': return <Dumbbell className="h-4 w-4" />;
+      case 'mobility': return <Move className="h-4 w-4" />;
+      default: return <Activity className="h-4 w-4" />;
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -4322,215 +4788,125 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const formatIntervals = () => {
-    if (!currentWorkout) return null;
-
-    if (currentWorkout.type === 'strength' && currentWorkout.strength_exercises) {
-      return currentWorkout.strength_exercises.map((ex: any, idx: number) => (
-        <div key={idx} className="text-xs md:text-sm text-gray-600 ml-3 md:ml-4 leading-snug">
-          {ex.name}: {ex.sets}x{ex.reps} @ {ex.weight} {useImperial ? 'lbs' : 'kg'}
-        </div>
-      ));
+  const getWorkoutSummary = (workout: any) => {
+    if (workout.type === 'strength' && workout.strength_exercises) {
+      const exerciseNames = workout.strength_exercises
+        .slice(0, 3) // Show first 3 exercises
+        .map((ex: any) => ex.name)
+        .join(', ');
+      const remaining = workout.strength_exercises.length > 3 ? ` +${workout.strength_exercises.length - 3} more` : '';
+      return exerciseNames + remaining;
     }
-
-    if (currentWorkout.intervals) {
-      return currentWorkout.intervals.map((interval: any, idx: number) => (
-        <div key={idx} className="text-xs md:text-sm text-gray-600 ml-3 md:ml-4 leading-snug">
-          {interval.time && `${interval.time}`}
-          {interval.distance && ` ${interval.distance} ${useImperial ? 'mi' : 'km'}`}
-          {interval.effortLabel && ` @ ${interval.effortLabel}`}
-          {!interval.effortLabel && interval.powerTarget && ` @ ${interval.powerTarget}`}
-          {!interval.effortLabel && !interval.powerTarget && interval.paceTarget && ` @ ${interval.paceTarget}`}
-          {interval.rpeTarget && `, RPE ${interval.rpeTarget}`}
-        </div>
-      ));
+    
+    if (workout.intervals && workout.intervals.length > 0) {
+      const segmentNames = workout.intervals
+        .slice(0, 2) // Show first 2 segments
+        .map((interval: any) => {
+          if (interval.effortLabel && interval.effortLabel !== `Segment ${workout.intervals.indexOf(interval) + 1}`) {
+            return interval.effortLabel;
+          }
+          if (interval.time) return interval.time;
+          if (interval.distance) return `${interval.distance}${useImperial ? 'mi' : 'km'}`;
+          return 'Segment';
+        })
+        .join(', ');
+      const remaining = workout.intervals.length > 2 ? ` +${workout.intervals.length - 2} more` : '';
+      return segmentNames + remaining;
     }
-
-    return <p className="text-xs md:text-sm text-gray-500 ml-3 md:ml-4">No segments</p>;
+    
+    const duration = workout.duration ? formatTime(workout.duration) : '';
+    return duration || 'Workout';
   };
 
   if (loading) {
     return (
-      <div className="w-full bg-white p-2 sm:p-3" style={{fontFamily: 'Inter, sans-serif'}}>
-        <div className="pb-2 md:pb-3">
-          <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
-            {formatDateDisplay(activeDate)}
-            {activeDate !== today && workouts && workouts.length > 0 && (
-              (() => {
-                const todaysWorkouts = workouts.filter((w: any) => w.date === today);
-                if (todaysWorkouts.length > 0) {
-                  const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
-                  return (
-                    <span className="text-xs md:text-sm text-gray-500 font-normal">
-                      · today: {types.join(' ')}
-                    </span>
-                  );
-                }
-                return null;
-              })()
-            )}
-          </h2>
-        </div>
-        <div className="py-3 md:py-4">
-          <div className="text-center py-3 md:py-4">
-            <p className="text-[#666666] text-sm">Loading...</p>
-          </div>
+      <div className="w-full py-4">
+        <div className="text-center">
+          <p className="text-gray-500 text-sm">Loading...</p>
         </div>
       </div>
     );
   }
 
-  if (!currentWorkout) {
+  if (displayWorkouts.length === 0) {
     return (
-      <div className="w-full bg-white p-4 sm:p-6" style={{fontFamily: 'Inter, sans-serif'}}>
-        <div className="pb-2 md:pb-3">
-          <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
-            {formatDateDisplay(activeDate)}
-            {activeDate !== today && workouts && workouts.length > 0 && (
-              (() => {
-                const todaysWorkouts = workouts.filter((w: any) => w.date === today);
-                if (todaysWorkouts.length > 0) {
-                  const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
-                  return (
-                    <span className="text-xs md:text-sm text-gray-500 font-normal">
-                      · today: {types.join(' ')}
-                    </span>
-                  );
-                }
-                return null;
-              })()
-            )}
-          </h2>
-        </div>
-        <div className="py-3 md:py-4">
-          <div className="text-center py-3 md:py-4">
-            <p className="text-[#666666] mb-3 text-sm">
-              No effort scheduled for this date
-            </p>
-            <Button 
-              onClick={() => {
-                console.log('🆕 Add effort clicked for date:', activeDate);
-                // FIXED: Pass a default type and the selected date
-                onAddEffort('run', activeDate);
-              }} 
-              size="sm" 
-              className="gap-2 bg-gray-600 text-white hover:bg-gray-700 border-gray-600 hover:border-gray-700 rounded-md transition-all duration-150 hover:transform hover:-translate-y-0.5 hover:shadow-md font-medium text-sm px-4 py-2 min-h-[36px]"
-            >
-              <Plus className="h-4 w-4" />
-              Add effort
-            </Button>
-          </div>
+      <div className="w-full py-6 px-4" style={{fontFamily: 'Inter, sans-serif'}}>
+        <div className="text-center">
+          <p className="text-gray-500 mb-4 text-sm">
+            No effort scheduled for today
+          </p>
+          <button 
+            onClick={() => {
+              console.log('🆕 Add effort clicked for date:', activeDate);
+              onAddEffort('run', activeDate);
+            }} 
+            className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2 mx-auto"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          >
+            <Plus className="h-4 w-4" />
+            Add effort
+          </button>
         </div>
       </div>
     );
   }
-
-  const intervalCount = currentWorkout.type === 'strength'
-    ? (currentWorkout.strength_exercises?.length || 0)
-    : (currentWorkout.intervals?.length || 0);
 
   return (
-    <div
-      className="w-full bg-white p-4 sm:p-6 cursor-pointer hover:bg-gray-50 transition-colors"
-      style={{fontFamily: 'Inter, sans-serif'}}
-      onClick={() => {
-        console.log('🔧 TodaysEffort clicked:', currentWorkout);
-        onEditEffort && onEditEffort(currentWorkout);
-      }}
-    >
-      <div className="pb-2 md:pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 md:gap-4">
-            <h2 className="text-base md:text-lg font-normal text-black flex items-center gap-2">
-              {formatDateDisplay(activeDate)}
-              {activeDate !== today && workouts && workouts.length > 0 && (
-                (() => {
-                  const todaysWorkouts = workouts.filter((w: any) => w.date === today);
-                  if (todaysWorkouts.length > 0) {
-                    const types = [...new Set(todaysWorkouts.map((w: any) => w.type))];
-                    return (
-                      <span className="text-xs md:text-sm text-gray-500 font-normal">
-                        · today: {types.join(' ')}
-                      </span>
-                    );
-                  }
-                  return null;
-                })()
-              )}
-            </h2>
-            {totalWorkouts > 1 && (
-              <div className="flex items-center gap-1 md:gap-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(prev => prev > 0 ? prev - 1 : totalWorkouts - 1);
-                  }}
-                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded min-w-[32px] min-h-[32px] flex items-center justify-center"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <span className="text-xs md:text-sm font-normal text-gray-500 px-1 md:px-2">
-                  {currentIndex + 1} of {totalWorkouts}
-                </span>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setCurrentIndex(prev => prev < totalWorkouts - 1 ? prev + 1 : 0);
-                  }}
-                  className="p-1 hover:text-black transition-colors text-gray-400 hover:bg-gray-50 rounded min-w-[32px] min-h-[32px] flex items-center justify-center"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-      <div className="space-y-3 md:space-y-4 py-3 md:py-4">
-        {/* Workout Title and Type */}
-        <div className="space-y-1">
-          <h3 className="font-medium text-base md:text-lg leading-tight">{currentWorkout.name || formatWorkoutType(currentWorkout.type)}</h3>
-          <p className="text-xs md:text-sm text-gray-600">{formatWorkoutType(currentWorkout.type)}</p>
-        </div>
-
-        {/* Total Time Display - ONLY for non-strength workouts */}
-        {currentWorkout.type !== 'strength' && currentWorkout.duration && currentWorkout.duration > 0 && (
-          <div className="flex items-center gap-2 text-xs md:text-sm text-gray-600">
-            <Clock className="h-3 w-3 md:h-4 md:w-4" />
-            <span className="font-medium">Total Time:</span>
-            <span>{formatTime(currentWorkout.duration)}</span>
-          </div>
-        )}
-
-        {/* Collapsible Segments/Exercises */}
-        {intervalCount > 0 && (
-          <div>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowIntervals(!showIntervals);
+    <div className="w-full relative" style={{fontFamily: 'Inter, sans-serif'}}>
+      {/* Horizontal scrollable workout cards - aggressive edge-to-edge positioning */}
+      <div className="overflow-x-auto scrollbar-hide -mx-4">
+        <div className="flex snap-x snap-mandatory">
+          {displayWorkouts.map((workout, index) => (
+            <div
+              key={workout.id || index}
+              className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2"
+              onClick={() => {
+                console.log('🔧 Workout clicked:', workout);
+                onEditEffort && onEditEffort(workout);
               }}
-              className="flex items-center gap-2 text-xs md:text-sm font-medium hover:text-gray-600 transition-colors"
             >
-              {showIntervals ? <ChevronDown className="h-3 w-3 md:h-4 md:w-4" /> : <ChevronRight className="h-3 w-3 md:h-4 md:w-4" />}
-              {currentWorkout.type === 'strength' ? 'Exercises' : 'Segments'} ({intervalCount})
-            </button>
-            {showIntervals && (
-              <div className="mt-1 md:mt-2 space-y-1">
-                {formatIntervals()}
+              <div className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                {/* Workout title and summary */}
+                <div className="space-y-2">
+                  <h3 className="font-medium text-base leading-tight">
+                    {workout.name || formatWorkoutType(workout.type)}
+                  </h3>
+                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                    {getIcon(workout.type)}
+                    <span>{getWorkoutSummary(workout)}</span>
+                  </div>
+                  
+                  {/* Notes if present */}
+                  {workout.userComments && (
+                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                      {workout.userComments}
+                    </p>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Notes */}
-        {currentWorkout.userComments && (
-          <div className="space-y-1">
-            <p className="text-xs md:text-sm font-medium">Notes</p>
-            <p className="text-xs md:text-sm text-gray-600 leading-relaxed">{currentWorkout.userComments}</p>
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
       </div>
+
+      {/* Clean fade overlay for right edge */}
+      {displayWorkouts.length > 1 && (
+        <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
+      )}
+
+      {/* Scroll indicator for multiple workouts */}
+      {displayWorkouts.length > 1 && (
+        <div className="flex justify-center mt-2">
+          <div className="flex gap-1">
+            {displayWorkouts.map((_, index) => (
+              <div
+                key={index}
+                className="w-1.5 h-1.5 rounded-full bg-gray-300"
+              />
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -4546,7 +4922,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
@@ -4896,20 +5273,60 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       )}
 
       <main className="max-w-7xl mx-auto px-3 py-2">
-        {/* Tab Toggle with discipline icon and date - new top line */}
+        {/* Tab Toggle with Build dropdown */}
         <div className="flex justify-between items-center mb-1">
           <div className="flex gap-1 items-center">
-            <button
-              onClick={() => setShowCompleted(false)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                !showCompleted 
-                  ? 'text-black border-b-2 border-black' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              Build effort
-            </button>
+            {!showCompleted ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    className="px-4 py-2 text-sm font-medium text-black border-b-2 border-black transition-colors flex items-center gap-2"
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  >
+                    Build effort
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'run' }))}
+                    className="cursor-pointer"
+                  >
+                    <Activity className="h-4 w-4 mr-2" />
+                    Run
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'ride' }))}
+                    className="cursor-pointer"
+                  >
+                    <Bike className="h-4 w-4 mr-2" />
+                    Ride
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'swim' }))}
+                    className="cursor-pointer"
+                  >
+                    <Waves className="h-4 w-4 mr-2" />
+                    Swim
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'strength' }))}
+                    className="cursor-pointer"
+                  >
+                    <Dumbbell className="h-4 w-4 mr-2" />
+                    Strength
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <button
+                onClick={() => setShowCompleted(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              >
+                Build effort
+              </button>
+            )}
             <button
               onClick={() => setShowCompleted(true)}
               className={`px-4 py-2 text-sm font-medium transition-colors ${
@@ -4924,12 +5341,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Dynamic discipline icon */}
-            {formData.type === 'run' && <span className="text-xl">🏃</span>}
-            {formData.type === 'ride' && <span className="text-xl">🚴</span>}
-            {formData.type === 'swim' && <span className="text-xl">🏊</span>}
-            {formData.type === 'strength' && <Dumbbell className="h-5 w-5 text-gray-700" />}
-            
             {/* Date moved to top line */}
             <Input
               type="date"
@@ -5008,14 +5419,12 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 )}
                 <div>
                   <div className="relative">
-                    <Textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                      placeholder=""
-                      rows={3}
-                      className={`border-0 bg-transparent min-h-[44px] ${formData.type === 'strength' ? '' : 'pb-8'}`}
+                    <div
+                      className={`min-h-[44px] w-full text-sm text-gray-900 p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
                       style={{borderRadius: 0, fontFamily: 'Inter, sans-serif'}}
-                    />
+                    >
+                      {generateWorkoutDescription()}
+                    </div>
                     {formData.type !== 'strength' && (
                       <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
                         <Clock className="h-3 w-3" />
@@ -5048,7 +5457,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
             {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
               <div className="bg-gray-50 p-2">
                 <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
-                  {generateWorkoutDescription() || 'Add segments to see workout summary...'}
+                  {generateWorkoutDescription()}
                 </p>
                 {calculateTotalTime() > 0 && (
                   <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'Inter, sans-serif'}}>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Plus, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
+import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown } from 'lucide-react';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -90,6 +91,107 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return duration || 'Workout';
   };
 
+  // 🚨 FIXED: Use the existing 'today' variable, don't redeclare it
+  const isPastDate = activeDate < today;
+  const isToday = activeDate === today;
+
+  // 🚨 NEW: Add Effort Dropdown Component
+  const AddEffortDropdown = () => {
+    if (isPastDate) {
+      // Past dates: Only show Log options
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button 
+              className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2"
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              <Plus className="h-4 w-4" />
+              Log effort
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onClick={() => onAddEffort('log-run', activeDate)}
+              className="cursor-pointer"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Log Run
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('log-ride', activeDate)}
+              className="cursor-pointer"
+            >
+              <Bike className="h-4 w-4 mr-2" />
+              Log Ride
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('log-swim', activeDate)}
+              className="cursor-pointer"
+            >
+              <Waves className="h-4 w-4 mr-2" />
+              Log Swim
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('log-strength', activeDate)}
+              className="cursor-pointer"
+            >
+              <Dumbbell className="h-4 w-4 mr-2" />
+              Log Strength
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    } else {
+      // Today and future: Show Build options
+      return (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button 
+              className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2"
+              style={{fontFamily: 'Inter, sans-serif'}}
+            >
+              <Plus className="h-4 w-4" />
+              Add effort
+              <ChevronDown className="h-3 w-3" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start">
+            <DropdownMenuItem
+              onClick={() => onAddEffort('run', activeDate)}
+              className="cursor-pointer"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Run
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('ride', activeDate)}
+              className="cursor-pointer"
+            >
+              <Bike className="h-4 w-4 mr-2" />
+              Ride
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('swim', activeDate)}
+              className="cursor-pointer"
+            >
+              <Waves className="h-4 w-4 mr-2" />
+              Swim
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('strength', activeDate)}
+              className="cursor-pointer"
+            >
+              <Dumbbell className="h-4 w-4 mr-2" />
+              Strength
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      );
+    }
+  };
+
   if (loading) {
     return (
       <div className="w-full py-4">
@@ -105,19 +207,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       <div className="w-full py-6 px-4" style={{fontFamily: 'Inter, sans-serif'}}>
         <div className="text-center">
           <p className="text-gray-500 mb-4 text-sm">
-            No effort scheduled for today
+            {isPastDate 
+              ? 'No effort logged for this date' 
+              : isToday 
+                ? 'No effort scheduled for today'
+                : 'No effort scheduled'
+            }
           </p>
-          <button 
-            onClick={() => {
-              console.log('🆕 Add effort clicked for date:', activeDate);
-              onAddEffort('run', activeDate);
-            }} 
-            className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2 mx-auto"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            <Plus className="h-4 w-4" />
-            Add effort
-          </button>
+          <AddEffortDropdown />
         </div>
       </div>
     );
@@ -158,16 +255,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               </div>
             </div>
           ))}
+          
+          {/* 🚨 NEW: Add effort card at the end when workouts exist */}
+          <div className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2">
+            <div className="p-4 flex items-center justify-center min-h-[100px]">
+              <AddEffortDropdown />
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Clean fade overlay for right edge */}
-      {displayWorkouts.length > 1 && (
-        <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
-      )}
+      <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
 
       {/* Scroll indicator for multiple workouts */}
-      {displayWorkouts.length > 1 && (
+      {displayWorkouts.length > 0 && (
         <div className="flex justify-center mt-2">
           <div className="flex gap-1">
             {displayWorkouts.map((_, index) => (
@@ -176,6 +278,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 className="w-1.5 h-1.5 rounded-full bg-gray-300"
               />
             ))}
+            {/* Extra dot for the add effort card */}
+            <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
           </div>
         </div>
       )}

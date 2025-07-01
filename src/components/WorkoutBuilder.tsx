@@ -47,9 +47,10 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     return getLocalDateString();
   };
 
+  // 🚨 FIXED: Don't default to 'run' if no initialType provided
   const [formData, setFormData] = useState({
     name: '',
-    type: (initialType as 'run' | 'ride' | 'strength' | 'swim') || 'run',
+    type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' : ''),
     date: getInitialDate(),
     description: '',
     userComments: '',
@@ -100,7 +101,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   }, [existingWorkout, initialDate]);
 
   useEffect(() => {
-    if (initialType) {
+    if (initialType && initialType !== '') {
       setFormData(prev => ({ ...prev, type: initialType as any }));
     }
   }, [initialType]);
@@ -345,6 +346,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       day: 'numeric' 
     }).replace(',', '');
   };
+
+  // 🚨 REMOVED: The scary type selection screen - now handled by TodaysEffort
 
   return (
     <div className="min-h-screen bg-white">
