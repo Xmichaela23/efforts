@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Button } from '@/components/ui/button';
 import { Plus, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
 
 interface TodaysEffortProps {
@@ -108,17 +107,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <p className="text-gray-500 mb-4 text-sm">
             No effort scheduled for today
           </p>
-          <Button 
+          <button 
             onClick={() => {
               console.log('🆕 Add effort clicked for date:', activeDate);
               onAddEffort('run', activeDate);
             }} 
-            size="sm" 
-            className="gap-2 text-black hover:text-gray-600 px-4 py-2 text-sm"
+            className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2 mx-auto"
+            style={{fontFamily: 'Inter, sans-serif'}}
           >
             <Plus className="h-4 w-4" />
             Add effort
-          </Button>
+          </button>
         </div>
       </div>
     );
