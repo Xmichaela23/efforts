@@ -44,15 +44,9 @@ const AppLayout: React.FC = () => {
   };
 
   const handleBackToDashboard = () => {
-    // Check if we have unsaved exercises in StrengthLogger
-    if (showStrengthLogger) {
-      if (confirm('Leave without saving? All progress will be lost.')) {
-        setShowStrengthLogger(false);
-      }
-      return;
-    }
-
-    // Regular builder close
+    // Removed the confirmation check for StrengthLogger
+    // Now directly closes without prompting to save
+    setShowStrengthLogger(false);
     setShowBuilder(false);
     setBuilderType('');
     setSelectedWorkout(null);
