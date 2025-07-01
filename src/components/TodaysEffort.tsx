@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown } from 'lucide-react';
+import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface TodaysEffortProps {
@@ -91,11 +91,40 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return duration || 'Workout';
   };
 
-  // 🚨 FIXED: Use the existing 'today' variable, don't redeclare it
+  // Format the date for display
+  const formatDisplayDate = (dateString: string) => {
+    const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(today.getDate() + 1);
+
+    // Check if it's today, yesterday, or tomorrow
+    const isToday = dateString === today.toLocaleDateString('en-CA');
+    const isYesterday = dateString === yesterday.toLocaleDateString('en-CA');
+    const isTomorrow = dateString === tomorrow.toLocaleDateString('en-CA');
+
+    if (isToday) {
+      return 'Today';
+    } else if (isYesterday) {
+      return 'Yesterday';
+    } else if (isTomorrow) {
+      return 'Tomorrow';
+    } else {
+      // Format as "Mon, Jan 15" for other dates
+      return date.toLocaleDateString('en-US', { 
+        weekday: 'short', 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+  };
+
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
-  // 🚨 NEW: Add Effort Dropdown Component
+  // Add Effort Dropdown Component
   const AddEffortDropdown = () => {
     if (isPastDate) {
       // Past dates: Only show Log options
@@ -186,6 +215,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <Dumbbell className="h-4 w-4 mr-2" />
               Strength
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('mobility', activeDate)}
+              className="cursor-pointer"
+            >
+              <Move className="h-4 w-4 mr-2" />
+              Mobility
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
@@ -202,85 +238,112 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     );
   }
 
-  if (displayWorkouts.length === 0) {
-    return (
-      <div className="w-full py-6 px-4" style={{fontFamily: 'Inter, sans-serif'}}>
-        <div className="text-center">
-          <p className="text-gray-500 mb-4 text-sm">
-            {isPastDate 
-              ? 'No effort logged for this date' 
-              : isToday 
-                ? 'No effort scheduled for today'
-                : 'No effort scheduled'
-            }
-          </p>
-          <AddEffortDropdown />
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="w-full relative" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* Horizontal scrollable workout cards - aggressive edge-to-edge positioning */}
-      <div className="overflow-x-auto scrollbar-hide -mx-4">
-        <div className="flex snap-x snap-mandatory">
-          {displayWorkouts.map((workout, index) => (
-            <div
-              key={workout.id || index}
-              className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2"
-              onClick={() => {
-                console.log('🔧 Workout clicked:', workout);
-                onEditEffort && onEditEffort(workout);
-              }}
-            >
-              <div className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
-                {/* Workout title and summary */}
-                <div className="space-y-2">
-                  <h3 className="font-medium text-base leading-tight">
-                    {workout.name || formatWorkoutType(workout.type)}
-                  </h3>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    {getIcon(workout.type)}
-                    <span>{getWorkoutSummary(workout)}</span>
+    <div className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
+      {/* 🚨 NEW: Date Header - Always visible */}
+      <div className="flex items-center justify-between mb-4 px-4">
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-medium text-gray-700">
+            {formatDisplayDate(activeDate)}
+          </span>
+          {/* Show actual date if it's not today/yesterday/tomorrow */}
+          {!['Today', 'Yesterday', 'Tomorrow'].includes(formatDisplayDate(activeDate)) && (
+            <span className="text-xs text-gray-500">
+              ({new Date(activeDate + 'T00:00:00').toLocaleDateString('en-US', { 
+                month: 'numeric', 
+                day: 'numeric',
+                year: new Date(activeDate).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+              })})
+            </span>
+          )}
+        </div>
+        
+        {/* Show effort count if any exist */}
+        {displayWorkouts.length > 0 && (
+          <span className="text-xs text-gray-500">
+            {displayWorkouts.length} effort{displayWorkouts.length !== 1 ? 's' : ''}
+          </span>
+        )}
+      </div>
+
+      {displayWorkouts.length === 0 ? (
+        <div className="w-full py-6 px-4">
+          <div className="text-center">
+            <p className="text-gray-500 mb-4 text-sm">
+              {isPastDate 
+                ? 'No effort logged for this date' 
+                : isToday 
+                  ? 'No effort scheduled for today'
+                  : 'No effort scheduled'
+              }
+            </p>
+            <AddEffortDropdown />
+          </div>
+        </div>
+      ) : (
+        <div className="w-full relative">
+          {/* Horizontal scrollable workout cards */}
+          <div className="overflow-x-auto scrollbar-hide -mx-4">
+            <div className="flex snap-x snap-mandatory">
+              {displayWorkouts.map((workout, index) => (
+                <div
+                  key={workout.id || index}
+                  className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2"
+                  onClick={() => {
+                    console.log('🔧 Workout clicked:', workout);
+                    onEditEffort && onEditEffort(workout);
+                  }}
+                >
+                  <div className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                    {/* Workout title and summary */}
+                    <div className="space-y-2">
+                      <h3 className="font-medium text-base leading-tight">
+                        {workout.name || formatWorkoutType(workout.type)}
+                      </h3>
+                      <div className="flex items-center gap-2 text-sm text-gray-600">
+                        {getIcon(workout.type)}
+                        <span>{getWorkoutSummary(workout)}</span>
+                      </div>
+                      
+                      {/* Notes if present */}
+                      {workout.userComments && (
+                        <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                          {workout.userComments}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  
-                  {/* Notes if present */}
-                  {workout.userComments && (
-                    <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
-                      {workout.userComments}
-                    </p>
-                  )}
+                </div>
+              ))}
+              
+              {/* Add effort card at the end when workouts exist */}
+              <div className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2">
+                <div className="p-4 flex items-center justify-center min-h-[100px]">
+                  <AddEffortDropdown />
                 </div>
               </div>
             </div>
-          ))}
-          
-          {/* 🚨 NEW: Add effort card at the end when workouts exist */}
-          <div className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2">
-            <div className="p-4 flex items-center justify-center min-h-[100px]">
-              <AddEffortDropdown />
+          </div>
+
+          {/* Clean fade overlay for right edge */}
+          <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
+
+          {/* Scroll indicator for multiple workouts */}
+          {displayWorkouts.length > 0 && (
+            <div className="flex justify-center mt-2">
+              <div className="flex gap-1">
+                {displayWorkouts.map((_, index) => (
+                  <div
+                    key={index}
+                    className="w-1.5 h-1.5 rounded-full bg-gray-300"
+                  />
+                ))}
+                {/* Extra dot for the add effort card */}
+                <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
+              </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Clean fade overlay for right edge */}
-      <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
-
-      {/* Scroll indicator for multiple workouts */}
-      {displayWorkouts.length > 0 && (
-        <div className="flex justify-center mt-2">
-          <div className="flex gap-1">
-            {displayWorkouts.map((_, index) => (
-              <div
-                key={index}
-                className="w-1.5 h-1.5 rounded-full bg-gray-300"
-              />
-            ))}
-            {/* Extra dot for the add effort card */}
-            <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
-          </div>
+          )}
         </div>
       )}
     </div>
