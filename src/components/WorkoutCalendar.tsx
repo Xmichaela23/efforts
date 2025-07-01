@@ -15,11 +15,12 @@ const DISCIPLINE_COLORS = {
   run: 'bg-red-500',
   ride: 'bg-green-500', 
   swim: 'bg-blue-500',
-  strength: 'bg-orange-500'
+  strength: 'bg-orange-500',
+  mobility: 'bg-purple-500'
 };
 
 interface WorkoutCalendarProps {
-  onAddEffort: (type: string, date?: string) => void; // FIXED: Match AppLayout interface
+  onAddEffort: (type: string, date?: string) => void;
   onSelectType: (type: string) => void;
   onSelectWorkout: (workout: any) => void;
   onViewCompleted: () => void;
@@ -39,6 +40,7 @@ export default function WorkoutCalendar({
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const navigateMonth = (direction: number) => {
     setCurrentDate(prev => {
@@ -77,13 +79,7 @@ export default function WorkoutCalendar({
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
-    // DEBUG: Log what workouts exist
-    console.log('🔍 All workouts:', workouts);
-    console.log('🔍 Looking for date:', dateStr);
-    
     const filtered = workouts.filter(w => w && w.date === dateStr) || [];
-    console.log('🔍 Found workouts for', dateStr, ':', filtered);
-    
     return filtered;
   };
 
@@ -95,18 +91,34 @@ export default function WorkoutCalendar({
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
-    console.log('📅 Calendar date clicked:', day, 'Date string:', dateStr);
-    console.log('📅 Year:', year, 'Month:', month, 'Day:', dayStr);
-    console.log('📅 Full date string length:', dateStr.length, 'Content:', JSON.stringify(dateStr));
+    // Set this date as selected for visual feedback
+    setSelectedDate(dateStr);
     
-    // FIXED: ONLY select the date - don't automatically open workouts
+    // Notify parent component about date selection
     if (onDateSelect) {
       onDateSelect(dateStr);
     }
+  };
+
+  const isToday = (day: number) => {
+    const today = new Date();
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
     
-    // Don't automatically open workouts for editing
-    // Let the user interact with TodaysEffort component to edit workouts
-    // Or click "Add effort" to create new ones
+    return (
+      day === today.getDate() &&
+      month === today.getMonth() &&
+      year === today.getFullYear()
+    );
+  };
+
+  const isSelected = (day: number) => {
+    if (!day || !selectedDate) return false;
+    const year = currentDate.getFullYear();
+    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(day).padStart(2, '0');
+    const dateStr = `${year}-${month}-${dayStr}`;
+    return dateStr === selectedDate;
   };
 
   const days = getDaysInMonth();
@@ -122,7 +134,7 @@ export default function WorkoutCalendar({
       
       <div className="w-full bg-white">
         <div className="p-1">
-          <div className="flex items-center justify-center gap-6 mb-3">
+          <div className="flex items-center justify-center gap-6 mb-4">
             <Button 
               className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]" 
               style={{borderRadius: '8px'}}
@@ -142,36 +154,60 @@ export default function WorkoutCalendar({
             </Button>
           </div>
           
-          <div className="grid gap-0 grid-cols-7 mb-3">
+          {/* Day headers */}
+          <div className="grid gap-0 grid-cols-7 mb-2">
             {DAYS.map(day => (
-              <div key={day} className="p-1 text-center font-semibold text-xs text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+              <div key={day} className="p-2 text-center font-semibold text-xs text-gray-600 uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
                 {day}
               </div>
             ))}
+          </div>
+
+          {/* Calendar grid */}
+          <div className="grid gap-1 grid-cols-7">
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
+              const todayClass = day && isToday(day) ? 'ring-2 ring-blue-500 ring-offset-1' : '';
+              const selectedClass = day && isSelected(day) ? 'bg-blue-50 border-blue-200' : '';
+              const hoverClass = day ? 'hover:bg-gray-50 hover:border-gray-200' : '';
+              
               return (
                 <div
                   key={index}
-                  className="min-h-[60px] p-1 bg-white hover:bg-gray-50 active:bg-gray-100 cursor-pointer transition-all duration-200 hover:shadow-md rounded-md"
+                  className={`
+                    aspect-square min-h-[60px] p-2 border border-gray-100 transition-all duration-200 cursor-pointer
+                    flex flex-col items-center justify-start
+                    ${todayClass} ${selectedClass} ${hoverClass}
+                    ${day ? 'bg-white' : 'bg-gray-50 cursor-default'}
+                  `}
                   onClick={() => day && handleDateClick(day)}
                 >
                   {day && (
                     <>
-                      <div className="text-sm font-semibold mb-1 text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>{day}</div>
+                      {/* Date number - centered and properly sized */}
+                      <div className={`
+                        text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center
+                        ${isToday(day) ? 'text-blue-600 font-semibold' : 'text-gray-900'}
+                        ${isSelected(day) ? 'text-blue-600' : ''}
+                      `} style={{fontFamily: 'Inter, sans-serif'}}>
+                        {day}
+                      </div>
                       
+                      {/* Workout indicators */}
                       {dayWorkouts.length > 0 && (
-                        <div className="flex justify-center items-center space-x-1 mt-1">
-                          {dayWorkouts.slice(0, 4).map((workout, idx) => (
+                        <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
+                          {dayWorkouts.slice(0, 3).map((workout, idx) => (
                             <div
-                              key={workout.id || idx} // FIXED: Fallback key in case id is missing
-                              className={`w-2 h-2 rounded-full shadow-sm ${DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS] || 'bg-gray-500'}`}
+                              key={workout.id || idx}
+                              className={`w-2 h-2 rounded-full shadow-sm ${
+                                DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS] || 'bg-gray-500'
+                              }`}
                               title={workout.name || workout.type}
                             />
                           ))}
-                          {dayWorkouts.length > 4 && (
-                            <div className="text-xs text-gray-500 font-medium">
-                              +{dayWorkouts.length - 4}
+                          {dayWorkouts.length > 3 && (
+                            <div className="text-[10px] text-gray-500 font-medium leading-none">
+                              +{dayWorkouts.length - 3}
                             </div>
                           )}
                         </div>
