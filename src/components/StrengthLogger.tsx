@@ -1,37 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Calculator, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { useAppContext } from '@/contexts/AppContext';
 
 interface LoggedSet {
   reps: number;
   weight: number;
   rir?: number;
   completed: boolean;
-  barType?: string; // Add bar type to each set
+  barType?: string;
 }
 
 interface LoggedExercise {
   id: string;
   name: string;
   sets: LoggedSet[];
+  expanded?: boolean;
 }
 
 interface StrengthLoggerProps {
   onClose: () => void;
 }
 
-// Inline Plate Math Component
-const PlateMathMini: React.FC<{ 
+// Plate Math Component
+const PlateMath: React.FC<{ 
   weight: number; 
   barType: string;
   useImperial?: boolean;
-  isExpanded: boolean;
-  onToggle: () => void;
-}> = ({ weight, barType, useImperial = true, isExpanded, onToggle }) => {
+}> = ({ weight, barType, useImperial = true }) => {
   const imperialPlates = [
     { weight: 45, count: 4, color: 'bg-blue-500' },
     { weight: 35, count: 2, color: 'bg-yellow-500' },
@@ -44,18 +43,18 @@ const PlateMathMini: React.FC<{
   // Bar types with their weights
   const barTypes = {
     'standard': { weight: 45, name: 'Barbell (45lb)' },
-    'womens': { weight: 33, name: 'Women\'s Olympic (33lb)' },
-    'safety': { weight: 45, name: 'Safety Squat Bar (45lb)' },
-    'ez': { weight: 25, name: 'EZ Curl Bar (25lb)' },
-    'trap': { weight: 60, name: 'Trap/Hex Bar (60lb)' },
-    'cambered': { weight: 55, name: 'Cambered Bar (55lb)' },
-    'swiss': { weight: 35, name: 'Swiss/Football Bar (35lb)' },
-    'technique': { weight: 15, name: 'Technique Bar (15lb)' }
+    'womens': { weight: 33, name: 'Women\'s (33lb)' },
+    'safety': { weight: 45, name: 'Safety Squat (45lb)' },
+    'ez': { weight: 25, name: 'EZ Curl (25lb)' },
+    'trap': { weight: 60, name: 'Trap/Hex (60lb)' },
+    'cambered': { weight: 55, name: 'Cambered (55lb)' },
+    'swiss': { weight: 35, name: 'Swiss/Football (35lb)' },
+    'technique': { weight: 15, name: 'Technique (15lb)' }
   };
 
   const currentBar = barTypes[barType as keyof typeof barTypes] || barTypes.standard;
   const barWeight = currentBar.weight;
-  const unit = useImperial ? 'lbs' : 'kg';
+  const unit = useImperial ? 'lb' : 'kg';
 
   const calculatePlates = () => {
     if (!weight || weight <= barWeight) {
@@ -92,35 +91,23 @@ const PlateMathMini: React.FC<{
   const plateCalc = calculatePlates();
 
   return (
-    <div className="mt-2">
-      <button
-        onClick={onToggle}
-        className="flex items-center gap-1 text-xs text-gray-600 hover:text-gray-800 w-full leading-none p-0"
-      >
-        <span>Plates</span>
-        <ChevronDown className="h-3 w-3" />
-      </button>
-      
-      {isExpanded && plateCalc.possible && (
-        <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-          <div className="text-gray-600 mb-1">{barWeight}lb bar + per side:</div>
-          {plateCalc.plates.length > 0 ? (
-            <div className="space-y-1">
-              {plateCalc.plates.map((plate, index) => (
-                <div key={index} className="flex items-center justify-between text-gray-600">
-                  <span>{plate.weight}{unit}</span>
-                  <span>{plate.count}x</span>
-                </div>
-              ))}
+    <div className="mt-1 p-2 bg-gray-50 rounded text-xs">
+      <div className="text-gray-600 mb-1">{barWeight}{unit} bar + per side:</div>
+      {plateCalc.plates.length > 0 ? (
+        <div className="space-y-1">
+          {plateCalc.plates.map((plate, index) => (
+            <div key={index} className="flex items-center justify-between text-gray-600">
+              <span>{plate.weight}{unit}</span>
+              <span>{plate.count}x</span>
             </div>
-          ) : (
-            <span className="text-gray-500">Empty bar only</span>
-          )}
+          ))}
         </div>
+      ) : (
+        <span className="text-gray-500">Empty bar only</span>
       )}
       
-      {isExpanded && !plateCalc.possible && (
-        <div className="mt-2 p-2 bg-red-50 rounded text-xs text-red-600">
+      {!plateCalc.possible && weight > barWeight && (
+        <div className="mt-1 text-red-600">
           Can't make exactly {weight}{unit} with standard plates
         </div>
       )}
@@ -133,6 +120,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
+  const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -162,7 +150,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
         barType: 'standard',
         rir: undefined,
         completed: false
-      }]
+      }],
+      expanded: true
     };
     setExercises([starterExercise]);
   }, []);
@@ -172,6 +161,13 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     setExpandedPlates(prev => ({
       ...prev,
       [key]: !prev[key]
+    }));
+  };
+
+  const toggleExerciseExpanded = (exerciseId: string) => {
+    setExpandedExercises(prev => ({
+      ...prev,
+      [exerciseId]: !prev[exerciseId]
     }));
   };
 
@@ -199,7 +195,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
         barType: 'standard',
         rir: undefined,
         completed: false
-      }]
+      }],
+      expanded: true
     };
     
     setExercises([...exercises, newExercise]);
@@ -216,8 +213,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     
     // If selected from suggestion, clear any active suggestions
     if (fromSuggestion) {
-      // Clear suggestions by resetting the current exercise if it matches
-      // This prevents the dropdown from showing for other exercises
+      setShowSuggestions(false);
     }
   };
 
@@ -233,7 +229,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           barType: 'standard',
           rir: undefined,
           completed: false
-        }]
+        }],
+        expanded: true
       }]);
     } else {
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
@@ -314,11 +311,6 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     }
   };
 
-  const handleExerciseNameSuggestions = (exerciseId: string, value: string) => {
-    const filtered = getFilteredExercises(value);
-    return filtered.length > 0 ? filtered.slice(0, 3) : [];
-  };
-
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   return (
@@ -333,12 +325,12 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
       {/* Mobile-first responsive container */}
       <div className="space-y-4 w-full max-w-full overflow-hidden">
         {exercises.map((exercise, exerciseIndex) => (
-          <Card key={exercise.id} className="mx-0">
-            <CardHeader className="pb-3">
+          <Card key={exercise.id} className="mx-0 overflow-hidden">
+            <div className="p-3 border-b border-gray-100">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
                   <Input
-                    placeholder="Exercise name (e.g., Squat, Bench Press)"
+                    placeholder="Exercise name"
                     value={exercise.name}
                     onChange={(e) => {
                       updateExerciseName(exercise.id, e.target.value);
@@ -353,13 +345,13 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                       // Delay closing to allow click on suggestions
                       setTimeout(() => setActiveDropdown(null), 150);
                     }}
-                    className="h-12 text-base font-medium"
+                    className="h-10 text-base font-medium border-gray-200"
                     style={{ fontSize: '16px' }}
                     autoFocus={exerciseIndex === 0 && !exercise.name}
                   />
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
-                    <div className="absolute top-14 left-0 right-0 bg-white border border-gray-200 rounded-lg shadow-lg z-10 max-h-32 overflow-y-auto">
-                      {handleExerciseNameSuggestions(exercise.id, exercise.name).map((suggestion, index) => (
+                    <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-32 overflow-y-auto">
+                      {getFilteredExercises(exercise.name).map((suggestion, index) => (
                         <button
                           key={index}
                           onMouseDown={(e) => e.preventDefault()}
@@ -367,7 +359,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                             updateExerciseName(exercise.id, suggestion, true);
                             setActiveDropdown(null);
                           }}
-                          className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b last:border-b-0 text-sm min-h-[44px]"
+                          className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm min-h-[36px] flex items-center"
                         >
                           {suggestion}
                         </button>
@@ -375,64 +367,97 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                     </div>
                   )}
                 </div>
+                <button
+                  onClick={() => toggleExerciseExpanded(exercise.id)}
+                  className="p-2 text-gray-500 hover:text-gray-700"
+                >
+                  {expandedExercises[exercise.id] ? 
+                    <ChevronUp className="h-4 w-4" /> : 
+                    <ChevronDown className="h-4 w-4" />
+                  }
+                </button>
                 {exercises.length > 1 && (
                   <Button 
                     onClick={() => deleteExercise(exercise.id)} 
                     variant="ghost" 
                     size="sm"
-                    className="text-gray-600 hover:text-gray-800 min-w-[44px] min-h-[44px] flex-shrink-0"
+                    className="text-gray-600 hover:text-gray-800 h-8 w-8 p-0 flex-shrink-0"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
               </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {exercise.sets.map((set, setIndex) => (
-                <div key={setIndex} className="p-3 sm:p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-medium text-base">Set {setIndex + 1}</span>
-                  </div>
-                  
-                  {/* Mobile-optimized grid with proper spacing */}
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="flex flex-col items-center">
-                      <label className="text-sm text-gray-600 mb-1 block">Reps</label>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={set.reps || ''}
-                        onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                        className="h-12 text-center text-base sm:text-lg w-20"
-                        style={{ fontSize: '16px' }}
-                      />
+            </div>
+
+            {(expandedExercises[exercise.id] !== false) && (
+              <div className="px-3 py-2">
+                {exercise.sets.map((set, setIndex) => (
+                  <div key={setIndex} className="mb-3 pb-3 border-b border-gray-100 last:border-0 last:mb-0 last:pb-0">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
                     </div>
-                    <div className="flex flex-col items-center">
-                      <label className="text-sm text-gray-600 mb-1 block">Weight (lbs)</label>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={set.weight || ''}
-                        onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                        className="h-12 text-center text-base sm:text-lg w-24"
-                        style={{ fontSize: '16px' }}
-                      />
-                      {/* Plate Math and Bar Type Side by Side - Left aligned */}
-                      <div className="flex items-baseline justify-start gap-2 mt-2 w-full">
-                        <PlateMathMini
-                          weight={set.weight}
-                          barType={set.barType || 'standard'}
-                          useImperial={true}
-                          isExpanded={expandedPlates[`${exercise.id}-${setIndex}`] || false}
-                          onToggle={() => togglePlateCalc(exercise.id, setIndex)}
+                    
+                    {/* Compact grid with smaller inputs */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="flex flex-col">
+                        <label className="text-xs text-gray-500 mb-1">Reps</label>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={set.reps || ''}
+                          onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                          className="h-9 text-center text-base"
+                          style={{ fontSize: '16px' }}
                         />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs text-gray-500 mb-1">Weight (lbs)</label>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={set.weight || ''}
+                          onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                          className="h-9 text-center text-base"
+                          style={{ fontSize: '16px' }}
+                        />
+                      </div>
+                      <div className="flex flex-col">
+                        <label className="text-xs text-gray-500 mb-1">RIR</label>
+                        <Input
+                          type="number"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          value={set.rir || ''}
+                          onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
+                          className="h-9 text-center text-base"
+                          min="0"
+                          max="5"
+                          style={{ fontSize: '16px' }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Bar type and plate calculator */}
+                    <div className="mt-2 flex flex-col">
+                      <div className="flex items-center justify-between">
+                        <button
+                          onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                          className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
+                        >
+                          Plates
+                          {expandedPlates[`${exercise.id}-${setIndex}`] ? 
+                            <ChevronUp className="h-3 w-3" /> : 
+                            <ChevronDown className="h-3 w-3" />
+                          }
+                        </button>
+                        
                         <Select
                           value={set.barType || 'standard'}
                           onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
                         >
-                          <SelectTrigger className="h-auto text-xs border-none bg-transparent p-0 m-0 text-gray-600 hover:text-gray-800 gap-1 w-auto leading-none">
+                          <SelectTrigger className="h-6 text-xs border-none bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -447,59 +472,83 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           </SelectContent>
                         </Select>
                       </div>
-                    </div>
-                    <div className="flex flex-col items-center">
-                      <label className="text-sm text-gray-600 mb-1 block">RIR</label>
-                      <Input
-                        type="number"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        value={set.rir || ''}
-                        onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                        className="h-12 text-center text-base sm:text-lg w-16"
-                        min="0"
-                        max="5"
-                        style={{ fontSize: '16px' }}
-                      />
+                      
+                      {expandedPlates[`${exercise.id}-${setIndex}`] && (
+                        <PlateMath
+                          weight={set.weight}
+                          barType={set.barType || 'standard'}
+                          useImperial={true}
+                        />
+                      )}
                     </div>
                   </div>
-                </div>
-              ))}
-              
-              <Button 
-                onClick={() => addSet(exercise.id)} 
-                variant="ghost"
-                size="lg" 
-                className="w-full h-12 text-base text-gray-600 hover:text-gray-800 hover:bg-gray-50 min-h-[44px]"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Add Set
-              </Button>
-            </CardContent>
+                ))}
+                
+                <Button 
+                  onClick={() => addSet(exercise.id)} 
+                  variant="ghost"
+                  className="w-full h-9 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Set
+                </Button>
+              </div>
+            )}
           </Card>
         ))}
 
-        {/* Simple + button to add new exercise */}
-        <div className="text-center">
-          <button
-            onClick={handleAddClick}
-            disabled={!currentExercise.trim()}
-            className="w-full h-12 text-2xl text-gray-400 hover:text-gray-600 bg-transparent rounded-lg transition-colors"
-          >
-            +
-          </button>
+        {/* Exercise search with suggestions */}
+        <div className="relative">
+          <div className="flex items-center border border-gray-200 rounded bg-white">
+            <div className="pl-3 text-gray-400">
+              <Search className="h-4 w-4" />
+            </div>
+            <Input
+              placeholder="Add exercise..."
+              value={currentExercise}
+              onChange={(e) => handleInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="h-10 border-0 text-sm"
+              style={{ fontSize: '16px' }}
+            />
+            {currentExercise && (
+              <Button 
+                onClick={handleAddClick}
+                className="h-10 px-3 bg-transparent hover:bg-transparent text-black"
+              >
+                <Plus className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+          
+          {showSuggestions && filteredExercises.length > 0 && (
+            <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 rounded shadow-lg z-10 max-h-64 overflow-y-auto">
+              {filteredExercises.map((exercise, index) => (
+                <button
+                  key={index}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleSuggestionClick(exercise)}
+                  className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 text-sm min-h-[40px]"
+                >
+                  {exercise}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* Save workout button */}
-        <div className="pt-4 text-center sm:text-right px-4">
-          <button 
+        {/* Save button */}
+        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white border-t border-gray-200 flex justify-center">
+          <Button 
             onClick={saveWorkout}
-            className="text-lg font-medium text-black hover:text-gray-600 min-h-[44px] px-4 py-2"
-            style={{fontFamily: 'Inter, sans-serif'}}
+            className="w-full h-10 bg-black text-white hover:bg-gray-800"
           >
             Save
-          </button>
+          </Button>
         </div>
+        
+        {/* Bottom padding to account for fixed save button */}
+        <div className="h-16"></div>
       </div>
     </>
   );
