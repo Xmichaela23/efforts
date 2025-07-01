@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
@@ -137,7 +136,6 @@ export default function WorkoutCalendar({
           <div className="flex items-center justify-center gap-6 mb-4">
             <Button 
               className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]" 
-              style={{borderRadius: '8px'}}
               onClick={() => navigateMonth(-1)}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
@@ -147,7 +145,6 @@ export default function WorkoutCalendar({
             </h3>
             <Button 
               className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]"
-              style={{borderRadius: '8px'}}
               onClick={() => navigateMonth(1)}
             >
               <ChevronRight className="h-5 w-5" strokeWidth={2.5} />
@@ -168,14 +165,14 @@ export default function WorkoutCalendar({
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
               const todayClass = day && isToday(day) ? 'ring-2 ring-blue-500 ring-offset-1' : '';
-              const selectedClass = day && isSelected(day) ? 'bg-blue-50 border-blue-200' : '';
-              const hoverClass = day ? 'hover:bg-gray-50 hover:border-gray-200' : '';
+              const selectedClass = day && isSelected(day) ? 'bg-blue-50' : '';
+              const hoverClass = day ? 'hover:bg-gray-50' : '';
               
               return (
                 <div
                   key={index}
                   className={`
-                    aspect-square min-h-[60px] p-2 border border-gray-100 transition-all duration-200 cursor-pointer
+                    aspect-square min-h-[60px] p-2 transition-all duration-200 cursor-pointer
                     flex flex-col items-center justify-start
                     ${todayClass} ${selectedClass} ${hoverClass}
                     ${day ? 'bg-white' : 'bg-gray-50 cursor-default'}
@@ -199,7 +196,7 @@ export default function WorkoutCalendar({
                           {dayWorkouts.slice(0, 3).map((workout, idx) => (
                             <div
                               key={workout.id || idx}
-                              className={`w-2 h-2 rounded-full shadow-sm ${
+                              className={`w-2 h-2 rounded-full ${
                                 DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS] || 'bg-gray-500'
                               }`}
                               title={workout.name || workout.type}

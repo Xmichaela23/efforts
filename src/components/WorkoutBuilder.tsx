@@ -273,7 +273,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const handleSaveAsRoutine = async () => {
     console.log('💾 Saving as routine...');
     // TODO: Implement routine saving logic
-    // This would save the workout structure as a reusable template
     alert('Save as routine feature coming soon!');
   };
 
@@ -572,12 +571,12 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
         {/* Fixed Save Button */}
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
-          <Button
+          <button
             onClick={() => handleSave(false)}
-            className="w-full h-10 bg-black text-white hover:bg-gray-800"
+            className="w-full h-12 text-white bg-black hover:bg-gray-900 transition-colors text-center"
           >
             Save
-          </Button>
+          </button>
         </div>
         
         {/* Bottom padding to account for fixed save button */}
