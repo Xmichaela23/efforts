@@ -353,7 +353,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     <div className="min-h-screen bg-white">
       {/* Save Success Banner */}
       {showSaveOptions && (
-        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 border border-gray-200 z-50 flex items-center gap-4">
+        <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 border border-gray-200 z-50 flex items-center gap-4">
           <Check className="h-5 w-5" />
           <span>{currentWorkout ? 'effort Updated' : 'effort saved'}</span>
         </div>

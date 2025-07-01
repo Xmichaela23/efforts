@@ -211,28 +211,34 @@ const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content - 🚨 FIXED: Added pt-16 to prevent sticky header overlap */}
-      <main className="flex-1 pt-16">
+      {/* Main content - 🚨 FIXED: Removed pt-16 from here since it's handled in individual components */}
+      <main className="flex-1">
         {/* 🚨 FIXED: Mobile centering container */}
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showStrengthLogger ? (
-            <StrengthLogger onClose={handleBackToDashboard} />
+            <div className="pt-4">
+              <StrengthLogger onClose={handleBackToDashboard} />
+            </div>
           ) : showBuilder ? (
-            <WorkoutBuilder
-              onClose={handleBackToDashboard}
-              initialType={builderType}
-              existingWorkout={workoutBeingEdited}
-              initialDate={selectedDate}
-            />
+            <div className="pt-4">
+              <WorkoutBuilder
+                onClose={handleBackToDashboard}
+                initialType={builderType}
+                existingWorkout={workoutBeingEdited}
+                initialDate={selectedDate}
+              />
+            </div>
           ) : selectedWorkout ? (
-            <WorkoutDetail
-              workout={selectedWorkout}
-              onUpdateWorkout={handleUpdateWorkout}
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-            />
+            <div className="pt-4">
+              <WorkoutDetail
+                workout={selectedWorkout}
+                onUpdateWorkout={handleUpdateWorkout}
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
+            </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1 pt-4">
               <TodaysEffort
                 selectedDate={selectedDate}
                 onAddEffort={handleAddEffort}
