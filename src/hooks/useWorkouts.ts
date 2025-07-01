@@ -83,15 +83,39 @@ export const useWorkouts = () => {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Get current user
+  const getCurrentUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    return user;
+  };
+
   // Fetch - ONLY use loading for initial fetch
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
+      
+      // Check if user is authenticated
+      const user = await getCurrentUser();
+      if (!user) {
+        console.log("No authenticated user found");
+        setWorkouts([]);
+        return;
+      }
+
+      console.log("Fetching workouts for user:", user.id);
+
       const { data, error } = await supabase
         .from("workouts")
         .select("*")
+        .eq("user_id", user.id)
         .order("date", { ascending: false });
-      if (error) throw error;
+      
+      if (error) {
+        console.error("Supabase error:", error);
+        throw error;
+      }
+
+      console.log("Raw workout data from Supabase:", data);
 
       const mapped = data.map((w) => ({
         id: w.id,
@@ -108,6 +132,8 @@ export const useWorkouts = () => {
         intervals: w.intervals ? JSON.parse(w.intervals) : [],
         strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
       }));
+      
+      console.log("Mapped workouts:", mapped);
       setWorkouts(mapped);
     } catch (err) {
       console.error("Error in fetchWorkouts:", err);
@@ -119,8 +145,13 @@ export const useWorkouts = () => {
   // Add - NO LOADING STATES
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
-      // 🔥 REMOVED: setLoading(true);
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
       const toSave = {
+        user_id: user.id, // Add user_id to the workout
         name: workoutData.name,
         type: workoutData.type,
         date: workoutData.date,
@@ -132,12 +163,19 @@ export const useWorkouts = () => {
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
       };
+
+      console.log("Saving workout with data:", toSave);
+
       const { data, error } = await supabase
         .from("workouts")
         .insert([toSave])
         .select()
         .single();
-      if (error) throw error;
+      
+      if (error) {
+        console.error("Error saving workout:", error);
+        throw error;
+      }
 
       const newWorkout: Workout = {
         id: data.id,
@@ -154,19 +192,23 @@ export const useWorkouts = () => {
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
       };
+      
       setWorkouts((prev) => [newWorkout, ...prev]);
       return newWorkout;
     } catch (err) {
       console.error("Error in addWorkout:", err);
       throw err;
     }
-    // 🔥 REMOVED: finally { setLoading(false); }
   };
 
   // Update - NO LOADING STATES
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
-      // 🔥 REMOVED: setLoading(true);
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
       const updateObject: any = {};
       if (updates.name !== undefined) updateObject.name = updates.name;
       if (updates.type !== undefined) updateObject.type = updates.type;
@@ -183,8 +225,10 @@ export const useWorkouts = () => {
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
+        .eq("user_id", user.id) // Ensure user can only update their own workouts
         .select()
         .single();
+      
       if (error) throw error;
 
       const updated: Workout = {
@@ -202,27 +246,35 @@ export const useWorkouts = () => {
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
       };
+      
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
       return updated;
     } catch (err) {
       console.error("Error in updateWorkout:", err);
       throw err;
     }
-    // 🔥 REMOVED: finally { setLoading(false); }
   };
 
   // Delete - NO LOADING STATES  
   const deleteWorkout = async (id: string) => {
     try {
-      // 🔥 REMOVED: setLoading(true);
-      const { error } = await supabase.from("workouts").delete().eq("id", id);
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+
+      const { error } = await supabase
+        .from("workouts")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", user.id); // Ensure user can only delete their own workouts
+      
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
     } catch (err) {
       console.error("Error in deleteWorkout:", err);
       throw err;
     }
-    // 🔥 REMOVED: finally { setLoading(false); }
   };
 
   const getWorkoutsForDate = (date: string) => workouts.filter((w) => w.date === date);
