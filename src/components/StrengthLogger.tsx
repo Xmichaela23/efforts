@@ -43,7 +43,7 @@ const PlateMathMini: React.FC<{
 
   // Bar types with their weights
   const barTypes = {
-    'standard': { weight: 45, name: 'Standard Olympic (45lb)' },
+    'standard': { weight: 45, name: 'Barbell (45lb)' },
     'womens': { weight: 33, name: 'Women\'s Olympic (33lb)' },
     'safety': { weight: 45, name: 'Safety Squat Bar (45lb)' },
     'ez': { weight: 25, name: 'EZ Curl Bar (25lb)' },
@@ -321,14 +321,12 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
 
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-
-
   return (
     <>
       {/* Header - Dashboard button handled by AppLayout */}
       <div className="bg-white border-b border-gray-200 pb-4 mb-4">
         <div className="flex items-center w-full">
-          <h1 className="text-xl font-medium text-gray-700">Strength Log</h1>
+          <h1 className="text-xl font-medium text-gray-700">Log Strength</h1>
         </div>
       </div>
 
@@ -388,8 +386,6 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                   </Button>
                 )}
               </div>
-
-
             </CardHeader>
             <CardContent className="space-y-3">
               {exercise.sets.map((set, setIndex) => (
@@ -423,8 +419,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                         className="h-12 text-center text-base sm:text-lg w-24"
                         style={{ fontSize: '16px' }}
                       />
-                      {/* Plate Math and Bar Type Side by Side - Left aligned on desktop */}
-                      <div className="flex items-baseline justify-center sm:justify-start gap-2 mt-2 w-full">
+                      {/* Plate Math and Bar Type Side by Side - Left aligned */}
+                      <div className="flex items-baseline justify-start gap-2 mt-2 w-full">
                         <PlateMathMini
                           weight={set.weight}
                           barType={set.barType || 'standard'}
@@ -436,11 +432,11 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           value={set.barType || 'standard'}
                           onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
                         >
-                                                      <SelectTrigger className="h-auto text-xs border-none bg-transparent p-0 m-0 text-gray-600 hover:text-gray-800 gap-1 w-auto leading-none">
+                          <SelectTrigger className="h-auto text-xs border-none bg-transparent p-0 m-0 text-gray-600 hover:text-gray-800 gap-1 w-auto leading-none">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="standard">Standard (45lb)</SelectItem>
+                            <SelectItem value="standard">Barbell (45lb)</SelectItem>
                             <SelectItem value="womens">Women's (33lb)</SelectItem>
                             <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
                             <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
@@ -501,7 +497,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
             className="text-lg font-medium text-black hover:text-gray-600 min-h-[44px] px-4 py-2"
             style={{fontFamily: 'Inter, sans-serif'}}
           >
-            Completed
+            Save
           </button>
         </div>
       </div>
