@@ -463,7 +463,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           value={set.barType || 'standard'}
                           onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
                         >
-                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto">
+                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent className="bg-white border border-gray-200 shadow-xl">
