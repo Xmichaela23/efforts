@@ -93,7 +93,8 @@ export default function WorkoutCalendar({
     // Set this date as selected for visual feedback
     setSelectedDate(dateStr);
     
-    // Notify parent component about date selection
+    // Always update the Today's Effort section to show this date
+    // This works for both empty dates and dates with workouts
     if (onDateSelect) {
       onDateSelect(dateStr);
     }

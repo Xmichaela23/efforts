@@ -88,38 +88,13 @@ const AppLayout: React.FC = () => {
     setShowBuilder(true);
   };
 
-  // 🚨 FIXED: Calendar date click navigation - Smart handling
+  // 🚨 FIXED: Calendar date click - only select date, don't auto-open workouts
   const handleDateSelect = (date: string) => {
     console.log('📅 Calendar date clicked:', date);
     setSelectedDate(date);
     
-    // Find workouts for the selected date
-    const workoutsForDate = workouts?.filter(w => w && w.date === date) || [];
-    console.log('🔍 Found workouts for', date, ':', workoutsForDate);
-    
-    if (workoutsForDate.length === 0) {
-      // Empty date - just select it, TodaysEffort will show "Add effort"
-      console.log('📅 Empty date selected - TodaysEffort will handle UI');
-    } else if (workoutsForDate.length === 1) {
-      // Single workout - open it for viewing/editing
-      const workout = workoutsForDate[0];
-      console.log('📝 Opening single workout:', workout);
-      
-      if (workout.workout_status === 'completed') {
-        // Open in detail view for completed workouts
-        setSelectedWorkout(workout);
-      } else {
-        // Open in builder for editing scheduled workouts
-        setWorkoutBeingEdited(workout);
-        setBuilderType(workout.type);
-        setShowBuilder(true);
-      }
-    } else {
-      // Multiple workouts - open first one for now
-      console.log('🔀 Multiple workouts - opening first one');
-      const workout = workoutsForDate[0];
-      setSelectedWorkout(workout);
-    }
+    // Just select the date - let TodaysEffort component handle displaying workouts
+    // Users can click on individual workouts in TodaysEffort to view/edit them
   };
 
   const handleViewCompleted = () => {
