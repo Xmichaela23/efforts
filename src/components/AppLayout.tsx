@@ -27,11 +27,17 @@ const AppLayout: React.FC = () => {
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
-  // 🚨 CRITICAL FIX: Reset tab to summary whenever selectedWorkout changes
+  // 🚨 CRITICAL FIX: Set appropriate tab when workout is selected
   useEffect(() => {
     if (selectedWorkout) {
-      console.log('🔍 New workout selected, resetting tab to summary:', selectedWorkout.id);
-      setActiveTab('summary');
+      console.log('🔍 New workout selected:', selectedWorkout.id, 'type:', selectedWorkout.type);
+      
+      // For strength workouts, default to 'completed' tab
+      if (selectedWorkout.type === 'strength') {
+        setActiveTab('completed');
+      } else {
+        setActiveTab('summary');
+      }
     }
   }, [selectedWorkout?.id]); // Only trigger when workout ID changes
 
@@ -48,7 +54,7 @@ const AppLayout: React.FC = () => {
   const handleWorkoutSelect = (workout: any) => {
     console.log('🔍 handleWorkoutSelect called with workout:', workout.id);
     setSelectedWorkout(workout);
-    // Tab will be reset to 'summary' by the useEffect above
+    // Tab will be set by the useEffect above based on workout type
   };
 
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
