@@ -17,6 +17,7 @@ const AppLayout: React.FC = () => {
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
+  const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('planned');
 
@@ -52,12 +53,22 @@ const AppLayout: React.FC = () => {
     setShowBuilder(false);
     setShowAllPlans(false);
     setBuilderType('');
+    setBuilderSourceContext('');
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
   };
 
+  const handleNavigateToPlans = () => {
+    setShowBuilder(false);
+    setBuilderType('');
+    setBuilderSourceContext('');
+    setWorkoutBeingEdited(null);
+    setShowAllPlans(true);
+  };
+
   const handleAddEffort = (type: string, date?: string) => {
     setBuilderType(type);
+    setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     
     if (date) {
@@ -75,6 +86,7 @@ const AppLayout: React.FC = () => {
 
   const handleSelectEffortType = (type: string) => {
     setBuilderType(type);
+    setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     
     // 🚨 FIXED: Handle both 'strength_logger' and 'log-strength'
@@ -88,6 +100,7 @@ const AppLayout: React.FC = () => {
   const handleEditEffort = (workout: any) => {
     setWorkoutBeingEdited(workout);
     setBuilderType(workout.type);
+    setBuilderSourceContext('');
     setShowBuilder(true);
   };
 
@@ -122,9 +135,10 @@ const AppLayout: React.FC = () => {
     setShowAllPlans(false);
   };
 
-  const handleBuildWorkout = (type: string) => {
-    console.log('Building workout of type:', type);
+  const handleBuildWorkout = (type: string, sourceContext?: string) => {
+    console.log('Building workout of type:', type, 'from context:', sourceContext);
     setBuilderType(type);
+    setBuilderSourceContext(sourceContext || '');
     setWorkoutBeingEdited(null);
     setShowAllPlans(false);
     setShowBuilder(true);
@@ -234,6 +248,8 @@ const AppLayout: React.FC = () => {
                 initialType={builderType}
                 existingWorkout={workoutBeingEdited}
                 initialDate={selectedDate}
+                sourceContext={builderSourceContext}
+                onNavigateToPlans={handleNavigateToPlans}
               />
             </div>
           ) : selectedWorkout ? (

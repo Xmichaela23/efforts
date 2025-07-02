@@ -28,7 +28,7 @@ interface FocusArea {
 interface AllPlansInterfaceProps {
   onClose: () => void;
   onSelectPlan: (plan: Plan) => void;
-  onBuildWorkout: (type: string) => void;
+  onBuildWorkout: (type: string, sourceContext?: string) => void;
 }
 
 const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ onClose, onSelectPlan, onBuildWorkout }) => {
@@ -47,7 +47,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ onClose, onSelect
   const categories: Category[] = [
     { id: 'running', name: 'Run', description: '', icon: Activity },
     { id: 'lifting', name: 'Strength', description: '', icon: Dumbbell },
-    { id: 'cycling', name: 'Cycle', description: '', icon: Bike },
+    { id: 'cycling', name: 'Ride', description: '', icon: Bike },
     { id: 'swimming', name: 'Swim', description: '', icon: Waves },
     { id: 'mobility', name: 'Mobility', description: '', icon: Move }
   ];
@@ -131,7 +131,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ onClose, onSelect
   };
 
   const handleBuild = () => {
-    console.log('Opening builder for:', selectedCategory);
+    console.log('Building workout for:', selectedCategory);
     const typeMapping = {
       running: 'run',
       lifting: 'strength',
@@ -140,7 +140,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ onClose, onSelect
       mobility: 'mobility'
     };
     const builderType = typeMapping[selectedCategory as keyof typeof typeMapping] || 'run';
-    onBuildWorkout(builderType);
+    onBuildWorkout(builderType, 'plans');
   };
 
   const handleBack = () => {

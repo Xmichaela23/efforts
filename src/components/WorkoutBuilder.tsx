@@ -75,7 +75,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     if (sourceContext === 'plans') {
       const disciplineMap = {
         'run': 'Run',
-        'ride': 'Cycle', 
+        'ride': 'Ride', 
         'strength': 'Strength',
         'swim': 'Swim',
         'mobility': 'Mobility'
