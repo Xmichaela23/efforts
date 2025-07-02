@@ -300,6 +300,7 @@ const AppLayout: React.FC = () => {
                 onUpdateWorkout={handleUpdateWorkout}
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
+                onClose={handleBackToDashboard}
               />
             </div>
           ) : (

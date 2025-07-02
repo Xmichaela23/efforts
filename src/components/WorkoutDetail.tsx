@@ -5,11 +5,12 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Upload, Activity, Dumbbell, Bike, Waves } from 'lucide-react';
+import { Upload, Activity, Dumbbell, Bike, Waves, Trash2 } from 'lucide-react';
 import WorkoutMetrics from './WorkoutMetrics';
 import CompletedTab from './CompletedTab';
 import StrengthExerciseBuilder from './StrengthExerciseBuilder';
 import StrengthCompletedView from './StrengthCompletedView';
+import { useAppContext } from '@/contexts/AppContext';
 
 interface WorkoutDetailProps {
   workout: {
@@ -47,9 +48,17 @@ interface WorkoutDetailProps {
   onUpdateWorkout: (workoutId: string, updates: any) => void;
   activeTab?: string;
   onTabChange?: (tab: string) => void;
+  onClose?: () => void;
 }
 
-const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout, activeTab = 'summary', onTabChange }) => {
+const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ 
+  workout, 
+  onUpdateWorkout, 
+  activeTab = 'summary', 
+  onTabChange,
+  onClose 
+}) => {
+  const { deleteWorkout } = useAppContext();
   const [comments, setComments] = useState(workout.comments || '');
   const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
 
@@ -61,6 +70,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
   const handleStrengthExercisesChange = (exercises: any[]) => {
     setStrengthExercises(exercises);
     onUpdateWorkout(workout.id, { strength_exercises: exercises });
+  };
+
+  const handleDelete = async () => {
+    if (confirm('Are you sure you want to delete this workout?')) {
+      try {
+        await deleteWorkout(workout.id);
+        onClose?.(); // Close the detail view after deletion
+      } catch (error) {
+        console.error('Error deleting workout:', error);
+        alert('Error deleting workout. Please try again.');
+      }
+    }
   };
 
   const getWorkoutType = () => {
@@ -102,30 +123,41 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
         <p className="text-sm text-muted-foreground">{new Date(workout.date).toLocaleDateString()}</p>
       </div>
 
-      {/* Simple tab navigation without card styling */}
+      {/* Tab navigation with delete button */}
       <div className="w-full">
-        <div className="flex space-x-8 border-b border-gray-200">
+        <div className="flex items-center justify-between border-b border-gray-200">
+          <div className="flex space-x-8">
+            <button
+              onClick={() => onTabChange?.('summary')}
+              className={`py-2 px-1 text-sm font-medium transition-colors ${
+                activeTab === 'summary'
+                  ? 'text-black border-b-2 border-black'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              Summary
+            </button>
+            <button
+              onClick={() => onTabChange?.('completed')}
+              className={`py-2 px-1 text-sm font-medium transition-colors ${
+                activeTab === 'completed'
+                  ? 'text-black border-b-2 border-black'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+              style={{ fontFamily: 'Inter, sans-serif' }}
+            >
+              Completed
+            </button>
+          </div>
+          
+          {/* Delete button aligned to the right */}
           <button
-            onClick={() => onTabChange?.('summary')}
-            className={`py-2 px-1 text-sm font-medium transition-colors ${
-              activeTab === 'summary'
-                ? 'text-black border-b-2 border-black'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
+            onClick={handleDelete}
+            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+            title="Delete workout"
           >
-            Summary
-          </button>
-          <button
-            onClick={() => onTabChange?.('completed')}
-            className={`py-2 px-1 text-sm font-medium transition-colors ${
-              activeTab === 'completed'
-                ? 'text-black border-b-2 border-black'
-                : 'text-gray-500 hover:text-gray-700'
-            }`}
-            style={{ fontFamily: 'Inter, sans-serif' }}
-          >
-            Completed
+            <Trash2 className="h-4 w-4" />
           </button>
         </div>
 
