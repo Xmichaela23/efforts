@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar } from 'lucide-react';
+import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -18,6 +19,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const { useImperial, workouts, loading } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
 
   const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
@@ -26,8 +28,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if (workouts && workouts.length > 0) {
       const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
       setDisplayWorkouts(dateWorkouts);
+      setCurrentIndex(0); // Reset to first workout when date changes
     } else {
       setDisplayWorkouts([]);
+      setCurrentIndex(0);
     }
   };
 
@@ -123,6 +127,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
+
+  // Navigation functions
+  const totalItems = displayWorkouts.length + 1; // +1 for the "Add effort" card
+  const canGoLeft = currentIndex > 0;
+  const canGoRight = currentIndex < totalItems - 1;
+
+  const goLeft = () => {
+    if (canGoLeft) {
+      setCurrentIndex(currentIndex - 1);
+    }
+  };
+
+  const goRight = () => {
+    if (canGoRight) {
+      setCurrentIndex(currentIndex + 1);
+    }
+  };
 
   // Add Effort Dropdown Component
   const AddEffortDropdown = () => {
@@ -240,7 +261,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* 🚨 NEW: Date Header - Always visible */}
+      {/* Date Header - Always visible */}
       <div className="flex items-center justify-between mb-6 px-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-500" />
@@ -283,20 +304,56 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : (
         <div className="w-full relative">
-          {/* Horizontal scrollable workout cards - FIXED: Use proper scroll snap setup */}
-          <div className="overflow-x-auto scrollbar-hide">
-            <div className="flex snap-x snap-mandatory" style={{ width: `${(displayWorkouts.length + 1) * 100}%` }}>
+          {/* Navigation buttons */}
+          {totalItems > 1 && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white shadow-md border border-gray-200 ${
+                  !canGoLeft ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                }`}
+                onClick={goLeft}
+                disabled={!canGoLeft}
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                className={`absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white shadow-md border border-gray-200 ${
+                  !canGoRight ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
+                }`}
+                onClick={goRight}
+                disabled={!canGoRight}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+
+          {/* Workout cards container */}
+          <div className="overflow-hidden px-4">
+            <div 
+              className="flex transition-transform duration-300 ease-in-out"
+              style={{ 
+                transform: `translateX(-${currentIndex * 100}%)`,
+                width: `${totalItems * 100}%`
+              }}
+            >
+              {/* Workout cards */}
               {displayWorkouts.map((workout, index) => (
                 <div
                   key={workout.id || index}
-                  className="flex-shrink-0 snap-start"
-                  style={{ width: `${100 / (displayWorkouts.length + 1)}%` }}
+                  className="flex-shrink-0 w-full"
+                  style={{ width: `${100 / totalItems}%` }}
                   onClick={() => {
                     console.log('🔧 Workout clicked:', workout);
                     onEditEffort && onEditEffort(workout);
                   }}
                 >
-                  <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-4">
+                  <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-2">
                     {/* Workout title and summary */}
                     <div className="space-y-3">
                       <h3 className="font-medium text-base leading-tight">
@@ -318,33 +375,31 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 </div>
               ))}
               
-              {/* Add effort card at the end when workouts exist - FIXED: Use same width calculation */}
+              {/* Add effort card at the end */}
               <div 
-                className="flex-shrink-0 snap-start"
-                style={{ width: `${100 / (displayWorkouts.length + 1)}%` }}
+                className="flex-shrink-0 w-full"
+                style={{ width: `${100 / totalItems}%` }}
               >
-                <div className="p-6 flex items-center justify-center min-h-[120px] mx-4">
+                <div className="p-6 flex items-center justify-center min-h-[120px] mx-2">
                   <AddEffortDropdown />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Clean fade overlay for right edge */}
-          <div className="absolute top-0 right-0 w-8 h-full bg-gradient-to-l from-white to-transparent pointer-events-none" />
-
-          {/* Scroll indicator for multiple workouts */}
-          {displayWorkouts.length > 0 && (
-            <div className="flex justify-center mt-3">
-              <div className="flex gap-1">
-                {displayWorkouts.map((_, index) => (
-                  <div
+          {/* Navigation dots */}
+          {totalItems > 1 && (
+            <div className="flex justify-center mt-4">
+              <div className="flex gap-2">
+                {Array.from({ length: totalItems }).map((_, index) => (
+                  <button
                     key={index}
-                    className="w-1.5 h-1.5 rounded-full bg-gray-300"
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      index === currentIndex ? 'bg-gray-600' : 'bg-gray-300'
+                    }`}
+                    onClick={() => setCurrentIndex(index)}
                   />
                 ))}
-                {/* Extra dot for the add effort card */}
-                <div className="w-1.5 h-1.5 rounded-full bg-gray-300" />
               </div>
             </div>
           )}
