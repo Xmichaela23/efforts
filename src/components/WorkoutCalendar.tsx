@@ -169,11 +169,11 @@ export default function WorkoutCalendar({
                 <div
                   key={index}
                   className={`
-                    aspect-square min-h-[60px] p-2 transition-all duration-200 cursor-pointer
+                    aspect-square min-h-[60px] p-2 transition-colors duration-200 cursor-pointer
                     flex flex-col items-center justify-start
                     ${day ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 cursor-default'}
-                    ${day && isToday(day) ? 'ring-1 ring-gray-400' : ''}
-                    ${day && isSelected(day) ? 'bg-gray-100' : ''}
+                    ${day && isToday(day) ? 'bg-gray-100' : ''}
+                    ${day && isSelected(day) ? 'bg-gray-200' : ''}
                   `}
                   onClick={() => day && handleDateClick(day)}
                 >
