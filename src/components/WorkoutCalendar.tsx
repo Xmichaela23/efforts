@@ -164,9 +164,6 @@ export default function WorkoutCalendar({
           <div className="grid gap-1 grid-cols-7">
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
-              const todayClass = day && isToday(day) ? 'ring-1 ring-gray-300' : '';
-              const selectedClass = day && isSelected(day) ? 'bg-gray-100' : '';
-              const hoverClass = day ? 'hover:bg-gray-50' : '';
               
               return (
                 <div
@@ -174,14 +171,15 @@ export default function WorkoutCalendar({
                   className={`
                     aspect-square min-h-[60px] p-2 transition-all duration-200 cursor-pointer
                     flex flex-col items-center justify-start
-                    ${todayClass} ${selectedClass} ${hoverClass}
-                    ${day ? 'bg-white' : 'bg-gray-50 cursor-default'}
+                    ${day ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 cursor-default'}
+                    ${day && isToday(day) ? 'ring-1 ring-gray-400' : ''}
+                    ${day && isSelected(day) ? 'bg-gray-100' : ''}
                   `}
                   onClick={() => day && handleDateClick(day)}
                 >
                   {day && (
                     <>
-                      {/* Date number - clean styling without any blue colors */}
+                      {/* Date number - clean styling */}
                       <div className="text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
                         {day}
                       </div>
