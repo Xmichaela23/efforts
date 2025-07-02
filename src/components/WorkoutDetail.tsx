@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Upload, Activity, Dumbbell } from 'lucide-react';
+import { Upload, Activity, Dumbbell, Bike, Waves } from 'lucide-react';
 import WorkoutMetrics from './WorkoutMetrics';
 import CompletedTab from './CompletedTab';
 import StrengthExerciseBuilder from './StrengthExerciseBuilder';
@@ -19,6 +19,7 @@ interface WorkoutDetailProps {
     date: string;
     workout_status?: string;
     strength_exercises?: any[];
+    completed_exercises?: any[];
     garmin_data?: any;
     time_series_data?: any;
     heart_rate_zones?: any[];

@@ -1,5 +1,4 @@
 import React, { useMemo } from 'react';
-import { useAppContext } from '@/contexts/AppContext';
 
 interface StrengthCompletedViewProps {
   workoutData: any; // The completed workout data
@@ -17,8 +16,6 @@ interface CompletedExercise {
 }
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData }) => {
-  const { workouts } = useAppContext();
-
   // Debug logging
   console.log('🔍 StrengthCompletedView received:', {
     workoutData,
@@ -52,7 +49,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const completedExercises = getCompletedExercises();
 
-  // Calculate total workout statistics
+  // Calculate total workout statistics - simplified to only show actual values
   const workoutStats = useMemo(() => {
     let totalSets = 0;
     let totalReps = 0;
