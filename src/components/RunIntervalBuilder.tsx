@@ -233,8 +233,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                 type="button"
                 onClick={(e) => unblockInterval(interval.id, e)}
                 size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0 border-blue-400 hover:bg-blue-100"
+                variant="ghost"
+                className="h-8 w-8 p-0"
                 title="Break apart block"
               >
                 <Edit className="h-3 w-3" />
@@ -243,8 +243,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                 type="button"
                 onClick={(e) => duplicateInterval(interval.id, e)}
                 size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0 border-blue-400 hover:bg-blue-100"
+                variant="ghost"
+                className="h-8 w-8 p-0"
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -252,8 +252,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
                 type="button"
                 onClick={(e) => deleteInterval(interval.id, e)}
                 size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0 border-blue-400 hover:bg-blue-100"
+                variant="ghost"
+                className="h-8 w-8 p-0"
               >
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -313,8 +313,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               type="button" 
               onClick={(e) => duplicateInterval(interval.id, e)} 
               size="sm" 
-              variant="outline" 
-              className="h-8 w-8 p-0 border-gray-400 hover:bg-gray-100"
+              variant="ghost" 
+              className="h-8 w-8 p-0"
             >
               <Copy className="h-3 w-3" />
             </Button>
@@ -322,8 +322,8 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               type="button" 
               onClick={(e) => deleteInterval(interval.id, e)} 
               size="sm" 
-              variant="outline" 
-              className="h-8 w-8 p-0 border-gray-400 hover:bg-gray-100"
+              variant="ghost" 
+              className="h-8 w-8 p-0"
             >
               <Trash2 className="h-3 w-3" />
             </Button>

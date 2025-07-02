@@ -102,10 +102,10 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
                 </h4>
               </div>
               <div className="flex gap-2">
-                <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-300 hover:bg-gray-100">
+                <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="ghost" className="h-8 w-8 p-0">
                   <Copy className="h-4 w-4" />
                 </Button>
-                <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-300 hover:bg-gray-100">
+                <Button type="button" onClick={(e) => deleteInterval(interval.id, e)} size="sm" variant="ghost" className="h-8 w-8 p-0">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>

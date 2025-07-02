@@ -5,6 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Copy, Trash2, ChevronRight, Dumbbell } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface StrengthExercise {
   id: string;
@@ -279,14 +280,14 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               <button 
                 type="button" 
                 onClick={(e) => duplicateExercise(exercise.id, e)} 
-                className="p-1.5 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white focus:outline-none min-h-[32px] min-w-[32px] flex items-center justify-center transition-colors"
+                className="p-1.5 text-gray-500 hover:bg-gray-50 bg-white focus:outline-none min-h-[32px] min-w-[32px] flex items-center justify-center transition-colors"
               >
                 <Copy className="h-3.5 w-3.5" />
               </button>
               <button 
                 type="button" 
                 onClick={(e) => deleteExercise(exercise.id, e)} 
-                className="p-1.5 border border-gray-200 text-gray-500 hover:bg-gray-50 bg-white focus:outline-none min-h-[32px] min-w-[32px] flex items-center justify-center transition-colors"
+                className="p-1.5 text-gray-500 hover:bg-gray-50 bg-white focus:outline-none min-h-[32px] min-w-[32px] flex items-center justify-center transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
               </button>

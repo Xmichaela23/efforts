@@ -237,8 +237,8 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                 type="button"
                 onClick={(e) => unblockInterval(interval.id, e)}
                 size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0 border-gray-300"
+                variant="ghost"
+                className="h-8 w-8 p-0"
                 title="Break apart block"
               >
                 <Edit className="h-3 w-3" />
@@ -247,8 +247,8 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                 type="button"
                 onClick={(e) => duplicateInterval(interval.id, e)}
                 size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0 border-gray-300"
+                variant="ghost"
+                className="h-8 w-8 p-0"
               >
                 <Copy className="h-3 w-3" />
               </Button>
@@ -256,8 +256,8 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
                 type="button"
                 onClick={(e) => deleteInterval(interval.id, e)}
                 size="sm"
-                variant="outline"
-                className="h-8 w-8 p-0 border-gray-300"
+                variant="ghost"
+                className="h-8 w-8 p-0"
               >
                 <Trash2 className="h-3 w-3" />
               </Button>
@@ -317,8 +317,8 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
               type="button" 
               onClick={(e) => duplicateInterval(interval.id, e)} 
               size="sm" 
-              variant="outline" 
-              className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100"
+              variant="ghost" 
+              className="h-8 w-8 p-0"
             >
               <Copy className="h-3 w-3" />
             </Button>
@@ -326,8 +326,8 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
               type="button" 
               onClick={(e) => deleteInterval(interval.id, e)} 
               size="sm" 
-              variant="outline" 
-              className="h-8 w-8 p-0 border-gray-300 hover:bg-gray-100"
+              variant="ghost" 
+              className="h-8 w-8 p-0"
             >
               <Trash2 className="h-3 w-3" />
             </Button>

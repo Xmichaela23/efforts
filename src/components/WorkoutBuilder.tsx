@@ -4,7 +4,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move, ArrowLeft } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
@@ -360,55 +359,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               <ArrowLeft className="h-4 w-4" />
               {getBackButtonText()}
             </Button>
-            
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  className="px-4 py-2 text-sm font-medium text-black transition-colors flex items-center gap-2"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                >
-                  Build effort
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="bg-white border border-gray-200 shadow-xl rounded-lg">
-                <DropdownMenuItem
-                  onClick={() => setFormData(prev => ({ ...prev, type: 'run' }))}
-                  className="cursor-pointer"
-                >
-                  <Activity className="h-4 w-4 mr-2" />
-                  Run
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setFormData(prev => ({ ...prev, type: 'ride' }))}
-                  className="cursor-pointer"
-                >
-                  <Bike className="h-4 w-4 mr-2" />
-                  Ride
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setFormData(prev => ({ ...prev, type: 'swim' }))}
-                  className="cursor-pointer"
-                >
-                  <Waves className="h-4 w-4 mr-2" />
-                  Swim
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setFormData(prev => ({ ...prev, type: 'strength' }))}
-                  className="cursor-pointer"
-                >
-                  <Dumbbell className="h-4 w-4 mr-2" />
-                  Strength
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setFormData(prev => ({ ...prev, type: 'mobility' }))}
-                  className="cursor-pointer"
-                >
-                  <Move className="h-4 w-4 mr-2" />
-                  Mobility
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
           
           <Input
