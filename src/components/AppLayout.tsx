@@ -19,7 +19,7 @@ const AppLayout: React.FC = () => {
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<string>('planned');
+  const [activeTab, setActiveTab] = useState<string>('summary'); // Reset to summary by default
 
   // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
@@ -27,7 +27,7 @@ const AppLayout: React.FC = () => {
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
-  // 🔍 Track selectedWorkout state changes
+  // 🔍 Track selectedWorkout state changes and reset tab when workout changes
   useEffect(() => {
     console.log('🔍 selectedWorkout state changed:', {
       selectedWorkout,
@@ -37,6 +37,11 @@ const AppLayout: React.FC = () => {
       workoutStatus: selectedWorkout?.workout_status,
       timestamp: new Date().toISOString()
     });
+    
+    // 🚨 RESET TAB TO SUMMARY when workout changes
+    if (selectedWorkout) {
+      setActiveTab('summary');
+    }
   }, [selectedWorkout]);
 
   // Format date for header display (June 30 2025 format)
@@ -75,6 +80,7 @@ const AppLayout: React.FC = () => {
     setBuilderSourceContext('');
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
+    setActiveTab('summary'); // Reset tab when going back to dashboard
   };
 
   const handleNavigateToPlans = () => {
