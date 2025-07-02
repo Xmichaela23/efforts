@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Copy, Trash2, Dumbbell, ChevronRight, Search } from 'lucide-react';
+import { Plus, Copy, Trash2, Dumbbell, ChevronRight } from 'lucide-react';
 
 export interface StrengthExercise {
   id: string;
@@ -43,7 +43,7 @@ const commonExercises = [
 ];
 
 export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false, isMetric = false }: StrengthExerciseBuilderProps) {
-  const [showSuggestions, setShowSuggestions] = useState<{[key: string]: boolean}>({});
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [showNotes, setShowNotes] = useState<{[key: string]: boolean}>({});
 
   const getFilteredExercises = (searchTerm: string) => {
@@ -132,13 +132,13 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
   };
 
   const handleExerciseNameChange = (exerciseId: string, value: string) => {
-    setShowSuggestions(prev => ({ ...prev, [exerciseId]: value.length > 0 }));
     updateExercise(exerciseId, { name: value });
+    setActiveDropdown(value.length > 0 ? exerciseId : null);
   };
 
   const selectExercise = (exerciseId: string, exerciseName: string) => {
     updateExercise(exerciseId, { name: exerciseName });
-    setShowSuggestions(prev => ({ ...prev, [exerciseId]: false }));
+    setActiveDropdown(null);
   };
 
   const toggleNotes = (exerciseId: string) => {
@@ -275,18 +275,26 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                 placeholder="Start typing exercise name..."
                 value={exercise.name}
                 onChange={(e) => handleExerciseNameChange(exercise.id, e.target.value)}
-                onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
-                onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
+                onFocus={() => {
+                  if (exercise.name.length > 0) {
+                    setActiveDropdown(exercise.id);
+                  }
+                }}
+                onBlur={() => {
+                  // Delay closing to allow click on suggestions
+                  setTimeout(() => setActiveDropdown(null), 200);
+                }}
                 className="h-9 text-sm border-gray-300"
                 style={{fontFamily: 'Inter, sans-serif'}}
               />
-              {showSuggestions[exercise.id] && (
+              {activeDropdown === exercise.id && exercise.name.length > 0 && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 shadow-lg max-h-32 overflow-y-auto">
                   {getFilteredExercises(exercise.name).map((exerciseName) => (
                     <button
                       key={exerciseName}
                       type="button"
                       className="w-full px-3 py-2 text-left hover:bg-gray-50 focus:bg-gray-50 focus:outline-none text-sm h-9 flex items-center"
+                      onMouseDown={(e) => e.preventDefault()} // Prevent blur from firing before click
                       onClick={() => selectExercise(exercise.id, exerciseName)}
                       style={{fontFamily: 'Inter, sans-serif'}}
                     >
