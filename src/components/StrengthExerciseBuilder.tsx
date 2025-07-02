@@ -43,7 +43,6 @@ const commonExercises = [
 ];
 
 export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false, isMetric = false }: StrengthExerciseBuilderProps) {
-  const [exerciseSearchTerms, setExerciseSearchTerms] = useState<{[key: string]: string}>({});
   const [showSuggestions, setShowSuggestions] = useState<{[key: string]: boolean}>({});
   const [showNotes, setShowNotes] = useState<{[key: string]: boolean}>({});
 
@@ -133,14 +132,12 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
   };
 
   const handleExerciseNameChange = (exerciseId: string, value: string) => {
-    setExerciseSearchTerms(prev => ({ ...prev, [exerciseId]: value }));
     setShowSuggestions(prev => ({ ...prev, [exerciseId]: value.length > 0 }));
     updateExercise(exerciseId, { name: value });
   };
 
   const selectExercise = (exerciseId: string, exerciseName: string) => {
     updateExercise(exerciseId, { name: exerciseName });
-    setExerciseSearchTerms(prev => ({ ...prev, [exerciseId]: exerciseName }));
     setShowSuggestions(prev => ({ ...prev, [exerciseId]: false }));
   };
 
@@ -274,20 +271,15 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
             <div className="md:col-span-2 relative">
-              <div className="flex items-center border border-gray-200 bg-white">
-                <div className="pl-3 text-gray-400">
-                  <Search className="h-4 w-4" />
-                </div>
-                <Input
-                  placeholder="Start typing exercise name..."
-                  value={exercise.name}
-                  onChange={(e) => handleExerciseNameChange(exercise.id, e.target.value)}
-                  onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
-                  onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
-                  className="h-9 text-sm border-gray-300"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                />
-              </div>
+              <Input
+                placeholder="Start typing exercise name..."
+                value={exercise.name}
+                onChange={(e) => handleExerciseNameChange(exercise.id, e.target.value)}
+                onFocus={() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: exercise.name.length > 0 }))}
+                onBlur={() => setTimeout(() => setShowSuggestions(prev => ({ ...prev, [exercise.id]: false })), 200)}
+                className="h-9 text-sm border-gray-300"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              />
               {showSuggestions[exercise.id] && (
                 <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 shadow-lg max-h-32 overflow-y-auto">
                   {getFilteredExercises(exercise.name).map((exerciseName) => (
