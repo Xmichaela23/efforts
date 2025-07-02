@@ -22,7 +22,19 @@ interface LoggedExercise {
 
 interface StrengthLoggerProps {
   onClose: () => void;
+  scheduledWorkout?: any; // Optional scheduled workout to pre-populate
 }
+
+// Simple volume calculator for save button
+const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
+  return exercises
+    .filter(ex => ex.name.trim() && ex.sets.length > 0)
+    .reduce((total, exercise) => {
+      const completedSets = exercise.sets.filter(set => set.completed);
+      const exerciseVolume = completedSets.reduce((sum, set) => sum + (set.reps * set.weight), 0);
+      return total + exerciseVolume;
+    }, 0);
+};
 
 // Plate Math Component
 const PlateMath: React.FC<{ 
@@ -114,12 +126,14 @@ const PlateMath: React.FC<{
   );
 };
 
-export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
+export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLoggerProps) {
+  const { workouts, addWorkout } = useAppContext();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
+  const [workoutStartTime] = useState<Date>(new Date());
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -138,22 +152,71 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
     'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
   ];
 
-  // Automatically add a starter exercise when component mounts
+  // Get today's date string
+  const getTodayDateString = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  // Calculate simple total volume for save button
+  const currentTotalVolume = React.useMemo(() => {
+    return calculateTotalVolume(exercises);
+  }, [exercises]);
+
+  // Initialize with scheduled workout or find today's planned workout
   React.useEffect(() => {
-    const starterExercise: LoggedExercise = {
-      id: Date.now().toString(),
-      name: '',
-      sets: [{
-        reps: 0,
-        weight: 0,
-        barType: 'standard',
-        rir: undefined,
-        completed: false
-      }],
-      expanded: true
-    };
-    setExercises([starterExercise]);
-  }, []);
+    let workoutToLoad = scheduledWorkout;
+
+    // If no scheduled workout provided, try to find today's planned strength workout
+    if (!workoutToLoad) {
+      const todayDate = getTodayDateString();
+      const todaysStrengthWorkouts = workouts.filter(workout => 
+        workout.date === todayDate && 
+        workout.type === 'strength' && 
+        workout.workout_status === 'planned'
+      );
+
+      if (todaysStrengthWorkouts.length > 0) {
+        workoutToLoad = todaysStrengthWorkouts[0];
+      }
+    }
+
+    if (workoutToLoad && workoutToLoad.strength_exercises) {
+      // Pre-populate with scheduled workout data
+      const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
+        id: exercise.id || `ex-${index}`,
+        name: exercise.name || '',
+        expanded: true,
+        sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
+          reps: exercise.reps || 0,
+          weight: exercise.weight || 0,
+          barType: 'standard',
+          rir: undefined,
+          completed: false
+        }))
+      }));
+      
+      setExercises(prePopulatedExercises);
+    } else {
+      // Start with empty exercise for manual logging
+      const starterExercise: LoggedExercise = {
+        id: Date.now().toString(),
+        name: '',
+        sets: [{
+          reps: 0,
+          weight: 0,
+          barType: 'standard',
+          rir: undefined,
+          completed: false
+        }],
+        expanded: true
+      };
+      setExercises([starterExercise]);
+    }
+  }, [scheduledWorkout, workouts]);
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
@@ -210,7 +273,6 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
         : exercise
     ));
     
-    // If selected from suggestion, clear any active suggestions
     if (fromSuggestion) {
       setShowSuggestions(false);
     }
@@ -218,7 +280,6 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
 
   const deleteExercise = (exerciseId: string) => {
     if (exercises.length === 1) {
-      // Don't delete the last exercise, just reset it
       setExercises([{
         id: Date.now().toString(),
         name: '',
@@ -265,25 +326,27 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
   };
 
   const saveWorkout = () => {
+    const workoutEndTime = new Date();
+    const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
+
     const completedWorkout = {
       id: Date.now().toString(),
-      name: `Strength - ${new Date().toLocaleDateString()}`,
-      type: 'strength',
+      name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString()}`,
+      type: 'strength' as const,
       date: new Date().toISOString().split('T')[0],
       description: exercises
         .filter(ex => ex.name.trim() && ex.sets.length > 0)
-        .map(ex => `${ex.name}: ${ex.sets.length} sets`)
+        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.completed).length}/${ex.sets.length} sets`)
         .join(', '),
-      duration: 0,
+      duration: durationMinutes,
       completed_exercises: exercises.filter(ex => ex.name.trim() && ex.sets.length > 0),
-      workout_status: 'completed'
+      workout_status: 'completed' as const
     };
 
-    const savedWorkouts = JSON.parse(localStorage.getItem('completedWorkouts') || '[]');
-    savedWorkouts.push(completedWorkout);
-    localStorage.setItem('completedWorkouts', JSON.stringify(savedWorkouts));
+    // Use the app context to save - this will integrate with the main workout system
+    addWorkout(completedWorkout);
 
-    alert('Workout saved to completed!');
+    alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
     onClose();
   };
 
@@ -313,22 +376,23 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
   return (
-    <>
+    <div className="min-h-screen pb-20">
       {/* Header */}
       <div className="bg-white pb-4 mb-4">
         <div className="flex items-center w-full">
-          <h1 className="text-xl font-medium text-gray-700">Log Strength</h1>
+          <h1 className="text-xl font-medium text-gray-700">
+            {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
+          </h1>
         </div>
       </div>
 
-      {/* Mobile-first responsive container */}
-      <div className="space-y-4 w-full max-w-full overflow-hidden">
+      {/* Main content container with proper mobile scrolling */}
+      <div className="space-y-4 w-full pb-4">
         {exercises.map((exercise, exerciseIndex) => (
-          <div key={exercise.id} className="mx-0 overflow-hidden bg-white">
+          <div key={exercise.id} className="bg-white">
             <div className="p-3">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
-                  {/* Updated exercise input to match the bottom input */}
                   <div className="flex items-center border border-gray-200 bg-white">
                     <div className="pl-3 text-gray-400">
                       <Search className="h-4 w-4" />
@@ -346,7 +410,6 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                         }
                       }}
                       onBlur={() => {
-                        // Delay closing to allow click on suggestions
                         setTimeout(() => setActiveDropdown(null), 150);
                       }}
                       className="h-10 text-base font-medium border-gray-300"
@@ -355,7 +418,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                     />
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
-                    <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-10 max-h-32 overflow-y-auto">
+                    <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-50 max-h-32 overflow-y-auto">
                       {getFilteredExercises(exercise.name).map((suggestion, index) => (
                         <button
                           key={index}
@@ -397,13 +460,22 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
             {(expandedExercises[exercise.id] !== false) && (
               <div className="px-3 py-2">
                 {exercise.sets.map((set, setIndex) => (
-                  <div key={setIndex} className="mb-3 pb-3 last:mb-0 last:pb-0">
+                  <div key={setIndex} className="mb-3 pb-3 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
+                      <button
+                        onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
+                        className={`text-xs px-2 py-1 rounded ${
+                          set.completed 
+                            ? 'bg-green-100 text-green-700' 
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                      >
+                        {set.completed ? '✓ Done' : 'Mark Done'}
+                      </button>
                     </div>
                     
-                    {/* Compact grid with smaller inputs */}
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-3 gap-3 mb-2">
                       <div className="flex flex-col">
                         <label className="text-xs text-gray-500 mb-1">Reps</label>
                         <Input
@@ -444,8 +516,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                       </div>
                     </div>
 
-                    {/* Bar type and plate calculator */}
-                    <div className="mt-2 flex flex-col">
+                    <div className="flex flex-col">
                       <div className="flex items-center justify-between">
                         <button
                           onClick={() => togglePlateCalc(exercise.id, setIndex)}
@@ -458,7 +529,6 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           }
                         </button>
                         
-                        {/* Updated Select component with removed frame */}
                         <Select
                           value={set.barType || 'standard'}
                           onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
@@ -466,7 +536,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
                           <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent className="bg-white border border-gray-200 shadow-xl">
+                          <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
                             <SelectItem value="standard">Barbell (45lb)</SelectItem>
                             <SelectItem value="womens">Women's (33lb)</SelectItem>
                             <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
@@ -503,8 +573,8 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           </div>
         ))}
 
-        {/* Exercise search with suggestions - matches the top input styling */}
-        <div className="relative">
+        {/* Add new exercise input */}
+        <div className="relative bg-white p-3">
           <div className="flex items-center border border-gray-200 bg-white">
             <div className="pl-3 text-gray-400">
               <Search className="h-4 w-4" />
@@ -528,7 +598,7 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
           </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-10 max-h-64 overflow-y-auto">
+            <div className="absolute top-16 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
@@ -542,26 +612,17 @@ export default function StrengthLogger({ onClose }: StrengthLoggerProps) {
             </div>
           )}
         </div>
-
-        {/* Save button - Updated to use clean styling */}
-        <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
-          <Button 
-            onClick={saveWorkout}
-            variant="clean"
-            className="w-full h-10 text-gray-700 hover:text-gray-900"
-            style={{
-              fontFamily: 'Inter, sans-serif',
-              fontWeight: 600,
-              fontSize: '15px'
-            }}
-          >
-            Save
-          </Button>
-        </div>
-        
-        {/* Bottom padding to account for fixed save button */}
-        <div className="h-16"></div>
       </div>
-    </>
+
+      {/* Fixed bottom save button */}
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-40">
+        <Button 
+          onClick={saveWorkout}
+          className="w-full h-12 bg-black text-white hover:bg-gray-800 text-base font-medium"
+        >
+          Save Workout • {currentTotalVolume.toLocaleString()}lbs total
+        </Button>
+      </div>
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import { Upload, Activity, Dumbbell } from 'lucide-react';
 import WorkoutMetrics from './WorkoutMetrics';
 import CompletedTab from './CompletedTab';
 import StrengthExerciseBuilder from './StrengthExerciseBuilder';
+import StrengthCompletedView from './StrengthCompletedView';
 
 interface WorkoutDetailProps {
   workout: {
@@ -51,6 +52,13 @@ interface WorkoutDetailProps {
 const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout, activeTab = 'summary', onTabChange }) => {
   const [comments, setComments] = useState(workout.comments || '');
   const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
+
+  // Debug: Log workout data to see what we're working with
+  console.log('Workout data:', { 
+    type: workout.type, 
+    workout_status: workout.workout_status,
+    hasCompletedExercises: !!workout.completed_exercises 
+  });
 
   const handleCommentsChange = (value: string) => {
     setComments(value);
@@ -117,7 +125,11 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
               workoutType={getWorkoutType()}
               workoutData={workout}
             />
+          ) : (workout.type === 'strength' && workout.workout_status === 'completed') ? (
+            // Show completed strength workout view with plan comparison
+            <StrengthCompletedView workoutData={workout} />
           ) : (
+            // Show strength exercise builder for planned workouts
             <StrengthExerciseBuilder
               exercises={strengthExercises}
               onChange={handleStrengthExercisesChange}

@@ -75,8 +75,8 @@ const AppLayout: React.FC = () => {
       setSelectedDate(date);
     }
     
-    // 🚨 FIXED: Only open specific interfaces, not automatic WorkoutBuilder
-    if (type === 'strength_logger' || type === 'log-strength') {
+    // 🚨 FIXED: Handle all strength logger variants including planned strength
+    if (type === 'strength_logger' || type === 'log-strength' || type === 'log-planned-strength') {
       setShowStrengthLogger(true);
     } else {
       // 🚨 NEW: Always open WorkoutBuilder with the selected type
@@ -89,8 +89,8 @@ const AppLayout: React.FC = () => {
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     
-    // 🚨 FIXED: Handle both 'strength_logger' and 'log-strength'
-    if (type === 'strength_logger' || type === 'log-strength') {
+    // 🚨 FIXED: Handle all strength logger variants including planned strength
+    if (type === 'strength_logger' || type === 'log-strength' || type === 'log-planned-strength') {
       setShowStrengthLogger(true);
     } else {
       setShowBuilder(true);

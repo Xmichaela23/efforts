@@ -6,7 +6,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move } from 'lucide-react';
+import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move, Calendar } from 'lucide-react';
 
 interface LogEffortDropdownProps {
   onSelectType: (type: string) => void;
@@ -36,7 +36,7 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
       <DropdownMenuContent
         align="start"
         className="bg-white border border-gray-200 shadow-xl"
-        style={{borderRadius: '12px', padding: '8px', minWidth: '160px'}}
+        style={{borderRadius: '12px', padding: '8px', minWidth: '180px'}}
       >
         <DropdownMenuItem
           onClick={() => onSelectType('log-strength')}
@@ -46,6 +46,16 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
           <Dumbbell className="h-5 w-5 mr-3" />
           Log Strength
         </DropdownMenuItem>
+        
+        <DropdownMenuItem
+          onClick={() => onSelectType('log-planned-strength')}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <Calendar className="h-5 w-5 mr-3" />
+          Log Planned Strength
+        </DropdownMenuItem>
+        
         <DropdownMenuItem
           onClick={() => onSelectType('log-run')}
           className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
