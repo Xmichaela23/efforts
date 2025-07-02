@@ -164,8 +164,8 @@ export default function WorkoutCalendar({
           <div className="grid gap-1 grid-cols-7">
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
-              const todayClass = ''; // Removed blue ring styling
-              const selectedClass = ''; // Removed blue background styling
+              const todayClass = day && isToday(day) ? 'ring-1 ring-gray-300' : '';
+              const selectedClass = day && isSelected(day) ? 'bg-gray-100' : '';
               const hoverClass = day ? 'hover:bg-gray-50' : '';
               
               return (

@@ -230,7 +230,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   if (loading) {
     return (
-      <div className="w-full py-4">
+      <div className="w-full py-6">
         <div className="text-center">
           <p className="text-gray-500 text-sm">Loading...</p>
         </div>
@@ -241,7 +241,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   return (
     <div className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
       {/* 🚨 NEW: Date Header - Always visible */}
-      <div className="flex items-center justify-between mb-4 px-4">
+      <div className="flex items-center justify-between mb-6 px-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-500" />
           <span className="text-sm font-medium text-gray-700">
@@ -268,9 +268,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {displayWorkouts.length === 0 ? (
-        <div className="w-full py-6 px-4">
+        <div className="w-full py-8 px-4">
           <div className="text-center">
-            <p className="text-gray-500 mb-4 text-sm">
+            <p className="text-gray-500 mb-6 text-sm">
               {isPastDate 
                 ? 'No effort logged for this date' 
                 : isToday 
@@ -295,9 +295,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     onEditEffort && onEditEffort(workout);
                   }}
                 >
-                  <div className="p-4 hover:bg-gray-50 transition-colors cursor-pointer">
+                  <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px]">
                     {/* Workout title and summary */}
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <h3 className="font-medium text-base leading-tight">
                         {workout.name || formatWorkoutType(workout.type)}
                       </h3>
@@ -319,7 +319,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               
               {/* Add effort card at the end when workouts exist */}
               <div className="flex-shrink-0 snap-start w-full max-w-sm pl-4 pr-2">
-                <div className="p-4 flex items-center justify-center min-h-[100px]">
+                <div className="p-6 flex items-center justify-center min-h-[120px]">
                   <AddEffortDropdown />
                 </div>
               </div>
@@ -331,7 +331,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
           {/* Scroll indicator for multiple workouts */}
           {displayWorkouts.length > 0 && (
-            <div className="flex justify-center mt-2">
+            <div className="flex justify-center mt-3">
               <div className="flex gap-1">
                 {displayWorkouts.map((_, index) => (
                   <div

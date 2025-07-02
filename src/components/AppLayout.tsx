@@ -232,7 +232,7 @@ const AppLayout: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="space-y-1 pt-4">
+            <div className="space-y-4 pt-4">
               <TodaysEffort
                 selectedDate={selectedDate}
                 onAddEffort={handleAddEffort}
