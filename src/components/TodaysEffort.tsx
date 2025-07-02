@@ -148,7 +148,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const carouselItems = createCarouselItems();
   const originalItemsLength = displayWorkouts.length + 1; // +1 for add effort card
 
-  // Navigation functions with seamless looping
+  // Navigation functions with seamless looping using requestAnimationFrame
   const goLeft = () => {
     if (originalItemsLength <= 1) return;
     
@@ -157,13 +157,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     
     // If we're at the first duplicate (index 0), snap to the real last item
     if (newIndex === 0) {
-      setTransitionEnabled(false);
       setTimeout(() => {
-        setCurrentIndex(originalItemsLength);
-        setTimeout(() => {
-          setTransitionEnabled(true);
-        }, 100); // Keep inner timeout for re-enabling transitions
-      }, 0); // Changed from 350ms to 0ms for instant snap
+        setTransitionEnabled(false);
+        requestAnimationFrame(() => {
+          setCurrentIndex(originalItemsLength);
+          requestAnimationFrame(() => {
+            setTransitionEnabled(true);
+          });
+        });
+      }, 300); // Wait for transition to complete (300ms matches CSS transition)
     }
   };
 
@@ -175,13 +177,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     
     // If we're at the last duplicate, snap to the real first item
     if (newIndex === originalItemsLength + 1) {
-      setTransitionEnabled(false);
       setTimeout(() => {
-        setCurrentIndex(1);
-        setTimeout(() => {
-          setTransitionEnabled(true);
-        }, 100); // Keep inner timeout for re-enabling transitions
-      }, 0); // Changed from 350ms to 0ms for instant snap
+        setTransitionEnabled(false);
+        requestAnimationFrame(() => {
+          setCurrentIndex(1);
+          requestAnimationFrame(() => {
+            setTransitionEnabled(true);
+          });
+        });
+      }, 300); // Wait for transition to complete (300ms matches CSS transition)
     }
   };
 
