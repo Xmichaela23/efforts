@@ -5,6 +5,17 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { Upload, Activity, Dumbbell, Bike, Waves, Trash2 } from 'lucide-react';
 import WorkoutMetrics from './WorkoutMetrics';
 import CompletedTab from './CompletedTab';
@@ -62,6 +73,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   const [comments, setComments] = useState(workout.comments || '');
   const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   const handleCommentsChange = (value: string) => {
     setComments(value);
@@ -73,7 +85,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     onUpdateWorkout(workout.id, { strength_exercises: exercises });
   };
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     
@@ -84,29 +96,30 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
       return;
     }
     
-    const confirmed = confirm('Are you sure you want to delete this workout?');
-    console.log('🗑️ User confirmation:', confirmed);
-    
-    if (confirmed) {
-      try {
-        setIsDeleting(true);
-        console.log('🗑️ Starting delete process for workout:', workout.id);
-        
-        await deleteWorkout(workout.id);
-        console.log('🗑️ Workout deleted successfully');
-        
-        // Close the detail view after successful deletion
-        if (onClose) {
-          console.log('🗑️ Calling onClose to return to dashboard');
-          onClose();
-        } else {
-          console.log('🗑️ No onClose function provided');
-        }
-      } catch (error) {
-        console.error('🗑️ Error deleting workout:', error);
-        alert('Error deleting workout. Please try again.');
-        setIsDeleting(false);
+    // Show the custom confirmation dialog
+    setShowConfirmDialog(true);
+  };
+
+  const confirmDelete = async () => {
+    try {
+      setIsDeleting(true);
+      setShowConfirmDialog(false);
+      console.log('🗑️ Starting delete process for workout:', workout.id);
+      
+      await deleteWorkout(workout.id);
+      console.log('🗑️ Workout deleted successfully');
+      
+      // Close the detail view after successful deletion
+      if (onClose) {
+        console.log('🗑️ Calling onClose to return to dashboard');
+        onClose();
+      } else {
+        console.log('🗑️ No onClose function provided');
       }
+    } catch (error) {
+      console.error('🗑️ Error deleting workout:', error);
+      alert('Error deleting workout. Please try again.');
+      setIsDeleting(false);
     }
   };
 
@@ -177,19 +190,42 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
             </button>
           </div>
           
-          {/* Delete button aligned to the right */}
-          <button
-            onClick={handleDelete}
-            disabled={isDeleting}
-            className={`p-2 transition-colors ${
-              isDeleting 
-                ? 'text-gray-300 cursor-not-allowed' 
-                : 'text-gray-400 hover:text-red-500'
-            }`}
-            title={isDeleting ? 'Deleting...' : 'Delete workout'}
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
+          {/* Delete button with AlertDialog */}
+          <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+            <AlertDialogTrigger asChild>
+              <button
+                onClick={handleDeleteClick}
+                disabled={isDeleting}
+                className={`p-2 transition-colors ${
+                  isDeleting 
+                    ? 'text-gray-300 cursor-not-allowed' 
+                    : 'text-gray-400 hover:text-red-500'
+                }`}
+                title={isDeleting ? 'Deleting...' : 'Delete workout'}
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Workout</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Are you sure you want to delete "{workout.name}"? This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setShowConfirmDialog(false)}>
+                  Cancel
+                </AlertDialogCancel>
+                <AlertDialogAction 
+                  onClick={confirmDelete}
+                  className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
 
         {/* Tab content */}
