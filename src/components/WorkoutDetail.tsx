@@ -206,20 +206,23 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                 <Trash2 className="h-4 w-4" />
               </button>
             </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Workout</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete "{workout.name}"? This action cannot be undone.
+            <AlertDialogContent className="max-w-xs sm:max-w-sm">
+              <AlertDialogHeader className="space-y-2">
+                <AlertDialogTitle className="text-base">Delete Workout</AlertDialogTitle>
+                <AlertDialogDescription className="text-sm">
+                  Delete "{workout.name}"?
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel onClick={() => setShowConfirmDialog(false)}>
+              <AlertDialogFooter className="flex-row gap-2 justify-end">
+                <AlertDialogCancel 
+                  onClick={() => setShowConfirmDialog(false)}
+                  className="mt-0 text-sm px-3 py-1.5"
+                >
                   Cancel
                 </AlertDialogCancel>
                 <AlertDialogAction 
                   onClick={confirmDelete}
-                  className="bg-red-600 hover:bg-red-700 focus:ring-red-600"
+                  className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-sm px-3 py-1.5"
                 >
                   Delete
                 </AlertDialogAction>
