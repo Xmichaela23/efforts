@@ -283,19 +283,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : (
         <div className="w-full relative">
-          {/* Horizontal scrollable workout cards - FIXED: Removed px-4 from here */}
+          {/* Horizontal scrollable workout cards - FIXED: Use proper scroll snap setup */}
           <div className="overflow-x-auto scrollbar-hide">
-            <div className="flex snap-x snap-mandatory">
+            <div className="flex snap-x snap-mandatory" style={{ width: `${(displayWorkouts.length + 1) * 100}%` }}>
               {displayWorkouts.map((workout, index) => (
                 <div
                   key={workout.id || index}
-                  className="flex-shrink-0 snap-start w-full px-4"
+                  className="flex-shrink-0 snap-start"
+                  style={{ width: `${100 / (displayWorkouts.length + 1)}%` }}
                   onClick={() => {
                     console.log('🔧 Workout clicked:', workout);
                     onEditEffort && onEditEffort(workout);
                   }}
                 >
-                  <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px]">
+                  <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-4">
                     {/* Workout title and summary */}
                     <div className="space-y-3">
                       <h3 className="font-medium text-base leading-tight">
@@ -317,9 +318,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 </div>
               ))}
               
-              {/* Add effort card at the end when workouts exist - FIXED: Added px-4 here */}
-              <div className="flex-shrink-0 snap-start w-full px-4">
-                <div className="p-6 flex items-center justify-center min-h-[120px]">
+              {/* Add effort card at the end when workouts exist - FIXED: Use same width calculation */}
+              <div 
+                className="flex-shrink-0 snap-start"
+                style={{ width: `${100 / (displayWorkouts.length + 1)}%` }}
+              >
+                <div className="p-6 flex items-center justify-center min-h-[120px] mx-4">
                   <AddEffortDropdown />
                 </div>
               </div>
