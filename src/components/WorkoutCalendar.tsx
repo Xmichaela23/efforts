@@ -136,7 +136,7 @@ export default function WorkoutCalendar({
         <div className="p-1">
           <div className="flex items-center justify-center gap-6 mb-4">
             <Button 
-              className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]" 
+              className="bg-transparent text-muted-foreground border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]" 
               onClick={() => navigateMonth(-1)}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
@@ -145,7 +145,7 @@ export default function WorkoutCalendar({
               {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
             </h3>
             <Button 
-              className="bg-transparent text-gray-700 border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]"
+              className="bg-transparent text-muted-foreground border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]"
               onClick={() => navigateMonth(1)}
             >
               <ChevronRight className="h-5 w-5" strokeWidth={2.5} />
@@ -155,7 +155,7 @@ export default function WorkoutCalendar({
           {/* Day headers */}
           <div className="grid gap-0 grid-cols-7 mb-2">
             {DAYS.map(day => (
-              <div key={day} className="p-2 text-center font-semibold text-xs text-gray-600 uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              <div key={day} className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
                 {day}
               </div>
             ))}
@@ -170,18 +170,18 @@ export default function WorkoutCalendar({
                 <div
                   key={index}
                   className={`
-                    aspect-square min-h-[60px] p-2 transition-colors duration-200 cursor-pointer
+                    aspect-square min-h-[60px] p-2 transition-all duration-200 cursor-pointer rounded-lg
                     flex flex-col items-center justify-start
-                    ${day ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 cursor-default'}
+                    ${day ? 'bg-white hover:bg-gray-50 hover:shadow-sm hover:border-gray-200 border border-transparent' : 'bg-gray-50 cursor-default'}
                     ${day && isToday(day) ? 'bg-gray-100' : ''}
-                    ${day && isSelected(day) ? 'bg-gray-200' : ''}
+                    ${day && isSelected(day) ? 'bg-gray-200 shadow-md border-gray-300' : ''}
                   `}
                   onClick={() => day && handleDateClick(day)}
                 >
                   {day && (
                     <>
                       {/* Date number - clean styling */}
-                      <div className="text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+                      <div className="text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                         {day}
                       </div>
                       
@@ -198,7 +198,7 @@ export default function WorkoutCalendar({
                             />
                           ))}
                           {dayWorkouts.length > 3 && (
-                            <div className="text-[10px] text-gray-500 font-medium leading-none">
+                            <div className="text-[10px] text-muted-foreground font-medium leading-none">
                               +{dayWorkouts.length - 3}
                             </div>
                           )}
