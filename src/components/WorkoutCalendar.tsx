@@ -181,10 +181,8 @@ export default function WorkoutCalendar({
                 >
                   {day && (
                     <>
-                      {/* Date number - removed blue text color */}
-                      <div className={`
-                        text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-gray-900
-                      `} style={{fontFamily: 'Inter, sans-serif'}}>
+                      {/* Date number - clean styling without any blue colors */}
+                      <div className="text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
                         {day}
                       </div>
                       
