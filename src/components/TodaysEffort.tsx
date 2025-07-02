@@ -128,19 +128,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
-  // Navigation functions
+  // Navigation functions with looping
   const totalItems = displayWorkouts.length + 1; // +1 for the "Add effort" card
-  const canGoLeft = currentIndex > 0;
-  const canGoRight = currentIndex < totalItems - 1;
 
   const goLeft = () => {
-    if (canGoLeft) {
+    if (currentIndex === 0) {
+      // Loop to the last item
+      setCurrentIndex(totalItems - 1);
+    } else {
       setCurrentIndex(currentIndex - 1);
     }
   };
 
   const goRight = () => {
-    if (canGoRight) {
+    if (currentIndex === totalItems - 1) {
+      // Loop to the first item
+      setCurrentIndex(0);
+    } else {
       setCurrentIndex(currentIndex + 1);
     }
   };
@@ -304,17 +308,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : (
         <div className="w-full relative">
-          {/* Navigation buttons - removed shadow-md */}
+          {/* Navigation buttons - only show if more than 1 item */}
           {totalItems > 1 && (
             <>
               <Button
                 variant="ghost"
                 size="icon"
-                className={`absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 ${
-                  !canGoLeft ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-                }`}
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50"
                 onClick={goLeft}
-                disabled={!canGoLeft}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
@@ -322,18 +323,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className={`absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 ${
-                  !canGoRight ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
-                }`}
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50"
                 onClick={goRight}
-                disabled={!canGoRight}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </>
           )}
 
-          {/* Workout cards container - fixed width calculation */}
+          {/* Workout cards container */}
           <div className="overflow-hidden px-4">
             <div 
               className="flex transition-transform duration-300 ease-in-out"
