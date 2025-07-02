@@ -153,7 +153,7 @@ export default function WorkoutCalendar({
           </div>
           
           {/* Day headers */}
-          <div className="grid gap-1 grid-cols-7 mb-2">
+          <div className="grid gap-3 grid-cols-7 mb-3">
             {DAYS.map(day => (
               <div key={day} className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
                 {day}
@@ -161,8 +161,8 @@ export default function WorkoutCalendar({
             ))}
           </div>
 
-          {/* Calendar grid - increased gap and min-height for better proportions */}
-          <div className="grid gap-2 grid-cols-7">
+          {/* Calendar grid - much wider gaps and taller cells for true squares */}
+          <div className="grid gap-3 grid-cols-7">
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
               
@@ -170,11 +170,11 @@ export default function WorkoutCalendar({
                 <div
                   key={index}
                   className={`
-                    aspect-square min-h-[70px] p-2 transition-all duration-200 cursor-pointer rounded-lg
+                    w-full h-16 p-2 transition-all duration-200 cursor-pointer rounded-lg
                     flex flex-col items-center justify-start
-                    ${day ? 'bg-white hover:bg-gray-50 hover:shadow-sm hover:border-gray-200 border border-transparent' : 'bg-gray-50 cursor-default'}
-                    ${day && isToday(day) ? 'bg-gray-100' : ''}
-                    ${day && isSelected(day) ? 'bg-gray-200 shadow-md border-gray-300' : ''}
+                    ${day ? 'bg-white hover:bg-gray-50 hover:shadow-lg hover:border-gray-200 border border-transparent hover:-translate-y-0.5' : 'bg-gray-50 cursor-default'}
+                    ${day && isToday(day) ? 'bg-gray-100 border-gray-200' : ''}
+                    ${day && isSelected(day) ? 'bg-gray-200 shadow-lg border-gray-300 -translate-y-0.5' : ''}
                   `}
                   onClick={() => day && handleDateClick(day)}
                 >
