@@ -339,7 +339,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
         .map(ex => `${ex.name}: ${ex.sets.filter(s => s.completed).length}/${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
-      completed_exercises: exercises.filter(ex => ex.name.trim() && ex.sets.length > 0),
+      strength_exercises: exercises.filter(ex => ex.name.trim() && ex.sets.length > 0),
       workout_status: 'completed' as const
     };
 
