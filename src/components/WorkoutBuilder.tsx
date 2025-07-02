@@ -47,7 +47,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
   const [formData, setFormData] = useState({
     name: '',
-    type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' : ''),
+    type: (existingWorkout?.type) || (initialType && initialType !== '' ? initialType as 'run' | 'ride' | 'strength' | 'swim' | 'mobility' : ''),
     date: getInitialDate(),
     description: '',
     userComments: '',
@@ -266,6 +266,10 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           }
         });
         break;
+      case 'mobility':
+        // For mobility workouts, we can add a simple description
+        parts.push('Mobility session');
+        break;
     }
     return parts.length > 0 ? parts.join(' + ') : '';
   };
@@ -397,6 +401,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                     <Dumbbell className="h-4 w-4 mr-2" />
                     Strength
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => setFormData(prev => ({ ...prev, type: 'mobility' }))}
+                    className="cursor-pointer"
+                  >
+                    <Move className="h-4 w-4 mr-2" />
+                    Mobility
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
@@ -506,7 +517,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                     >
                       {generateWorkoutDescription()}
                     </div>
-                    {formData.type !== 'strength' && (
+                    {formData.type !== 'strength' && formData.type !== 'mobility' && (
                       <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
                         <Clock className="h-3 w-3" />
                         <span>Total Time: {formatTime(calculateTotalTime())}</span>
@@ -532,10 +543,17 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               {formData.type === 'strength' && (
                 <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
               )}
+              {formData.type === 'mobility' && (
+                <div className="text-center py-8 text-gray-500">
+                  <Move className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-lg font-medium mb-2">Mobility Session</p>
+                  <p className="text-sm">Track your mobility and flexibility work</p>
+                </div>
+              )}
             </div>
 
             {/* Auto-generated Preview - if content exists */}
-            {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0) && (
+            {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility') && (
               <div className="bg-gray-50 p-2">
                 <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
                   {generateWorkoutDescription()}
