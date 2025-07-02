@@ -365,7 +365,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
             type="date"
             value={formData.date}
             onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-            className="min-h-[44px] bg-transparent w-auto border border-gray-300"
+            className="min-h-[44px] bg-transparent w-auto border-none shadow-none focus:border-none focus:ring-0 focus:outline-none"
             style={{fontFamily: 'Inter, sans-serif'}}
           />
         </div>
