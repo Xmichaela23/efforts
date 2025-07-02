@@ -54,10 +54,13 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
   const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
 
   // Debug: Log workout data to see what we're working with
-  console.log('Workout data:', { 
+  console.log('🔍 WorkoutDetail Debug:', { 
     type: workout.type, 
     workout_status: workout.workout_status,
-    hasCompletedExercises: !!workout.completed_exercises 
+    hasStrengthExercises: !!workout.strength_exercises,
+    strengthExercisesLength: workout.strength_exercises?.length || 0,
+    strengthExercisesData: workout.strength_exercises,
+    fullWorkout: workout
   });
 
   const handleCommentsChange = (value: string) => {
@@ -75,6 +78,19 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
     if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'cycling';
     return 'cycling'; // default
   };
+
+  // Determine if this is a completed strength workout
+  const isCompletedStrengthWorkout = workout.type === 'strength' && 
+    workout.workout_status === 'completed' && 
+    workout.strength_exercises && 
+    workout.strength_exercises.length > 0;
+
+  console.log('🔍 Completed strength check:', {
+    isStrength: workout.type === 'strength',
+    isCompleted: workout.workout_status === 'completed',
+    hasExercises: workout.strength_exercises && workout.strength_exercises.length > 0,
+    finalResult: isCompletedStrengthWorkout
+  });
 
   return (
     <div className="space-y-6">
@@ -125,17 +141,31 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
               workoutType={getWorkoutType()}
               workoutData={workout}
             />
-          ) : (workout.type === 'strength' && workout.workout_status === 'completed') ? (
+          ) : isCompletedStrengthWorkout ? (
             // Show completed strength workout view with plan comparison
-            <StrengthCompletedView workoutData={workout} />
+            <div>
+              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <p className="text-sm text-green-800">
+                  ✅ Showing completed strength workout view
+                </p>
+              </div>
+              <StrengthCompletedView workoutData={workout} />
+            </div>
           ) : (
             // Show strength exercise builder for planned workouts
-            <StrengthExerciseBuilder
-              exercises={strengthExercises}
-              onChange={handleStrengthExercisesChange}
-              isMetric={true}
-              isCompleted={true}
-            />
+            <div>
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  📝 Showing strength exercise builder (planned workout)
+                </p>
+              </div>
+              <StrengthExerciseBuilder
+                exercises={strengthExercises}
+                onChange={handleStrengthExercisesChange}
+                isMetric={true}
+                isCompleted={true}
+              />
+            </div>
           )}
         </TabsContent>
       </Tabs>
