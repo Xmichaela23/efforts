@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
-import RoutinesDropdown from './RoutinesDropdown';
+import PlansDropdown from './PlansDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -128,7 +128,7 @@ export default function WorkoutCalendar({
       <div className="w-full flex justify-center items-center mb-2 gap-1 flex-nowrap">
         <NewEffortDropdown onSelectType={onSelectType} />
         <LogEffortDropdown onSelectType={onSelectType} />
-        <RoutinesDropdown onSelectRoutine={onSelectRoutine} />
+        <PlansDropdown onSelectRoutine={onSelectRoutine} />
         <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
       </div>
       

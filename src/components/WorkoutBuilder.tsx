@@ -5,7 +5,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move } from 'lucide-react';
+import { Save, Clock, Trash2, Check, Dumbbell, ChevronRight, Activity, Bike, Waves, ChevronDown, Move, ArrowLeft } from 'lucide-react';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
 import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
@@ -17,11 +17,12 @@ interface WorkoutBuilderProps {
   initialType?: string;
   existingWorkout?: any;
   initialDate?: string;
+  sourceContext?: string;
+  onNavigateToPlans?: () => void;
 }
 
-export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate }: WorkoutBuilderProps) {
+export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate, sourceContext, onNavigateToPlans }: WorkoutBuilderProps) {
   const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
-  const [showCompleted, setShowCompleted] = useState(false);
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   
@@ -59,8 +60,35 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [swimIntervals, setSwimIntervals] = useState<SwimInterval[]>([]);
   const [strengthExercises, setStrengthExercises] = useState<StrengthExercise[]>([]);
 
-  // Use global Imperial setting instead of local isMetric
   const isMetric = !useImperial;
+
+  // Simple back button logic
+  const handleBackClick = () => {
+    if (sourceContext === 'plans' && onNavigateToPlans) {
+      onNavigateToPlans();
+    } else {
+      onClose();
+    }
+  };
+
+  const getBackButtonText = () => {
+    if (sourceContext === 'plans') {
+      const disciplineMap = {
+        'run': 'Run',
+        'ride': 'Cycle', 
+        'strength': 'Strength',
+        'swim': 'Swim',
+        'mobility': 'Mobility'
+      };
+      
+      const disciplineName = disciplineMap[formData.type as keyof typeof disciplineMap];
+      if (disciplineName) {
+        return `Back to ${disciplineName}`;
+      }
+    }
+    
+    return 'Dashboard';
+  };
 
   useEffect(() => {
     console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType, initialDate });
@@ -158,7 +186,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
     if (!confirm('Clear all workout data and start fresh?')) return;
 
-    // Always clear everything and stay in builder
     setFormData({
       name: '',
       type: 'run',
@@ -267,32 +294,18 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         });
         break;
       case 'mobility':
-        // For mobility workouts, we can add a simple description
         parts.push('Mobility session');
         break;
     }
     return parts.length > 0 ? parts.join(' + ') : '';
   };
 
-  const handleSaveAsRoutine = async () => {
-    console.log('💾 Saving as routine...');
-    // TODO: Implement routine saving logic
-    alert('Save as routine feature coming soon!');
-  };
-
   const handleSave = async (navigateAfterSave: boolean = false) => {
     console.log('🚀 Save function called!');
-    console.log('📊 Form data:', formData);
-    console.log('🏃 Run intervals:', runIntervals);
-    console.log('🚴 Ride intervals:', rideIntervals);
-    console.log('🏊 Swim intervals:', swimIntervals);
-    console.log('💪 Strength exercises:', strengthExercises);
-    console.log('📝 Current workout:', currentWorkout);
-
+    
     try {
       const workoutTitle = formData.name.trim() || 
         `${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} - ${new Date(formData.date).toLocaleDateString()}`;
-      const finalDescription = formData.description.trim() || generateWorkoutDescription();
 
       const workoutData = {
         ...formData,
@@ -306,31 +319,20 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         workout_status: 'planned'
       };
 
-      console.log('💾 Final workout data to save:', workoutData);
-      console.log('🔄 About to call addWorkout...');
-
       let savedWorkout;
 
       if (currentWorkout && currentWorkout.id) {
-        console.log('📝 UPDATING existing workout with ID:', currentWorkout.id);
         savedWorkout = await updateWorkout(currentWorkout.id, workoutData);
       } else {
-        console.log('➕ CREATING new workout');
         savedWorkout = await addWorkout(workoutData);
       }
 
-      console.log('✅ Workout saved successfully! Result:', savedWorkout);
-
       setCurrentWorkout(savedWorkout);
-
       setShowSaveOptions(true);
       setTimeout(() => setShowSaveOptions(false), 3000);
 
       if (navigateAfterSave) {
-        console.log('🔄 Navigating after save...');
-        onClose();
-      } else {
-        console.log('🔄 Staying in builder for continued editing...');
+        handleBackClick();
       }
     } catch (error) {
       console.error('Error saving workout:', error);
@@ -338,18 +340,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     }
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'short', 
-      month: 'short', 
-      day: 'numeric' 
-    }).replace(',', '');
-  };
-
   return (
     <div className="min-h-screen bg-white">
-      {/* Save Success Banner */}
       {showSaveOptions && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 z-50 flex items-center gap-4">
           <Check className="h-5 w-5" />
@@ -358,93 +350,76 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       )}
 
       <main className="max-w-7xl mx-auto px-3 py-2">
-        {/* Tab Toggle with Build dropdown */}
         <div className="flex justify-between items-center mb-1">
-          <div className="flex gap-1 items-center">
-            {!showCompleted ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    className="px-4 py-2 text-sm font-medium text-black transition-colors flex items-center gap-2"
-                    style={{fontFamily: 'Inter, sans-serif'}}
-                  >
-                    Build effort
-                    <ChevronDown className="h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="bg-white border border-gray-200 shadow-xl rounded-lg">
-                  <DropdownMenuItem
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'run' }))}
-                    className="cursor-pointer"
-                  >
-                    <Activity className="h-4 w-4 mr-2" />
-                    Run
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'ride' }))}
-                    className="cursor-pointer"
-                  >
-                    <Bike className="h-4 w-4 mr-2" />
-                    Ride
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'swim' }))}
-                    className="cursor-pointer"
-                  >
-                    <Waves className="h-4 w-4 mr-2" />
-                    Swim
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'strength' }))}
-                    className="cursor-pointer"
-                  >
-                    <Dumbbell className="h-4 w-4 mr-2" />
-                    Strength
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setFormData(prev => ({ ...prev, type: 'mobility' }))}
-                    className="cursor-pointer"
-                  >
-                    <Move className="h-4 w-4 mr-2" />
-                    Mobility
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <button
-                onClick={() => setShowCompleted(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-                style={{fontFamily: 'Inter, sans-serif'}}
-              >
-                Build effort
-              </button>
-            )}
-            <button
-              onClick={() => setShowCompleted(true)}
-              className={`px-4 py-2 text-sm font-medium transition-colors ${
-                showCompleted 
-                  ? 'text-black' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              style={{fontFamily: 'Inter, sans-serif'}}
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleBackClick}
+              variant="ghost"
+              className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black"
             >
-              Completed
-            </button>
+              <ArrowLeft className="h-4 w-4" />
+              {getBackButtonText()}
+            </Button>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="px-4 py-2 text-sm font-medium text-black transition-colors flex items-center gap-2"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                >
+                  Build effort
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="bg-white border border-gray-200 shadow-xl rounded-lg">
+                <DropdownMenuItem
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'run' }))}
+                  className="cursor-pointer"
+                >
+                  <Activity className="h-4 w-4 mr-2" />
+                  Run
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'ride' }))}
+                  className="cursor-pointer"
+                >
+                  <Bike className="h-4 w-4 mr-2" />
+                  Ride
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'swim' }))}
+                  className="cursor-pointer"
+                >
+                  <Waves className="h-4 w-4 mr-2" />
+                  Swim
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'strength' }))}
+                  className="cursor-pointer"
+                >
+                  <Dumbbell className="h-4 w-4 mr-2" />
+                  Strength
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'mobility' }))}
+                  className="cursor-pointer"
+                >
+                  <Move className="h-4 w-4 mr-2" />
+                  Mobility
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
           
-          <div className="flex items-center gap-3">
-            {/* Date moved to top line */}
-            <Input
-              type="date"
-              value={formData.date}
-              onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-              className="min-h-[44px] bg-transparent w-auto border border-gray-300"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            />
-          </div>
+          <Input
+            type="date"
+            value={formData.date}
+            onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+            className="min-h-[44px] bg-transparent w-auto border border-gray-300"
+            style={{fontFamily: 'Inter, sans-serif'}}
+          />
         </div>
 
-        {/* Imperial/Metric Toggle - Only for Run and Ride */}
         {(formData.type === 'run' || formData.type === 'ride') && (
           <div className="flex justify-end items-center gap-2 mb-1">
             <Label htmlFor="units" className="text-sm font-medium text-gray-700">
@@ -452,7 +427,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
             </Label>
             <Switch
               id="units"
-              checked={!useImperial} // Switch shows Metric when checked
+              checked={!useImperial}
               onCheckedChange={toggleUnits}
               className="data-[state=checked]:bg-black data-[state=unchecked]:bg-gray-200"
             />
@@ -462,132 +437,105 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </div>
         )}
 
-        {!showCompleted ? (
-          <div className="space-y-1">
-            {/* Simplified Form - Focus input full width with trash */}
-            <div className="p-2 pt-1">
-              <div className="flex items-center gap-4 mb-3">
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Focus"
-                  className="border-gray-300 min-h-[44px] flex-1"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                />
-                <button
-                  onClick={handleTrashClick}
-                  className="text-gray-400 hover:text-red-500 transition-colors"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
+        <div className="space-y-1">
+          <div className="p-2 pt-1">
+            <div className="flex items-center gap-4 mb-3">
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Focus"
+                className="border-gray-300 min-h-[44px] flex-1"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              />
+              <button
+                onClick={handleTrashClick}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-                {formData.type === 'strength' && (
-                  <div>
-                    {/* Notes for strength */}
-                    <div>
-                      <button
-                        type="button"
-                        onClick={() => setShowNotes(!showNotes)}
-                        className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
-                      >
-                        <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes ? 'rotate-90' : ''}`} />
-                        Notes
-                      </button>
-
-                      {showNotes && (
-                        <Textarea
-                          value={formData.userComments}
-                          onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
-                          placeholder=""
-                          rows={2}
-                          className="border-gray-300 min-h-[44px]"
-                          style={{fontFamily: 'Inter, sans-serif'}}
-                        />
-                      )}
-                    </div>
-                  </div>
-                )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+              {formData.type === 'strength' && (
                 <div>
-                  <div className="relative">
-                    <div
-                      className={`min-h-[44px] w-full text-sm text-gray-900 p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
-                      style={{fontFamily: 'Inter, sans-serif'}}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => setShowNotes(!showNotes)}
+                      className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
                     >
-                      {generateWorkoutDescription()}
-                    </div>
-                    {formData.type !== 'strength' && formData.type !== 'mobility' && (
-                      <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
-                        <Clock className="h-3 w-3" />
-                        <span>Total Time: {formatTime(calculateTotalTime())}</span>
-                      </div>
+                      <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes ? 'rotate-90' : ''}`} />
+                      Notes
+                    </button>
+
+                    {showNotes && (
+                      <Textarea
+                        value={formData.userComments}
+                        onChange={(e) => setFormData(prev => ({ ...prev, userComments: e.target.value }))}
+                        placeholder=""
+                        rows={2}
+                        className="border-gray-300 min-h-[44px]"
+                        style={{fontFamily: 'Inter, sans-serif'}}
+                      />
                     )}
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Structure Section - clean container */}
-            <div className="p-2 pt-0">
-              
-              {formData.type === 'run' && (
-                <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
               )}
-              {formData.type === 'ride' && (
-                <RideIntervalBuilder intervals={rideIntervals} onChange={setRideIntervals} isMetric={isMetric} />
-              )}
-              {formData.type === 'swim' && (
-                <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
-              )}
-              {formData.type === 'strength' && (
-                <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
-              )}
-              {formData.type === 'mobility' && (
-                <div className="text-center py-8 text-gray-500">
-                  <Move className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-lg font-medium mb-2">Mobility Session</p>
-                  <p className="text-sm">Track your mobility and flexibility work</p>
-                </div>
-              )}
-            </div>
-
-            {/* Auto-generated Preview - if content exists */}
-            {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility') && (
-              <div className="bg-gray-50 p-2">
-                <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
-                  {generateWorkoutDescription()}
-                </p>
-                {calculateTotalTime() > 0 && (
-                  <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'Inter, sans-serif'}}>
-                    Total Time: {formatTime(calculateTotalTime())}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          /* Completed Tab Content - simplified */
-          <div className="p-2">
-            {formData.type === 'strength' ? (
-              <StrengthExerciseBuilder
-                exercises={strengthExercises}
-                onChange={setStrengthExercises}
-                isCompleted={true}
-              />
-            ) : (
               <div>
-                <h3 className="text-lg font-medium text-black mb-3" style={{fontFamily: 'Inter, sans-serif'}}>Completed Session Data</h3>
-                <div className="text-center py-12">
-                  <p className="text-gray-500 mb-2">No completed session data available</p>
-                  <p className="text-sm text-gray-400">Connect your device or manually mark as completed</p>
+                <div className="relative">
+                  <div
+                    className={`min-h-[44px] w-full text-sm text-gray-900 p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  >
+                    {generateWorkoutDescription()}
+                  </div>
+                  {formData.type !== 'strength' && formData.type !== 'mobility' && (
+                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
+                      <Clock className="h-3 w-3" />
+                      <span>Total Time: {formatTime(calculateTotalTime())}</span>
+                    </div>
+                  )}
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-2 pt-0">
+            {formData.type === 'run' && (
+              <RunIntervalBuilder intervals={runIntervals} onChange={setRunIntervals} isMetric={isMetric} />
+            )}
+            {formData.type === 'ride' && (
+              <RideIntervalBuilder intervals={rideIntervals} onChange={setRideIntervals} isMetric={isMetric} />
+            )}
+            {formData.type === 'swim' && (
+              <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
+            )}
+            {formData.type === 'strength' && (
+              <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
+            )}
+            {formData.type === 'mobility' && (
+              <div className="text-center py-8 text-gray-500">
+                <Move className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                <p className="text-lg font-medium mb-2">Mobility Session</p>
+                <p className="text-sm">Track your mobility and flexibility work</p>
               </div>
             )}
           </div>
-        )}
 
-        {/* Fixed Save Button - Updated to use clean styling */}
+          {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility') && (
+            <div className="bg-gray-50 p-2">
+              <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+                {generateWorkoutDescription()}
+              </p>
+              {calculateTotalTime() > 0 && (
+                <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Total Time: {formatTime(calculateTotalTime())}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
         <div className="fixed bottom-0 left-0 right-0 p-3 bg-white flex justify-center">
           <Button
             onClick={() => handleSave(false)}
@@ -603,7 +551,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           </Button>
         </div>
         
-        {/* Bottom padding to account for fixed save button */}
         <div className="h-16"></div>
       </main>
     </div>

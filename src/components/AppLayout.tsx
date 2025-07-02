@@ -9,11 +9,13 @@ import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 import StrengthLogger from './StrengthLogger';
+import AllPlansInterface from './AllPlansInterface';
 
 const AppLayout: React.FC = () => {
   const { workouts, loading, useImperial, toggleUnits } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
+  const [showAllPlans, setShowAllPlans] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('planned');
@@ -48,6 +50,7 @@ const AppLayout: React.FC = () => {
     // Now directly closes without prompting to save
     setShowStrengthLogger(false);
     setShowBuilder(false);
+    setShowAllPlans(false);
     setBuilderType('');
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
@@ -101,6 +104,32 @@ const AppLayout: React.FC = () => {
     console.log('View completed workouts');
   };
 
+  const handleSelectRoutine = (routineId: string) => {
+    console.log('handleSelectRoutine called with:', routineId);
+    if (routineId === 'all-plans') {
+      console.log('Setting showAllPlans to true');
+      setShowAllPlans(true);
+      console.log('showAllPlans should now be true');
+    } else {
+      console.log('Plan selected:', routineId);
+      // TODO: Handle specific plan selection
+    }
+  };
+
+  const handlePlanSelect = (plan: any) => {
+    console.log('Selected plan:', plan);
+    // TODO: Handle plan selection (add to active plans, etc.)
+    setShowAllPlans(false);
+  };
+
+  const handleBuildWorkout = (type: string) => {
+    console.log('Building workout of type:', type);
+    setBuilderType(type);
+    setWorkoutBeingEdited(null);
+    setShowAllPlans(false);
+    setShowBuilder(true);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -108,6 +137,8 @@ const AppLayout: React.FC = () => {
       </div>
     );
   }
+
+  console.log('Render state - showAllPlans:', showAllPlans, 'showBuilder:', showBuilder, 'showStrengthLogger:', showStrengthLogger, 'selectedWorkout:', selectedWorkout);
 
   return (
     <div className="min-h-screen bg-background">
@@ -152,8 +183,8 @@ const AppLayout: React.FC = () => {
               
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               
-              {/* Dashboard button when in builder/logger */}
-              {(selectedWorkout || showStrengthLogger || showBuilder) && (
+              {/* Dashboard button when in builder/logger/plans */}
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans) && (
                 <Button
                   onClick={handleBackToDashboard}
                   variant="ghost"
@@ -170,7 +201,7 @@ const AppLayout: React.FC = () => {
 
             {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
-              {!(selectedWorkout || showStrengthLogger || showBuilder) && (
+              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans) && (
                 <span className="text-lg font-normal text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
                 </span>
@@ -184,7 +215,15 @@ const AppLayout: React.FC = () => {
       <main className="flex-1">
         {/* 🚨 FIXED: Mobile centering container */}
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
-          {showStrengthLogger ? (
+          {showAllPlans ? (
+            <div className="pt-4">
+              <AllPlansInterface
+                onClose={handleBackToDashboard}
+                onSelectPlan={handlePlanSelect}
+                onBuildWorkout={handleBuildWorkout}
+              />
+            </div>
+          ) : showStrengthLogger ? (
             <div className="pt-4">
               <StrengthLogger onClose={handleBackToDashboard} />
             </div>
@@ -221,6 +260,7 @@ const AppLayout: React.FC = () => {
                 onViewCompleted={handleViewCompleted}
                 onEditEffort={handleEditEffort}
                 onDateSelect={handleDateSelect}
+                onSelectRoutine={handleSelectRoutine}
               />
             </div>
           )}
