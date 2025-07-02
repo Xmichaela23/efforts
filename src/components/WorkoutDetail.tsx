@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -111,59 +110,87 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
         </CardHeader>
       </Card>
 
-      <Tabs value={activeTab} onValueChange={onTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="summary">Summary</TabsTrigger>
-          <TabsTrigger value="completed">Completed</TabsTrigger>
-        </TabsList>
+      {/* Simple tab navigation without card styling */}
+      <div className="w-full">
+        <div className="flex space-x-8 border-b border-gray-200">
+          <button
+            onClick={() => onTabChange?.('summary')}
+            className={`py-2 px-1 text-sm font-medium transition-colors ${
+              activeTab === 'summary'
+                ? 'text-black border-b-2 border-black'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Summary
+          </button>
+          <button
+            onClick={() => onTabChange?.('completed')}
+            className={`py-2 px-1 text-sm font-medium transition-colors ${
+              activeTab === 'completed'
+                ? 'text-black border-b-2 border-black'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            style={{ fontFamily: 'Inter, sans-serif' }}
+          >
+            Completed
+          </button>
+        </div>
 
-        <TabsContent value="summary" className="space-y-4">
-          <WorkoutMetrics workout={workout} />
-          
-          <Card>
-            <CardHeader>
-              <CardTitle>Comments</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                placeholder="Add your comments about this workout..."
-                value={comments}
-                onChange={(e) => handleCommentsChange(e.target.value)}
-                rows={4}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="completed" className="space-y-4">
-          {workout.type === 'endurance' ? (
-            <CompletedTab 
-              workoutType={getWorkoutType()}
-              workoutData={workout}
-            />
-          ) : isCompletedStrengthWorkout ? (
-            // Show completed strength workout view with plan comparison
-            <div>
-              <StrengthCompletedView workoutData={workout} />
-            </div>
-          ) : (
-            // Show strength exercise builder for planned workouts
-            <div>
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-800">
-                  📝 Showing strength exercise builder (planned workout)
-                </p>
-              </div>
-              <StrengthExerciseBuilder
-                exercises={strengthExercises}
-                onChange={handleStrengthExercisesChange}
-                isMetric={true}
-                isCompleted={true}
-              />
+        {/* Tab content */}
+        <div className="mt-6">
+          {activeTab === 'summary' && (
+            <div className="space-y-4">
+              <WorkoutMetrics workout={workout} />
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Comments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="Add your comments about this workout..."
+                    value={comments}
+                    onChange={(e) => handleCommentsChange(e.target.value)}
+                    rows={4}
+                  />
+                </CardContent>
+              </Card>
             </div>
           )}
-        </TabsContent>
-      </Tabs>
+
+          {activeTab === 'completed' && (
+            <div className="space-y-4">
+              {workout.type === 'endurance' ? (
+                <CompletedTab 
+                  workoutType={getWorkoutType()}
+                  workoutData={workout}
+                />
+              ) : isCompletedStrengthWorkout ? (
+                // Show completed strength workout view with plan comparison
+                <div>
+                  <StrengthCompletedView workoutData={workout} />
+                </div>
+              ) : (
+                // Show strength exercise builder for planned workouts
+                <div>
+                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      📝 Showing strength exercise builder (planned workout)
+                    </p>
+                  </div>
+                  <StrengthExerciseBuilder
+                    exercises={strengthExercises}
+                    onChange={handleStrengthExercisesChange}
+                    isMetric={true}
+                    isCompleted={true}
+                  />
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
