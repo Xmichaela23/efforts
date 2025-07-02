@@ -52,16 +52,6 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
   const [comments, setComments] = useState(workout.comments || '');
   const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
 
-  // Debug: Log workout data to see what we're working with
-  console.log('🔍 WorkoutDetail Debug:', { 
-    type: workout.type, 
-    workout_status: workout.workout_status,
-    hasStrengthExercises: !!workout.strength_exercises,
-    strengthExercisesLength: workout.strength_exercises?.length || 0,
-    strengthExercisesData: workout.strength_exercises,
-    fullWorkout: workout
-  });
-
   const handleCommentsChange = (value: string) => {
     setComments(value);
     onUpdateWorkout(workout.id, { comments: value });
@@ -78,37 +68,38 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
     return 'cycling'; // default
   };
 
+  const getWorkoutIcon = () => {
+    switch (workout.type) {
+      case 'strength':
+        return <Dumbbell className="h-5 w-5" />;
+      case 'run':
+        return <Activity className="h-5 w-5" />;
+      case 'ride':
+        return <Bike className="h-5 w-5" />;
+      case 'swim':
+        return <Waves className="h-5 w-5" />;
+      default:
+        return <Activity className="h-5 w-5" />;
+    }
+  };
+
   // Determine if this is a completed strength workout
   const isCompletedStrengthWorkout = workout.type === 'strength' && 
     workout.workout_status === 'completed' && 
     (workout.strength_exercises?.length > 0 || workout.completed_exercises?.length > 0);
 
-  console.log('🔍 Completed strength check:', {
-    isStrength: workout.type === 'strength',
-    isCompleted: workout.workout_status === 'completed',
-    hasStrengthExercises: workout.strength_exercises && workout.strength_exercises.length > 0,
-    hasCompletedExercises: workout.completed_exercises && workout.completed_exercises.length > 0,
-    finalResult: isCompletedStrengthWorkout
-  });
-
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                {workout.type === 'endurance' ? <Activity className="h-5 w-5" /> : <Dumbbell className="h-5 w-5" />}
-                {workout.name}
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">{new Date(workout.date).toLocaleDateString()}</p>
-            </div>
-            <Badge variant={workout.workout_status === 'completed' ? 'default' : 'secondary'}>
-              {workout.workout_status || 'planned'}
-            </Badge>
-          </div>
-        </CardHeader>
-      </Card>
+      {/* Header with workout title and icon */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          {getWorkoutIcon()}
+          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Inter, sans-serif' }}>
+            {workout.name}
+          </h1>
+        </div>
+        <p className="text-sm text-muted-foreground">{new Date(workout.date).toLocaleDateString()}</p>
+      </div>
 
       {/* Simple tab navigation without card styling */}
       <div className="w-full">
@@ -167,25 +158,14 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
                   workoutData={workout}
                 />
               ) : isCompletedStrengthWorkout ? (
-                // Show completed strength workout view with plan comparison
-                <div>
-                  <StrengthCompletedView workoutData={workout} />
-                </div>
+                <StrengthCompletedView workoutData={workout} />
               ) : (
-                // Show strength exercise builder for planned workouts
-                <div>
-                  <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      📝 Showing strength exercise builder (planned workout)
-                    </p>
-                  </div>
-                  <StrengthExerciseBuilder
-                    exercises={strengthExercises}
-                    onChange={handleStrengthExercisesChange}
-                    isMetric={true}
-                    isCompleted={true}
-                  />
-                </div>
+                <StrengthExerciseBuilder
+                  exercises={strengthExercises}
+                  onChange={handleStrengthExercisesChange}
+                  isMetric={true}
+                  isCompleted={true}
+                />
               )}
             </div>
           )}
