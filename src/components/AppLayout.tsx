@@ -19,7 +19,7 @@ const AppLayout: React.FC = () => {
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<string>('summary'); // Reset to summary by default
+  const [activeTab, setActiveTab] = useState<string>('summary'); // Always start with summary
 
   // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
@@ -27,22 +27,13 @@ const AppLayout: React.FC = () => {
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
-  // 🔍 Track selectedWorkout state changes and reset tab when workout changes
+  // 🚨 CRITICAL FIX: Reset tab to summary whenever selectedWorkout changes
   useEffect(() => {
-    console.log('🔍 selectedWorkout state changed:', {
-      selectedWorkout,
-      hasWorkout: !!selectedWorkout,
-      workoutId: selectedWorkout?.id,
-      workoutType: selectedWorkout?.type,
-      workoutStatus: selectedWorkout?.workout_status,
-      timestamp: new Date().toISOString()
-    });
-    
-    // 🚨 RESET TAB TO SUMMARY when workout changes
     if (selectedWorkout) {
+      console.log('🔍 New workout selected, resetting tab to summary:', selectedWorkout.id);
       setActiveTab('summary');
     }
-  }, [selectedWorkout]);
+  }, [selectedWorkout?.id]); // Only trigger when workout ID changes
 
   // Format date for header display (June 30 2025 format)
   const formatHeaderDate = () => {
@@ -55,14 +46,9 @@ const AppLayout: React.FC = () => {
   };
 
   const handleWorkoutSelect = (workout: any) => {
-    console.log('🔍 handleWorkoutSelect called with workout:', {
-      workout,
-      workoutId: workout?.id,
-      workoutType: workout?.type,
-      workoutStatus: workout?.workout_status,
-      timestamp: new Date().toISOString()
-    });
+    console.log('🔍 handleWorkoutSelect called with workout:', workout.id);
     setSelectedWorkout(workout);
+    // Tab will be reset to 'summary' by the useEffect above
   };
 
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
@@ -70,9 +56,8 @@ const AppLayout: React.FC = () => {
   };
 
   const handleBackToDashboard = () => {
-    console.log('🔍 handleBackToDashboard called - clearing selectedWorkout');
-    // Removed the confirmation check for StrengthLogger
-    // Now directly closes without prompting to save
+    console.log('🔍 handleBackToDashboard called - clearing all state');
+    // Clear all state and return to dashboard
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
@@ -80,11 +65,10 @@ const AppLayout: React.FC = () => {
     setBuilderSourceContext('');
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
-    setActiveTab('summary'); // Reset tab when going back to dashboard
+    setActiveTab('summary'); // Reset tab when going back
   };
 
   const handleNavigateToPlans = () => {
-    console.log('🔍 handleNavigateToPlans called - clearing selectedWorkout');
     setShowBuilder(false);
     setBuilderType('');
     setBuilderSourceContext('');
@@ -94,11 +78,10 @@ const AppLayout: React.FC = () => {
   };
 
   const handleAddEffort = (type: string, date?: string) => {
-    console.log('🔍 handleAddEffort called - clearing selectedWorkout');
     setBuilderType(type);
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
-    setSelectedWorkout(null);
+    setSelectedWorkout(null); // Clear selected workout
     
     if (date) {
       setSelectedDate(date);
@@ -114,11 +97,10 @@ const AppLayout: React.FC = () => {
   };
 
   const handleSelectEffortType = (type: string) => {
-    console.log('🔍 handleSelectEffortType called - clearing selectedWorkout');
     setBuilderType(type);
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
-    setSelectedWorkout(null);
+    setSelectedWorkout(null); // Clear selected workout
     
     // 🚨 FIXED: Handle all strength logger variants including planned strength
     if (type === 'strength_logger' || type === 'log-strength' || type === 'log-planned-strength') {
@@ -129,17 +111,16 @@ const AppLayout: React.FC = () => {
   };
 
   const handleEditEffort = (workout: any) => {
-    console.log('🔍 handleEditEffort called - clearing selectedWorkout and setting workoutBeingEdited');
     setWorkoutBeingEdited(workout);
     setBuilderType(workout.type);
     setBuilderSourceContext('');
-    setSelectedWorkout(null);
+    setSelectedWorkout(null); // Clear selected workout when editing
     setShowBuilder(true);
   };
 
   // 🚨 FIXED: Calendar date click - only select date, don't auto-open workouts
   const handleDateSelect = (date: string) => {
-    console.log('🔍 handleDateSelect called:', date);
+    console.log('📅 Calendar date clicked:', date);
     setSelectedDate(date);
     
     // Just select the date - let TodaysEffort component handle displaying workouts
@@ -151,9 +132,8 @@ const AppLayout: React.FC = () => {
   };
 
   const handleSelectRoutine = (routineId: string) => {
-    console.log('🔍 handleSelectRoutine called - clearing selectedWorkout');
     console.log('handleSelectRoutine called with:', routineId);
-    setSelectedWorkout(null);
+    setSelectedWorkout(null); // Clear selected workout
     if (routineId === 'all-plans') {
       console.log('Setting showAllPlans to true');
       setShowAllPlans(true);
@@ -165,20 +145,18 @@ const AppLayout: React.FC = () => {
   };
 
   const handlePlanSelect = (plan: any) => {
-    console.log('🔍 handlePlanSelect called - clearing selectedWorkout');
     console.log('Selected plan:', plan);
-    setSelectedWorkout(null);
+    setSelectedWorkout(null); // Clear selected workout
     // TODO: Handle plan selection (add to active plans, etc.)
     setShowAllPlans(false);
   };
 
   const handleBuildWorkout = (type: string, sourceContext?: string) => {
-    console.log('🔍 handleBuildWorkout called - clearing selectedWorkout');
     console.log('Building workout of type:', type, 'from context:', sourceContext);
     setBuilderType(type);
     setBuilderSourceContext(sourceContext || '');
     setWorkoutBeingEdited(null);
-    setSelectedWorkout(null);
+    setSelectedWorkout(null); // Clear selected workout
     setShowAllPlans(false);
     setShowBuilder(true);
   };
@@ -198,7 +176,8 @@ const AppLayout: React.FC = () => {
     selectedWorkout: !!selectedWorkout,
     selectedWorkoutId: selectedWorkout?.id,
     selectedWorkoutType: selectedWorkout?.type,
-    selectedWorkoutStatus: selectedWorkout?.workout_status
+    selectedWorkoutStatus: selectedWorkout?.workout_status,
+    activeTab
   });
 
   return (
