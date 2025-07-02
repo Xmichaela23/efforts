@@ -304,13 +304,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : (
         <div className="w-full relative">
-          {/* Navigation buttons */}
+          {/* Navigation buttons - removed shadow-md */}
           {totalItems > 1 && (
             <>
               <Button
                 variant="ghost"
                 size="icon"
-                className={`absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white shadow-md border border-gray-200 ${
+                className={`absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 ${
                   !canGoLeft ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                 }`}
                 onClick={goLeft}
@@ -322,7 +322,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className={`absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white shadow-md border border-gray-200 ${
+                className={`absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 ${
                   !canGoRight ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-50'
                 }`}
                 onClick={goRight}
@@ -333,21 +333,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </>
           )}
 
-          {/* Workout cards container */}
+          {/* Workout cards container - fixed width calculation */}
           <div className="overflow-hidden px-4">
             <div 
               className="flex transition-transform duration-300 ease-in-out"
               style={{ 
                 transform: `translateX(-${currentIndex * 100}%)`,
-                width: `${totalItems * 100}%`
               }}
             >
               {/* Workout cards */}
               {displayWorkouts.map((workout, index) => (
                 <div
                   key={workout.id || index}
-                  className="flex-shrink-0 w-full"
-                  style={{ width: `${100 / totalItems}%` }}
+                  className="basis-full flex-shrink-0"
                   onClick={() => {
                     console.log('🔧 Workout clicked:', workout);
                     onEditEffort && onEditEffort(workout);
@@ -376,10 +374,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               ))}
               
               {/* Add effort card at the end */}
-              <div 
-                className="flex-shrink-0 w-full"
-                style={{ width: `${100 / totalItems}%` }}
-              >
+              <div className="basis-full flex-shrink-0">
                 <div className="p-6 flex items-center justify-center min-h-[120px] mx-2">
                   <AddEffortDropdown />
                 </div>
