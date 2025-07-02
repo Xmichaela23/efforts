@@ -386,36 +386,6 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               </div>
             </div>
 
-            {/* Ultra-compact Weight Structure */}
-            <div>
-              <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
-                Weight Structure
-              </Label>
-              <RadioGroup
-                value={exercise.weightMode}
-                onValueChange={(value: 'same' | 'individual') => {
-                  updateExercise(exercise.id, { 
-                    weightMode: value,
-                    individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
-                  });
-                }}
-                className="flex gap-3"
-              >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
-                  <Label htmlFor={`same-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                    Same weight
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
-                  <Label htmlFor={`individual-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                    Different weights
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
             {exercise.weightMode === 'same' ? (
               <div>
                 <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
@@ -474,6 +444,36 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                 </div>
               </div>
             )}
+
+            {/* Ultra-compact Weight Structure - moved below weight input */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                Weight Structure
+              </Label>
+              <RadioGroup
+                value={exercise.weightMode}
+                onValueChange={(value: 'same' | 'individual') => {
+                  updateExercise(exercise.id, { 
+                    weightMode: value,
+                    individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
+                  });
+                }}
+                className="flex gap-3"
+              >
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
+                  <Label htmlFor={`same-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    Same weight
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
+                  <Label htmlFor={`individual-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    Different weights
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
 
             {/* Ultra-compact Collapsible Notes */}
             <div>
