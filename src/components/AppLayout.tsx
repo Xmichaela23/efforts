@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -27,6 +27,18 @@ const AppLayout: React.FC = () => {
   // Track selected date for calendar interactions
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
+  // 🔍 Track selectedWorkout state changes
+  useEffect(() => {
+    console.log('🔍 selectedWorkout state changed:', {
+      selectedWorkout,
+      hasWorkout: !!selectedWorkout,
+      workoutId: selectedWorkout?.id,
+      workoutType: selectedWorkout?.type,
+      workoutStatus: selectedWorkout?.workout_status,
+      timestamp: new Date().toISOString()
+    });
+  }, [selectedWorkout]);
+
   // Format date for header display (June 30 2025 format)
   const formatHeaderDate = () => {
     const today = new Date();
@@ -38,7 +50,13 @@ const AppLayout: React.FC = () => {
   };
 
   const handleWorkoutSelect = (workout: any) => {
-    console.log('❌ WRONG: handleWorkoutSelect called - going to detail view');
+    console.log('🔍 handleWorkoutSelect called with workout:', {
+      workout,
+      workoutId: workout?.id,
+      workoutType: workout?.type,
+      workoutStatus: workout?.workout_status,
+      timestamp: new Date().toISOString()
+    });
     setSelectedWorkout(workout);
   };
 
@@ -47,6 +65,7 @@ const AppLayout: React.FC = () => {
   };
 
   const handleBackToDashboard = () => {
+    console.log('🔍 handleBackToDashboard called - clearing selectedWorkout');
     // Removed the confirmation check for StrengthLogger
     // Now directly closes without prompting to save
     setShowStrengthLogger(false);
@@ -59,17 +78,21 @@ const AppLayout: React.FC = () => {
   };
 
   const handleNavigateToPlans = () => {
+    console.log('🔍 handleNavigateToPlans called - clearing selectedWorkout');
     setShowBuilder(false);
     setBuilderType('');
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
+    setSelectedWorkout(null);
     setShowAllPlans(true);
   };
 
   const handleAddEffort = (type: string, date?: string) => {
+    console.log('🔍 handleAddEffort called - clearing selectedWorkout');
     setBuilderType(type);
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
+    setSelectedWorkout(null);
     
     if (date) {
       setSelectedDate(date);
@@ -85,9 +108,11 @@ const AppLayout: React.FC = () => {
   };
 
   const handleSelectEffortType = (type: string) => {
+    console.log('🔍 handleSelectEffortType called - clearing selectedWorkout');
     setBuilderType(type);
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
+    setSelectedWorkout(null);
     
     // 🚨 FIXED: Handle all strength logger variants including planned strength
     if (type === 'strength_logger' || type === 'log-strength' || type === 'log-planned-strength') {
@@ -98,15 +123,17 @@ const AppLayout: React.FC = () => {
   };
 
   const handleEditEffort = (workout: any) => {
+    console.log('🔍 handleEditEffort called - clearing selectedWorkout and setting workoutBeingEdited');
     setWorkoutBeingEdited(workout);
     setBuilderType(workout.type);
     setBuilderSourceContext('');
+    setSelectedWorkout(null);
     setShowBuilder(true);
   };
 
   // 🚨 FIXED: Calendar date click - only select date, don't auto-open workouts
   const handleDateSelect = (date: string) => {
-    console.log('📅 Calendar date clicked:', date);
+    console.log('🔍 handleDateSelect called:', date);
     setSelectedDate(date);
     
     // Just select the date - let TodaysEffort component handle displaying workouts
@@ -118,7 +145,9 @@ const AppLayout: React.FC = () => {
   };
 
   const handleSelectRoutine = (routineId: string) => {
+    console.log('🔍 handleSelectRoutine called - clearing selectedWorkout');
     console.log('handleSelectRoutine called with:', routineId);
+    setSelectedWorkout(null);
     if (routineId === 'all-plans') {
       console.log('Setting showAllPlans to true');
       setShowAllPlans(true);
@@ -130,16 +159,20 @@ const AppLayout: React.FC = () => {
   };
 
   const handlePlanSelect = (plan: any) => {
+    console.log('🔍 handlePlanSelect called - clearing selectedWorkout');
     console.log('Selected plan:', plan);
+    setSelectedWorkout(null);
     // TODO: Handle plan selection (add to active plans, etc.)
     setShowAllPlans(false);
   };
 
   const handleBuildWorkout = (type: string, sourceContext?: string) => {
+    console.log('🔍 handleBuildWorkout called - clearing selectedWorkout');
     console.log('Building workout of type:', type, 'from context:', sourceContext);
     setBuilderType(type);
     setBuilderSourceContext(sourceContext || '');
     setWorkoutBeingEdited(null);
+    setSelectedWorkout(null);
     setShowAllPlans(false);
     setShowBuilder(true);
   };
@@ -152,7 +185,15 @@ const AppLayout: React.FC = () => {
     );
   }
 
-  console.log('Render state - showAllPlans:', showAllPlans, 'showBuilder:', showBuilder, 'showStrengthLogger:', showStrengthLogger, 'selectedWorkout:', selectedWorkout);
+  console.log('🔍 AppLayout render state:', {
+    showAllPlans, 
+    showBuilder, 
+    showStrengthLogger, 
+    selectedWorkout: !!selectedWorkout,
+    selectedWorkoutId: selectedWorkout?.id,
+    selectedWorkoutType: selectedWorkout?.type,
+    selectedWorkoutStatus: selectedWorkout?.workout_status
+  });
 
   return (
     <div className="min-h-screen bg-background">
