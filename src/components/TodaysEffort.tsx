@@ -19,7 +19,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const { useImperial, workouts, loading } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(1); // Start at 1 due to prepended duplicate
+  const [transitionEnabled, setTransitionEnabled] = useState(true);
 
   const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
@@ -28,10 +29,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if (workouts && workouts.length > 0) {
       const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
       setDisplayWorkouts(dateWorkouts);
-      setCurrentIndex(0); // Reset to first workout when date changes
+      setCurrentIndex(1); // Reset to first real item when date changes
     } else {
       setDisplayWorkouts([]);
-      setCurrentIndex(0);
+      setCurrentIndex(1);
     }
   };
 
@@ -128,25 +129,68 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
-  // Navigation functions with looping
-  const totalItems = displayWorkouts.length + 1; // +1 for the "Add effort" card
+  // Create carousel items with duplicates for seamless looping
+  const createCarouselItems = () => {
+    const addEffortCard = { type: 'add-effort', id: 'add-effort' };
+    const originalItems = [...displayWorkouts, addEffortCard];
+    
+    if (originalItems.length <= 1) {
+      return originalItems;
+    }
+    
+    // Create: [last_item, ...original_items, first_item]
+    const lastItem = originalItems[originalItems.length - 1];
+    const firstItem = originalItems[0];
+    
+    return [lastItem, ...originalItems, firstItem];
+  };
 
+  const carouselItems = createCarouselItems();
+  const originalItemsLength = displayWorkouts.length + 1; // +1 for add effort card
+
+  // Navigation functions with seamless looping
   const goLeft = () => {
-    if (currentIndex === 0) {
-      // Loop to the last item
-      setCurrentIndex(totalItems - 1);
-    } else {
-      setCurrentIndex(currentIndex - 1);
+    if (originalItemsLength <= 1) return;
+    
+    const newIndex = currentIndex - 1;
+    setCurrentIndex(newIndex);
+    
+    // If we're at the first duplicate (index 0), snap to the real last item
+    if (newIndex === 0) {
+      setTransitionEnabled(false);
+      setTimeout(() => {
+        setCurrentIndex(originalItemsLength);
+        setTimeout(() => {
+          setTransitionEnabled(true);
+        }, 50);
+      }, 300); // Wait for transition to complete
     }
   };
 
   const goRight = () => {
-    if (currentIndex === totalItems - 1) {
-      // Loop to the first item
-      setCurrentIndex(0);
-    } else {
-      setCurrentIndex(currentIndex + 1);
+    if (originalItemsLength <= 1) return;
+    
+    const newIndex = currentIndex + 1;
+    setCurrentIndex(newIndex);
+    
+    // If we're at the last duplicate, snap to the real first item
+    if (newIndex === originalItemsLength + 1) {
+      setTransitionEnabled(false);
+      setTimeout(() => {
+        setCurrentIndex(1);
+        setTimeout(() => {
+          setTransitionEnabled(true);
+        }, 50);
+      }, 300); // Wait for transition to complete
     }
+  };
+
+  // Get the current real index for dots (accounting for duplicates)
+  const getRealIndex = () => {
+    if (originalItemsLength <= 1) return 0;
+    if (currentIndex === 0) return originalItemsLength - 1; // First duplicate shows last real item
+    if (currentIndex === originalItemsLength + 1) return 0; // Last duplicate shows first real item
+    return currentIndex - 1; // Adjust for prepended duplicate
   };
 
   // Add Effort Dropdown Component
@@ -309,12 +353,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       ) : (
         <div className="w-full relative">
           {/* Navigation buttons - only show if more than 1 item */}
-          {totalItems > 1 && (
+          {originalItemsLength > 1 && (
             <>
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50"
+                className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50 shadow-sm"
                 onClick={goLeft}
               >
                 <ChevronLeft className="h-4 w-4" />
@@ -323,7 +367,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <Button
                 variant="ghost"
                 size="icon"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50"
+                className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50 shadow-sm"
                 onClick={goRight}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -334,63 +378,69 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           {/* Workout cards container */}
           <div className="overflow-hidden px-4">
             <div 
-              className="flex transition-transform duration-300 ease-in-out"
+              className="flex"
               style={{ 
                 transform: `translateX(-${currentIndex * 100}%)`,
+                transition: transitionEnabled ? 'transform 0.3s ease-in-out' : 'none'
               }}
             >
-              {/* Workout cards */}
-              {displayWorkouts.map((workout, index) => (
-                <div
-                  key={workout.id || index}
-                  className="basis-full flex-shrink-0"
-                  onClick={() => {
-                    console.log('🔧 Workout clicked:', workout);
-                    onEditEffort && onEditEffort(workout);
-                  }}
-                >
-                  <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-2">
-                    {/* Workout title and summary */}
-                    <div className="space-y-3">
-                      <h3 className="font-medium text-base leading-tight">
-                        {workout.name || formatWorkoutType(workout.type)}
-                      </h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        {getIcon(workout.type)}
-                        <span>{getWorkoutSummary(workout)}</span>
+              {/* Render carousel items (includes duplicates) */}
+              {carouselItems.map((item, index) => {
+                if (item.type === 'add-effort') {
+                  return (
+                    <div key={`add-effort-${index}`} className="basis-full flex-shrink-0">
+                      <div className="p-6 flex items-center justify-center min-h-[120px] mx-2">
+                        <AddEffortDropdown />
                       </div>
-                      
-                      {/* Notes if present */}
-                      {workout.userComments && (
-                        <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
-                          {workout.userComments}
-                        </p>
-                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={`${item.id}-${index}`}
+                    className="basis-full flex-shrink-0"
+                    onClick={() => {
+                      console.log('🔧 Workout clicked:', item);
+                      onEditEffort && onEditEffort(item);
+                    }}
+                  >
+                    <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-2">
+                      {/* Workout title and summary */}
+                      <div className="space-y-3">
+                        <h3 className="font-medium text-base leading-tight">
+                          {item.name || formatWorkoutType(item.type)}
+                        </h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                          {getIcon(item.type)}
+                          <span>{getWorkoutSummary(item)}</span>
+                        </div>
+                        
+                        {/* Notes if present */}
+                        {item.userComments && (
+                          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                            {item.userComments}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              
-              {/* Add effort card at the end */}
-              <div className="basis-full flex-shrink-0">
-                <div className="p-6 flex items-center justify-center min-h-[120px] mx-2">
-                  <AddEffortDropdown />
-                </div>
-              </div>
+                );
+              })}
             </div>
           </div>
 
-          {/* Navigation dots */}
-          {totalItems > 1 && (
+          {/* Navigation dots - only show if more than 1 item */}
+          {originalItemsLength > 1 && (
             <div className="flex justify-center mt-4">
               <div className="flex gap-2">
-                {Array.from({ length: totalItems }).map((_, index) => (
+                {Array.from({ length: originalItemsLength }).map((_, index) => (
                   <button
                     key={index}
                     className={`w-2 h-2 rounded-full transition-colors ${
-                      index === currentIndex ? 'bg-gray-600' : 'bg-gray-300'
+                      index === getRealIndex() ? 'bg-gray-600' : 'bg-gray-300'
                     }`}
-                    onClick={() => setCurrentIndex(index)}
+                    onClick={() => setCurrentIndex(index + 1)} // +1 to account for prepended duplicate
                   />
                 ))}
               </div>
