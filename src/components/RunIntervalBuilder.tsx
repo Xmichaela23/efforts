@@ -291,7 +291,10 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
               }}
             >
               <SelectTrigger className="bg-transparent p-0 h-auto font-medium text-sm border-gray-200">
-                <SelectValue />
+                <div className="flex items-center">
+                  <Activity className="h-4 w-4 mr-2" />
+                  <SelectValue />
+                </div>
               </SelectTrigger>
               <SelectContent className="bg-white border border-gray-200 shadow-xl">
                 <SelectItem value={`Segment ${index + 1}`}>Segment {index + 1}</SelectItem>

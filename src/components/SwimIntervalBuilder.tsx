@@ -96,7 +96,10 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <GripVertical className="h-4 w-4 text-muted-foreground" />
-                <h4 className="font-medium">Segment {index + 1}</h4>
+                <h4 className="font-medium flex items-center">
+                  <Waves className="h-4 w-4 mr-2" />
+                  Segment {index + 1}
+                </h4>
               </div>
               <div className="flex gap-2">
                 <Button type="button" onClick={(e) => duplicateInterval(interval.id, e)} size="sm" variant="outline" className="border-gray-300 hover:bg-gray-100">
