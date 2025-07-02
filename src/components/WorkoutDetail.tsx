@@ -16,7 +16,7 @@ interface WorkoutDetailProps {
   workout: {
     id: string;
     name: string;
-    type: 'endurance' | 'strength';
+    type: string;
     date: string;
     workout_status?: string;
     strength_exercises?: any[];
@@ -82,13 +82,13 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
   // Determine if this is a completed strength workout
   const isCompletedStrengthWorkout = workout.type === 'strength' && 
     workout.workout_status === 'completed' && 
-    workout.strength_exercises && 
-    workout.strength_exercises.length > 0;
+    (workout.strength_exercises?.length > 0 || workout.completed_exercises?.length > 0);
 
   console.log('🔍 Completed strength check:', {
     isStrength: workout.type === 'strength',
     isCompleted: workout.workout_status === 'completed',
-    hasExercises: workout.strength_exercises && workout.strength_exercises.length > 0,
+    hasStrengthExercises: workout.strength_exercises && workout.strength_exercises.length > 0,
+    hasCompletedExercises: workout.completed_exercises && workout.completed_exercises.length > 0,
     finalResult: isCompletedStrengthWorkout
   });
 
@@ -144,11 +144,6 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({ workout, onUpdateWorkout,
           ) : isCompletedStrengthWorkout ? (
             // Show completed strength workout view with plan comparison
             <div>
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">
-                  ✅ Showing completed strength workout view
-                </p>
-              </div>
               <StrengthCompletedView workoutData={workout} />
             </div>
           ) : (

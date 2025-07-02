@@ -329,19 +329,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
+    // Filter out exercises with no name or no sets
+    const validExercises = exercises.filter(ex => ex.name.trim() && ex.sets.length > 0);
+
+    // Prepare the workout data
     const completedWorkout = {
-      id: Date.now().toString(),
+      id: scheduledWorkout?.id || Date.now().toString(),
       name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString()}`,
       type: 'strength' as const,
-      date: new Date().toISOString().split('T')[0],
-      description: exercises
-        .filter(ex => ex.name.trim() && ex.sets.length > 0)
+      date: scheduledWorkout?.date || new Date().toISOString().split('T')[0],
+      description: validExercises
         .map(ex => `${ex.name}: ${ex.sets.filter(s => s.completed).length}/${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
-      strength_exercises: exercises.filter(ex => ex.name.trim() && ex.sets.length > 0),
-      workout_status: 'completed' as const
+      strength_exercises: validExercises,
+      workout_status: 'completed' as const,
+      completedManually: true
     };
+
+    console.log('🔍 Saving completed workout:', completedWorkout);
 
     // Use the app context to save - this will integrate with the main workout system
     addWorkout(completedWorkout);
