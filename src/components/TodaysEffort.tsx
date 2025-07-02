@@ -283,13 +283,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       ) : (
         <div className="w-full relative">
-          {/* Horizontal scrollable workout cards */}
-          <div className="overflow-x-auto scrollbar-hide px-4">
+          {/* Horizontal scrollable workout cards - FIXED: Removed px-4 from here */}
+          <div className="overflow-x-auto scrollbar-hide">
             <div className="flex snap-x snap-mandatory">
               {displayWorkouts.map((workout, index) => (
                 <div
                   key={workout.id || index}
-                  className="flex-shrink-0 snap-start w-full"
+                  className="flex-shrink-0 snap-start w-full px-4"
                   onClick={() => {
                     console.log('🔧 Workout clicked:', workout);
                     onEditEffort && onEditEffort(workout);
@@ -317,8 +317,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 </div>
               ))}
               
-              {/* Add effort card at the end when workouts exist */}
-              <div className="flex-shrink-0 snap-start w-full">
+              {/* Add effort card at the end when workouts exist - FIXED: Added px-4 here */}
+              <div className="flex-shrink-0 snap-start w-full px-4">
                 <div className="p-6 flex items-center justify-center min-h-[120px]">
                   <AddEffortDropdown />
                 </div>
