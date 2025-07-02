@@ -81,22 +81,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   return (
     <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-      {/* Header */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold text-gray-900">{workoutData.name}</h1>
-          <span className="text-sm text-green-600 font-medium">COMPLETED</span>
-        </div>
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>{workoutData.date}</span>
-          <span>•</span>
-          <span>{workoutData.duration} min</span>
-          <span>•</span>
-          <span className="font-medium">{workoutStats.volume.toLocaleString()} lbs total</span>
-        </div>
-      </div>
-
-      {/* Exercises */}
+      {/* Exercises - no header, just the content */}
       <div className="space-y-6">
         {completedExercises.length === 0 ? (
           <div className="text-center py-8 text-gray-500">
