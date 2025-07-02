@@ -162,8 +162,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         setCurrentIndex(originalItemsLength);
         setTimeout(() => {
           setTransitionEnabled(true);
-        }, 50);
-      }, 300); // Wait for transition to complete
+        }, 100); // Increased from 50ms to 100ms
+      }, 350); // Increased from 300ms to 350ms
     }
   };
 
@@ -180,8 +180,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         setCurrentIndex(1);
         setTimeout(() => {
           setTransitionEnabled(true);
-        }, 50);
-      }, 300); // Wait for transition to complete
+        }, 100); // Increased from 50ms to 100ms
+      }, 350); // Increased from 300ms to 350ms
     }
   };
 
