@@ -216,7 +216,7 @@ const AppLayout: React.FC = () => {
             {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
               {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans) && (
-                <span className="text-lg font-normal text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+                <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
                 </span>
               )}

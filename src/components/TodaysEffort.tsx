@@ -305,7 +305,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     return (
       <div className="w-full py-6">
         <div className="text-center">
-          <p className="text-gray-500 text-sm">Loading...</p>
+          <p className="text-muted-foreground text-sm">Loading...</p>
         </div>
       </div>
     );
@@ -316,13 +316,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       {/* Date Header - Always visible */}
       <div className="flex items-center justify-between mb-6 px-4">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-gray-500" />
-          <span className="text-sm font-medium text-gray-700">
+          <Calendar className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium text-foreground">
             {formatDisplayDate(activeDate)}
           </span>
           {/* Show actual date if it's not today/yesterday/tomorrow */}
           {!['Today', 'Yesterday', 'Tomorrow'].includes(formatDisplayDate(activeDate)) && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-muted-foreground">
               ({new Date(activeDate + 'T00:00:00').toLocaleDateString('en-US', { 
                 month: 'numeric', 
                 day: 'numeric',
@@ -334,7 +334,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         
         {/* Show effort count if any exist */}
         {displayWorkouts.length > 0 && (
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-muted-foreground">
             {displayWorkouts.length} effort{displayWorkouts.length !== 1 ? 's' : ''}
           </span>
         )}
@@ -343,7 +343,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       {displayWorkouts.length === 0 ? (
         <div className="w-full py-8 px-4">
           <div className="text-center">
-            <p className="text-gray-500 mb-6 text-sm">
+            <p className="text-muted-foreground mb-6 text-sm">
               {isPastDate 
                 ? 'No effort logged for this date' 
                 : isToday 
@@ -415,14 +415,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <h3 className="font-medium text-base leading-tight">
                           {item.name || formatWorkoutType(item.type)}
                         </h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           {getIcon(item.type)}
                           <span>{getWorkoutSummary(item)}</span>
                         </div>
                         
                         {/* Notes if present */}
                         {item.userComments && (
-                          <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
+                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
                             {item.userComments}
                           </p>
                         )}
@@ -442,7 +442,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   <button
                     key={index}
                     className={`w-2 h-2 rounded-full transition-colors ${
-                      index === getRealIndex() ? 'bg-gray-600' : 'bg-gray-300'
+                      index === getRealIndex() ? 'bg-foreground' : 'bg-muted-foreground'
                     }`}
                     onClick={() => setCurrentIndex(index + 1)} // +1 to account for prepended duplicate
                   />

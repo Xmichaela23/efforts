@@ -183,7 +183,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
       <div className="space-y-4 -mx-4 px-0">
         {exercises.map((exercise, index) => (
           <div key={exercise.id} className="px-4 py-4">
-            <h4 className="font-semibold text-lg mb-4 text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+            <h4 className="font-semibold text-lg mb-4 text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
               {exercise.name || `Exercise ${index + 1}`}
             </h4>
             
@@ -197,17 +197,17 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                 return (
                   <div key={setIndex} className="bg-gray-50 p-3 -mx-4 px-4">
                     <div className="flex items-center justify-between mb-3">
-                      <span className="font-semibold text-base text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+                      <span className="font-semibold text-base text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                         Set {setIndex + 1}
                       </span>
-                      <span className="text-sm text-gray-600" style={{fontFamily: 'Inter, sans-serif'}}>
+                      <span className="text-sm text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                         Planned: {exercise.reps || 0} reps @ {plannedWeight || 0} lbs
                       </span>
                     </div>
                     
                     <div className="grid grid-cols-3 gap-3">
                       <div>
-                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                        <Label className="text-xs font-medium text-foreground mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
                           Reps
                         </Label>
                         <Input
@@ -220,7 +220,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                         />
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                        <Label className="text-xs font-medium text-foreground mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
                           Weight (lbs)
                         </Label>
                         <Input
@@ -233,7 +233,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                         />
                       </div>
                       <div>
-                        <Label className="text-xs font-medium text-gray-700 mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                        <Label className="text-xs font-medium text-foreground mb-1 block" style={{fontFamily: 'Inter, sans-serif'}}>
                           RIR
                         </Label>
                         <Input
@@ -256,7 +256,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
           <Button 
             type="button" 
             variant="clean"
-            className="w-full h-12 text-gray-700 hover:text-gray-900"
+            className="w-full h-12 text-muted-foreground hover:text-foreground"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 600,
@@ -339,7 +339,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
             {/* Sets and Reps side by side - ALWAYS 2 columns, reduced height */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs font-medium text-gray-700 mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                <Label className="text-xs font-medium text-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                   Sets
                 </Label>
                 <Input
@@ -362,7 +362,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                 />
               </div>
               <div>
-                <Label className="text-xs font-medium text-gray-700 mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                <Label className="text-xs font-medium text-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                   Reps
                 </Label>
                 <Input
@@ -388,7 +388,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
 
             {/* Ultra-compact Weight Structure */}
             <div>
-              <Label className="text-xs font-medium text-gray-700 mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+              <Label className="text-xs font-medium text-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                 Weight Structure
               </Label>
               <RadioGroup
@@ -403,13 +403,13 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               >
                 <div className="flex items-center space-x-1">
                   <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
-                  <Label htmlFor={`same-${exercise.id}`} className="text-xs text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
+                  <Label htmlFor={`same-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                     Same weight
                   </Label>
                 </div>
                 <div className="flex items-center space-x-1">
                   <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
-                  <Label htmlFor={`individual-${exercise.id}`} className="text-xs text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
+                  <Label htmlFor={`individual-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                     Different weights
                   </Label>
                 </div>
@@ -418,7 +418,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
 
             {exercise.weightMode === 'same' ? (
               <div>
-                <Label className="text-xs font-medium text-gray-700 mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                <Label className="text-xs font-medium text-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                   Weight (lbs)
                 </Label>
                 <Input
@@ -442,13 +442,13 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               </div>
             ) : (
               <div>
-                <Label className="text-xs font-medium text-gray-700 mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                <Label className="text-xs font-medium text-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                   Weight per Set (lbs)
                 </Label>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   {Array.from({ length: exercise.sets }).map((_, setIndex) => (
                     <div key={setIndex} className="flex items-center gap-1.5">
-                      <span className="text-xs font-medium w-10 text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
+                      <span className="text-xs font-medium w-10 text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                         Set {setIndex + 1}:
                       </span>
                       <Input
@@ -480,7 +480,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               <button
                 type="button"
                 onClick={() => toggleNotes(exercise.id)}
-                className="flex items-center gap-0.5 text-xs font-medium text-gray-700 hover:text-gray-900 mb-0.5"
+                className="flex items-center gap-0.5 text-xs font-medium text-muted-foreground hover:text-foreground mb-0.5"
                 style={{fontFamily: 'Inter, sans-serif'}}
               >
                 <ChevronRight className={`h-2.5 w-2.5 transform transition-transform ${showNotes[exercise.id] ? 'rotate-90' : ''}`} />

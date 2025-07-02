@@ -354,7 +354,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
             <Button
               onClick={handleBackClick}
               variant="ghost"
-              className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black"
+              className="flex items-center gap-2 p-0 h-auto text-muted-foreground hover:text-black"
             >
               <ArrowLeft className="h-4 w-4" />
               {getBackButtonText()}
@@ -372,7 +372,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
         {(formData.type === 'run' || formData.type === 'ride') && (
           <div className="flex justify-end items-center gap-2 mb-1">
-            <Label htmlFor="units" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="units" className="text-sm font-medium text-muted-foreground">
               Imperial
             </Label>
             <Switch
@@ -381,7 +381,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               onCheckedChange={toggleUnits}
               className="data-[state=checked]:bg-black data-[state=unchecked]:bg-gray-200"
             />
-            <Label htmlFor="units" className="text-sm font-medium text-gray-700">
+            <Label htmlFor="units" className="text-sm font-medium text-muted-foreground">
               Metric
             </Label>
           </div>
@@ -412,7 +412,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                     <button
                       type="button"
                       onClick={() => setShowNotes(!showNotes)}
-                      className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
+                      className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground mb-2"
                     >
                       <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes ? 'rotate-90' : ''}`} />
                       Notes
@@ -434,13 +434,13 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               <div>
                 <div className="relative">
                   <div
-                    className={`min-h-[44px] w-full text-sm text-gray-900 p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
+                    className={`min-h-[44px] w-full text-sm text-foreground p-3 ${formData.type === 'strength' ? '' : 'pb-8'}`}
                     style={{fontFamily: 'Inter, sans-serif'}}
                   >
                     {generateWorkoutDescription()}
                   </div>
                   {formData.type !== 'strength' && formData.type !== 'mobility' && (
-                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-gray-500 text-sm">
+                    <div className="absolute bottom-2 right-3 flex items-center gap-2 text-muted-foreground text-sm">
                       <Clock className="h-3 w-3" />
                       <span>Total Time: {formatTime(calculateTotalTime())}</span>
                     </div>
@@ -464,7 +464,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
             )}
             {formData.type === 'mobility' && (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-muted-foreground">
                 <Move className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                 <p className="text-lg font-medium mb-2">Mobility Session</p>
                 <p className="text-sm">Track your mobility and flexibility work</p>
@@ -474,11 +474,11 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
 
           {(runIntervals.length > 0 || rideIntervals.length > 0 || swimIntervals.length > 0 || strengthExercises.length > 0 || formData.type === 'mobility') && (
             <div className="bg-gray-50 p-2">
-              <p className="text-sm text-gray-900" style={{fontFamily: 'Inter, sans-serif'}}>
+              <p className="text-sm text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                 {generateWorkoutDescription()}
               </p>
               {calculateTotalTime() > 0 && (
-                <p className="text-xs text-gray-600 mt-1" style={{fontFamily: 'Inter, sans-serif'}}>
+                <p className="text-xs text-muted-foreground mt-1" style={{fontFamily: 'Inter, sans-serif'}}>
                   Total Time: {formatTime(calculateTotalTime())}
                 </p>
               )}
@@ -490,7 +490,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           <Button
             onClick={() => handleSave(false)}
             variant="clean"
-            className="w-full h-12 text-gray-700 hover:text-gray-900"
+            className="w-full h-12 text-muted-foreground hover:text-foreground"
             style={{
               fontFamily: 'Inter, sans-serif',
               fontWeight: 600,

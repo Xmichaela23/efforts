@@ -21,7 +21,7 @@ const buttonVariants = cva(
         toggle: "bg-white text-black border border-gray-300 hover:bg-gray-50 hover:text-black",
         "toggle-active": "bg-black text-white border border-black",
         // New clean variant for Save buttons and similar actions
-        clean: "bg-transparent text-gray-700 hover:text-gray-900 border-none shadow-none",
+        clean: "bg-transparent text-muted-foreground hover:text-foreground border-none shadow-none",
       },
       size: {
         default: "px-6 py-3",
