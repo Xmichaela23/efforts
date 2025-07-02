@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Copy, Trash2, GripVertical } from 'lucide-react';
+import { Copy, Trash2, GripVertical, Waves } from 'lucide-react';
 
 export interface SwimInterval {
   id: string;
@@ -23,6 +23,23 @@ interface SwimIntervalBuilderProps {
 }
 
 export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: SwimIntervalBuilderProps) {
+  
+  // Auto-add first interval when component mounts and intervals array is empty
+  useEffect(() => {
+    if (intervals.length === 0) {
+      const starterInterval: SwimInterval = {
+        id: Date.now().toString(),
+        distance: '',
+        equipment: 'None',
+        recoveryType: 'time',
+        recovery: '',
+        repeatCount: 1,
+        duration: 0
+      };
+      onChange([starterInterval]);
+    }
+  }, [intervals.length, onChange]);
+
   const addInterval = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -73,14 +90,6 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-medium">Segments</h3>
-        <Button type="button" onClick={addInterval} size="sm" className="bg-gray-500 hover:bg-gray-600">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Segment
-        </Button>
-      </div>
-      
       <div className="space-y-4">
         {intervals.map((interval, index) => (
           <div key={interval.id} className="p-4 border border-gray-200">
@@ -199,6 +208,20 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
         {intervals.length === 0 && (
           <div className="text-center py-8 text-muted-foreground">
             No segments added yet. Click "Add Segment" to get started.
+          </div>
+        )}
+
+        {/* Bottom Add Segment button when segments exist */}
+        {intervals.length > 0 && (
+          <div className="text-center pt-4">
+            <button 
+              type="button" 
+              onClick={addInterval} 
+              className="px-4 py-2 text-black text-sm"
+            >
+              <Waves className="h-4 w-4 mr-2 inline" />
+              Add Segment
+            </button>
           </div>
         )}
       </div>

@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Copy, Trash2, GripVertical, Repeat, Edit, Activity } from 'lucide-react';
+import { Copy, Trash2, GripVertical, Repeat, Edit, Activity } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export interface RunInterval {
@@ -28,15 +28,15 @@ interface RunIntervalBuilderProps {
   isMetric: boolean;
 }
 
-// Fixed time input handler - properly calculates duration
+// Fixed time input handler - no auto-conversion during typing
 const handleTimeInput = (value: string, onChange: (timeStr: string, duration: number) => void) => {
   if (value === '') {
     onChange('', 0);
     return;
   }
   
+  // Allow direct input without auto-conversion
   const timeStr = value;
-  let duration = 0;
   
   // Calculate duration for any valid time format
   if (timeStr.includes(':')) {
@@ -47,24 +47,42 @@ const handleTimeInput = (value: string, onChange: (timeStr: string, duration: nu
     // Validate seconds
     if (sec >= 60) return;
     
-    duration = min * 60 + sec;
+    const duration = min * 60 + sec;
+    onChange(timeStr, duration);
   } else {
-    // For inputs without colon, treat as minutes
+    // For inputs without colon, treat as minutes and calculate duration
     const min = parseInt(timeStr) || 0;
-    duration = min * 60;
+    const duration = min * 60;
+    onChange(timeStr, duration);
   }
-  
-  onChange(timeStr, duration);
 };
 
 // Smart time formatting on blur
 const handleTimeBlur = (value: string, onChange: (timeStr: string, duration: number) => void) => {
-  const timeStr = value;
-  if (timeStr && !timeStr.includes(':') && timeStr.length <= 2) {
-    const formattedTime = `${timeStr}:00`;
-    const duration = (parseInt(timeStr) || 0) * 60;
-    onChange(formattedTime, duration);
+  if (!value) return;
+  
+  let timeStr = value;
+  
+  // Auto-format only on blur: "4" -> "4:00", "45" -> "45:00"
+  if (!timeStr.includes(':') && timeStr.length <= 2) {
+    timeStr = `${timeStr}:00`;
+    
+    const min = parseInt(timeStr.split(':')[0]) || 0;
+    const duration = min * 60;
+    onChange(timeStr, duration);
+    return;
   }
+  
+  // Handle existing formatted time
+  const parts = timeStr.split(':');
+  const min = parseInt(parts[0]) || 0;
+  const sec = parseInt(parts[1]) || 0;
+  
+  // Validate and format
+  if (sec >= 60) return;
+  
+  const duration = min * 60 + sec;
+  onChange(timeStr, duration);
 };
 
 // Mobile Safari numeric input fix
@@ -84,6 +102,19 @@ const handleNumericInput = (value: string, onChange: (num: number) => void) => {
 export default function RunIntervalBuilder({ intervals, onChange, isMetric }: RunIntervalBuilderProps) {
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
   const [blockRepeatCount, setBlockRepeatCount] = useState(1);
+
+  // Auto-add first interval when component mounts and intervals array is empty
+  useEffect(() => {
+    if (intervals.length === 0) {
+      const starterInterval: RunInterval = {
+        id: Date.now().toString(),
+        time: '',
+        distance: '',
+        duration: 0
+      };
+      onChange([starterInterval]);
+    }
+  }, [intervals.length, onChange]);
 
   const addInterval = (e?: React.MouseEvent) => {
     if (e) {
@@ -390,18 +421,6 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
 
   return (
     <div className="space-y-3">
-      {/* Left-aligned Add Effort button with runner emoji */}
-      <div className="mb-3 text-center">
-        <button 
-          type="button" 
-          onClick={addInterval} 
-          className="px-4 py-2 text-black text-sm"
-        >
-          <Activity className="h-4 w-4 mr-2 inline" />
-          Add Segment
-        </button>
-      </div>
-
       {/* Segments */}
       <div className="space-y-3">
         {intervals.map((interval, index) => renderInterval(interval, index))}
@@ -413,7 +432,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
           </div>
         )}
 
-        {/* Bottom Add Effort button when segments exist */}
+        {/* Bottom Add Segment button when segments exist */}
         {intervals.length > 0 && (
           <div className="text-center pt-4">
             <button 

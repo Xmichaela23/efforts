@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -104,6 +104,19 @@ const handleNumericInput = (value: string, onChange: (num: number) => void) => {
 export default function RideIntervalBuilder({ intervals, onChange, isMetric }: RideIntervalBuilderProps) {
   const [selectedIntervals, setSelectedIntervals] = useState<string[]>([]);
   const [blockRepeatCount, setBlockRepeatCount] = useState(1);
+
+  // Auto-add first interval when component mounts and intervals array is empty
+  useEffect(() => {
+    if (intervals.length === 0) {
+      const starterInterval: RideInterval = {
+        id: Date.now().toString(),
+        time: '',
+        distance: '',
+        duration: 0
+      };
+      onChange([starterInterval]);
+    }
+  }, [intervals.length, onChange]);
 
   const addInterval = (e?: React.MouseEvent) => {
     if (e) {
@@ -433,18 +446,6 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
 
   return (
     <div className="space-y-3">
-      {/* Clean Add Segment button */}
-      <div className="mb-3 text-center">
-        <button 
-          type="button" 
-          onClick={addInterval} 
-          className="px-4 py-2 text-black text-sm"
-        >
-          <Bike className="h-4 w-4 mr-2 inline" />
-          Add Segment
-        </button>
-      </div>
-
       {/* Segments */}
       <div className="space-y-3">
         {intervals.map((interval, index) => renderInterval(interval, index))}
