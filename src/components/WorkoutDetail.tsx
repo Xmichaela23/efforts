@@ -61,6 +61,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   const { deleteWorkout } = useAppContext();
   const [comments, setComments] = useState(workout.comments || '');
   const [strengthExercises, setStrengthExercises] = useState(workout.strength_exercises || []);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleCommentsChange = (value: string) => {
     setComments(value);
@@ -78,19 +79,33 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     
     console.log('🗑️ Delete button clicked for workout:', workout.id);
     
-    if (confirm('Are you sure you want to delete this workout?')) {
+    if (isDeleting) {
+      console.log('🗑️ Already deleting, ignoring click');
+      return;
+    }
+    
+    const confirmed = confirm('Are you sure you want to delete this workout?');
+    console.log('🗑️ User confirmation:', confirmed);
+    
+    if (confirmed) {
       try {
-        console.log('🗑️ Deleting workout:', workout.id);
+        setIsDeleting(true);
+        console.log('🗑️ Starting delete process for workout:', workout.id);
+        
         await deleteWorkout(workout.id);
         console.log('🗑️ Workout deleted successfully');
         
         // Close the detail view after successful deletion
         if (onClose) {
+          console.log('🗑️ Calling onClose to return to dashboard');
           onClose();
+        } else {
+          console.log('🗑️ No onClose function provided');
         }
       } catch (error) {
         console.error('🗑️ Error deleting workout:', error);
         alert('Error deleting workout. Please try again.');
+        setIsDeleting(false);
       }
     }
   };
@@ -165,8 +180,13 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           {/* Delete button aligned to the right */}
           <button
             onClick={handleDelete}
-            className="p-2 text-gray-400 hover:text-red-500 transition-colors"
-            title="Delete workout"
+            disabled={isDeleting}
+            className={`p-2 transition-colors ${
+              isDeleting 
+                ? 'text-gray-300 cursor-not-allowed' 
+                : 'text-gray-400 hover:text-red-500'
+            }`}
+            title={isDeleting ? 'Deleting...' : 'Delete workout'}
           >
             <Trash2 className="h-4 w-4" />
           </button>
