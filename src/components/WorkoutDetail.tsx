@@ -72,13 +72,24 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     onUpdateWorkout(workout.id, { strength_exercises: exercises });
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    console.log('🗑️ Delete button clicked for workout:', workout.id);
+    
     if (confirm('Are you sure you want to delete this workout?')) {
       try {
+        console.log('🗑️ Deleting workout:', workout.id);
         await deleteWorkout(workout.id);
-        onClose?.(); // Close the detail view after deletion
+        console.log('🗑️ Workout deleted successfully');
+        
+        // Close the detail view after successful deletion
+        if (onClose) {
+          onClose();
+        }
       } catch (error) {
-        console.error('Error deleting workout:', error);
+        console.error('🗑️ Error deleting workout:', error);
         alert('Error deleting workout. Please try again.');
       }
     }
