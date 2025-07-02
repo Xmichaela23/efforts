@@ -388,7 +388,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
 
             {/* Ultra-compact Weight Structure */}
             <div>
-              <Label className="text-xs font-medium text-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+              <Label className="text-xs font-medium text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                 Weight Structure
               </Label>
               <RadioGroup
