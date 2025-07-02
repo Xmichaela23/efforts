@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Copy, Trash2, ChevronRight, Search } from 'lucide-react';
+import { Copy, Trash2, ChevronRight, Dumbbell } from 'lucide-react';
 
 export interface StrengthExercise {
   id: string;
@@ -294,11 +294,11 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
           </div>
           
           <div className="space-y-2">
-            {/* Exercise name input with search icon - reduced height */}
+            {/* Exercise name input with Dumbbell icon - reduced height */}
             <div className="relative">
               <div className="flex items-center border border-gray-200 bg-white">
                 <div className="pl-2 text-gray-400">
-                  <Search className="h-4 w-4" />
+                  <Dumbbell className="h-4 w-4" />
                 </div>
                 <Input
                   placeholder="Add exercise..."
@@ -505,7 +505,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
       <div className="relative pt-1">
         <div className="flex items-center border border-gray-200 bg-white">
           <div className="pl-2 text-gray-400">
-            <Search className="h-4 w-4" />
+            <Dumbbell className="h-4 w-4" />
           </div>
           <Input
             placeholder="Add exercise..."
