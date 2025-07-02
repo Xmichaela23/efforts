@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Plus, Copy, Trash2, Dumbbell, ChevronRight, Search } from 'lucide-react';
+import { Copy, Trash2, ChevronRight, Search } from 'lucide-react';
 
 export interface StrengthExercise {
   id: string;
@@ -45,6 +45,23 @@ const commonExercises = [
 export default function StrengthExerciseBuilder({ exercises, onChange, isCompleted = false, isMetric = false }: StrengthExerciseBuilderProps) {
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
   const [showNotes, setShowNotes] = useState<{[key: string]: boolean}>({});
+  const [currentExerciseInput, setCurrentExerciseInput] = useState('');
+  const [showAddExerciseSuggestions, setShowAddExerciseSuggestions] = useState(false);
+
+  // Auto-add first exercise when component mounts and exercises array is empty
+  useEffect(() => {
+    if (exercises.length === 0 && !isCompleted) {
+      const starterExercise: StrengthExercise = {
+        id: Date.now().toString(),
+        name: '',
+        sets: 5,
+        reps: 5,
+        weightMode: 'same',
+        completed_sets: []
+      };
+      onChange([starterExercise]);
+    }
+  }, [exercises.length, onChange, isCompleted]);
 
   const getFilteredExercises = (searchTerm: string) => {
     return searchTerm.length > 0
@@ -56,27 +73,21 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
       : [];
   };
 
-  const addExercise = (e: React.MouseEvent, afterIndex?: number) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
+  const addExercise = (exerciseName?: string) => {
+    const nameToAdd = exerciseName || currentExerciseInput.trim();
+    
     const newExercise: StrengthExercise = {
       id: Date.now().toString(),
-      name: '',
-      sets: 0,
-      reps: 0,
+      name: nameToAdd,
+      sets: 5,
+      reps: 5,
       weightMode: 'same',
       completed_sets: []
     };
     
-    if (afterIndex !== undefined) {
-      const newExercises = [...exercises];
-      newExercises.splice(afterIndex + 1, 0, newExercise);
-      onChange(newExercises);
-    } else {
-      onChange([...exercises, newExercise]);
-    }
+    onChange([...exercises, newExercise]);
+    setCurrentExerciseInput('');
+    setShowAddExerciseSuggestions(false);
   };
 
   const updateExercise = (id: string, updates: Partial<StrengthExercise>) => {
@@ -145,6 +156,25 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
 
   const toggleNotes = (exerciseId: string) => {
     setShowNotes(prev => ({ ...prev, [exerciseId]: !prev[exerciseId] }));
+  };
+
+  const handleAddExerciseInputChange = (value: string) => {
+    setCurrentExerciseInput(value);
+    setShowAddExerciseSuggestions(value.length > 0);
+  };
+
+  const handleAddExerciseSuggestionClick = (exerciseName: string) => {
+    addExercise(exerciseName);
+  };
+
+  const handleAddExerciseKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addExercise();
+    }
+    if (e.key === 'Escape') {
+      setShowAddExerciseSuggestions(false);
+    }
   };
 
   if (isCompleted) {
@@ -244,15 +274,6 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
       {exercises.map((exercise, index) => (
         <div key={exercise.id} className="space-y-3 py-3 first:pt-0">
           <div className="flex items-center justify-between">
-            <button 
-              type="button" 
-              onClick={(e) => addExercise(e, index)} 
-              className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-start transition-colors"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              <Plus className="h-5 w-5 mr-2" />
-              <span className="text-lg font-medium">Exercise</span>
-            </button>
             <div className="flex gap-3">
               <button 
                 type="button" 
@@ -271,9 +292,9 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
             </div>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
-            <div className="md:col-span-2 relative">
-              {/* Exercise name input with search icon */}
+          <div className="space-y-4">
+            {/* Exercise name input with search icon */}
+            <div className="relative">
               <div className="flex items-center border border-gray-200 bg-white">
                 <div className="pl-3 text-gray-400">
                   <Search className="h-4 w-4" />
@@ -313,199 +334,212 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               )}
             </div>
             
-            {/* Sets and Reps side by side */}
+            {/* Sets and Reps side by side - ALWAYS 2 columns */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Sets
+                </Label>
+                <Input
+                  type="number"
+                  value={exercise.sets || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateExercise(exercise.id, { sets: 0 });
+                    } else {
+                      const numValue = parseInt(value);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        updateExercise(exercise.id, { sets: numValue });
+                      }
+                    }
+                  }}
+                  className="min-h-[44px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                  placeholder="5"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Reps
+                </Label>
+                <Input
+                  type="number"
+                  value={exercise.reps || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateExercise(exercise.id, { reps: 0 });
+                    } else {
+                      const numValue = parseInt(value);
+                      if (!isNaN(numValue) && numValue >= 0) {
+                        updateExercise(exercise.id, { reps: numValue });
+                      }
+                    }
+                  }}
+                  className="min-h-[44px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                  placeholder="5"
+                />
+              </div>
+            </div>
+
+            {/* Compact Weight Structure */}
             <div>
               <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
-                Sets
+                Weight Structure
               </Label>
-              <Input
-                type="number"
-                value={exercise.sets || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    updateExercise(exercise.id, { sets: 0 });
-                  } else {
-                    const numValue = parseInt(value);
-                    if (!isNaN(numValue) && numValue >= 0) {
-                      updateExercise(exercise.id, { sets: numValue });
-                    }
-                  }
+              <RadioGroup
+                value={exercise.weightMode}
+                onValueChange={(value: 'same' | 'individual') => {
+                  updateExercise(exercise.id, { 
+                    weightMode: value,
+                    individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
+                  });
                 }}
-                className="min-h-[44px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{fontFamily: 'Inter, sans-serif'}}
-                placeholder="5"
-              />
+                className="flex gap-6"
+              >
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[16px] min-w-[16px]" />
+                  <Label htmlFor={`same-${exercise.id}`} className="text-sm text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
+                    Same weight
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[16px] min-w-[16px]" />
+                  <Label htmlFor={`individual-${exercise.id}`} className="text-sm text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
+                    Different weights
+                  </Label>
+                </div>
+              </RadioGroup>
             </div>
-            <div>
-              <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
-                Reps
-              </Label>
-              <Input
-                type="number"
-                value={exercise.reps || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    updateExercise(exercise.id, { reps: 0 });
-                  } else {
-                    const numValue = parseInt(value);
-                    if (!isNaN(numValue) && numValue >= 0) {
-                      updateExercise(exercise.id, { reps: numValue });
-                    }
-                  }
-                }}
-                className="min-h-[44px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{fontFamily: 'Inter, sans-serif'}}
-                placeholder="5"
-              />
-            </div>
-          </div>
 
-          {/* Compact Weight Structure */}
-          <div className="mb-3">
-            <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
-              Weight Structure
-            </Label>
-            <RadioGroup
-              value={exercise.weightMode}
-              onValueChange={(value: 'same' | 'individual') => {
-                updateExercise(exercise.id, { 
-                  weightMode: value,
-                  individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
-                });
-              }}
-              className="flex gap-6"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[16px] min-w-[16px]" />
-                <Label htmlFor={`same-${exercise.id}`} className="text-sm font-medium text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
-                  Same weight
+            {exercise.weightMode === 'same' ? (
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Weight (lbs)
                 </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[16px] min-w-[16px]" />
-                <Label htmlFor={`individual-${exercise.id}`} className="text-sm font-medium text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
-                  Different weights
-                </Label>
-              </div>
-            </RadioGroup>
-          </div>
-
-          {exercise.weightMode === 'same' ? (
-            <div className="mb-3">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
-                Weight (lbs)
-              </Label>
-              <Input
-                type="number"
-                placeholder="185"
-                value={exercise.weight || ''}
-                onChange={(e) => {
-                  const value = e.target.value;
-                  if (value === '') {
-                    updateExercise(exercise.id, { weight: undefined });
-                  } else {
-                    const numValue = parseInt(value);
-                    if (!isNaN(numValue)) {
-                      updateExercise(exercise.id, { weight: numValue });
+                <Input
+                  type="number"
+                  placeholder="185"
+                  value={exercise.weight || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateExercise(exercise.id, { weight: undefined });
+                    } else {
+                      const numValue = parseInt(value);
+                      if (!isNaN(numValue)) {
+                        updateExercise(exercise.id, { weight: numValue });
+                      }
                     }
-                  }
-                }}
-                className="min-h-[44px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                style={{fontFamily: 'Inter, sans-serif'}}
-              />
-            </div>
-          ) : (
-            <div className="mb-3">
-              <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
-                Weight per Set (lbs)
-              </Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {Array.from({ length: exercise.sets }).map((_, setIndex) => (
-                  <div key={setIndex} className="flex items-center gap-3">
-                    <span className="text-sm font-medium w-16 text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
-                      Set {setIndex + 1}:
-                    </span>
-                    <Input
-                      type="number"
-                      placeholder="185"
-                      value={exercise.individualWeights?.[setIndex] || ''}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '') {
-                          updateIndividualWeight(exercise.id, setIndex, 0);
-                        } else {
-                          const numValue = parseInt(value);
-                          if (!isNaN(numValue)) {
-                            updateIndividualWeight(exercise.id, setIndex, numValue);
+                  }}
+                  className="min-h-[44px] text-base border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                />
+              </div>
+            ) : (
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-2 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Weight per Set (lbs)
+                </Label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {Array.from({ length: exercise.sets }).map((_, setIndex) => (
+                    <div key={setIndex} className="flex items-center gap-3">
+                      <span className="text-sm font-medium w-16 text-gray-700" style={{fontFamily: 'Inter, sans-serif'}}>
+                        Set {setIndex + 1}:
+                      </span>
+                      <Input
+                        type="number"
+                        placeholder="185"
+                        value={exercise.individualWeights?.[setIndex] || ''}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            updateIndividualWeight(exercise.id, setIndex, 0);
+                          } else {
+                            const numValue = parseInt(value);
+                            if (!isNaN(numValue)) {
+                              updateIndividualWeight(exercise.id, setIndex, numValue);
+                            }
                           }
-                        }
-                      }}
-                      className="min-h-[40px] text-base border-gray-300 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                      style={{fontFamily: 'Inter, sans-serif'}}
-                    />
-                  </div>
-                ))}
+                        }}
+                        className="min-h-[40px] text-base border-gray-300 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        style={{fontFamily: 'Inter, sans-serif'}}
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
-
-          {/* Collapsible Notes */}
-          <div className="mb-3">
-            <button
-              type="button"
-              onClick={() => toggleNotes(exercise.id)}
-              className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes[exercise.id] ? 'rotate-90' : ''}`} />
-              Notes
-            </button>
-
-            {showNotes[exercise.id] && (
-              <Textarea
-                placeholder="Form cues, rest time, etc."
-                value={exercise.notes || ''}
-                onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
-                rows={3}
-                className="min-h-[80px] text-base border-gray-300"
-                style={{fontFamily: 'Inter, sans-serif'}}
-              />
             )}
+
+            {/* Collapsible Notes */}
+            <div>
+              <button
+                type="button"
+                onClick={() => toggleNotes(exercise.id)}
+                className="flex items-center gap-1 text-sm font-medium text-gray-700 hover:text-gray-900 mb-2"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              >
+                <ChevronRight className={`h-4 w-4 transform transition-transform ${showNotes[exercise.id] ? 'rotate-90' : ''}`} />
+                Notes
+              </button>
+
+              {showNotes[exercise.id] && (
+                <Textarea
+                  placeholder="Form cues, rest time, etc."
+                  value={exercise.notes || ''}
+                  onChange={(e) => updateExercise(exercise.id, { notes: e.target.value })}
+                  rows={3}
+                  className="min-h-[80px] text-base border-gray-300"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                />
+              )}
+            </div>
           </div>
         </div>
       ))}
       
-      {/* Bottom + Exercise button for continuous building */}
-      {exercises.length > 0 && (
-        <button 
-          type="button" 
-          onClick={(e) => addExercise(e)} 
-          className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-start transition-colors"
-          style={{fontFamily: 'Inter, sans-serif'}}
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          <span className="text-lg font-medium">Exercise</span>
-        </button>
-      )}
-        
-      {exercises.length === 0 && (
-        <div className="text-center py-10 text-gray-500">
-          <button 
-            type="button" 
-            onClick={(e) => addExercise(e)} 
-            className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 focus:outline-none flex items-center min-h-[44px] justify-center transition-colors mx-auto"
-            style={{fontFamily: 'Inter, sans-serif'}}
-          >
-            <Plus className="h-5 w-5 mr-2" />
-            <span className="text-lg font-medium">Exercise</span>
-          </button>
-          <p className="text-lg text-gray-500 mt-4" style={{fontFamily: 'Inter, sans-serif'}}>
-            No exercises added yet.
-          </p>
+      {/* Bottom exercise search with suggestions - mirrors Log Strength layout */}
+      <div className="relative">
+        <div className="flex items-center border border-gray-200 bg-white">
+          <div className="pl-3 text-gray-400">
+            <Search className="h-4 w-4" />
+          </div>
+          <Input
+            placeholder="Add exercise..."
+            value={currentExerciseInput}
+            onChange={(e) => handleAddExerciseInputChange(e.target.value)}
+            onKeyDown={handleAddExerciseKeyDown}
+            onFocus={() => {
+              if (currentExerciseInput.length > 0) {
+                setShowAddExerciseSuggestions(true);
+              }
+            }}
+            onBlur={() => {
+              // Delay closing to allow click on suggestions
+              setTimeout(() => setShowAddExerciseSuggestions(false), 200);
+            }}
+            className="h-10 text-sm border-gray-300"
+            style={{ fontSize: '16px' }}
+          />
         </div>
-      )}
+        
+        {showAddExerciseSuggestions && getFilteredExercises(currentExerciseInput).length > 0 && (
+          <div className="absolute top-11 left-0 right-0 bg-white border border-gray-200 shadow-lg z-10 max-h-64 overflow-y-auto">
+            {getFilteredExercises(currentExerciseInput).map((exercise, index) => (
+              <button
+                key={index}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => handleAddExerciseSuggestionClick(exercise)}
+                className="w-full text-left px-3 py-2 hover:bg-gray-50 text-sm min-h-[40px]"
+              >
+                {exercise}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
