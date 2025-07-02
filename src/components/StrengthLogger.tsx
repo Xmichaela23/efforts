@@ -477,7 +477,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
                             : 'bg-gray-100 text-gray-600'
                         }`}
                       >
-                        {set.completed ? '✓ Done' : 'Mark Done'}
+                        {set.completed ? '✓ Done' : 'Done'}
                       </button>
                     </div>
                     
