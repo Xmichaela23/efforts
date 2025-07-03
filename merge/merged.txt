@@ -1,4 +1,4 @@
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/App.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/App.tsx
 
 import './index.css'
 import { Toaster } from "@/components/ui/toaster";
@@ -32,7 +32,7 @@ const App = () => (
 export default App;
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/AllEffortsDropdown.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/AllEffortsDropdown.tsx
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -126,7 +126,7 @@ const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout
 
 export default AllEffortsDropdown;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/AllPlansInterface.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/AllPlansInterface.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, ArrowRight, ChevronDown, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
@@ -462,7 +462,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ onClose, onSelect
 
 export default AllPlansInterface;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/AppLayout.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/AppLayout.tsx
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -584,12 +584,22 @@ const AppLayout: React.FC = () => {
     }
   };
 
+  // 🔧 FIXED: handleEditEffort now goes to Summary/Completed view instead of Builder
   const handleEditEffort = (workout: any) => {
-    setWorkoutBeingEdited(workout);
-    setBuilderType(workout.type);
+    console.log('🎯 Workout clicked from Today\'s Effort:', workout);
+    
+    // 🆕 FIXED: Use the same logic as handleWorkoutSelect
+    // This will open WorkoutDetail (Summary/Completed view) instead of Builder
+    setSelectedWorkout(workout);
+    
+    // 🆕 Clear any builder-related state (don't need these anymore)
+    setWorkoutBeingEdited(null);
+    setBuilderType('');
     setBuilderSourceContext('');
-    setSelectedWorkout(null); // Clear selected workout when editing
-    setShowBuilder(true);
+    setShowBuilder(false);
+    
+    // 🆕 Set appropriate tab based on workout type (handled by useEffect above)
+    // The useEffect will automatically set the right tab when selectedWorkout changes
   };
 
   // 🚨 FIXED: Calendar date click - only select date, don't auto-open workouts
@@ -813,7 +823,7 @@ const AppLayout: React.FC = () => {
 
 export default AppLayout;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/BannerUpload.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/BannerUpload.tsx
 import React, { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -888,7 +898,7 @@ export const BannerUpload: React.FC<BannerUploadProps> = ({ onBannerChange }) =>
   );
 };
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/CalendarHeader.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/CalendarHeader.tsx
 import React from 'react';
 import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
@@ -931,7 +941,7 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 
 export default CalendarHeader;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/CompletedTab.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/CompletedTab.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/contexts/AppContext';
@@ -1175,7 +1185,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
 
 export default CompletedTab;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/CycleIntervalBuilder.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/CycleIntervalBuilder.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1360,7 +1370,7 @@ export default function CycleIntervalBuilder({ intervals, onChange, isMetric }: 
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/FilteredWorkoutList.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/FilteredWorkoutList.tsx
 import React, { useState, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -1516,7 +1526,7 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
 
 export default FilteredWorkoutList;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/GarminAutoSync.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/GarminAutoSync.tsx
 import React, { useState, useEffect } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -1622,7 +1632,7 @@ const GarminAutoSync: React.FC<GarminAutoSyncProps> = ({ onWorkoutImported }) =>
 
 export default GarminAutoSync;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/GarminConnect.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/GarminConnect.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -1907,7 +1917,7 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
 
 export default GarminConnect;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/GarminExport.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/GarminExport.tsx
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -2085,7 +2095,7 @@ const GarminExport: React.FC<GarminExportProps> = ({ workoutName, intervals }) =
 
 export default GarminExport;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/GarminSeamless.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/GarminSeamless.tsx
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -2284,7 +2294,7 @@ const GarminSeamless: React.FC<GarminSeamlessProps> = ({ onAutoSyncChange }) => 
 
 export default GarminSeamless;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/GarminSetup.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/GarminSetup.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
@@ -2420,7 +2430,7 @@ const GarminSetup: React.FC = () => {
 
 export default GarminSetup;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/LogEffortDropdown.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/LogEffortDropdown.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -2509,7 +2519,7 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
 
 export default LogEffortDropdown;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/NewEffortDropdown.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/NewEffortDropdown.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -2597,7 +2607,7 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
 
 export default NewEffortDropdown;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/PlansDropdown.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/PlansDropdown.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
@@ -2732,7 +2742,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
 
 export default PlansDropdown;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/RideIntervalBuilder.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/RideIntervalBuilder.tsx
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -3256,7 +3266,7 @@ export default function RideIntervalBuilder({ intervals, onChange, isMetric }: R
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/RoutinesDropdown.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/RoutinesDropdown.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import {
@@ -3333,7 +3343,7 @@ const RoutinesDropdown: React.FC<RoutinesDropdownProps> = ({ onSelectRoutine }) 
 
 export default RoutinesDropdown;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/RunIntervalBuilder.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/RunIntervalBuilder.tsx
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -3832,7 +3842,7 @@ export default function RunIntervalBuilder({ intervals, onChange, isMetric }: Ru
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthCompletedView.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/StrengthCompletedView.tsx
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Dumbbell } from 'lucide-react';
@@ -4117,7 +4127,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
 export default StrengthCompletedView;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthExerciseBuilder.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/StrengthExerciseBuilder.tsx
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -4716,8 +4726,8 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthLogger.tsx
-import React, { useState, useRef } from 'react';
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/StrengthLogger.tsx
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -4853,6 +4863,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
+  const [isInitialized, setIsInitialized] = useState(false); // 🆕 Track initialization
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -4885,28 +4896,61 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     return calculateTotalVolume(exercises);
   }, [exercises]);
 
-  // Initialize with scheduled workout or find today's planned workout
-  React.useEffect(() => {
+  // 🆕 Create empty starter exercise
+  const createEmptyExercise = (): LoggedExercise => ({
+    id: Date.now().toString(),
+    name: '',
+    sets: [{
+      reps: 0,
+      weight: 0,
+      barType: 'standard',
+      rir: undefined,
+      completed: false
+    }],
+    expanded: true
+  });
+
+  // 🔧 FIXED: Proper initialization with cleanup
+  useEffect(() => {
+    console.log('🔄 StrengthLogger initializing...');
+    
+    // 🆕 Always start fresh - clear any existing state
+    setExercises([]);
+    setExpandedPlates({});
+    setExpandedExercises({});
+    setCurrentExercise('');
+    setShowSuggestions(false);
+    
     let workoutToLoad = scheduledWorkout;
 
-    // If no scheduled workout provided, try to find today's planned strength workout
+    // If no scheduled workout provided, do a FRESH check for today's planned workout
     if (!workoutToLoad) {
+      console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
       const todayDate = getTodayDateString();
-      const todaysStrengthWorkouts = workouts.filter(workout => 
+      
+      // Get CURRENT workouts from the hub (not stale data)
+      const currentWorkouts = workouts || [];
+      const todaysStrengthWorkouts = currentWorkouts.filter(workout => 
         workout.date === todayDate && 
         workout.type === 'strength' && 
         workout.workout_status === 'planned'
       );
 
+      console.log('📊 Found planned workouts for today:', todaysStrengthWorkouts);
+
       if (todaysStrengthWorkouts.length > 0) {
         workoutToLoad = todaysStrengthWorkouts[0];
+        console.log('✅ Using planned workout:', workoutToLoad.name);
+      } else {
+        console.log('ℹ️ No planned strength workout found for today');
       }
     }
 
-    if (workoutToLoad && workoutToLoad.strength_exercises) {
+    if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
+      console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
-        id: exercise.id || `ex-${index}`,
+        id: exercise.id || `ex-${Date.now()}-${index}`,
         name: exercise.name || '',
         expanded: true,
         sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
@@ -4920,22 +4964,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       
       setExercises(prePopulatedExercises);
     } else {
+      console.log('🆕 Starting with empty exercise for manual logging');
       // Start with empty exercise for manual logging
-      const starterExercise: LoggedExercise = {
-        id: Date.now().toString(),
-        name: '',
-        sets: [{
-          reps: 0,
-          weight: 0,
-          barType: 'standard',
-          rir: undefined,
-          completed: false
-        }],
-        expanded: true
-      };
-      setExercises([starterExercise]);
+      setExercises([createEmptyExercise()]);
     }
-  }, [scheduledWorkout, workouts]);
+    
+    setIsInitialized(true);
+  }, [scheduledWorkout, workouts]); // 🆕 Depend on workouts to get fresh data
+
+  // 🆕 Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log('🧹 StrengthLogger cleanup - clearing state');
+      setExercises([]);
+      setExpandedPlates({});
+      setExpandedExercises({});
+      setCurrentExercise('');
+      setShowSuggestions(false);
+    };
+  }, []);
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
@@ -4999,18 +5046,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
   const deleteExercise = (exerciseId: string) => {
     if (exercises.length === 1) {
-      setExercises([{
-        id: Date.now().toString(),
-        name: '',
-        sets: [{
-          reps: 0,
-          weight: 0,
-          barType: 'standard',
-          rir: undefined,
-          completed: false
-        }],
-        expanded: true
-      }]);
+      // 🔧 FIXED: Use the helper function for consistency
+      setExercises([createEmptyExercise()]);
     } else {
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
     }
@@ -5050,6 +5087,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
     // Filter out exercises with no name or no sets
     const validExercises = exercises.filter(ex => ex.name.trim() && ex.sets.length > 0);
+
+    if (validExercises.length === 0) {
+      alert('Please add at least one exercise with a name to save the workout.');
+      return;
+    }
 
     // Prepare the workout data
     const completedWorkout = {
@@ -5099,6 +5141,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   };
 
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // 🆕 Don't render until properly initialized
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen pb-20">
+        <div className="bg-white pb-4 mb-4">
+          <div className="flex items-center w-full">
+            <h1 className="text-xl font-medium text-gray-700">Loading...</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-20">
@@ -5352,7 +5407,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthPlansView.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/StrengthPlansView.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -5575,7 +5630,7 @@ const StrengthPlansView: React.FC<StrengthPlansViewProps> = ({
 
 export default StrengthPlansView;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthSummaryView.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/StrengthSummaryView.tsx
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 
@@ -5730,7 +5785,7 @@ const StrengthSummaryView: React.FC<StrengthSummaryViewProps> = ({ workoutData }
 
 export default StrengthSummaryView;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/StrengthTracker.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/StrengthTracker.tsx
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5837,7 +5892,7 @@ const StrengthTracker: React.FC<StrengthTrackerProps> = ({ exercises, onUpdateEx
 
 export default StrengthTracker;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/SwimExport.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/SwimExport.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -5923,7 +5978,7 @@ const SwimExport: React.FC<SwimExportProps> = ({ workoutName, swimData }) => {
 
 export default SwimExport;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/SwimIntervalBuilder.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/SwimIntervalBuilder.tsx
 import React, { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6158,7 +6213,7 @@ export default function SwimIntervalBuilder({ intervals, onChange, isMetric }: S
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/SwimWorkoutForm.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/SwimWorkoutForm.tsx
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6286,7 +6341,7 @@ const SwimWorkoutForm: React.FC<SwimWorkoutFormProps> = ({ swimData, onChange })
 
 export default SwimWorkoutForm;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/TodaysEffort.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/TodaysEffort.tsx
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -6316,7 +6371,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const loadWorkoutsForDate = () => {
     if (workouts && workouts.length > 0) {
-      const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
+      console.log('🔍 All workouts for', activeDate, ':', workouts.filter((w: any) => w.date === activeDate));
+      
+      // 🔧 FIXED: Filter by both date AND status
+      const dateWorkouts = workouts.filter((w: any) => {
+        const isCorrectDate = w.date === activeDate;
+        
+        // For today and future dates: show only planned workouts
+        if (activeDate >= today) {
+          const isPlanned = w.workout_status === 'planned' || !w.workout_status; // Handle missing status as planned
+          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}`);
+          return isCorrectDate && isPlanned;
+        } 
+        // For past dates: show both planned and completed for reference
+        else {
+          console.log(`Past date workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}`);
+          return isCorrectDate;
+        }
+      });
+      
+      console.log('✅ Filtered workouts to display:', dateWorkouts);
       setDisplayWorkouts(dateWorkouts);
       setCurrentIndex(1); // Reset to first real item when date changes
     } else {
@@ -6383,6 +6457,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     
     const duration = workout.duration ? formatTime(workout.duration) : '';
     return duration || 'Workout';
+  };
+
+  // 🆕 Get status badge for workout
+  const getStatusBadge = (workout: any) => {
+    if (workout.workout_status === 'completed') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          ✓ Completed
+        </span>
+      );
+    }
+    return null;
   };
 
   // Format the date for display
@@ -6701,9 +6787,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-2">
                       {/* Workout title and summary */}
                       <div className="space-y-3">
-                        <h3 className="font-medium text-base leading-tight">
-                          {item.name || formatWorkoutType(item.type)}
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium text-base leading-tight">
+                            {item.name || formatWorkoutType(item.type)}
+                          </h3>
+                          {/* 🆕 Show status badge for completed workouts */}
+                          {getStatusBadge(item)}
+                        </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           {getIcon(item.type)}
                           <span>{getWorkoutSummary(item)}</span>
@@ -6747,7 +6837,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
 export default TodaysEffort;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutBuilder.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutBuilder.tsx
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7257,7 +7347,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutCalendar.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutCalendar.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -7481,7 +7571,7 @@ export default function WorkoutCalendar({
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutCharts.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutCharts.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
@@ -7593,7 +7683,7 @@ const WorkoutCharts: React.FC<WorkoutChartsProps> = ({ timeSeriesData, heartRate
 
 export default WorkoutCharts;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutDetail.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutDetail.tsx
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7741,9 +7831,8 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     }
   };
 
-  // Determine if this is a completed strength workout
-  const isCompletedStrengthWorkout = workout.type === 'strength' && 
-    workout.workout_status === 'completed' && 
+  // 🔧 FIXED: Simplified condition - show StrengthCompletedView for ALL strength workouts in Completed tab
+  const isStrengthWorkout = workout.type === 'strength' && 
     (workout.strength_exercises?.length > 0 || workout.completed_exercises?.length > 0);
 
   return (
@@ -7822,7 +7911,12 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           {activeTab === 'summary' && (
             <div className="space-y-4">
               {workout.type === 'strength' ? (
-                <StrengthSummaryView workoutData={workout} />
+                <StrengthSummaryView workoutData={{
+                  ...workout,
+                  comments: workout.comments || '',
+                  strength_exercises: workout.strength_exercises || [],
+                  completed_exercises: workout.completed_exercises || []
+                }} />
               ) : (
                 <WorkoutMetrics workout={workout} />
               )}
@@ -7850,9 +7944,29 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                   workoutType={getWorkoutType()}
                   workoutData={workout}
                 />
-              ) : isCompletedStrengthWorkout ? (
-                <StrengthCompletedView workoutData={workout} />
+              ) : workout.type === 'strength' ? (
+                // 🔧 FIXED: Always use StrengthCompletedView for strength workouts with safe defaults
+                <StrengthCompletedView 
+                  workoutData={{
+                    ...workout,
+                    comments: workout.comments || '',
+                    strength_exercises: workout.strength_exercises?.map((exercise: any) => ({
+                      ...exercise,
+                      // Transform builder format to completed format if needed
+                      sets: Array.isArray(exercise.sets) 
+                        ? exercise.sets  // Already in correct format
+                        : Array.from({ length: exercise.sets || 0 }, (_, i) => ({
+                            reps: exercise.reps || 0,
+                            weight: exercise.weight || 0,
+                            completed: true,
+                            rir: undefined
+                          }))
+                    })) || [],
+                    completed_exercises: workout.completed_exercises || []
+                  }}
+                />
               ) : (
+                // 🔧 FIXED: Only fallback to StrengthExerciseBuilder for non-strength workouts or as last resort
                 <StrengthExerciseBuilder
                   exercises={strengthExercises}
                   onChange={handleStrengthExercisesChange}
@@ -7870,7 +7984,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
 export default WorkoutDetail;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutForm.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutForm.tsx
 import React, { useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8113,7 +8227,7 @@ export default function WorkoutForm({ onClose }: WorkoutFormProps) {
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutIntervals.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutIntervals.tsx
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import RunIntervalBuilder, { RunInterval } from './RunIntervalBuilder';
@@ -8279,7 +8393,7 @@ const WorkoutIntervals: React.FC<WorkoutIntervalsProps> = ({ intervals, onChange
 
 export default WorkoutIntervals;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutList.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutList.tsx
 import React from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8364,7 +8478,7 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ onWorkoutSelect }) => {
 
 export default WorkoutList;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutMetrics.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutMetrics.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8460,7 +8574,7 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
 
 export default WorkoutMetrics;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutSummary.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutSummary.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8602,7 +8716,7 @@ export default function WorkoutSummary({ workout, onClose }: WorkoutSummaryProps
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutSummaryChart.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutSummaryChart.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8719,7 +8833,7 @@ export default function WorkoutSummaryChart({ intervals, workoutType }: WorkoutS
   );
 }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/WorkoutTypeFilter.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/WorkoutTypeFilter.tsx
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8866,7 +8980,7 @@ const WorkoutTypeFilter: React.FC<WorkoutTypeFilterProps> = ({
 
 export default WorkoutTypeFilter;
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/theme-provider.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/theme-provider.tsx
 "use client"
 
 import * as React from "react"
@@ -8938,7 +9052,7 @@ export const useTheme = (): ThemeContextType => {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/accordion.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/accordion.tsx
 import * as React from "react"
 import * as AccordionPrimitive from "@radix-ui/react-accordion"
 import { ChevronDown } from "lucide-react"
@@ -8997,7 +9111,7 @@ AccordionContent.displayName = AccordionPrimitive.Content.displayName
 export { Accordion, AccordionItem, AccordionTrigger, AccordionContent }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/alert-dialog.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/alert-dialog.tsx
 import * as React from "react"
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog"
 
@@ -9139,7 +9253,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/alert.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/alert.tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -9207,7 +9321,7 @@ AlertDescription.displayName = "AlertDescription"
 export { Alert, AlertTitle, AlertDescription }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/aspect-ratio.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/aspect-ratio.tsx
 import * as AspectRatioPrimitive from "@radix-ui/react-aspect-ratio"
 
 const AspectRatio = AspectRatioPrimitive.Root
@@ -9215,7 +9329,7 @@ const AspectRatio = AspectRatioPrimitive.Root
 export { AspectRatio }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/avatar.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/avatar.tsx
 import * as React from "react"
 import * as AvatarPrimitive from "@radix-ui/react-avatar"
 
@@ -9272,7 +9386,7 @@ AvatarFallback.displayName = AvatarPrimitive.Fallback.displayName
 export { Avatar, AvatarImage, AvatarFallback }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/badge.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/badge.tsx
 import * as React from "react"
 import { cva, type VariantProps } from "class-variance-authority"
 
@@ -9323,7 +9437,7 @@ function Badge({ className, variant, size, ...props }: BadgeProps) {
 export { Badge, badgeVariants }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/breadcrumb.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/breadcrumb.tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { ChevronRight, MoreHorizontal } from "lucide-react"
@@ -9441,7 +9555,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/button.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/button.tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -9510,7 +9624,7 @@ Button.displayName = "Button"
 
 export { Button, buttonVariants }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/calendar.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/calendar.tsx
 import * as React from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { DayPicker } from "react-day-picker";
@@ -9577,7 +9691,7 @@ Calendar.displayName = "Calendar";
 export { Calendar };
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/card.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/card.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -9649,7 +9763,7 @@ CardFooter.displayName = "CardFooter"
 
 export { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/carousel.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/carousel.tsx
 import * as React from "react"
 import useEmblaCarousel, {
   type UseEmblaCarouselType,
@@ -9912,7 +10026,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/chart.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/chart.tsx
 import * as React from "react"
 import * as RechartsPrimitive from "recharts"
 
@@ -10278,7 +10392,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/checkbox.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/checkbox.tsx
 import * as React from "react"
 import * as CheckboxPrimitive from "@radix-ui/react-checkbox"
 import { Check } from "lucide-react"
@@ -10309,7 +10423,7 @@ Checkbox.displayName = CheckboxPrimitive.Root.displayName
 export { Checkbox }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/collapsible.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/collapsible.tsx
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible"
 
 const Collapsible = CollapsiblePrimitive.Root
@@ -10321,7 +10435,7 @@ const CollapsibleContent = CollapsiblePrimitive.CollapsibleContent
 export { Collapsible, CollapsibleTrigger, CollapsibleContent }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/command.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/command.tsx
 import * as React from "react"
 import { type DialogProps } from "@radix-ui/react-dialog"
 import { Command as CommandPrimitive } from "cmdk"
@@ -10475,7 +10589,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/context-menu.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/context-menu.tsx
 import * as React from "react"
 import * as ContextMenuPrimitive from "@radix-ui/react-context-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
@@ -10676,7 +10790,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/dialog.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/dialog.tsx
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
@@ -10799,7 +10913,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/drawer.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/drawer.tsx
 import * as React from "react"
 import { Drawer as DrawerPrimitive } from "vaul"
 
@@ -10918,7 +11032,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/dropdown-menu.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/dropdown-menu.tsx
 import * as React from "react"
 import * as DropdownMenuPrimitive from "@radix-ui/react-dropdown-menu"
 import { Check, ChevronRight, Circle } from "lucide-react"
@@ -11119,7 +11233,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/form.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/form.tsx
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { Slot } from "@radix-ui/react-slot"
@@ -11298,7 +11412,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/hover-card.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/hover-card.tsx
 import * as React from "react"
 import * as HoverCardPrimitive from "@radix-ui/react-hover-card"
 
@@ -11328,7 +11442,7 @@ HoverCardContent.displayName = HoverCardPrimitive.Content.displayName
 export { HoverCard, HoverCardTrigger, HoverCardContent }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/input-otp.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/input-otp.tsx
 import * as React from "react"
 import { OTPInput, OTPInputContext } from "input-otp"
 import { Dot } from "lucide-react"
@@ -11400,7 +11514,7 @@ InputOTPSeparator.displayName = "InputOTPSeparator"
 export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/input.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/input.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -11431,7 +11545,7 @@ Input.displayName = "Input"
 
 export { Input }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/label.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/label.tsx
 import * as React from "react"
 import * as LabelPrimitive from "@radix-ui/react-label"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -11477,7 +11591,7 @@ Label.displayName = LabelPrimitive.Root.displayName
 export { Label }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/menubar.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/menubar.tsx
 import * as React from "react"
 import * as MenubarPrimitive from "@radix-ui/react-menubar"
 import { Check, ChevronRight, Circle } from "lucide-react"
@@ -11714,7 +11828,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/navigation-menu.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/navigation-menu.tsx
 import * as React from "react"
 import * as NavigationMenuPrimitive from "@radix-ui/react-navigation-menu"
 import { cva } from "class-variance-authority"
@@ -11845,7 +11959,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/pagination.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/pagination.tsx
 import * as React from "react"
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react"
 
@@ -11967,7 +12081,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/popover.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/popover.tsx
 import * as React from "react"
 import * as PopoverPrimitive from "@radix-ui/react-popover"
 
@@ -11999,7 +12113,7 @@ PopoverContent.displayName = PopoverPrimitive.Content.displayName
 export { Popover, PopoverTrigger, PopoverContent }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/progress.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/progress.tsx
 import * as React from "react"
 import * as ProgressPrimitive from "@radix-ui/react-progress"
 
@@ -12039,7 +12153,7 @@ Progress.displayName = ProgressPrimitive.Root.displayName
 export { Progress }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/radio-group.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/radio-group.tsx
 import * as React from "react"
 import * as RadioGroupPrimitive from "@radix-ui/react-radio-group"
 import { Circle } from "lucide-react"
@@ -12083,7 +12197,7 @@ RadioGroupItem.displayName = RadioGroupPrimitive.Item.displayName
 
 export { RadioGroup, RadioGroupItem }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/resizable.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/resizable.tsx
 import { GripVertical } from "lucide-react"
 import * as ResizablePrimitive from "react-resizable-panels"
 
@@ -12129,7 +12243,7 @@ const ResizableHandle = ({
 export { ResizablePanelGroup, ResizablePanel, ResizableHandle }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/scroll-area.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/scroll-area.tsx
 import * as React from "react"
 import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area"
 
@@ -12180,7 +12294,7 @@ ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
 export { ScrollArea, ScrollBar }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/select.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/select.tsx
 import * as React from "react"
 import * as SelectPrimitive from "@radix-ui/react-select"
 import { Check, ChevronDown, ChevronUp } from "lucide-react"
@@ -12341,7 +12455,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/separator.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/separator.tsx
 import * as React from "react"
 import * as SeparatorPrimitive from "@radix-ui/react-separator"
 
@@ -12381,7 +12495,7 @@ Separator.displayName = SeparatorPrimitive.Root.displayName
 export { Separator }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/sheet.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/sheet.tsx
 import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
@@ -12515,7 +12629,7 @@ export {
 
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/sidebar.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/sidebar.tsx
 import * as React from "react"
 import { Slot } from "@radix-ui/react-slot"
 import { VariantProps, cva } from "class-variance-authority"
@@ -13256,7 +13370,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/skeleton.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/skeleton.tsx
 import * as React from "react"
 import { cn } from "@/lib/utils"
 
@@ -13284,7 +13398,7 @@ function Skeleton({
 export { Skeleton }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/slider.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/slider.tsx
 import * as React from "react"
 import * as SliderPrimitive from "@radix-ui/react-slider"
 
@@ -13313,7 +13427,7 @@ Slider.displayName = SliderPrimitive.Root.displayName
 export { Slider }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/sonner.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/sonner.tsx
 
 import React from "react"
 import { Toaster as Sonner, toast } from "sonner"
@@ -13347,7 +13461,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 export { Toaster, toast }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/switch.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/switch.tsx
 import * as React from "react"
 import * as SwitchPrimitives from "@radix-ui/react-switch"
 
@@ -13377,7 +13491,7 @@ Switch.displayName = SwitchPrimitives.Root.displayName
 export { Switch }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/table.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/table.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -13497,7 +13611,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/tabs.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/tabs.tsx
 import * as React from "react"
 import * as TabsPrimitive from "@radix-ui/react-tabs"
 
@@ -13553,7 +13667,7 @@ TabsContent.displayName = TabsPrimitive.Content.displayName
 
 export { Tabs, TabsList, TabsTrigger, TabsContent }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/textarea.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/textarea.tsx
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
@@ -13583,7 +13697,7 @@ Textarea.displayName = "Textarea"
 
 export { Textarea }
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/toast.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/toast.tsx
 import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -13713,7 +13827,7 @@ export {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/toaster.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/toaster.tsx
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
@@ -13749,7 +13863,7 @@ export function Toaster() {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/toggle-group.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/toggle-group.tsx
 import * as React from "react"
 import * as ToggleGroupPrimitive from "@radix-ui/react-toggle-group"
 import { type VariantProps } from "class-variance-authority"
@@ -13819,7 +13933,7 @@ ToggleGroupItem.displayName = ToggleGroupPrimitive.Item.displayName
 export { ToggleGroup, ToggleGroupItem }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/toggle.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/toggle.tsx
 import * as React from "react"
 import * as TogglePrimitive from "@radix-ui/react-toggle"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -13867,7 +13981,7 @@ Toggle.displayName = TogglePrimitive.Root.displayName
 export { Toggle, toggleVariants }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/components/ui/tooltip.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/components/ui/tooltip.tsx
 import * as React from "react"
 import * as TooltipPrimitive from "@radix-ui/react-tooltip"
 
@@ -13898,7 +14012,7 @@ TooltipContent.displayName = TooltipPrimitive.Content.displayName
 export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/contexts/AppContext.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/contexts/AppContext.tsx
 import React, { createContext, useContext, useState } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
 
@@ -13991,7 +14105,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
 };
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/hooks/use-mobile.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/hooks/use-mobile.tsx
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768;
@@ -14015,7 +14129,7 @@ export function useIsMobile() {
 }
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/main.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/main.tsx
 
 import { createRoot } from 'react-dom/client'
 import App from './App.tsx'
@@ -14025,7 +14139,7 @@ import './index.css'
 createRoot(document.getElementById("root")!).render(<App />);
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/pages/Index.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/pages/Index.tsx
 
 import React from 'react';
 import AppLayout from '@/components/AppLayout';
@@ -14042,7 +14156,7 @@ const Index: React.FC = () => {
 export default Index;
 
 
-// File: /Users/michaelambp/Documents/efforts_App/Efforts/src/pages/NotFound.tsx
+// File: /Users/michaelambp/Documents/efforts_App/Efforts 7:3/src/pages/NotFound.tsx
 import { useLocation } from "react-router-dom";
 import { useEffect } from "react";
 

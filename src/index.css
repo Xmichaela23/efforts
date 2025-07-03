@@ -32,11 +32,30 @@
   * {
     @apply border-border;
   }
+  
+  html {
+    height: 100%;
+    /* Prevent mobile zoom on input focus */
+    -webkit-text-size-adjust: 100%;
+    -ms-text-size-adjust: 100%;
+  }
+  
   body {
     @apply bg-background text-foreground;
     font-family: 'Inter', sans-serif;
     letter-spacing: 0.02em;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow-x: hidden;
+    /* Improve mobile scrolling */
+    -webkit-overflow-scrolling: touch;
   }
+  
+  #root {
+    height: 100%;
+  }
+  
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Inter', sans-serif;
     font-weight: 600;
@@ -46,6 +65,36 @@
 @layer components {
   .font-mono {
     font-variant-numeric: tabular-nums;
+  }
+  
+  /* 🚨 MOBILE APP CONTAINER - CSS Grid Layout */
+  .mobile-app-container {
+    display: grid;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    height: 100dvh;
+    width: 100%;
+    background: hsl(var(--background));
+    overflow: hidden;
+  }
+  
+  /* 🚨 MOBILE HEADER - Fixed at top */
+  .mobile-header {
+    grid-row: 1;
+    border-bottom: 1px solid hsl(var(--border) / 0.4);
+    background: hsl(var(--card) / 0.3);
+    backdrop-filter: blur(8px);
+    z-index: 40;
+  }
+  
+  /* 🚨 MOBILE MAIN CONTENT - Scrollable area */
+  .mobile-main-content {
+    grid-row: 2;
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
+    /* Add bottom padding for mobile safe area */
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 
@@ -58,4 +107,33 @@
 .scrollbar-hide {
   -ms-overflow-style: none;  /* IE and Edge */
   scrollbar-width: none;  /* Firefox */
+}
+
+/* 🚨 MOBILE OPTIMIZATIONS */
+@media (max-width: 768px) {
+  /* Force proper viewport behavior */
+  .mobile-app-container {
+    height: 100vh;
+    height: 100svh; /* Small viewport height for mobile */
+    max-height: 100vh;
+    max-height: 100svh;
+  }
+  
+  /* Improve touch interactions */
+  button, a, input, select, textarea {
+    touch-action: manipulation;
+  }
+  
+  /* Prevent input zoom on iOS */
+  input[type="text"], 
+  input[type="number"], 
+  input[type="email"], 
+  input[type="password"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }

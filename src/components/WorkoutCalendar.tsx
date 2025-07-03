@@ -75,12 +75,29 @@ export default function WorkoutCalendar({
 
   const getWorkoutsForDate = (day: number) => {
     if (!day || !workouts) return [];
+    
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
-    const filtered = workouts.filter(w => w && w.date === dateStr) || [];
+    // 🔧 FIXED: Apply same filtering logic as TodaysEffort
+    const today = new Date().toLocaleDateString('en-CA');
+    
+    const filtered = workouts.filter((w) => {
+      if (!w || w.date !== dateStr) return false;
+      
+      // For today and future dates: show only planned workouts
+      if (dateStr >= today) {
+        const isPlanned = w.workout_status === 'planned' || !w.workout_status;
+        return isPlanned;
+      } 
+      // For past dates: show both planned and completed for reference
+      else {
+        return true;
+      }
+    });
+    
     return filtered;
   };
 

@@ -197,8 +197,10 @@ const AppLayout: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-lg">Loading...</div>
+      <div className="mobile-app-container">
+        <div className="flex items-center justify-center h-full">
+          <div className="text-lg">Loading...</div>
+        </div>
       </div>
     );
   }
@@ -216,10 +218,9 @@ const AppLayout: React.FC = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="mobile-app-container">
       {/* Header with navigation */}
-      <header className="border-b border-border/40 bg-card/30 backdrop-blur-sm sticky top-0 z-40">
-        {/* 🚨 FIXED: Mobile centering container */}
+      <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
             {/* Left: Hamburger menu and efforts title */}
@@ -286,9 +287,8 @@ const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content - 🚨 FIXED: Removed pt-16 from here since it's handled in individual components */}
-      <main className="flex-1">
-        {/* 🚨 FIXED: Mobile centering container */}
+      {/* Main content */}
+      <main className="mobile-main-content">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showStrengthPlans ? (
             <div className="pt-4">
