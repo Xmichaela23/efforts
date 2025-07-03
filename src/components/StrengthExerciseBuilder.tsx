@@ -17,6 +17,7 @@ export interface StrengthExercise {
   weightMode: 'same' | 'individual';
   individualWeights?: number[];
   completed_sets?: Array<{ reps: number; weight: number; rir?: number; completed: boolean }>;
+  oneRepMax?: number; // Add 1RM to exercise
 }
 
 interface StrengthExerciseBuilderProps {
@@ -63,6 +64,12 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
       onChange([starterExercise]);
     }
   }, [exercises.length, onChange, isCompleted]);
+
+  // Calculate percentage of 1RM
+  const calculatePercentage = (weight: number, oneRepMax: number): number => {
+    if (!weight || !oneRepMax || oneRepMax === 0) return 0;
+    return Math.round((weight / oneRepMax) * 100);
+  };
 
   const getFilteredExercises = (searchTerm: string) => {
     return searchTerm.length > 0
@@ -193,6 +200,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                   ? exercise.weight 
                   : exercise.individualWeights?.[setIndex];
                 const completedSet = exercise.completed_sets?.[setIndex];
+                const percentage = exercise.oneRepMax ? calculatePercentage(plannedWeight || 0, exercise.oneRepMax) : 0;
                 
                 return (
                   <div key={setIndex} className="bg-gray-50 p-3 -mx-4 px-4">
@@ -202,6 +210,7 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                       </span>
                       <span className="text-sm text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                         Planned: {exercise.reps || 0} reps @ {plannedWeight || 0} lbs
+                        {percentage > 0 && ` (${percentage}%)`}
                       </span>
                     </div>
                     
@@ -386,29 +395,37 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
               </div>
             </div>
 
+            {/* Weight input with percentage display */}
             {exercise.weightMode === 'same' ? (
               <div>
                 <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
                   Weight (lbs)
                 </Label>
-                <Input
-                  type="number"
-                  placeholder="185"
-                  value={exercise.weight || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '') {
-                      updateExercise(exercise.id, { weight: undefined });
-                    } else {
-                      const numValue = parseInt(value);
-                      if (!isNaN(numValue)) {
-                        updateExercise(exercise.id, { weight: numValue });
+                <div className="relative">
+                  <Input
+                    type="number"
+                    placeholder="185"
+                    value={exercise.weight || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        updateExercise(exercise.id, { weight: undefined });
+                      } else {
+                        const numValue = parseInt(value);
+                        if (!isNaN(numValue)) {
+                          updateExercise(exercise.id, { weight: numValue });
+                        }
                       }
-                    }
-                  }}
-                  className="min-h-[36px] text-sm border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                />
+                    }}
+                    className="min-h-[36px] text-sm border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none pr-16"
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  />
+                  {exercise.weight && exercise.oneRepMax && exercise.oneRepMax > 0 && (
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
+                      {calculatePercentage(exercise.weight, exercise.oneRepMax)}%
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <div>
@@ -421,58 +438,91 @@ export default function StrengthExerciseBuilder({ exercises, onChange, isComplet
                       <span className="text-xs w-10 text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                         Set {setIndex + 1}:
                       </span>
-                      <Input
-                        type="number"
-                        placeholder="185"
-                        value={exercise.individualWeights?.[setIndex] || ''}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === '') {
-                            updateIndividualWeight(exercise.id, setIndex, 0);
-                          } else {
-                            const numValue = parseInt(value);
-                            if (!isNaN(numValue)) {
-                              updateIndividualWeight(exercise.id, setIndex, numValue);
+                      <div className="relative flex-1">
+                        <Input
+                          type="number"
+                          placeholder="185"
+                          value={exercise.individualWeights?.[setIndex] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '') {
+                              updateIndividualWeight(exercise.id, setIndex, 0);
+                            } else {
+                              const numValue = parseInt(value);
+                              if (!isNaN(numValue)) {
+                                updateIndividualWeight(exercise.id, setIndex, numValue);
+                              }
                             }
-                          }
-                        }}
-                        className="min-h-[32px] text-xs border-gray-300 flex-1 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        style={{fontFamily: 'Inter, sans-serif'}}
-                      />
+                          }}
+                          className="min-h-[32px] text-xs border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none pr-10"
+                          style={{fontFamily: 'Inter, sans-serif'}}
+                        />
+                        {exercise.individualWeights?.[setIndex] && exercise.oneRepMax && exercise.oneRepMax > 0 && (
+                          <div className="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
+                            {calculatePercentage(exercise.individualWeights[setIndex], exercise.oneRepMax)}%
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Ultra-compact Weight Structure - moved below weight input */}
-            <div>
-              <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
-                Weight Structure
-              </Label>
-              <RadioGroup
-                value={exercise.weightMode}
-                onValueChange={(value: 'same' | 'individual') => {
-                  updateExercise(exercise.id, { 
-                    weightMode: value,
-                    individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
-                  });
-                }}
-                className="flex gap-3"
-              >
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
-                  <Label htmlFor={`same-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                    Same weight
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
-                  <Label htmlFor={`individual-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                    Different weights
-                  </Label>
-                </div>
-              </RadioGroup>
+            {/* Weight Structure and 1RM input side by side */}
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                  Weight Structure
+                </Label>
+                <RadioGroup
+                  value={exercise.weightMode}
+                  onValueChange={(value: 'same' | 'individual') => {
+                    updateExercise(exercise.id, { 
+                      weightMode: value,
+                      individualWeights: value === 'individual' ? Array(exercise.sets).fill(exercise.weight || 0) : undefined
+                    });
+                  }}
+                  className="flex gap-3"
+                >
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="same" id={`same-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
+                    <Label htmlFor={`same-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                      Same
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <RadioGroupItem value="individual" id={`individual-${exercise.id}`} className="min-h-[12px] min-w-[12px]" />
+                    <Label htmlFor={`individual-${exercise.id}`} className="text-xs text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                      Different
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </div>
+              
+              <div>
+                <Label className="text-xs text-muted-foreground mb-0.5 block" style={{fontFamily: 'Inter, sans-serif'}}>
+                  1RM
+                </Label>
+                <Input
+                  type="number"
+                  placeholder="225"
+                  value={exercise.oneRepMax || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '') {
+                      updateExercise(exercise.id, { oneRepMax: undefined });
+                    } else {
+                      const numValue = parseInt(value);
+                      if (!isNaN(numValue)) {
+                        updateExercise(exercise.id, { oneRepMax: numValue });
+                      }
+                    }
+                  }}
+                  className="min-h-[36px] text-sm border-gray-300 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  style={{fontFamily: 'Inter, sans-serif'}}
+                />
+              </div>
             </div>
 
             {/* Ultra-compact Collapsible Notes */}

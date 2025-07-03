@@ -27,7 +27,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const loadWorkoutsForDate = () => {
     if (workouts && workouts.length > 0) {
-      const dateWorkouts = workouts.filter((w: any) => w.date === activeDate);
+      console.log('🔍 All workouts for', activeDate, ':', workouts.filter((w: any) => w.date === activeDate));
+      
+      // 🔧 FIXED: Filter by both date AND status
+      const dateWorkouts = workouts.filter((w: any) => {
+        const isCorrectDate = w.date === activeDate;
+        
+        // For today and future dates: show only planned workouts
+        if (activeDate >= today) {
+          const isPlanned = w.workout_status === 'planned' || !w.workout_status; // Handle missing status as planned
+          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}`);
+          return isCorrectDate && isPlanned;
+        } 
+        // For past dates: show both planned and completed for reference
+        else {
+          console.log(`Past date workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}`);
+          return isCorrectDate;
+        }
+      });
+      
+      console.log('✅ Filtered workouts to display:', dateWorkouts);
       setDisplayWorkouts(dateWorkouts);
       setCurrentIndex(1); // Reset to first real item when date changes
     } else {
@@ -94,6 +113,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     
     const duration = workout.duration ? formatTime(workout.duration) : '';
     return duration || 'Workout';
+  };
+
+  // 🆕 Get status badge for workout
+  const getStatusBadge = (workout: any) => {
+    if (workout.workout_status === 'completed') {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+          ✓ Completed
+        </span>
+      );
+    }
+    return null;
   };
 
   // Format the date for display
@@ -412,9 +443,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-2">
                       {/* Workout title and summary */}
                       <div className="space-y-3">
-                        <h3 className="font-medium text-base leading-tight">
-                          {item.name || formatWorkoutType(item.type)}
-                        </h3>
+                        <div className="flex items-center justify-between">
+                          <h3 className="font-medium text-base leading-tight">
+                            {item.name || formatWorkoutType(item.type)}
+                          </h3>
+                          {/* 🆕 Show status badge for completed workouts */}
+                          {getStatusBadge(item)}
+                        </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           {getIcon(item.type)}
                           <span>{getWorkoutSummary(item)}</span>

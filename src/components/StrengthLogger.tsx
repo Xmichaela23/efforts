@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -134,6 +134,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
+  const [isInitialized, setIsInitialized] = useState(false); // 🆕 Track initialization
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -166,28 +167,61 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     return calculateTotalVolume(exercises);
   }, [exercises]);
 
-  // Initialize with scheduled workout or find today's planned workout
-  React.useEffect(() => {
+  // 🆕 Create empty starter exercise
+  const createEmptyExercise = (): LoggedExercise => ({
+    id: Date.now().toString(),
+    name: '',
+    sets: [{
+      reps: 0,
+      weight: 0,
+      barType: 'standard',
+      rir: undefined,
+      completed: false
+    }],
+    expanded: true
+  });
+
+  // 🔧 FIXED: Proper initialization with cleanup
+  useEffect(() => {
+    console.log('🔄 StrengthLogger initializing...');
+    
+    // 🆕 Always start fresh - clear any existing state
+    setExercises([]);
+    setExpandedPlates({});
+    setExpandedExercises({});
+    setCurrentExercise('');
+    setShowSuggestions(false);
+    
     let workoutToLoad = scheduledWorkout;
 
-    // If no scheduled workout provided, try to find today's planned strength workout
+    // If no scheduled workout provided, do a FRESH check for today's planned workout
     if (!workoutToLoad) {
+      console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
       const todayDate = getTodayDateString();
-      const todaysStrengthWorkouts = workouts.filter(workout => 
+      
+      // Get CURRENT workouts from the hub (not stale data)
+      const currentWorkouts = workouts || [];
+      const todaysStrengthWorkouts = currentWorkouts.filter(workout => 
         workout.date === todayDate && 
         workout.type === 'strength' && 
         workout.workout_status === 'planned'
       );
 
+      console.log('📊 Found planned workouts for today:', todaysStrengthWorkouts);
+
       if (todaysStrengthWorkouts.length > 0) {
         workoutToLoad = todaysStrengthWorkouts[0];
+        console.log('✅ Using planned workout:', workoutToLoad.name);
+      } else {
+        console.log('ℹ️ No planned strength workout found for today');
       }
     }
 
-    if (workoutToLoad && workoutToLoad.strength_exercises) {
+    if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
+      console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
-        id: exercise.id || `ex-${index}`,
+        id: exercise.id || `ex-${Date.now()}-${index}`,
         name: exercise.name || '',
         expanded: true,
         sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
@@ -201,22 +235,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       
       setExercises(prePopulatedExercises);
     } else {
+      console.log('🆕 Starting with empty exercise for manual logging');
       // Start with empty exercise for manual logging
-      const starterExercise: LoggedExercise = {
-        id: Date.now().toString(),
-        name: '',
-        sets: [{
-          reps: 0,
-          weight: 0,
-          barType: 'standard',
-          rir: undefined,
-          completed: false
-        }],
-        expanded: true
-      };
-      setExercises([starterExercise]);
+      setExercises([createEmptyExercise()]);
     }
-  }, [scheduledWorkout, workouts]);
+    
+    setIsInitialized(true);
+  }, [scheduledWorkout, workouts]); // 🆕 Depend on workouts to get fresh data
+
+  // 🆕 Cleanup when component unmounts
+  useEffect(() => {
+    return () => {
+      console.log('🧹 StrengthLogger cleanup - clearing state');
+      setExercises([]);
+      setExpandedPlates({});
+      setExpandedExercises({});
+      setCurrentExercise('');
+      setShowSuggestions(false);
+    };
+  }, []);
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
@@ -280,18 +317,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
   const deleteExercise = (exerciseId: string) => {
     if (exercises.length === 1) {
-      setExercises([{
-        id: Date.now().toString(),
-        name: '',
-        sets: [{
-          reps: 0,
-          weight: 0,
-          barType: 'standard',
-          rir: undefined,
-          completed: false
-        }],
-        expanded: true
-      }]);
+      // 🔧 FIXED: Use the helper function for consistency
+      setExercises([createEmptyExercise()]);
     } else {
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
     }
@@ -331,6 +358,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
     // Filter out exercises with no name or no sets
     const validExercises = exercises.filter(ex => ex.name.trim() && ex.sets.length > 0);
+
+    if (validExercises.length === 0) {
+      alert('Please add at least one exercise with a name to save the workout.');
+      return;
+    }
 
     // Prepare the workout data
     const completedWorkout = {
@@ -380,6 +412,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   };
 
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+
+  // 🆕 Don't render until properly initialized
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen pb-20">
+        <div className="bg-white pb-4 mb-4">
+          <div className="flex items-center w-full">
+            <h1 className="text-xl font-medium text-gray-700">Loading...</h1>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen pb-20">

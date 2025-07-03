@@ -26,6 +26,7 @@ interface WorkoutCalendarProps {
   onEditEffort: (workout: any) => void;
   onDateSelect?: (dateString: string) => void;
   onSelectRoutine?: (type: string) => void;
+  onSelectDiscipline?: (discipline: string) => void;
 }
 
 export default function WorkoutCalendar({ 
@@ -35,7 +36,8 @@ export default function WorkoutCalendar({
   onViewCompleted,
   onEditEffort,
   onDateSelect,
-  onSelectRoutine
+  onSelectRoutine,
+  onSelectDiscipline
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -128,7 +130,10 @@ export default function WorkoutCalendar({
       <div className="w-full flex justify-center items-center mb-2 gap-1 flex-nowrap">
         <NewEffortDropdown onSelectType={onSelectType} />
         <LogEffortDropdown onSelectType={onSelectType} />
-        <PlansDropdown onSelectRoutine={onSelectRoutine} />
+        <PlansDropdown 
+          onSelectRoutine={onSelectRoutine} 
+          onSelectDiscipline={onSelectDiscipline}
+        />
         <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
       </div>
       

@@ -21,6 +21,7 @@ import WorkoutMetrics from './WorkoutMetrics';
 import CompletedTab from './CompletedTab';
 import StrengthExerciseBuilder from './StrengthExerciseBuilder';
 import StrengthCompletedView from './StrengthCompletedView';
+import StrengthSummaryView from './StrengthSummaryView';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface WorkoutDetailProps {
@@ -144,24 +145,12 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
     }
   };
 
-  // Determine if this is a completed strength workout
-  const isCompletedStrengthWorkout = workout.type === 'strength' && 
-    workout.workout_status === 'completed' && 
+  // 🔧 FIXED: Simplified condition - show StrengthCompletedView for ALL strength workouts in Completed tab
+  const isStrengthWorkout = workout.type === 'strength' && 
     (workout.strength_exercises?.length > 0 || workout.completed_exercises?.length > 0);
 
   return (
     <div className="space-y-6">
-      {/* Header with workout title and icon */}
-      <div className="space-y-2">
-        <div className="flex items-center gap-2">
-          {getWorkoutIcon()}
-          <h1 className="text-2xl font-semibold text-gray-900" style={{ fontFamily: 'Inter, sans-serif' }}>
-            {workout.name}
-          </h1>
-        </div>
-        <p className="text-sm text-muted-foreground">{new Date(workout.date).toLocaleDateString()}</p>
-      </div>
-
       {/* Tab navigation with delete button */}
       <div className="w-full">
         <div className="flex items-center justify-between border-b border-gray-200">
@@ -235,7 +224,16 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
         <div className="mt-6">
           {activeTab === 'summary' && (
             <div className="space-y-4">
-              <WorkoutMetrics workout={workout} />
+              {workout.type === 'strength' ? (
+                <StrengthSummaryView workoutData={{
+                  ...workout,
+                  comments: workout.comments || '',
+                  strength_exercises: workout.strength_exercises || [],
+                  completed_exercises: workout.completed_exercises || []
+                }} />
+              ) : (
+                <WorkoutMetrics workout={workout} />
+              )}
               
               <Card>
                 <CardHeader>
@@ -260,9 +258,29 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                   workoutType={getWorkoutType()}
                   workoutData={workout}
                 />
-              ) : isCompletedStrengthWorkout ? (
-                <StrengthCompletedView workoutData={workout} />
+              ) : workout.type === 'strength' ? (
+                // 🔧 FIXED: Always use StrengthCompletedView for strength workouts with safe defaults
+                <StrengthCompletedView 
+                  workoutData={{
+                    ...workout,
+                    comments: workout.comments || '',
+                    strength_exercises: workout.strength_exercises?.map((exercise: any) => ({
+                      ...exercise,
+                      // Transform builder format to completed format if needed
+                      sets: Array.isArray(exercise.sets) 
+                        ? exercise.sets  // Already in correct format
+                        : Array.from({ length: exercise.sets || 0 }, (_, i) => ({
+                            reps: exercise.reps || 0,
+                            weight: exercise.weight || 0,
+                            completed: true,
+                            rir: undefined
+                          }))
+                    })) || [],
+                    completed_exercises: workout.completed_exercises || []
+                  }}
+                />
               ) : (
+                // 🔧 FIXED: Only fallback to StrengthExerciseBuilder for non-strength workouts or as last resort
                 <StrengthExerciseBuilder
                   exercises={strengthExercises}
                   onChange={handleStrengthExercisesChange}

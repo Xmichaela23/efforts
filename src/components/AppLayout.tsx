@@ -10,12 +10,14 @@ import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 import StrengthLogger from './StrengthLogger';
 import AllPlansInterface from './AllPlansInterface';
+import StrengthPlansView from './StrengthPlansView';
 
 const AppLayout: React.FC = () => {
   const { workouts, loading, useImperial, toggleUnits } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
+  const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -67,6 +69,7 @@ const AppLayout: React.FC = () => {
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
+    setShowStrengthPlans(false);
     setBuilderType('');
     setBuilderSourceContext('');
     setSelectedWorkout(null);
@@ -116,12 +119,22 @@ const AppLayout: React.FC = () => {
     }
   };
 
+  // 🔧 FIXED: handleEditEffort now goes to Summary/Completed view instead of Builder
   const handleEditEffort = (workout: any) => {
-    setWorkoutBeingEdited(workout);
-    setBuilderType(workout.type);
+    console.log('🎯 Workout clicked from Today\'s Effort:', workout);
+    
+    // 🆕 FIXED: Use the same logic as handleWorkoutSelect
+    // This will open WorkoutDetail (Summary/Completed view) instead of Builder
+    setSelectedWorkout(workout);
+    
+    // 🆕 Clear any builder-related state (don't need these anymore)
+    setWorkoutBeingEdited(null);
+    setBuilderType('');
     setBuilderSourceContext('');
-    setSelectedWorkout(null); // Clear selected workout when editing
-    setShowBuilder(true);
+    setShowBuilder(false);
+    
+    // 🆕 Set appropriate tab based on workout type (handled by useEffect above)
+    // The useEffect will automatically set the right tab when selectedWorkout changes
   };
 
   // 🚨 FIXED: Calendar date click - only select date, don't auto-open workouts
@@ -150,6 +163,20 @@ const AppLayout: React.FC = () => {
     }
   };
 
+  // 🚨 NEW: Handle discipline selection from Plans dropdown
+  const handleSelectDiscipline = (discipline: string) => {
+    console.log('handleSelectDiscipline called with:', discipline);
+    setSelectedWorkout(null); // Clear selected workout
+    
+    // Go directly to discipline-specific plans page
+    if (discipline === 'strength') {
+      setShowStrengthPlans(true);
+    } else {
+      // For other disciplines, still use AllPlansInterface for now
+      setShowAllPlans(true);
+    }
+  };
+
   const handlePlanSelect = (plan: any) => {
     console.log('Selected plan:', plan);
     setSelectedWorkout(null); // Clear selected workout
@@ -164,6 +191,7 @@ const AppLayout: React.FC = () => {
     setWorkoutBeingEdited(null);
     setSelectedWorkout(null); // Clear selected workout
     setShowAllPlans(false);
+    setShowStrengthPlans(false);
     setShowBuilder(true);
   };
 
@@ -179,6 +207,7 @@ const AppLayout: React.FC = () => {
     showAllPlans, 
     showBuilder, 
     showStrengthLogger, 
+    showStrengthPlans,
     selectedWorkout: !!selectedWorkout,
     selectedWorkoutId: selectedWorkout?.id,
     selectedWorkoutType: selectedWorkout?.type,
@@ -230,7 +259,7 @@ const AppLayout: React.FC = () => {
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               
               {/* Dashboard button when in builder/logger/plans */}
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans) && (
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && (
                 <Button
                   onClick={handleBackToDashboard}
                   variant="ghost"
@@ -247,7 +276,7 @@ const AppLayout: React.FC = () => {
 
             {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
-              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans) && (
+              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && (
                 <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
                 </span>
@@ -261,7 +290,14 @@ const AppLayout: React.FC = () => {
       <main className="flex-1">
         {/* 🚨 FIXED: Mobile centering container */}
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
-          {showAllPlans ? (
+          {showStrengthPlans ? (
+            <div className="pt-4">
+              <StrengthPlansView
+                onClose={handleBackToDashboard}
+                onBuildWorkout={handleBuildWorkout}
+              />
+            </div>
+          ) : showAllPlans ? (
             <div className="pt-4">
               <AllPlansInterface
                 onClose={handleBackToDashboard}
@@ -310,6 +346,7 @@ const AppLayout: React.FC = () => {
                 onEditEffort={handleEditEffort}
                 onDateSelect={handleDateSelect}
                 onSelectRoutine={handleSelectRoutine}
+                onSelectDiscipline={handleSelectDiscipline}
               />
             </div>
           )}
