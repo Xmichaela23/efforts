@@ -11,9 +11,11 @@ import TodaysEffort from './TodaysEffort';
 import StrengthLogger from './StrengthLogger';
 import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
+import WorkoutSummary from './WorkoutSummary';
+import NewEffortDropdown from './NewEffortDropdown';
 
 const AppLayout: React.FC = () => {
-  const { workouts, loading, useImperial, toggleUnits } = useAppContext();
+  const { workouts, loading, useImperial, toggleUnits, deleteWorkout } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
@@ -21,13 +23,20 @@ const AppLayout: React.FC = () => {
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
-  const [activeTab, setActiveTab] = useState<string>('summary'); // Always start with summary
+  const [activeTab, setActiveTab] = useState<string>('summary');
+
+  // 🆕 NEW: Sliding summary state
+  const [showSummary, setShowSummary] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
+  const [dateWorkouts, setDateWorkouts] = useState<any[]>([]);
+  const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
+  
+  // 🆕 NEW: Touch/swipe handling
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
-
-  // Track selected date for calendar interactions
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
 
   // 🚨 CRITICAL FIX: Set appropriate tab when workout is selected
   useEffect(() => {
@@ -74,7 +83,123 @@ const AppLayout: React.FC = () => {
     setBuilderSourceContext('');
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
-    setActiveTab('summary'); // Reset tab when going back
+    setActiveTab('summary');
+    // 🆕 NEW: Clear summary state
+    setShowSummary(false);
+    setDateWorkouts([]);
+    setCurrentWorkoutIndex(0);
+  };
+
+  // 🆕 NEW: Handle date selection - update Today's Effort to show selected date
+  const handleDateSelect = (date: string) => {
+    console.log('📅 Date selected:', date);
+    console.log('📅 Previous selectedDate:', selectedDate);
+    setSelectedDate(date);
+    console.log('📅 New selectedDate will be:', date);
+    
+    // Update Today's Effort to show this date immediately
+    // This enables the sliding functionality for empty dates
+  };
+
+  // 🚨 FIXED: Handle workout clicks - route completed workouts to WorkoutDetail
+  const handleEditEffort = (workout: any) => {
+    console.log('🎯 Workout clicked from Today\'s Effort:', workout);
+    console.log('🎯 Workout status:', workout.workout_status);
+    
+    // If workout is completed, go directly to WorkoutDetail
+    if (workout.workout_status === 'completed') {
+      console.log('🎯 Routing completed workout to WorkoutDetail');
+      setSelectedWorkout(workout);
+      // Tab will be set by useEffect based on workout type
+    } else {
+      // For scheduled/planned workouts, use sliding summary
+      console.log('🎯 Routing scheduled workout to sliding summary');
+      setDateWorkouts([workout]);
+      setCurrentWorkoutIndex(0);
+      setShowSummary(true);
+    }
+  };
+
+  // 🆕 NEW: Touch/swipe handlers for pure sliding navigation
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+    console.log('👆 Touch start:', e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+    
+    console.log('👆 Touch end - distance:', distance, 'left swipe:', isLeftSwipe, 'right swipe:', isRightSwipe, 'showSummary:', showSummary);
+
+    if (showSummary && dateWorkouts.length > 0) {
+      if (isLeftSwipe) {
+        console.log('⬅️ Swiping left - next workout');
+        // Swipe left - next workout (only if there are more workouts)
+        if (currentWorkoutIndex < dateWorkouts.length - 1) {
+          setCurrentWorkoutIndex(currentWorkoutIndex + 1);
+        }
+        // If at last workout, do nothing (no abyss)
+      } else if (isRightSwipe) {
+        console.log('➡️ Swiping right');
+        // Swipe right - previous workout or back to calendar
+        if (currentWorkoutIndex > 0) {
+          setCurrentWorkoutIndex(currentWorkoutIndex - 1);
+        } else {
+          console.log('🔙 Going back to calendar');
+          // At first workout, go back to calendar
+          setShowSummary(false);
+          setDateWorkouts([]);
+          setCurrentWorkoutIndex(0);
+        }
+      }
+    } else if (!showSummary) {
+      // If we're on calendar and swipe left, slide to summary for selected date
+      if (isLeftSwipe) {
+        console.log('📅 Calendar swipe left - checking for workouts on', selectedDate);
+        const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
+        console.log('📅 Found', workoutsForDate.length, 'workouts for', selectedDate);
+        console.log('📅 Workout details:', workoutsForDate);
+        
+        // Always slide to summary, even if no workouts (will show "Add effort" screen)
+        setDateWorkouts(workoutsForDate);
+        setCurrentWorkoutIndex(0);
+        setShowSummary(true);
+      }
+    } else if (showSummary && dateWorkouts.length === 0) {
+      // Handle empty date swiping
+      if (isRightSwipe) {
+        console.log('🔙 Going back to calendar from empty date');
+        setShowSummary(false);
+        setDateWorkouts([]);
+        setCurrentWorkoutIndex(0);
+      }
+    }
+    
+    // Reset touch state
+    setTouchStart(null);
+    setTouchEnd(null);
+  };
+
+  const handleDeleteWorkout = async (workoutId: string) => {
+    try {
+      await deleteWorkout(workoutId);
+      // Close summary and go back to calendar after deletion
+      setShowSummary(false);
+      setDateWorkouts([]);
+      setCurrentWorkoutIndex(0);
+    } catch (error) {
+      console.error('Error deleting workout:', error);
+      alert('Error deleting workout. Please try again.');
+    }
   };
 
   const handleNavigateToPlans = () => {
@@ -117,33 +242,6 @@ const AppLayout: React.FC = () => {
     } else {
       setShowBuilder(true);
     }
-  };
-
-  // 🔧 FIXED: handleEditEffort now goes to Summary/Completed view instead of Builder
-  const handleEditEffort = (workout: any) => {
-    console.log('🎯 Workout clicked from Today\'s Effort:', workout);
-    
-    // 🆕 FIXED: Use the same logic as handleWorkoutSelect
-    // This will open WorkoutDetail (Summary/Completed view) instead of Builder
-    setSelectedWorkout(workout);
-    
-    // 🆕 Clear any builder-related state (don't need these anymore)
-    setWorkoutBeingEdited(null);
-    setBuilderType('');
-    setBuilderSourceContext('');
-    setShowBuilder(false);
-    
-    // 🆕 Set appropriate tab based on workout type (handled by useEffect above)
-    // The useEffect will automatically set the right tab when selectedWorkout changes
-  };
-
-  // 🚨 FIXED: Calendar date click - only select date, don't auto-open workouts
-  const handleDateSelect = (date: string) => {
-    console.log('📅 Calendar date clicked:', date);
-    setSelectedDate(date);
-    
-    // Just select the date - let TodaysEffort component handle displaying workouts
-    // Users can click on individual workouts in TodaysEffort to view/edit them
   };
 
   const handleViewCompleted = () => {
@@ -205,21 +303,28 @@ const AppLayout: React.FC = () => {
     );
   }
 
+  // Get current workout for summary display
+  const currentWorkout = dateWorkouts[currentWorkoutIndex];
+
   console.log('🔍 AppLayout render state:', {
     showAllPlans, 
     showBuilder, 
     showStrengthLogger, 
     showStrengthPlans,
+    showSummary,
+    dateWorkouts: dateWorkouts.length,
+    currentWorkoutIndex,
     selectedWorkout: !!selectedWorkout,
     selectedWorkoutId: selectedWorkout?.id,
     selectedWorkoutType: selectedWorkout?.type,
     selectedWorkoutStatus: selectedWorkout?.workout_status,
+    selectedDate,
     activeTab
   });
 
   return (
     <div className="mobile-app-container">
-      {/* Header with navigation */}
+      {/* Header with navigation - NO CHEVRONS */}
       <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
@@ -260,7 +365,7 @@ const AppLayout: React.FC = () => {
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               
               {/* Dashboard button when in builder/logger/plans */}
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && (
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && !showSummary && (
                 <Button
                   onClick={handleBackToDashboard}
                   variant="ghost"
@@ -272,12 +377,14 @@ const AppLayout: React.FC = () => {
               )}
             </div>
 
-            {/* Center: Empty for spacing */}
-            <div></div>
+            {/* Center: Empty - removed workout indicator dots that were showing as ")) symbol */}
+            <div className="flex items-center">
+              {/* Dots removed - they were appearing as ")) on mobile */}
+            </div>
 
             {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
-              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && (
+              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showSummary) && (
                 <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
                 </span>
@@ -287,7 +394,7 @@ const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content */}
+      {/* Main content with pure sliding navigation */}
       <main className="mobile-main-content">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showStrengthPlans ? (
@@ -331,23 +438,67 @@ const AppLayout: React.FC = () => {
               />
             </div>
           ) : (
-            <div className="space-y-4 pt-4">
-              <TodaysEffort
-                selectedDate={selectedDate}
-                onAddEffort={handleAddEffort}
-                onViewCompleted={handleViewCompleted}
-                onEditEffort={handleEditEffort}
-              />
-              <WorkoutCalendar
-                onAddEffort={handleAddEffort}
-                onSelectType={handleSelectEffortType}
-                onSelectWorkout={handleWorkoutSelect}
-                onViewCompleted={handleViewCompleted}
-                onEditEffort={handleEditEffort}
-                onDateSelect={handleDateSelect}
-                onSelectRoutine={handleSelectRoutine}
-                onSelectDiscipline={handleSelectDiscipline}
-              />
+            // 🆕 NEW: Pure sliding container
+            <div className="sliding-container">
+              <div 
+                className={`sliding-wrapper ${showSummary ? 'show-summary' : ''}`}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                {/* Calendar view */}
+                <div className="slide-panel calendar-panel">
+                  <div className="space-y-4 pt-4">
+                    <TodaysEffort
+                      selectedDate={selectedDate}
+                      onAddEffort={handleAddEffort}
+                      onViewCompleted={handleViewCompleted}
+                      onEditEffort={handleEditEffort}
+                    />
+                    <WorkoutCalendar
+                      onAddEffort={handleAddEffort}
+                      onSelectType={handleSelectEffortType}
+                      onSelectWorkout={handleEditEffort}
+                      onViewCompleted={handleViewCompleted}
+                      onEditEffort={handleEditEffort}
+                      onDateSelect={handleDateSelect}
+                      onSelectRoutine={handleSelectRoutine}
+                      onSelectDiscipline={handleSelectDiscipline}
+                    />
+                  </div>
+                </div>
+
+                {/* Summary view */}
+                <div className="slide-panel summary-panel">
+                  <div className="pt-4">
+                    {currentWorkout ? (
+                      <WorkoutSummary 
+                        workout={currentWorkout} 
+                        onClose={() => {
+                          setShowSummary(false);
+                          setDateWorkouts([]);
+                          setCurrentWorkoutIndex(0);
+                        }}
+                        onDelete={handleDeleteWorkout}
+                      />
+                    ) : showSummary ? (
+                      // Show "Add effort" screen when no workouts for this date
+                      <div className="flex flex-col items-center justify-center py-16 px-4">
+                        <h2 className="text-lg font-medium mb-4">No workouts for this date</h2>
+                        <p className="text-muted-foreground mb-8 text-center">
+                          Add a workout to get started
+                        </p>
+                        <NewEffortDropdown 
+                          onSelectType={(type) => {
+                            setShowSummary(false);
+                            handleAddEffort(type, selectedDate);
+                          }} 
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

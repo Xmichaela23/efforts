@@ -17,16 +17,18 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
+          className="flex items-center gap-2 text-black hover:text-gray-600 transition-colors"
           style={{
             fontFamily: 'Inter, sans-serif',
             fontWeight: 600,
             padding: '14px 16px',
-            borderRadius: '8px',
             fontSize: '15px',
             minHeight: '48px',
             flex: 1,
-            maxWidth: '90px'
+            maxWidth: '90px',
+            background: 'transparent',
+            border: 'none',
+            boxShadow: 'none'
           }}
         >
           Build

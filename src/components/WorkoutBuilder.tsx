@@ -247,7 +247,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               if (interval.distance) segmentDesc += ` (${interval.distance}${isMetric ? 'km' : 'mi'})`;
               if (interval.powerTarget) segmentDesc += ` @ ${interval.powerTarget}`;
               if (interval.speedTarget) segmentDesc += ` @ ${interval.speedTarget}`;
-              if (interval.rpeTarget) segmentDesc += ` RPE ${interval.rpeTarget}`;
+              if (interval.rpeTarget) segmentDesc += ` @ RPE ${interval.rpeTarget}`;
 
               if (interval.repeat && interval.repeatCount && interval.repeatCount > 1) {
                 segmentDesc = `${interval.repeatCount}x(${segmentDesc})`;
@@ -304,7 +304,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     
     try {
       const workoutTitle = formData.name.trim() || 
-        `${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} - ${new Date(formData.date).toLocaleDateString()}`;
+        `${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} - ${formData.date}`;
 
       const workoutData = {
         ...formData,

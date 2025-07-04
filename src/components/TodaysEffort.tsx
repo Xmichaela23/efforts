@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Button } from '@/components/ui/button';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -19,8 +18,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 }) => {
   const { useImperial, workouts, loading } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(1); // Start at 1 due to prepended duplicate
-  const [transitionEnabled, setTransitionEnabled] = useState(true);
 
   const today = new Date().toLocaleDateString('en-CA');
   const activeDate = selectedDate || today;
@@ -48,83 +45,39 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       
       console.log('✅ Filtered workouts to display:', dateWorkouts);
       setDisplayWorkouts(dateWorkouts);
-      setCurrentIndex(1); // Reset to first real item when date changes
     } else {
       setDisplayWorkouts([]);
-      setCurrentIndex(1);
     }
   };
 
+  // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
+    console.log('🔄 TodaysEffort useEffect triggered - selectedDate:', selectedDate, 'activeDate:', activeDate);
     loadWorkoutsForDate();
-  }, [workouts, activeDate]);
-
-  const formatWorkoutType = (type: string) => {
-    return type.charAt(0).toUpperCase() + type.slice(1);
-  };
+  }, [workouts, selectedDate]); // Changed from activeDate to selectedDate
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'swim': return <Waves className="h-4 w-4" />;
-      case 'ride': return <Bike className="h-4 w-4" />;
-      case 'run': return <Activity className="h-4 w-4" />;
-      case 'strength': return <Dumbbell className="h-4 w-4" />;
-      case 'mobility': return <Move className="h-4 w-4" />;
-      default: return <Activity className="h-4 w-4" />;
+      case 'swim': return <Waves className="h-8 w-8" />;
+      case 'ride': return <Bike className="h-8 w-8" />;
+      case 'run': return <Activity className="h-8 w-8" />;
+      case 'strength': return <Dumbbell className="h-8 w-8" />;
+      case 'mobility': return <Move className="h-8 w-8" />;
+      default: return <Activity className="h-8 w-8" />;
     }
   };
 
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    }
-    return `${minutes}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const getWorkoutSummary = (workout: any) => {
-    if (workout.type === 'strength' && workout.strength_exercises) {
-      const exerciseNames = workout.strength_exercises
-        .slice(0, 3) // Show first 3 exercises
-        .map((ex: any) => ex.name)
-        .join(', ');
-      const remaining = workout.strength_exercises.length > 3 ? ` +${workout.strength_exercises.length - 3} more` : '';
-      return exerciseNames + remaining;
-    }
+  const getIconColor = (workout: any) => {
+    const isCompleted = workout.workout_status === 'completed';
     
-    if (workout.intervals && workout.intervals.length > 0) {
-      const segmentNames = workout.intervals
-        .slice(0, 2) // Show first 2 segments
-        .map((interval: any) => {
-          if (interval.effortLabel && interval.effortLabel !== `Segment ${workout.intervals.indexOf(interval) + 1}`) {
-            return interval.effortLabel;
-          }
-          if (interval.time) return interval.time;
-          if (interval.distance) return `${interval.distance}${useImperial ? 'mi' : 'km'}`;
-          return 'Segment';
-        })
-        .join(', ');
-      const remaining = workout.intervals.length > 2 ? ` +${workout.intervals.length - 2} more` : '';
-      return segmentNames + remaining;
+    switch (workout.type) {
+      case 'swim': return isCompleted ? 'text-cyan-300' : 'text-cyan-600';
+      case 'ride': return isCompleted ? 'text-blue-300' : 'text-blue-600';
+      case 'run': return isCompleted ? 'text-green-300' : 'text-green-600';
+      case 'strength': return isCompleted ? 'text-orange-300' : 'text-orange-600';
+      case 'mobility': return isCompleted ? 'text-purple-300' : 'text-purple-600';
+      default: return isCompleted ? 'text-gray-300' : 'text-gray-600';
     }
-    
-    const duration = workout.duration ? formatTime(workout.duration) : '';
-    return duration || 'Workout';
-  };
-
-  // 🆕 Get status badge for workout
-  const getStatusBadge = (workout: any) => {
-    if (workout.workout_status === 'completed') {
-      return (
-        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-          ✓ Completed
-        </span>
-      );
-    }
-    return null;
   };
 
   // Format the date for display
@@ -159,74 +112,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
-
-  // Create carousel items with duplicates for seamless looping
-  const createCarouselItems = () => {
-    const addEffortCard = { type: 'add-effort', id: 'add-effort' };
-    const originalItems = [...displayWorkouts, addEffortCard];
-    
-    if (originalItems.length <= 1) {
-      return originalItems;
-    }
-    
-    // Create: [last_item, ...original_items, first_item]
-    const lastItem = originalItems[originalItems.length - 1];
-    const firstItem = originalItems[0];
-    
-    return [lastItem, ...originalItems, firstItem];
-  };
-
-  const carouselItems = createCarouselItems();
-  const originalItemsLength = displayWorkouts.length + 1; // +1 for add effort card
-
-  // Navigation functions with seamless looping using requestAnimationFrame
-  const goLeft = () => {
-    if (originalItemsLength <= 1) return;
-    
-    const newIndex = currentIndex - 1;
-    setCurrentIndex(newIndex);
-    
-    // If we're at the first duplicate (index 0), snap to the real last item
-    if (newIndex === 0) {
-      setTimeout(() => {
-        setTransitionEnabled(false);
-        requestAnimationFrame(() => {
-          setCurrentIndex(originalItemsLength);
-          requestAnimationFrame(() => {
-            setTransitionEnabled(true);
-          });
-        });
-      }, 300); // Wait for transition to complete (300ms matches CSS transition)
-    }
-  };
-
-  const goRight = () => {
-    if (originalItemsLength <= 1) return;
-    
-    const newIndex = currentIndex + 1;
-    setCurrentIndex(newIndex);
-    
-    // If we're at the last duplicate, snap to the real first item
-    if (newIndex === originalItemsLength + 1) {
-      setTimeout(() => {
-        setTransitionEnabled(false);
-        requestAnimationFrame(() => {
-          setCurrentIndex(1);
-          requestAnimationFrame(() => {
-            setTransitionEnabled(true);
-          });
-        });
-      }, 300); // Wait for transition to complete (300ms matches CSS transition)
-    }
-  };
-
-  // Get the current real index for dots (accounting for duplicates)
-  const getRealIndex = () => {
-    if (originalItemsLength <= 1) return 0;
-    if (currentIndex === 0) return originalItemsLength - 1; // First duplicate shows last real item
-    if (currentIndex === originalItemsLength + 1) return 0; // Last duplicate shows first real item
-    return currentIndex - 1; // Adjust for prepended duplicate
-  };
 
   // Add Effort Dropdown Component
   const AddEffortDropdown = () => {
@@ -386,105 +271,39 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         </div>
       ) : (
-        <div className="w-full relative">
-          {/* Navigation buttons - only show if more than 1 item */}
-          {originalItemsLength > 1 && (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute left-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50 shadow-sm"
-                onClick={goLeft}
+        <div className="w-full px-4">
+          {/* Clean row of clickable workout symbols */}
+          <div className="flex items-center justify-center gap-6 py-8">
+            {displayWorkouts.map((workout) => (
+              <button
+                key={workout.id}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🎯 Symbol clicked:', workout);
+                  onEditEffort && onEditEffort(workout);
+                }}
+                onTouchStart={(e) => {
+                  e.stopPropagation();
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  console.log('🎯 Symbol touched:', workout);
+                  onEditEffort && onEditEffort(workout);
+                }}
+                className={`p-6 rounded-xl active:scale-95 transition-transform cursor-pointer ${getIconColor(workout)}`}
+                style={{ minWidth: '80px', minHeight: '80px' }}
               >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute right-2 top-1/2 transform -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-white border border-gray-200 hover:bg-gray-50 shadow-sm"
-                onClick={goRight}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </>
-          )}
-
-          {/* Workout cards container */}
-          <div className="overflow-hidden px-4">
-            <div 
-              className="flex"
-              style={{ 
-                transform: `translateX(-${currentIndex * 100}%)`,
-                transition: transitionEnabled ? 'transform 0.3s ease-in-out' : 'none'
-              }}
-            >
-              {/* Render carousel items (includes duplicates) */}
-              {carouselItems.map((item, index) => {
-                if (item.type === 'add-effort') {
-                  return (
-                    <div key={`add-effort-${index}`} className="basis-full flex-shrink-0">
-                      <div className="p-6 flex items-center justify-center min-h-[120px] mx-2">
-                        <AddEffortDropdown />
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <div
-                    key={`${item.id}-${index}`}
-                    className="basis-full flex-shrink-0"
-                    onClick={() => {
-                      console.log('🔧 Workout clicked:', item);
-                      onEditEffort && onEditEffort(item);
-                    }}
-                  >
-                    <div className="p-6 hover:bg-gray-50 transition-colors cursor-pointer min-h-[120px] mx-2">
-                      {/* Workout title and summary */}
-                      <div className="space-y-3">
-                        <div className="flex items-center justify-between">
-                          <h3 className="font-medium text-base leading-tight">
-                            {item.name || formatWorkoutType(item.type)}
-                          </h3>
-                          {/* 🆕 Show status badge for completed workouts */}
-                          {getStatusBadge(item)}
-                        </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          {getIcon(item.type)}
-                          <span>{getWorkoutSummary(item)}</span>
-                        </div>
-                        
-                        {/* Notes if present */}
-                        {item.userComments && (
-                          <p className="text-xs text-muted-foreground leading-relaxed line-clamp-2">
-                            {item.userComments}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                {getIcon(workout.type)}
+              </button>
+            ))}
           </div>
-
-          {/* Navigation dots - only show if more than 1 item */}
-          {originalItemsLength > 1 && (
-            <div className="flex justify-center mt-4">
-              <div className="flex gap-2">
-                {Array.from({ length: originalItemsLength }).map((_, index) => (
-                  <button
-                    key={index}
-                    className={`w-2 h-2 rounded-full transition-colors ${
-                      index === getRealIndex() ? 'bg-foreground' : 'bg-muted-foreground'
-                    }`}
-                    onClick={() => setCurrentIndex(index + 1)} // +1 to account for prepended duplicate
-                  />
-                ))}
-              </div>
-            </div>
-          )}
+          
+          {/* Add effort option at the bottom */}
+          <div className="text-center pt-4">
+            <AddEffortDropdown />
+          </div>
         </div>
       )}
     </div>

@@ -1,42 +1,55 @@
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import React, { useState } from 'react';
+import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface WorkoutSummaryProps {
   workout: any;
   onClose: () => void;
+  onDelete?: (workoutId: string) => void;
 }
 
-export default function WorkoutSummary({ workout, onClose }: WorkoutSummaryProps) {
+export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSummaryProps) {
+  console.log('🚨 NEW CLEAN WORKOUT SUMMARY LOADED');
+  console.log('🔍 Workout intervals:', workout.intervals);
+  console.log('🔍 Full workout object:', JSON.stringify(workout, null, 2));
   const { useImperial } = useAppContext();
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [workoutStatus, setWorkoutStatus] = useState(workout?.status || workout?.workout_status || 'planned');
 
   if (!workout) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Workout Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8 text-muted-foreground">
-            No workout selected
-          </div>
-          <Button onClick={onClose} className="w-full mt-4 bg-black text-white hover:bg-gray-800">
-            Close
-          </Button>
-        </CardContent>
-      </Card>
+      <div className="p-3 space-y-4">
+        <div className="text-center py-8 text-gray-500">
+          No workout selected
+        </div>
+      </div>
     );
   }
 
   const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
     return date.toLocaleDateString('en-US', { 
       weekday: 'long', 
       year: 'numeric', 
       month: 'long', 
       day: 'numeric' 
     });
+  };
+
+  const handleMarkComplete = () => {
+    setWorkoutStatus('completed');
+  };
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Delete this workout?')) return;
+    
+    if (onDelete && workout.id) {
+      onDelete(workout.id);
+    }
   };
 
   const getWorkoutTypeColor = (type: string) => {
@@ -49,92 +62,130 @@ export default function WorkoutSummary({ workout, onClose }: WorkoutSummaryProps
     }
   };
 
+  const isCompleted = workoutStatus === 'completed';
+  const hasNotes = workout.notes || workout.description;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <span>Workout Summary</span>
-          <Button onClick={onClose} variant="outline" className="border-black hover:bg-gray-100">
-            Close
-          </Button>
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <h2 className="text-2xl font-bold mb-2">{workout.name || 'Untitled Workout'}</h2>
-          <p className="text-muted-foreground">{formatDate(workout.date)}</p>
+    <div className="p-3 space-y-4" style={{listStyle: 'none', listStyleType: 'none'}}>
+      <style jsx>{`
+        * {
+          list-style: none !important;
+          list-style-type: none !important;
+        }
+        *::before, *::after {
+          content: none !important;
+        }
+      `}</style>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl font-bold">{workout.name || 'Untitled Workout'}</h1>
+          <p className="text-gray-500">{formatDate(workout.date)}</p>
           <p className={`text-lg font-medium capitalize ${getWorkoutTypeColor(workout.type)}`}>
             {workout.type} Workout
           </p>
         </div>
-
-        {workout.description && (
-          <div>
-            <h3 className="font-semibold mb-2">Description</h3>
-            <p className="text-muted-foreground">{workout.description}</p>
-          </div>
-        )}
-
-        {workout.intervals && workout.intervals.length > 0 && (
-          <div>
-            <h3 className="font-semibold mb-3">Intervals</h3>
-            <div className="space-y-3">
-              {workout.intervals.map((interval: any, index: number) => (
-                <Card key={interval.id || index} className="p-3">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium">Segment {index + 1}</h4>
-                      <div className="text-sm text-muted-foreground space-y-1">
-                        {interval.time && <p>Time: {interval.time}</p>}
-                        {interval.distance && <p>Distance: {interval.distance} {useImperial ? 'mi' : 'km'}</p>}
-                        {interval.paceTarget && <p>Pace Target: {interval.paceTarget}</p>}
-                        {interval.powerTarget && <p>Power Target: {interval.powerTarget}</p>}
-                        {interval.bpmTarget && <p>Heart Rate: {interval.bpmTarget} BPM</p>}
-                        {interval.rpeTarget && <p>RPE Target: {interval.rpeTarget}</p>}
-                        {interval.cadenceTarget && <p>Cadence: {interval.cadenceTarget} RPM</p>}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {workout.strength_exercises && workout.strength_exercises.length > 0 && (
-          <div>
-            <h3 className="font-semibold mb-3">Exercises</h3>
-            <div className="space-y-3">
-              {workout.strength_exercises.map((exercise: any, index: number) => (
-                <Card key={exercise.id || index} className="p-3">
-                  <h4 className="font-medium">{exercise.name}</h4>
-                  <p className="text-sm text-muted-foreground">
-                    {exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} {useImperial ? 'lbs' : 'kg'}
-                  </p>
-                  {exercise.notes && (
-                    <p className="text-sm text-muted-foreground mt-1">{exercise.notes}</p>
-                  )}
-                </Card>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {workout.comments && (
-          <div>
-            <h3 className="font-semibold mb-2">Comments</h3>
-            <Card className="p-3">
-              <p className="text-muted-foreground">{workout.comments}</p>
-            </Card>
-          </div>
-        )}
-
-        <div className="pt-4">
-          <Button onClick={onClose} className="w-full bg-black text-white hover:bg-gray-800">
-            Close
-          </Button>
+        <div className="flex items-center gap-4">
+          {!isCompleted && (
+            <button
+              onClick={handleMarkComplete}
+              className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700"
+            >
+              Mark done
+            </button>
+          )}
+          <button
+            onClick={handleDelete}
+            className="text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* Description */}
+      {workout.description && (
+        <div className="space-y-2">
+          <h3 className="font-semibold text-lg">Description</h3>
+          <p className="text-gray-600">{workout.description}</p>
+        </div>
+      )}
+
+      {/* Intervals - FIXED: Added CSS to prevent mobile ")) symbols */}
+      {workout.intervals && workout.intervals.length > 0 && (
+        <div className="space-y-3">
+          {workout.intervals.map((interval: any, index: number) => (
+            <div key={interval.id || index} className="space-y-1">
+              <h4 className="font-medium text-lg">
+                {interval.effortLabel || interval.name || `SEGMENT ${index + 1}`}
+              </h4>
+              <div className="space-y-1 text-gray-600">
+                {isCompleted ? (
+                  /* Completed view - unpack repeats */
+                  <div>
+                    {interval.isRepeatBlock ? (
+                      <div className="space-y-1">
+                        <p>{interval.time} planned:</p>
+                        <div className="ml-4 space-y-1">
+                          {Array.from({ length: interval.repeatCount || 1 }, (_, i) => (
+                            <div key={i} className="space-y-1">
+                              <p className="font-medium text-sm">Repeat {i + 1}:</p>
+                              <p className="ml-4">4:00 @ Hard planned → 4:02 actual (6:15 pace, HR: 165 avg)</p>
+                              <p className="ml-4">1:00 @ Easy planned → 58s actual (8:30 pace, HR: 145 avg)</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <p>{interval.time} planned → {interval.time} actual (N/A pace, HR: N/A avg)</p>
+                    )}
+                  </div>
+                ) : (
+                  /* Planned view - clean and simple */
+                  <div>
+                    <p>{interval.time} @ {interval.effortLabel || 'Easy'} pace</p>
+                    {interval.bpmTarget && <p>HR: {interval.bpmTarget} bpm</p>}
+                    {interval.paceTarget && <p>Pace: {interval.paceTarget}</p>}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Strength Exercises */}
+      {workout.strength_exercises && workout.strength_exercises.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="font-semibold text-lg">EXERCISES</h3>
+          {workout.strength_exercises.map((exercise: any, index: number) => (
+            <div key={exercise.id || index} className="space-y-1">
+              <h4 className="font-medium text-lg">{exercise.name}</h4>
+              <div className="text-gray-600">
+                <p>{exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} {useImperial ? 'lbs' : 'kg'}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Expandable Notes */}
+      {hasNotes && (
+        <div className="space-y-2">
+          <button
+            onClick={() => setNotesExpanded(!notesExpanded)}
+            className="flex items-center gap-2 font-semibold text-lg hover:text-blue-600"
+          >
+            {notesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            NOTES
+          </button>
+          {notesExpanded && (
+            <div className="text-gray-600 whitespace-pre-wrap">
+              {workout.notes || workout.description}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
