@@ -182,7 +182,6 @@ export const useWorkouts = () => {
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
         user_id: user.id  // 🔥 FIXED: Add user_id
-        user_id: user.id  // 🔥 FIXED: Add user_id
       };
 
       console.log("Saving workout with data:", toSave);
