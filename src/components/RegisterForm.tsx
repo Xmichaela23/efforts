@@ -4,34 +4,49 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 
-interface LoginFormProps {
-  onSwitchToRegister: () => void;
+interface RegisterFormProps {
+  onSuccess: () => void;
+  onSwitchToLogin: () => void;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
+const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError('');
 
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password: password,
       });
 
       if (error) {
         setError(error.message);
+      } else {
+        onSuccess();
       }
-      // AuthWrapper will handle the redirect via onAuthStateChange
     } catch (error) {
       setError('An unexpected error occurred');
-      console.error('Login error:', error);
+      console.error('Registration error:', error);
     } finally {
       setLoading(false);
     }
@@ -39,14 +54,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
-        <p className="mt-2 text-gray-600">Sign in to your account</p>
+        <p className="mt-2 text-gray-600">Create your account</p>
       </div>
 
-      {/* Login Form */}
-      <form onSubmit={handleLogin} className="space-y-4">
+      <form onSubmit={handleRegister} className="space-y-4">
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-600 text-sm">{error}</p>
@@ -73,7 +86,20 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter your password"
+            placeholder="Create a password (min 6 characters)"
+            required
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm your password"
             required
             className="mt-1"
           />
@@ -84,19 +110,18 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
           disabled={loading}
           className="w-full bg-black text-white hover:bg-gray-800"
         >
-          {loading ? 'Signing in...' : 'Sign In'}
+          {loading ? 'Creating account...' : 'Create Account'}
         </Button>
       </form>
 
-      {/* Switch to Register */}
       <div className="text-center">
         <p className="text-gray-600">
-          Don't have an account?{' '}
+          Already have an account?{' '}
           <button
-            onClick={onSwitchToRegister}
+            onClick={onSwitchToLogin}
             className="text-black font-medium hover:underline"
           >
-            Create one
+            Sign in
           </button>
         </p>
       </div>
@@ -104,4 +129,4 @@ const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
   );
 };
 
-export default LoginForm;
+export default RegisterForm;
