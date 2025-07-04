@@ -24,7 +24,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  const [showPlanBuilder, setShowPlanBuilder] = useState(false);
+  const [showLocalPlanModal, setShowLocalPlanModal] = useState(false);
   const [planPrompt, setPlanPrompt] = useState('');
   const [generatingPlan, setGeneratingPlan] = useState(false);
   
@@ -237,7 +237,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         }
       }
       
-      setShowPlanBuilder(false);
+      setShowLocalPlanModal(false);
       setPlanPrompt('');
       
       // Show success message
@@ -548,7 +548,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       )}
 
       {/* Plan Builder Modal */}
-      {showPlanBuilder && (
+      {showLocalPlanModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-lg font-semibold mb-4">Build me a plan</h2>
@@ -584,7 +584,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   {generatingPlan ? 'Generating...' : 'Generate Plan'}
                 </Button>
                 <Button
-                  onClick={() => setShowPlanBuilder(false)}
+                  onClick={() => setShowLocalPlanModal(false)}
                   variant="outline"
                 >
                   Cancel
@@ -645,7 +645,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 style={{fontFamily: 'Inter, sans-serif'}}
               />
               <Button
-                onClick={() => setShowPlanBuilder(true)}
+                onClick={() => setShowLocalPlanModal(true)}
                 variant="ghost"
                 className="text-gray-600 hover:text-black flex items-center gap-2"
               >

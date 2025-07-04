@@ -4,15 +4,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move } from 'lucide-react';
+import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move, Kanban } from 'lucide-react';
 
 interface NewEffortDropdownProps {
   onSelectType: (type: string) => void;
+  onOpenPlanBuilder?: () => void;
 }
 
-const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) => {
+const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType, onOpenPlanBuilder }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -40,6 +42,20 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
         className="bg-white border border-gray-200 shadow-xl"
         style={{borderRadius: '12px', padding: '8px', minWidth: '160px'}}
       >
+        <DropdownMenuItem
+          onClick={() => {
+            console.log('🔥 Build me a plan clicked!', onOpenPlanBuilder);
+            onOpenPlanBuilder?.();
+          }}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <Kanban className="h-5 w-5 mr-3" />
+          Build me a plan
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator className="my-2" />
+        
         <DropdownMenuItem
           onClick={() => onSelectType('run')}
           className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"

@@ -18,6 +18,14 @@ const DISCIPLINE_COLORS = {
   mobility: 'bg-purple-500'
 };
 
+interface Plan {
+  id: string;
+  name: string;
+  currentWeek?: number;
+  status: 'active' | 'completed';
+  description?: string;
+}
+
 interface WorkoutCalendarProps {
   onAddEffort: (type: string, date?: string) => void;
   onSelectType: (type: string) => void;
@@ -27,7 +35,10 @@ interface WorkoutCalendarProps {
   onDateSelect?: (dateString: string) => void;
   onSelectRoutine?: (type: string) => void;
   onSelectDiscipline?: (discipline: string) => void;
-  isSwipingHorizontally?: boolean; // NEW: Track when parent is swiping
+  onOpenPlanBuilder?: () => void;
+  isSwipingHorizontally?: boolean;
+  currentPlans?: Plan[]; // NEW: AI-generated current plans
+  completedPlans?: Plan[]; // NEW: Completed plans
 }
 
 export default function WorkoutCalendar({ 
@@ -39,7 +50,10 @@ export default function WorkoutCalendar({
   onDateSelect,
   onSelectRoutine,
   onSelectDiscipline,
-  isSwipingHorizontally = false // NEW: Default to false
+  onOpenPlanBuilder,
+  isSwipingHorizontally = false,
+  currentPlans = [], // NEW: Default to empty array
+  completedPlans = [] // NEW: Default to empty array
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -162,11 +176,15 @@ export default function WorkoutCalendar({
     <div className="w-full">
       {/* FIXED: Extra tight spacing - more overlap between buttons */}
       <div className="w-full flex justify-center items-center mb-2 -space-x-2 flex-nowrap px-4">
-        <NewEffortDropdown onSelectType={onSelectType} />
+        <NewEffortDropdown 
+          onSelectType={onSelectType} 
+          onOpenPlanBuilder={onOpenPlanBuilder}
+        />
         <LogEffortDropdown onSelectType={onSelectType} />
         <PlansDropdown 
-          onSelectRoutine={onSelectRoutine} 
-          onSelectDiscipline={onSelectDiscipline}
+          onSelectRoutine={onSelectRoutine}
+          currentPlans={currentPlans}
+          completedPlans={completedPlans}
         />
         <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
       </div>

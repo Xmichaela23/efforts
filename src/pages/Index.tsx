@@ -1,12 +1,11 @@
-
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+import AuthWrapper from '@/components/AuthWrapper';
 import { AppProvider } from '@/contexts/AppContext';
 
 const Index: React.FC = () => {
   return (
     <AppProvider>
-      <AppLayout />
+      <AuthWrapper />
     </AppProvider>
   );
 };

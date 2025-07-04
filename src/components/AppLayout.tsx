@@ -13,17 +13,54 @@ import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
+import PlansDropdown from './PlansDropdown';
+import PlanBuilder from './PlanBuilder';
 
-const AppLayout: React.FC = () => {
-  const { workouts, loading, useImperial, toggleUnits, deleteWorkout } = useAppContext();
+interface Plan {
+  id: string;
+  name: string;
+  currentWeek?: number;
+  status: 'active' | 'completed';
+  description?: string;
+}
+
+// 🔥 NEW: Add interface for AppLayout props
+interface AppLayoutProps {
+  onLogout?: () => void;
+}
+
+// 🔥 UPDATED: AppLayout now accepts onLogout prop
+const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
+  const { 
+    workouts, 
+    loading, 
+    useImperial, 
+    toggleUnits, 
+    deleteWorkout,
+    // NEW: Plan context
+    currentPlans,
+    completedPlans,
+    detailedPlans,
+    plansLoading,
+    addPlan,
+    deletePlan,
+    updatePlan,
+    refreshPlans
+  } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
+  const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('summary');
+
+  // Plan data state - now comes from context
+  // const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
+  // const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
+  // const [detailedPlans, setDetailedPlans] = useState<any>({});
 
   // 🆕 NEW: Sliding summary state
   const [showSummary, setShowSummary] = useState(false);
@@ -75,16 +112,30 @@ const AppLayout: React.FC = () => {
     console.log('Updating workout:', workoutId, updates);
   };
 
+  const handleOpenPlanBuilder = () => {
+    setShowPlanBuilder(true);
+    // Clear other states
+    setShowSummary(false);
+    setDateWorkouts([]);
+    setCurrentWorkoutIndex(0);
+  };
+
   const handleBackToDashboard = () => {
     console.log('🔍 handleBackToDashboard called - clearing all state');
-    // 🚨 FIX: If we came from summary, go back to summary with the same date
-    const shouldReturnToSummary = showBuilder && selectedDate;
+    
+    // 🚨 FIX: Check if we're coming from Plan Builder BEFORE clearing states
+    const comingFromPlanBuilder = showPlanBuilder;
+    
+    // 🚨 FIX: Only return to summary if we came from a workout that was opened from summary sliding
+    // This should ONLY happen when editing an existing workout from the sliding summary view
+    const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
     
     // Clear all state and return to dashboard
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
+    setShowPlanBuilder(false);
     setBuilderType('');
     setBuilderSourceContext('');
     setSelectedWorkout(null);
@@ -413,7 +464,9 @@ const AppLayout: React.FC = () => {
       console.log('showAllPlans should now be true');
     } else {
       console.log('Plan selected:', routineId);
-      // TODO: Handle specific plan selection
+      // Handle specific plan selection - could open plan detail view
+      // For now, open AllPlansInterface and let it handle the plan detail view
+      setShowAllPlans(true);
     }
   };
 
@@ -449,6 +502,66 @@ const AppLayout: React.FC = () => {
     setShowBuilder(true);
   };
 
+  // Plan generation callback - now uses context
+  const handlePlanGenerated = async (newPlan: any) => {
+    console.log('🎯 handlePlanGenerated called in AppLayout with:', newPlan);
+    
+    try {
+      // Save to Supabase via context
+      await addPlan(newPlan);
+      console.log('🎯 Plan saved to Supabase successfully');
+      
+      // Close plan builder and show plans interface
+      setShowPlanBuilder(false);
+      setShowAllPlans(true);
+    } catch (error) {
+      console.error('🎯 Error saving plan:', error);
+      alert('Error saving plan. Please try again.');
+    }
+  };
+
+  // Handle plan deletion - now uses context
+  const handlePlanDeleted = async (planId: string) => {
+    console.log('🗑️ handlePlanDeleted called with planId:', planId);
+    
+    try {
+      // Find workouts associated with this plan
+      const planWorkouts = workouts?.filter(w => {
+        const matchesId = w.planId === planId;
+        const matchesPattern = w.name && (
+          w.name.includes('Week 1') || 
+          w.name.includes('Week 2') || 
+          w.name.includes('Week 3') || 
+          w.name.includes('Week 4')
+        );
+        return matchesId || matchesPattern;
+      }) || [];
+      
+      console.log('🗑️ Found plan workouts to delete:', planWorkouts.length);
+      
+      // Delete all associated workouts
+      for (const workout of planWorkouts) {
+        try {
+          console.log('🗑️ Deleting workout:', workout.id, workout.name);
+          await deleteWorkout(workout.id);
+        } catch (error) {
+          console.error('🗑️ Error deleting workout:', workout.id, error);
+        }
+      }
+      
+      // Delete plan from Supabase via context
+      await deletePlan(planId);
+      console.log('🗑️ Plan deleted successfully');
+      
+      // Go back to plans list
+      setShowAllPlans(true);
+      
+    } catch (error) {
+      console.error('🗑️ Error deleting plan:', error);
+      alert('Error deleting plan. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="mobile-app-container">
@@ -470,6 +583,7 @@ const AppLayout: React.FC = () => {
     showBuilder, 
     showStrengthLogger, 
     showStrengthPlans,
+    showPlanBuilder,
     showSummary,
     dateWorkouts: dateWorkouts.length,
     currentWorkoutIndex,
@@ -480,8 +594,15 @@ const AppLayout: React.FC = () => {
     selectedDate,
     activeTab,
     finalTransform,
-    isSwipeActive
+    isSwipeActive,
+    currentPlans: currentPlans.length,
+    completedPlans: completedPlans.length
   });
+
+  // 🚨 DEBUG: Log plan state 
+  console.log('🗂️ Current Plans State:', currentPlans);
+  console.log('🗂️ Completed Plans State:', completedPlans);
+  console.log('🗂️ Detailed Plans State:', Object.keys(detailedPlans));
 
   return (
     <div className="mobile-app-container">
@@ -517,7 +638,8 @@ const AppLayout: React.FC = () => {
                   <DropdownMenuItem>
                     Help & Support
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  {/* 🔥 UPDATED: Sign Out now calls onLogout */}
+                  <DropdownMenuItem onClick={onLogout}>
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -526,7 +648,7 @@ const AppLayout: React.FC = () => {
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               
               {/* Dashboard button when in builder/logger/plans */}
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && !showSummary && (
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
                 <Button
                   onClick={handleBackToDashboard}
                   variant="ghost"
@@ -545,7 +667,7 @@ const AppLayout: React.FC = () => {
 
             {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
-              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showSummary) && (
+              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
                 <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
                 </span>
@@ -558,7 +680,14 @@ const AppLayout: React.FC = () => {
       {/* Main content with Apple Photos style sliding */}
       <main className="mobile-main-content">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
-          {showStrengthPlans ? (
+          {showPlanBuilder ? (
+            <div className="pt-4">
+              <PlanBuilder 
+                onClose={handleBackToDashboard}
+                onPlanGenerated={handlePlanGenerated}
+              />
+            </div>
+          ) : showStrengthPlans ? (
             <div className="pt-4">
               <StrengthPlansView
                 onClose={handleBackToDashboard}
@@ -571,6 +700,10 @@ const AppLayout: React.FC = () => {
                 onClose={handleBackToDashboard}
                 onSelectPlan={handlePlanSelect}
                 onBuildWorkout={handleBuildWorkout}
+                currentPlans={currentPlans}
+                completedPlans={completedPlans}
+                detailedPlans={detailedPlans}
+                onDeletePlan={handlePlanDeleted}
               />
             </div>
           ) : showStrengthLogger ? (
@@ -633,7 +766,10 @@ const AppLayout: React.FC = () => {
                         onDateSelect={handleDateSelect}
                         onSelectRoutine={handleSelectRoutine}
                         onSelectDiscipline={handleSelectDiscipline}
+                        onOpenPlanBuilder={handleOpenPlanBuilder}
                         isSwipingHorizontally={isSwipeActive}
+                        currentPlans={currentPlans}
+                        completedPlans={completedPlans}
                       />
                     </div>
                   </div>
@@ -672,7 +808,8 @@ const AppLayout: React.FC = () => {
                                 setShowSummary(false);
                                 handleAddEffort(type, selectedDate);
                               }, 300); // Wait for animation to complete
-                            }} 
+                            }}
+                            onOpenPlanBuilder={handleOpenPlanBuilder}
                           />
                           
                           {/* 🚨 FIX: Add back button for empty date screen */}

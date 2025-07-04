@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
+import { supabase } from '@/lib/supabase';
 
 export interface WorkoutInterval {
   id: string;
@@ -30,16 +31,44 @@ interface Workout {
   swimData?: SwimWorkoutData;
 }
 
+// NEW: Plan interface
+interface Plan {
+  id: string;
+  name: string;
+  description?: string;
+  type?: string;
+  duration?: number;
+  level?: string;
+  goal?: string;
+  status: 'active' | 'completed';
+  current_week?: number;
+  created_date?: string;
+  total_workouts?: number;
+  weeks?: any;
+  user_id?: string;
+}
+
 interface AppContextType {
+  // Existing workout properties
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   workouts: Workout[];
   loading: boolean;
   addWorkout: (workout: Omit<Workout, 'id'>) => Promise<any>;
-  updateWorkout: (id: string, updates: Partial<Workout>) => Promise<any>; // ADD THIS
+  updateWorkout: (id: string, updates: Partial<Workout>) => Promise<any>;
   deleteWorkout: (id: string) => Promise<void>;
   useImperial: boolean;
   toggleUnits: () => void;
+  
+  // NEW: Plan management
+  currentPlans: Plan[];
+  completedPlans: Plan[];
+  detailedPlans: any;
+  plansLoading: boolean;
+  addPlan: (plan: any) => Promise<void>;
+  deletePlan: (planId: string) => Promise<void>;
+  updatePlan: (planId: string, updates: any) => Promise<void>;
+  refreshPlans: () => Promise<void>;
 }
 
 const defaultAppContext: AppContextType = {
@@ -48,10 +77,20 @@ const defaultAppContext: AppContextType = {
   workouts: [],
   loading: false,
   addWorkout: async () => {},
-  updateWorkout: async () => {}, // ADD THIS
+  updateWorkout: async () => {},
   deleteWorkout: async () => {},
   useImperial: true,
   toggleUnits: () => {},
+  
+  // NEW: Plan defaults
+  currentPlans: [],
+  completedPlans: [],
+  detailedPlans: {},
+  plansLoading: false,
+  addPlan: async () => {},
+  deletePlan: async () => {},
+  updatePlan: async () => {},
+  refreshPlans: async () => {},
 };
 
 const AppContext = createContext<AppContextType>(defaultAppContext);
@@ -59,10 +98,162 @@ const AppContext = createContext<AppContextType>(defaultAppContext);
 export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Existing workout state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
-  const { workouts, loading, addWorkout, updateWorkout, deleteWorkout } = useWorkouts(); // ADD updateWorkout
+  const { workouts, loading, addWorkout, updateWorkout, deleteWorkout } = useWorkouts();
+  
+  // NEW: Plan state
+  const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
+  const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
+  const [detailedPlans, setDetailedPlans] = useState<any>({});
+  const [plansLoading, setPlansLoading] = useState(true);
 
+  // NEW: Load plans from Supabase
+  const loadPlans = async () => {
+    try {
+      setPlansLoading(true);
+      console.log('📋 Loading plans from Supabase...');
+      
+      const { data: plans, error } = await supabase
+        .from('plans')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading plans:', error);
+        return;
+      }
+
+      console.log('📋 Loaded plans:', plans);
+
+      // Separate active and completed plans
+      const active = plans?.filter(p => p.status === 'active') || [];
+      const completed = plans?.filter(p => p.status === 'completed') || [];
+      
+      setCurrentPlans(active);
+      setCompletedPlans(completed);
+      
+      // Build detailed plans object
+      const detailed = {};
+      plans?.forEach(plan => {
+        detailed[plan.id] = plan;
+      });
+      setDetailedPlans(detailed);
+      
+      console.log('📋 Active plans:', active.length);
+      console.log('📋 Completed plans:', completed.length);
+      
+    } catch (error) {
+      console.error('Error in loadPlans:', error);
+    } finally {
+      setPlansLoading(false);
+    }
+  };
+
+  // NEW: Add plan to Supabase - FIXED with user_id
+  const addPlan = async (planData: any) => {
+    try {
+      console.log('📋 Adding plan to Supabase:', planData);
+      
+      // 🔥 FIXED: Get the current user for Row Level Security
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('plans')
+        .insert([{
+          id: planData.id,
+          name: planData.name,
+          description: planData.description,
+          type: planData.type,
+          duration: planData.duration,
+          level: planData.level,
+          goal: planData.goal,
+          status: planData.status || 'active',
+          current_week: planData.currentWeek || 1,
+          total_workouts: planData.totalWorkouts,
+          weeks: planData.weeks,
+          user_id: user?.id  // 🔥 ADDED: Required for RLS authentication
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding plan:', error);
+        throw error;
+      }
+
+      console.log('📋 Plan added successfully:', data);
+      
+      // Refresh plans to get updated data
+      await loadPlans();
+      
+    } catch (error) {
+      console.error('Error in addPlan:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Delete plan from Supabase
+  const deletePlan = async (planId: string) => {
+    try {
+      console.log('📋 Deleting plan from Supabase:', planId);
+      
+      const { error } = await supabase
+        .from('plans')
+        .delete()
+        .eq('id', planId);
+
+      if (error) {
+        console.error('Error deleting plan:', error);
+        throw error;
+      }
+
+      console.log('📋 Plan deleted successfully');
+      
+      // Refresh plans to get updated data
+      await loadPlans();
+      
+    } catch (error) {
+      console.error('Error in deletePlan:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Update plan in Supabase
+  const updatePlan = async (planId: string, updates: any) => {
+    try {
+      console.log('📋 Updating plan in Supabase:', planId, updates);
+      
+      const { data, error } = await supabase
+        .from('plans')
+        .update(updates)
+        .eq('id', planId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating plan:', error);
+        throw error;
+      }
+
+      console.log('📋 Plan updated successfully:', data);
+      
+      // Refresh plans to get updated data
+      await loadPlans();
+      
+    } catch (error) {
+      console.error('Error in updatePlan:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Refresh plans
+  const refreshPlans = async () => {
+    await loadPlans();
+  };
+
+  // Existing functions
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
   };
@@ -71,18 +262,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUseImperial(prev => !prev);
   };
 
+  // NEW: Load plans on mount
+  useEffect(() => {
+    loadPlans();
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
+        // Existing workout values
         sidebarOpen,
         toggleSidebar,
         workouts,
         loading,
         addWorkout,
-        updateWorkout, // ADD THIS
+        updateWorkout,
         deleteWorkout,
         useImperial,
         toggleUnits,
+        
+        // NEW: Plan values
+        currentPlans,
+        completedPlans,
+        detailedPlans,
+        plansLoading,
+        addPlan,
+        deletePlan,
+        updatePlan,
+        refreshPlans,
       }}
     >
       {children}
