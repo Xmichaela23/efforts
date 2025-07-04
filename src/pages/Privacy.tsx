@@ -96,4 +96,3 @@ export default function Privacy({ onBack }: PrivacyProps) {
     </div>
   );
 }
-new
