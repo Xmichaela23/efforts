@@ -31,9 +31,12 @@ const AppLayout: React.FC = () => {
   const [dateWorkouts, setDateWorkouts] = useState<any[]>([]);
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   
-  // 🆕 NEW: Touch/swipe handling
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  // 🍎 APPLE PHOTOS STYLE: Enhanced touch handling
+  const [isSwipeActive, setIsSwipeActive] = useState(false);
+  const [swipeProgress, setSwipeProgress] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [liveTransform, setLiveTransform] = useState(0);
 
   // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
@@ -74,6 +77,9 @@ const AppLayout: React.FC = () => {
 
   const handleBackToDashboard = () => {
     console.log('🔍 handleBackToDashboard called - clearing all state');
+    // 🚨 FIX: If we came from summary, go back to summary with the same date
+    const shouldReturnToSummary = showBuilder && selectedDate;
+    
     // Clear all state and return to dashboard
     setShowStrengthLogger(false);
     setShowBuilder(false);
@@ -84,10 +90,31 @@ const AppLayout: React.FC = () => {
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
-    // 🆕 NEW: Clear summary state
-    setShowSummary(false);
-    setDateWorkouts([]);
-    setCurrentWorkoutIndex(0);
+    setLiveTransform(0);
+    
+    // 🚨 FIX: If we should return to summary, restore the summary state
+    if (shouldReturnToSummary) {
+      // Check if there are workouts for this date
+      const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
+      if (workoutsForDate.length > 0) {
+        // Return to summary with workouts
+        setDateWorkouts(workoutsForDate);
+        setCurrentWorkoutIndex(0);
+        setShowSummary(true);
+        setLiveTransform(-50);
+      } else {
+        // Return to empty date summary
+        setDateWorkouts([]);
+        setCurrentWorkoutIndex(0);
+        setShowSummary(true);
+        setLiveTransform(-50);
+      }
+    } else {
+      // 🆕 NEW: Clear summary state completely
+      setShowSummary(false);
+      setDateWorkouts([]);
+      setCurrentWorkoutIndex(0);
+    }
   };
 
   // 🆕 NEW: Handle date selection - update Today's Effort to show selected date
@@ -120,82 +147,201 @@ const AppLayout: React.FC = () => {
     }
   };
 
-  // 🆕 NEW: Touch/swipe handlers for pure sliding navigation
+  // 🍎 APPLE PHOTOS STYLE: Smooth, instant, visual feedback
   const handleTouchStart = (e: React.TouchEvent) => {
-    setTouchEnd(null);
-    setTouchStart(e.targetTouches[0].clientX);
-    console.log('👆 Touch start:', e.targetTouches[0].clientX);
+    const touch = e.targetTouches[0];
+    setTouchStartX(touch.clientX);
+    setTouchStartY(touch.clientY);
+    setIsSwipeActive(false);
+    setSwipeProgress(0);
+    setLiveTransform(0);
+    console.log('👆 Touch start - Apple Photos style', {
+      x: touch.clientX,
+      y: touch.clientY,
+      showSummary,
+      selectedDate,
+      hasWorkouts: workouts?.filter(w => w.date === selectedDate)?.length || 0
+    });
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (!touchStartX || !touchStartY) return;
+    
+    const touch = e.targetTouches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    
+    // 🍎 APPLE PHOTOS: Balanced horizontal detection - 8px threshold
+    const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 8;
+    
+    if (isHorizontalSwipe) {
+      // 🍎 PHOTOS STYLE: Activate horizontal swipe mode
+      if (!isSwipeActive) {
+        console.log('🔥 Horizontal swipe ACTIVATED', {
+          deltaX,
+          deltaY,
+          showSummary,
+          selectedDate
+        });
+      }
+      setIsSwipeActive(true);
+      
+      // Prevent other interactions during swipe
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Calculate swipe progress (0-100) for visual feedback
+      const progress = Math.min(Math.abs(deltaX) / 50, 1) * 100;
+      setSwipeProgress(progress);
+      
+      // 🍎 PHOTOS STYLE: Live transform - content moves with finger
+      const screenWidth = window.innerWidth;
+      const transformPercent = (deltaX / screenWidth) * 100;
+      
+      if (showSummary) {
+        // In workout view - slide between workouts or back to calendar
+        const baseTransform = -50; // Current position (50% left)
+        let liveTransform = Math.max(-100, Math.min(0, baseTransform + transformPercent));
+        
+        // For empty dates, make sure right swipe goes back to calendar
+        if (dateWorkouts.length === 0 && deltaX > 0) {
+          liveTransform = Math.max(-50, Math.min(0, baseTransform + transformPercent));
+        }
+        
+        setLiveTransform(liveTransform);
+      } else {
+        // In calendar view - preview workout slide
+        const liveTransform = Math.max(-50, Math.min(0, transformPercent));
+        setLiveTransform(liveTransform);
+      }
+    } else {
+      // Reset swipe state if not horizontal
+      if (isSwipeActive) {
+        setIsSwipeActive(false);
+      }
+    }
   };
 
   const handleTouchEnd = () => {
-    if (!touchStart || !touchEnd) return;
+    if (!touchStartX || !touchStartY) return;
     
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
+    const wasSwipeActive = isSwipeActive;
+    const progress = swipeProgress;
+    const currentTransform = liveTransform;
     
-    console.log('👆 Touch end - distance:', distance, 'left swipe:', isLeftSwipe, 'right swipe:', isRightSwipe, 'showSummary:', showSummary);
-
-    if (showSummary && dateWorkouts.length > 0) {
-      if (isLeftSwipe) {
-        console.log('⬅️ Swiping left - next workout');
-        // Swipe left - next workout (only if there are more workouts)
-        if (currentWorkoutIndex < dateWorkouts.length - 1) {
+    // 🍎 APPLE PHOTOS: Only process if it was a real swipe
+    if (!wasSwipeActive) {
+      // Reset states
+      setIsSwipeActive(false);
+      setSwipeProgress(0);
+      setTouchStartX(null);
+      setTouchStartY(null);
+      setLiveTransform(0);
+      return;
+    }
+    
+    // 🍎 APPLE PHOTOS: Reasonable commit threshold - 15%
+    const commitThreshold = 15;
+    const isCommitted = progress > commitThreshold;
+    
+    if (isCommitted) {
+      // Determine direction from current transform
+      const isLeftSwipe = currentTransform < (showSummary ? -50 : 0);
+      const isRightSwipe = currentTransform > (showSummary ? -50 : 0);
+      
+      console.log('🍎 Swipe committed:', { isLeftSwipe, isRightSwipe, showSummary, dateWorkouts: dateWorkouts.length });
+      
+      if (showSummary && dateWorkouts.length > 0) {
+        // We're in workout summary view with workouts
+        if (isLeftSwipe && currentWorkoutIndex < dateWorkouts.length - 1) {
+          // Next workout
           setCurrentWorkoutIndex(currentWorkoutIndex + 1);
-        }
-        // If at last workout, do nothing (no abyss)
-      } else if (isRightSwipe) {
-        console.log('➡️ Swiping right');
-        // Swipe right - previous workout or back to calendar
-        if (currentWorkoutIndex > 0) {
-          setCurrentWorkoutIndex(currentWorkoutIndex - 1);
+          setLiveTransform(-50); // Snap to workout position
+        } else if (isRightSwipe) {
+          if (currentWorkoutIndex > 0) {
+            // Previous workout
+            setCurrentWorkoutIndex(currentWorkoutIndex - 1);
+            setLiveTransform(-50); // Snap to workout position
+          } else {
+            // Back to calendar (like Photos back to grid)
+            console.log('🔙 Swiping back to calendar from workout');
+            setShowSummary(false);
+            setDateWorkouts([]);
+            setCurrentWorkoutIndex(0);
+            setLiveTransform(0); // Snap to calendar position
+          }
         } else {
-          console.log('🔙 Going back to calendar');
-          // At first workout, go back to calendar
+          // Not committed - snap back
+          setLiveTransform(-50);
+        }
+      } else if (showSummary && dateWorkouts.length === 0) {
+        // 🚨 FIX: We're in EMPTY DATE summary view - swipe right should go back
+        if (isRightSwipe) {
+          console.log('🔙 Swiping back to calendar from EMPTY DATE');
           setShowSummary(false);
           setDateWorkouts([]);
           setCurrentWorkoutIndex(0);
+          setLiveTransform(0); // Snap to calendar position
+        } else {
+          // Not committed - snap back to empty date position
+          setLiveTransform(-50);
         }
-      }
-    } else if (!showSummary) {
-      // If we're on calendar and swipe left, slide to summary for selected date
-      if (isLeftSwipe) {
-        console.log('📅 Calendar swipe left - checking for workouts on', selectedDate);
+      } else if (!showSummary && isLeftSwipe) {
+        // Enter workout view (like Photos full-screen)
+        console.log('🔙 Swiping from calendar to summary for date:', selectedDate);
         const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
-        console.log('📅 Found', workoutsForDate.length, 'workouts for', selectedDate);
-        console.log('📅 Workout details:', workoutsForDate);
+        console.log('📊 Found workouts for date:', workoutsForDate.length, workoutsForDate);
         
-        // Always slide to summary, even if no workouts (will show "Add effort" screen)
-        setDateWorkouts(workoutsForDate);
-        setCurrentWorkoutIndex(0);
-        setShowSummary(true);
+        if (workoutsForDate.length > 0) {
+          // Has workouts - go to workout summary
+          setDateWorkouts(workoutsForDate);
+          setCurrentWorkoutIndex(0);
+          setShowSummary(true);
+          setLiveTransform(-50); // Snap to workout position
+          console.log('✅ Navigated to workout summary');
+        } else {
+          // No workouts - go to empty date screen
+          setDateWorkouts([]);
+          setCurrentWorkoutIndex(0);
+          setShowSummary(true);
+          setLiveTransform(-50); // Snap to empty date position
+          console.log('✅ Navigated to empty date screen');
+        }
+      } else {
+        // Not committed - snap back to calendar
+        setLiveTransform(0);
       }
-    } else if (showSummary && dateWorkouts.length === 0) {
-      // Handle empty date swiping
-      if (isRightSwipe) {
-        console.log('🔙 Going back to calendar from empty date');
-        setShowSummary(false);
-        setDateWorkouts([]);
-        setCurrentWorkoutIndex(0);
+    } else {
+      // 🍎 APPLE PHOTOS: Smooth animation back to position if not committed
+      if (showSummary) {
+        setLiveTransform(-50);
+      } else {
+        setLiveTransform(0);
       }
     }
     
-    // Reset touch state
-    setTouchStart(null);
-    setTouchEnd(null);
+    // Reset touch states
+    setIsSwipeActive(false);
+    setSwipeProgress(0);
+    setTouchStartX(null);
+    setTouchStartY(null);
+    
+    // Clear live transform after animation completes
+    setTimeout(() => {
+      setLiveTransform(0);
+    }, 300);
   };
 
   const handleDeleteWorkout = async (workoutId: string) => {
     try {
       await deleteWorkout(workoutId);
-      // Close summary and go back to calendar after deletion
-      setShowSummary(false);
-      setDateWorkouts([]);
-      setCurrentWorkoutIndex(0);
+      // 🍎 APPLE PHOTOS STYLE: Smooth transition back to calendar
+      setLiveTransform(0); // Animate back to calendar position
+      setTimeout(() => {
+        setShowSummary(false);
+        setDateWorkouts([]);
+        setCurrentWorkoutIndex(0);
+      }, 300); // Wait for animation to complete
     } catch (error) {
       console.error('Error deleting workout:', error);
       alert('Error deleting workout. Please try again.');
@@ -221,12 +367,22 @@ const AppLayout: React.FC = () => {
       setSelectedDate(date);
     }
     
+    // 🚨 IMPORTANT: Store where we came from for proper back navigation
+    const cameFromSummary = showSummary;
+    
     // 🚨 FIXED: Handle all strength logger variants - now only 'log-strength'
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
       // 🚨 NEW: Always open WorkoutBuilder with the selected type
       setShowBuilder(true);
+    }
+    
+    // Clear summary state but remember we came from there
+    if (cameFromSummary) {
+      setShowSummary(false);
+      setDateWorkouts([]);
+      setCurrentWorkoutIndex(0);
     }
   };
 
@@ -306,6 +462,9 @@ const AppLayout: React.FC = () => {
   // Get current workout for summary display
   const currentWorkout = dateWorkouts[currentWorkoutIndex];
 
+  // 🍎 APPLE PHOTOS STYLE: Calculate final transform
+  const finalTransform = liveTransform !== 0 ? liveTransform : (showSummary ? -50 : 0);
+
   console.log('🔍 AppLayout render state:', {
     showAllPlans, 
     showBuilder, 
@@ -319,12 +478,14 @@ const AppLayout: React.FC = () => {
     selectedWorkoutType: selectedWorkout?.type,
     selectedWorkoutStatus: selectedWorkout?.workout_status,
     selectedDate,
-    activeTab
+    activeTab,
+    finalTransform,
+    isSwipeActive
   });
 
   return (
     <div className="mobile-app-container">
-      {/* Header with navigation - NO CHEVRONS */}
+      {/* Header with navigation */}
       <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
@@ -377,7 +538,7 @@ const AppLayout: React.FC = () => {
               )}
             </div>
 
-            {/* Center: Empty - removed workout indicator dots that were showing as ")) symbol */}
+            {/* Center: Empty - removed workout indicator dots */}
             <div className="flex items-center">
               {/* Dots removed - they were appearing as ")) on mobile */}
             </div>
@@ -394,7 +555,7 @@ const AppLayout: React.FC = () => {
         </div>
       </header>
 
-      {/* Main content with pure sliding navigation */}
+      {/* Main content with Apple Photos style sliding */}
       <main className="mobile-main-content">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showStrengthPlans ? (
@@ -438,33 +599,43 @@ const AppLayout: React.FC = () => {
               />
             </div>
           ) : (
-            // 🆕 NEW: Pure sliding container
+            // 🍎 APPLE PHOTOS STYLE: Balanced sliding container
             <div className="sliding-container">
               <div 
-                className={`sliding-wrapper ${showSummary ? 'show-summary' : ''}`}
+                className="sliding-wrapper"
+                style={{
+                  transform: `translateX(${finalTransform}%)`,
+                  transition: isSwipeActive ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                }}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
               >
                 {/* Calendar view */}
                 <div className="slide-panel calendar-panel">
-                  <div className="space-y-4 pt-4">
+                  <div className="space-y-2 pt-4">
                     <TodaysEffort
                       selectedDate={selectedDate}
                       onAddEffort={handleAddEffort}
                       onViewCompleted={handleViewCompleted}
                       onEditEffort={handleEditEffort}
                     />
-                    <WorkoutCalendar
-                      onAddEffort={handleAddEffort}
-                      onSelectType={handleSelectEffortType}
-                      onSelectWorkout={handleEditEffort}
-                      onViewCompleted={handleViewCompleted}
-                      onEditEffort={handleEditEffort}
-                      onDateSelect={handleDateSelect}
-                      onSelectRoutine={handleSelectRoutine}
-                      onSelectDiscipline={handleSelectDiscipline}
-                    />
+                    <div 
+                      className="calendar-container"
+                      style={{ touchAction: isSwipeActive ? 'none' : 'auto' }}
+                    >
+                      <WorkoutCalendar
+                        onAddEffort={handleAddEffort}
+                        onSelectType={handleSelectEffortType}
+                        onSelectWorkout={handleEditEffort}
+                        onViewCompleted={handleViewCompleted}
+                        onEditEffort={handleEditEffort}
+                        onDateSelect={handleDateSelect}
+                        onSelectRoutine={handleSelectRoutine}
+                        onSelectDiscipline={handleSelectDiscipline}
+                        isSwipingHorizontally={isSwipeActive}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -475,9 +646,13 @@ const AppLayout: React.FC = () => {
                       <WorkoutSummary 
                         workout={currentWorkout} 
                         onClose={() => {
-                          setShowSummary(false);
-                          setDateWorkouts([]);
-                          setCurrentWorkoutIndex(0);
+                          // 🍎 APPLE PHOTOS STYLE: Smooth back transition
+                          setLiveTransform(0); // Animate back to calendar position
+                          setTimeout(() => {
+                            setShowSummary(false);
+                            setDateWorkouts([]);
+                            setCurrentWorkoutIndex(0);
+                          }, 300); // Wait for animation to complete
                         }}
                         onDelete={handleDeleteWorkout}
                       />
@@ -488,12 +663,34 @@ const AppLayout: React.FC = () => {
                         <p className="text-muted-foreground mb-8 text-center">
                           Add a workout to get started
                         </p>
-                        <NewEffortDropdown 
-                          onSelectType={(type) => {
-                            setShowSummary(false);
-                            handleAddEffort(type, selectedDate);
-                          }} 
-                        />
+                        <div className="flex flex-col items-center gap-4">
+                          <NewEffortDropdown 
+                            onSelectType={(type) => {
+                              // 🍎 APPLE PHOTOS STYLE: Smooth transition to builder
+                              setLiveTransform(0); // Animate back to calendar position first
+                              setTimeout(() => {
+                                setShowSummary(false);
+                                handleAddEffort(type, selectedDate);
+                              }, 300); // Wait for animation to complete
+                            }} 
+                          />
+                          
+                          {/* 🚨 FIX: Add back button for empty date screen */}
+                          <button
+                            onClick={() => {
+                              // 🍎 APPLE PHOTOS STYLE: Smooth back transition
+                              setLiveTransform(0); // Animate back to calendar position
+                              setTimeout(() => {
+                                setShowSummary(false);
+                                setDateWorkouts([]);
+                                setCurrentWorkoutIndex(0);
+                              }, 300); // Wait for animation to complete
+                            }}
+                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            ← Back to calendar
+                          </button>
+                        </div>
                       </div>
                     ) : null}
                   </div>

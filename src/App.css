@@ -50,3 +50,64 @@
 .read-the-docs {
   color: #5f7676;
 }
+
+/* 🔒 MINIMAL BOUNCE FIX - ONLY WHAT'S NEEDED */
+
+/* Stop elastic scrolling everywhere */
+html, body {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Stop pull-to-refresh */
+body {
+  overscroll-behavior-y: none;
+}
+
+/* Better touch handling */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Prevent text selection during swipes */
+.mobile-app-container {
+  -webkit-user-select: none;
+  user-select: none;
+  overscroll-behavior: none;
+}
+
+/* Stabilize sliding container */
+.sliding-container {
+  overflow: hidden;
+  position: relative;
+  touch-action: pan-x;
+}
+
+.sliding-wrapper {
+  display: flex;
+  width: 200%;
+  height: 100%;
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  touch-action: pan-x;
+  transform: translateX(0);
+}
+
+.sliding-wrapper.show-summary {
+  transform: translateX(-50%);
+}
+
+.slide-panel {
+  width: 50%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: none;
+}
+
+/* Fix calendar buttons */
+button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}

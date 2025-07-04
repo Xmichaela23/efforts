@@ -27,6 +27,7 @@ interface WorkoutCalendarProps {
   onDateSelect?: (dateString: string) => void;
   onSelectRoutine?: (type: string) => void;
   onSelectDiscipline?: (discipline: string) => void;
+  isSwipingHorizontally?: boolean; // NEW: Track when parent is swiping
 }
 
 export default function WorkoutCalendar({ 
@@ -37,7 +38,8 @@ export default function WorkoutCalendar({
   onEditEffort,
   onDateSelect,
   onSelectRoutine,
-  onSelectDiscipline
+  onSelectDiscipline,
+  isSwipingHorizontally = false // NEW: Default to false
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -103,6 +105,14 @@ export default function WorkoutCalendar({
 
   const handleDateClick = (day: number, event: React.MouseEvent | React.TouchEvent) => {
     if (!day) return;
+    
+    // 🚨 NEW: Ignore date clicks during horizontal swipes
+    if (isSwipingHorizontally) {
+      console.log('🚫 Ignoring date click during swipe');
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     
     // Prevent event from bubbling up to parent swipe handlers
     event.preventDefault();
@@ -205,10 +215,11 @@ export default function WorkoutCalendar({
                     ${day ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
                     ${day && isToday(day) ? 'bg-gray-100 border-gray-200' : ''}
                     ${day && isSelected(day) ? 'bg-gray-200 border-gray-300' : ''}
+                    ${isSwipingHorizontally ? 'pointer-events-none' : ''}
                   `}
                   onClick={(e) => day && handleDateClick(day, e)}
                   onTouchEnd={(e) => day && handleDateClick(day, e)}
-                  disabled={!day}
+                  disabled={!day || isSwipingHorizontally}
                   type="button"
                 >
                   {day && (

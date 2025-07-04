@@ -58,12 +58,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'swim': return <Waves className="h-8 w-8" />;
-      case 'ride': return <Bike className="h-8 w-8" />;
-      case 'run': return <Activity className="h-8 w-8" />;
-      case 'strength': return <Dumbbell className="h-8 w-8" />;
-      case 'mobility': return <Move className="h-8 w-8" />;
-      default: return <Activity className="h-8 w-8" />;
+      case 'swim': return <Waves className="h-5 w-5" />;
+      case 'ride': return <Bike className="h-5 w-5" />;
+      case 'run': return <Activity className="h-5 w-5" />;
+      case 'strength': return <Dumbbell className="h-5 w-5" />;
+      case 'mobility': return <Move className="h-5 w-5" />;
+      default: return <Activity className="h-5 w-5" />;
     }
   };
 
@@ -219,7 +219,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   if (loading) {
     return (
-      <div className="w-full py-6">
+      <div className="w-full py-2">
         <div className="text-center">
           <p className="text-muted-foreground text-sm">Loading...</p>
         </div>
@@ -229,51 +229,43 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   return (
     <div className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* Date Header - Always visible */}
-      <div className="flex items-center justify-between mb-6 px-4">
+      {/* 🔥 COMPRESSED: Minimal header with inline layout */}
+      <div className="flex items-center justify-between mb-3 px-4">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">
             {formatDisplayDate(activeDate)}
           </span>
-          {/* Show actual date if it's not today/yesterday/tomorrow */}
-          {!['Today', 'Yesterday', 'Tomorrow'].includes(formatDisplayDate(activeDate)) && (
+          {/* Show effort count inline */}
+          {displayWorkouts.length > 0 && (
             <span className="text-xs text-muted-foreground">
-              ({new Date(activeDate + 'T00:00:00').toLocaleDateString('en-US', { 
-                month: 'numeric', 
-                day: 'numeric',
-                year: new Date(activeDate).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
-              })})
+              · {displayWorkouts.length} effort{displayWorkouts.length !== 1 ? 's' : ''}
             </span>
           )}
         </div>
         
-        {/* Show effort count if any exist */}
-        {displayWorkouts.length > 0 && (
-          <span className="text-xs text-muted-foreground">
-            {displayWorkouts.length} effort{displayWorkouts.length !== 1 ? 's' : ''}
-          </span>
-        )}
+        {/* Add effort button always visible */}
+        <AddEffortDropdown />
       </div>
 
       {displayWorkouts.length === 0 ? (
-        <div className="w-full py-8 px-4">
+        // 🔥 COMPRESSED: Minimal empty state
+        <div className="w-full py-2 px-4">
           <div className="text-center">
-            <p className="text-muted-foreground mb-6 text-sm">
+            <p className="text-muted-foreground text-xs">
               {isPastDate 
-                ? 'No effort logged for this date' 
+                ? 'No effort logged' 
                 : isToday 
-                  ? 'No effort scheduled for today'
+                  ? 'No effort scheduled'
                   : 'No effort scheduled'
               }
             </p>
-            <AddEffortDropdown />
           </div>
         </div>
       ) : (
+        // 🔥 COMPRESSED: Tight row of smaller workout symbols
         <div className="w-full px-4">
-          {/* Clean row of clickable workout symbols */}
-          <div className="flex items-center justify-center gap-6 py-8">
+          <div className="flex items-center justify-center gap-4 py-3">
             {displayWorkouts.map((workout) => (
               <button
                 key={workout.id}
@@ -292,17 +284,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   console.log('🎯 Symbol touched:', workout);
                   onEditEffort && onEditEffort(workout);
                 }}
-                className={`p-6 rounded-xl active:scale-95 transition-transform cursor-pointer ${getIconColor(workout)}`}
-                style={{ minWidth: '80px', minHeight: '80px' }}
+                className={`p-3 rounded-lg active:scale-95 transition-transform cursor-pointer ${getIconColor(workout)}`}
+                style={{ minWidth: '44px', minHeight: '44px' }}
               >
                 {getIcon(workout.type)}
               </button>
             ))}
-          </div>
-          
-          {/* Add effort option at the bottom */}
-          <div className="text-center pt-4">
-            <AddEffortDropdown />
           </div>
         </div>
       )}
