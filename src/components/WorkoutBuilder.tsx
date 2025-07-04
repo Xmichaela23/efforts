@@ -18,15 +18,13 @@ interface WorkoutBuilderProps {
   initialDate?: string;
   sourceContext?: string;
   onNavigateToPlans?: () => void;
+  onOpenPlanBuilder?: () => void; // NEW: Add prop to open proper PlanBuilder
 }
 
-export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate, sourceContext, onNavigateToPlans }: WorkoutBuilderProps) {
+export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate, sourceContext, onNavigateToPlans, onOpenPlanBuilder }: WorkoutBuilderProps) {
   const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  const [showLocalPlanModal, setShowLocalPlanModal] = useState(false);
-  const [planPrompt, setPlanPrompt] = useState('');
-  const [generatingPlan, setGeneratingPlan] = useState(false);
   
   const [currentWorkout, setCurrentWorkout] = useState<any>(existingWorkout || null);
 
@@ -63,202 +61,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const [strengthExercises, setStrengthExercises] = useState<StrengthExercise[]>([]);
 
   const isMetric = !useImperial;
-
-  // Plan generation function
-  const generatePlan = async () => {
-    if (!planPrompt.trim()) return;
-    
-    setGeneratingPlan(true);
-    try {
-      // Mock response for now - replace with real API later
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
-      
-      // Generate a month of progressive workouts
-      const generateMonthOfWorkouts = (goal: string) => {
-        const workouts = [];
-        const startDate = new Date();
-        
-        // Example: 5K training plan over 4 weeks
-        for (let week = 0; week < 4; week++) {
-          for (let day = 0; day < 7; day++) {
-            const currentDate = new Date(startDate);
-            currentDate.setDate(startDate.getDate() + (week * 7) + day);
-            const dateStr = currentDate.toISOString().split('T')[0];
-            
-            // Skip some days (rest days)
-            if (day === 1 || day === 3 || day === 6) continue;
-            
-            let workout = null;
-            
-            if (day === 0) { // Monday - Long run
-              workout = {
-                date: dateStr,
-                type: 'run',
-                name: `Week ${week + 1} - Long Run`,
-                intervals: [
-                  {
-                    id: '1',
-                    time: '10:00',
-                    effortLabel: 'Easy Warmup',
-                    rpeTarget: '4',
-                    duration: 600,
-                    repeatCount: 1
-                  },
-                  {
-                    id: '2',
-                    time: `${30 + (week * 5)}:00`,
-                    effortLabel: 'Steady Pace',
-                    rpeTarget: '6',
-                    duration: (30 + (week * 5)) * 60,
-                    repeatCount: 1
-                  },
-                  {
-                    id: '3',
-                    time: '10:00',
-                    effortLabel: 'Easy Cool Down',
-                    rpeTarget: '3',
-                    duration: 600,
-                    repeatCount: 1
-                  }
-                ]
-              };
-            } else if (day === 2) { // Wednesday - Intervals
-              workout = {
-                date: dateStr,
-                type: 'run',
-                name: `Week ${week + 1} - Speed Work`,
-                intervals: [
-                  {
-                    id: '1',
-                    time: '15:00',
-                    effortLabel: 'Warmup',
-                    rpeTarget: '4',
-                    duration: 900,
-                    repeatCount: 1
-                  },
-                  {
-                    id: '2',
-                    time: `${4 + week}x(2:00 Hard/1:00 Easy)`,
-                    effortLabel: 'Intervals',
-                    rpeTarget: '8',
-                    duration: (4 + week) * 180,
-                    repeatCount: 1,
-                    isRepeatBlock: true
-                  },
-                  {
-                    id: '3',
-                    time: '10:00',
-                    effortLabel: 'Cool Down',
-                    rpeTarget: '3',
-                    duration: 600,
-                    repeatCount: 1
-                  }
-                ]
-              };
-            } else if (day === 4) { // Friday - Recovery
-              workout = {
-                date: dateStr,
-                type: 'run',
-                name: `Week ${week + 1} - Recovery Run`,
-                intervals: [
-                  {
-                    id: '1',
-                    time: '25:00',
-                    effortLabel: 'Easy Recovery',
-                    rpeTarget: '4',
-                    duration: 1500,
-                    repeatCount: 1
-                  }
-                ]
-              };
-            } else if (day === 5) { // Saturday - Strength
-              workout = {
-                date: dateStr,
-                type: 'strength',
-                name: `Week ${week + 1} - Strength Training`,
-                exercises: [
-                  {
-                    id: '1',
-                    name: 'Squats',
-                    sets: 3,
-                    reps: 12,
-                    weight: 135,
-                    weightMode: 'same'
-                  },
-                  {
-                    id: '2',
-                    name: 'Lunges',
-                    sets: 3,
-                    reps: 10,
-                    weight: 0,
-                    weightMode: 'same'
-                  },
-                  {
-                    id: '3',
-                    name: 'Calf Raises',
-                    sets: 3,
-                    reps: 15,
-                    weight: 0,
-                    weightMode: 'same'
-                  }
-                ]
-              };
-            }
-            
-            if (workout) {
-              workouts.push(workout);
-            }
-          }
-        }
-        
-        return workouts;
-      };
-      
-      // Generate the month of workouts
-      const monthWorkouts = generateMonthOfWorkouts(planPrompt);
-      
-      // Save all workouts to your app
-      for (const workout of monthWorkouts) {
-        const workoutData = {
-          ...workout,
-          description: workout.intervals ? 
-            workout.intervals.map(i => i.effortLabel || i.time).join(' + ') :
-            workout.exercises?.map(e => `${e.name} ${e.sets}x${e.reps}`).join(' + '),
-          duration: workout.intervals ? 
-            workout.intervals.reduce((sum, i) => sum + (i.duration || 0), 0) : 
-            2400, // 40 min default for strength
-          workout_status: 'planned'
-        };
-        
-        try {
-          await addWorkout(workoutData);
-        } catch (error) {
-          console.error('Error saving workout:', error);
-        }
-      }
-      
-      setShowLocalPlanModal(false);
-      setPlanPrompt('');
-      
-      // Show success message
-      alert(`Generated ${monthWorkouts.length} workouts for your training plan!`);
-      
-    } catch (error) {
-      console.error('Error generating plan:', error);
-      alert('Error generating plan. Please try again.');
-    } finally {
-      setGeneratingPlan(false);
-    }
-  };
-
-  // Quick plan suggestions
-  const quickPlans = [
-    "Build me a 30-minute easy run",
-    "Create a 5K training workout",
-    "I want a 45-minute bike ride with intervals",
-    "Design a full-body strength workout",
-    "Give me a swim workout for endurance"
-  ];
 
   // Simple back button logic
   const handleBackClick = () => {
@@ -547,54 +349,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         </div>
       )}
 
-      {/* Plan Builder Modal */}
-      {showLocalPlanModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md">
-            <h2 className="text-lg font-semibold mb-4">Build me a plan</h2>
-            
-            <div className="space-y-4">
-              <Textarea
-                value={planPrompt}
-                onChange={(e) => setPlanPrompt(e.target.value)}
-                placeholder="Describe what you want to train for..."
-                rows={3}
-                className="w-full"
-              />
-              
-              <div className="space-y-2">
-                <p className="text-sm text-gray-600">Quick suggestions:</p>
-                {quickPlans.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setPlanPrompt(suggestion)}
-                    className="block w-full text-left p-2 text-sm bg-gray-50 hover:bg-gray-100 rounded"
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-              
-              <div className="flex gap-2">
-                <Button
-                  onClick={generatePlan}
-                  disabled={!planPrompt.trim() || generatingPlan}
-                  className="flex-1"
-                >
-                  {generatingPlan ? 'Generating...' : 'Generate Plan'}
-                </Button>
-                <Button
-                  onClick={() => setShowLocalPlanModal(false)}
-                  variant="outline"
-                >
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
       <main className="max-w-7xl mx-auto px-3 py-2">
         <div className="flex justify-between items-center mb-1">
           <div className="flex items-center gap-2">
@@ -644,8 +398,16 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 className="border-gray-300 min-h-[44px] flex-1"
                 style={{fontFamily: 'Inter, sans-serif'}}
               />
+              {/* FIXED: Use proper PlanBuilder instead of local modal */}
               <Button
-                onClick={() => setShowLocalPlanModal(true)}
+                onClick={() => {
+                  console.log('🎯 Build me a plan clicked - opening proper PlanBuilder');
+                  if (onOpenPlanBuilder) {
+                    onOpenPlanBuilder();
+                  } else {
+                    console.warn('onOpenPlanBuilder not provided');
+                  }
+                }}
                 variant="ghost"
                 className="text-gray-600 hover:text-black flex items-center gap-2"
               >

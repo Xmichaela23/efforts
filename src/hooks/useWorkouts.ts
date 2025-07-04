@@ -115,18 +115,23 @@ export const useWorkouts = () => {
     }
   };
 
-  // Fetch - ONLY use loading for initial fetch
+  // Fetch - FIXED: Filter by user_id
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
-
+      
       console.log("Fetching workouts...");
+      
+      // Get current user to filter workouts
+      const user = await getCurrentUser();
+      console.log("Fetching workouts for user:", user.id);
 
       const { data, error } = await supabase
         .from("workouts")
         .select("*")
+        .eq("user_id", user.id)  // 🔥 FIXED: Filter by user_id
         .order("date", { ascending: false });
-      
+
       if (error) {
         console.error("Supabase error:", error);
         throw error;
@@ -149,7 +154,7 @@ export const useWorkouts = () => {
         intervals: w.intervals ? JSON.parse(w.intervals) : [],
         strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
       }));
-      
+
       console.log("Mapped workouts:", mapped);
       setWorkouts(mapped);
     } catch (err) {
@@ -159,7 +164,7 @@ export const useWorkouts = () => {
     }
   };
 
-  // Add - NO LOADING STATES
+  // Add - FIXED: Include user_id
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
@@ -176,6 +181,8 @@ export const useWorkouts = () => {
         workout_status: workoutData.workout_status ?? "planned",
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
+        user_id: user.id  // 🔥 FIXED: Add user_id
+        user_id: user.id  // 🔥 FIXED: Add user_id
       };
 
       console.log("Saving workout with data:", toSave);
@@ -185,7 +192,7 @@ export const useWorkouts = () => {
         .insert([toSave])
         .select()
         .single();
-      
+
       if (error) {
         console.error("Error saving workout:", error);
         throw error;
@@ -206,7 +213,7 @@ export const useWorkouts = () => {
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
       };
-      
+
       setWorkouts((prev) => [newWorkout, ...prev]);
       return newWorkout;
     } catch (err) {
@@ -215,7 +222,7 @@ export const useWorkouts = () => {
     }
   };
 
-  // Update - NO LOADING STATES
+  // Update - FIXED: Add user verification
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
       const user = await getCurrentUser();
@@ -237,9 +244,10 @@ export const useWorkouts = () => {
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
+        .eq("user_id", user.id)  // 🔥 FIXED: Verify user owns this workout
         .select()
         .single();
-      
+
       if (error) throw error;
 
       const updated: Workout = {
@@ -257,7 +265,7 @@ export const useWorkouts = () => {
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
       };
-      
+
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
       return updated;
     } catch (err) {
@@ -266,7 +274,7 @@ export const useWorkouts = () => {
     }
   };
 
-  // Delete - NO LOADING STATES  
+  // Delete - FIXED: Add user verification
   const deleteWorkout = async (id: string) => {
     try {
       const user = await getCurrentUser();
@@ -275,8 +283,9 @@ export const useWorkouts = () => {
       const { error } = await supabase
         .from("workouts")
         .delete()
-        .eq("id", id);
-      
+        .eq("id", id)
+        .eq("user_id", user.id);  // 🔥 FIXED: Verify user owns this workout
+
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
     } catch (err) {

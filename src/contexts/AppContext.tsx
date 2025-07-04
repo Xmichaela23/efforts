@@ -127,17 +127,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       console.log('📋 Loaded plans:', plans);
 
-      // Separate active and completed plans
-      const active = plans?.filter(p => p.status === 'active') || [];
-      const completed = plans?.filter(p => p.status === 'completed') || [];
+      // Separate active and completed plans WITH FIELD MAPPING
+      const active = plans?.filter(p => p.status === 'active').map(plan => ({
+        ...plan,
+        currentWeek: plan.current_week  // Map snake_case to camelCase
+      })) || [];
+      
+      const completed = plans?.filter(p => p.status === 'completed').map(plan => ({
+        ...plan,
+        currentWeek: plan.current_week  // Map snake_case to camelCase
+      })) || [];
       
       setCurrentPlans(active);
       setCompletedPlans(completed);
       
-      // Build detailed plans object
+      // Build detailed plans object WITH FIELD MAPPING
       const detailed = {};
       plans?.forEach(plan => {
-        detailed[plan.id] = plan;
+        detailed[plan.id] = {
+          ...plan,
+          currentWeek: plan.current_week  // Map snake_case to camelCase
+        };
       });
       setDetailedPlans(detailed);
       

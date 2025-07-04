@@ -244,333 +244,380 @@ export default AllEffortsDropdown;
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/AllPlansInterface.tsx
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, ArrowRight, ChevronDown, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
+import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target } from 'lucide-react';
 
 interface Plan {
   id: string;
   name: string;
   description: string;
-  details: string;
-  category: string;
-  focusArea: string;
-}
-
-interface Category {
-  id: string;
-  name: string;
-  description: string;
-  icon: any;
-}
-
-interface FocusArea {
-  id: string;
-  name: string;
-  description: string;
-  categoryId: string;
+  currentWeek?: number;
+  status: 'active' | 'completed';
 }
 
 interface AllPlansInterfaceProps {
   onClose: () => void;
   onSelectPlan: (plan: Plan) => void;
   onBuildWorkout: (type: string, sourceContext?: string) => void;
+  currentPlans?: Plan[];
+  completedPlans?: Plan[];
+  detailedPlans?: any;
 }
 
-const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ onClose, onSelectPlan, onBuildWorkout }) => {
-  const [currentLevel, setCurrentLevel] = useState<'categories' | 'focus' | 'plans'>('categories');
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [selectedFocusArea, setSelectedFocusArea] = useState<string>('');
-  const [showMore, setShowMore] = useState(false);
+const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ 
+  onClose, 
+  onSelectPlan, 
+  onBuildWorkout,
+  currentPlans = [],
+  completedPlans = [],
+  detailedPlans = {}
+}) => {
+  const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
+  const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
+  const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [planStatus, setPlanStatus] = useState<string>('active');
 
-  // Current active plans - would come from context/state in real app
-  const currentPlans = [
-    { id: '1', name: 'Marathon Training', currentWeek: 8 },
-    { id: '2', name: 'Strength Foundation', currentWeek: 3 }
-  ];
-
-  // Data from wireframes - Updated terminology
-  const categories: Category[] = [
-    { id: 'running', name: 'Run', description: '', icon: Activity },
-    { id: 'lifting', name: 'Strength', description: '', icon: Dumbbell },
-    { id: 'cycling', name: 'Ride', description: '', icon: Bike },
-    { id: 'swimming', name: 'Swim', description: '', icon: Waves },
-    { id: 'mobility', name: 'Mobility', description: '', icon: Move }
-  ];
-
-  const focusAreas: FocusArea[] = [
-    { id: 'start-running', name: 'Start Running', description: '', categoryId: 'running' },
-    { id: 'distance-training', name: 'Distance Training', description: '', categoryId: 'running' },
-    { id: 'marathon-prep', name: 'Marathon Prep', description: '', categoryId: 'running' },
-    { id: 'speed-development', name: 'Speed Development', description: '', categoryId: 'running' }
-  ];
-
-  const plans: Plan[] = [
-    {
-      id: '16-week-buildup',
-      name: '16-Week Build-up',
-      description: '',
-      details: '',
-      category: 'running',
-      focusArea: 'marathon-prep'
-    },
-    {
-      id: '12-week-focused',
-      name: '12-Week Focused',
-      description: '',
-      details: '',
-      category: 'running',
-      focusArea: 'marathon-prep'
-    },
-    {
-      id: '20-week-high-volume',
-      name: '20-Week High Volume',
-      description: '',
-      details: '',
-      category: 'running',
-      focusArea: 'marathon-prep'
-    },
-    {
-      id: 'hansons-method',
-      name: 'Hansons Method',
-      description: '',
-      details: '',
-      category: 'running',
-      focusArea: 'marathon-prep'
-    },
-    {
-      id: 'pfitzinger-18-55',
-      name: 'Pfitzinger 18/55',
-      description: '',
-      details: '',
-      category: 'running',
-      focusArea: 'marathon-prep'
-    },
-    {
-      id: 'pfitzinger-18-70',
-      name: 'Pfitzinger 18/70',
-      description: '',
-      details: '',
-      category: 'running',
-      focusArea: 'marathon-prep'
+  const handlePlanClick = (planId: string) => {
+    console.log('Opening plan details for:', planId);
+    const planDetail = detailedPlans[planId as keyof typeof detailedPlans];
+    if (planDetail) {
+      setSelectedPlanDetail(planDetail);
+      setSelectedWeek(planDetail.currentWeek);
+      setPlanStatus(planDetail.status);
+      setCurrentView('detail');
     }
-  ];
-
-  const handleCategoryClick = (categoryId: string) => {
-    setSelectedCategory(categoryId);
-    setCurrentLevel('focus');
-  };
-
-  const handleFocusAreaClick = (focusAreaId: string) => {
-    setSelectedFocusArea(focusAreaId);
-    setCurrentLevel('plans');
-  };
-
-  const handlePlanSelect = (plan: Plan) => {
-    onSelectPlan(plan);
-    onClose();
-  };
-
-  const handleCurrentPlanClick = () => {
-    console.log('Opening current running plan details');
-    // TODO: Navigate to plan details view
-  };
-
-  const handleBuild = () => {
-    console.log('Building workout for:', selectedCategory);
-    const typeMapping = {
-      running: 'run',
-      lifting: 'strength',
-      cycling: 'ride',
-      swimming: 'swim',
-      mobility: 'mobility'
-    };
-    const builderType = typeMapping[selectedCategory as keyof typeof typeMapping] || 'run';
-    onBuildWorkout(builderType, 'plans');
   };
 
   const handleBack = () => {
-    if (currentLevel === 'focus') {
-      setCurrentLevel('categories');
-      setSelectedCategory('');
-    } else if (currentLevel === 'plans') {
-      setCurrentLevel('focus');
-      setSelectedFocusArea('');
+    setCurrentView('list');
+    setSelectedPlanDetail(null);
+  };
+
+  // Plan Detail View Functions
+  const getWorkoutIcon = (type: string) => {
+    switch (type) {
+      case 'run': return '🏃';
+      case 'ride': return '🚴';
+      case 'swim': return '🏊';
+      case 'strength': return '💪';
+      case 'rest': return '😴';
+      default: return '⚡';
+    }
+  };
+  
+  const getIntensityColor = (intensity: string) => {
+    switch (intensity) {
+      case 'Easy': return 'bg-green-100 text-green-800 border-green-200';
+      case 'Moderate': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'Hard': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
-  const getFilteredFocusAreas = () => {
-    return focusAreas.filter(area => area.categoryId === selectedCategory);
-  };
-
-  const getFilteredPlans = () => {
-    const filtered = plans.filter(plan => 
-      plan.category === selectedCategory && plan.focusArea === selectedFocusArea
+  const getCompletionBadge = (workout: any) => {
+    if (!workout.completed) {
+      return (
+        <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+          Planned
+        </span>
+      );
+    }
+    
+    const ratingColors = {
+      1: 'bg-red-100 text-red-800 border-red-200',
+      2: 'bg-orange-100 text-orange-800 border-orange-200', 
+      3: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      4: 'bg-green-100 text-green-800 border-green-200',
+      5: 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    };
+    
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${ratingColors[workout.rating as keyof typeof ratingColors] || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+        ✓ {workout.rating}/5
+      </span>
     );
-    return showMore ? filtered : filtered.slice(0, 5);
+  };
+  
+  const formatDuration = (minutes: number) => {
+    if (!minutes) return '';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
-  const getRemainingCount = () => {
-    const total = plans.filter(plan => 
-      plan.category === selectedCategory && plan.focusArea === selectedFocusArea
-    ).length;
-    return Math.max(0, total - 5);
+  const getWeeklyVolume = (week: any) => {
+    return week.workouts.reduce((total: number, workout: any) => {
+      return total + (workout.duration || 0);
+    }, 0);
   };
 
-  const getTitle = () => {
-    if (currentLevel === 'categories') return 'All Plans';
-    if (currentLevel === 'focus') {
-      const category = categories.find(c => c.id === selectedCategory);
-      return `${category?.name} Plans`;
-    }
-    if (currentLevel === 'plans') {
-      const focusArea = focusAreas.find(f => f.id === selectedFocusArea);
-      return `${focusArea?.name} Plans`;
-    }
-    return 'All Plans';
-  };
+  // Plan Detail View Render
+  if (currentView === 'detail' && selectedPlanDetail) {
+    const progress = Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100);
+    const currentWeekData = selectedPlanDetail.weeks.find((w: any) => w.weekNumber === selectedWeek);
+    
+    const totalVolume = selectedPlanDetail.weeks.reduce((total: number, week: any) => {
+      return total + getWeeklyVolume(week);
+    }, 0);
 
-  const getBackText = () => {
-    if (currentLevel === 'focus') return 'Back to Categories';
-    if (currentLevel === 'plans') {
-      const category = categories.find(c => c.id === selectedCategory);
-      return `Back to ${category?.name}`;
-    }
-    return 'Back';
-  };
+    const averageWeeklyVolume = Math.round(totalVolume / selectedPlanDetail.duration);
 
-  const getCurrentPlan = () => {
-    if (selectedCategory === 'running') {
-      return { name: 'Marathon Training', currentWeek: 8 };
-    }
-    if (selectedCategory === 'lifting') {
-      return { name: 'Strength Foundation', currentWeek: 3 };
-    }
-    return null;
-  };
+    return (
+      <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <button 
+            onClick={handleBack}
+            className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Plans
+          </button>
+          
+          <div className="flex items-center gap-2">
+            {planStatus === 'active' ? (
+              <button 
+                onClick={() => setPlanStatus('paused')}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Pause className="h-4 w-4" />
+                Pause
+              </button>
+            ) : (
+              <button 
+                onClick={() => setPlanStatus('active')}
+                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <Play className="h-4 w-4" />
+                Resume
+              </button>
+            )}
+            
+            <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+              <Edit className="h-4 w-4" />
+              Modify
+            </button>
+            
+            <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </button>
+          </div>
+        </div>
 
+        {/* Plan Overview */}
+        <div className="border border-gray-200 rounded-lg">
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">{selectedPlanDetail.name}</h1>
+                <p className="text-gray-600 mt-1">{selectedPlanDetail.description}</p>
+              </div>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                planStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+              }`}>
+                {planStatus}
+              </span>
+            </div>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-2xl font-bold">{selectedPlanDetail.duration}</div>
+                <div className="text-sm text-gray-600">Weeks</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{selectedPlanDetail.totalWorkouts}</div>
+                <div className="text-sm text-gray-600">Workouts</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{Math.round(totalVolume / 60)}h</div>
+                <div className="text-sm text-gray-600">Total Time</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl font-bold">{averageWeeklyVolume}m</div>
+                <div className="text-sm text-gray-600">Avg/Week</div>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span>Progress</span>
+                <span>Week {selectedPlanDetail.currentWeek} of {selectedPlanDetail.duration}</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-black rounded-full h-2 transition-all duration-300" 
+                  style={{ width: `${progress}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Week Navigation */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-2">
+          {selectedPlanDetail.weeks.map((week: any) => (
+            <button
+              key={week.weekNumber}
+              onClick={() => setSelectedWeek(week.weekNumber)}
+              className={`whitespace-nowrap px-4 py-2 rounded-lg font-medium transition-colors ${
+                selectedWeek === week.weekNumber 
+                  ? 'bg-black text-white' 
+                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
+              } ${
+                week.weekNumber === selectedPlanDetail.currentWeek ? 'ring-2 ring-blue-500' : ''
+              }`}
+            >
+              Week {week.weekNumber}
+              {week.weekNumber === selectedPlanDetail.currentWeek && (
+                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
+                  Current
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Selected Week Details */}
+        {currentWeekData && (
+          <div className="border border-gray-200 rounded-lg">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-bold flex items-center gap-2 mb-2">
+                <Calendar className="h-5 w-5" />
+                Week {currentWeekData.weekNumber}: {currentWeekData.title}
+              </h2>
+              <p className="text-gray-600 mb-4">{currentWeekData.focus}</p>
+              <div className="flex items-center gap-4 text-sm text-gray-600">
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  {formatDuration(getWeeklyVolume(currentWeekData))} total
+                </div>
+                <div className="flex items-center gap-1">
+                  <Target className="h-4 w-4" />
+                  {currentWeekData.workouts.filter((w: any) => w.type !== 'rest').length} workouts
+                </div>
+              </div>
+            </div>
+            <div className="p-6">
+              <div className="space-y-3">
+                {currentWeekData.workouts.map((workout: any) => (
+                  <div
+                    key={workout.id}
+                    className={`p-4 rounded-lg border transition-colors cursor-pointer ${
+                      workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="text-2xl">{getWorkoutIcon(workout.type)}</div>
+                        <div className="flex-1">
+                          <div className="font-medium">{workout.name}</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            {workout.description}
+                          </div>
+                          {workout.completed && workout.notes && (
+                            <div className="text-xs text-gray-500 mt-1 italic">
+                              "{workout.notes}"
+                            </div>
+                          )}
+                          {workout.completed && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Completed {workout.completedDate}
+                              {workout.actualDuration && workout.duration && (
+                                <span className={`ml-2 ${workout.actualDuration > workout.duration ? 'text-orange-600' : workout.actualDuration < workout.duration ? 'text-blue-600' : 'text-green-600'}`}>
+                                  {formatDuration(workout.actualDuration)} 
+                                  {workout.actualDuration !== workout.duration && (
+                                    <span> (planned: {formatDuration(workout.duration)})</span>
+                                  )}
+                                </span>
+                              )}
+                              {workout.actualDistance && workout.distance && (
+                                <span className={`ml-2 ${workout.actualDistance > workout.distance ? 'text-orange-600' : workout.actualDistance < workout.distance ? 'text-blue-600' : 'text-green-600'}`}>
+                                  {workout.actualDistance}km
+                                  {workout.actualDistance !== workout.distance && (
+                                    <span> (planned: {workout.distance}km)</span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        {getCompletionBadge(workout)}
+                        {workout.intensity && (
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getIntensityColor(workout.intensity)}`}>
+                            {workout.intensity}
+                          </span>
+                        )}
+                        {!workout.completed && workout.duration && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                            {formatDuration(workout.duration)}
+                          </span>
+                        )}
+                        {!workout.completed && workout.distance && (
+                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                            {workout.distance}km
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Plans List View
   return (
     <div className="space-y-6" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* Back button only - no duplicate title */}
-      {currentLevel !== 'categories' && (
-        <Button
-          onClick={handleBack}
-          variant="ghost"
-          className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {getBackText()}
-        </Button>
-      )}
-
-      {/* Current Plans Section - only show on categories level */}
-      {currentLevel === 'categories' && currentPlans.length > 0 && (
+      {/* Current Plans */}
+      {currentPlans.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium text-gray-900">Current Plans</h2>
           {currentPlans.map((plan) => (
             <div
               key={plan.id}
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
+              onClick={() => handlePlanClick(plan.id)}
+              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg border border-gray-200"
             >
               <div className="font-medium">{plan.name} - Wk {plan.currentWeek}</div>
+              <div className="text-sm text-gray-600 mt-1">{plan.description}</div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Content */}
-      <div className="space-y-3">
-        {currentLevel === 'categories' && (
-          <>
-            {currentPlans.length > 0 && (
-              <h2 className="text-lg font-medium text-gray-900">Browse Plans</h2>
-            )}
-            {categories.map((category) => {
-              const IconComponent = category.icon;
-              return (
-                <div
-                  key={category.id}
-                  onClick={() => handleCategoryClick(category.id)}
-                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <IconComponent className="h-5 w-5 text-gray-600" />
-                      <div className="font-medium">{category.name}</div>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-gray-400" />
-                  </div>
-                </div>
-              );
-            })}
-          </>
-        )}
-
-        {currentLevel === 'focus' && (
-          <>
-            {/* Current Plan - show for any discipline that has one */}
-            {getCurrentPlan() && (
-              <>
-                <div
-                  onClick={handleCurrentPlanClick}
-                  className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
-                >
-                  <div className="font-medium">Current Plan: {getCurrentPlan()?.name} - Wk {getCurrentPlan()?.currentWeek}</div>
-                </div>
-                <div className="border-t border-gray-200 my-4"></div>
-              </>
-            )}
-
-            {getFilteredFocusAreas().map((focusArea) => (
-              <div
-                key={focusArea.id}
-                onClick={() => handleFocusAreaClick(focusArea.id)}
-                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">{focusArea.name}</div>
-                  <ArrowRight className="h-4 w-4 text-gray-400" />
-                </div>
-              </div>
-            ))}
-
-            {/* Build - show for all disciplines */}
-            <div className="border-t border-gray-200 my-4"></div>
+      {/* Completed Plans */}
+      {completedPlans.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-medium text-gray-900">Completed Plans</h2>
+          {completedPlans.map((plan) => (
             <div
-              onClick={handleBuild}
-              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
+              key={plan.id}
+              onClick={() => handlePlanClick(plan.id)}
+              className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg border border-gray-200"
             >
-              <div className="font-medium">Build</div>
+              <div className="font-medium">{plan.name}</div>
+              <div className="text-sm text-gray-600 mt-1">{plan.description}</div>
+              <div className="text-xs text-green-600 mt-1">✓ Completed</div>
             </div>
-          </>
-        )}
+          ))}
+        </div>
+      )}
 
-        {currentLevel === 'plans' && (
-          <>
-            {getFilteredPlans().map((plan) => (
-              <div
-                key={plan.id}
-                onClick={() => handlePlanSelect(plan)}
-                className="p-4 cursor-pointer hover:bg-gray-50 transition-colors rounded-lg"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">{plan.name}</div>
-                  <div className="w-2 h-2 bg-black rounded-full"></div>
-                </div>
-              </div>
-            ))}
-            
-            {!showMore && getRemainingCount() > 0 && (
-              <Button
-                onClick={() => setShowMore(true)}
-                variant="ghost"
-                className="w-full flex items-center gap-2 text-gray-600 hover:text-black"
-              >
-                <ChevronDown className="h-4 w-4" />
-                Show More ({getRemainingCount()} plans)
-              </Button>
-            )}
-          </>
-        )}
-      </div>
+      {/* Empty State */}
+      {currentPlans.length === 0 && completedPlans.length === 0 && (
+        <div className="text-center py-8">
+          <h2 className="text-lg font-medium text-gray-900 mb-2">No Plans Yet</h2>
+          <p className="text-gray-600 mb-4">Use "Build me a plan" in the Builder tab to create your first training plan</p>
+        </div>
+      )}
     </div>
   );
 };
@@ -593,17 +640,54 @@ import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
+import PlansDropdown from './PlansDropdown';
+import PlanBuilder from './PlanBuilder';
 
-const AppLayout: React.FC = () => {
-  const { workouts, loading, useImperial, toggleUnits, deleteWorkout } = useAppContext();
+interface Plan {
+  id: string;
+  name: string;
+  currentWeek?: number;
+  status: 'active' | 'completed';
+  description?: string;
+}
+
+// 🔥 NEW: Add interface for AppLayout props
+interface AppLayoutProps {
+  onLogout?: () => void;
+}
+
+// 🔥 UPDATED: AppLayout now accepts onLogout prop
+const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
+  const { 
+    workouts, 
+    loading, 
+    useImperial, 
+    toggleUnits, 
+    deleteWorkout,
+    // NEW: Plan context
+    currentPlans,
+    completedPlans,
+    detailedPlans,
+    plansLoading,
+    addPlan,
+    deletePlan,
+    updatePlan,
+    refreshPlans
+  } = useAppContext();
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
+  const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('summary');
+
+  // Plan data state - now comes from context
+  // const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
+  // const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
+  // const [detailedPlans, setDetailedPlans] = useState<any>({});
 
   // 🆕 NEW: Sliding summary state
   const [showSummary, setShowSummary] = useState(false);
@@ -655,16 +739,30 @@ const AppLayout: React.FC = () => {
     console.log('Updating workout:', workoutId, updates);
   };
 
+  const handleOpenPlanBuilder = () => {
+    setShowPlanBuilder(true);
+    // Clear other states
+    setShowSummary(false);
+    setDateWorkouts([]);
+    setCurrentWorkoutIndex(0);
+  };
+
   const handleBackToDashboard = () => {
     console.log('🔍 handleBackToDashboard called - clearing all state');
-    // 🚨 FIX: If we came from summary, go back to summary with the same date
-    const shouldReturnToSummary = showBuilder && selectedDate;
+    
+    // 🚨 FIX: Check if we're coming from Plan Builder BEFORE clearing states
+    const comingFromPlanBuilder = showPlanBuilder;
+    
+    // 🚨 FIX: Only return to summary if we came from a workout that was opened from summary sliding
+    // This should ONLY happen when editing an existing workout from the sliding summary view
+    const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
     
     // Clear all state and return to dashboard
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
+    setShowPlanBuilder(false);
     setBuilderType('');
     setBuilderSourceContext('');
     setSelectedWorkout(null);
@@ -993,7 +1091,9 @@ const AppLayout: React.FC = () => {
       console.log('showAllPlans should now be true');
     } else {
       console.log('Plan selected:', routineId);
-      // TODO: Handle specific plan selection
+      // Handle specific plan selection - could open plan detail view
+      // For now, open AllPlansInterface and let it handle the plan detail view
+      setShowAllPlans(true);
     }
   };
 
@@ -1029,6 +1129,66 @@ const AppLayout: React.FC = () => {
     setShowBuilder(true);
   };
 
+  // Plan generation callback - now uses context
+  const handlePlanGenerated = async (newPlan: any) => {
+    console.log('🎯 handlePlanGenerated called in AppLayout with:', newPlan);
+    
+    try {
+      // Save to Supabase via context
+      await addPlan(newPlan);
+      console.log('🎯 Plan saved to Supabase successfully');
+      
+      // Close plan builder and show plans interface
+      setShowPlanBuilder(false);
+      setShowAllPlans(true);
+    } catch (error) {
+      console.error('🎯 Error saving plan:', error);
+      alert('Error saving plan. Please try again.');
+    }
+  };
+
+  // Handle plan deletion - now uses context
+  const handlePlanDeleted = async (planId: string) => {
+    console.log('🗑️ handlePlanDeleted called with planId:', planId);
+    
+    try {
+      // Find workouts associated with this plan
+      const planWorkouts = workouts?.filter(w => {
+        const matchesId = w.planId === planId;
+        const matchesPattern = w.name && (
+          w.name.includes('Week 1') || 
+          w.name.includes('Week 2') || 
+          w.name.includes('Week 3') || 
+          w.name.includes('Week 4')
+        );
+        return matchesId || matchesPattern;
+      }) || [];
+      
+      console.log('🗑️ Found plan workouts to delete:', planWorkouts.length);
+      
+      // Delete all associated workouts
+      for (const workout of planWorkouts) {
+        try {
+          console.log('🗑️ Deleting workout:', workout.id, workout.name);
+          await deleteWorkout(workout.id);
+        } catch (error) {
+          console.error('🗑️ Error deleting workout:', workout.id, error);
+        }
+      }
+      
+      // Delete plan from Supabase via context
+      await deletePlan(planId);
+      console.log('🗑️ Plan deleted successfully');
+      
+      // Go back to plans list
+      setShowAllPlans(true);
+      
+    } catch (error) {
+      console.error('🗑️ Error deleting plan:', error);
+      alert('Error deleting plan. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="mobile-app-container">
@@ -1050,6 +1210,7 @@ const AppLayout: React.FC = () => {
     showBuilder, 
     showStrengthLogger, 
     showStrengthPlans,
+    showPlanBuilder,
     showSummary,
     dateWorkouts: dateWorkouts.length,
     currentWorkoutIndex,
@@ -1060,8 +1221,15 @@ const AppLayout: React.FC = () => {
     selectedDate,
     activeTab,
     finalTransform,
-    isSwipeActive
+    isSwipeActive,
+    currentPlans: currentPlans.length,
+    completedPlans: completedPlans.length
   });
+
+  // 🚨 DEBUG: Log plan state 
+  console.log('🗂️ Current Plans State:', currentPlans);
+  console.log('🗂️ Completed Plans State:', completedPlans);
+  console.log('🗂️ Detailed Plans State:', Object.keys(detailedPlans));
 
   return (
     <div className="mobile-app-container">
@@ -1097,7 +1265,8 @@ const AppLayout: React.FC = () => {
                   <DropdownMenuItem>
                     Help & Support
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  {/* 🔥 UPDATED: Sign Out now calls onLogout */}
+                  <DropdownMenuItem onClick={onLogout}>
                     Sign Out
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -1106,7 +1275,7 @@ const AppLayout: React.FC = () => {
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               
               {/* Dashboard button when in builder/logger/plans */}
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans) && !showSummary && (
+              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
                 <Button
                   onClick={handleBackToDashboard}
                   variant="ghost"
@@ -1125,7 +1294,7 @@ const AppLayout: React.FC = () => {
 
             {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
-              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showSummary) && (
+              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
                 <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
                   {formatHeaderDate()}
                 </span>
@@ -1138,7 +1307,14 @@ const AppLayout: React.FC = () => {
       {/* Main content with Apple Photos style sliding */}
       <main className="mobile-main-content">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
-          {showStrengthPlans ? (
+          {showPlanBuilder ? (
+            <div className="pt-4">
+              <PlanBuilder 
+                onClose={handleBackToDashboard}
+                onPlanGenerated={handlePlanGenerated}
+              />
+            </div>
+          ) : showStrengthPlans ? (
             <div className="pt-4">
               <StrengthPlansView
                 onClose={handleBackToDashboard}
@@ -1151,6 +1327,10 @@ const AppLayout: React.FC = () => {
                 onClose={handleBackToDashboard}
                 onSelectPlan={handlePlanSelect}
                 onBuildWorkout={handleBuildWorkout}
+                currentPlans={currentPlans}
+                completedPlans={completedPlans}
+                detailedPlans={detailedPlans}
+                onDeletePlan={handlePlanDeleted}
               />
             </div>
           ) : showStrengthLogger ? (
@@ -1213,7 +1393,10 @@ const AppLayout: React.FC = () => {
                         onDateSelect={handleDateSelect}
                         onSelectRoutine={handleSelectRoutine}
                         onSelectDiscipline={handleSelectDiscipline}
+                        onOpenPlanBuilder={handleOpenPlanBuilder}
                         isSwipingHorizontally={isSwipeActive}
+                        currentPlans={currentPlans}
+                        completedPlans={completedPlans}
                       />
                     </div>
                   </div>
@@ -1252,7 +1435,8 @@ const AppLayout: React.FC = () => {
                                 setShowSummary(false);
                                 handleAddEffort(type, selectedDate);
                               }, 300); // Wait for animation to complete
-                            }} 
+                            }}
+                            onOpenPlanBuilder={handleOpenPlanBuilder}
                           />
                           
                           {/* 🚨 FIX: Add back button for empty date screen */}
@@ -1285,6 +1469,88 @@ const AppLayout: React.FC = () => {
 };
 
 export default AppLayout;
+
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/AuthWrapper.tsx
+import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+import LoginForm from './LoginForm';
+import RegisterForm from './RegisterForm';
+import AppLayout from './AppLayout';
+
+const AuthWrapper: React.FC = () => {
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [showRegister, setShowRegister] = useState(false);
+
+  useEffect(() => {
+    // Check if user is already logged in
+    const checkUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUser(user);
+      } catch (error) {
+        console.error('Error checking user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    checkUser();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
+        setUser(session?.user ?? null);
+        setLoading(false);
+      }
+    );
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-lg">Loading...</div>
+      </div>
+    );
+  }
+
+  // If user is logged in, show the main app
+  if (user) {
+    return <AppLayout onLogout={handleLogout} />;
+  }
+
+  // If not logged in, show auth forms
+  return (
+    <div className="min-h-screen bg-white flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        {showRegister ? (
+          <RegisterForm 
+            onSuccess={() => setShowRegister(false)}
+            onSwitchToLogin={() => setShowRegister(false)}
+          />
+        ) : (
+          <LoginForm 
+            onSwitchToRegister={() => setShowRegister(true)}
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default AuthWrapper;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/BannerUpload.tsx
 import React, { useState, useRef } from 'react';
@@ -2982,6 +3248,115 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
 
 export default LogEffortDropdown;
 
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/LoginForm.tsx
+import React, { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+interface LoginFormProps {
+  onSwitchToRegister: () => void;
+}
+
+const LoginForm: React.FC<LoginFormProps> = ({ onSwitchToRegister }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        setError(error.message);
+      }
+      // AuthWrapper will handle the redirect via onAuthStateChange
+    } catch (error) {
+      setError('An unexpected error occurred');
+      console.error('Login error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
+        <p className="mt-2 text-gray-600">Sign in to your account</p>
+      </div>
+
+      {/* Login Form */}
+      <form onSubmit={handleLogin} className="space-y-4">
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
+
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password"
+            required
+            className="mt-1"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-black text-white hover:bg-gray-800"
+        >
+          {loading ? 'Signing in...' : 'Sign In'}
+        </Button>
+      </form>
+
+      {/* Switch to Register */}
+      <div className="text-center">
+        <p className="text-gray-600">
+          Don't have an account?{' '}
+          <button
+            onClick={onSwitchToRegister}
+            className="text-black font-medium hover:underline"
+          >
+            Create one
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default LoginForm;
+
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/NewEffortDropdown.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
@@ -2989,15 +3364,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move } from 'lucide-react';
+import { ChevronDown, Waves, Bike, Activity, Dumbbell, Move, Kanban } from 'lucide-react';
 
 interface NewEffortDropdownProps {
   onSelectType: (type: string) => void;
+  onOpenPlanBuilder?: () => void;
 }
 
-const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) => {
+const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType, onOpenPlanBuilder }) => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -3025,6 +3402,20 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
         className="bg-white border border-gray-200 shadow-xl"
         style={{borderRadius: '12px', padding: '8px', minWidth: '160px'}}
       >
+        <DropdownMenuItem
+          onClick={() => {
+            console.log('🔥 Build me a plan clicked!', onOpenPlanBuilder);
+            onOpenPlanBuilder?.();
+          }}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <Kanban className="h-5 w-5 mr-3" />
+          Build me a plan
+        </DropdownMenuItem>
+        
+        <DropdownMenuSeparator className="my-2" />
+        
         <DropdownMenuItem
           onClick={() => onSelectType('run')}
           className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
@@ -3072,67 +3463,358 @@ const NewEffortDropdown: React.FC<NewEffortDropdownProps> = ({ onSelectType }) =
 
 export default NewEffortDropdown;
 
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/PlanBuilder.tsx
+// src/components/PlanBuilder.tsx
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { ArrowLeft, Kanban } from 'lucide-react';
+import { useAppContext } from '@/contexts/AppContext';
+
+interface PlanBuilderProps {
+  onClose: () => void;
+  onPlanGenerated?: (plan: any) => void; // NEW: Callback for plan creation
+}
+
+export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderProps) {
+  const { addWorkout } = useAppContext();
+  const [planPrompt, setPlanPrompt] = useState('');
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+
+  // Quick plan suggestions
+  const quickPlans = [
+    "Build me a 30-minute easy run",
+    "Create a 5K training workout", 
+    "I want a 45-minute bike ride with intervals",
+    "Design a full-body strength workout",
+    "Give me a swim workout for endurance",
+    "Build me a 4-week marathon training plan",
+    "Create a triathlon program",
+    "I need a strength plan for runners"
+  ];
+
+  const generatePlan = async () => {
+    if (!planPrompt.trim()) return;
+    
+    setGeneratingPlan(true);
+    try {
+      // Mock response for now - replace with real AI later
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
+      
+      // Generate a month of progressive workouts
+      const generateMonthOfWorkouts = (goal: string) => {
+        const workouts = [];
+        const startDate = new Date();
+        
+        // Example: 5K training plan over 4 weeks
+        for (let week = 0; week < 4; week++) {
+          for (let day = 0; day < 7; day++) {
+            const currentDate = new Date(startDate);
+            currentDate.setDate(startDate.getDate() + (week * 7) + day);
+            const dateStr = currentDate.toISOString().split('T')[0];
+            
+            // Skip some days (rest days)
+            if (day === 1 || day === 3 || day === 6) continue;
+            
+            let workout = null;
+            
+            if (day === 0) { // Monday - Long run
+              workout = {
+                date: dateStr,
+                type: 'run',
+                name: `Week ${week + 1} - Long Run`,
+                intervals: [
+                  {
+                    id: '1',
+                    time: '10:00',
+                    effortLabel: 'Easy Warmup',
+                    rpeTarget: '4',
+                    duration: 600,
+                    repeatCount: 1
+                  },
+                  {
+                    id: '2',
+                    time: `${30 + (week * 5)}:00`,
+                    effortLabel: 'Steady Pace',
+                    rpeTarget: '6',
+                    duration: (30 + (week * 5)) * 60,
+                    repeatCount: 1
+                  },
+                  {
+                    id: '3',
+                    time: '10:00',
+                    effortLabel: 'Easy Cool Down',
+                    rpeTarget: '3',
+                    duration: 600,
+                    repeatCount: 1
+                  }
+                ]
+              };
+            } else if (day === 2) { // Wednesday - Intervals
+              workout = {
+                date: dateStr,
+                type: 'run',
+                name: `Week ${week + 1} - Speed Work`,
+                intervals: [
+                  {
+                    id: '1',
+                    time: '15:00',
+                    effortLabel: 'Warmup',
+                    rpeTarget: '4',
+                    duration: 900,
+                    repeatCount: 1
+                  },
+                  {
+                    id: '2',
+                    time: `${4 + week}x(2:00 Hard/1:00 Easy)`,
+                    effortLabel: 'Intervals',
+                    rpeTarget: '8',
+                    duration: (4 + week) * 180,
+                    repeatCount: 1,
+                    isRepeatBlock: true
+                  },
+                  {
+                    id: '3',
+                    time: '10:00',
+                    effortLabel: 'Cool Down',
+                    rpeTarget: '3',
+                    duration: 600,
+                    repeatCount: 1
+                  }
+                ]
+              };
+            } else if (day === 4) { // Friday - Recovery
+              workout = {
+                date: dateStr,
+                type: 'run',
+                name: `Week ${week + 1} - Recovery Run`,
+                intervals: [
+                  {
+                    id: '1',
+                    time: '25:00',
+                    effortLabel: 'Easy Recovery',
+                    rpeTarget: '4',
+                    duration: 1500,
+                    repeatCount: 1
+                  }
+                ]
+              };
+            } else if (day === 5) { // Saturday - Strength
+              workout = {
+                date: dateStr,
+                type: 'strength',
+                name: `Week ${week + 1} - Strength Training`,
+                exercises: [
+                  {
+                    id: '1',
+                    name: 'Squats',
+                    sets: 3,
+                    reps: 12,
+                    weight: 135,
+                    weightMode: 'same'
+                  },
+                  {
+                    id: '2',
+                    name: 'Lunges',
+                    sets: 3,
+                    reps: 10,
+                    weight: 0,
+                    weightMode: 'same'
+                  },
+                  {
+                    id: '3',
+                    name: 'Calf Raises',
+                    sets: 3,
+                    reps: 15,
+                    weight: 0,
+                    weightMode: 'same'
+                  }
+                ]
+              };
+            }
+            
+            if (workout) {
+              workouts.push(workout);
+            }
+          }
+        }
+        
+        return workouts;
+      };
+      
+      // Generate the month of workouts
+      const monthWorkouts = generateMonthOfWorkouts(planPrompt);
+      
+      // NEW: Create plan metadata for Plans dropdown
+      const planId = `plan-${Date.now()}`;
+      const planData = {
+        id: planId,
+        name: planPrompt.length > 30 ? `${planPrompt.substring(0, 30)}...` : planPrompt,
+        description: planPrompt,
+        type: 'run', // Could be determined by AI
+        duration: 4, // 4 weeks
+        level: 'intermediate',
+        goal: planPrompt,
+        status: 'active',
+        currentWeek: 1,
+        createdDate: new Date().toISOString().split('T')[0],
+        totalWorkouts: monthWorkouts.length,
+        weeks: [] // Could be populated with detailed week structure for plan detail view
+      };
+      
+      console.log('🚀 Generated plan data:', planData);
+      
+      // Save all workouts to your app
+      for (const workout of monthWorkouts) {
+        const workoutData = {
+          ...workout,
+          planId: planId, // NEW: Link workouts to plan
+          description: workout.intervals ? 
+            workout.intervals.map(i => i.effortLabel || i.time).join(' + ') :
+            workout.exercises?.map(e => `${e.name} ${e.sets}x${e.reps}`).join(' + '),
+          duration: workout.intervals ? 
+            workout.intervals.reduce((sum, i) => sum + (i.duration || 0), 0) : 
+            2400, // 40 min default for strength
+          workout_status: 'planned'
+        };
+        
+        try {
+          await addWorkout(workoutData);
+        } catch (error) {
+          console.error('Error saving workout:', error);
+        }
+      }
+      
+      // NEW: Call the plan generation callback
+      if (onPlanGenerated) {
+        console.log('🚀 Calling onPlanGenerated with:', planData);
+        onPlanGenerated(planData);
+      }
+      
+      setPlanPrompt('');
+      
+      // Show success message
+      alert(`Generated ${monthWorkouts.length} workouts for your training plan!`);
+      
+      // Don't close automatically - let AppLayout handle it
+      // onClose();
+      
+    } catch (error) {
+      console.error('Error generating plan:', error);
+      alert('Error generating plan. Please try again.');
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      <main className="max-w-7xl mx-auto px-3 py-2">
+        {/* Header */}
+        <div className="flex justify-between items-center mb-6">
+          <Button
+            onClick={onClose}
+            variant="ghost"
+            className="flex items-center gap-2 p-0 h-auto text-muted-foreground hover:text-black"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Dashboard
+          </Button>
+        </div>
+
+        {/* Main Content */}
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8">
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-gray-50 rounded-full">
+                <Kanban className="h-8 w-8 text-gray-600" />
+              </div>
+            </div>
+            <h1 className="text-2xl font-semibold mb-2">Build me a plan</h1>
+            <p className="text-gray-600">
+              Describe what you want to train for and I'll create a personalized plan
+            </p>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <Textarea
+                value={planPrompt}
+                onChange={(e) => setPlanPrompt(e.target.value)}
+                placeholder="I want to train for a 5K race in 8 weeks..."
+                rows={4}
+                className="w-full min-h-[100px] border-gray-300"
+                style={{fontFamily: 'Inter, sans-serif'}}
+              />
+            </div>
+            
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 font-medium">Quick suggestions:</p>
+              <div className="grid grid-cols-1 gap-2">
+                {quickPlans.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setPlanPrompt(suggestion)}
+                    className="text-left p-3 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  >
+                    {suggestion}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div className="pt-4">
+              <Button
+                onClick={generatePlan}
+                disabled={!planPrompt.trim() || generatingPlan}
+                className="w-full h-12 bg-black text-white hover:bg-gray-800"
+                style={{
+                  fontFamily: 'Inter, sans-serif',
+                  fontWeight: 600
+                }}
+              >
+                {generatingPlan ? 'Generating plan...' : 'Generate Plan'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
+
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/PlansDropdown.tsx
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ChevronDown, ArrowRight, Activity, Bike, Dumbbell, Waves, Move } from 'lucide-react';
+import { ChevronDown, ArrowRight } from 'lucide-react';
 
-interface ActivePlan {
+interface Plan {
   id: string;
   name: string;
-  currentWeek: number;
-  type: 'running' | 'cycling' | 'swimming' | 'strength' | 'triathlon';
+  currentWeek?: number;
+  status: 'active' | 'completed';
+  description?: string;
 }
 
 interface PlansDropdownProps {
   onSelectRoutine?: (planId: string) => void;
-  onSelectDiscipline?: (discipline: string) => void;
+  currentPlans?: Plan[];
+  completedPlans?: Plan[];
 }
 
-const PlansDropdown: React.FC<PlansDropdownProps> = ({ 
+const PlansDropdown: React.FC<PlansDropdownProps> = ({
   onSelectRoutine,
-  onSelectDiscipline
+  currentPlans = [],
+  completedPlans = []
 }) => {
-  // Mock active plans data - replace with real data later
-  const mockActivePlans: ActivePlan[] = [
-    {
-      id: '1',
-      name: 'Marathon Training',
-      currentWeek: 8,
-      type: 'running'
-    },
-    {
-      id: '2', 
-      name: 'Strength Foundation',
-      currentWeek: 3,
-      type: 'strength'
-    }
-  ];
-
-  const disciplines = [
-    { id: 'run', name: 'Run', icon: Activity },
-    { id: 'ride', name: 'Ride', icon: Bike },
-    { id: 'strength', name: 'Strength', icon: Dumbbell },
-    { id: 'swim', name: 'Swim', icon: Waves },
-    { id: 'mobility', name: 'Mobility', icon: Move }
-  ];
-
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
     e.stopPropagation();
     console.log('Selected plan:', planId);
     if (onSelectRoutine) {
       onSelectRoutine(planId);
-    }
-  };
-
-  const handleDisciplineSelect = (e: React.MouseEvent, disciplineId: string) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log('Selected discipline:', disciplineId);
-    if (onSelectDiscipline) {
-      onSelectDiscipline(disciplineId);
     }
   };
 
@@ -3171,41 +3853,196 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         style={{borderRadius: '12px', padding: '8px', minWidth: '200px'}}
       >
         {/* Current Plans */}
-        {mockActivePlans.map((plan) => (
-          <DropdownMenuItem
-            key={plan.id}
-            onClick={(e) => handlePlanSelect(e, plan.id)}
-            className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-            style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '50px'}}
-          >
-            <span className="text-xs text-gray-500 mb-1">Current:</span>
-            <span className="font-medium">{plan.name} - Wk {plan.currentWeek}</span>
-          </DropdownMenuItem>
-        ))}
+        {currentPlans.length > 0 && (
+          <>
+            {currentPlans.map((plan) => (
+              <DropdownMenuItem
+                key={plan.id}
+                onClick={(e) => handlePlanSelect(e, plan.id)}
+                className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '50px'}}
+              >
+                <span className="text-xs text-gray-500 mb-1">Current:</span>
+                <span className="font-medium">{plan.name} - Wk {plan.currentWeek}</span>
+              </DropdownMenuItem>
+            ))}
+            
+            {completedPlans.length > 0 && (
+              <DropdownMenuSeparator className="my-2" />
+            )}
+          </>
+        )}
+
+        {/* Completed Plans */}
+        {completedPlans.length > 0 && (
+          <>
+            {completedPlans.slice(0, 3).map((plan) => (
+              <DropdownMenuItem
+                key={plan.id}
+                onClick={(e) => handlePlanSelect(e, plan.id)}
+                className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '50px'}}
+              >
+                <span className="text-xs text-gray-500 mb-1">Completed:</span>
+                <span className="font-medium">{plan.name}</span>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+
+        {/* Show All Plans if there are any plans or as fallback */}
+        {(currentPlans.length > 0 || completedPlans.length > 0) && (
+          <DropdownMenuSeparator className="my-2" />
+        )}
         
-        {mockActivePlans.length > 0 && <DropdownMenuSeparator />}
-        
-        {/* Discipline Quick Access */}
-        {disciplines.map((discipline) => {
-          const IconComponent = discipline.icon;
-          return (
-            <DropdownMenuItem
-              key={discipline.id}
-              onClick={(e) => handleDisciplineSelect(e, discipline.id)}
-              className="flex items-center hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-              style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-            >
-              <IconComponent className="h-5 w-5 mr-3" />
-              <span className="font-medium">{discipline.name}</span>
-            </DropdownMenuItem>
-          );
-        })}
+        <DropdownMenuItem
+          onClick={handleAllPlans}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>{currentPlans.length === 0 && completedPlans.length === 0 ? 'All Plans' : 'View All Plans'}</span>
+          <ArrowRight className="h-4 w-4" />
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );
 };
 
 export default PlansDropdown;
+
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/RegisterForm.tsx
+import React, { useState } from 'react';
+import { supabase } from '@/lib/supabase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+
+interface RegisterFormProps {
+  onSuccess: () => void;
+  onSwitchToLogin: () => void;
+}
+
+const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin }) => {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      setLoading(false);
+      return;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (error) {
+        setError(error.message);
+      } else {
+        onSuccess();
+      }
+    } catch (error) {
+      setError('An unexpected error occurred');
+      console.error('Registration error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
+        <p className="mt-2 text-gray-600">Create your account</p>
+      </div>
+
+      <form onSubmit={handleRegister} className="space-y-4">
+        {error && (
+          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
+
+        <div>
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="Enter your email"
+            required
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="password">Password</Label>
+          <Input
+            id="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Create a password (min 6 characters)"
+            required
+            className="mt-1"
+          />
+        </div>
+
+        <div>
+          <Label htmlFor="confirmPassword">Confirm Password</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            placeholder="Confirm your password"
+            required
+            className="mt-1"
+          />
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-black text-white hover:bg-gray-800"
+        >
+          {loading ? 'Creating account...' : 'Create Account'}
+        </Button>
+      </form>
+
+      <div className="text-center">
+        <p className="text-gray-600">
+          Already have an account?{' '}
+          <button
+            onClick={onSwitchToLogin}
+            className="text-black font-medium hover:underline"
+          >
+            Sign in
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+export default RegisterForm;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/RideIntervalBuilder.tsx
 import React, { useState, useEffect } from 'react';
@@ -7135,7 +7972,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
-  const [showPlanBuilder, setShowPlanBuilder] = useState(false);
+  const [showLocalPlanModal, setShowLocalPlanModal] = useState(false);
   const [planPrompt, setPlanPrompt] = useState('');
   const [generatingPlan, setGeneratingPlan] = useState(false);
   
@@ -7348,7 +8185,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         }
       }
       
-      setShowPlanBuilder(false);
+      setShowLocalPlanModal(false);
       setPlanPrompt('');
       
       // Show success message
@@ -7659,7 +8496,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       )}
 
       {/* Plan Builder Modal */}
-      {showPlanBuilder && (
+      {showLocalPlanModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h2 className="text-lg font-semibold mb-4">Build me a plan</h2>
@@ -7695,7 +8532,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   {generatingPlan ? 'Generating...' : 'Generate Plan'}
                 </Button>
                 <Button
-                  onClick={() => setShowPlanBuilder(false)}
+                  onClick={() => setShowLocalPlanModal(false)}
                   variant="outline"
                 >
                   Cancel
@@ -7756,7 +8593,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                 style={{fontFamily: 'Inter, sans-serif'}}
               />
               <Button
-                onClick={() => setShowPlanBuilder(true)}
+                onClick={() => setShowLocalPlanModal(true)}
                 variant="ghost"
                 className="text-gray-600 hover:text-black flex items-center gap-2"
               >
@@ -7894,6 +8731,14 @@ const DISCIPLINE_COLORS = {
   mobility: 'bg-purple-500'
 };
 
+interface Plan {
+  id: string;
+  name: string;
+  currentWeek?: number;
+  status: 'active' | 'completed';
+  description?: string;
+}
+
 interface WorkoutCalendarProps {
   onAddEffort: (type: string, date?: string) => void;
   onSelectType: (type: string) => void;
@@ -7903,7 +8748,10 @@ interface WorkoutCalendarProps {
   onDateSelect?: (dateString: string) => void;
   onSelectRoutine?: (type: string) => void;
   onSelectDiscipline?: (discipline: string) => void;
-  isSwipingHorizontally?: boolean; // NEW: Track when parent is swiping
+  onOpenPlanBuilder?: () => void;
+  isSwipingHorizontally?: boolean;
+  currentPlans?: Plan[]; // NEW: AI-generated current plans
+  completedPlans?: Plan[]; // NEW: Completed plans
 }
 
 export default function WorkoutCalendar({ 
@@ -7915,7 +8763,10 @@ export default function WorkoutCalendar({
   onDateSelect,
   onSelectRoutine,
   onSelectDiscipline,
-  isSwipingHorizontally = false // NEW: Default to false
+  onOpenPlanBuilder,
+  isSwipingHorizontally = false,
+  currentPlans = [], // NEW: Default to empty array
+  completedPlans = [] // NEW: Default to empty array
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -8038,11 +8889,15 @@ export default function WorkoutCalendar({
     <div className="w-full">
       {/* FIXED: Extra tight spacing - more overlap between buttons */}
       <div className="w-full flex justify-center items-center mb-2 -space-x-2 flex-nowrap px-4">
-        <NewEffortDropdown onSelectType={onSelectType} />
+        <NewEffortDropdown 
+          onSelectType={onSelectType} 
+          onOpenPlanBuilder={onOpenPlanBuilder}
+        />
         <LogEffortDropdown onSelectType={onSelectType} />
         <PlansDropdown 
-          onSelectRoutine={onSelectRoutine} 
-          onSelectDiscipline={onSelectDiscipline}
+          onSelectRoutine={onSelectRoutine}
+          currentPlans={currentPlans}
+          completedPlans={completedPlans}
         />
         <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
       </div>
@@ -14635,8 +15490,9 @@ export { useToast, toast };
 
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/contexts/AppContext.tsx
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
+import { supabase } from '@/lib/supabase';
 
 export interface WorkoutInterval {
   id: string;
@@ -14667,16 +15523,44 @@ interface Workout {
   swimData?: SwimWorkoutData;
 }
 
+// NEW: Plan interface
+interface Plan {
+  id: string;
+  name: string;
+  description?: string;
+  type?: string;
+  duration?: number;
+  level?: string;
+  goal?: string;
+  status: 'active' | 'completed';
+  current_week?: number;
+  created_date?: string;
+  total_workouts?: number;
+  weeks?: any;
+  user_id?: string;
+}
+
 interface AppContextType {
+  // Existing workout properties
   sidebarOpen: boolean;
   toggleSidebar: () => void;
   workouts: Workout[];
   loading: boolean;
   addWorkout: (workout: Omit<Workout, 'id'>) => Promise<any>;
-  updateWorkout: (id: string, updates: Partial<Workout>) => Promise<any>; // ADD THIS
+  updateWorkout: (id: string, updates: Partial<Workout>) => Promise<any>;
   deleteWorkout: (id: string) => Promise<void>;
   useImperial: boolean;
   toggleUnits: () => void;
+  
+  // NEW: Plan management
+  currentPlans: Plan[];
+  completedPlans: Plan[];
+  detailedPlans: any;
+  plansLoading: boolean;
+  addPlan: (plan: any) => Promise<void>;
+  deletePlan: (planId: string) => Promise<void>;
+  updatePlan: (planId: string, updates: any) => Promise<void>;
+  refreshPlans: () => Promise<void>;
 }
 
 const defaultAppContext: AppContextType = {
@@ -14685,10 +15569,20 @@ const defaultAppContext: AppContextType = {
   workouts: [],
   loading: false,
   addWorkout: async () => {},
-  updateWorkout: async () => {}, // ADD THIS
+  updateWorkout: async () => {},
   deleteWorkout: async () => {},
   useImperial: true,
   toggleUnits: () => {},
+  
+  // NEW: Plan defaults
+  currentPlans: [],
+  completedPlans: [],
+  detailedPlans: {},
+  plansLoading: false,
+  addPlan: async () => {},
+  deletePlan: async () => {},
+  updatePlan: async () => {},
+  refreshPlans: async () => {},
 };
 
 const AppContext = createContext<AppContextType>(defaultAppContext);
@@ -14696,10 +15590,162 @@ const AppContext = createContext<AppContextType>(defaultAppContext);
 export const useAppContext = () => useContext(AppContext);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Existing workout state
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
-  const { workouts, loading, addWorkout, updateWorkout, deleteWorkout } = useWorkouts(); // ADD updateWorkout
+  const { workouts, loading, addWorkout, updateWorkout, deleteWorkout } = useWorkouts();
+  
+  // NEW: Plan state
+  const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
+  const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
+  const [detailedPlans, setDetailedPlans] = useState<any>({});
+  const [plansLoading, setPlansLoading] = useState(true);
 
+  // NEW: Load plans from Supabase
+  const loadPlans = async () => {
+    try {
+      setPlansLoading(true);
+      console.log('📋 Loading plans from Supabase...');
+      
+      const { data: plans, error } = await supabase
+        .from('plans')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error loading plans:', error);
+        return;
+      }
+
+      console.log('📋 Loaded plans:', plans);
+
+      // Separate active and completed plans
+      const active = plans?.filter(p => p.status === 'active') || [];
+      const completed = plans?.filter(p => p.status === 'completed') || [];
+      
+      setCurrentPlans(active);
+      setCompletedPlans(completed);
+      
+      // Build detailed plans object
+      const detailed = {};
+      plans?.forEach(plan => {
+        detailed[plan.id] = plan;
+      });
+      setDetailedPlans(detailed);
+      
+      console.log('📋 Active plans:', active.length);
+      console.log('📋 Completed plans:', completed.length);
+      
+    } catch (error) {
+      console.error('Error in loadPlans:', error);
+    } finally {
+      setPlansLoading(false);
+    }
+  };
+
+  // NEW: Add plan to Supabase - FIXED with user_id
+  const addPlan = async (planData: any) => {
+    try {
+      console.log('📋 Adding plan to Supabase:', planData);
+      
+      // 🔥 FIXED: Get the current user for Row Level Security
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { data, error } = await supabase
+        .from('plans')
+        .insert([{
+          id: planData.id,
+          name: planData.name,
+          description: planData.description,
+          type: planData.type,
+          duration: planData.duration,
+          level: planData.level,
+          goal: planData.goal,
+          status: planData.status || 'active',
+          current_week: planData.currentWeek || 1,
+          total_workouts: planData.totalWorkouts,
+          weeks: planData.weeks,
+          user_id: user?.id  // 🔥 ADDED: Required for RLS authentication
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error adding plan:', error);
+        throw error;
+      }
+
+      console.log('📋 Plan added successfully:', data);
+      
+      // Refresh plans to get updated data
+      await loadPlans();
+      
+    } catch (error) {
+      console.error('Error in addPlan:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Delete plan from Supabase
+  const deletePlan = async (planId: string) => {
+    try {
+      console.log('📋 Deleting plan from Supabase:', planId);
+      
+      const { error } = await supabase
+        .from('plans')
+        .delete()
+        .eq('id', planId);
+
+      if (error) {
+        console.error('Error deleting plan:', error);
+        throw error;
+      }
+
+      console.log('📋 Plan deleted successfully');
+      
+      // Refresh plans to get updated data
+      await loadPlans();
+      
+    } catch (error) {
+      console.error('Error in deletePlan:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Update plan in Supabase
+  const updatePlan = async (planId: string, updates: any) => {
+    try {
+      console.log('📋 Updating plan in Supabase:', planId, updates);
+      
+      const { data, error } = await supabase
+        .from('plans')
+        .update(updates)
+        .eq('id', planId)
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Error updating plan:', error);
+        throw error;
+      }
+
+      console.log('📋 Plan updated successfully:', data);
+      
+      // Refresh plans to get updated data
+      await loadPlans();
+      
+    } catch (error) {
+      console.error('Error in updatePlan:', error);
+      throw error;
+    }
+  };
+
+  // NEW: Refresh plans
+  const refreshPlans = async () => {
+    await loadPlans();
+  };
+
+  // Existing functions
   const toggleSidebar = () => {
     setSidebarOpen(prev => !prev);
   };
@@ -14708,18 +15754,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUseImperial(prev => !prev);
   };
 
+  // NEW: Load plans on mount
+  useEffect(() => {
+    loadPlans();
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
+        // Existing workout values
         sidebarOpen,
         toggleSidebar,
         workouts,
         loading,
         addWorkout,
-        updateWorkout, // ADD THIS
+        updateWorkout,
         deleteWorkout,
         useImperial,
         toggleUnits,
+        
+        // NEW: Plan values
+        currentPlans,
+        completedPlans,
+        detailedPlans,
+        plansLoading,
+        addPlan,
+        deletePlan,
+        updatePlan,
+        refreshPlans,
       }}
     >
       {children}
@@ -15474,21 +16536,19 @@ createRoot(document.getElementById("root")!).render(<App />);
 
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/pages/Index.tsx
-
 import React from 'react';
-import AppLayout from '@/components/AppLayout';
+import AuthWrapper from '@/components/AuthWrapper';
 import { AppProvider } from '@/contexts/AppContext';
 
 const Index: React.FC = () => {
   return (
     <AppProvider>
-      <AppLayout />
+      <AuthWrapper />
     </AppProvider>
   );
 };
 
 export default Index;
-
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/pages/NotFound.tsx
 import { useLocation } from "react-router-dom";
