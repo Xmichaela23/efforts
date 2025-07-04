@@ -101,13 +101,19 @@ export default function WorkoutCalendar({
     return filtered;
   };
 
-  const handleDateClick = (day: number) => {
+  const handleDateClick = (day: number, event: React.MouseEvent | React.TouchEvent) => {
     if (!day) return;
+    
+    // Prevent event from bubbling up to parent swipe handlers
+    event.preventDefault();
+    event.stopPropagation();
     
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
+    
+    console.log('📅 Calendar cell clicked:', dateStr);
     
     // Set this date as selected for visual feedback
     setSelectedDate(dateStr);
@@ -144,7 +150,8 @@ export default function WorkoutCalendar({
 
   return (
     <div className="w-full">
-      <div className="w-full flex justify-center items-center mb-2 gap-1 flex-nowrap">
+      {/* FIXED: Extra tight spacing - more overlap between buttons */}
+      <div className="w-full flex justify-center items-center mb-2 -space-x-2 flex-nowrap px-4">
         <NewEffortDropdown onSelectType={onSelectType} />
         <LogEffortDropdown onSelectType={onSelectType} />
         <PlansDropdown 
@@ -183,22 +190,26 @@ export default function WorkoutCalendar({
             ))}
           </div>
 
-          {/* Calendar grid - much wider gaps and taller cells for true squares */}
+          {/* Calendar grid - improved responsiveness without transform/shadow effects */}
           <div className="grid gap-3 grid-cols-7">
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
               
               return (
-                <div
+                <button
                   key={index}
                   className={`
-                    w-full h-16 p-2 transition-all duration-200 cursor-pointer rounded-lg
+                    w-full h-16 p-2 transition-all duration-100 rounded-lg
                     flex flex-col items-center justify-start
-                    ${day ? 'bg-white hover:bg-gray-50 hover:shadow-lg hover:border-gray-200 border border-transparent hover:-translate-y-0.5' : 'bg-gray-50 cursor-default'}
+                    min-h-[44px] touch-manipulation select-none
+                    ${day ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
                     ${day && isToday(day) ? 'bg-gray-100 border-gray-200' : ''}
-                    ${day && isSelected(day) ? 'bg-gray-200 shadow-lg border-gray-300 -translate-y-0.5' : ''}
+                    ${day && isSelected(day) ? 'bg-gray-200 border-gray-300' : ''}
                   `}
-                  onClick={() => day && handleDateClick(day)}
+                  onClick={(e) => day && handleDateClick(day, e)}
+                  onTouchEnd={(e) => day && handleDateClick(day, e)}
+                  disabled={!day}
+                  type="button"
                 >
                   {day && (
                     <>
@@ -228,7 +239,7 @@ export default function WorkoutCalendar({
                       )}
                     </>
                   )}
-                </div>
+                </button>
               );
             })}
           </div>
