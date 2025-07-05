@@ -26,6 +26,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if (workouts && workouts.length > 0) {
       console.log('🔍 All workouts for', activeDate, ':', workouts.filter((w: any) => w.date === activeDate));
       
+      // 🚨 DEBUG: Check actual date formats
+      console.log('🔍 DEBUG - First few workout dates:', workouts.slice(0, 3).map(w => ({
+        name: w.name,
+        date: w.date,
+        dateType: typeof w.date,
+        activeDate: activeDate,
+        matches: w.date === activeDate
+      })));
+      
       // 🔧 FIXED: Filter by both date AND status
       const dateWorkouts = workouts.filter((w: any) => {
         const isCorrectDate = w.date === activeDate;

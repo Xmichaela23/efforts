@@ -109,15 +109,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [detailedPlans, setDetailedPlans] = useState<any>({});
   const [plansLoading, setPlansLoading] = useState(true);
 
-  // NEW: Load plans from Supabase
+  // NEW: Load plans from Supabase with user filtering
   const loadPlans = async () => {
     try {
       setPlansLoading(true);
       console.log('📋 Loading plans from Supabase...');
       
+      // Get current user for filtering
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('No authenticated user, showing no plans');
+        setCurrentPlans([]);
+        setCompletedPlans([]);
+        setDetailedPlans({});
+        return;
+      }
+
+      console.log('Loading plans for user:', user.id);
+
       const { data: plans, error } = await supabase
         .from('plans')
         .select('*')
+        .eq('user_id', user.id)  // ✅ FILTER: Only get plans for this user
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -204,22 +218,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // NEW: Delete plan from Supabase
+  // ✅ FIXED: Delete plan from Supabase with proper user authentication
   const deletePlan = async (planId: string) => {
     try {
-      console.log('📋 Deleting plan from Supabase:', planId);
+      console.log('🗑️ Deleting plan from Supabase:', planId);
       
+      // Get current user for Row Level Security
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be authenticated to delete plans');
+      }
+      
+      console.log('Using authenticated user for plan deletion:', user.id);
+
       const { error } = await supabase
         .from('plans')
         .delete()
-        .eq('id', planId);
+        .eq('id', planId)
+        .eq('user_id', user.id); // ✅ FIXED: Verify user owns this plan
 
       if (error) {
         console.error('Error deleting plan:', error);
         throw error;
       }
 
-      console.log('📋 Plan deleted successfully');
+      console.log('🗑️ Plan deleted successfully');
       
       // Refresh plans to get updated data
       await loadPlans();

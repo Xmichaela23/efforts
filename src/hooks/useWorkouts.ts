@@ -83,53 +83,42 @@ export const useWorkouts = () => {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Get current user with demo user fallback
+  // Get current user - proper auth this time
   const getCurrentUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Always use demo user for now
-      const demoUser = {
-        id: 'demo-user-12345',
-        email: 'demo@efforts.app',
-        created_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        role: 'authenticated'
-      };
-      console.log("Using demo user:", demoUser.id);
-      return demoUser;
+      if (user) {
+        console.log("Using authenticated user:", user.id);
+        return user;
+      } else {
+        console.log("No authenticated user found");
+        return null;
+      }
     } catch (error) {
       console.error("Auth error:", error);
-      // Still return demo user even if auth fails
-      return {
-        id: 'demo-user-12345',
-        email: 'demo@efforts.app',
-        created_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        role: 'authenticated'
-      };
+      return null;
     }
   };
 
-  // Fetch - FIXED: Filter by user_id
+  // Fetch - WITH proper user filtering
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
       
-      console.log("Fetching workouts...");
-      
-      // Get current user to filter workouts
       const user = await getCurrentUser();
+      if (!user) {
+        console.log("No user authenticated, showing no workouts");
+        setWorkouts([]);
+        return;
+      }
+
       console.log("Fetching workouts for user:", user.id);
 
       const { data, error } = await supabase
         .from("workouts")
         .select("*")
-        .eq("user_id", user.id)  // 🔥 FIXED: Filter by user_id
+        .eq("user_id", user.id)
         .order("date", { ascending: false });
 
       if (error) {
@@ -164,10 +153,14 @@ export const useWorkouts = () => {
     }
   };
 
-  // Add - FIXED: Include user_id
+  // Add - WITH proper user_id
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to save workouts");
+      }
+
       console.log("Using user for save:", user.id);
 
       const toSave = {
@@ -181,7 +174,7 @@ export const useWorkouts = () => {
         workout_status: workoutData.workout_status ?? "planned",
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
-        user_id: user.id  // 🔥 FIXED: Add user_id
+        user_id: user.id  // ✅ PROPER: Add authenticated user_id
       };
 
       console.log("Saving workout with data:", toSave);
@@ -221,10 +214,14 @@ export const useWorkouts = () => {
     }
   };
 
-  // Update - FIXED: Add user verification
+  // Update - WITH user verification
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
       const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to update workouts");
+      }
+
       console.log("Using user for update:", user.id);
 
       const updateObject: any = {};
@@ -243,7 +240,7 @@ export const useWorkouts = () => {
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
-        .eq("user_id", user.id)  // 🔥 FIXED: Verify user owns this workout
+        .eq("user_id", user.id)  // ✅ VERIFY: User owns this workout
         .select()
         .single();
 
@@ -273,17 +270,21 @@ export const useWorkouts = () => {
     }
   };
 
-  // Delete - FIXED: Add user verification
+  // Delete - WITH user verification
   const deleteWorkout = async (id: string) => {
     try {
       const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to delete workouts");
+      }
+
       console.log("Using user for delete:", user.id);
 
       const { error } = await supabase
         .from("workouts")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);  // 🔥 FIXED: Verify user owns this workout
+        .eq("user_id", user.id);  // ✅ VERIFY: User owns this workout
 
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));

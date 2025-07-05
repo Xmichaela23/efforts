@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface Plan {
   id: string;
@@ -14,6 +15,7 @@ interface AllPlansInterfaceProps {
   onClose: () => void;
   onSelectPlan: (plan: Plan) => void;
   onBuildWorkout: (type: string, sourceContext?: string) => void;
+  onDeletePlan?: (planId: string) => void;
   currentPlans?: Plan[];
   completedPlans?: Plan[];
   detailedPlans?: any;
@@ -23,6 +25,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   onClose, 
   onSelectPlan, 
   onBuildWorkout,
+  onDeletePlan,
   currentPlans = [],
   completedPlans = [],
   detailedPlans = {}
@@ -46,6 +49,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const handleBack = () => {
     setCurrentView('list');
     setSelectedPlanDetail(null);
+  };
+
+  const handleDeletePlan = async () => {
+    if (!selectedPlanDetail || !onDeletePlan) return;
+    
+    try {
+      await onDeletePlan(selectedPlanDetail.id);
+      // Navigate back to list after successful deletion
+      handleBack();
+    } catch (error) {
+      console.error('Error deleting plan:', error);
+      // You could add a toast notification here for better UX
+    }
   };
 
   // Plan Detail View Functions
@@ -133,7 +149,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {planStatus === 'active' ? (
               <button 
                 onClick={() => setPlanStatus('paused')}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors"
               >
                 <Pause className="h-4 w-4" />
                 Pause
@@ -141,22 +157,44 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             ) : (
               <button 
                 onClick={() => setPlanStatus('active')}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors"
               >
                 <Play className="h-4 w-4" />
                 Resume
               </button>
             )}
             
-            <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
               <Edit className="h-4 w-4" />
               Modify
             </button>
             
-            <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
+            {/* Fixed Delete Button with Confirmation Dialog */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 transition-colors">
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Plan</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{selectedPlanDetail.name}"? This will also delete all associated workouts. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeletePlan}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Delete Plan
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 

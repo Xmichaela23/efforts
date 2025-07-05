@@ -138,7 +138,7 @@ export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderPro
                 date: dateStr,
                 type: 'strength',
                 name: `Week ${week + 1} - Strength Training`,
-                exercises: [
+                strength_exercises: [  // 🔥 FIXED: Changed from 'exercises' to 'strength_exercises'
                   {
                     id: '1',
                     name: 'Squats',
@@ -201,15 +201,21 @@ export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderPro
       // Save all workouts to your app
       for (const workout of monthWorkouts) {
         const workoutData = {
-          ...workout,
-          planId: planId, // NEW: Link workouts to plan
+          name: workout.name,
+          type: workout.type,
+          date: workout.date,
           description: workout.intervals ? 
             workout.intervals.map(i => i.effortLabel || i.time).join(' + ') :
-            workout.exercises?.map(e => `${e.name} ${e.sets}x${e.reps}`).join(' + '),
+            workout.strength_exercises?.map(e => `${e.name} ${e.sets}x${e.reps}`).join(' + ') || '',
           duration: workout.intervals ? 
             workout.intervals.reduce((sum, i) => sum + (i.duration || 0), 0) : 
             2400, // 40 min default for strength
-          workout_status: 'planned'
+          workout_status: 'planned',
+          intervals: workout.intervals || undefined,
+          strength_exercises: workout.strength_exercises || undefined,
+          userComments: '',  // 🔥 FIXED: Added missing required fields
+          completedManually: false,  // 🔥 FIXED: Added missing required fields
+          planId: planId  // Link workouts to plan
         };
         
         try {
