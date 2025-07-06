@@ -245,6 +245,7 @@ export default AllEffortsDropdown;
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target } from 'lucide-react';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface Plan {
   id: string;
@@ -258,6 +259,7 @@ interface AllPlansInterfaceProps {
   onClose: () => void;
   onSelectPlan: (plan: Plan) => void;
   onBuildWorkout: (type: string, sourceContext?: string) => void;
+  onDeletePlan?: (planId: string) => void;
   currentPlans?: Plan[];
   completedPlans?: Plan[];
   detailedPlans?: any;
@@ -267,6 +269,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   onClose, 
   onSelectPlan, 
   onBuildWorkout,
+  onDeletePlan,
   currentPlans = [],
   completedPlans = [],
   detailedPlans = {}
@@ -290,6 +293,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const handleBack = () => {
     setCurrentView('list');
     setSelectedPlanDetail(null);
+  };
+
+  const handleDeletePlan = async () => {
+    if (!selectedPlanDetail || !onDeletePlan) return;
+    
+    try {
+      await onDeletePlan(selectedPlanDetail.id);
+      // Navigate back to list after successful deletion
+      handleBack();
+    } catch (error) {
+      console.error('Error deleting plan:', error);
+      // You could add a toast notification here for better UX
+    }
   };
 
   // Plan Detail View Functions
@@ -377,7 +393,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {planStatus === 'active' ? (
               <button 
                 onClick={() => setPlanStatus('paused')}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors"
               >
                 <Pause className="h-4 w-4" />
                 Pause
@@ -385,22 +401,44 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             ) : (
               <button 
                 onClick={() => setPlanStatus('active')}
-                className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors"
               >
                 <Play className="h-4 w-4" />
                 Resume
               </button>
             )}
             
-            <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">
+            <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
               <Edit className="h-4 w-4" />
               Modify
             </button>
             
-            <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </button>
+            {/* Fixed Delete Button with Confirmation Dialog */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 transition-colors">
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Plan</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete "{selectedPlanDetail.name}"? This will also delete all associated workouts. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeletePlan}
+                    className="bg-red-600 hover:bg-red-700"
+                  >
+                    Delete Plan
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </div>
 
@@ -625,7 +663,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 export default AllPlansInterface;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/AppLayout.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -642,84 +680,205 @@ import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
+import ImportDataPage from './ImportDataPage';
 
-interface Plan {
-  id: string;
-  name: string;
-  currentWeek?: number;
-  status: 'active' | 'completed';
-  description?: string;
-}
-
-// 🔥 NEW: Add interface for AppLayout props
 interface AppLayoutProps {
   onLogout?: () => void;
 }
 
-// 🔥 UPDATED: AppLayout now accepts onLogout prop
 const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const { 
     workouts, 
     loading, 
-    useImperial, 
-    toggleUnits, 
     deleteWorkout,
-    // NEW: Plan context
+    addWorkout,
     currentPlans,
     completedPlans,
     detailedPlans,
-    plansLoading,
     addPlan,
-    deletePlan,
-    updatePlan,
-    refreshPlans
+    deletePlan
   } = useAppContext();
+  
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
+  const [showImportPage, setShowImportPage] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<string>('summary');
 
-  // Plan data state - now comes from context
-  // const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
-  // const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
-  // const [detailedPlans, setDetailedPlans] = useState<any>({});
-
-  // 🆕 NEW: Sliding summary state
   const [showSummary, setShowSummary] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(new Date().toLocaleDateString('en-CA'));
   const [dateWorkouts, setDateWorkouts] = useState<any[]>([]);
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
-  
-  // 🍎 APPLE PHOTOS STYLE: Enhanced touch handling
-  const [isSwipeActive, setIsSwipeActive] = useState(false);
-  const [swipeProgress, setSwipeProgress] = useState(0);
-  const [touchStartX, setTouchStartX] = useState<number | null>(null);
-  const [touchStartY, setTouchStartY] = useState<number | null>(null);
-  const [liveTransform, setLiveTransform] = useState(0);
-
-  // Track workout being edited in builder
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
 
-  // 🚨 CRITICAL FIX: Set appropriate tab when workout is selected
+  // Ultra-simple transform state
+  const [transform, setTransform] = useState(0);
+  const [isSwipeDetected, setIsSwipeDetected] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (selectedWorkout) {
-      console.log('🔍 New workout selected:', selectedWorkout.id, 'type:', selectedWorkout.type);
-      
-      // For strength workouts, default to 'completed' tab
       if (selectedWorkout.type === 'strength') {
+        setActiveTab('completed');
+      } else if (selectedWorkout.workout_status === 'completed') {
+        // 🔧 FIX: Completed workouts (like FIT imports) should show Completed tab
         setActiveTab('completed');
       } else {
         setActiveTab('summary');
       }
     }
-  }, [selectedWorkout?.id]); // Only trigger when workout ID changes
+  }, [selectedWorkout?.id]);
 
-  // Format date for header display (June 30 2025 format)
+  // Simple transform sync
+  useEffect(() => {
+    setTransform(showSummary ? -50 : 0);
+  }, [showSummary]);
+
+  // Add modern swipe handlers
+  useEffect(() => {
+    const container = containerRef.current;
+    const wrapper = wrapperRef.current;
+    if (!container || !wrapper) return;
+
+    let startX = 0;
+    let currentX = 0;
+    let isPointerDown = false;
+    let hasMovedHorizontally = false;
+
+    const handlePointerDown = (clientX: number) => {
+      startX = clientX;
+      currentX = clientX;
+      isPointerDown = true;
+      hasMovedHorizontally = false;
+      
+      // Disable CSS transition for live tracking
+      wrapper.style.transition = 'none';
+    };
+
+    const handlePointerMove = (clientX: number, preventDefault: () => void) => {
+      if (!isPointerDown) return;
+      
+      currentX = clientX;
+      const deltaX = currentX - startX;
+      const deltaY = 0; // We don't track Y for simplicity
+      
+      // Start horizontal movement immediately on any horizontal motion
+      if (Math.abs(deltaX) > 2) {
+        if (!hasMovedHorizontally) {
+          hasMovedHorizontally = true;
+          setIsSwipeDetected(true);
+          preventDefault();
+        }
+        
+        // Live transform - content follows finger immediately
+        const baseTransform = showSummary ? -50 : 0;
+        const dragPercent = (deltaX / window.innerWidth) * 100;
+        let newTransform = baseTransform + dragPercent;
+        
+        // Soft bounds with resistance at edges
+        if (newTransform > 0) {
+          newTransform = newTransform * 0.3; // Resistance when going past calendar
+        } else if (newTransform < -100) {
+          newTransform = -100 + (newTransform + 100) * 0.3; // Resistance past summary
+        }
+        
+        wrapper.style.transform = `translateX(${newTransform}%)`;
+      }
+    };
+
+    const handlePointerUp = () => {
+      if (!isPointerDown) return;
+      
+      // Re-enable CSS transition for snap animation
+      wrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
+      
+      if (hasMovedHorizontally) {
+        const deltaX = currentX - startX;
+        const velocity = Math.abs(deltaX);
+        
+        // Smart threshold - smaller swipe needed if fast, larger if slow
+        const threshold = velocity > 100 ? 30 : 80;
+        
+        if (Math.abs(deltaX) > threshold) {
+          if (deltaX > 0 && showSummary) {
+            // Swipe right: summary → calendar
+            setShowSummary(false);
+            setDateWorkouts([]);
+            setCurrentWorkoutIndex(0);
+          } else if (deltaX < 0 && !showSummary) {
+            // Swipe left: calendar → summary
+            const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
+            setDateWorkouts(workoutsForDate);
+            setCurrentWorkoutIndex(0);
+            setShowSummary(true);
+          } else {
+            // Snap back to current position
+            wrapper.style.transform = `translateX(${showSummary ? -50 : 0}%)`;
+          }
+        } else {
+          // Snap back to current position
+          wrapper.style.transform = `translateX(${showSummary ? -50 : 0}%)`;
+        }
+      }
+      
+      // Reset everything
+      isPointerDown = false;
+      hasMovedHorizontally = false;
+      setIsSwipeDetected(false);
+    };
+
+    // Mouse events
+    const handleMouseDown = (e: MouseEvent) => {
+      handlePointerDown(e.clientX);
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      handlePointerMove(e.clientX, () => e.preventDefault());
+    };
+
+    const handleMouseUp = (e: MouseEvent) => {
+      handlePointerUp();
+    };
+
+    // Touch events
+    const handleTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      handlePointerDown(touch.clientX);
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      handlePointerMove(touch.clientX, () => e.preventDefault());
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      handlePointerUp();
+    };
+
+    // Add listeners
+    container.addEventListener('mousedown', handleMouseDown, { passive: true });
+    container.addEventListener('mousemove', handleMouseMove, { passive: false });
+    container.addEventListener('mouseup', handleMouseUp, { passive: true });
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('mousedown', handleMouseDown);
+      container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [showSummary, workouts, selectedDate]);
+
   const formatHeaderDate = () => {
     const today = new Date();
     return today.toLocaleDateString('en-US', { 
@@ -730,9 +889,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   const handleWorkoutSelect = (workout: any) => {
-    console.log('🔍 handleWorkoutSelect called with workout:', workout.id);
     setSelectedWorkout(workout);
-    // Tab will be set by the useEffect above based on workout type
   };
 
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
@@ -741,285 +898,131 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const handleOpenPlanBuilder = () => {
     setShowPlanBuilder(true);
-    // Clear other states
     setShowSummary(false);
     setDateWorkouts([]);
     setCurrentWorkoutIndex(0);
   };
 
+  // NEW: Import handlers
+  const handleImportClick = () => {
+    setShowImportPage(true);
+  };
+
+  // 🔧 FIXED: Properly extract and flatten FIT metrics with data type conversion
+  const handleWorkoutsImported = (importedWorkouts: any[]) => {
+    console.log('📥 handleWorkoutsImported called with:', importedWorkouts);
+    
+    importedWorkouts.forEach(async (workout) => {
+      try {
+        // 🔍 DEBUG: Check elevation_gain values at both locations
+        console.log('🔍 ELEVATION DEBUG - workout.metrics?.elevation_gain:', workout.metrics?.elevation_gain, typeof workout.metrics?.elevation_gain);
+        console.log('🔍 ELEVATION DEBUG - workout.elevation_gain:', workout.elevation_gain, typeof workout.elevation_gain);
+        console.log('🔍 ELEVATION DEBUG - full metrics object:', workout.metrics);
+        
+        const workoutToSave = {
+          name: workout.name,
+          type: workout.type,
+          date: workout.date,
+          duration: workout.duration,
+          distance: workout.distance,
+          description: workout.description || "",
+          userComments: "",
+          completedManually: false,
+          workout_status: 'completed',
+          // 🔧 FIXED: Extract metrics from nested structure and ensure proper data types
+          avg_heart_rate: workout.metrics?.avg_heart_rate,
+          max_heart_rate: workout.metrics?.max_heart_rate,
+          avg_power: workout.metrics?.avg_power,
+          max_power: workout.metrics?.max_power,
+          normalized_power: workout.metrics?.normalized_power,
+          avg_speed: workout.metrics?.avg_speed,
+          max_speed: workout.metrics?.max_speed,
+          avg_cadence: workout.metrics?.avg_cadence,
+          max_cadence: workout.metrics?.max_cadence,
+          // 🔧 CRITICAL FIX: Check both locations for elevation_gain
+          elevation_gain: workout.metrics?.elevation_gain ? 
+            Math.round(Number(workout.metrics.elevation_gain)) : 
+            workout.elevation_gain ? 
+              Math.round(Number(workout.elevation_gain)) : 
+              null,
+          elevation_loss: workout.metrics?.elevation_loss,
+          calories: workout.metrics?.calories,
+          tss: workout.metrics?.training_stress_score,
+          intensity_factor: workout.metrics?.intensity_factor,
+          // 🔧 NEW: Add elapsed_time field that WorkoutMetrics expects for duration
+          elapsed_time: workout.duration,
+          // Keep metrics object for CompletedTab compatibility
+          metrics: workout.metrics
+        };
+        
+        // 🔍 DEBUG: Check what elevation_gain value we're actually saving
+        console.log('🔍 ELEVATION DEBUG - Final elevation_gain value being saved:', workoutToSave.elevation_gain);
+        console.log('🔧 Flattened workout data for database:', workoutToSave);
+        await addWorkout(workoutToSave);
+        console.log('✅ Imported workout with metrics:', workout.name);
+      } catch (error) {
+        console.error('❌ Error importing workout:', error);
+      }
+    });
+    
+    console.log(`Successfully imported ${importedWorkouts.length} workouts`);
+    setShowImportPage(false);
+  };
+
   const handleBackToDashboard = () => {
-    console.log('🔍 handleBackToDashboard called - clearing all state');
-    
-    // 🚨 FIX: Check if we're coming from Plan Builder BEFORE clearing states
     const comingFromPlanBuilder = showPlanBuilder;
-    
-    // 🚨 FIX: Only return to summary if we came from a workout that was opened from summary sliding
-    // This should ONLY happen when editing an existing workout from the sliding summary view
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
     
-    // Clear all state and return to dashboard
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowPlanBuilder(false);
+    setShowImportPage(false); // NEW: Reset import page
     setBuilderType('');
     setBuilderSourceContext('');
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
-    setLiveTransform(0);
     
-    // 🚨 FIX: If we should return to summary, restore the summary state
     if (shouldReturnToSummary) {
-      // Check if there are workouts for this date
       const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
       if (workoutsForDate.length > 0) {
-        // Return to summary with workouts
         setDateWorkouts(workoutsForDate);
         setCurrentWorkoutIndex(0);
         setShowSummary(true);
-        setLiveTransform(-50);
       } else {
-        // Return to empty date summary
         setDateWorkouts([]);
         setCurrentWorkoutIndex(0);
         setShowSummary(true);
-        setLiveTransform(-50);
       }
     } else {
-      // 🆕 NEW: Clear summary state completely
       setShowSummary(false);
       setDateWorkouts([]);
       setCurrentWorkoutIndex(0);
     }
   };
 
-  // 🆕 NEW: Handle date selection - update Today's Effort to show selected date
   const handleDateSelect = (date: string) => {
-    console.log('📅 Date selected:', date);
-    console.log('📅 Previous selectedDate:', selectedDate);
     setSelectedDate(date);
-    console.log('📅 New selectedDate will be:', date);
-    
-    // Update Today's Effort to show this date immediately
-    // This enables the sliding functionality for empty dates
   };
 
-  // 🚨 FIXED: Handle workout clicks - route completed workouts to WorkoutDetail
   const handleEditEffort = (workout: any) => {
-    console.log('🎯 Workout clicked from Today\'s Effort:', workout);
-    console.log('🎯 Workout status:', workout.workout_status);
-    
-    // If workout is completed, go directly to WorkoutDetail
     if (workout.workout_status === 'completed') {
-      console.log('🎯 Routing completed workout to WorkoutDetail');
       setSelectedWorkout(workout);
-      // Tab will be set by useEffect based on workout type
     } else {
-      // For scheduled/planned workouts, use sliding summary
-      console.log('🎯 Routing scheduled workout to sliding summary');
       setDateWorkouts([workout]);
       setCurrentWorkoutIndex(0);
       setShowSummary(true);
     }
   };
 
-  // 🍎 APPLE PHOTOS STYLE: Smooth, instant, visual feedback
-  const handleTouchStart = (e: React.TouchEvent) => {
-    const touch = e.targetTouches[0];
-    setTouchStartX(touch.clientX);
-    setTouchStartY(touch.clientY);
-    setIsSwipeActive(false);
-    setSwipeProgress(0);
-    setLiveTransform(0);
-    console.log('👆 Touch start - Apple Photos style', {
-      x: touch.clientX,
-      y: touch.clientY,
-      showSummary,
-      selectedDate,
-      hasWorkouts: workouts?.filter(w => w.date === selectedDate)?.length || 0
-    });
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    if (!touchStartX || !touchStartY) return;
-    
-    const touch = e.targetTouches[0];
-    const deltaX = touch.clientX - touchStartX;
-    const deltaY = touch.clientY - touchStartY;
-    
-    // 🍎 APPLE PHOTOS: Balanced horizontal detection - 8px threshold
-    const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 8;
-    
-    if (isHorizontalSwipe) {
-      // 🍎 PHOTOS STYLE: Activate horizontal swipe mode
-      if (!isSwipeActive) {
-        console.log('🔥 Horizontal swipe ACTIVATED', {
-          deltaX,
-          deltaY,
-          showSummary,
-          selectedDate
-        });
-      }
-      setIsSwipeActive(true);
-      
-      // Prevent other interactions during swipe
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // Calculate swipe progress (0-100) for visual feedback
-      const progress = Math.min(Math.abs(deltaX) / 50, 1) * 100;
-      setSwipeProgress(progress);
-      
-      // 🍎 PHOTOS STYLE: Live transform - content moves with finger
-      const screenWidth = window.innerWidth;
-      const transformPercent = (deltaX / screenWidth) * 100;
-      
-      if (showSummary) {
-        // In workout view - slide between workouts or back to calendar
-        const baseTransform = -50; // Current position (50% left)
-        let liveTransform = Math.max(-100, Math.min(0, baseTransform + transformPercent));
-        
-        // For empty dates, make sure right swipe goes back to calendar
-        if (dateWorkouts.length === 0 && deltaX > 0) {
-          liveTransform = Math.max(-50, Math.min(0, baseTransform + transformPercent));
-        }
-        
-        setLiveTransform(liveTransform);
-      } else {
-        // In calendar view - preview workout slide
-        const liveTransform = Math.max(-50, Math.min(0, transformPercent));
-        setLiveTransform(liveTransform);
-      }
-    } else {
-      // Reset swipe state if not horizontal
-      if (isSwipeActive) {
-        setIsSwipeActive(false);
-      }
-    }
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStartX || !touchStartY) return;
-    
-    const wasSwipeActive = isSwipeActive;
-    const progress = swipeProgress;
-    const currentTransform = liveTransform;
-    
-    // 🍎 APPLE PHOTOS: Only process if it was a real swipe
-    if (!wasSwipeActive) {
-      // Reset states
-      setIsSwipeActive(false);
-      setSwipeProgress(0);
-      setTouchStartX(null);
-      setTouchStartY(null);
-      setLiveTransform(0);
-      return;
-    }
-    
-    // 🍎 APPLE PHOTOS: Reasonable commit threshold - 15%
-    const commitThreshold = 15;
-    const isCommitted = progress > commitThreshold;
-    
-    if (isCommitted) {
-      // Determine direction from current transform
-      const isLeftSwipe = currentTransform < (showSummary ? -50 : 0);
-      const isRightSwipe = currentTransform > (showSummary ? -50 : 0);
-      
-      console.log('🍎 Swipe committed:', { isLeftSwipe, isRightSwipe, showSummary, dateWorkouts: dateWorkouts.length });
-      
-      if (showSummary && dateWorkouts.length > 0) {
-        // We're in workout summary view with workouts
-        if (isLeftSwipe && currentWorkoutIndex < dateWorkouts.length - 1) {
-          // Next workout
-          setCurrentWorkoutIndex(currentWorkoutIndex + 1);
-          setLiveTransform(-50); // Snap to workout position
-        } else if (isRightSwipe) {
-          if (currentWorkoutIndex > 0) {
-            // Previous workout
-            setCurrentWorkoutIndex(currentWorkoutIndex - 1);
-            setLiveTransform(-50); // Snap to workout position
-          } else {
-            // Back to calendar (like Photos back to grid)
-            console.log('🔙 Swiping back to calendar from workout');
-            setShowSummary(false);
-            setDateWorkouts([]);
-            setCurrentWorkoutIndex(0);
-            setLiveTransform(0); // Snap to calendar position
-          }
-        } else {
-          // Not committed - snap back
-          setLiveTransform(-50);
-        }
-      } else if (showSummary && dateWorkouts.length === 0) {
-        // 🚨 FIX: We're in EMPTY DATE summary view - swipe right should go back
-        if (isRightSwipe) {
-          console.log('🔙 Swiping back to calendar from EMPTY DATE');
-          setShowSummary(false);
-          setDateWorkouts([]);
-          setCurrentWorkoutIndex(0);
-          setLiveTransform(0); // Snap to calendar position
-        } else {
-          // Not committed - snap back to empty date position
-          setLiveTransform(-50);
-        }
-      } else if (!showSummary && isLeftSwipe) {
-        // Enter workout view (like Photos full-screen)
-        console.log('🔙 Swiping from calendar to summary for date:', selectedDate);
-        const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
-        console.log('📊 Found workouts for date:', workoutsForDate.length, workoutsForDate);
-        
-        if (workoutsForDate.length > 0) {
-          // Has workouts - go to workout summary
-          setDateWorkouts(workoutsForDate);
-          setCurrentWorkoutIndex(0);
-          setShowSummary(true);
-          setLiveTransform(-50); // Snap to workout position
-          console.log('✅ Navigated to workout summary');
-        } else {
-          // No workouts - go to empty date screen
-          setDateWorkouts([]);
-          setCurrentWorkoutIndex(0);
-          setShowSummary(true);
-          setLiveTransform(-50); // Snap to empty date position
-          console.log('✅ Navigated to empty date screen');
-        }
-      } else {
-        // Not committed - snap back to calendar
-        setLiveTransform(0);
-      }
-    } else {
-      // 🍎 APPLE PHOTOS: Smooth animation back to position if not committed
-      if (showSummary) {
-        setLiveTransform(-50);
-      } else {
-        setLiveTransform(0);
-      }
-    }
-    
-    // Reset touch states
-    setIsSwipeActive(false);
-    setSwipeProgress(0);
-    setTouchStartX(null);
-    setTouchStartY(null);
-    
-    // Clear live transform after animation completes
-    setTimeout(() => {
-      setLiveTransform(0);
-    }, 300);
-  };
-
   const handleDeleteWorkout = async (workoutId: string) => {
     try {
       await deleteWorkout(workoutId);
-      // 🍎 APPLE PHOTOS STYLE: Smooth transition back to calendar
-      setLiveTransform(0); // Animate back to calendar position
-      setTimeout(() => {
-        setShowSummary(false);
-        setDateWorkouts([]);
-        setCurrentWorkoutIndex(0);
-      }, 300); // Wait for animation to complete
+      setShowSummary(false);
+      setDateWorkouts([]);
+      setCurrentWorkoutIndex(0);
     } catch (error) {
       console.error('Error deleting workout:', error);
       alert('Error deleting workout. Please try again.');
@@ -1039,24 +1042,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setBuilderType(type);
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
-    setSelectedWorkout(null); // Clear selected workout
+    setSelectedWorkout(null);
     
     if (date) {
       setSelectedDate(date);
     }
     
-    // 🚨 IMPORTANT: Store where we came from for proper back navigation
     const cameFromSummary = showSummary;
     
-    // 🚨 FIXED: Handle all strength logger variants - now only 'log-strength'
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
-      // 🚨 NEW: Always open WorkoutBuilder with the selected type
       setShowBuilder(true);
     }
     
-    // Clear summary state but remember we came from there
     if (cameFromSummary) {
       setShowSummary(false);
       setDateWorkouts([]);
@@ -1068,9 +1067,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setBuilderType(type);
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
-    setSelectedWorkout(null); // Clear selected workout
+    setSelectedWorkout(null);
     
-    // 🚨 FIXED: Handle all strength logger variants - now only 'log-strength'
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
@@ -1083,76 +1081,48 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   const handleSelectRoutine = (routineId: string) => {
-    console.log('handleSelectRoutine called with:', routineId);
-    setSelectedWorkout(null); // Clear selected workout
-    if (routineId === 'all-plans') {
-      console.log('Setting showAllPlans to true');
-      setShowAllPlans(true);
-      console.log('showAllPlans should now be true');
-    } else {
-      console.log('Plan selected:', routineId);
-      // Handle specific plan selection - could open plan detail view
-      // For now, open AllPlansInterface and let it handle the plan detail view
-      setShowAllPlans(true);
-    }
+    setSelectedWorkout(null);
+    setShowAllPlans(true);
   };
 
-  // 🚨 NEW: Handle discipline selection from Plans dropdown
   const handleSelectDiscipline = (discipline: string) => {
-    console.log('handleSelectDiscipline called with:', discipline);
-    setSelectedWorkout(null); // Clear selected workout
+    setSelectedWorkout(null);
     
-    // Go directly to discipline-specific plans page
     if (discipline === 'strength') {
       setShowStrengthPlans(true);
     } else {
-      // For other disciplines, still use AllPlansInterface for now
       setShowAllPlans(true);
     }
   };
 
   const handlePlanSelect = (plan: any) => {
-    console.log('Selected plan:', plan);
-    setSelectedWorkout(null); // Clear selected workout
-    // TODO: Handle plan selection (add to active plans, etc.)
+    setSelectedWorkout(null);
     setShowAllPlans(false);
   };
 
   const handleBuildWorkout = (type: string, sourceContext?: string) => {
-    console.log('Building workout of type:', type, 'from context:', sourceContext);
     setBuilderType(type);
     setBuilderSourceContext(sourceContext || '');
     setWorkoutBeingEdited(null);
-    setSelectedWorkout(null); // Clear selected workout
+    setSelectedWorkout(null);
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowBuilder(true);
   };
 
-  // Plan generation callback - now uses context
   const handlePlanGenerated = async (newPlan: any) => {
-    console.log('🎯 handlePlanGenerated called in AppLayout with:', newPlan);
-    
     try {
-      // Save to Supabase via context
       await addPlan(newPlan);
-      console.log('🎯 Plan saved to Supabase successfully');
-      
-      // Close plan builder and show plans interface
       setShowPlanBuilder(false);
       setShowAllPlans(true);
     } catch (error) {
-      console.error('🎯 Error saving plan:', error);
+      console.error('Error saving plan:', error);
       alert('Error saving plan. Please try again.');
     }
   };
 
-  // Handle plan deletion - now uses context
   const handlePlanDeleted = async (planId: string) => {
-    console.log('🗑️ handlePlanDeleted called with planId:', planId);
-    
     try {
-      // Find workouts associated with this plan
       const planWorkouts = workouts?.filter(w => {
         const matchesId = w.planId === planId;
         const matchesPattern = w.name && (
@@ -1164,30 +1134,50 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         return matchesId || matchesPattern;
       }) || [];
       
-      console.log('🗑️ Found plan workouts to delete:', planWorkouts.length);
-      
-      // Delete all associated workouts
       for (const workout of planWorkouts) {
         try {
-          console.log('🗑️ Deleting workout:', workout.id, workout.name);
           await deleteWorkout(workout.id);
         } catch (error) {
-          console.error('🗑️ Error deleting workout:', workout.id, error);
+          console.error('Error deleting workout:', workout.id, error);
         }
       }
       
-      // Delete plan from Supabase via context
       await deletePlan(planId);
-      console.log('🗑️ Plan deleted successfully');
-      
-      // Go back to plans list
       setShowAllPlans(true);
       
     } catch (error) {
-      console.error('🗑️ Error deleting plan:', error);
+      console.error('Error deleting plan:', error);
       alert('Error deleting plan. Please try again.');
     }
   };
+
+  // Dead simple swipe detection
+  const handleSwipeLeft = () => {
+    if (!showSummary) {
+      const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
+      setDateWorkouts(workoutsForDate);
+      setCurrentWorkoutIndex(0);
+      setShowSummary(true);
+    }
+  };
+
+  const handleSwipeRight = () => {
+    if (showSummary) {
+      setShowSummary(false);
+      setDateWorkouts([]);
+      setCurrentWorkoutIndex(0);
+    }
+  };
+
+  // NEW: Show import page
+  if (showImportPage) {
+    return (
+      <ImportDataPage 
+        onClose={() => setShowImportPage(false)}
+        onWorkoutsImported={handleWorkoutsImported}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -1199,45 +1189,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     );
   }
 
-  // Get current workout for summary display
   const currentWorkout = dateWorkouts[currentWorkoutIndex];
-
-  // 🍎 APPLE PHOTOS STYLE: Calculate final transform
-  const finalTransform = liveTransform !== 0 ? liveTransform : (showSummary ? -50 : 0);
-
-  console.log('🔍 AppLayout render state:', {
-    showAllPlans, 
-    showBuilder, 
-    showStrengthLogger, 
-    showStrengthPlans,
-    showPlanBuilder,
-    showSummary,
-    dateWorkouts: dateWorkouts.length,
-    currentWorkoutIndex,
-    selectedWorkout: !!selectedWorkout,
-    selectedWorkoutId: selectedWorkout?.id,
-    selectedWorkoutType: selectedWorkout?.type,
-    selectedWorkoutStatus: selectedWorkout?.workout_status,
-    selectedDate,
-    activeTab,
-    finalTransform,
-    isSwipeActive,
-    currentPlans: currentPlans.length,
-    completedPlans: completedPlans.length
-  });
-
-  // 🚨 DEBUG: Log plan state 
-  console.log('🗂️ Current Plans State:', currentPlans);
-  console.log('🗂️ Completed Plans State:', completedPlans);
-  console.log('🗂️ Detailed Plans State:', Object.keys(detailedPlans));
 
   return (
     <div className="mobile-app-container">
-      {/* Header with navigation */}
       <header className="mobile-header">
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full">
-            {/* Left: Hamburger menu and efforts title */}
             <div className="flex items-center space-x-1 pl-4">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -1254,7 +1212,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <Settings className="mr-2 h-4 w-4" />
                     Connect Devices
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleImportClick}>
                     <Upload className="mr-2 h-4 w-4" />
                     Import
                   </DropdownMenuItem>
@@ -1265,7 +1223,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   <DropdownMenuItem>
                     Help & Support
                   </DropdownMenuItem>
-                  {/* 🔥 UPDATED: Sign Out now calls onLogout */}
                   <DropdownMenuItem onClick={onLogout}>
                     Sign Out
                   </DropdownMenuItem>
@@ -1274,7 +1231,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               
-              {/* Dashboard button when in builder/logger/plans */}
               {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
                 <Button
                   onClick={handleBackToDashboard}
@@ -1287,12 +1243,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               )}
             </div>
 
-            {/* Center: Empty - removed workout indicator dots */}
             <div className="flex items-center">
-              {/* Dots removed - they were appearing as ")) on mobile */}
             </div>
 
-            {/* Right: Date (only when on dashboard) */}
             <div className="flex items-center pr-4">
               {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
                 <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
@@ -1304,7 +1257,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      {/* Main content with Apple Photos style sliding */}
       <main className="mobile-main-content">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showPlanBuilder ? (
@@ -1359,20 +1311,38 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : (
-            // 🍎 APPLE PHOTOS STYLE: Balanced sliding container
-            <div className="sliding-container">
+            <div 
+              ref={containerRef}
+              className="relative w-full h-full"
+              style={{
+                overflow: 'hidden'
+              }}
+            >
+              {/* Swipe capture overlay - only visible during potential swipes */}
+              {isSwipeDetected && (
+                <div 
+                  className="absolute inset-0 z-50"
+                  style={{
+                    backgroundColor: 'transparent',
+                    pointerEvents: 'auto'
+                  }}
+                />
+              )}
+              
               <div 
-                className="sliding-wrapper"
+                ref={wrapperRef}
+                className="flex h-full"
                 style={{
-                  transform: `translateX(${finalTransform}%)`,
-                  transition: isSwipeActive ? 'none' : 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+                  width: '200%',
+                  transform: `translateX(${transform}%)`,
+                  transition: 'transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
+                  willChange: 'transform',
+                  backfaceVisibility: 'hidden',
+                  WebkitBackfaceVisibility: 'hidden'
                 }}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
               >
-                {/* Calendar view */}
-                <div className="slide-panel calendar-panel">
+                {/* Calendar Panel */}
+                <div className="w-1/2 flex-shrink-0">
                   <div className="space-y-2 pt-4">
                     <TodaysEffort
                       selectedDate={selectedDate}
@@ -1380,47 +1350,37 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       onViewCompleted={handleViewCompleted}
                       onEditEffort={handleEditEffort}
                     />
-                    <div 
-                      className="calendar-container"
-                      style={{ touchAction: isSwipeActive ? 'none' : 'auto' }}
-                    >
-                      <WorkoutCalendar
-                        onAddEffort={handleAddEffort}
-                        onSelectType={handleSelectEffortType}
-                        onSelectWorkout={handleEditEffort}
-                        onViewCompleted={handleViewCompleted}
-                        onEditEffort={handleEditEffort}
-                        onDateSelect={handleDateSelect}
-                        onSelectRoutine={handleSelectRoutine}
-                        onSelectDiscipline={handleSelectDiscipline}
-                        onOpenPlanBuilder={handleOpenPlanBuilder}
-                        isSwipingHorizontally={isSwipeActive}
-                        currentPlans={currentPlans}
-                        completedPlans={completedPlans}
-                      />
-                    </div>
+                    <WorkoutCalendar
+                      onAddEffort={handleAddEffort}
+                      onSelectType={handleSelectEffortType}
+                      onSelectWorkout={handleEditEffort}
+                      onViewCompleted={handleViewCompleted}
+                      onEditEffort={handleEditEffort}
+                      onDateSelect={handleDateSelect}
+                      onSelectRoutine={handleSelectRoutine}
+                      onSelectDiscipline={handleSelectDiscipline}
+                      onOpenPlanBuilder={handleOpenPlanBuilder}
+                      isSwipingHorizontally={isSwipeDetected}
+                      currentPlans={currentPlans}
+                      completedPlans={completedPlans}
+                    />
                   </div>
                 </div>
 
-                {/* Summary view */}
-                <div className="slide-panel summary-panel">
+                {/* Summary Panel */}
+                <div className="w-1/2 flex-shrink-0">
                   <div className="pt-4">
                     {currentWorkout ? (
                       <WorkoutSummary 
                         workout={currentWorkout} 
                         onClose={() => {
-                          // 🍎 APPLE PHOTOS STYLE: Smooth back transition
-                          setLiveTransform(0); // Animate back to calendar position
-                          setTimeout(() => {
-                            setShowSummary(false);
-                            setDateWorkouts([]);
-                            setCurrentWorkoutIndex(0);
-                          }, 300); // Wait for animation to complete
+                          setShowSummary(false);
+                          setDateWorkouts([]);
+                          setCurrentWorkoutIndex(0);
                         }}
                         onDelete={handleDeleteWorkout}
                       />
                     ) : showSummary ? (
-                      // Show "Add effort" screen when no workouts for this date
                       <div className="flex flex-col items-center justify-center py-16 px-4">
                         <h2 className="text-lg font-medium mb-4">No workouts for this date</h2>
                         <p className="text-muted-foreground mb-8 text-center">
@@ -1429,26 +1389,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                         <div className="flex flex-col items-center gap-4">
                           <NewEffortDropdown 
                             onSelectType={(type) => {
-                              // 🍎 APPLE PHOTOS STYLE: Smooth transition to builder
-                              setLiveTransform(0); // Animate back to calendar position first
-                              setTimeout(() => {
-                                setShowSummary(false);
-                                handleAddEffort(type, selectedDate);
-                              }, 300); // Wait for animation to complete
+                              setShowSummary(false);
+                              handleAddEffort(type, selectedDate);
                             }}
                             onOpenPlanBuilder={handleOpenPlanBuilder}
                           />
                           
-                          {/* 🚨 FIX: Add back button for empty date screen */}
                           <button
                             onClick={() => {
-                              // 🍎 APPLE PHOTOS STYLE: Smooth back transition
-                              setLiveTransform(0); // Animate back to calendar position
-                              setTimeout(() => {
-                                setShowSummary(false);
-                                setDateWorkouts([]);
-                                setCurrentWorkoutIndex(0);
-                              }, 300); // Wait for animation to complete
+                              setShowSummary(false);
+                              setDateWorkouts([]);
+                              setCurrentWorkoutIndex(0);
                             }}
                             className="text-sm text-muted-foreground hover:text-foreground transition-colors"
                           >
@@ -1671,12 +1622,13 @@ const CalendarHeader: React.FC<CalendarHeaderProps> = ({
 export default CalendarHeader;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/CompletedTab.tsx
+console.log('🚨 COMPLETEDTAB COMPONENT LOADED');
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface CompletedTabProps {
-  workoutType: 'cycling' | 'running';
+  workoutType: 'ride' | 'run' | 'swim' | 'strength';
   workoutData: any;
 }
 
@@ -1685,229 +1637,274 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [selectedMetric, setSelectedMetric] = useState('hr');
   const [hoverPoint, setHoverPoint] = useState<{x: number, y: number, values: any} | null>(null);
 
-  const metrics = workoutType === 'cycling' 
-    ? ['hr', 'power', 'speed', 'cadence']
-    : ['hr', 'pace', 'speed', 'cadence'];
+  // 🔍 DEBUG: Always log what we receive
+  console.log('🔍 CompletedTab Debug:', {
+    workoutType,
+    workoutData,
+    hasMetrics: !!workoutData?.metrics,
+    metricsKeys: workoutData?.metrics ? Object.keys(workoutData.metrics) : 'no metrics',
+    duration: workoutData?.duration,
+    distance: workoutData?.distance
+  });
 
-  const metricColors = {
-    hr: '#EF4444',
-    power: '#F59E0B', 
-    speed: '#3B82F6',
-    cadence: '#8B5CF6',
-    pace: '#8B5CF6'
+  // 🛡️ DEFENSIVE: Always show basic structure even with no data
+  if (!workoutData) {
+    return (
+      <div className="space-y-8" style={{fontFamily: 'Inter, sans-serif'}}>
+        <div className="p-4 text-center">
+          <p className="text-gray-500">No workout data available</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 🔧 SIMPLE: Helper functions with safe defaults
+  const safeNumber = (value: any): string => {
+    if (value === null || value === undefined || isNaN(value)) return 'N/A';
+    return String(value);
   };
 
-  // Convert units based on imperial/metric preference
-  const convertDistance = (km: number) => {
-    return useImperial ? (km * 0.621371).toFixed(1) + ' mi' : km.toFixed(1) + ' km';
-  };
-
-  const convertSpeed = (kmh: number) => {
-    return useImperial ? (kmh * 0.621371).toFixed(1) + ' mph' : kmh.toFixed(1) + ' km/h';
-  };
-
-  const convertElevation = (m: number) => {
-    return useImperial ? Math.round(m * 3.28084) + ' ft' : m + ' m';
-  };
-
-  const convertPace = (minPerKm: string) => {
-    if (!useImperial) return minPerKm + ' /km';
-    const [min, sec] = minPerKm.split(':').map(Number);
-    const totalSeconds = (min * 60 + sec) * 1.609344;
-    const newMin = Math.floor(totalSeconds / 60);
-    const newSec = Math.round(totalSeconds % 60);
-    return `${newMin}:${newSec.toString().padStart(2, '0')} /mi`;
-  };
-
-  const summaryData = workoutType === 'cycling' ? {
-    distance: convertDistance(45.2),
-    duration: '1:23:45',
-    speed: convertSpeed(32.4),
-    power: '245 W',
-    tss: '142 TSS',
-    elevation: convertElevation(892)
-  } : {
-    distance: convertDistance(10.5),
-    duration: '42:18',
-    pace: convertPace('4:02'),
-    hr: '165 bpm',
-    elevation: convertElevation(156),
-    cadence: '180 spm'
-  };
-
-  const summaryLabels = workoutType === 'cycling' ? {
-    distance: 'Distance',
-    duration: 'Duration',
-    speed: 'Avg Speed',
-    power: 'Avg Power',
-    tss: 'TSS',
-    elevation: 'Elevation Gain'
-  } : {
-    distance: 'Distance',
-    duration: 'Duration',
-    pace: 'Avg Pace',
-    hr: 'Avg HR',
-    elevation: 'Elevation Gain',
-    cadence: 'Avg Cadence'
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<SVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+  const formatDuration = (seconds: any): string => {
+    // 🔍 DEBUG: Log exactly what we receive
+    console.log('🔍 formatDuration called with:', seconds, typeof seconds);
     
-    const distance = x / rect.width * (workoutType === 'cycling' ? 45.2 : 10.5);
-    const elevation = Math.round(300 - (y - 50) * 0.5);
+    const num = Number(seconds);
+    console.log('🔍 formatDuration converted to number:', num, 'isNaN:', isNaN(num), '!num:', !num);
     
-    const values = {
-      distance: convertDistance(distance),
-      elevation: convertElevation(elevation),
-      [selectedMetric]: selectedMetric === 'hr' ? '165 bpm' : 
-                      selectedMetric === 'power' ? '245 W' :
-                      selectedMetric === 'speed' ? convertSpeed(32) :
-                      selectedMetric === 'pace' ? convertPace('4:02') : '90 rpm'
-    };
-    
-    setHoverPoint({ x, y, values });
-  };
-
-  // Generate elevation profile data points
-  const generateElevationPath = () => {
-    const points = [];
-    const width = 800;
-    const height = 300;
-    for (let i = 0; i <= width; i += 20) {
-      const elevation = 250 + Math.sin(i * 0.01) * 30 + Math.cos(i * 0.005) * 20;
-      points.push(`${i},${elevation}`);
+    if (num === null || num === undefined || isNaN(num) || num === 0) {
+      console.log('🔍 formatDuration returning N/A because:', { num, isNull: num === null, isUndefined: num === undefined, isNaN: isNaN(num), isZero: num === 0 });
+      return 'N/A';
     }
-    return `M0,300 L${points.join(' L')} L${width},350 L0,350 Z`;
+    
+    const hours = Math.floor(num / 3600);
+    const minutes = Math.floor((num % 3600) / 60);
+    const secs = num % 60;
+    
+    let result;
+    if (hours > 0) {
+      result = `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    } else {
+      result = `${minutes}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    console.log('🔍 formatDuration returning:', result);
+    return result;
   };
 
-  const generateMetricPath = () => {
-    const points = [];
-    const width = 800;
-    for (let i = 0; i <= width; i += 20) {
-      let value;
-      switch(selectedMetric) {
-        case 'hr':
-          value = 150 + Math.sin(i * 0.008) * 25;
-          break;
-        case 'power':
-          value = 180 + Math.sin(i * 0.006) * 40;
-          break;
-        case 'speed':
-          value = 200 + Math.cos(i * 0.007) * 30;
-          break;
-        case 'pace':
-          value = 190 + Math.sin(i * 0.009) * 35;
-          break;
-        default:
-          value = 170 + Math.cos(i * 0.005) * 25;
-      }
-      points.push(`${i},${value}`);
+  const formatDistance = (km: any): string => {
+    const num = Number(km);
+    if (!num || isNaN(num)) return 'N/A';
+    
+    if (useImperial) {
+      return (num * 0.621371).toFixed(1) + ' mi';
     }
-    return `M${points.join(' L')}`;
+    return num.toFixed(1) + ' km';
   };
+
+  const formatSpeed = (kmh: any): string => {
+    const num = Number(kmh);
+    if (!num || isNaN(num)) return 'N/A';
+    
+    if (useImperial) {
+      return (num * 0.621371).toFixed(1) + ' mph';
+    }
+    return num.toFixed(1) + ' km/h';
+  };
+
+  const formatElevation = (m: any): string => {
+    const num = Number(m);
+    if (!num || isNaN(num) || num === 0) return 'N/A';
+    
+    if (useImperial) {
+      return Math.round(num * 3.28084) + ' ft';
+    }
+    return num + ' m';
+  };
+
+  const formatPace = (kmh: any): string => {
+    const num = Number(kmh);
+    if (!num || isNaN(num)) return 'N/A';
+    
+    const minPerKm = 60 / num;
+    const minutes = Math.floor(minPerKm);
+    const seconds = Math.round((minPerKm - minutes) * 60);
+    
+    if (useImperial) {
+      const minPerMile = minPerKm * 1.609344;
+      const mileMinutes = Math.floor(minPerMile);
+      const mileSeconds = Math.round((minPerMile - mileMinutes) * 60);
+      return `${mileMinutes}:${mileSeconds.toString().padStart(2, '0')} /mi`;
+    }
+    
+    return `${minutes}:${seconds.toString().padStart(2, '0')} /km`;
+  };
+
+  // 🏠 ALWAYS BUILD THE HOUSE: Primary metrics that always show
+  const primaryMetrics = [
+    {
+      label: 'Distance',
+      value: formatDistance(workoutData.distance),
+      icon: '📏'
+    },
+    {
+      label: 'Duration', 
+      value: formatDuration(workoutData.duration),
+      icon: '⏱️'
+    },
+    {
+      label: 'Heart Rate',
+      value: workoutData.metrics?.avg_heart_rate ? `${safeNumber(workoutData.metrics.avg_heart_rate)} bpm` : 'N/A',
+      icon: '💓'
+    },
+    {
+      label: 'Power',
+      value: workoutData.metrics?.avg_power ? `${safeNumber(workoutData.metrics.avg_power)} W` : 'N/A',
+      icon: '⚡'
+    },
+    {
+      label: 'Speed',
+      value: formatSpeed(workoutData.metrics?.avg_speed),
+      icon: '🏃'
+    },
+    {
+      label: 'Elevation',
+      value: formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain),
+      icon: '⛰️'
+    }
+  ];
+
+  // 🏠 ALWAYS BUILD THE HOUSE: Secondary metrics that always show
+  const secondaryMetrics = [
+    {
+      label: 'Max HR',
+      value: workoutData.metrics?.max_heart_rate ? `${safeNumber(workoutData.metrics.max_heart_rate)} bpm` : 'N/A'
+    },
+    {
+      label: 'Max Power',
+      value: workoutData.metrics?.max_power ? `${safeNumber(workoutData.metrics.max_power)} W` : 'N/A'
+    },
+    {
+      label: 'Max Speed',
+      value: formatSpeed(workoutData.metrics?.max_speed)
+    },
+    {
+      label: 'Calories',
+      value: workoutData.metrics?.calories ? `${safeNumber(workoutData.metrics.calories)} cal` : 'N/A'
+    },
+    {
+      label: 'TSS',
+      value: workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'
+    },
+    {
+      label: 'Intensity Factor',
+      value: workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'
+    }
+  ];
+
+  // 🎛️ Available metrics for toggle buttons (only show if data exists)
+  const availableMetrics = [];
+  if (workoutData.metrics?.avg_heart_rate) availableMetrics.push({ id: 'hr', label: 'Heart Rate' });
+  if (workoutData.metrics?.avg_power && workoutType === 'ride') availableMetrics.push({ id: 'power', label: 'Power' });
+  if (workoutData.metrics?.avg_speed) availableMetrics.push({ id: 'speed', label: 'Speed' });
+  if (workoutData.metrics?.avg_cadence) availableMetrics.push({ id: 'cadence', label: 'Cadence' });
 
   return (
     <div className="space-y-8" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* Summary Cards */}
-      <div className="grid grid-cols-6 gap-px bg-[#E5E5E5]">
-        {Object.entries(summaryData).map(([key, value]) => (
-          <div key={key} className="bg-white p-6">
-            <div className="text-2xl font-semibold text-black mb-1" style={{fontFeatureSettings: '"tnum"'}}>
-              {value}
+      
+      {/* 🏠 ALWAYS SHOW: Primary Summary Cards */}
+      <div className="grid grid-cols-3 md:grid-cols-6 gap-4">
+        {primaryMetrics.map((metric, index) => (
+          <div key={index} className="p-4 md:p-6">
+            <div className="text-lg md:text-2xl font-semibold text-black mb-1" style={{fontFeatureSettings: '"tnum"'}}>
+              {metric.value}
             </div>
-            <div className="text-sm text-[#666666] font-normal">
-              {summaryLabels[key as keyof typeof summaryLabels]}
+            <div className="text-xs md:text-sm text-[#666666] font-normal">
+              {metric.label}
             </div>
           </div>
         ))}
       </div>
 
-      {/* Metric Toggle Buttons */}
-      <div className="flex gap-2">
-        {metrics.map((metric) => (
-          <Button
-            key={metric}
-            onClick={() => setSelectedMetric(metric)}
-            className={`px-6 py-3 text-sm font-medium uppercase tracking-wide ${
-              selectedMetric === metric
-                ? 'bg-black text-white'
-                : 'bg-white text-[#666666] border border-[#E5E5E5] hover:bg-[#F5F5F5]'
-            }`}
-          >
-            {metric}
-          </Button>
-        ))}
-      </div>
-
-      {/* Chart Area */}
-      <div className="bg-white border border-[#E5E5E5] h-96 relative">
-        <svg 
-          width="100%" 
-          height="100%" 
-          className="absolute inset-0"
-          viewBox="0 0 800 400"
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => setHoverPoint(null)}
-        >
-          {/* Elevation Profile */}
-          <path
-            d={generateElevationPath()}
-            fill="#F5F5F5"
-            stroke="none"
-          />
-          
-          {/* Metric Overlay Line */}
-          <path
-            d={generateMetricPath()}
-            fill="none"
-            stroke={metricColors[selectedMetric as keyof typeof metricColors]}
-            strokeWidth="2"
-          />
-          
-          {/* Hover Line */}
-          {hoverPoint && (
-            <line
-              x1={hoverPoint.x}
-              y1={50}
-              x2={hoverPoint.x}
-              y2={350}
-              stroke="#000"
-              strokeWidth="1"
-              strokeDasharray="2,2"
-            />
-          )}
-        </svg>
-        
-        {/* Tooltip */}
-        {hoverPoint && (
-          <div 
-            className="absolute bg-white border border-[#E5E5E5] p-3 text-sm pointer-events-none z-10"
-            style={{
-              left: Math.min(hoverPoint.x + 10, 700),
-              top: Math.max(hoverPoint.y - 60, 10),
-              fontFamily: 'Inter, sans-serif'
-            }}
-          >
-            {Object.entries(hoverPoint.values).map(([key, value]) => (
-              <div key={key} className="flex justify-between gap-4">
-                <span className="text-[#666666] capitalize">{key}:</span>
-                <span className="text-black font-medium">{value}</span>
+      {/* 🏠 ALWAYS SHOW: Secondary Metrics Grid */}
+      <div>
+        <h3 className="text-lg font-semibold mb-4 text-black">Advanced Metrics</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {secondaryMetrics.map((metric, index) => (
+            <div key={index} className="p-4">
+              <div className="text-lg font-semibold text-black mb-1" style={{fontFeatureSettings: '"tnum"'}}>
+                {metric.value}
               </div>
-            ))}
-          </div>
-        )}
-        
-        {/* Axis Labels */}
-        <div className="absolute bottom-2 left-4 text-xs text-[#666666]">
-          0 {useImperial ? 'mi' : 'km'}
-        </div>
-        <div className="absolute bottom-2 right-4 text-xs text-[#666666]">
-          {workoutType === 'cycling' ? convertDistance(45.2) : convertDistance(10.5)}
+              <div className="text-xs text-[#666666] font-normal">
+                {metric.label}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
+
+      {/* 🎛️ CONDITIONAL: Metric Toggle Buttons (only if we have data) */}
+      {availableMetrics.length > 1 && (
+        <div className="flex gap-2 flex-wrap">
+          {availableMetrics.map((metric) => (
+            <Button
+              key={metric.id}
+              onClick={() => setSelectedMetric(metric.id)}
+              className={`px-4 md:px-6 py-2 md:py-3 text-xs md:text-sm font-medium uppercase tracking-wide ${
+                selectedMetric === metric.id
+                  ? 'text-white'
+                  : 'text-[#666666] hover:text-black'
+              }`}
+            >
+              {metric.label}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* 📊 CONDITIONAL: Chart Area (only if we have meaningful data) */}
+      {(workoutData.distance > 0 || workoutData.duration > 300) && (
+        <div className="h-80 md:h-96 relative">
+          <div className="flex items-center justify-center h-full text-gray-500">
+            📊 Chart visualization would appear here
+            <br />
+            <small>(Distance: {formatDistance(workoutData.distance)}, Duration: {formatDuration(workoutData.duration)})</small>
+          </div>
+        </div>
+      )}
+
+      {/* 🏠 ALWAYS SHOW: Workout Details */}
+      <div className="p-4">
+        <h4 className="font-medium mb-2 text-black">Workout Details</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          <div>
+            <span className="text-[#666666]">Date: </span>
+            <span className="text-black">
+              {workoutData.date ? new Date(workoutData.date).toLocaleDateString() : 'N/A'}
+            </span>
+          </div>
+          <div>
+            <span className="text-[#666666]">Device: </span>
+            <span className="text-black">
+              {workoutData.deviceInfo?.manufacturer ? 
+                `${workoutData.deviceInfo.manufacturer} ${workoutData.deviceInfo.product || ''}` : 
+                'N/A'
+              }
+            </span>
+          </div>
+          <div>
+            <span className="text-[#666666]">Activity: </span>
+            <span className="text-black capitalize">{workoutData.type || 'N/A'}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 🔍 DEBUG INFO (remove this after debugging) */}
+      <details className="p-4">
+        <summary className="cursor-pointer text-sm font-medium">Debug Info (click to expand)</summary>
+        <pre className="text-xs mt-2 p-2 overflow-auto max-h-40">
+          {JSON.stringify({ workoutType, workoutData }, null, 2)}
+        </pre>
+      </details>
     </div>
   );
 };
@@ -2254,6 +2251,628 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
 };
 
 export default FilteredWorkoutList;
+
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/FitFileImporter.tsx
+import React, { useState, useCallback } from 'react';
+import { Button } from '@/components/ui/button';
+import { Upload, File, CheckCircle, AlertCircle, Info } from 'lucide-react';
+
+interface FitFileImporterProps {
+  onWorkoutsImported: (workouts: any[]) => void;
+}
+
+interface ImportedWorkout {
+  id: string;
+  name: string;
+  type: string;
+  date: string;
+  duration: number;
+  distance?: number;
+  metrics: {
+    avg_heart_rate?: number;
+    max_heart_rate?: number;
+    avg_power?: number;
+    max_power?: number;
+    normalized_power?: number;
+    calories?: number;
+    elevation_gain?: number;
+    avg_speed?: number;
+    max_speed?: number;
+    avg_cadence?: number;
+    max_cadence?: number;
+    training_stress_score?: number;
+    intensity_factor?: number;
+    avg_temperature?: number;
+    max_temperature?: number;
+  };
+  deviceInfo: {
+    manufacturer?: string;
+    product?: string;
+  };
+}
+
+// Load the fit-file-parser library dynamically
+const loadFitParser = async () => {
+  if (window.FitParser) {
+    return window.FitParser;
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.skypack.dev/fit-file-parser';
+    script.type = 'module';
+    script.onload = () => {
+      // The library exports as default, but we need to access it properly
+      import('https://cdn.skypack.dev/fit-file-parser')
+        .then(module => {
+          window.FitParser = module.default;
+          resolve(module.default);
+        })
+        .catch(reject);
+    };
+    script.onerror = () => reject(new Error('Failed to load FIT parser library'));
+    document.head.appendChild(script);
+  });
+};
+
+// Sport type mapping from FIT to our app types
+const mapFitSportToAppType = (sport: string): string => {
+  if (!sport) return 'ride'; // Default to ride for cycling files
+  
+  const sportLower = sport.toLowerCase();
+  
+  if (sportLower.includes('cycling') || sportLower.includes('biking') || sport === 'cycling') {
+    return 'ride';
+  } else if (sportLower.includes('running') || sport === 'running') {
+    return 'run';
+  } else if (sportLower.includes('swimming') || sport === 'swimming') {
+    return 'swim';
+  } else if (sportLower.includes('strength') || sportLower.includes('training') || sportLower.includes('fitness')) {
+    return 'strength';
+  } else {
+    console.log(`Unknown sport "${sport}", defaulting to 'ride'`);
+    return 'ride';
+  }
+};
+
+const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported }) => {
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [processedFiles, setProcessedFiles] = useState<ImportedWorkout[]>([]);
+  const [errors, setErrors] = useState<string[]>([]);
+  const [parserLoaded, setParserLoaded] = useState(false);
+
+  // Initialize the FIT parser
+  React.useEffect(() => {
+    loadFitParser()
+      .then(() => {
+        setParserLoaded(true);
+        console.log('FIT parser loaded successfully');
+      })
+      .catch(error => {
+        console.error('Failed to load FIT parser:', error);
+        setErrors(['Failed to load FIT file parser. Please refresh the page and try again.']);
+      });
+  }, []);
+
+  const parseFitFile = async (file: File): Promise<ImportedWorkout> => {
+    if (!window.FitParser) {
+      throw new Error('FIT parser not loaded');
+    }
+
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        try {
+          const arrayBuffer = e.target?.result as ArrayBuffer;
+          
+          // Create FitParser instance with optimal settings
+          const fitParser = new window.FitParser({
+            force: true,
+            speedUnit: 'km/h',
+            lengthUnit: 'km',
+            temperatureUnit: 'celsius',
+            pressureUnit: 'bar',
+            elapsedRecordField: true,
+            mode: 'both', // Use 'both' mode like the examples show
+          });
+
+          fitParser.parse(arrayBuffer, (error: any, data: any) => {
+            if (error) {
+              console.error('FIT parsing error:', error);
+              reject(new Error(`Failed to parse FIT file: ${error.message || error}`));
+              return;
+            }
+
+            try {
+              console.log('Raw FIT data:', data);
+              
+              // 🔧 DEBUG: Check what data structure we actually get
+              console.log('DEBUG - data.sessions exists?', !!data.sessions);
+              console.log('DEBUG - data.sessions type:', typeof data.sessions);  
+              console.log('DEBUG - data.sessions length:', data.sessions?.length);
+              console.log('DEBUG - all data keys:', Object.keys(data));
+              
+              // 🔧 FIXED: Extract date from the correct location - prioritize local_timestamp
+              let workoutDate = new Date().toISOString().split('T')[0]; // fallback to today
+              
+              console.log('🔧 DEBUG: Available timestamps:', {
+                local_timestamp: data.local_timestamp,
+                timestamp: data.timestamp,
+                sessions_start_time: data.sessions?.[0]?.start_time
+              });
+              
+              if (data.local_timestamp) {
+                const dateObj = new Date(data.local_timestamp);
+                workoutDate = dateObj.getFullYear() + '-' + 
+                  String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+                  String(dateObj.getDate()).padStart(2, '0');
+                console.log('✅ Using local_timestamp for date:', workoutDate);
+              } else if (data.timestamp) {
+                const dateObj = new Date(data.timestamp);
+                workoutDate = dateObj.getFullYear() + '-' + 
+                  String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+                  String(dateObj.getDate()).padStart(2, '0');
+                console.log('✅ Using timestamp for date:', workoutDate);
+              } else if (data.sessions && data.sessions[0] && data.sessions[0].start_time) {
+                const dateObj = new Date(data.sessions[0].start_time);
+                workoutDate = dateObj.getFullYear() + '-' + 
+                  String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
+                  String(dateObj.getDate()).padStart(2, '0');
+                console.log('✅ Using sessions[0].start_time for date:', workoutDate);
+              } else {
+                console.log('⚠️ No timestamp found, using today:', workoutDate);
+              }
+
+              // 🔧 FIXED: Extract session data from the correct location
+              let session = null;
+              if (data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
+                session = data.sessions[0];
+                console.log('✅ Found sessions[0]:', session);
+              } else {
+                console.log('❌ No sessions array found, trying alternatives');
+                console.log('DEBUG - Looking for alternative session data...');
+                
+                // Try alternative paths based on different parser modes
+                if (data.activity) {
+                  session = data.activity;
+                  console.log('✅ Using data.activity as session:', session);
+                } else if (data.session) {
+                  session = data.session;
+                  console.log('✅ Using data.session as session:', session);
+                } else {
+                  console.log('❌ No session data found in any location');
+                  session = {}; // Create empty session to prevent crash
+                }
+              }
+
+              // 🔧 FIXED: Extract sport from the correct location
+              let sport = 'cycling'; // default
+              if (data.sports && Array.isArray(data.sports) && data.sports[0] && data.sports[0].sport) {
+                sport = data.sports[0].sport;
+                console.log('✅ Found sport in sports array:', sport);
+              } else if (session.sport) {
+                sport = session.sport;
+                console.log('✅ Found sport in session:', sport);
+              } else {
+                console.log('⚠️ No sport found, using default:', sport);
+              }
+              
+              const workoutType = mapFitSportToAppType(sport);
+              console.log('✅ Mapped sport to app type:', sport, '→', workoutType);
+
+              // 🔧 FIXED: Extract duration from session and ensure it's a valid number
+              const duration = session.total_elapsed_time ? Math.round(Number(session.total_elapsed_time)) : 
+                              session.total_timer_time ? Math.round(Number(session.total_timer_time)) : 
+                              0;
+              console.log('✅ Extracted duration:', duration, 'seconds');
+
+              // 🔧 FIXED: Extract distance from session and ensure it's a valid number or null
+              const distance = session.total_distance ? 
+                Math.round(Number(session.total_distance) * 100) / 100 : 
+                null;
+              console.log('✅ Extracted distance:', distance, 'km');
+
+              // 🔧 CRITICAL FIX: Check multiple possible elevation field names
+              let elevationGain = null;
+              console.log('🔧 DEBUG: Checking all elevation fields in session:');
+              console.log('  session.total_ascent:', session.total_ascent);
+              console.log('  session.elevation_gain:', session.elevation_gain);
+              console.log('  session.ascent:', session.ascent);
+              console.log('  session.total_elevation_gain:', session.total_elevation_gain);
+              console.log('  session.enhanced_ascent:', session.enhanced_ascent);
+              
+              if (session.total_ascent) {
+                // 🔧 CRITICAL FIX: total_ascent is in kilometers, convert to meters
+                elevationGain = Math.round(Number(session.total_ascent) * 1000);
+                console.log('✅ Using total_ascent for elevation:', elevationGain, 'meters (converted from', session.total_ascent, 'km)');
+              } else if (session.elevation_gain) {
+                elevationGain = Math.round(Number(session.elevation_gain));
+                console.log('✅ Using elevation_gain for elevation:', elevationGain);
+              } else if (session.ascent) {
+                elevationGain = Math.round(Number(session.ascent));
+                console.log('✅ Using ascent for elevation:', elevationGain);
+              } else if (session.total_elevation_gain) {
+                elevationGain = Math.round(Number(session.total_elevation_gain));
+                console.log('✅ Using total_elevation_gain for elevation:', elevationGain);
+              } else if (session.enhanced_ascent) {
+                elevationGain = Math.round(Number(session.enhanced_ascent));
+                console.log('✅ Using enhanced_ascent for elevation:', elevationGain);
+              } else {
+                console.log('❌ No elevation field found in session');
+              }
+
+              // 🔧 FIXED: Extract all metrics directly from session object and sanitize for database
+              const metrics = {
+                // Heart Rate - ensure numbers or null
+                avg_heart_rate: session.avg_heart_rate ? Number(session.avg_heart_rate) : null,
+                max_heart_rate: session.max_heart_rate ? Number(session.max_heart_rate) : null,
+                
+                // Power (cycling) - ensure numbers or null
+                avg_power: session.avg_power ? Number(session.avg_power) : null,
+                max_power: session.max_power ? Number(session.max_power) : null,
+                normalized_power: session.normalized_power ? Number(session.normalized_power) : null,
+                
+                // Calories & Energy - ensure numbers or null
+                calories: session.total_calories ? Number(session.total_calories) : null,
+                
+                // 🔧 FIXED: Use the elevation value we found from multiple possible fields
+                elevation_gain: elevationGain,
+                
+                // Speed - ensure numbers or null
+                avg_speed: session.enhanced_avg_speed ? Number(session.enhanced_avg_speed) : 
+                          session.avg_speed ? Number(session.avg_speed) : null,
+                max_speed: session.enhanced_max_speed ? Number(session.enhanced_max_speed) : 
+                          session.max_speed ? Number(session.max_speed) : null,
+                
+                // Cadence - ensure numbers or null
+                avg_cadence: session.avg_cadence ? Number(session.avg_cadence) : null,
+                max_cadence: session.max_cadence ? Number(session.max_cadence) : null,
+                
+                // Advanced Training Metrics - ensure numbers or null
+                training_stress_score: session.training_stress_score ? Number(session.training_stress_score) : null,
+                // 🔧 CRITICAL FIX: Convert intensity_factor from decimal to percentage (0.498 → 50)
+                intensity_factor: session.intensity_factor ? Math.round(Number(session.intensity_factor) * 100) : null,
+                
+                // Temperature - ensure numbers or null
+                avg_temperature: session.avg_temperature ? Number(session.avg_temperature) : null,
+                max_temperature: session.max_temperature ? Number(session.max_temperature) : null,
+              };
+
+              console.log('✅ Extracted metrics from session:', metrics);
+              console.log('🔧 DEBUG - Individual metric values:');
+              console.log('  avg_heart_rate:', typeof metrics.avg_heart_rate, metrics.avg_heart_rate);
+              console.log('  avg_power:', typeof metrics.avg_power, metrics.avg_power);
+              console.log('  elevation_gain:', typeof metrics.elevation_gain, metrics.elevation_gain, 'meters');
+              console.log('  intensity_factor:', typeof metrics.intensity_factor, metrics.intensity_factor, '(converted from decimal to percentage)');
+              console.log('  duration:', typeof duration, duration);
+              console.log('  distance:', typeof distance, distance);
+
+              // Create the workout object with proper data types for database
+              const workout: ImportedWorkout = {
+                id: `fit_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                name: file.name.replace('.fit', '').replace(/[_-]/g, ' '),
+                type: workoutType,
+                date: workoutDate,
+                duration: duration,
+                distance: distance,
+                // 🔧 FIXED: Don't include nested metrics object - it causes database issues
+                metrics: {
+                  avg_heart_rate: metrics.avg_heart_rate,
+                  max_heart_rate: metrics.max_heart_rate,
+                  avg_power: metrics.avg_power,
+                  max_power: metrics.max_power,
+                  normalized_power: metrics.normalized_power,
+                  calories: metrics.calories,
+                  elevation_gain: metrics.elevation_gain,
+                  avg_speed: metrics.avg_speed,
+                  max_speed: metrics.max_speed,
+                  avg_cadence: metrics.avg_cadence,
+                  max_cadence: metrics.max_cadence,
+                  training_stress_score: metrics.training_stress_score,
+                  intensity_factor: metrics.intensity_factor,
+                  avg_temperature: metrics.avg_temperature,
+                  max_temperature: metrics.max_temperature,
+                },
+                deviceInfo: {
+                  manufacturer: data.file_id?.manufacturer || data.file_creator?.software_version || 'Unknown',
+                  product: data.file_id?.product || 'FIT Device'
+                }
+              };
+
+              console.log('✅ Created workout from FIT data:', workout);
+              console.log('📊 Final extracted metrics:', workout.metrics);
+              resolve(workout);
+              
+            } catch (processingError) {
+              console.error('Error processing FIT data:', processingError);
+              reject(new Error(`Error processing workout data: ${processingError.message}`));
+            }
+          });
+          
+        } catch (parseError) {
+          console.error('Error reading FIT file:', parseError);
+          reject(new Error(`Error reading file: ${parseError.message}`));
+        }
+      };
+      
+      reader.onerror = () => {
+        reject(new Error('Failed to read file'));
+      };
+      
+      reader.readAsArrayBuffer(file);
+    });
+  };
+
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    
+    if (!parserLoaded) {
+      setErrors(['FIT parser is still loading. Please wait a moment and try again.']);
+      return;
+    }
+    
+    const files = Array.from(e.dataTransfer.files);
+    const fitFiles = files.filter(file => 
+      file.name.toLowerCase().endsWith('.fit')
+    );
+    
+    if (fitFiles.length === 0) {
+      setErrors(['Please drop only .fit files']);
+      return;
+    }
+    
+    setIsProcessing(true);
+    setErrors([]);
+    const processedWorkouts: ImportedWorkout[] = [];
+    const processingErrors: string[] = [];
+    
+    for (const file of fitFiles) {
+      try {
+        console.log(`Processing FIT file: ${file.name}`);
+        const workout = await parseFitFile(file);
+        processedWorkouts.push(workout);
+        console.log(`Successfully processed: ${file.name}`);
+      } catch (error) {
+        console.error(`Error processing ${file.name}:`, error);
+        processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    
+    setProcessedFiles(processedWorkouts);
+    setErrors(processingErrors);
+    setIsProcessing(false);
+    
+    if (processedWorkouts.length > 0) {
+      onWorkoutsImported(processedWorkouts);
+    }
+  }, [onWorkoutsImported, parserLoaded]);
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleFileInput = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!parserLoaded) {
+      setErrors(['FIT parser is still loading. Please wait a moment and try again.']);
+      return;
+    }
+    
+    const files = Array.from(e.target.files || []);
+    const fitFiles = files.filter(file => 
+      file.name.toLowerCase().endsWith('.fit')
+    );
+    
+    if (fitFiles.length === 0) {
+      setErrors(['Please select only .fit files']);
+      return;
+    }
+    
+    setIsProcessing(true);
+    setErrors([]);
+    const processedWorkouts: ImportedWorkout[] = [];
+    const processingErrors: string[] = [];
+    
+    for (const file of fitFiles) {
+      try {
+        console.log(`Processing FIT file: ${file.name}`);
+        const workout = await parseFitFile(file);
+        processedWorkouts.push(workout);
+        console.log(`Successfully processed: ${file.name}`);
+      } catch (error) {
+        console.error(`Error processing ${file.name}:`, error);
+        processingErrors.push(`${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+    
+    setProcessedFiles(processedWorkouts);
+    setErrors(processingErrors);
+    setIsProcessing(false);
+    
+    if (processedWorkouts.length > 0) {
+      onWorkoutsImported(processedWorkouts);
+    }
+  }, [onWorkoutsImported, parserLoaded]);
+
+  return (
+    <div className="w-full max-w-2xl mx-auto p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold mb-2">Import FIT Files</h2>
+        <p className="text-gray-600">
+          Upload your .fit files from Garmin, Wahoo, or other devices. 
+          All metrics including power, heart rate, elevation, and training data will be extracted automatically.
+        </p>
+      </div>
+
+      {/* Parser Status */}
+      {!parserLoaded && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center">
+          <Info className="h-5 w-5 text-blue-500 mr-2 flex-shrink-0" />
+          <span className="text-blue-700">Loading FIT file parser...</span>
+        </div>
+      )}
+
+      {/* Drop Zone */}
+      <div
+        className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
+          isDragOver 
+            ? 'border-blue-500 bg-blue-50' 
+            : parserLoaded 
+              ? 'border-gray-300 hover:border-gray-400'
+              : 'border-gray-200 bg-gray-50'
+        }`}
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+      >
+        <Upload className={`mx-auto h-12 w-12 mb-4 ${
+          isDragOver 
+            ? 'text-blue-500' 
+            : parserLoaded 
+              ? 'text-gray-400'
+              : 'text-gray-300'
+        }`} />
+        
+        {isProcessing ? (
+          <div>
+            <p className="text-lg font-medium mb-2">Processing FIT files...</p>
+            <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full"></div>
+          </div>
+        ) : (
+          <div>
+            <p className="text-lg font-medium mb-2">
+              {parserLoaded 
+                ? 'Drop .fit files here or click to select' 
+                : 'Loading FIT parser...'}
+            </p>
+            <p className="text-sm text-gray-500 mb-4">
+              Automatically extracts sport type, power, heart rate, elevation, and all training metrics
+            </p>
+            <input
+              type="file"
+              accept=".fit"
+              multiple
+              onChange={handleFileInput}
+              className="hidden"
+              id="file-input"
+              disabled={!parserLoaded}
+            />
+            <label htmlFor="file-input">
+              <Button className="cursor-pointer" disabled={!parserLoaded}>
+                <File className="h-4 w-4 mr-2" />
+                Select FIT Files
+              </Button>
+            </label>
+          </div>
+        )}
+      </div>
+
+      {/* Supported Metrics Info */}
+      {parserLoaded && (
+        <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+          <h4 className="font-medium mb-2">Automatically Extracted Metrics:</h4>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-600">
+            <div>• Activity Type</div>
+            <div>• Distance & Duration</div>
+            <div>• Heart Rate (avg/max)</div>
+            <div>• Power (avg/max/NP)</div>
+            <div>• Speed & Pace</div>
+            <div>• Cadence</div>
+            <div>• Elevation Gain</div>
+            <div>• Calories</div>
+            <div>• Training Stress Score</div>
+            <div>• Temperature</div>
+            <div>• Intensity Factor</div>
+            <div>• Device Information</div>
+          </div>
+        </div>
+      )}
+
+      {/* Results */}
+      {processedFiles.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-3 flex items-center">
+            <CheckCircle className="h-5 w-5 text-green-500 mr-2" />
+            Successfully Imported ({processedFiles.length})
+          </h3>
+          <div className="space-y-3">
+            {processedFiles.map((workout, index) => (
+              <div key={index} className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <p className="font-medium">{workout.name}</p>
+                    <p className="text-sm text-gray-600 mt-1">
+                      <span className="font-medium">{workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}</span>
+                      {' • '}{workout.date}
+                      {workout.duration > 0 && ` • ${Math.floor(workout.duration / 3600)}:${Math.floor((workout.duration % 3600) / 60).toString().padStart(2, '0')}:${(workout.duration % 60).toString().padStart(2, '0')}`}
+                      {workout.distance && ` • ${workout.distance} km`}
+                    </p>
+                    {/* Show key metrics */}
+                    <div className="text-xs text-gray-500 mt-2 flex flex-wrap gap-3">
+                      {workout.metrics.avg_heart_rate && (
+                        <span>HR: {workout.metrics.avg_heart_rate} bpm</span>
+                      )}
+                      {workout.metrics.avg_power && (
+                        <span>Power: {workout.metrics.avg_power}W</span>
+                      )}
+                      {workout.metrics.calories && (
+                        <span>Calories: {workout.metrics.calories}</span>
+                      )}
+                      {workout.metrics.elevation_gain && (
+                        <span>Elevation: {workout.metrics.elevation_gain}m</span>
+                      )}
+                      {workout.metrics.training_stress_score && (
+                        <span>TSS: {workout.metrics.training_stress_score}</span>
+                      )}
+                      {workout.metrics.intensity_factor && (
+                        <span>IF: {workout.metrics.intensity_factor}%</span>
+                      )}
+                    </div>
+                  </div>
+                  <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Errors */}
+      {errors.length > 0 && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold mb-3 flex items-center">
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            Errors ({errors.length})
+          </h3>
+          <div className="space-y-2">
+            {errors.map((error, index) => (
+              <div key={index} className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Extend window object for TypeScript
+declare global {
+  interface Window {
+    FitParser: any;
+  }
+}
+
+export default FitFileImporter;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/GarminAutoSync.tsx
 import React, { useState, useEffect } from 'react';
@@ -3158,6 +3777,240 @@ const GarminSetup: React.FC = () => {
 };
 
 export default GarminSetup;
+
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/ImportDataPage.tsx
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Upload, FileText, Download, Watch, Smartphone, Activity } from 'lucide-react';
+import FitFileImporter from './FitFileImporter';
+import GarminConnect from './GarminConnect';
+
+interface ImportDataPageProps {
+  onClose: () => void;
+  onWorkoutsImported: (workouts: any[]) => void;
+}
+
+const ImportDataPage: React.FC<ImportDataPageProps> = ({ onClose, onWorkoutsImported }) => {
+  const [activeTab, setActiveTab] = useState('fit');
+
+  const handleFileImport = (workouts: any[]) => {
+    onWorkoutsImported(workouts);
+    // Show success message or redirect
+  };
+
+  const handleCSVImport = () => {
+    // Handle CSV import
+    console.log('CSV import clicked');
+  };
+
+  const handleStravaImport = () => {
+    // Handle Strava bulk export import
+    console.log('Strava import clicked');
+  };
+
+  return (
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="sticky top-0 bg-white border-b border-gray-200 z-10">
+        <div className="flex items-center justify-between h-16 px-4">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              onClick={onClose}
+              className="text-sm font-medium hover:bg-gray-50"
+            >
+              ← Back
+            </Button>
+            <h1 className="text-xl font-semibold">Import Data</h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="p-4 space-y-6">
+        <div className="text-center space-y-2">
+          <h2 className="text-2xl font-bold">Import Your Workouts</h2>
+          <p className="text-gray-600">
+            Bring your training data from other platforms and devices
+          </p>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="fit">FIT Files</TabsTrigger>
+            <TabsTrigger value="garmin">Garmin</TabsTrigger>
+            <TabsTrigger value="strava">Strava</TabsTrigger>
+            <TabsTrigger value="csv">CSV/Manual</TabsTrigger>
+          </TabsList>
+
+          {/* FIT Files Tab */}
+          <TabsContent value="fit" className="space-y-4">
+            <FitFileImporter onWorkoutsImported={handleFileImport} />
+          </TabsContent>
+
+          {/* Garmin Connect Tab */}
+          <TabsContent value="garmin" className="space-y-4">
+            <GarminConnect onWorkoutsImported={handleFileImport} />
+          </TabsContent>
+
+          {/* Strava Tab */}
+          <TabsContent value="strava" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5 text-orange-500" />
+                  Import from Strava
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-600">
+                  Import your activities from Strava bulk export
+                </div>
+
+                <div className="p-4 bg-blue-50 rounded-lg space-y-3">
+                  <h4 className="font-medium text-blue-900">How to export from Strava:</h4>
+                  <ol className="text-sm text-blue-800 space-y-1">
+                    <li>1. Go to Strava.com → Settings → My Account</li>
+                    <li>2. Scroll to "Download or Delete Your Account"</li>
+                    <li>3. Click "Request Your Archive"</li>
+                    <li>4. Download the ZIP file when ready</li>
+                    <li>5. Upload the GPX files here</li>
+                  </ol>
+                </div>
+
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <div className="space-y-2">
+                    <div className="text-sm">Drop Strava GPX files here</div>
+                    <Button variant="outline" onClick={handleStravaImport}>
+                      Choose GPX Files
+                    </Button>
+                    <div className="text-xs text-gray-500">
+                      Supports bulk GPX import from Strava export
+                    </div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p><strong>What gets imported:</strong></p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>GPS tracks and routes</li>
+                    <li>Activity type and duration</li>
+                    <li>Basic metrics (distance, elevation)</li>
+                    <li>Heart rate data (if available)</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* CSV/Manual Tab */}
+          <TabsContent value="csv" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5 text-green-500" />
+                  CSV Import
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-gray-600">
+                  Import workouts from spreadsheets or other training apps
+                </div>
+
+                <div className="p-4 bg-green-50 rounded-lg space-y-3">
+                  <h4 className="font-medium text-green-900">CSV Format Example:</h4>
+                  <div className="text-sm text-green-800 font-mono bg-white p-3 rounded border">
+                    Date,Type,Duration,Distance,Intensity,Notes<br/>
+                    2025-01-15,Run,45min,8km,Zone2,Easy recovery<br/>
+                    2025-01-16,Bike,90min,35km,Zone3,Base endurance
+                  </div>
+                </div>
+
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
+                  <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <div className="space-y-2">
+                    <div className="text-sm">Drop CSV files here</div>
+                    <Button variant="outline" onClick={handleCSVImport}>
+                      Choose CSV File
+                    </Button>
+                    <div className="text-xs text-gray-500">
+                      Or download our template to get started
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Download className="h-4 w-4 mr-2" />
+                    Download Template
+                  </Button>
+                  <Button variant="outline" size="sm" className="flex-1">
+                    View Format Guide
+                  </Button>
+                </div>
+
+                <div className="text-xs text-gray-500 space-y-1">
+                  <p><strong>Supported columns:</strong></p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li>Date, Type (Run/Bike/Swim/Strength)</li>
+                    <li>Duration (minutes or HH:MM format)</li>
+                    <li>Distance, Intensity/Zone, Notes</li>
+                    <li>Optional: HR, Power, Pace, RPE</li>
+                  </ul>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+
+        {/* Quick Stats */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-blue-600">FIT</div>
+                <div className="text-xs text-gray-500">Most comprehensive</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-orange-600">GPX</div>
+                <div className="text-xs text-gray-500">GPS + basic metrics</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-green-600">CSV</div>
+                <div className="text-xs text-gray-500">Simple & flexible</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Help Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Need Help?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="text-sm text-gray-600">
+              Having trouble importing your data? We're here to help.
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                View Import Guide
+              </Button>
+              <Button variant="outline" size="sm">
+                Contact Support
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+};
+
+export default ImportDataPage;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/LogEffortDropdown.tsx
 import React from 'react';
@@ -7678,15 +8531,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     if (workouts && workouts.length > 0) {
       console.log('🔍 All workouts for', activeDate, ':', workouts.filter((w: any) => w.date === activeDate));
       
+      // 🚨 DEBUG: Check actual date formats
+      console.log('🔍 DEBUG - First few workout dates:', workouts.slice(0, 3).map(w => ({
+        name: w.name,
+        date: w.date,
+        dateType: typeof w.date,
+        activeDate: activeDate,
+        matches: w.date === activeDate
+      })));
+      
       // 🔧 FIXED: Filter by both date AND status
       const dateWorkouts = workouts.filter((w: any) => {
         const isCorrectDate = w.date === activeDate;
         
-        // For today and future dates: show only planned workouts
+        // For today and future dates: show both planned AND completed workouts
         if (activeDate >= today) {
           const isPlanned = w.workout_status === 'planned' || !w.workout_status; // Handle missing status as planned
-          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}`);
-          return isCorrectDate && isPlanned;
+          const isCompleted = w.workout_status === 'completed';
+          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}, IsCompleted: ${isCompleted}`);
+          return isCorrectDate && (isPlanned || isCompleted); // ✅ FIXED: Show both planned AND completed
         } 
         // For past dates: show both planned and completed for reference
         else {
@@ -8999,9 +9862,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   };
 
   const getWorkoutType = () => {
-    if (workout.name.toLowerCase().includes('run')) return 'running';
-    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'cycling';
-    return 'cycling'; // default
+    // 🔧 FIXED: Properly map workout types for CompletedTab
+    if (workout.type === 'run') return 'run';
+    if (workout.type === 'ride') return 'ride';
+    if (workout.type === 'swim') return 'swim';
+    if (workout.type === 'strength') return 'strength';
+    
+    // Fallback logic for legacy names
+    if (workout.name.toLowerCase().includes('run')) return 'run';
+    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'ride';
+    if (workout.name.toLowerCase().includes('swim')) return 'swim';
+    
+    return 'ride'; // default to ride for cycling files
   };
 
   const getWorkoutIcon = () => {
@@ -9049,7 +9921,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               }`}
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
-              Completed
+              Completed: {getWorkoutType().charAt(0).toUpperCase() + getWorkoutType().slice(1)}
             </button>
           </div>
           
@@ -9127,9 +9999,10 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
           {activeTab === 'completed' && (
             <div className="space-y-4">
-              {workout.type === 'endurance' ? (
+              {/* 🔧 FIXED: Support all endurance workout types (ride, run, swim) for CompletedTab */}
+              {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim') ? (
                 <CompletedTab 
-                  workoutType={getWorkoutType()}
+                  workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength'}
                   workoutData={workout}
                 />
               ) : workout.type === 'strength' ? (
@@ -9154,13 +10027,11 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                   }}
                 />
               ) : (
-                // 🔧 FIXED: Only fallback to StrengthExerciseBuilder for non-strength workouts or as last resort
-                <StrengthExerciseBuilder
-                  exercises={strengthExercises}
-                  onChange={handleStrengthExercisesChange}
-                  isMetric={true}
-                  isCompleted={true}
-                />
+                // 🔧 FALLBACK: For unknown workout types
+                <div className="text-center py-8 text-gray-500">
+                  <p>Completed view not available for workout type: {workout.type}</p>
+                  <p className="text-sm mt-2">This workout type is not yet supported in the completed view.</p>
+                </div>
               )}
             </div>
           )}
@@ -9675,6 +10546,7 @@ import { Activity, Clock, Zap, Heart } from 'lucide-react';
 interface WorkoutMetricsProps {
   workout: {
     distance?: number;
+    duration?: number; // 🔧 ADDED: The actual field name used in the data
     elapsed_time?: number;
     moving_time?: number;
     avg_speed?: number;
@@ -9701,7 +10573,12 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
     if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
   const formatPace = (pace?: number) => {
@@ -9730,7 +10607,7 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
           <Clock className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatTime(workout.elapsed_time)}</div>
+          <div className="text-2xl font-bold">{formatTime(workout.duration || workout.elapsed_time)}</div>
           <p className="text-xs text-muted-foreground">Moving: {formatTime(workout.moving_time)}</p>
         </CardContent>
       </Card>
@@ -15369,15 +16246,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [detailedPlans, setDetailedPlans] = useState<any>({});
   const [plansLoading, setPlansLoading] = useState(true);
 
-  // NEW: Load plans from Supabase
+  // NEW: Load plans from Supabase with user filtering
   const loadPlans = async () => {
     try {
       setPlansLoading(true);
       console.log('📋 Loading plans from Supabase...');
       
+      // Get current user for filtering
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.log('No authenticated user, showing no plans');
+        setCurrentPlans([]);
+        setCompletedPlans([]);
+        setDetailedPlans({});
+        return;
+      }
+
+      console.log('Loading plans for user:', user.id);
+
       const { data: plans, error } = await supabase
         .from('plans')
         .select('*')
+        .eq('user_id', user.id)  // ✅ FILTER: Only get plans for this user
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -15464,22 +16355,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  // NEW: Delete plan from Supabase
+  // ✅ FIXED: Delete plan from Supabase with proper user authentication
   const deletePlan = async (planId: string) => {
     try {
-      console.log('📋 Deleting plan from Supabase:', planId);
+      console.log('🗑️ Deleting plan from Supabase:', planId);
       
+      // Get current user for Row Level Security
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error('User must be authenticated to delete plans');
+      }
+      
+      console.log('Using authenticated user for plan deletion:', user.id);
+
       const { error } = await supabase
         .from('plans')
         .delete()
-        .eq('id', planId);
+        .eq('id', planId)
+        .eq('user_id', user.id); // ✅ FIXED: Verify user owns this plan
 
       if (error) {
         console.error('Error deleting plan:', error);
         throw error;
       }
 
-      console.log('📋 Plan deleted successfully');
+      console.log('🗑️ Plan deleted successfully');
       
       // Refresh plans to get updated data
       await loadPlans();
@@ -15866,59 +16767,65 @@ export interface Workout {
   workout_status?: "planned" | "completed" | "skipped" | "in_progress";
   created_at?: string;
   updated_at?: string;
+  // 🔧 ADDED: Rich FIT metrics support
+  avg_heart_rate?: number;
+  max_heart_rate?: number;
+  avg_power?: number;
+  max_power?: number;
+  normalized_power?: number;
+  avg_speed?: number;
+  max_speed?: number;
+  avg_cadence?: number;
+  max_cadence?: number;
+  elevation_gain?: number;
+  elevation_loss?: number;
+  calories?: number;
+  tss?: number;
+  intensity_factor?: number;
+  distance?: number;
+  metrics?: any; // For CompletedTab compatibility
 }
 
 export const useWorkouts = () => {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Get current user with demo user fallback
+  // Get current user - proper auth this time
   const getCurrentUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       
-      // Always use demo user for now
-      const demoUser = {
-        id: 'demo-user-12345',
-        email: 'demo@efforts.app',
-        created_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        role: 'authenticated'
-      };
-      console.log("Using demo user:", demoUser.id);
-      return demoUser;
+      if (user) {
+        console.log("Using authenticated user:", user.id);
+        return user;
+      } else {
+        console.log("No authenticated user found");
+        return null;
+      }
     } catch (error) {
       console.error("Auth error:", error);
-      // Still return demo user even if auth fails
-      return {
-        id: 'demo-user-12345',
-        email: 'demo@efforts.app',
-        created_at: new Date().toISOString(),
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        role: 'authenticated'
-      };
+      return null;
     }
   };
 
-  // Fetch - FIXED: Filter by user_id
+  // Fetch - WITH proper user filtering and rich metrics
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
       
-      console.log("Fetching workouts...");
-      
-      // Get current user to filter workouts
       const user = await getCurrentUser();
+      if (!user) {
+        console.log("No user authenticated, showing no workouts");
+        setWorkouts([]);
+        return;
+      }
+
       console.log("Fetching workouts for user:", user.id);
 
       const { data, error } = await supabase
         .from("workouts")
         .select("*")
-        .eq("user_id", user.id)  // 🔥 FIXED: Filter by user_id
+        .eq("user_id", user.id)
         .order("date", { ascending: false });
 
       if (error) {
@@ -15942,6 +16849,39 @@ export const useWorkouts = () => {
         updated_at: w.updated_at,
         intervals: w.intervals ? JSON.parse(w.intervals) : [],
         strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
+        // 🔧 ADDED: Map rich FIT metrics from database
+        avg_heart_rate: w.avg_heart_rate,
+        max_heart_rate: w.max_heart_rate,
+        avg_power: w.avg_power,
+        max_power: w.max_power,
+        normalized_power: w.normalized_power,
+        avg_speed: w.avg_speed,
+        max_speed: w.max_speed,
+        avg_cadence: w.avg_cadence,
+        max_cadence: w.max_cadence,
+        elevation_gain: w.elevation_gain,
+        elevation_loss: w.elevation_loss,
+        calories: w.calories,
+        tss: w.tss,
+        intensity_factor: w.intensity_factor,
+        distance: w.distance,
+        // 🔧 ADDED: Reconstruct metrics object for CompletedTab
+        metrics: {
+          avg_heart_rate: w.avg_heart_rate,
+          max_heart_rate: w.max_heart_rate,
+          avg_power: w.avg_power,
+          max_power: w.max_power,
+          normalized_power: w.normalized_power,
+          avg_speed: w.avg_speed,
+          max_speed: w.max_speed,
+          avg_cadence: w.avg_cadence,
+          max_cadence: w.max_cadence,
+          elevation_gain: w.elevation_gain,
+          elevation_loss: w.elevation_loss,
+          calories: w.calories,
+          training_stress_score: w.tss,
+          intensity_factor: w.intensity_factor,
+        }
       }));
 
       console.log("Mapped workouts:", mapped);
@@ -15953,10 +16893,14 @@ export const useWorkouts = () => {
     }
   };
 
-  // Add - FIXED: Include user_id
+  // Add - WITH rich FIT metrics support
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to save workouts");
+      }
+
       console.log("Using user for save:", user.id);
 
       const toSave = {
@@ -15970,7 +16914,23 @@ export const useWorkouts = () => {
         workout_status: workoutData.workout_status ?? "planned",
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
-        user_id: user.id  // 🔥 FIXED: Add user_id
+        user_id: user.id,
+        // 🔧 ADDED: Include all rich FIT metrics in database save
+        avg_heart_rate: workoutData.avg_heart_rate,
+        max_heart_rate: workoutData.max_heart_rate,
+        avg_power: workoutData.avg_power,
+        max_power: workoutData.max_power,
+        normalized_power: workoutData.normalized_power,
+        avg_speed: workoutData.avg_speed,
+        max_speed: workoutData.max_speed,
+        avg_cadence: workoutData.avg_cadence,
+        max_cadence: workoutData.max_cadence,
+        elevation_gain: workoutData.elevation_gain,
+        elevation_loss: workoutData.elevation_loss,
+        calories: workoutData.calories,
+        tss: workoutData.tss,
+        intensity_factor: workoutData.intensity_factor,
+        distance: workoutData.distance,
       };
 
       console.log("Saving workout with data:", toSave);
@@ -16000,6 +16960,39 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
+        // 🔧 ADDED: Include rich metrics in returned workout
+        avg_heart_rate: data.avg_heart_rate,
+        max_heart_rate: data.max_heart_rate,
+        avg_power: data.avg_power,
+        max_power: data.max_power,
+        normalized_power: data.normalized_power,
+        avg_speed: data.avg_speed,
+        max_speed: data.max_speed,
+        avg_cadence: data.avg_cadence,
+        max_cadence: data.max_cadence,
+        elevation_gain: data.elevation_gain,
+        elevation_loss: data.elevation_loss,
+        calories: data.calories,
+        tss: data.tss,
+        intensity_factor: data.intensity_factor,
+        distance: data.distance,
+        // 🔧 ADDED: Reconstruct metrics object for CompletedTab
+        metrics: {
+          avg_heart_rate: data.avg_heart_rate,
+          max_heart_rate: data.max_heart_rate,
+          avg_power: data.avg_power,
+          max_power: data.max_power,
+          normalized_power: data.normalized_power,
+          avg_speed: data.avg_speed,
+          max_speed: data.max_speed,
+          avg_cadence: data.avg_cadence,
+          max_cadence: data.max_cadence,
+          elevation_gain: data.elevation_gain,
+          elevation_loss: data.elevation_loss,
+          calories: data.calories,
+          training_stress_score: data.tss,
+          intensity_factor: data.intensity_factor,
+        }
       };
 
       setWorkouts((prev) => [newWorkout, ...prev]);
@@ -16010,10 +17003,14 @@ export const useWorkouts = () => {
     }
   };
 
-  // Update - FIXED: Add user verification
+  // Update - WITH user verification and rich metrics
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
       const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to update workouts");
+      }
+
       console.log("Using user for update:", user.id);
 
       const updateObject: any = {};
@@ -16027,12 +17024,28 @@ export const useWorkouts = () => {
       if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
       if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
       if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
+      // 🔧 ADDED: Support updating rich metrics
+      if (updates.avg_heart_rate !== undefined) updateObject.avg_heart_rate = updates.avg_heart_rate;
+      if (updates.max_heart_rate !== undefined) updateObject.max_heart_rate = updates.max_heart_rate;
+      if (updates.avg_power !== undefined) updateObject.avg_power = updates.avg_power;
+      if (updates.max_power !== undefined) updateObject.max_power = updates.max_power;
+      if (updates.normalized_power !== undefined) updateObject.normalized_power = updates.normalized_power;
+      if (updates.avg_speed !== undefined) updateObject.avg_speed = updates.avg_speed;
+      if (updates.max_speed !== undefined) updateObject.max_speed = updates.max_speed;
+      if (updates.avg_cadence !== undefined) updateObject.avg_cadence = updates.avg_cadence;
+      if (updates.max_cadence !== undefined) updateObject.max_cadence = updates.max_cadence;
+      if (updates.elevation_gain !== undefined) updateObject.elevation_gain = updates.elevation_gain;
+      if (updates.elevation_loss !== undefined) updateObject.elevation_loss = updates.elevation_loss;
+      if (updates.calories !== undefined) updateObject.calories = updates.calories;
+      if (updates.tss !== undefined) updateObject.tss = updates.tss;
+      if (updates.intensity_factor !== undefined) updateObject.intensity_factor = updates.intensity_factor;
+      if (updates.distance !== undefined) updateObject.distance = updates.distance;
 
       const { data, error } = await supabase
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
-        .eq("user_id", user.id)  // 🔥 FIXED: Verify user owns this workout
+        .eq("user_id", user.id)
         .select()
         .single();
 
@@ -16052,6 +17065,39 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
+        // 🔧 ADDED: Include rich metrics in updated workout
+        avg_heart_rate: data.avg_heart_rate,
+        max_heart_rate: data.max_heart_rate,
+        avg_power: data.avg_power,
+        max_power: data.max_power,
+        normalized_power: data.normalized_power,
+        avg_speed: data.avg_speed,
+        max_speed: data.max_speed,
+        avg_cadence: data.avg_cadence,
+        max_cadence: data.max_cadence,
+        elevation_gain: data.elevation_gain,
+        elevation_loss: data.elevation_loss,
+        calories: data.calories,
+        tss: data.tss,
+        intensity_factor: data.intensity_factor,
+        distance: data.distance,
+        // 🔧 ADDED: Reconstruct metrics object
+        metrics: {
+          avg_heart_rate: data.avg_heart_rate,
+          max_heart_rate: data.max_heart_rate,
+          avg_power: data.avg_power,
+          max_power: data.max_power,
+          normalized_power: data.normalized_power,
+          avg_speed: data.avg_speed,
+          max_speed: data.max_speed,
+          avg_cadence: data.avg_cadence,
+          max_cadence: data.max_cadence,
+          elevation_gain: data.elevation_gain,
+          elevation_loss: data.elevation_loss,
+          calories: data.calories,
+          training_stress_score: data.tss,
+          intensity_factor: data.intensity_factor,
+        }
       };
 
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
@@ -16062,17 +17108,21 @@ export const useWorkouts = () => {
     }
   };
 
-  // Delete - FIXED: Add user verification
+  // Delete - WITH user verification
   const deleteWorkout = async (id: string) => {
     try {
       const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to delete workouts");
+      }
+
       console.log("Using user for delete:", user.id);
 
       const { error } = await supabase
         .from("workouts")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);  // 🔥 FIXED: Verify user owns this workout
+        .eq("user_id", user.id);
 
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
@@ -16091,7 +17141,7 @@ export const useWorkouts = () => {
 
   return {
     workouts,
-    loading, // Only true during initial fetch
+    loading,
     addWorkout,
     updateWorkout,
     deleteWorkout,

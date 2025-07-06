@@ -39,11 +39,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const dateWorkouts = workouts.filter((w: any) => {
         const isCorrectDate = w.date === activeDate;
         
-        // For today and future dates: show only planned workouts
+        // For today and future dates: show both planned AND completed workouts
         if (activeDate >= today) {
           const isPlanned = w.workout_status === 'planned' || !w.workout_status; // Handle missing status as planned
-          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}`);
-          return isCorrectDate && isPlanned;
+          const isCompleted = w.workout_status === 'completed';
+          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}, IsCompleted: ${isCompleted}`);
+          return isCorrectDate && (isPlanned || isCompleted); // ✅ FIXED: Show both planned AND completed
         } 
         // For past dates: show both planned and completed for reference
         else {

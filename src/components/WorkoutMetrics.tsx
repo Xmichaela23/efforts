@@ -6,6 +6,7 @@ import { Activity, Clock, Zap, Heart } from 'lucide-react';
 interface WorkoutMetricsProps {
   workout: {
     distance?: number;
+    duration?: number; // 🔧 ADDED: The actual field name used in the data
     elapsed_time?: number;
     moving_time?: number;
     avg_speed?: number;
@@ -32,7 +33,12 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
     if (!seconds) return 'N/A';
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+    const secs = seconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
   const formatPace = (pace?: number) => {
@@ -61,7 +67,7 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
           <Clock className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">{formatTime(workout.elapsed_time)}</div>
+          <div className="text-2xl font-bold">{formatTime(workout.duration || workout.elapsed_time)}</div>
           <p className="text-xs text-muted-foreground">Moving: {formatTime(workout.moving_time)}</p>
         </CardContent>
       </Card>

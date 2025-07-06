@@ -15,6 +15,7 @@ import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
+import ImportDataPage from './ImportDataPage';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -25,6 +26,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     workouts, 
     loading, 
     deleteWorkout,
+    addWorkout,
     currentPlans,
     completedPlans,
     detailedPlans,
@@ -37,6 +39,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
+  const [showImportPage, setShowImportPage] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -57,6 +60,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   useEffect(() => {
     if (selectedWorkout) {
       if (selectedWorkout.type === 'strength') {
+        setActiveTab('completed');
+      } else if (selectedWorkout.workout_status === 'completed') {
+        // 🔧 FIX: Completed workouts (like FIT imports) should show Completed tab
         setActiveTab('completed');
       } else {
         setActiveTab('summary');
@@ -232,6 +238,72 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setCurrentWorkoutIndex(0);
   };
 
+  // NEW: Import handlers
+  const handleImportClick = () => {
+    setShowImportPage(true);
+  };
+
+  // 🔧 FIXED: Properly extract and flatten FIT metrics with data type conversion
+  const handleWorkoutsImported = (importedWorkouts: any[]) => {
+    console.log('📥 handleWorkoutsImported called with:', importedWorkouts);
+    
+    importedWorkouts.forEach(async (workout) => {
+      try {
+        // 🔍 DEBUG: Check elevation_gain values at both locations
+        console.log('🔍 ELEVATION DEBUG - workout.metrics?.elevation_gain:', workout.metrics?.elevation_gain, typeof workout.metrics?.elevation_gain);
+        console.log('🔍 ELEVATION DEBUG - workout.elevation_gain:', workout.elevation_gain, typeof workout.elevation_gain);
+        console.log('🔍 ELEVATION DEBUG - full metrics object:', workout.metrics);
+        
+        const workoutToSave = {
+          name: workout.name,
+          type: workout.type,
+          date: workout.date,
+          duration: workout.duration,
+          distance: workout.distance,
+          description: workout.description || "",
+          userComments: "",
+          completedManually: false,
+          workout_status: 'completed',
+          // 🔧 FIXED: Extract metrics from nested structure and ensure proper data types
+          avg_heart_rate: workout.metrics?.avg_heart_rate,
+          max_heart_rate: workout.metrics?.max_heart_rate,
+          avg_power: workout.metrics?.avg_power,
+          max_power: workout.metrics?.max_power,
+          normalized_power: workout.metrics?.normalized_power,
+          avg_speed: workout.metrics?.avg_speed,
+          max_speed: workout.metrics?.max_speed,
+          avg_cadence: workout.metrics?.avg_cadence,
+          max_cadence: workout.metrics?.max_cadence,
+          // 🔧 CRITICAL FIX: Check both locations for elevation_gain
+          elevation_gain: workout.metrics?.elevation_gain ? 
+            Math.round(Number(workout.metrics.elevation_gain)) : 
+            workout.elevation_gain ? 
+              Math.round(Number(workout.elevation_gain)) : 
+              null,
+          elevation_loss: workout.metrics?.elevation_loss,
+          calories: workout.metrics?.calories,
+          tss: workout.metrics?.training_stress_score,
+          intensity_factor: workout.metrics?.intensity_factor,
+          // 🔧 NEW: Add elapsed_time field that WorkoutMetrics expects for duration
+          elapsed_time: workout.duration,
+          // Keep metrics object for CompletedTab compatibility
+          metrics: workout.metrics
+        };
+        
+        // 🔍 DEBUG: Check what elevation_gain value we're actually saving
+        console.log('🔍 ELEVATION DEBUG - Final elevation_gain value being saved:', workoutToSave.elevation_gain);
+        console.log('🔧 Flattened workout data for database:', workoutToSave);
+        await addWorkout(workoutToSave);
+        console.log('✅ Imported workout with metrics:', workout.name);
+      } catch (error) {
+        console.error('❌ Error importing workout:', error);
+      }
+    });
+    
+    console.log(`Successfully imported ${importedWorkouts.length} workouts`);
+    setShowImportPage(false);
+  };
+
   const handleBackToDashboard = () => {
     const comingFromPlanBuilder = showPlanBuilder;
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
@@ -241,6 +313,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowPlanBuilder(false);
+    setShowImportPage(false); // NEW: Reset import page
     setBuilderType('');
     setBuilderSourceContext('');
     setSelectedWorkout(null);
@@ -431,6 +504,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   };
 
+  // NEW: Show import page
+  if (showImportPage) {
+    return (
+      <ImportDataPage 
+        onClose={() => setShowImportPage(false)}
+        onWorkoutsImported={handleWorkoutsImported}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="mobile-app-container">
@@ -464,7 +547,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <Settings className="mr-2 h-4 w-4" />
                     Connect Devices
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleImportClick}>
                     <Upload className="mr-2 h-4 w-4" />
                     Import
                   </DropdownMenuItem>

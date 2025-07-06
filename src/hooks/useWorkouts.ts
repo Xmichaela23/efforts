@@ -77,6 +77,23 @@ export interface Workout {
   workout_status?: "planned" | "completed" | "skipped" | "in_progress";
   created_at?: string;
   updated_at?: string;
+  // 🔧 ADDED: Rich FIT metrics support
+  avg_heart_rate?: number;
+  max_heart_rate?: number;
+  avg_power?: number;
+  max_power?: number;
+  normalized_power?: number;
+  avg_speed?: number;
+  max_speed?: number;
+  avg_cadence?: number;
+  max_cadence?: number;
+  elevation_gain?: number;
+  elevation_loss?: number;
+  calories?: number;
+  tss?: number;
+  intensity_factor?: number;
+  distance?: number;
+  metrics?: any; // For CompletedTab compatibility
 }
 
 export const useWorkouts = () => {
@@ -101,7 +118,7 @@ export const useWorkouts = () => {
     }
   };
 
-  // Fetch - WITH proper user filtering
+  // Fetch - WITH proper user filtering and rich metrics
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
@@ -142,6 +159,39 @@ export const useWorkouts = () => {
         updated_at: w.updated_at,
         intervals: w.intervals ? JSON.parse(w.intervals) : [],
         strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
+        // 🔧 ADDED: Map rich FIT metrics from database
+        avg_heart_rate: w.avg_heart_rate,
+        max_heart_rate: w.max_heart_rate,
+        avg_power: w.avg_power,
+        max_power: w.max_power,
+        normalized_power: w.normalized_power,
+        avg_speed: w.avg_speed,
+        max_speed: w.max_speed,
+        avg_cadence: w.avg_cadence,
+        max_cadence: w.max_cadence,
+        elevation_gain: w.elevation_gain,
+        elevation_loss: w.elevation_loss,
+        calories: w.calories,
+        tss: w.tss,
+        intensity_factor: w.intensity_factor,
+        distance: w.distance,
+        // 🔧 ADDED: Reconstruct metrics object for CompletedTab
+        metrics: {
+          avg_heart_rate: w.avg_heart_rate,
+          max_heart_rate: w.max_heart_rate,
+          avg_power: w.avg_power,
+          max_power: w.max_power,
+          normalized_power: w.normalized_power,
+          avg_speed: w.avg_speed,
+          max_speed: w.max_speed,
+          avg_cadence: w.avg_cadence,
+          max_cadence: w.max_cadence,
+          elevation_gain: w.elevation_gain,
+          elevation_loss: w.elevation_loss,
+          calories: w.calories,
+          training_stress_score: w.tss,
+          intensity_factor: w.intensity_factor,
+        }
       }));
 
       console.log("Mapped workouts:", mapped);
@@ -153,7 +203,7 @@ export const useWorkouts = () => {
     }
   };
 
-  // Add - WITH proper user_id
+  // Add - WITH rich FIT metrics support
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
@@ -174,7 +224,23 @@ export const useWorkouts = () => {
         workout_status: workoutData.workout_status ?? "planned",
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
-        user_id: user.id  // ✅ PROPER: Add authenticated user_id
+        user_id: user.id,
+        // 🔧 ADDED: Include all rich FIT metrics in database save
+        avg_heart_rate: workoutData.avg_heart_rate,
+        max_heart_rate: workoutData.max_heart_rate,
+        avg_power: workoutData.avg_power,
+        max_power: workoutData.max_power,
+        normalized_power: workoutData.normalized_power,
+        avg_speed: workoutData.avg_speed,
+        max_speed: workoutData.max_speed,
+        avg_cadence: workoutData.avg_cadence,
+        max_cadence: workoutData.max_cadence,
+        elevation_gain: workoutData.elevation_gain,
+        elevation_loss: workoutData.elevation_loss,
+        calories: workoutData.calories,
+        tss: workoutData.tss,
+        intensity_factor: workoutData.intensity_factor,
+        distance: workoutData.distance,
       };
 
       console.log("Saving workout with data:", toSave);
@@ -204,6 +270,39 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
+        // 🔧 ADDED: Include rich metrics in returned workout
+        avg_heart_rate: data.avg_heart_rate,
+        max_heart_rate: data.max_heart_rate,
+        avg_power: data.avg_power,
+        max_power: data.max_power,
+        normalized_power: data.normalized_power,
+        avg_speed: data.avg_speed,
+        max_speed: data.max_speed,
+        avg_cadence: data.avg_cadence,
+        max_cadence: data.max_cadence,
+        elevation_gain: data.elevation_gain,
+        elevation_loss: data.elevation_loss,
+        calories: data.calories,
+        tss: data.tss,
+        intensity_factor: data.intensity_factor,
+        distance: data.distance,
+        // 🔧 ADDED: Reconstruct metrics object for CompletedTab
+        metrics: {
+          avg_heart_rate: data.avg_heart_rate,
+          max_heart_rate: data.max_heart_rate,
+          avg_power: data.avg_power,
+          max_power: data.max_power,
+          normalized_power: data.normalized_power,
+          avg_speed: data.avg_speed,
+          max_speed: data.max_speed,
+          avg_cadence: data.avg_cadence,
+          max_cadence: data.max_cadence,
+          elevation_gain: data.elevation_gain,
+          elevation_loss: data.elevation_loss,
+          calories: data.calories,
+          training_stress_score: data.tss,
+          intensity_factor: data.intensity_factor,
+        }
       };
 
       setWorkouts((prev) => [newWorkout, ...prev]);
@@ -214,7 +313,7 @@ export const useWorkouts = () => {
     }
   };
 
-  // Update - WITH user verification
+  // Update - WITH user verification and rich metrics
   const updateWorkout = async (id: string, updates: Partial<Workout>) => {
     try {
       const user = await getCurrentUser();
@@ -235,12 +334,28 @@ export const useWorkouts = () => {
       if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
       if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
       if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
+      // 🔧 ADDED: Support updating rich metrics
+      if (updates.avg_heart_rate !== undefined) updateObject.avg_heart_rate = updates.avg_heart_rate;
+      if (updates.max_heart_rate !== undefined) updateObject.max_heart_rate = updates.max_heart_rate;
+      if (updates.avg_power !== undefined) updateObject.avg_power = updates.avg_power;
+      if (updates.max_power !== undefined) updateObject.max_power = updates.max_power;
+      if (updates.normalized_power !== undefined) updateObject.normalized_power = updates.normalized_power;
+      if (updates.avg_speed !== undefined) updateObject.avg_speed = updates.avg_speed;
+      if (updates.max_speed !== undefined) updateObject.max_speed = updates.max_speed;
+      if (updates.avg_cadence !== undefined) updateObject.avg_cadence = updates.avg_cadence;
+      if (updates.max_cadence !== undefined) updateObject.max_cadence = updates.max_cadence;
+      if (updates.elevation_gain !== undefined) updateObject.elevation_gain = updates.elevation_gain;
+      if (updates.elevation_loss !== undefined) updateObject.elevation_loss = updates.elevation_loss;
+      if (updates.calories !== undefined) updateObject.calories = updates.calories;
+      if (updates.tss !== undefined) updateObject.tss = updates.tss;
+      if (updates.intensity_factor !== undefined) updateObject.intensity_factor = updates.intensity_factor;
+      if (updates.distance !== undefined) updateObject.distance = updates.distance;
 
       const { data, error } = await supabase
         .from("workouts")
         .update(updateObject)
         .eq("id", id)
-        .eq("user_id", user.id)  // ✅ VERIFY: User owns this workout
+        .eq("user_id", user.id)
         .select()
         .single();
 
@@ -260,6 +375,39 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
+        // 🔧 ADDED: Include rich metrics in updated workout
+        avg_heart_rate: data.avg_heart_rate,
+        max_heart_rate: data.max_heart_rate,
+        avg_power: data.avg_power,
+        max_power: data.max_power,
+        normalized_power: data.normalized_power,
+        avg_speed: data.avg_speed,
+        max_speed: data.max_speed,
+        avg_cadence: data.avg_cadence,
+        max_cadence: data.max_cadence,
+        elevation_gain: data.elevation_gain,
+        elevation_loss: data.elevation_loss,
+        calories: data.calories,
+        tss: data.tss,
+        intensity_factor: data.intensity_factor,
+        distance: data.distance,
+        // 🔧 ADDED: Reconstruct metrics object
+        metrics: {
+          avg_heart_rate: data.avg_heart_rate,
+          max_heart_rate: data.max_heart_rate,
+          avg_power: data.avg_power,
+          max_power: data.max_power,
+          normalized_power: data.normalized_power,
+          avg_speed: data.avg_speed,
+          max_speed: data.max_speed,
+          avg_cadence: data.avg_cadence,
+          max_cadence: data.max_cadence,
+          elevation_gain: data.elevation_gain,
+          elevation_loss: data.elevation_loss,
+          calories: data.calories,
+          training_stress_score: data.tss,
+          intensity_factor: data.intensity_factor,
+        }
       };
 
       setWorkouts((prev) => prev.map((w) => (w.id === id ? updated : w)));
@@ -284,7 +432,7 @@ export const useWorkouts = () => {
         .from("workouts")
         .delete()
         .eq("id", id)
-        .eq("user_id", user.id);  // ✅ VERIFY: User owns this workout
+        .eq("user_id", user.id);
 
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
@@ -303,7 +451,7 @@ export const useWorkouts = () => {
 
   return {
     workouts,
-    loading, // Only true during initial fetch
+    loading,
     addWorkout,
     updateWorkout,
     deleteWorkout,

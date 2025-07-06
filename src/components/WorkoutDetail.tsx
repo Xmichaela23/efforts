@@ -125,9 +125,18 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
   };
 
   const getWorkoutType = () => {
-    if (workout.name.toLowerCase().includes('run')) return 'running';
-    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'cycling';
-    return 'cycling'; // default
+    // 🔧 FIXED: Properly map workout types for CompletedTab
+    if (workout.type === 'run') return 'run';
+    if (workout.type === 'ride') return 'ride';
+    if (workout.type === 'swim') return 'swim';
+    if (workout.type === 'strength') return 'strength';
+    
+    // Fallback logic for legacy names
+    if (workout.name.toLowerCase().includes('run')) return 'run';
+    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'ride';
+    if (workout.name.toLowerCase().includes('swim')) return 'swim';
+    
+    return 'ride'; // default to ride for cycling files
   };
 
   const getWorkoutIcon = () => {
@@ -175,7 +184,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               }`}
               style={{ fontFamily: 'Inter, sans-serif' }}
             >
-              Completed
+              Completed: {getWorkoutType().charAt(0).toUpperCase() + getWorkoutType().slice(1)}
             </button>
           </div>
           
@@ -253,9 +262,10 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
           {activeTab === 'completed' && (
             <div className="space-y-4">
-              {workout.type === 'endurance' ? (
+              {/* 🔧 FIXED: Support all endurance workout types (ride, run, swim) for CompletedTab */}
+              {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim') ? (
                 <CompletedTab 
-                  workoutType={getWorkoutType()}
+                  workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength'}
                   workoutData={workout}
                 />
               ) : workout.type === 'strength' ? (
@@ -280,13 +290,11 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                   }}
                 />
               ) : (
-                // 🔧 FIXED: Only fallback to StrengthExerciseBuilder for non-strength workouts or as last resort
-                <StrengthExerciseBuilder
-                  exercises={strengthExercises}
-                  onChange={handleStrengthExercisesChange}
-                  isMetric={true}
-                  isCompleted={true}
-                />
+                // 🔧 FALLBACK: For unknown workout types
+                <div className="text-center py-8 text-gray-500">
+                  <p>Completed view not available for workout type: {workout.type}</p>
+                  <p className="text-sm mt-2">This workout type is not yet supported in the completed view.</p>
+                </div>
               )}
             </div>
           )}
