@@ -80,7 +80,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
 
   const formatTemperature = (c: any): string => {
     console.log('🔍 formatTemperature called with:', c, typeof c);
-    const num = Number(c);
+    
+    // Try direct column first, then nested metrics
+    const temp = c || workoutData.avg_temperature || workoutData.metrics?.avg_temperature;
+    const num = Number(temp);
+    
     if (!num || isNaN(num)) {
       console.log('🔍 formatTemperature returning N/A because num is:', num, 'isNaN:', isNaN(num));
       return 'N/A';
@@ -115,17 +119,18 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
 
   const getCityFromCoordinates = (lat: any, lng: any): string => {
     console.log('🔍 getCityFromCoordinates called with:', lat, lng);
-    // Simple coordinate to city lookup for major cities
-    const latNum = Number(lat);
-    const lngNum = Number(lng);
+    
+    // Try direct columns first, then nested
+    const latNum = Number(lat || workoutData.start_position_lat);
+    const lngNum = Number(lng || workoutData.start_position_long);
     
     if (!latNum || !lngNum) {
       console.log('🔍 getCityFromCoordinates returning Unknown - no valid coords');
       return 'Unknown';
     }
     
-    // Los Angeles area
-    if (latNum >= 33.7 && latNum <= 34.3 && lngNum >= -118.7 && lngNum <= -117.9) {
+    // Los Angeles area - FIXED BOUNDS
+    if (latNum >= 33.7 && latNum <= 34.5 && lngNum >= -118.9 && lngNum <= -117.9) {
       console.log('🔍 getCityFromCoordinates returning Los Angeles');
       return 'Los Angeles';
     }
@@ -313,7 +318,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
             {formatTime(workoutData.timestamp)}
           </span>
           <span className="text-black">
-            {formatTemperature(workoutData.metrics?.avg_temperature)}
+            {formatTemperature(workoutData.avg_temperature)}
           </span>
         </div>
       </div>
