@@ -13,7 +13,17 @@ interface ImportedWorkout {
   date: string;
   duration: number;
   distance?: number;
+  
+  // 🆕 NEW TOP-LEVEL FIELDS for CompletedTab
+  timestamp?: string;
+  start_position_lat?: number;
+  start_position_long?: number;
+  friendly_name?: string;
+  moving_time?: number;
+  elapsed_time?: number;
+  
   metrics: {
+    // EXISTING FIELDS
     avg_heart_rate?: number;
     max_heart_rate?: number;
     avg_power?: number;
@@ -29,7 +39,48 @@ interface ImportedWorkout {
     intensity_factor?: number;
     avg_temperature?: number;
     max_temperature?: number;
+    
+    // 🆕 NEW TIME DATA
+    total_timer_time?: number;
+    total_elapsed_time?: number;
+    
+    // 🆕 NEW WORK/ENERGY
+    total_work?: number;
+    
+    // 🆕 NEW ELEVATION
+    total_descent?: number;
+    
+    // 🆕 NEW PERFORMANCE
+    avg_vam?: number;
+    total_training_effect?: number;
+    total_anaerobic_effect?: number;
+    
+    // 🆕 NEW ZONES DATA
+    functional_threshold_power?: number;
+    threshold_heart_rate?: number;
+    hr_calc_type?: string;
+    pwr_calc_type?: string;
+    
+    // 🆕 NEW USER PROFILE DATA
+    age?: number;
+    weight?: number;
+    height?: number;
+    gender?: string;
+    default_max_heart_rate?: number;
+    resting_heart_rate?: number;
+    dist_setting?: string;
+    weight_setting?: string;
+    
+    // 🆕 NEW CYCLING DETAILS DATA
+    avg_fractional_cadence?: number;
+    avg_left_pedal_smoothness?: number;
+    avg_left_torque_effectiveness?: number;
+    max_fractional_cadence?: number;
+    left_right_balance?: number;
+    threshold_power?: number;
+    total_cycles?: number;
   };
+  
   deviceInfo: {
     manufacturer?: string;
     product?: string;
@@ -131,16 +182,34 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
             }
 
             try {
-              console.log('Raw FIT data:', data);
+              console.log('🔍 FULL RAW FIT DATA:', data);
               
               // 🔧 DEBUG: Check what data structure we actually get
               console.log('DEBUG - data.sessions exists?', !!data.sessions);
               console.log('DEBUG - data.sessions type:', typeof data.sessions);  
               console.log('DEBUG - data.sessions length:', data.sessions?.length);
-              console.log('DEBUG - all data keys:', Object.keys(data));
+              console.log('DEBUG - ALL DATA KEYS:', Object.keys(data));
+              
+              // 🆕 NEW: Debug ALL possible data structures
+              console.log('🔍 ZONES DEBUG - data.zones_target:', data.zones_target);
+              console.log('🔍 ZONES DEBUG - data.zones:', data.zones);
+              console.log('🔍 ZONES DEBUG - data.zone_target:', data.zone_target);
+              console.log('🔍 USER DEBUG - data.user_profile:', data.user_profile);
+              console.log('🔍 USER DEBUG - data.user:', data.user);
+              console.log('🔍 DEVICE DEBUG - data.device_info:', data.device_info);
+              console.log('🔍 DEVICE DEBUG - data.device:', data.device);
+              console.log('🔍 FILE DEBUG - data.file_id:', data.file_id);
+              console.log('🔍 FILE DEBUG - data.file_creator:', data.file_creator);
+              
+              // 🔍 DEBUG: Log the session object completely
+              if (data.sessions && data.sessions[0]) {
+                console.log('🔍 FULL SESSION OBJECT:', data.sessions[0]);
+                console.log('🔍 SESSION KEYS:', Object.keys(data.sessions[0]));
+              }
               
               // 🔧 FIXED: Extract date from the correct location - prioritize local_timestamp
               let workoutDate = new Date().toISOString().split('T')[0]; // fallback to today
+              let workoutTimestamp = null;
               
               console.log('🔧 DEBUG: Available timestamps:', {
                 local_timestamp: data.local_timestamp,
@@ -153,18 +222,21 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 workoutDate = dateObj.getFullYear() + '-' + 
                   String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                   String(dateObj.getDate()).padStart(2, '0');
+                workoutTimestamp = data.local_timestamp;
                 console.log('✅ Using local_timestamp for date:', workoutDate);
               } else if (data.timestamp) {
                 const dateObj = new Date(data.timestamp);
                 workoutDate = dateObj.getFullYear() + '-' + 
                   String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                   String(dateObj.getDate()).padStart(2, '0');
+                workoutTimestamp = data.timestamp;
                 console.log('✅ Using timestamp for date:', workoutDate);
               } else if (data.sessions && data.sessions[0] && data.sessions[0].start_time) {
                 const dateObj = new Date(data.sessions[0].start_time);
                 workoutDate = dateObj.getFullYear() + '-' + 
                   String(dateObj.getMonth() + 1).padStart(2, '0') + '-' + 
                   String(dateObj.getDate()).padStart(2, '0');
+                workoutTimestamp = data.sessions[0].start_time;
                 console.log('✅ Using sessions[0].start_time for date:', workoutDate);
               } else {
                 console.log('⚠️ No timestamp found, using today:', workoutDate);
@@ -219,14 +291,29 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 null;
               console.log('✅ Extracted distance:', distance, 'km');
 
+              // 🆕 NEW: Extract location data for title generation
+              const startPositionLat = session.start_position_lat ? Number(session.start_position_lat) : null;
+              const startPositionLong = session.start_position_long ? Number(session.start_position_long) : null;
+              console.log('✅ Extracted location:', { lat: startPositionLat, lng: startPositionLong });
+
+              // 🆕 NEW: Extract device friendly name (from user_profile)
+              const friendlyName = data.user_profile?.friendly_name || 
+                                 data.device_info?.friendly_name || 
+                                 data.file_creator?.friendly_name || 
+                                 data.file_id?.friendly_name ||
+                                 null;
+              console.log('✅ Extracted friendly_name:', friendlyName);
+
               // 🔧 CRITICAL FIX: Check multiple possible elevation field names
               let elevationGain = null;
+              let elevationLoss = null;
               console.log('🔧 DEBUG: Checking all elevation fields in session:');
               console.log('  session.total_ascent:', session.total_ascent);
               console.log('  session.elevation_gain:', session.elevation_gain);
               console.log('  session.ascent:', session.ascent);
               console.log('  session.total_elevation_gain:', session.total_elevation_gain);
               console.log('  session.enhanced_ascent:', session.enhanced_ascent);
+              console.log('  session.total_descent:', session.total_descent);
               
               if (session.total_ascent) {
                 // 🔧 CRITICAL FIX: total_ascent is in kilometers, convert to meters
@@ -245,44 +332,98 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 elevationGain = Math.round(Number(session.enhanced_ascent));
                 console.log('✅ Using enhanced_ascent for elevation:', elevationGain);
               } else {
-                console.log('❌ No elevation field found in session');
+                console.log('❌ No elevation gain field found in session');
               }
+
+              // 🆕 NEW: Extract elevation loss/descent
+              if (session.total_descent) {
+                elevationLoss = Math.round(Number(session.total_descent));
+                console.log('✅ Extracted elevation loss:', elevationLoss, 'meters');
+              }
+
+              // 🆕 NEW: Extract zones data
+              const zonesData = data.zones_target || {};
+              console.log('🆕 DEBUG: Zones data:', zonesData);
+
+              // 🆕 NEW: Extract user profile data
+              const userProfile = data.user_profile || {};
+              console.log('🆕 DEBUG: User profile data:', userProfile);
 
               // 🔧 FIXED: Extract all metrics directly from session object and sanitize for database
               const metrics = {
-                // Heart Rate - ensure numbers or null
+                // EXISTING Heart Rate - ensure numbers or null
                 avg_heart_rate: session.avg_heart_rate ? Number(session.avg_heart_rate) : null,
                 max_heart_rate: session.max_heart_rate ? Number(session.max_heart_rate) : null,
                 
-                // Power (cycling) - ensure numbers or null
+                // EXISTING Power (cycling) - ensure numbers or null
                 avg_power: session.avg_power ? Number(session.avg_power) : null,
                 max_power: session.max_power ? Number(session.max_power) : null,
                 normalized_power: session.normalized_power ? Number(session.normalized_power) : null,
                 
-                // Calories & Energy - ensure numbers or null
+                // EXISTING Calories & Energy - ensure numbers or null
                 calories: session.total_calories ? Number(session.total_calories) : null,
                 
                 // 🔧 FIXED: Use the elevation value we found from multiple possible fields
                 elevation_gain: elevationGain,
                 
-                // Speed - ensure numbers or null
+                // EXISTING Speed - ensure numbers or null
                 avg_speed: session.enhanced_avg_speed ? Number(session.enhanced_avg_speed) : 
                           session.avg_speed ? Number(session.avg_speed) : null,
                 max_speed: session.enhanced_max_speed ? Number(session.enhanced_max_speed) : 
                           session.max_speed ? Number(session.max_speed) : null,
                 
-                // Cadence - ensure numbers or null
+                // EXISTING Cadence - ensure numbers or null
                 avg_cadence: session.avg_cadence ? Number(session.avg_cadence) : null,
                 max_cadence: session.max_cadence ? Number(session.max_cadence) : null,
                 
-                // Advanced Training Metrics - ensure numbers or null
+                // EXISTING Advanced Training Metrics - ensure numbers or null
                 training_stress_score: session.training_stress_score ? Number(session.training_stress_score) : null,
                 // 🔧 CRITICAL FIX: Convert intensity_factor from decimal to percentage (0.498 → 50)
                 intensity_factor: session.intensity_factor ? Math.round(Number(session.intensity_factor) * 100) : null,
                 
-                // Temperature - ensure numbers or null
+                // EXISTING Temperature - ensure numbers or null
                 avg_temperature: session.avg_temperature ? Number(session.avg_temperature) : null,
                 max_temperature: session.max_temperature ? Number(session.max_temperature) : null,
+
+                // 🆕 NEW TIME DATA
+                total_timer_time: session.total_timer_time ? Number(session.total_timer_time) : null,
+                total_elapsed_time: session.total_elapsed_time ? Number(session.total_elapsed_time) : null,
+
+                // 🆕 NEW WORK/ENERGY
+                total_work: session.total_work ? Number(session.total_work) : null,
+
+                // 🆕 NEW ELEVATION
+                total_descent: elevationLoss,
+
+                // 🆕 NEW PERFORMANCE
+                avg_vam: session.avg_vam ? Number(session.avg_vam) : null,
+                total_training_effect: session.total_training_effect ? Number(session.total_training_effect) : null,
+                total_anaerobic_effect: session.total_anaerobic_effect ? Number(session.total_anaerobic_effect) : null,
+
+                // 🆕 NEW ZONES DATA (from zones_target object)
+                functional_threshold_power: zonesData.functional_threshold_power ? Number(zonesData.functional_threshold_power) : null,
+                threshold_heart_rate: zonesData.threshold_heart_rate ? Number(zonesData.threshold_heart_rate) : null,
+                hr_calc_type: zonesData.hr_calc_type || null,
+                pwr_calc_type: zonesData.pwr_calc_type || null,
+
+                // 🆕 NEW USER PROFILE DATA (from user_profile object)
+                age: userProfile.age ? Number(userProfile.age) : null,
+                weight: userProfile.weight ? Number(userProfile.weight) : null,
+                height: userProfile.height ? Number(userProfile.height) : null,
+                gender: userProfile.gender || null,
+                default_max_heart_rate: userProfile.default_max_heart_rate ? Number(userProfile.default_max_heart_rate) : null,
+                resting_heart_rate: userProfile.resting_heart_rate ? Number(userProfile.resting_heart_rate) : null,
+                dist_setting: userProfile.dist_setting || null,
+                weight_setting: userProfile.weight_setting || null,
+
+                // 🆕 NEW CYCLING DETAILS DATA (from session object)
+                avg_fractional_cadence: session.avg_fractional_cadence ? Number(session.avg_fractional_cadence) : null,
+                avg_left_pedal_smoothness: session.avg_left_pedal_smoothness ? Number(session.avg_left_pedal_smoothness) : null,
+                avg_left_torque_effectiveness: session.avg_left_torque_effectiveness ? Number(session.avg_left_torque_effectiveness) : null,
+                max_fractional_cadence: session.max_fractional_cadence ? Number(session.max_fractional_cadence) : null,
+                left_right_balance: session.left_right_balance ? Number(session.left_right_balance) : null,
+                threshold_power: session.threshold_power ? Number(session.threshold_power) : null,
+                total_cycles: session.total_cycles ? Number(session.total_cycles) : null,
               };
 
               console.log('✅ Extracted metrics from session:', metrics);
@@ -293,6 +434,13 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
               console.log('  intensity_factor:', typeof metrics.intensity_factor, metrics.intensity_factor, '(converted from decimal to percentage)');
               console.log('  duration:', typeof duration, duration);
               console.log('  distance:', typeof distance, distance);
+              console.log('🆕 NEW FIELDS:');
+              console.log('  total_work:', metrics.total_work);
+              console.log('  avg_vam:', metrics.avg_vam);
+              console.log('  total_timer_time:', metrics.total_timer_time);
+              console.log('  start_position_lat:', startPositionLat);
+              console.log('  start_position_long:', startPositionLong);
+              console.log('  friendly_name:', friendlyName);
 
               // Create the workout object with proper data types for database
               const workout: ImportedWorkout = {
@@ -302,8 +450,18 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 date: workoutDate,
                 duration: duration,
                 distance: distance,
-                // 🔧 FIXED: Don't include nested metrics object - it causes database issues
+                
+                // 🆕 NEW TOP-LEVEL FIELDS
+                timestamp: workoutTimestamp,
+                start_position_lat: startPositionLat,
+                start_position_long: startPositionLong,
+                friendly_name: friendlyName,
+                moving_time: metrics.total_timer_time, // moving time is typically total_timer_time
+                elapsed_time: metrics.total_elapsed_time,
+                
+                // ALL METRICS (existing + new)
                 metrics: {
+                  // EXISTING FIELDS
                   avg_heart_rate: metrics.avg_heart_rate,
                   max_heart_rate: metrics.max_heart_rate,
                   avg_power: metrics.avg_power,
@@ -319,6 +477,34 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                   intensity_factor: metrics.intensity_factor,
                   avg_temperature: metrics.avg_temperature,
                   max_temperature: metrics.max_temperature,
+                  
+                  // 🆕 NEW FIELDS
+                  total_timer_time: metrics.total_timer_time,
+                  total_elapsed_time: metrics.total_elapsed_time,
+                  total_work: metrics.total_work,
+                  total_descent: metrics.total_descent,
+                  avg_vam: metrics.avg_vam,
+                  total_training_effect: metrics.total_training_effect,
+                  total_anaerobic_effect: metrics.total_anaerobic_effect,
+                  functional_threshold_power: metrics.functional_threshold_power,
+                  threshold_heart_rate: metrics.threshold_heart_rate,
+                  hr_calc_type: metrics.hr_calc_type,
+                  pwr_calc_type: metrics.pwr_calc_type,
+                  age: metrics.age,
+                  weight: metrics.weight,
+                  height: metrics.height,
+                  gender: metrics.gender,
+                  default_max_heart_rate: metrics.default_max_heart_rate,
+                  resting_heart_rate: metrics.resting_heart_rate,
+                  dist_setting: metrics.dist_setting,
+                  weight_setting: metrics.weight_setting,
+                  avg_fractional_cadence: metrics.avg_fractional_cadence,
+                  avg_left_pedal_smoothness: metrics.avg_left_pedal_smoothness,
+                  avg_left_torque_effectiveness: metrics.avg_left_torque_effectiveness,
+                  max_fractional_cadence: metrics.max_fractional_cadence,
+                  left_right_balance: metrics.left_right_balance,
+                  threshold_power: metrics.threshold_power,
+                  total_cycles: metrics.total_cycles,
                 },
                 deviceInfo: {
                   manufacturer: data.file_id?.manufacturer || data.file_creator?.software_version || 'Unknown',
@@ -328,6 +514,14 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
 
               console.log('✅ Created workout from FIT data:', workout);
               console.log('📊 Final extracted metrics:', workout.metrics);
+              console.log('🆕 NEW FIELDS Summary:', {
+                timestamp: workout.timestamp,
+                location: { lat: workout.start_position_lat, lng: workout.start_position_long },
+                friendly_name: workout.friendly_name,
+                total_work: workout.metrics.total_work,
+                avg_vam: workout.metrics.avg_vam,
+                total_timer_time: workout.metrics.total_timer_time
+              });
               resolve(workout);
               
             } catch (processingError) {
@@ -453,7 +647,7 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
         <h2 className="text-2xl font-bold mb-2">Import FIT Files</h2>
         <p className="text-gray-600">
           Upload your .fit files from Garmin, Wahoo, or other devices. 
-          All metrics including power, heart rate, elevation, and training data will be extracted automatically.
+          All metrics including power, heart rate, elevation, location, zones, and user profile data will be extracted automatically.
         </p>
       </div>
 
@@ -499,7 +693,7 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                 : 'Loading FIT parser...'}
             </p>
             <p className="text-sm text-gray-500 mb-4">
-              Automatically extracts sport type, power, heart rate, elevation, and all training metrics
+              Automatically extracts sport type, power, heart rate, elevation, location, zones, user profile, and all training metrics
             </p>
             <input
               type="file"
@@ -525,18 +719,20 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
         <div className="mt-4 p-4 bg-gray-50 rounded-lg">
           <h4 className="font-medium mb-2">Automatically Extracted Metrics:</h4>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-sm text-gray-600">
-            <div>• Activity Type</div>
+            <div>• Activity Type & Location</div>
             <div>• Distance & Duration</div>
             <div>• Heart Rate (avg/max)</div>
             <div>• Power (avg/max/NP)</div>
             <div>• Speed & Pace</div>
-            <div>• Cadence</div>
-            <div>• Elevation Gain</div>
-            <div>• Calories</div>
+            <div>• Cadence & Cycling Details</div>
+            <div>• Elevation Gain/Loss</div>
+            <div>• Calories & Total Work</div>
             <div>• Training Stress Score</div>
-            <div>• Temperature</div>
+            <div>• Temperature & VAM</div>
             <div>• Intensity Factor</div>
-            <div>• Device Information</div>
+            <div>• Device & User Profile</div>
+            <div>• Training Zones Data</div>
+            <div>• Power Curve Details</div>
           </div>
         </div>
       )}
@@ -559,6 +755,7 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                       {' • '}{workout.date}
                       {workout.duration > 0 && ` • ${Math.floor(workout.duration / 3600)}:${Math.floor((workout.duration % 3600) / 60).toString().padStart(2, '0')}:${(workout.duration % 60).toString().padStart(2, '0')}`}
                       {workout.distance && ` • ${workout.distance} km`}
+                      {workout.start_position_lat && workout.start_position_long && ` • GPS`}
                     </p>
                     {/* Show key metrics */}
                     <div className="text-xs text-gray-500 mt-2 flex flex-wrap gap-3">
@@ -579,6 +776,12 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                       )}
                       {workout.metrics.intensity_factor && (
                         <span>IF: {workout.metrics.intensity_factor}%</span>
+                      )}
+                      {workout.metrics.total_work && (
+                        <span>Work: {Math.round(workout.metrics.total_work / 1000)}kJ</span>
+                      )}
+                      {workout.friendly_name && (
+                        <span>Device: {workout.friendly_name}</span>
                       )}
                     </div>
                   </div>

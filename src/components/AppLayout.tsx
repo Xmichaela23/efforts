@@ -15,7 +15,7 @@ import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
-import ImportDataPage from './ImportDataPage';
+import FitFileImporter from './FitFileImporter';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -243,18 +243,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowImportPage(true);
   };
 
-  // 🔧 FIXED: Properly extract and flatten FIT metrics with data type conversion
+  // 🔧 ENHANCED: Complete FIT data extraction - pass through ALL fields that FitFileImporter extracts
   const handleWorkoutsImported = (importedWorkouts: any[]) => {
     console.log('📥 handleWorkoutsImported called with:', importedWorkouts);
     
     importedWorkouts.forEach(async (workout) => {
       try {
-        // 🔍 DEBUG: Check elevation_gain values at both locations
-        console.log('🔍 ELEVATION DEBUG - workout.metrics?.elevation_gain:', workout.metrics?.elevation_gain, typeof workout.metrics?.elevation_gain);
-        console.log('🔍 ELEVATION DEBUG - workout.elevation_gain:', workout.elevation_gain, typeof workout.elevation_gain);
-        console.log('🔍 ELEVATION DEBUG - full metrics object:', workout.metrics);
+        console.log('🔧 Processing workout with all fields:', workout.name);
+        console.log('🔍 Full workout object:', workout);
         
         const workoutToSave = {
+          // CORE WORKOUT DATA
           name: workout.name,
           type: workout.type,
           date: workout.date,
@@ -264,7 +263,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           userComments: "",
           completedManually: false,
           workout_status: 'completed',
-          // 🔧 FIXED: Extract metrics from nested structure and ensure proper data types
+          
+          // 🆕 NEW TOP-LEVEL FIELDS that CompletedTab expects
+          timestamp: workout.timestamp,
+          start_position_lat: workout.start_position_lat,
+          start_position_long: workout.start_position_long,
+          friendly_name: workout.friendly_name,
+          moving_time: workout.moving_time,
+          elapsed_time: workout.elapsed_time,
+          
+          // EXISTING FIELDS - ensure proper data types
           avg_heart_rate: workout.metrics?.avg_heart_rate,
           max_heart_rate: workout.metrics?.max_heart_rate,
           avg_power: workout.metrics?.avg_power,
@@ -274,33 +282,91 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           max_speed: workout.metrics?.max_speed,
           avg_cadence: workout.metrics?.avg_cadence,
           max_cadence: workout.metrics?.max_cadence,
-          // 🔧 CRITICAL FIX: Check both locations for elevation_gain
+          calories: workout.metrics?.calories,
+          tss: workout.metrics?.training_stress_score,
+          intensity_factor: workout.metrics?.intensity_factor,
+          
+          // ELEVATION - check both locations for elevation_gain
           elevation_gain: workout.metrics?.elevation_gain ? 
             Math.round(Number(workout.metrics.elevation_gain)) : 
             workout.elevation_gain ? 
               Math.round(Number(workout.elevation_gain)) : 
               null,
           elevation_loss: workout.metrics?.elevation_loss,
-          calories: workout.metrics?.calories,
-          tss: workout.metrics?.training_stress_score,
-          intensity_factor: workout.metrics?.intensity_factor,
-          // 🔧 NEW: Add elapsed_time field that WorkoutMetrics expects for duration
-          elapsed_time: workout.duration,
-          // Keep metrics object for CompletedTab compatibility
+          
+          // 🆕 NEW FIELDS - Pass through ALL the metrics that FitFileImporter extracts
+          avg_temperature: workout.metrics?.avg_temperature,
+          max_temperature: workout.metrics?.max_temperature,
+          total_timer_time: workout.metrics?.total_timer_time,
+          total_elapsed_time: workout.metrics?.total_elapsed_time,
+          total_work: workout.metrics?.total_work,
+          total_descent: workout.metrics?.total_descent,
+          avg_vam: workout.metrics?.avg_vam,
+          total_training_effect: workout.metrics?.total_training_effect,
+          total_anaerobic_effect: workout.metrics?.total_anaerobic_effect,
+          
+          // 🆕 ZONES DATA
+          functional_threshold_power: workout.metrics?.functional_threshold_power,
+          threshold_heart_rate: workout.metrics?.threshold_heart_rate,
+          hr_calc_type: workout.metrics?.hr_calc_type,
+          pwr_calc_type: workout.metrics?.pwr_calc_type,
+          
+          // 🆕 USER PROFILE DATA
+          age: workout.metrics?.age,
+          weight: workout.metrics?.weight,
+          height: workout.metrics?.height,
+          gender: workout.metrics?.gender,
+          default_max_heart_rate: workout.metrics?.default_max_heart_rate,
+          resting_heart_rate: workout.metrics?.resting_heart_rate,
+          dist_setting: workout.metrics?.dist_setting,
+          weight_setting: workout.metrics?.weight_setting,
+          
+          // 🆕 CYCLING DETAILS DATA
+          avg_fractional_cadence: workout.metrics?.avg_fractional_cadence,
+          avg_left_pedal_smoothness: workout.metrics?.avg_left_pedal_smoothness,
+          avg_left_torque_effectiveness: workout.metrics?.avg_left_torque_effectiveness,
+          max_fractional_cadence: workout.metrics?.max_fractional_cadence,
+          left_right_balance: workout.metrics?.left_right_balance,
+          threshold_power: workout.metrics?.threshold_power,
+          total_cycles: workout.metrics?.total_cycles,
+          
+          // 🆕 DEVICE INFO
+          deviceInfo: workout.deviceInfo,
+          
+          // Keep complete metrics object for CompletedTab compatibility
           metrics: workout.metrics
         };
         
-        // 🔍 DEBUG: Check what elevation_gain value we're actually saving
-        console.log('🔍 ELEVATION DEBUG - Final elevation_gain value being saved:', workoutToSave.elevation_gain);
-        console.log('🔧 Flattened workout data for database:', workoutToSave);
+        console.log('✅ Complete workout data being saved:', workoutToSave);
+        console.log('🆕 NEW FIELDS being saved:');
+        console.log('  Location:', { lat: workoutToSave.start_position_lat, lng: workoutToSave.start_position_long });
+        console.log('  Temperature:', workoutToSave.avg_temperature);
+        console.log('  Device:', workoutToSave.friendly_name);
+        console.log('  Total Work:', workoutToSave.total_work);
+        console.log('  VAM:', workoutToSave.avg_vam);
+        console.log('  Training Effects:', { 
+          aerobic: workoutToSave.total_training_effect, 
+          anaerobic: workoutToSave.total_anaerobic_effect 
+        });
+        console.log('  User Profile:', { 
+          age: workoutToSave.age, 
+          weight: workoutToSave.weight, 
+          height: workoutToSave.height 
+        });
+        console.log('  Cycling Details:', {
+          left_right_balance: workoutToSave.left_right_balance,
+          pedal_smoothness: workoutToSave.avg_left_pedal_smoothness,
+          torque_effectiveness: workoutToSave.avg_left_torque_effectiveness
+        });
+        
         await addWorkout(workoutToSave);
-        console.log('✅ Imported workout with metrics:', workout.name);
+        console.log('✅ Successfully imported workout with ALL metrics:', workout.name);
       } catch (error) {
         console.error('❌ Error importing workout:', error);
       }
     });
     
-    console.log(`Successfully imported ${importedWorkouts.length} workouts`);
+    console.log(`✅ Successfully imported ${importedWorkouts.length} workouts with complete data`);
     setShowImportPage(false);
   };
 
@@ -504,11 +570,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   };
 
-  // NEW: Show import page
+  // Show import page
   if (showImportPage) {
     return (
-      <ImportDataPage 
-        onClose={() => setShowImportPage(false)}
+      <FitFileImporter 
         onWorkoutsImported={handleWorkoutsImported}
       />
     );
