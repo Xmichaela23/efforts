@@ -144,6 +144,12 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     const city = getCityFromCoordinates(workoutData.start_position_lat, workoutData.start_position_long);
     const title = `${date} ${city} ${workoutData.type}`;
     console.log('🔍 generateTitle result:', title);
+    console.log('🔍 generateTitle debugging:', {
+      date: workoutData.date,
+      start_position_lat: workoutData.start_position_lat,
+      start_position_long: workoutData.start_position_long,
+      type: workoutData.type
+    });
     return title;
   };
 
