@@ -23,6 +23,7 @@ interface LoggedExercise {
 interface StrengthLoggerProps {
   onClose: () => void;
   scheduledWorkout?: any; // Optional scheduled workout to pre-populate
+  onWorkoutSaved?: (workout: any) => void; // NEW: Navigate to completed workout
 }
 
 // Simple volume calculator for save button
@@ -30,8 +31,9 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
   return exercises
     .filter(ex => ex.name.trim() && ex.sets.length > 0)
     .reduce((total, exercise) => {
-      const completedSets = exercise.sets.filter(set => set.completed);
-      const exerciseVolume = completedSets.reduce((sum, set) => sum + (set.reps * set.weight), 0);
+      // Count all sets that have actual reps and weight (not just completed ones)
+      const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
+      const exerciseVolume = setsWithData.reduce((sum, set) => sum + (set.reps * set.weight), 0);
       return total + exerciseVolume;
     }, 0);
 };
@@ -126,97 +128,7 @@ const PlateMath: React.FC<{
   );
 };
 
-// Long Press Set Component for delete functionality
-const LongPressSet: React.FC<{
-  children: React.ReactNode;
-  onDelete: () => void;
-  canDelete: boolean;
-}> = ({ children, onDelete, canDelete }) => {
-  const [isLongPressing, setIsLongPressing] = useState(false);
-  const [showDeleteOption, setShowDeleteOption] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if (!canDelete) return;
-    
-    setIsLongPressing(true);
-    timeoutRef.current = setTimeout(() => {
-      setShowDeleteOption(true);
-      // Vibrate if available
-      if (navigator.vibrate) {
-        navigator.vibrate(50);
-      }
-    }, 800); // 800ms long press
-  };
-
-  const handleTouchEnd = () => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setIsLongPressing(false);
-  };
-
-  const handleTouchMove = () => {
-    // Cancel long press if user moves finger
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-    setIsLongPressing(false);
-  };
-
-  const handleDelete = () => {
-    setShowDeleteOption(false);
-    onDelete();
-  };
-
-  const handleCancel = () => {
-    setShowDeleteOption(false);
-  };
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
-  return (
-    <div className="relative">
-      <div
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        onTouchMove={handleTouchMove}
-        className={`${isLongPressing ? 'bg-gray-50' : ''} transition-colors duration-200`}
-      >
-        {children}
-      </div>
-      
-      {/* Delete confirmation overlay */}
-      {showDeleteOption && (
-        <div className="absolute inset-0 bg-red-500 bg-opacity-90 flex items-center justify-center z-50 rounded">
-          <div className="flex gap-3">
-            <button
-              onClick={handleDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium"
-            >
-              Delete Set
-            </button>
-            <button
-              onClick={handleCancel}
-              className="bg-gray-600 text-white px-4 py-2 rounded text-sm font-medium"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLoggerProps) {
+export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved }: StrengthLoggerProps) {
   const { workouts, addWorkout } = useAppContext();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
@@ -499,7 +411,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       type: 'strength' as const,
       date: scheduledWorkout?.date || new Date().toISOString().split('T')[0],
       description: validExercises
-        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.completed).length}/${ex.sets.length} sets`)
+        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.reps > 0 && s.weight > 0).length}/${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
       strength_exercises: validExercises,
@@ -512,8 +424,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     // Use the app context to save - this will integrate with the main workout system
     addWorkout(completedWorkout);
 
-    alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
-    onClose();
+    // Navigate to completed view instead of showing alert
+    if (onWorkoutSaved) {
+      onWorkoutSaved(completedWorkout);
+    } else {
+      // Fallback to old behavior if no navigation callback provided
+      alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
+      onClose();
+    }
   };
 
   const handleInputChange = (value: string) => {

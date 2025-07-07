@@ -22,9 +22,9 @@ interface AppLayoutProps {
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
-  const { 
-    workouts, 
-    loading, 
+  const {
+    workouts,
+    loading,
     deleteWorkout,
     addWorkout,
     currentPlans,
@@ -33,7 +33,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     addPlan,
     deletePlan
   } = useAppContext();
-  
+
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
@@ -91,18 +91,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       currentX = clientX;
       isPointerDown = true;
       hasMovedHorizontally = false;
-      
       // Disable CSS transition for live tracking
       wrapper.style.transition = 'none';
     };
 
     const handlePointerMove = (clientX: number, preventDefault: () => void) => {
       if (!isPointerDown) return;
-      
       currentX = clientX;
       const deltaX = currentX - startX;
       const deltaY = 0; // We don't track Y for simplicity
-      
+
       // Start horizontal movement immediately on any horizontal motion
       if (Math.abs(deltaX) > 2) {
         if (!hasMovedHorizontally) {
@@ -110,36 +108,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           setIsSwipeDetected(true);
           preventDefault();
         }
-        
+
         // Live transform - content follows finger immediately
         const baseTransform = showSummary ? -50 : 0;
         const dragPercent = (deltaX / window.innerWidth) * 100;
         let newTransform = baseTransform + dragPercent;
-        
+
         // Soft bounds with resistance at edges
         if (newTransform > 0) {
           newTransform = newTransform * 0.3; // Resistance when going past calendar
         } else if (newTransform < -100) {
           newTransform = -100 + (newTransform + 100) * 0.3; // Resistance past summary
         }
-        
+
         wrapper.style.transform = `translateX(${newTransform}%)`;
       }
     };
 
     const handlePointerUp = () => {
       if (!isPointerDown) return;
-      
+
       // Re-enable CSS transition for snap animation
       wrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-      
+
       if (hasMovedHorizontally) {
         const deltaX = currentX - startX;
         const velocity = Math.abs(deltaX);
-        
+
         // Smart threshold - smaller swipe needed if fast, larger if slow
         const threshold = velocity > 100 ? 30 : 80;
-        
+
         if (Math.abs(deltaX) > threshold) {
           if (deltaX > 0 && showSummary) {
             // Swipe right: summary → calendar
@@ -161,7 +159,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           wrapper.style.transform = `translateX(${showSummary ? -50 : 0}%)`;
         }
       }
-      
+
       // Reset everything
       isPointerDown = false;
       hasMovedHorizontally = false;
@@ -216,10 +214,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const formatHeaderDate = () => {
     const today = new Date();
-    return today.toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return today.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
@@ -246,12 +244,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // 🔧 ENHANCED: Complete FIT data extraction - pass through ALL fields that FitFileImporter extracts
   const handleWorkoutsImported = (importedWorkouts: any[]) => {
     console.log('📥 handleWorkoutsImported called with:', importedWorkouts);
-    
+
     importedWorkouts.forEach(async (workout) => {
       try {
         console.log('🔧 Processing workout with all fields:', workout.name);
         console.log('🔍 Full workout object:', workout);
-        
+
         const workoutToSave = {
           // CORE WORKOUT DATA
           name: workout.name,
@@ -263,7 +261,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           userComments: "",
           completedManually: false,
           workout_status: 'completed',
-          
+
           // 🆕 NEW TOP-LEVEL FIELDS that CompletedTab expects
           timestamp: workout.timestamp,
           start_position_lat: workout.start_position_lat,
@@ -271,7 +269,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           friendly_name: workout.friendly_name,
           moving_time: workout.moving_time,
           elapsed_time: workout.elapsed_time,
-          
+
           // EXISTING FIELDS - ensure proper data types
           avg_heart_rate: workout.metrics?.avg_heart_rate,
           max_heart_rate: workout.metrics?.max_heart_rate,
@@ -285,15 +283,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           calories: workout.metrics?.calories,
           tss: workout.metrics?.training_stress_score,
           intensity_factor: workout.metrics?.intensity_factor,
-          
+
           // ELEVATION - check both locations for elevation_gain
-          elevation_gain: workout.metrics?.elevation_gain ? 
-            Math.round(Number(workout.metrics.elevation_gain)) : 
-            workout.elevation_gain ? 
-              Math.round(Number(workout.elevation_gain)) : 
+          elevation_gain: workout.metrics?.elevation_gain ?
+            Math.round(Number(workout.metrics.elevation_gain)) :
+            workout.elevation_gain ?
+              Math.round(Number(workout.elevation_gain)) :
               null,
           elevation_loss: workout.metrics?.elevation_loss,
-          
+
           // 🆕 NEW FIELDS - Pass through ALL the metrics that FitFileImporter extracts
           avg_temperature: workout.metrics?.avg_temperature,
           max_temperature: workout.metrics?.max_temperature,
@@ -304,13 +302,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           avg_vam: workout.metrics?.avg_vam,
           total_training_effect: workout.metrics?.total_training_effect,
           total_anaerobic_effect: workout.metrics?.total_anaerobic_effect,
-          
+
           // 🆕 ZONES DATA
           functional_threshold_power: workout.metrics?.functional_threshold_power,
           threshold_heart_rate: workout.metrics?.threshold_heart_rate,
           hr_calc_type: workout.metrics?.hr_calc_type,
           pwr_calc_type: workout.metrics?.pwr_calc_type,
-          
+
           // 🆕 USER PROFILE DATA
           age: workout.metrics?.age,
           weight: workout.metrics?.weight,
@@ -320,7 +318,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           resting_heart_rate: workout.metrics?.resting_heart_rate,
           dist_setting: workout.metrics?.dist_setting,
           weight_setting: workout.metrics?.weight_setting,
-          
+
           // 🆕 CYCLING DETAILS DATA
           avg_fractional_cadence: workout.metrics?.avg_fractional_cadence,
           avg_left_pedal_smoothness: workout.metrics?.avg_left_pedal_smoothness,
@@ -329,43 +327,43 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           left_right_balance: workout.metrics?.left_right_balance,
           threshold_power: workout.metrics?.threshold_power,
           total_cycles: workout.metrics?.total_cycles,
-          
+
           // 🆕 DEVICE INFO
           deviceInfo: workout.deviceInfo,
-          
+
           // Keep complete metrics object for CompletedTab compatibility
           metrics: workout.metrics
         };
-        
+
         console.log('✅ Complete workout data being saved:', workoutToSave);
         console.log('🆕 NEW FIELDS being saved:');
-        console.log('  Location:', { lat: workoutToSave.start_position_lat, lng: workoutToSave.start_position_long });
-        console.log('  Temperature:', workoutToSave.avg_temperature);
-        console.log('  Device:', workoutToSave.friendly_name);
-        console.log('  Total Work:', workoutToSave.total_work);
-        console.log('  VAM:', workoutToSave.avg_vam);
-        console.log('  Training Effects:', { 
-          aerobic: workoutToSave.total_training_effect, 
-          anaerobic: workoutToSave.total_anaerobic_effect 
+        console.log(' Location:', { lat: workoutToSave.start_position_lat, lng: workoutToSave.start_position_long });
+        console.log(' Temperature:', workoutToSave.avg_temperature);
+        console.log(' Device:', workoutToSave.friendly_name);
+        console.log(' Total Work:', workoutToSave.total_work);
+        console.log(' VAM:', workoutToSave.avg_vam);
+        console.log(' Training Effects:', {
+          aerobic: workoutToSave.total_training_effect,
+          anaerobic: workoutToSave.total_anaerobic_effect
         });
-        console.log('  User Profile:', { 
-          age: workoutToSave.age, 
-          weight: workoutToSave.weight, 
-          height: workoutToSave.height 
+        console.log(' User Profile:', {
+          age: workoutToSave.age,
+          weight: workoutToSave.weight,
+          height: workoutToSave.height
         });
-        console.log('  Cycling Details:', {
+        console.log(' Cycling Details:', {
           left_right_balance: workoutToSave.left_right_balance,
           pedal_smoothness: workoutToSave.avg_left_pedal_smoothness,
           torque_effectiveness: workoutToSave.avg_left_torque_effectiveness
         });
-        
+
         await addWorkout(workoutToSave);
         console.log('✅ Successfully imported workout with ALL metrics:', workout.name);
       } catch (error) {
         console.error('❌ Error importing workout:', error);
       }
     });
-    
+
     console.log(`✅ Successfully imported ${importedWorkouts.length} workouts with complete data`);
     setShowImportPage(false);
   };
@@ -373,7 +371,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handleBackToDashboard = () => {
     const comingFromPlanBuilder = showPlanBuilder;
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
-    
+
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
@@ -385,7 +383,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
-    
+
     if (shouldReturnToSummary) {
       const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
       if (workoutsForDate.length > 0) {
@@ -444,19 +442,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     setSelectedWorkout(null);
-    
+
     if (date) {
       setSelectedDate(date);
     }
-    
+
     const cameFromSummary = showSummary;
-    
+
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
       setShowBuilder(true);
     }
-    
+
     if (cameFromSummary) {
       setShowSummary(false);
       setDateWorkouts([]);
@@ -469,7 +467,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     setSelectedWorkout(null);
-    
+
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
@@ -488,7 +486,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const handleSelectDiscipline = (discipline: string) => {
     setSelectedWorkout(null);
-    
+
     if (discipline === 'strength') {
       setShowStrengthPlans(true);
     } else {
@@ -527,14 +525,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       const planWorkouts = workouts?.filter(w => {
         const matchesId = w.planId === planId;
         const matchesPattern = w.name && (
-          w.name.includes('Week 1') || 
-          w.name.includes('Week 2') || 
-          w.name.includes('Week 3') || 
+          w.name.includes('Week 1') ||
+          w.name.includes('Week 2') ||
+          w.name.includes('Week 3') ||
           w.name.includes('Week 4')
         );
         return matchesId || matchesPattern;
       }) || [];
-      
+
       for (const workout of planWorkouts) {
         try {
           await deleteWorkout(workout.id);
@@ -542,10 +540,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           console.error('Error deleting workout:', workout.id, error);
         }
       }
-      
+
       await deletePlan(planId);
       setShowAllPlans(true);
-      
+
     } catch (error) {
       console.error('Error deleting plan:', error);
       alert('Error deleting plan. Please try again.');
@@ -573,7 +571,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // Show import page
   if (showImportPage) {
     return (
-      <FitFileImporter 
+      <FitFileImporter
         onWorkoutsImported={handleWorkoutsImported}
       />
     );
@@ -628,9 +626,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
+
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
-              
+
               {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
                 <Button
                   onClick={handleBackToDashboard}
@@ -661,7 +659,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showPlanBuilder ? (
             <div className="pt-4">
-              <PlanBuilder 
+              <PlanBuilder
                 onClose={handleBackToDashboard}
                 onPlanGenerated={handlePlanGenerated}
               />
@@ -687,7 +685,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : showStrengthLogger ? (
             <div className="pt-4">
-              <StrengthLogger onClose={handleBackToDashboard} />
+              <StrengthLogger 
+                onClose={handleBackToDashboard} 
+                onWorkoutSaved={(workout) => {
+                  setShowStrengthLogger(false);
+                  setSelectedWorkout(workout);
+                  setActiveTab('completed');
+                }}
+              />
             </div>
           ) : showBuilder ? (
             <div className="pt-4">
@@ -711,7 +716,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : (
-            <div 
+            <div
               ref={containerRef}
               className="relative w-full h-full"
               style={{
@@ -720,7 +725,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             >
               {/* Swipe capture overlay - only visible during potential swipes */}
               {isSwipeDetected && (
-                <div 
+                <div
                   className="absolute inset-0 z-50"
                   style={{
                     backgroundColor: 'transparent',
@@ -728,8 +733,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   }}
                 />
               )}
-              
-              <div 
+
+              <div
                 ref={wrapperRef}
                 className="flex h-full"
                 style={{
@@ -771,8 +776,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <div className="w-1/2 flex-shrink-0">
                   <div className="pt-4">
                     {currentWorkout ? (
-                      <WorkoutSummary 
-                        workout={currentWorkout} 
+                      <WorkoutSummary
+                        workout={currentWorkout}
                         onClose={() => {
                           setShowSummary(false);
                           setDateWorkouts([]);
@@ -787,14 +792,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                           Add a workout to get started
                         </p>
                         <div className="flex flex-col items-center gap-4">
-                          <NewEffortDropdown 
+                          <NewEffortDropdown
                             onSelectType={(type) => {
                               setShowSummary(false);
                               handleAddEffort(type, selectedDate);
                             }}
                             onOpenPlanBuilder={handleOpenPlanBuilder}
                           />
-                          
                           <button
                             onClick={() => {
                               setShowSummary(false);

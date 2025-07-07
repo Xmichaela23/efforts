@@ -38,10 +38,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return planned;
   }, [workouts, workoutData.date, workoutData.id]);
 
-  // Calculate volume for an exercise
+  // FIXED: Calculate volume for an exercise - count sets with actual data
   const calculateExerciseVolume = (sets: Array<{ reps: number; weight: number; completed?: boolean }>) => {
     return sets
-      .filter(set => set.completed !== false)
+      .filter(set => set.reps > 0 && set.weight > 0) // Changed from completed check to data check
       .reduce((total, set) => total + (set.reps * set.weight), 0);
   };
 
@@ -90,7 +90,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const completedExercises = getCompletedExercises();
 
-  // Calculate total workout statistics
+  // FIXED: Calculate total workout statistics - count sets with data
   const workoutStats = useMemo(() => {
     let totalSets = 0;
     let totalReps = 0;
@@ -99,10 +99,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     completedExercises.forEach((exercise: CompletedExercise) => {
       if (!exercise.sets) return;
       
-      const completedSets = exercise.sets.filter(set => set.completed !== false);
-      totalSets += completedSets.length;
-      totalReps += completedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
-      totalVolume += calculateExerciseVolume(completedSets);
+      // Changed: count sets with actual data instead of just completed sets
+      const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
+      totalSets += setsWithData.length;
+      totalReps += setsWithData.reduce((sum, set) => sum + (set.reps || 0), 0);
+      totalVolume += calculateExerciseVolume(exercise.sets);
     });
 
     return {
