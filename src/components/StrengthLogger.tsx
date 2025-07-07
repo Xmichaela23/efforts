@@ -126,6 +126,96 @@ const PlateMath: React.FC<{
   );
 };
 
+// Long Press Set Component for delete functionality
+const LongPressSet: React.FC<{
+  children: React.ReactNode;
+  onDelete: () => void;
+  canDelete: boolean;
+}> = ({ children, onDelete, canDelete }) => {
+  const [isLongPressing, setIsLongPressing] = useState(false);
+  const [showDeleteOption, setShowDeleteOption] = useState(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!canDelete) return;
+    
+    setIsLongPressing(true);
+    timeoutRef.current = setTimeout(() => {
+      setShowDeleteOption(true);
+      // Vibrate if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
+    }, 800); // 800ms long press
+  };
+
+  const handleTouchEnd = () => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    setIsLongPressing(false);
+  };
+
+  const handleTouchMove = () => {
+    // Cancel long press if user moves finger
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+    setIsLongPressing(false);
+  };
+
+  const handleDelete = () => {
+    setShowDeleteOption(false);
+    onDelete();
+  };
+
+  const handleCancel = () => {
+    setShowDeleteOption(false);
+  };
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
+
+  return (
+    <div className="relative">
+      <div
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onTouchMove={handleTouchMove}
+        className={`${isLongPressing ? 'bg-gray-50' : ''} transition-colors duration-200`}
+      >
+        {children}
+      </div>
+      
+      {/* Delete confirmation overlay */}
+      {showDeleteOption && (
+        <div className="absolute inset-0 bg-red-500 bg-opacity-90 flex items-center justify-center z-50 rounded">
+          <div className="flex gap-3">
+            <button
+              onClick={handleDelete}
+              className="bg-red-600 text-white px-4 py-2 rounded text-sm font-medium"
+            >
+              Delete Set
+            </button>
+            <button
+              onClick={handleCancel}
+              className="bg-gray-600 text-white px-4 py-2 rounded text-sm font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLoggerProps) {
   const { workouts, addWorkout } = useAppContext();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
@@ -134,7 +224,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
-  const [isInitialized, setIsInitialized] = useState(false); // 🆕 Track initialization
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -167,7 +257,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     return calculateTotalVolume(exercises);
   }, [exercises]);
 
-  // 🆕 Create empty starter exercise
+  // Create empty starter exercise
   const createEmptyExercise = (): LoggedExercise => ({
     id: Date.now().toString(),
     name: '',
@@ -181,11 +271,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     expanded: true
   });
 
-  // 🔧 FIXED: Proper initialization with cleanup
+  // Proper initialization with cleanup
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
     
-    // 🆕 Always start fresh - clear any existing state
+    // Always start fresh - clear any existing state
     setExercises([]);
     setExpandedPlates({});
     setExpandedExercises({});
@@ -221,7 +311,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
-        id: exercise.id || `ex-${Date.now()}-${index}`,
+        id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
         name: exercise.name || '',
         expanded: true,
         sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
@@ -241,9 +331,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     }
     
     setIsInitialized(true);
-  }, [scheduledWorkout, workouts]); // 🆕 Depend on workouts to get fresh data
+  }, [scheduledWorkout, workouts]);
 
-  // 🆕 Cleanup when component unmounts
+  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       console.log('🧹 StrengthLogger cleanup - clearing state');
@@ -301,6 +391,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     setExercises([...exercises, newExercise]);
     setCurrentExercise('');
     setShowSuggestions(false);
+    
+    // Auto-expand the new exercise so you can immediately start logging
+    setExpandedExercises(prev => ({
+      ...prev,
+      [newExercise.id]: true
+    }));
+    
+    // Remove focus from any input to prevent keyboard from staying up
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   };
 
   const updateExerciseName = (exerciseId: string, name: string, fromSuggestion = false) => {
@@ -317,7 +418,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
   const deleteExercise = (exerciseId: string) => {
     if (exercises.length === 1) {
-      // 🔧 FIXED: Use the helper function for consistency
       setExercises([createEmptyExercise()]);
     } else {
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
@@ -336,8 +436,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   };
 
   const addSet = (exerciseId: string) => {
+    console.log('🔄 Adding set to exercise:', exerciseId);
     setExercises(exercises.map(exercise => {
       if (exercise.id === exerciseId) {
+        console.log('✅ Found exercise, current sets:', exercise.sets.length);
         const lastSet = exercise.sets[exercise.sets.length - 1];
         const newSet: LoggedSet = {
           reps: lastSet?.reps || 0,
@@ -346,7 +448,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
           rir: undefined,
           completed: false
         };
-        return { ...exercise, sets: [...exercise.sets, newSet] };
+        const updatedExercise = { ...exercise, sets: [...exercise.sets, newSet] };
+        console.log('✅ New exercise with sets:', updatedExercise.sets.length);
+        return updatedExercise;
+      }
+      return exercise;
+    }));
+  };
+
+  // NEW: Delete individual set
+  const deleteSet = (exerciseId: string, setIndex: number) => {
+    setExercises(exercises.map(exercise => {
+      if (exercise.id === exerciseId) {
+        const newSets = exercise.sets.filter((_, index) => index !== setIndex);
+        // Ensure at least one set remains
+        if (newSets.length === 0) {
+          return {
+            ...exercise,
+            sets: [{
+              reps: 0,
+              weight: 0,
+              barType: 'standard',
+              rir: undefined,
+              completed: false
+            }]
+          };
+        }
+        return { ...exercise, sets: newSets };
       }
       return exercise;
     }));
@@ -413,7 +541,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  // 🆕 Don't render until properly initialized
+  // Don't render until properly initialized
   if (!isInitialized) {
     return (
       <div className="min-h-screen pb-20">
@@ -465,7 +593,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
                       }}
                       className="h-10 text-base font-medium border-gray-300"
                       style={{ fontSize: '16px' }}
-                      autoFocus={exerciseIndex === 0 && !exercise.name}
                     />
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
@@ -512,109 +639,127 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
               <div className="px-3 py-2">
                 {exercise.sets.map((set, setIndex) => (
                   <div key={setIndex} className="mb-3 pb-3 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
-                      <button
-                        onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
-                        className={`text-xs px-2 py-1 rounded ${
-                          set.completed 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {set.completed ? '✓ Done' : 'Done'}
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-3 mb-2">
-                      <div className="flex flex-col">
-                        <label className="text-xs text-gray-500 mb-1">Reps</label>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.reps || ''}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-base border-gray-300"
-                          style={{ fontSize: '16px' }}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-xs text-gray-500 mb-1">Weight (lbs)</label>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.weight || ''}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-base border-gray-300"
-                          style={{ fontSize: '16px' }}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-xs text-gray-500 mb-1">RIR</label>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.rir || ''}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                          className="h-9 text-center text-base border-gray-300"
-                          min="0"
-                          max="5"
-                          style={{ fontSize: '16px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                          className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
-                        >
-                          Plates
-                          {expandedPlates[`${exercise.id}-${setIndex}`] ? 
-                            <ChevronUp className="h-3 w-3" /> : 
-                            <ChevronDown className="h-3 w-3" />
-                          }
-                        </button>
-                        
-                        <Select
-                          value={set.barType || 'standard'}
-                          onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
-                        >
-                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                            <SelectItem value="standard">Barbell (45lb)</SelectItem>
-                            <SelectItem value="womens">Women's (33lb)</SelectItem>
-                            <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
-                            <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
-                            <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
-                            <SelectItem value="cambered">Cambered (55lb)</SelectItem>
-                            <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
-                            <SelectItem value="technique">Technique (15lb)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
+                        <div className="flex items-center gap-2">
+                          {exercise.sets.length > 1 && (
+                            <button
+                              onClick={() => deleteSet(exercise.id, setIndex)}
+                              className="text-gray-400 hover:text-red-600 p-1"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
+                            className={`text-xs px-3 py-2 rounded min-h-[32px] ${
+                              set.completed 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {set.completed ? '✓ Done' : 'Done'}
+                          </button>
+                        </div>
                       </div>
                       
-                      {expandedPlates[`${exercise.id}-${setIndex}`] && (
-                        <PlateMath
-                          weight={set.weight}
-                          barType={set.barType || 'standard'}
-                          useImperial={true}
-                        />
-                      )}
+                      <div className="grid grid-cols-3 gap-3 mb-2">
+                        <div className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">Reps</label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.reps === 0 ? '' : set.reps.toString()}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                            className="h-9 text-center text-base border-gray-300"
+                            style={{ fontSize: '16px' }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">Weight (lbs)</label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.weight === 0 ? '' : set.weight.toString()}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                            className="h-9 text-center text-base border-gray-300"
+                            style={{ fontSize: '16px' }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">RIR</label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.rir || ''}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
+                            className="h-9 text-center text-base border-gray-300"
+                            min="0"
+                            max="5"
+                            style={{ fontSize: '16px' }}
+                            placeholder="RIR"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                            className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
+                          >
+                            Plates
+                            {expandedPlates[`${exercise.id}-${setIndex}`] ? 
+                              <ChevronUp className="h-3 w-3" /> : 
+                              <ChevronDown className="h-3 w-3" />
+                            }
+                          </button>
+                          
+                          <Select
+                            value={set.barType || 'standard'}
+                            onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
+                          >
+                            <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                              <SelectItem value="standard">Barbell (45lb)</SelectItem>
+                              <SelectItem value="womens">Women's (33lb)</SelectItem>
+                              <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
+                              <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
+                              <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
+                              <SelectItem value="cambered">Cambered (55lb)</SelectItem>
+                              <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
+                              <SelectItem value="technique">Technique (15lb)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {expandedPlates[`${exercise.id}-${setIndex}`] && (
+                          <PlateMath
+                            weight={set.weight}
+                            barType={set.barType || 'standard'}
+                            useImperial={true}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
                 ))}
                 
                 <Button 
-                  onClick={() => addSet(exercise.id)} 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addSet(exercise.id);
+                  }}
                   variant="ghost"
                   className="w-full h-9 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                  type="button"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Set
@@ -666,13 +811,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       </div>
 
       {/* Fixed bottom save button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-40">
-        <Button 
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white">
+        <button 
           onClick={saveWorkout}
-          className="w-full h-12 bg-black text-white hover:bg-gray-800 text-base font-medium"
+          className="w-full h-12 text-black hover:text-blue-600 text-base font-medium"
         >
-          Save Workout • {currentTotalVolume.toLocaleString()}lbs total
-        </Button>
+          Save
+        </button>
       </div>
     </div>
   );

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import WorkoutDetail from './WorkoutDetail';
+import CompletedTab from './CompletedTab';
 
 interface WorkoutSummaryProps {
   workout: any;
@@ -15,6 +18,7 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
   const { useImperial } = useAppContext();
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [workoutStatus, setWorkoutStatus] = useState(workout?.status || workout?.workout_status || 'planned');
+  const [activeTab, setActiveTab] = useState('summary');
 
   if (!workout) {
     return (
@@ -62,6 +66,24 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
     }
   };
 
+  const getWorkoutType = () => {
+    if (workout.type === 'run') return 'run';
+    if (workout.type === 'ride') return 'ride';
+    if (workout.type === 'swim') return 'swim';
+    if (workout.type === 'strength') return 'strength';
+    
+    // Fallback logic for legacy names
+    if (workout.name.toLowerCase().includes('run')) return 'run';
+    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'ride';
+    if (workout.name.toLowerCase().includes('swim')) return 'swim';
+    
+    return 'ride'; // default to ride for cycling files
+  };
+
+  const handleUpdateWorkout = (workoutId: string, updates: any) => {
+    console.log('Updating workout:', workoutId, updates);
+  };
+
   const isCompleted = workoutStatus === 'completed';
   const hasNotes = workout.notes || workout.description;
 
@@ -76,116 +98,121 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
           content: none !important;
         }
       `}</style>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold">{workout.name || 'Untitled Workout'}</h1>
-          <p className="text-gray-500">{formatDate(workout.date)}</p>
-          <p className={`text-lg font-medium capitalize ${getWorkoutTypeColor(workout.type)}`}>
-            {workout.type} Workout
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          {!isCompleted && (
-            <button
-              onClick={handleMarkComplete}
-              className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700"
-            >
-              Mark done
-            </button>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="summary" className="data-[state=active]:bg-gray-300 data-[state=active]:text-gray-800">Planned</TabsTrigger>
+          <TabsTrigger value="detail" className="data-[state=active]:bg-gray-300 data-[state=active]:text-gray-800">Compare</TabsTrigger>
+          <TabsTrigger value="completed" className="data-[state=active]:bg-gray-300 data-[state=active]:text-gray-800">Detail</TabsTrigger>
+        </TabsList>
+
+        {/* Summary Tab - Original WorkoutSummary Content */}
+        <TabsContent value="summary" className="space-y-4 mt-4">
+          {/* Description */}
+          {workout.description && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-lg">Description</h3>
+              <p className="text-gray-600">{workout.description}</p>
+            </div>
           )}
-          <button
-            onClick={handleDelete}
-            className="text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
 
-      {/* Description */}
-      {workout.description && (
-        <div className="space-y-2">
-          <h3 className="font-semibold text-lg">Description</h3>
-          <p className="text-gray-600">{workout.description}</p>
-        </div>
-      )}
-
-      {/* Intervals - FIXED: Added CSS to prevent mobile ")) symbols */}
-      {workout.intervals && workout.intervals.length > 0 && (
-        <div className="space-y-3">
-          {workout.intervals.map((interval: any, index: number) => (
-            <div key={interval.id || index} className="space-y-1">
-              <h4 className="font-medium text-lg">
-                {interval.effortLabel || interval.name || `SEGMENT ${index + 1}`}
-              </h4>
-              <div className="space-y-1 text-gray-600">
-                {isCompleted ? (
-                  /* Completed view - unpack repeats */
-                  <div>
-                    {interval.isRepeatBlock ? (
-                      <div className="space-y-1">
-                        <p>{interval.time} planned:</p>
-                        <div className="ml-4 space-y-1">
-                          {Array.from({ length: interval.repeatCount || 1 }, (_, i) => (
-                            <div key={i} className="space-y-1">
-                              <p className="font-medium text-sm">Repeat {i + 1}:</p>
-                              <p className="ml-4">4:00 @ Hard planned → 4:02 actual (6:15 pace, HR: 165 avg)</p>
-                              <p className="ml-4">1:00 @ Easy planned → 58s actual (8:30 pace, HR: 145 avg)</p>
+          {/* Intervals */}
+          {workout.intervals && workout.intervals.length > 0 && (
+            <div className="space-y-3">
+              {workout.intervals.map((interval: any, index: number) => (
+                <div key={interval.id || index} className="space-y-1">
+                  <h4 className="font-medium text-lg">
+                    {interval.effortLabel || interval.name || `SEGMENT ${index + 1}`}
+                  </h4>
+                  <div className="space-y-1 text-gray-600">
+                    {isCompleted ? (
+                      /* Completed view - unpack repeats */
+                      <div>
+                        {interval.isRepeatBlock ? (
+                          <div className="space-y-1">
+                            <p>{interval.time} planned:</p>
+                            <div className="ml-4 space-y-1">
+                              {Array.from({ length: interval.repeatCount || 1 }, (_, i) => (
+                                <div key={i} className="space-y-1">
+                                  <p className="font-medium text-sm">Repeat {i + 1}:</p>
+                                  <p className="ml-4">4:00 @ Hard planned → 4:02 actual (6:15 pace, HR: 165 avg)</p>
+                                  <p className="ml-4">1:00 @ Easy planned → 58s actual (8:30 pace, HR: 145 avg)</p>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ) : (
+                          <p>{interval.time} planned → {interval.time} actual (N/A pace, HR: N/A avg)</p>
+                        )}
                       </div>
                     ) : (
-                      <p>{interval.time} planned → {interval.time} actual (N/A pace, HR: N/A avg)</p>
+                      /* Planned view - clean and simple */
+                      <div>
+                        <p>{interval.time} @ {interval.effortLabel || 'Easy'} pace</p>
+                        {interval.bpmTarget && <p>HR: {interval.bpmTarget} bpm</p>}
+                        {interval.paceTarget && <p>Pace: {interval.paceTarget}</p>}
+                      </div>
                     )}
                   </div>
-                ) : (
-                  /* Planned view - clean and simple */
-                  <div>
-                    <p>{interval.time} @ {interval.effortLabel || 'Easy'} pace</p>
-                    {interval.bpmTarget && <p>HR: {interval.bpmTarget} bpm</p>}
-                    {interval.paceTarget && <p>Pace: {interval.paceTarget}</p>}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Strength Exercises */}
-      {workout.strength_exercises && workout.strength_exercises.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg">EXERCISES</h3>
-          {workout.strength_exercises.map((exercise: any, index: number) => (
-            <div key={exercise.id || index} className="space-y-1">
-              <h4 className="font-medium text-lg">{exercise.name}</h4>
-              <div className="text-gray-600">
-                <p>{exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} {useImperial ? 'lbs' : 'kg'}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Expandable Notes */}
-      {hasNotes && (
-        <div className="space-y-2">
-          <button
-            onClick={() => setNotesExpanded(!notesExpanded)}
-            className="flex items-center gap-2 font-semibold text-lg hover:text-blue-600"
-          >
-            {notesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            NOTES
-          </button>
-          {notesExpanded && (
-            <div className="text-gray-600 whitespace-pre-wrap">
-              {workout.notes || workout.description}
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      )}
+
+          {/* Strength Exercises */}
+          {workout.strength_exercises && workout.strength_exercises.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-semibold text-lg">EXERCISES</h3>
+              {workout.strength_exercises.map((exercise: any, index: number) => (
+                <div key={exercise.id || index} className="space-y-1">
+                  <h4 className="font-medium text-lg">{exercise.name}</h4>
+                  <div className="text-gray-600">
+                    <p>{exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} {useImperial ? 'lbs' : 'kg'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Expandable Notes */}
+          {hasNotes && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setNotesExpanded(!notesExpanded)}
+                className="flex items-center gap-2 font-semibold text-lg hover:text-blue-600"
+              >
+                {notesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                NOTES
+              </button>
+              {notesExpanded && (
+                <div className="text-gray-600 whitespace-pre-wrap">
+                  {workout.notes || workout.description}
+                </div>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Detail Tab - Planned vs Executed Comparison */}
+        <TabsContent value="detail" className="mt-4">
+          <WorkoutDetail
+            workout={workout}
+            onUpdateWorkout={handleUpdateWorkout}
+            activeTab="summary"
+            onTabChange={() => {}}
+            onClose={onClose}
+          />
+        </TabsContent>
+
+        {/* Completed Tab - Full Analytics */}
+        <TabsContent value="completed" className="mt-4">
+          <CompletedTab
+            workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength'}
+            workoutData={workout}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
