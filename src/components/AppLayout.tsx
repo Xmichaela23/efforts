@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Menu, User, Upload, Settings } from 'lucide-react';
+import { Menu, User, Upload, Settings, Activity } from 'lucide-react';
 import WorkoutBuilder from './WorkoutBuilder';
 import WorkoutCalendar from './WorkoutCalendar';
 import WorkoutDetail from './WorkoutDetail';
@@ -16,6 +16,7 @@ import NewEffortDropdown from './NewEffortDropdown';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
+import TrainingBaselines from './TrainingBaselines';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -40,6 +41,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
+  const [showTrainingBaselines, setShowTrainingBaselines] = useState(false);
   const [builderType, setBuilderType] = useState<string>('');
   const [builderSourceContext, setBuilderSourceContext] = useState<string>('');
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -236,6 +238,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setCurrentWorkoutIndex(0);
   };
 
+  // NEW: Training Baselines handler
+  const handleTrainingBaselinesClick = () => {
+    setShowTrainingBaselines(true);
+  };
+
   // NEW: Import handlers
   const handleImportClick = () => {
     setShowImportPage(true);
@@ -377,7 +384,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowAllPlans(false);
     setShowStrengthPlans(false);
     setShowPlanBuilder(false);
-    setShowImportPage(false); // NEW: Reset import page
+    setShowImportPage(false);
+    setShowTrainingBaselines(false); // NEW: Reset training baselines
     setBuilderType('');
     setBuilderSourceContext('');
     setSelectedWorkout(null);
@@ -577,6 +585,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     );
   }
 
+  // Show training baselines
+  if (showTrainingBaselines) {
+    return (
+      <TrainingBaselines
+        onClose={handleBackToDashboard}
+      />
+    );
+  }
+
   if (loading) {
     return (
       <div className="mobile-app-container">
@@ -602,6 +619,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
+                  <DropdownMenuItem onClick={handleTrainingBaselinesClick}>
+                    <Activity className="mr-2 h-4 w-4" />
+                    Training Baselines
+                  </DropdownMenuItem>
                   <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     Profile

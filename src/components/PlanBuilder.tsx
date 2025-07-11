@@ -1,865 +1,978 @@
-// src/components/PlanBuilder.tsx
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { ArrowLeft, ArrowRight, Kanban, Calendar } from 'lucide-react';
-import { useAppContext } from '@/contexts/AppContext';
+import { ArrowLeft, Calendar } from 'lucide-react';
 
-interface PlanBuilderProps {
-  onClose: () => void;
-  onPlanGenerated?: (plan: any) => void;
+// Import the extracted manual component
+import ManualPlanBuilder from './ManualPlanBuilder';
+
+// Import the existing RealTrainingAI service
+import { RealTrainingAI } from '../services/RealTrainingAI';
+
+// Updated assessment interface for the correct question order
+interface Assessment {
+  focus: string;
+  age: number;
+  currentFitness: string;
+  benchmarks: {
+    running?: string | string[];
+    cycling?: string | string[];
+    swimming?: string | string[];
+    strength?: string | string[];
+  };
+  triathlonDistance?: string; 
+  injuryHistory: string;
+  injuryDetails?: {
+    hasInjuries: boolean;
+    bodyRegions: string[];
+    specificInjuries: {
+      [region: string]: {
+        type: string;
+        timeline: string;
+        severity: string;
+        cause: string;
+        painLevel: {
+          rest: number;
+          light: number;
+          moderate: number;
+        };
+        medicalStatus: string;
+        limitations: string;
+        helpful: string;
+      };
+    };
+  };
+  triathlonStrength?: string;
+  singleDisciplineStrength?: string;
+  hybridStrength?: string;
+  goal: string;
+  timeline: string;
+  eventDetails?: string;
+  eventCategory?: string;
+  eventType?: string;
+  eventDate?: string;
+  courseDetails?: {
+    elevationGain: string;
+    courseProfile: string;
+    surfaceType: string;
+    climate: string;
+    technicalDifficulty: string;
+    courseDescription?: string;
+    hasSpecificCourse: boolean;
+  };
+  daysPerWeek: string;
+  weekdayTime: string;
+  weekendTime: string;
+  trainingBackground: string;
+  equipment: {
+    running?: string[];
+    cycling?: string[];
+    swimming?: string[];
+    strength?: string[];
+  };
+  // Specific performance numbers
+  performanceNumbers: {
+    ftp?: number;
+    swimPace?: string; // "1:25" format
+    squat?: number;
+    deadlift?: number;
+    bench?: number;
+    runningPaces?: {
+      fiveK?: string;
+      tenK?: string;
+      halfMarathon?: string;
+      marathon?: string;
+    };
+  };
 }
 
-export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderProps) {
-  const { addWorkout } = useAppContext();
+export default function PlanBuilder() {
+  const [realAI] = useState(() => new RealTrainingAI());
+
+  // Tab management
+  const [activeTab, setActiveTab] = useState<'assessment' | 'manual'>('assessment');
   
-  // Tab state
-  const [activeTab, setActiveTab] = useState<'suggested' | 'free'>('suggested');
+  // Assessment tab state
+  const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [answers, setAnswers] = useState<Assessment>({
+    focus: '',
+    age: 0,
+    currentFitness: '',
+    benchmarks: {},
+    triathlonDistance: '',
+    injuryHistory: '',
+    injuryDetails: {
+      hasInjuries: false,
+      bodyRegions: [],
+      specificInjuries: {}
+    },
+    triathlonStrength: '',
+    singleDisciplineStrength: '',
+    hybridStrength: '',
+    goal: '',
+    timeline: '',
+    eventDetails: '',
+    eventCategory: '',
+    eventType: '',
+    eventDate: '',
+    courseDetails: {
+      elevationGain: '',
+      courseProfile: '',
+      surfaceType: '',
+      climate: '',
+      technicalDifficulty: '',
+      courseDescription: '',
+      hasSpecificCourse: false
+    },
+    daysPerWeek: '', 
+    weekdayTime: '',
+    weekendTime: '',
+    trainingBackground: '',
+    equipment: {},
+    performanceNumbers: {}
+  });
+  const [selectedEventCategory, setSelectedEventCategory] = useState('');
+  const [selectedEventType, setSelectedEventType] = useState('');
+  const [currentCourseStep, setCurrentCourseStep] = useState(0);
+  const [textInput, setTextInput] = useState('');
   
-  // Free tab state (existing functionality)
-  const [planPrompt, setPlanPrompt] = useState('');
+  // Shared state
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
   const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [generatedPlan, setGeneratedPlan] = useState<any>(null);
 
-  // Suggested tab state
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
-    category: '',
-    specificGoal: '',
-    experienceLevel: '',
-    trainingFrequency: '',
-    timePerSession: '',
-    equipmentLocation: '',
-    startDate: new Date().toISOString().split('T')[0]
-  });
-
-  // Enhanced quick plan suggestions with more variety
-  const quickPlans = [
-    "Build me a 30-minute easy run for recovery",
-    "Create a 5K training plan over 6 weeks", 
-    "I want a 45-minute bike ride with 6x3min intervals",
-    "Design a full-body strength workout for runners",
-    "Give me a 2000m swim workout for endurance",
-    "Build me a 4-week marathon training plan",
-    "Create a 12-week triathlon program for beginners",
-    "I need a strength plan to prevent running injuries",
-    "Design a 2-week taper for my upcoming race",
-    "Create interval training for improving 10K speed"
+  // Time options for ultra-capable training
+  const TIME_OPTIONS = [
+    '30 minutes',
+    '45 minutes', 
+    '1 hour',
+    '1.5 hours',
+    '2 hours',
+    '2.5 hours',
+    '3 hours',
+    '4 hours',
+    '5 hours',
+    '6 hours',
+    '7 hours',
+    '8+ hours'
   ];
 
-  // Suggested tab categories and options
-  const categories = {
-    '1': 'Running',
-    '2': 'Cycling', 
-    '3': 'Swimming',
-    '4': 'Strength',
-    '5': 'Mobility',
-    '6': 'Hybrid'
+  // Helper function to check both string and array benchmarks
+  const containsValue = (field: string | string[] | undefined, value: string): boolean => {
+    if (!field) return false;
+    if (Array.isArray(field)) {
+      return field.some(item => item.includes(value));
+    }
+    return field.includes(value);
   };
 
-  const specificGoals = {
-    '1': [ // Running
-      'Train for a 5K',
-      'Train for a 10K', 
-      'Train for a half marathon',
-      'Train for a marathon',
-      'Make me faster',
-      'Add strength to my running'
-    ],
-    '2': [ // Cycling
-      'Improve my FTP',
-      'Train for a century ride',
-      'Build cycling endurance', 
-      'Make me faster',
-      'Add strength to my cycling'
-    ],
-    '3': [ // Swimming
-      'Train for my first triathlon swim',
-      'Improve my swimming technique',
-      'Build swimming endurance',
-      'Make me faster'
-    ],
-    '4': [ // Strength
-      'Build muscle mass',
-      'Get stronger (powerlifting focus)',
-      'Functional strength for daily life',
-      'Make me stronger'
-    ],
-    '5': [ // Mobility
-      'Daily mobility routine',
-      'Runner\'s mobility plan',
-      'Cyclist\'s mobility plan',
-      'Make me more flexible'
-    ],
-    '6': [ // Hybrid
-      'Triathlon training (swim/bike/run)',
-      'Running + strength integration',
-      'Cycling + strength integration',
-      'Triathlon + strength integration'
-    ]
-  };
-
-  const experienceLevels = [
-    'New to this',
-    'Been doing it a while', 
-    'Experienced'
+  // FIXED: Assessment questions in correct order - Discipline → Age → Fitness → Benchmarks → Injuries → Strength → Goals → Timeline → Events → Frequency → Time → Background → Equipment
+  const ASSESSMENT_QUESTIONS = [
+    {
+      id: 'focus',
+      text: "What's your primary focus?",
+      options: [
+        "Running",
+        "Cycling", 
+        "Swimming",
+        "Strength Training",
+        "Triathlon",
+        "Hybrid"
+      ]
+    },
+    {
+      id: 'age',
+      text: "What's your age?",
+      type: 'number',
+      placeholder: "Enter your age"
+    },
+    {
+      id: 'currentFitness', 
+      text: "How would you describe your current fitness?",
+      options: [
+        "Complete beginner - get winded easily",
+        "Some fitness - can exercise 20-30 minutes", 
+        "Pretty fit - regular exerciser",
+        "Very fit - train consistently",
+        "Competitive athlete level"
+      ]
+    },
+    // Benchmark question (dynamic based on focus)
+    null, // Will be generated dynamically
+    {
+      id: 'injuryHistory',
+      text: "Any current injuries, pain, or physical limitations?",
+      options: [
+        "No current injuries or limitations",
+        "Minor aches/pains but can train normally",
+        "Previous injury - need to avoid certain movements",
+        "Current injury - working around limitations"
+      ]
+    },
+    {
+      id: 'injuryBodyRegions',
+      text: "Which areas of your body are affected? (Select all that apply)",
+      type: 'multiSelect',
+      options: [
+        "Head/Neck/Cervical spine",
+        "Shoulder (Left)",
+        "Shoulder (Right)", 
+        "Elbow/Forearm (Left)",
+        "Elbow/Forearm (Right)",
+        "Wrist/Hand (Left)",
+        "Wrist/Hand (Right)",
+        "Chest/Ribs",
+        "Upper back/Thoracic spine",
+        "Lower back/Lumbar spine",
+        "Hip/Pelvis (Left)",
+        "Hip/Pelvis (Right)",
+        "Thigh/Quad/Hamstring (Left)",
+        "Thigh/Quad/Hamstring (Right)",
+        "Knee (Left)",
+        "Knee (Right)",
+        "Calf/Shin (Left)",
+        "Calf/Shin (Right)",
+        "Ankle/Foot (Left)",
+        "Ankle/Foot (Right)"
+      ],
+      condition: (answers: Assessment) => answers.injuryHistory !== "No current injuries or limitations"
+    },
+    {
+      id: 'singleDisciplineStrength',
+      text: "Do you want to add strength training to your training plan?",
+      options: [
+        "No strength training",
+        "Injury prevention focus (functional movements, stability)",
+        "Power development (heavier loads, lower reps for force)",
+        "Sport-specific functional (movements that enhance your discipline)",
+        "Build muscle (moderate reps, higher volume)",
+        "General fitness"
+      ],
+      condition: (answers: Assessment) => ['Running', 'Cycling', 'Swimming'].includes(answers.focus)
+    },
+    {
+      id: 'triathlonStrength',
+      text: "Do you want to add strength training to your triathlon plan?",
+      options: [
+        "No strength training",
+        "Injury prevention focus (functional movements, stability)",
+        "Power development (heavier loads, lower reps for force)",
+        "Sport-specific functional (movements that enhance swim/bike/run)",
+        "Build muscle (moderate reps, higher volume)",
+        "General fitness"
+      ],
+      condition: (answers: Assessment) => answers.focus === "Triathlon"
+    },
+    {
+      id: 'hybridStrength',
+      text: "What's your strength training goal?",
+      options: [
+        "Build maximum strength (heavier loads, lower reps)",
+        "Build muscle size and strength (moderate reps, higher volume)",
+        "Functional strength for sports performance",
+        "General fitness and injury prevention"
+      ],
+      condition: (answers: Assessment) => {
+        if (answers.focus !== "Hybrid") return false;
+        const strengthBenchmarks = answers.benchmarks.strength;
+        return Array.isArray(strengthBenchmarks) && strengthBenchmarks.length > 0;
+      }
+    },
+    {
+      id: 'goal',
+      text: "What's your main goal?",
+      options: [
+        "Get started with exercise",
+        "Lose weight and get in shape", 
+        "Get faster/stronger",
+        "Train for specific event",
+        "Maintain current fitness"
+      ]
+    },
+    {
+      id: 'timeline',
+      text: "What's your training approach?",
+      options: [
+        "I have a specific race/event coming up",
+        "4-week training blocks (3 weeks build, 1 week recover)",
+        "Continuous improvement until I find an event",
+        "Maintain current fitness level"
+      ]
+    },
+    {
+      id: 'eventDetails',
+      text: "What specific event are you training for?",
+      type: 'eventSelection',
+      condition: (answers: Assessment) => answers.goal === "Train for specific event"
+    },
+    {
+      id: 'eventDate',
+      text: "When is your event?",
+      type: 'date',
+      condition: (answers: Assessment) => answers.goal === "Train for specific event" && answers.eventDetails
+    },
+    {
+      id: 'courseDetails',
+      text: "Tell us about the course:",
+      type: 'courseAnalysis',
+      condition: (answers: Assessment) => answers.goal === "Train for specific event" && answers.eventDetails
+    },
+    {
+      id: 'daysPerWeek',
+      text: "How many days per week can you train?",
+      options: [
+        "2-3 days",
+        "4-5 days", 
+        "6+ days"
+      ]
+    },
+    {
+      id: 'combinedTime',
+      text: "How much time do you have for training?",
+      type: 'combinedTime'
+    },
+    {
+      id: 'trainingBackground',
+      text: "What's your training background?",
+      options: [
+        "Brand new to structured training",
+        "Returning after 6+ months off",
+        "Train occasionally but inconsistently",
+        "Train consistently for 6+ months",
+        "Train consistently for 2+ years"
+      ]
+    },
+    {
+      id: 'equipment',
+      text: "What equipment do you have access to?",
+      type: 'equipment'
+    }
   ];
 
-  const trainingFrequencies = [
-    '2 days per week',
-    '3 days per week',
-    '4 days per week',
-    '5 days per week',
-    '6 days per week',
-    '7 days per week'
-  ];
-
-  const timePerSessions = [
-    '15-30 minutes',
-    '30-45 minutes',
-    '45-60 minutes',
-    '60-90 minutes',
-    '90+ minutes'
-  ];
-
-  const getEquipmentOptions = () => {
-    const category = formData.category;
-    if (category === '1' || category === '2') { // Running/Cycling
-      return ['Indoor only', 'Outdoor only', 'Both indoor and outdoor'];
-    } else if (category === '4') { // Strength
-      return ['Full gym access', 'Home gym', 'Dumbbells only', 'Bodyweight only'];
-    } else if (category === '3') { // Swimming
-      return ['Pool access', 'Open water', 'Both pool and open water'];
-    } else if (category === '5') { // Mobility
-      return ['No equipment needed'];
+  // Get benchmark question based on focus
+  const getBenchmarkQuestion = () => {
+    const focus = answers.focus;
+    
+    if (focus === 'Running') {
+      return {
+        id: 'benchmarks',
+        text: "What's your current running level?",
+        options: [
+          "Don't know my running pace/times",
+          "5K in 30+ minutes (recreational runner)",
+          "5K in 25-30 minutes (fitness runner)", 
+          "5K in 20-25 minutes (trained runner)",
+          "5K under 20 minutes (competitive runner)",
+          "I know my exact times/paces"
+        ]
+      };
+    } else if (focus === 'Cycling') {
+      return {
+        id: 'benchmarks',
+        text: "What's your current cycling level?",
+        options: [
+          "Don't track cycling speed/power",
+          "Average 12-15 mph on flats (recreational)",
+          "Average 16-18 mph on flats (fitness rider)",
+          "Average 19-21 mph on flats (trained cyclist)", 
+          "Average 22+ mph on flats (competitive cyclist)",
+          "I know my FTP (watts)"
+        ]
+      };
+    } else if (focus === 'Swimming') {
+      return {
+        id: 'benchmarks',
+        text: "What's your current swimming level?",
+        options: [
+          "Don't know swimming pace/new to swimming",
+          "Can swim 25 yards continuously",
+          "Can swim 100 yards continuously",
+          "Can swim 500+ yards continuously",
+          "Competitive swimmer/masters level",
+          "I know my 100-yard pace"
+        ]
+      };
+    } else if (focus === 'Strength Training') {
+      return {
+        id: 'benchmarks',
+        text: "What's your current strength level?",
+        options: [
+          "Don't know my strength levels",
+          "Bodyweight movements only",
+          "Can squat/deadlift around bodyweight",
+          "Can squat/deadlift 1.25x bodyweight",
+          "Can squat/deadlift 1.5x+ bodyweight", 
+          "I know my compound 1RMs"
+        ]
+      };
+    } else if (focus === 'Triathlon') {
+      return {
+        id: 'benchmarks',
+        text: "What triathlon distance do you focus on?",
+        type: 'triathlon',
+        distanceOptions: [
+          "Sprint distance (750m swim, 20km bike, 5km run)",
+          "Olympic distance (1.5km swim, 40km bike, 10km run)",
+          "70.3 Half Ironman (1.9km swim, 90km bike, 21km run)",
+          "140.6 Full Ironman (3.8km swim, 180km bike, 42km run)",
+          "Multi-distance / general triathlon fitness"
+        ],
+        categories: {
+          swimming: [
+            "Don't know swimming pace/new to swimming",
+            "Can swim 500+ yards continuously",
+            "Can swim 1500+ yards continuously",
+            "I know my 100-yard pace"
+          ],
+          cycling: [
+            "Don't track cycling speed/power",
+            "Average 16-18 mph on flats",
+            "Average 19-21 mph on flats",
+            "I know my FTP (watts)"
+          ],
+          running: [
+            "Don't know my running pace/times",
+            "5K in 30+ minutes",
+            "5K in 25-30 minutes",
+            "5K in 20-25 minutes", 
+            "5K under 20 minutes",
+            "I know my exact times/paces"
+          ]
+        }
+      };
     } else { // Hybrid
-      return ['Full gym + outdoor access', 'Home gym + outdoor', 'Minimal equipment'];
-    }
-  };
-
-  const handleNext = () => {
-    if (currentStep < 7) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  // 🧠 INTELLIGENT AI RESPONSE - Actually understands training
-  const simulateAIResponse = async (prompt: string, startDateStr: string) => {
-    // Simulate AI processing time
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    const promptLower = prompt.toLowerCase();
-    
-    console.log('🧠 Intelligent AI analyzing prompt:', prompt);
-    
-    // 🧠 SMART DISCIPLINE DETECTION
-    const disciplines = [];
-    const isIntegration = promptLower.includes('integration') || promptLower.includes('hybrid') || promptLower.includes('+');
-    
-    if (promptLower.includes('run')) disciplines.push('run');
-    if (promptLower.includes('bike') || promptLower.includes('cycle') || promptLower.includes('ride')) disciplines.push('ride');
-    if (promptLower.includes('swim')) disciplines.push('swim');
-    if (promptLower.includes('strength') || promptLower.includes('gym') || promptLower.includes('weights')) disciplines.push('strength');
-    if (promptLower.includes('mobility') || promptLower.includes('flexibility')) disciplines.push('mobility');
-    
-    // Default to running if no discipline detected
-    if (disciplines.length === 0) disciplines.push('run');
-    
-    console.log('🧠 Detected disciplines:', disciplines, 'Integration:', isIntegration);
-    
-    // 🧠 SMART DURATION DETECTION
-    let weeks = 4; // default
-    const weekMatches = prompt.match(/(\d+)\s*weeks?/i);
-    if (weekMatches) {
-      weeks = Math.min(Math.max(parseInt(weekMatches[1]), 1), 16);
-    }
-    
-    // 🧠 SMART FREQUENCY DETECTION
-    let daysPerWeek = 4; // default
-    const frequencyMatches = prompt.match(/(\d+)\s*days?\s*per\s*week/i);
-    if (frequencyMatches) {
-      daysPerWeek = Math.min(Math.max(parseInt(frequencyMatches[1]), 2), 7);
-    }
-    
-    // 🧠 SMART LEVEL DETECTION
-    let level = 'intermediate';
-    if (promptLower.includes('beginner') || promptLower.includes('new to') || promptLower.includes('just started')) {
-      level = 'beginner';
-    } else if (promptLower.includes('advanced') || promptLower.includes('experienced') || promptLower.includes('competitive')) {
-      level = 'advanced';
-    }
-    
-    console.log('🧠 Plan parameters:', { weeks, daysPerWeek, level, disciplines, isIntegration });
-    
-    // 🧠 GENERATE INTELLIGENT WORKOUTS
-    const workouts = generateIntelligentWorkouts(disciplines, weeks, daysPerWeek, level, isIntegration, startDateStr, prompt);
-    
-    return {
-      plan: {
-        name: generateSmartPlanName(prompt, disciplines, isIntegration),
-        description: prompt,
-        type: disciplines[0],
-        duration: weeks,
-        level: level,
-        goal: extractGoal(prompt),
-        status: 'active',
-        currentWeek: 1,
-        createdDate: new Date().toISOString().split('T')[0],
-        totalWorkouts: workouts.length,
-        disciplines: disciplines,
-        isIntegrated: isIntegration
-      },
-      workouts: workouts
-    };
-  };
-
-  // 🧠 SMART PLAN NAME GENERATION
-  const generateSmartPlanName = (prompt: string, disciplines: string[], isIntegration: boolean) => {
-    const promptLower = prompt.toLowerCase();
-    
-    if (promptLower.includes('5k')) return '5K Training Plan';
-    if (promptLower.includes('10k')) return '10K Training Plan';
-    if (promptLower.includes('marathon')) return 'Marathon Training Plan';
-    if (promptLower.includes('triathlon')) return 'Triathlon Training Plan';
-    
-    if (isIntegration && disciplines.length > 1) {
-      const disciplineNames = disciplines.map(d => {
-        const names = { 'run': 'Running', 'ride': 'Cycling', 'swim': 'Swimming', 'strength': 'Strength', 'mobility': 'Mobility' };
-        return names[d] || d;
-      });
-      return `${disciplineNames.join(' + ')} Integration Plan`;
-    }
-    
-    const disciplineNames = {
-      'run': 'Running',
-      'ride': 'Cycling', 
-      'swim': 'Swimming',
-      'strength': 'Strength',
-      'mobility': 'Mobility'
-    };
-    
-    return `${disciplineNames[disciplines[0]] || 'Training'} Plan`;
-  };
-
-  const extractGoal = (prompt: string) => {
-    const promptLower = prompt.toLowerCase();
-    
-    if (promptLower.includes('race') || promptLower.includes('5k') || promptLower.includes('10k')) {
-      return 'Race Performance';
-    }
-    if (promptLower.includes('endurance') || promptLower.includes('distance')) {
-      return 'Endurance Building';
-    }
-    if (promptLower.includes('speed') || promptLower.includes('fast')) {
-      return 'Speed Development';
-    }
-    if (promptLower.includes('strength') || promptLower.includes('muscle')) {
-      return 'Strength Building';
-    }
-    if (promptLower.includes('integration') || promptLower.includes('hybrid')) {
-      return 'Cross-Training';
-    }
-    
-    return 'General Fitness';
-  };
-
-  // 🧠 INTELLIGENT WORKOUT GENERATION
-  const generateIntelligentWorkouts = (
-    disciplines: string[], 
-    weeks: number, 
-    daysPerWeek: number, 
-    level: string, 
-    isIntegration: boolean,
-    startDateStr: string, 
-    prompt: string
-  ) => {
-    const workouts = [];
-    const startDate = new Date(startDateStr);
-    
-    console.log('🧠 Generating intelligent workouts:', { disciplines, weeks, daysPerWeek, isIntegration });
-    
-    for (let week = 0; week < weeks; week++) {
-      const isRecoveryWeek = (week + 1) % 4 === 0;
-      const phase = week < weeks * 0.5 ? 'base' : week < weeks * 0.8 ? 'build' : 'peak';
-      
-      // 🧠 SMART WEEKLY SCHEDULING
-      let weeklySchedule = [];
-      
-      if (isIntegration && disciplines.includes('run') && disciplines.includes('strength')) {
-        // 🧠 RUNNING + STRENGTH INTEGRATION
-        weeklySchedule = generateRunningStrengthSchedule(daysPerWeek, level);
-      } else if (isIntegration && disciplines.length > 1) {
-        // 🧠 MULTI-DISCIPLINE INTEGRATION  
-        weeklySchedule = generateMultiDisciplineSchedule(disciplines, daysPerWeek);
-      } else {
-        // 🧠 SINGLE DISCIPLINE FOCUS
-        weeklySchedule = generateSingleDisciplineSchedule(disciplines[0], daysPerWeek);
-      }
-      
-      console.log(`🧠 Week ${week + 1} schedule:`, weeklySchedule);
-      
-      // Generate workouts for each day in the schedule
-      weeklySchedule.forEach((dayPlan, dayIndex) => {
-        if (dayPlan.type === 'rest') return;
-        
-        const currentDate = new Date(startDate);
-        currentDate.setDate(startDate.getDate() + (week * 7) + dayIndex);
-        const dateStr = currentDate.toISOString().split('T')[0];
-        
-        const workout = generateSmartWorkout(dayPlan, week, phase, level, isRecoveryWeek, dateStr);
-        if (workout) {
-          workouts.push(workout);
+      return {
+        id: 'benchmarks',
+        text: "Select all disciplines you want to train and your levels:",
+        type: 'hybridSelect',
+        categories: {
+          running: [
+            "Don't know my running pace/times",
+            "5K in 30+ minutes (recreational)",
+            "5K in 25-30 minutes (fitness level)",
+            "5K in 20-25 minutes (trained runner)", 
+            "5K under 20 minutes (competitive)",
+            "I know my exact times/paces"
+          ],
+          cycling: [
+            "Don't track cycling speed/power",
+            "Average 16-18 mph (fitness rider)",
+            "Average 19-21 mph (trained cyclist)",
+            "I know my FTP (watts)"
+          ],
+          swimming: [
+            "Don't know swimming pace/new to swimming",
+            "Can swim 500+ yards continuously",
+            "Can swim 1500+ yards continuously",
+            "I know my 100-yard pace"
+          ],
+          strength: [
+            "Don't know my strength levels",
+            "Can squat/deadlift around bodyweight",
+            "Can squat/deadlift 1.25x+ bodyweight",
+            "I know my compound 1RMs"
+          ]
         }
-      });
-    }
-    
-    console.log('🧠 Generated total workouts:', workouts.length);
-    return workouts;
-  };
-
-  // 🧠 SMART WEEKLY SCHEDULING
-  const generateRunningStrengthSchedule = (daysPerWeek: number, level: string) => {
-    const schedules = {
-      3: [ // 3 days: 2 run, 1 strength
-        { type: 'run', focus: 'easy' },
-        { type: 'rest' },
-        { type: 'strength', focus: 'full-body' },
-        { type: 'rest' },
-        { type: 'run', focus: 'long' },
-        { type: 'rest' },
-        { type: 'rest' }
-      ],
-      4: [ // 4 days: 2 run, 2 strength
-        { type: 'run', focus: 'easy' },
-        { type: 'strength', focus: 'upper' },
-        { type: 'rest' },
-        { type: 'run', focus: 'intervals' },
-        { type: 'rest' },
-        { type: 'strength', focus: 'lower' },
-        { type: 'rest' }
-      ],
-      5: [ // 5 days: 3 run, 2 strength
-        { type: 'run', focus: 'easy' },
-        { type: 'strength', focus: 'upper' },
-        { type: 'run', focus: 'intervals' },
-        { type: 'rest' },
-        { type: 'strength', focus: 'lower' },
-        { type: 'run', focus: 'long' },
-        { type: 'rest' }
-      ],
-      6: [ // 6 days: 3 run, 3 strength  
-        { type: 'run', focus: 'easy' },
-        { type: 'strength', focus: 'upper' },
-        { type: 'run', focus: 'intervals' },
-        { type: 'strength', focus: 'lower' },
-        { type: 'run', focus: 'tempo' },
-        { type: 'strength', focus: 'core' },
-        { type: 'rest' }
-      ]
-    };
-    
-    return schedules[Math.min(daysPerWeek, 6) as keyof typeof schedules] || schedules[4];
-  };
-
-  const generateMultiDisciplineSchedule = (disciplines: string[], daysPerWeek: number) => {
-    // Simple rotation through disciplines
-    const schedule = [];
-    let disciplineIndex = 0;
-    
-    for (let day = 0; day < 7; day++) {
-      if (day < daysPerWeek) {
-        schedule.push({ 
-          type: disciplines[disciplineIndex % disciplines.length], 
-          focus: 'base' 
-        });
-        disciplineIndex++;
-      } else {
-        schedule.push({ type: 'rest' });
-      }
-    }
-    
-    return schedule;
-  };
-
-  const generateSingleDisciplineSchedule = (discipline: string, daysPerWeek: number) => {
-    const schedule = [];
-    const focuses = discipline === 'run' ? ['easy', 'intervals', 'tempo', 'long'] : ['base', 'intervals', 'endurance', 'recovery'];
-    
-    for (let day = 0; day < 7; day++) {
-      if (day < daysPerWeek) {
-        schedule.push({ 
-          type: discipline, 
-          focus: focuses[day % focuses.length] 
-        });
-      } else {
-        schedule.push({ type: 'rest' });
-      }
-    }
-    
-    return schedule;
-  };
-
-  // 🧠 SMART WORKOUT GENERATION
-  const generateSmartWorkout = (dayPlan: any, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string) => {
-    const levelMultipliers = { beginner: 0.8, intermediate: 1.0, advanced: 1.2 };
-    const multiplier = levelMultipliers[level] || 1.0;
-    
-    if (dayPlan.type === 'run') {
-      return generateSmartRunWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr, multiplier);
-    } else if (dayPlan.type === 'strength') {
-      return generateSmartStrengthWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr);
-    } else if (dayPlan.type === 'ride') {
-      return generateSmartRideWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr, multiplier);
-    } else if (dayPlan.type === 'swim') {
-      return generateSmartSwimWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr, multiplier);
-    }
-    
-    return null;
-  };
-
-  // 🧠 INTELLIGENT RUNNING WORKOUTS WITH COACHING NOTES
-  const generateSmartRunWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string, multiplier: number) => {
-    const baseRPE = { beginner: 4, intermediate: 5, advanced: 5 }[level];
-    const hardRPE = { beginner: 7, intermediate: 8, advanced: 9 }[level];
-    
-    const workoutTypes = {
-      'easy': {
-        name: `Week ${week + 1} - Easy Run`,
-        description: `Aerobic base building run. This builds your aerobic engine and improves fat burning. Should feel conversational - you could talk in full sentences.`,
-        coachingNotes: `Purpose: Aerobic development & recovery\nKey: Nose breathing if possible, very relaxed effort\nNote: Common mistake is going too fast - slow down!`,
-        intervals: [
-          {
-            id: '1',
-            time: `${Math.round((35 + week * 5) * multiplier)}:00`,
-            effortLabel: 'Easy Pace',
-            rpeTarget: baseRPE.toString(),
-            duration: Math.round((35 + week * 5) * multiplier) * 60,
-            repeatCount: 1
-          }
-        ]
-      },
-      'intervals': {
-        name: `Week ${week + 1} - Interval Training`,
-        description: `VO2 max intervals to improve your top-end speed and oxygen processing. These should feel hard but controlled.`,
-        coachingNotes: `Purpose: VO2 max development, neuromuscular power\nKey: Strong effort but not all-out sprints\nNote: Recovery jogs are crucial - don't skip them!`,
-        intervals: [
-          {
-            id: '1',
-            time: '15:00',
-            effortLabel: 'Warmup',
-            rpeTarget: baseRPE.toString(),
-            duration: 900,
-            repeatCount: 1
-          },
-          {
-            id: '2',
-            time: '3:00',
-            effortLabel: 'Hard Interval',
-            rpeTarget: hardRPE.toString(),
-            duration: 180,
-            repeatCount: 1
-          },
-          {
-            id: '3',
-            time: '2:00',
-            effortLabel: 'Recovery Jog',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 120,
-            repeatCount: 1
-          },
-          {
-            id: '4',
-            time: '3:00',
-            effortLabel: 'Hard Interval',
-            rpeTarget: hardRPE.toString(),
-            duration: 180,
-            repeatCount: 1
-          },
-          {
-            id: '5',
-            time: '2:00',
-            effortLabel: 'Recovery Jog',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 120,
-            repeatCount: 1
-          },
-          {
-            id: '6',
-            time: '3:00',
-            effortLabel: 'Hard Interval',
-            rpeTarget: hardRPE.toString(),
-            duration: 180,
-            repeatCount: 1
-          },
-          {
-            id: '7',
-            time: '2:00',
-            effortLabel: 'Recovery Jog',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 120,
-            repeatCount: 1
-          },
-          {
-            id: '8',
-            time: '3:00',
-            effortLabel: 'Hard Interval',
-            rpeTarget: hardRPE.toString(),
-            duration: 180,
-            repeatCount: 1
-          },
-          {
-            id: '9',
-            time: '2:00',
-            effortLabel: 'Recovery Jog',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 120,
-            repeatCount: 1
-          },
-          ...(week >= 1 ? [{
-            id: '10',
-            time: '3:00',
-            effortLabel: 'Hard Interval',
-            rpeTarget: hardRPE.toString(),
-            duration: 180,
-            repeatCount: 1
-          },
-          {
-            id: '11',
-            time: '2:00',
-            effortLabel: 'Recovery Jog',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 120,
-            repeatCount: 1
-          }] : []),
-          ...(week >= 2 ? [{
-            id: '12',
-            time: '3:00',
-            effortLabel: 'Hard Interval',
-            rpeTarget: hardRPE.toString(),
-            duration: 180,
-            repeatCount: 1
-          },
-          {
-            id: '13',
-            time: '2:00',
-            effortLabel: 'Recovery Jog',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 120,
-            repeatCount: 1
-          }] : []),
-          {
-            id: '14',
-            time: '15:00',
-            effortLabel: 'Cooldown',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 900,
-            repeatCount: 1
-          }
-        ]
-      },
-      'tempo': {
-        name: `Week ${week + 1} - Tempo Run`,
-        description: `Lactate threshold training - the effort you could sustain for about 1 hour in a race. Comfortably hard.`,
-        coachingNotes: `Purpose: Lactate threshold improvement, race pace training\nKey: Steady, sustainable effort - not intervals\nNote: Should feel like 15k-half marathon race pace`,
-        intervals: [
-          {
-            id: '1',
-            time: '15:00',
-            effortLabel: 'Warmup',
-            rpeTarget: baseRPE.toString(),
-            duration: 900,
-            repeatCount: 1
-          },
-          {
-            id: '2',
-            time: `${15 + week * 2}:00`,
-            effortLabel: 'Tempo Pace',
-            rpeTarget: (baseRPE + 2).toString(),
-            duration: (15 + week * 2) * 60,
-            repeatCount: 1
-          },
-          {
-            id: '3',
-            time: '10:00',
-            effortLabel: 'Cooldown',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 600,
-            repeatCount: 1
-          }
-        ]
-      },
-      'long': {
-        name: `Week ${week + 1} - Long Run`,
-        description: `Aerobic endurance builder. Teaches your body to use fat for fuel and builds mental toughness for race day.`,
-        coachingNotes: `Purpose: Aerobic endurance, fat adaptation, mental training\nKey: Start easy, stay easy - it's about time on feet\nNote: Practice race day nutrition and hydration`,
-        intervals: [
-          {
-            id: '1',
-            time: '10:00',
-            effortLabel: 'Warmup',
-            rpeTarget: baseRPE.toString(),
-            duration: 600,
-            repeatCount: 1
-          },
-          {
-            id: '2',
-            time: `${Math.round((60 + week * 10) * multiplier)}:00`,
-            effortLabel: phase === 'base' ? 'Aerobic Base' : 'Steady Effort',
-            rpeTarget: (baseRPE + (phase === 'peak' ? 2 : 1)).toString(),
-            duration: Math.round((60 + week * 10) * multiplier) * 60,
-            repeatCount: 1
-          },
-          {
-            id: '3',
-            time: '10:00',
-            effortLabel: 'Cooldown',
-            rpeTarget: (baseRPE - 1).toString(),
-            duration: 600,
-            repeatCount: 1
-          }
-        ]
-      }
-    };
-    
-    const workout = workoutTypes[focus] || workoutTypes['easy'];
-    
-    return {
-      date: dateStr,
-      type: 'run',
-      ...workout
-    };
-  };
-
-  // 🧠 INTELLIGENT STRENGTH WORKOUTS WITH COACHING NOTES
-  const generateSmartStrengthWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string) => {
-    const coachingNotes = {
-      'upper': `Purpose: Upper body strength for improved posture & arm swing\nKey: Control the eccentric (lowering) phase\nNote: Focus on form over speed - quality reps only`,
-      'lower': `Purpose: Single-leg strength & power for running efficiency\nKey: Unilateral work prevents imbalances\nNote: Start lighter than you think - balance is harder than bilateral`,
-      'core': `Purpose: Core stability for efficient energy transfer\nKey: Anti-movement (planks) > movement (crunches)\nNote: Breathe normally - don't hold your breath`,
-      'full-body': `Purpose: Functional movement patterns for running\nKey: Focus on compound movements\nNote: Perfect form before adding weight`
-    };
-
-    const exerciseLibrary = {
-      'upper': [
-        { name: 'Push-ups', sets: 3, reps: 8 + week * 2, weight: 0, weightMode: 'same', note: 'Modify on knees if needed' },
-        { name: 'Pull-ups/Assisted Pull-ups', sets: 3, reps: 5 + week, weight: 0, weightMode: 'same', note: 'Use band assistance if needed' },
-        { name: 'Overhead Press', sets: 3, reps: 8 + week, weight: 65 + week * 5, weightMode: 'same', note: 'Keep core tight, press straight up' },
-        { name: 'Bent-over Rows', sets: 3, reps: 10 + week, weight: 85 + week * 5, weightMode: 'same', note: 'Squeeze shoulder blades together' },
-        { name: 'Chest Press', sets: 3, reps: 10 + week, weight: 95 + week * 5, weightMode: 'same', note: 'Control the negative' },
-        { name: 'Tricep Dips', sets: 3, reps: 8 + week, weight: 0, weightMode: 'same', note: 'Keep body close to bench' }
-      ],
-      'lower': [
-        { name: 'Squats', sets: 4, reps: 10 + week * 2, weight: 135 + week * 10, weightMode: 'same', note: 'Hip-width stance, knees track over toes' },
-        { name: 'Romanian Deadlifts', sets: 3, reps: 8 + week, weight: 155 + week * 10, weightMode: 'same', note: 'Hinge at hips, feel hamstring stretch' },
-        { name: 'Lunges (each leg)', sets: 3, reps: 10 + week, weight: 25 + week * 5, weightMode: 'same', note: 'Step back, not forward - safer for knees' },
-        { name: 'Calf Raises', sets: 3, reps: 15 + week * 2, weight: 45 + week * 5, weightMode: 'same', note: 'Full range of motion, pause at top' },
-        { name: 'Glute Bridges', sets: 3, reps: 15 + week * 2, weight: 45 + week * 5, weightMode: 'same', note: 'Squeeze glutes hard at top' },
-        { name: 'Single-leg RDL', sets: 3, reps: 8 + week, weight: 15 + week * 2, weightMode: 'same', note: 'Start with bodyweight, focus on balance' }
-      ],
-      'core': [
-        { name: 'Planks', sets: 3, reps: 45 + week * 15, weight: 0, weightMode: 'same', note: 'Hold time in seconds - maintain straight line' },
-        { name: 'Russian Twists', sets: 3, reps: 20 + week * 5, weight: 10 + week * 2, weightMode: 'same', note: 'Controlled rotation, heels off ground' },
-        { name: 'Dead Bugs', sets: 3, reps: 10 + week * 2, weight: 0, weightMode: 'same', note: 'Press low back into floor' },
-        { name: 'Bird Dogs', sets: 3, reps: 8 + week * 2, weight: 0, weightMode: 'same', note: 'Opposite arm/leg, hold 3 seconds' },
-        { name: 'Side Planks', sets: 3, reps: 30 + week * 10, weight: 0, weightMode: 'same', note: 'Each side - hold time in seconds' },
-        { name: 'Mountain Climbers', sets: 3, reps: 20 + week * 5, weight: 0, weightMode: 'same', note: 'Each leg - controlled, not frantic' }
-      ],
-      'full-body': [
-        { name: 'Squats', sets: 3, reps: 10 + week, weight: 135 + week * 5, weightMode: 'same', note: 'Foundation movement - perfect your form' },
-        { name: 'Push-ups', sets: 3, reps: 8 + week, weight: 0, weightMode: 'same', note: 'Modify on knees if needed' },
-        { name: 'Romanian Deadlifts', sets: 3, reps: 8 + week, weight: 115 + week * 5, weightMode: 'same', note: 'Hip hinge pattern - crucial for runners' },
-        { name: 'Overhead Press', sets: 3, reps: 8 + week, weight: 45 + week * 5, weightMode: 'same', note: 'Full body stability exercise' },
-        { name: 'Planks', sets: 3, reps: 45 + week * 10, weight: 0, weightMode: 'same', note: 'Hold time in seconds' },
-        { name: 'Lunges', sets: 3, reps: 10 + week, weight: 20 + week * 2, weightMode: 'same', note: 'Each leg - single leg strength' }
-      ]
-    };
-    
-    const exercises = exerciseLibrary[focus] || exerciseLibrary['full-body'];
-    
-    return {
-      date: dateStr,
-      type: 'strength',
-      name: `Week ${week + 1} - ${focus.charAt(0).toUpperCase() + focus.slice(1)} Strength`,
-      description: `Strength training session focused on ${focus} development for running performance.`,
-      coachingNotes: coachingNotes[focus] || coachingNotes['full-body'],
-      strength_exercises: exercises.map((exercise, index) => ({
-        id: (index + 1).toString(),
-        ...exercise
-      }))
-    };
-  };
-
-  // 🧠 INTELLIGENT RIDE WORKOUTS
-  const generateSmartRideWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string, multiplier: number) => {
-    const duration = Math.round((60 + week * 15) * multiplier);
-    
-    return {
-      date: dateStr,
-      type: 'ride',
-      name: `Week ${week + 1} - ${focus.charAt(0).toUpperCase() + focus.slice(1)} Ride`,
-      intervals: [
-        {
-          id: '1',
-          time: `${duration}:00`,
-          powerTarget: focus === 'intervals' ? 'Zone 4-5' : focus === 'tempo' ? 'Zone 3' : 'Zone 2',
-          duration: duration * 60,
-          repeatCount: 1
-        }
-      ]
-    };
-  };
-
-  // 🧠 INTELLIGENT SWIM WORKOUTS
-  const generateSmartSwimWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string, multiplier: number) => {
-    const distance = Math.round((1500 + week * 300) * multiplier);
-    
-    return {
-      date: dateStr,
-      type: 'swim',
-      name: `Week ${week + 1} - ${focus.charAt(0).toUpperCase() + focus.slice(1)} Swim`,
-      intervals: [
-        {
-          id: '1',
-          distance: distance,
-          stroke: 'Freestyle',
-          targetRPE: focus === 'intervals' ? '7' : '5',
-          equipment: 'None',
-          repeatCount: 1
-        }
-      ]
-    };
-  };
-
-  const generatePlanFromSuggested = async () => {
-    const categoryName = categories[formData.category as keyof typeof categories];
-    const goalName = formData.specificGoal;
-    
-    const planPrompt = `${goalName}. Experience level: ${formData.experienceLevel}. Training frequency: ${formData.trainingFrequency}. Session duration: ${formData.timePerSession}. Equipment: ${formData.equipmentLocation}.`;
-    
-    return await generatePlan(planPrompt, formData.startDate);
-  };
-
-  const generatePlan = async (prompt?: string, startDateStr?: string) => {
-    const actualPrompt = prompt || planPrompt;
-    const actualStartDate = startDateStr || startDate;
-    
-    if (!actualPrompt.trim()) return;
-    
-    setGeneratingPlan(true);
-    try {
-      console.log('🧠 Generating INTELLIGENT AI plan for:', actualPrompt);
-      
-      // Generate AI-powered plan
-      const aiResult = await simulateAIResponse(actualPrompt, actualStartDate);
-      
-      // Create plan metadata
-      const planId = `plan-${Date.now()}`;
-      
-      // NEW: Organize workouts by week for detailed plan view
-      const organizeWorkoutsByWeek = (workouts: any[], startDate: string, planDuration: number) => {
-        const weeks = [];
-        
-        for (let weekNum = 1; weekNum <= planDuration; weekNum++) {
-          const weekWorkouts = workouts.filter(workout => {
-            const workoutDate = new Date(workout.date);
-            const startDateObj = new Date(startDate);
-            const weekStart = new Date(startDateObj);
-            weekStart.setDate(startDateObj.getDate() + ((weekNum - 1) * 7));
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekStart.getDate() + 6);
-            
-            return workoutDate >= weekStart && workoutDate <= weekEnd;
-          });
-          
-          weeks.push({
-            weekNumber: weekNum,
-            title: `Week ${weekNum}`,
-            focus: `Progressive training week ${weekNum}`,
-            workouts: weekWorkouts.map(w => ({
-              ...w,
-              completed: false,
-              intensity: w.intervals ? (
-                parseInt(w.intervals[0]?.rpeTarget || '5') > 7 ? 'Hard' : 
-                parseInt(w.intervals[0]?.rpeTarget || '5') > 5 ? 'Moderate' : 'Easy'
-              ) : 'Moderate',
-              duration: Math.floor((w.duration || 0) / 60) // Convert to minutes
-            }))
-          });
-        }
-        
-        return weeks;
       };
+    }
+  };
+
+  // Get equipment question options with added swimming equipment
+  const getEquipmentOptions = () => {
+    return {
+      running: [
+        "Treadmill access",
+        "Road running", 
+        "Trail access",
+        "Track access"
+      ],
+      cycling: [
+        "Road bike",
+        "Indoor trainer/smart trainer",
+        "Gym stationary bikes",
+        "Mountain bike"
+      ],
+      swimming: [
+        "Pool access",
+        "Open water access",
+        "Paddles",
+        "Pull buoy",
+        "Kickboard",
+        "Fins",
+        "Snorkel",
+        "No regular swimming access"
+      ],
+      strength: [
+        "Full barbell + plates",
+        "Adjustable dumbbells",
+        "Fixed dumbbells", 
+        "Squat rack or power cage",
+        "Bench (flat/adjustable)",
+        "Pull-up bar",
+        "Kettlebells",
+        "Resistance bands",
+        "Cable machine/functional trainer",
+        "Bodyweight only",
+        "Full commercial gym access"
+      ]
+    };
+  };
+
+  // Get event options based on primary focus
+  const getEventOptions = () => {
+    const focus = answers.focus.toLowerCase();
+    
+    if (focus === 'running') {
+      return [
+        "5K",
+        "10K", 
+        "15K",
+        "Half Marathon",
+        "Marathon",
+        "50K Ultra",
+        "50 Mile Ultra",
+        "100K Ultra",
+        "100 Mile Ultra"
+      ];
+    } else if (focus === 'triathlon') {
+      return [
+        "Sprint Triathlon",
+        "Olympic Triathlon", 
+        "70.3 Half Ironman",
+        "140.6 Full Ironman",
+        "Ultra Distance Triathlon"
+      ];
+    } else if (focus === 'cycling') {
+      return [
+        "Time Trial",
+        "Road Race",
+        "Criterium",
+        "Gran Fondo",
+        "Century Ride",
+        "Gravel Race",
+        "Stage Race",
+        "Hill Climb"
+      ];
+    } else if (focus === 'swimming') {
+      return [
+        "Open Water Swim",
+        "Pool Competition",
+        "Masters Meet"
+      ];
+    } else {
+      // For Strength Training or Hybrid, show general options
+      return [
+        "Powerlifting Competition",
+        "CrossFit Competition",
+        "Obstacle Race (Spartan, Tough Mudder)",
+        "General Fitness Goal"
+      ];
+    }
+  };
+  const getElevationGainOptions = () => {
+    const options = [];
+    for (let i = 0; i <= 20000; i += 500) {
+      if (i === 0) options.push("0-500 feet");
+      else if (i === 20000) options.push("20,000+ feet");
+      else options.push(`${i.toLocaleString()}-${(i + 500).toLocaleString()} feet`);
+    }
+    return options;
+  };
+
+  const getCourseDetailOptions = () => {
+    return {
+      courseProfile: [
+        "Flat/Rolling",
+        "Hilly",
+        "Mountainous",
+        "Mixed terrain"
+      ],
+      surfaceType: [
+        "Road/Pavement",
+        "Trail/Dirt",
+        "Gravel",
+        "Mixed surfaces",
+        "Track"
+      ],
+      climate: [
+        "Cool (under 60°F)",
+        "Moderate (60-75°F)",
+        "Warm (75-85°F)",
+        "Hot (85-95°F)",
+        "Very hot (95°F+)",
+        "Humid conditions",
+        "High altitude"
+      ],
+      technicalDifficulty: [
+        "Beginner friendly",
+        "Moderate technical",
+        "Advanced technical",
+        "Expert level"
+      ]
+    };
+  };
+
+  const totalQuestions = 17;
+  
+  const getCurrentQuestion = () => {
+    if (currentQuestion === 3) return getBenchmarkQuestion();
+    
+    // Handle conditional questions - FIXED: Skip questions that don't apply
+    const question = ASSESSMENT_QUESTIONS[currentQuestion];
+    if (question?.condition && !question.condition(answers)) {
+      console.log(`Skipping question ${currentQuestion} due to condition not met:`, question.id);
+      return null; // Skip this question
+    }
+    
+    return question;
+  };
+  
+  const currentQ = getCurrentQuestion();
+  const isLastQuestion = currentQuestion === totalQuestions - 1;
+  const isComplete = currentQuestion >= totalQuestions;
+
+  // Check if single-discipline benchmark question needs manual continue
+  const needsManualContinue = (questionId: string, focus: string): boolean => {
+    if (questionId !== 'benchmarks') return false;
+    
+    // Single disciplines that need manual continue after input fields
+    if (focus === 'Running') {
+      return containsValue(answers.benchmarks.running, 'I know my exact times/paces');
+    }
+    if (focus === 'Cycling') {
+      return containsValue(answers.benchmarks.cycling, 'I know my FTP (watts)');
+    }
+    if (focus === 'Swimming') {
+      return containsValue(answers.benchmarks.swimming, 'I know my 100-yard pace');
+    }
+    if (focus === 'Strength Training') {
+      return containsValue(answers.benchmarks.strength, 'I know my compound 1RMs');
+    }
+    
+    return false;
+  };
+
+  const handleOptionSelect = (option: string, category?: string) => {
+    console.log(`Option selected: ${option}, category: ${category}, current question: ${currentQuestion}`);
+    
+    if (currentQ?.type === 'triathlon' && category) {
+      // Handle triathlon multi-select for performance levels
+      const currentBenchmarks = answers.benchmarks[category as keyof typeof answers.benchmarks] || [];
+      const updatedBenchmarks = Array.isArray(currentBenchmarks) 
+        ? (currentBenchmarks.includes(option) 
+            ? currentBenchmarks.filter(item => item !== option)
+            : [...currentBenchmarks, option])
+        : [option];
       
-      const weeks = organizeWorkoutsByWeek(aiResult.workouts, actualStartDate, aiResult.plan.duration);
+      setAnswers(prev => ({
+        ...prev,
+        benchmarks: {
+          ...prev.benchmarks,
+          [category]: updatedBenchmarks
+        }
+      }));
+    } else if (currentQ?.type === 'hybridSelect' && category) {
+      // Handle hybrid selection
+      const currentBenchmarks = answers.benchmarks[category as keyof typeof answers.benchmarks] || [];
       
-      const planData = {
-        ...aiResult.plan,
-        id: planId,
-        weeks: weeks,
-        currentWeek: 1
-      };
+      if (!Array.isArray(currentBenchmarks) || currentBenchmarks.length === 0) {
+        setAnswers(prev => ({
+          ...prev,
+          benchmarks: {
+            ...prev.benchmarks,
+            [category]: [option]
+          }
+        }));
+      } else {
+        setAnswers(prev => ({
+          ...prev,
+          benchmarks: {
+            ...prev.benchmarks,
+            [category]: [option]
+          }
+        }));
+      }
+    } else if (currentQ?.type === 'multiSelect') {
+      // FIXED: Handle multi-select for injury body regions
+      const currentSelections = answers.injuryDetails?.bodyRegions || [];
+      const updatedSelections = currentSelections.includes(option)
+        ? currentSelections.filter(item => item !== option)
+        : [...currentSelections, option];
       
-      console.log('🧠 Generated INTELLIGENT plan data:', planData);
-      console.log('🧠 Generated workouts:', aiResult.workouts.length);
-      console.log('🧠 Organized weeks:', weeks.length);
+      setAnswers(prev => ({
+        ...prev,
+        injuryDetails: {
+          ...prev.injuryDetails!,
+          bodyRegions: updatedSelections
+        }
+      }));
+    } else if (currentQ?.type === 'equipment') {
+      // Handle equipment selection
+      const updatedEquipment = { ...answers.equipment };
+      if (category) {
+        const currentItems = updatedEquipment[category as keyof typeof updatedEquipment] || [];
+        updatedEquipment[category as keyof typeof updatedEquipment] = Array.isArray(currentItems)
+          ? (currentItems.includes(option)
+              ? currentItems.filter(item => item !== option)
+              : [...currentItems, option])
+          : [option];
+      }
       
-      // Save all workouts to the app
-      for (const workout of aiResult.workouts) {
-        const workoutData = {
-          name: workout.name,
-          type: workout.type,
-          date: workout.date,
-          description: workout.intervals ? 
-            workout.intervals.map(i => `${i.effortLabel || i.time || ''}`).join(' + ') :
-            workout.strength_exercises?.map(e => `${e.name} ${e.sets}x${e.reps}`).join(' + ') || '',
-          duration: workout.intervals ? 
-            workout.intervals.reduce((sum, i) => sum + (i.duration || 0), 0) : 
-            2400, // 40 min default for strength
-          workout_status: 'planned',
-          intervals: workout.intervals || undefined,
-          strength_exercises: workout.strength_exercises || undefined,
-          userComments: '',
-          completedManually: false,
-          planId: planId
+      setAnswers(prev => ({
+        ...prev,
+        equipment: updatedEquipment
+      }));
+    } else {
+      // Handle single select
+      const field = currentQ!.id as keyof Assessment;
+      if (field === 'benchmarks') {
+        const newAnswers = {
+          ...answers,
+          benchmarks: {
+            ...answers.benchmarks,
+            [answers.focus.toLowerCase()]: option
+          }
         };
+        setAnswers(newAnswers);
         
-        try {
-          await addWorkout(workoutData);
-        } catch (error) {
-          console.error('Error saving workout:', error);
+        // Check if we need manual continue with the updated answers
+        if (!needsManualContinue('benchmarks', answers.focus)) {
+          console.log('Auto-advancing after benchmark selection');
+          setTimeout(() => {
+            advanceToNextQuestion();
+          }, 100);
         }
-      }
-      
-      // Call the plan generation callback directly - NO POPUP
-      if (onPlanGenerated) {
-        console.log('🧠 Calling onPlanGenerated with:', planData);
-        onPlanGenerated(planData);
-      }
-      
-      // Reset forms
-      if (activeTab === 'suggested') {
-        setFormData({
-          category: '', specificGoal: '', experienceLevel: '', 
-          trainingFrequency: '', timePerSession: '', equipmentLocation: '',
-          startDate: new Date().toISOString().split('T')[0]
-        });
-        setCurrentStep(1);
       } else {
-        setPlanPrompt('');
+        setAnswers(prev => ({
+          ...prev,
+          [field]: option
+        }));
+        
+        // Special handling for injury history - FIXED
+        if (field === 'injuryHistory') {
+          const hasInjuries = option !== "No current injuries or limitations";
+          setAnswers(prev => ({
+            ...prev,
+            injuryDetails: {
+              ...prev.injuryDetails!,
+              hasInjuries: hasInjuries
+            }
+          }));
+          
+          console.log('Injury history set:', option, 'hasInjuries:', hasInjuries);
+          
+          // FIXED: For injury history, always auto-advance regardless of selection
+          setTimeout(() => {
+            advanceToNextQuestion();
+          }, 100);
+          return;
+        }
+        
+        // For all other single select questions, auto advance
+        console.log('Auto-advancing after single select');
+        setTimeout(() => {
+          advanceToNextQuestion();
+        }, 100);
+      }
+    }
+  };
+
+  const handleTriathlonDistanceSelect = (distance: string) => {
+    setAnswers(prev => ({
+      ...prev,
+      triathlonDistance: distance
+    }));
+  };
+
+  const handleNumberSubmit = () => {
+    if (!textInput.trim()) return;
+    
+    const age = parseInt(textInput);
+    if (age < 13 || age > 100) return;
+    
+    setAnswers(prev => ({
+      ...prev,
+      age: age
+    }));
+    setSelectedEventCategory('');
+    setSelectedEventType('');
+    setCurrentCourseStep(0);
+    setTextInput('');
+    
+    advanceToNextQuestion();
+  };
+
+  const handleTextSubmit = () => {
+    if (!textInput.trim()) return;
+    
+    setAnswers(prev => ({
+      ...prev,
+      [currentQ!.id]: textInput.trim()
+    }));
+    setTextInput('');
+    
+    advanceToNextQuestion();
+  };
+
+  const advanceToNextQuestion = () => {
+    let nextQ = currentQuestion + 1;
+    
+    // Skip conditional questions that don't apply
+    while (nextQ < totalQuestions) {
+      if (nextQ === 3) {
+        // Benchmark question - always valid
+        break;
       }
       
-      // REMOVED: Success alert popup - users flow directly to their plan
+      const nextQuestion = ASSESSMENT_QUESTIONS[nextQ];
+      if (!nextQuestion?.condition) {
+        // No condition - always valid
+        break;
+      }
+      
+      // FIXED: Check condition with current answers
+      if (nextQuestion.condition(answers)) {
+        break;
+      }
+      
+      nextQ++; // Skip this question
+    }
+    
+    console.log(`Advancing from question ${currentQuestion} to question ${nextQ}, total questions: ${totalQuestions}`);
+    console.log('Current answers for injury check:', {
+      injuryHistory: answers.injuryHistory,
+      hasInjuries: answers.injuryDetails?.hasInjuries
+    });
+    
+    setCurrentQuestion(Math.min(nextQ, totalQuestions));
+  };
+
+  const handleContinue = () => {
+    advanceToNextQuestion();
+  };
+
+  const goBack = () => {
+    if (currentQuestion > 0) {
+      // Find previous valid question
+      let prevQ = currentQuestion - 1;
+      while (prevQ >= 0) {
+        if (prevQ === 3) {
+          // Benchmark question - always valid
+          break;
+        }
+        
+        const prevQuestion = ASSESSMENT_QUESTIONS[prevQ];
+        if (!prevQuestion?.condition || prevQuestion.condition(answers)) {
+          break;
+        }
+        prevQ--;
+      }
+      
+      setCurrentQuestion(Math.max(prevQ, 0));
+      setTextInput('');
+    }
+  };
+
+  // Build prompt from assessment
+  const buildPrompt = (): string => {
+    let benchmarkText = '';
+    if (answers.focus === 'Triathlon' || answers.focus === 'Hybrid') {
+      Object.entries(answers.benchmarks).forEach(([sport, levels]) => {
+        if (Array.isArray(levels) && levels.length > 0) {
+          benchmarkText += `${sport}: ${levels.join(', ')}; `;
+        }
+      });
+      if (answers.triathlonDistance) {
+        benchmarkText += `Distance Focus: ${answers.triathlonDistance}; `;
+      }
+    } else {
+      const singleBenchmark = answers.benchmarks[answers.focus.toLowerCase() as keyof typeof answers.benchmarks];
+      if (singleBenchmark) {
+        benchmarkText = `Performance Level: ${singleBenchmark}`;
+      }
+    }
+
+    let equipmentText = '';
+    Object.entries(answers.equipment).forEach(([category, items]) => {
+      if (Array.isArray(items) && items.length > 0) {
+        equipmentText += `${category}: ${items.join(', ')}; `;
+      }
+    });
+
+    return `Create a training plan based on this assessment:
+
+Primary Focus: ${answers.focus}
+Age: ${answers.age}
+Current Fitness: ${answers.currentFitness}
+${benchmarkText}
+Injury History: ${answers.injuryHistory}
+Training Frequency: ${answers.daysPerWeek}
+Weekday Duration: ${answers.weekdayTime}
+Weekend Duration: ${answers.weekendTime}
+Main Goal: ${answers.goal}
+Timeline: ${answers.timeline}
+${answers.eventDetails ? `Event: ${answers.eventDetails}` : ''}
+${answers.eventDate ? `Event Date: ${answers.eventDate}` : ''}
+${answers.courseDetails?.courseDescription ? `Course Details: ${answers.courseDetails.courseDescription}` : ''}
+${answers.courseDetails?.elevationGain ? `Course Characteristics: ${answers.courseDetails.elevationGain} elevation, ${answers.courseDetails.courseProfile}, ${answers.courseDetails.surfaceType}, ${answers.courseDetails.climate}, ${answers.courseDetails.technicalDifficulty}` : ''}
+Training Background: ${answers.trainingBackground}
+Equipment: ${equipmentText}
+${answers.triathlonStrength ? `Triathlon Strength Approach: ${answers.triathlonStrength}` : ''}
+${answers.singleDisciplineStrength ? `Strength Training Approach: ${answers.singleDisciplineStrength}` : ''}
+
+Create a structured weekly training plan that:
+- Matches their current fitness level and performance benchmarks
+- Uses only the equipment they have available
+- Respects their injury history and limitations
+- Progresses appropriately based on their training background
+- Fits their time constraints and frequency
+- Uses sound training science and periodization
+- Provides specific, actionable workouts
+- Is age-appropriate for their training zones and recovery
+${answers.singleDisciplineStrength === 'No strength training' || answers.triathlonStrength === 'No strength training' ? '- IMPORTANT: Do NOT include any strength training, lifting, or resistance work - focus purely on the primary discipline' : ''}
+${(answers.singleDisciplineStrength && answers.singleDisciplineStrength !== 'No strength training') || (answers.triathlonStrength && answers.triathlonStrength !== 'No strength training') ? '- Include strength training as specified in their strength training approach' : ''}
+
+Be intelligent about interpreting their fitness and benchmark descriptions to create appropriate training intensities.`;
+  };
+
+  // Generate plan from assessment
+  const generatePlanFromAssessment = async () => {
+    setGeneratingPlan(true);
+    
+    try {
+      console.log('Building plan from assessment...');
+      
+      const prompt = buildPrompt();
+      console.log('Assessment prompt:', prompt);
+      
+      // Call training service
+      const result = await realAI.generateTrainingPlan(
+        prompt,
+        startDate,
+        answers
+      );
+      
+      console.log('Plan generated:', result);
+      
+      // Convert to display format
+      const enhancedPlan = {
+        id: result.plan.id || `plan-${Date.now()}`,
+        name: result.plan.name || 'Training Plan',
+        description: result.plan.description || 'Personalized training plan based on your assessment',
+        focus: answers.focus,
+        goal: answers.goal,
+        daysPerWeek: answers.daysPerWeek,
+        weekdayTime: answers.weekdayTime,
+        weekendTime: answers.weekendTime,
+        weeklySchedule: generateDisplaySchedule(result.workouts),
+        currentWeek: 1,
+        totalWeeks: result.plan.duration || 8,
+        workouts: result.workouts
+      };
+      
+      console.log('Enhanced plan created:', enhancedPlan);
+      setGeneratedPlan(enhancedPlan);
       
     } catch (error) {
       console.error('Error generating plan:', error);
@@ -869,333 +982,1073 @@ export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderPro
     }
   };
 
-  const renderSuggestedStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">Pick your training interest:</h2>
-            <div className="space-y-3">
-              {Object.entries(categories).map(([key, category]) => (
-                <button
-                  key={key}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, category: key }));
-                    handleNext();
-                  }}
-                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
-                >
-                  {category}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 2:
-        const goalOptions = specificGoals[formData.category as keyof typeof specificGoals] || [];
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">{categories[formData.category as keyof typeof categories]}</h2>
-            <div className="space-y-3">
-              {goalOptions.map((goal, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, specificGoal: goal }));
-                    handleNext();
-                  }}
-                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
-                >
-                  {goal}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 3:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">What's your experience level?</h2>
-            <div className="space-y-3">
-              {experienceLevels.map((level) => (
-                <button
-                  key={level}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, experienceLevel: level }));
-                    handleNext();
-                  }}
-                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
-                >
-                  {level}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">How many days per week do you want to train?</h2>
-            <div className="space-y-3">
-              {trainingFrequencies.map((freq) => (
-                <button
-                  key={freq}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, trainingFrequency: freq }));
-                    handleNext();
-                  }}
-                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
-                >
-                  {freq}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">How much time do you have per session?</h2>
-            <div className="space-y-3">
-              {timePerSessions.map((time) => (
-                <button
-                  key={time}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, timePerSession: time }));
-                    handleNext();
-                  }}
-                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
-                >
-                  {time}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 6:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">What equipment do you have access to and where will you train?</h2>
-            <div className="space-y-3">
-              {getEquipmentOptions().map((option) => (
-                <button
-                  key={option}
-                  onClick={() => {
-                    setFormData(prev => ({ ...prev, equipmentLocation: option }));
-                    handleNext();
-                  }}
-                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
-                >
-                  {option}
-                </button>
-              ))}
-            </div>
-          </div>
-        );
-
-      case 7:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-xl font-medium">When do you want to start?</h2>
-            <Input
-              type="date"
-              value={formData.startDate}
-              onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
-              className="text-lg p-4 min-h-[44px]"
-            />
-            
-            <div className="space-y-4 p-4">
-              <h3 className="font-medium">Plan Summary:</h3>
-              <div className="space-y-2 text-sm">
-                <p><strong>Goal:</strong> {formData.specificGoal}</p>
-                <p><strong>Experience:</strong> {formData.experienceLevel}</p>
-                <p><strong>Frequency:</strong> {formData.trainingFrequency}</p>
-                <p><strong>Session Time:</strong> {formData.timePerSession}</p>
-                <p><strong>Equipment:</strong> {formData.equipmentLocation}</p>
-                <p><strong>Start Date:</strong> {formData.startDate}</p>
-              </div>
-            </div>
-            
-            <Button
-              onClick={generatePlanFromSuggested}
-              disabled={generatingPlan}
-              className="w-full h-12 text-white hover:bg-gray-800"
-              style={{ backgroundColor: generatingPlan ? '#6b7280' : '#000000' }}
-            >
-              {generatingPlan ? (
-                <div className="flex items-center gap-2">
-                  <Kanban className="h-4 w-4 animate-spin" />
-                  Generating intelligent plan...
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Kanban className="h-4 w-4" />
-                  Generate Intelligent Plan
-                </div>
-              )}
-            </Button>
-          </div>
-        );
-
-      default:
-        return null;
+  const generateDisplaySchedule = (workouts: any[]): string[] => {
+    console.log('Generating display schedule from workouts:', workouts);
+    
+    if (!workouts || workouts.length === 0) {
+      console.log('No workouts provided, using fallback schedule');
+      return [
+        'Monday: Structured workout based on your goals',
+        'Tuesday: Recovery or cross-training',
+        'Wednesday: High intensity training session', 
+        'Thursday: Active recovery',
+        'Friday: Skill or technique work',
+        'Saturday: Long session or competition prep',
+        'Sunday: Rest or light activity'
+      ];
     }
+
+    const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const schedule = [];
+    
+    for (let i = 0; i < 7; i++) {
+      if (workouts[i]) {
+        const workout = workouts[i];
+        
+        if (workout.name && workout.description) {
+          let description = workout.description;
+          if (description.toLowerCase().startsWith(dayNames[i].toLowerCase())) {
+            description = description.substring(dayNames[i].length + 1).trim();
+            if (description.startsWith(':')) description = description.substring(1).trim();
+          }
+          
+          schedule.push(`${dayNames[i]}: ${workout.name} - ${description}`);
+        } else {
+          schedule.push(`${dayNames[i]}: ${workout.name || 'Training Session'}`);
+        }
+      } else {
+        schedule.push(`${dayNames[i]}: Rest day`);
+      }
+    }
+    
+    return schedule;
+  };
+
+  const reset = () => {
+    setCurrentQuestion(0);
+    setAnswers({
+      focus: '',
+      age: 0,
+      currentFitness: '',
+      benchmarks: {},
+      triathlonDistance: '',
+      injuryHistory: '',
+      injuryDetails: {
+        hasInjuries: false,
+        bodyRegions: [],
+        specificInjuries: {}
+      },
+      triathlonStrength: '',
+      singleDisciplineStrength: '',
+      hybridStrength: '',
+      goal: '',
+      timeline: '',
+      eventDetails: '',
+      eventCategory: '',
+      eventType: '',
+      eventDate: '',
+      courseDetails: {
+        elevationGain: '',
+        courseProfile: '',
+        surfaceType: '',
+        climate: '',
+        technicalDifficulty: '',
+        courseDescription: '',
+        hasSpecificCourse: false
+      },
+      daysPerWeek: '', 
+      weekdayTime: '',
+      weekendTime: '',
+      trainingBackground: '',
+      equipment: {},
+      performanceNumbers: {}
+    });
+    setTextInput('');
+    setGeneratedPlan(null);
+    setActiveTab('assessment');
   };
 
   return (
     <div className="min-h-screen bg-white">
       <main className="max-w-7xl mx-auto px-3 py-2">
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <Button
-            onClick={onClose}
-            variant="ghost"
-            className="flex items-center gap-2 p-0 h-auto text-muted-foreground hover:text-black"
+        <div className="flex justify-end items-center mb-6">
+          <button
+            onClick={reset}
+            className="px-4 py-2 text-gray-600 hover:text-black transition-colors"
           >
-            <ArrowLeft className="h-4 w-4" />
-            Dashboard
-          </Button>
+            Reset
+          </button>
         </div>
 
         {/* Tabs */}
         <div className="max-w-2xl mx-auto mb-8">
           <div className="flex">
             <button
-              onClick={() => setActiveTab('suggested')}
+              onClick={() => setActiveTab('assessment')}
               className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
-                activeTab === 'suggested'
+                activeTab === 'assessment'
                   ? 'border-black text-black'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Suggested
+              Assessment
             </button>
             <button
-              onClick={() => setActiveTab('free')}
+              onClick={() => setActiveTab('manual')}
               className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
-                activeTab === 'free'
+                activeTab === 'manual'
                   ? 'border-black text-black'
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              Free
+              Manual
             </button>
           </div>
         </div>
 
         <div className="max-w-2xl mx-auto">
-          {activeTab === 'suggested' ? (
-            <div>
-              {/* Navigation for suggested mode */}
-              {currentStep > 1 && (
-                <div className="flex justify-between items-center mb-6">
-                  <Button
-                    onClick={handleBack}
-                    variant="ghost"
-                    className="flex items-center gap-2"
-                  >
-                    <ArrowLeft className="h-4 w-4" />
-                    Back
-                  </Button>
-                  <span className="text-sm text-gray-500">
-                    Step {currentStep} of 7
-                  </span>
-                </div>
-              )}
-              
-              {renderSuggestedStep()}
-            </div>
-          ) : (
-            <div>
-              <div className="text-center mb-8">
-                <div className="flex justify-center mb-4">
-                  <div className="p-4 rounded-full">
-                    <Kanban className="h-8 w-8 text-black" />
+          {activeTab === 'assessment' ? (
+            /* Assessment Tab */
+            <div className="space-y-6">
+              {!isComplete && !generatedPlan ? (
+                /* Assessment Questions */
+                <div className="space-y-6">
+                  <div className="text-center mb-8">
+                    {/* Progress bar */}
+                    <div className="w-full bg-gray-200 rounded-full h-2 mb-4">
+                      <div 
+                        className="bg-black h-2 rounded-full transition-all duration-300" 
+                        style={{width: `${(currentQuestion / totalQuestions) * 100}%`}}
+                      ></div>
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Question {currentQuestion + 1} of {totalQuestions}
+                    </p>
                   </div>
-                </div>
-                <h1 className="text-2xl font-semibold mb-2">Build me a plan</h1>
-                <p className="text-gray-600">
-                  Describe your training goals and I'll create a personalized plan with progressive workouts
-                </p>
-              </div>
 
-              <div className="space-y-6">
-                {/* Start Date Input */}
-                <div className="space-y-2">
-                  <Label htmlFor="startDate" className="text-sm font-medium text-gray-700">
-                    Start Date
-                  </Label>
-                  <div className="relative">
-                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="startDate"
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      className="pl-10 min-h-[44px]"
-                    />
-                  </div>
-                </div>
-
-                {/* Plan Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="planPrompt" className="text-sm font-medium text-gray-700">
-                    Describe Your Training Goal
-                  </Label>
-                  <Textarea
-                    id="planPrompt"
-                    value={planPrompt}
-                    onChange={(e) => setPlanPrompt(e.target.value)}
-                    placeholder="I want to train for a 5K race in 8 weeks. I'm a beginner runner who can currently run for 20 minutes without stopping..."
-                    rows={4}
-                    className="w-full min-h-[100px]"
-                  />
-                </div>
-                
-                {/* Quick Suggestions */}
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600 font-medium">Quick suggestions:</p>
-                  <div className="grid grid-cols-1 gap-2">
-                    {quickPlans.map((suggestion, index) => (
+                  {/* Back button */}
+                  {currentQuestion > 0 && (
+                    <div className="flex justify-start">
                       <button
-                        key={index}
-                        onClick={() => setPlanPrompt(suggestion)}
-                        className="text-left p-3 text-sm hover:text-blue-600 transition-colors"
+                        onClick={goBack}
+                        className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-black transition-colors"
                       >
-                        {suggestion}
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
                       </button>
-                    ))}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* FIXED: Skip rendering when question should be skipped due to conditions */}
+                  {currentQ ? (
+                    <>
+                      <div className="text-center">
+                        <h2 className="text-xl font-medium mb-6">{currentQ?.text}</h2>
+                      </div>
+
+                      {currentQ?.type === 'number' ? (
+                        /* Number input for age */
+                        <div className="space-y-4">
+                          <div className="flex justify-center">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={textInput}
+                              onChange={(e) => setTextInput(e.target.value)}
+                              placeholder={currentQ.placeholder}
+                              className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-center text-lg"
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && textInput.trim()) {
+                                  e.preventDefault();
+                                  handleNumberSubmit();
+                                }
+                              }}
+                            />
+                          </div>
+                          <div className="text-center">
+                            <button
+                              onClick={handleNumberSubmit}
+                              disabled={!textInput.trim() || parseInt(textInput) < 13 || parseInt(textInput) > 100}
+                              className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                            >
+                              Continue
+                            </button>
+                          </div>
+                        </div>
+                      ) : currentQ?.type === 'combinedTime' ? (
+                        /* FIXED: Combined time selection with ultra-capable options */
+                        <div className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium text-gray-700">Weekday time limit:</label>
+                              <select
+                                value={answers.weekdayTime}
+                                onChange={(e) => setAnswers(prev => ({
+                                  ...prev,
+                                  weekdayTime: e.target.value
+                                }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                              >
+                                <option value="">Select weekday time</option>
+                                {TIME_OPTIONS.map((option, index) => (
+                                  <option key={index} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div className="space-y-3">
+                              <label className="text-sm font-medium text-gray-700">Weekend time limit:</label>
+                              <select
+                                value={answers.weekendTime}
+                                onChange={(e) => setAnswers(prev => ({
+                                  ...prev,
+                                  weekendTime: e.target.value
+                                }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                              >
+                                <option value="">Select weekend time</option>
+                                {TIME_OPTIONS.map((option, index) => (
+                                  <option key={index} value={option}>{option}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
+                          
+                          <div className="text-center pt-4">
+                            <button
+                              onClick={handleContinue}
+                              disabled={!answers.weekdayTime || !answers.weekendTime}
+                              className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                            >
+                              Continue
+                            </button>
+                          </div>
+                        </div>
+                      ) : currentQ?.type === 'triathlon' ? (
+                        /* Triathlon with distance selection first */
+                        <div className="space-y-6">
+                          {!answers.triathlonDistance ? (
+                            <div className="space-y-3">
+                              <h3 className="text-lg font-medium">First, what distance do you focus on?</h3>
+                              <div className="space-y-2">
+                                {currentQ.distanceOptions?.map((option, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => handleTriathlonDistanceSelect(option)}
+                                    className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                                  >
+                                    <span className="font-medium text-gray-500 mr-3">{index + 1}.</span>
+                                    {option}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-6">
+                              <div className="text-center p-3 bg-gray-50 rounded-lg">
+                                <p className="text-sm text-gray-600">Distance Focus: <strong>{answers.triathlonDistance}</strong></p>
+                              </div>
+                              
+                              <h3 className="text-lg font-medium">Now, what are your performance levels?</h3>
+                              {Object.entries(currentQ.categories || {}).map(([category, options]) => (
+                                <div key={category} className="space-y-3">
+                                  <h4 className="font-medium capitalize">{category}:</h4>
+                                  <div className="space-y-2">
+                                    {options.map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => handleOptionSelect(option, category)}
+                                        className={`w-full p-4 text-left transition-colors ${
+                                          (answers.benchmarks[category as keyof typeof answers.benchmarks] as string[] || []).includes(option)
+                                            ? 'text-blue-600'
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {(answers.benchmarks[category as keyof typeof answers.benchmarks] as string[] || []).includes(option) ? '✓' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  
+                                  {/* Input fields for performance data */}
+                                  {category === 'cycling' && containsValue(answers.benchmarks.cycling, 'I know my FTP (watts)') && (
+                                    <div className="ml-4 mt-3 p-3 bg-gray-50 rounded-lg">
+                                      <label className="text-sm font-medium">Your FTP (watts):</label>
+                                      <input
+                                        type="number"
+                                        placeholder="285"
+                                        value={answers.performanceNumbers.ftp || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            ftp: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        className="mt-1 w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  {category === 'swimming' && containsValue(answers.benchmarks.swimming, 'I know my 100-yard pace') && (
+                                    <div className="ml-4 mt-3 p-3 bg-gray-50 rounded-lg">
+                                      <label className="text-sm font-medium">Your 100-yard pace (mm:ss):</label>
+                                      <input
+                                        type="text"
+                                        placeholder="1:25"
+                                        value={answers.performanceNumbers.swimPace || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            swimPace: e.target.value
+                                          }
+                                        }))}
+                                        className="mt-1 w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                  )}
+                                  
+                                  {category === 'running' && containsValue(answers.benchmarks.running, 'I know my exact times/paces') && (
+                                    <div className="ml-4 mt-3 p-3 bg-gray-50 rounded-lg">
+                                      <label className="text-sm font-medium mb-2 block">Your race times (optional):</label>
+                                      <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                          <label className="text-xs text-gray-600">5K time</label>
+                                          <input
+                                            type="text"
+                                            placeholder="18:30"
+                                            value={answers.performanceNumbers.runningPaces?.fiveK || ''}
+                                            onChange={(e) => setAnswers(prev => ({
+                                              ...prev,
+                                              performanceNumbers: {
+                                                ...prev.performanceNumbers,
+                                                runningPaces: {
+                                                  ...prev.performanceNumbers.runningPaces,
+                                                  fiveK: e.target.value
+                                                }
+                                              }
+                                            }))}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="text-xs text-gray-600">10K time</label>
+                                          <input
+                                            type="text"
+                                            placeholder="38:15"
+                                            value={answers.performanceNumbers.runningPaces?.tenK || ''}
+                                            onChange={(e) => setAnswers(prev => ({
+                                              ...prev,
+                                              performanceNumbers: {
+                                                ...prev.performanceNumbers,
+                                                runningPaces: {
+                                                  ...prev.performanceNumbers.runningPaces,
+                                                  tenK: e.target.value
+                                                }
+                                              }
+                                            }))}
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              
+                              <div className="text-center pt-4">
+                                <button
+                                  onClick={handleContinue}
+                                  className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium"
+                                >
+                                  Continue
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : currentQ?.type === 'hybridSelect' ? (
+                        /* Hybrid selection */
+                        <div className="space-y-6">
+                          <p className="text-sm text-gray-600">First check which disciplines you want to train, then select your level in each:</p>
+                          {Object.entries(currentQ.categories || {}).map(([category, options]) => {
+                            const isEnabled = (answers.benchmarks[category as keyof typeof answers.benchmarks] as string[] || []).length > 0;
+                            return (
+                              <div key={category} className="space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <input
+                                    type="checkbox"
+                                    checked={isEnabled}
+                                    onChange={() => {
+                                      if (isEnabled) {
+                                        setAnswers(prev => ({
+                                          ...prev,
+                                          benchmarks: {
+                                            ...prev.benchmarks,
+                                            [category]: []
+                                          }
+                                        }));
+                                      } else {
+                                        setAnswers(prev => ({
+                                          ...prev,
+                                          benchmarks: {
+                                            ...prev.benchmarks,
+                                            [category]: [options[0]]
+                                          }
+                                        }));
+                                      }
+                                    }}
+                                    className="w-4 h-4"
+                                  />
+                                  <h3 className="text-lg font-medium capitalize">{category}</h3>
+                                </div>
+                                {isEnabled && (
+                                  <div className="ml-7 space-y-2">
+                                    {options.map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => handleOptionSelect(option, category)}
+                                        className={`w-full p-3 text-left text-sm transition-colors ${
+                                          (answers.benchmarks[category as keyof typeof answers.benchmarks] as string[] || []).includes(option)
+                                            ? 'text-blue-600'
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {(answers.benchmarks[category as keyof typeof answers.benchmarks] as string[] || []).includes(option) ? '●' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                          <div className="text-center pt-4">
+                            <button
+                              onClick={handleContinue}
+                              className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium"
+                            >
+                              Continue
+                            </button>
+                          </div>
+                        </div>
+                      ) : currentQ?.type === 'eventSelection' ? (
+                        /* FIXED: Direct event selection based on primary focus */
+                        <div className="space-y-3">
+                          <div className="text-center p-3 bg-gray-50 rounded-lg mb-4">
+                            <p className="text-sm text-gray-600">
+                              <strong className="capitalize">{answers.focus}</strong> Events
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            {getEventOptions().map((eventType, index) => (
+                              <button
+                                key={index}
+                                onClick={() => {
+                                  setAnswers(prev => ({
+                                    ...prev,
+                                    eventDetails: eventType
+                                  }));
+                                  advanceToNextQuestion();
+                                }}
+                                className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                              >
+                                <span className="font-medium text-gray-500 mr-3">{index + 1}.</span>
+                                {eventType}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : currentQ?.type === 'date' ? (
+                        /* Date input for event date */
+                        <div className="space-y-4">
+                          <div className="flex justify-center">
+                            <input
+                              type="date"
+                              value={textInput}
+                              onChange={(e) => setTextInput(e.target.value)}
+                              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                            />
+                          </div>
+                          <div className="text-center">
+                            <button
+                              onClick={() => {
+                                setAnswers(prev => ({
+                                  ...prev,
+                                  eventDate: textInput
+                                }));
+                                setTextInput('');
+                                advanceToNextQuestion();
+                              }}
+                              disabled={!textInput}
+                              className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                            >
+                              Continue
+                            </button>
+                          </div>
+                        </div>
+                      ) : currentQ?.type === 'courseAnalysis' ? (
+                        /* Course Analysis - Multi-step */
+                        <div className="space-y-6">
+                          {currentCourseStep === 0 ? (
+                            <div className="space-y-4">
+                              <h3 className="text-lg font-medium">Do you have specific course information?</h3>
+                              <div className="space-y-2">
+                                <button
+                                  onClick={() => {
+                                    setAnswers(prev => ({
+                                      ...prev,
+                                      courseDetails: {
+                                        ...prev.courseDetails!,
+                                        hasSpecificCourse: true
+                                      }
+                                    }));
+                                    setCurrentCourseStep(1);
+                                  }}
+                                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                                >
+                                  <span className="font-medium text-gray-500 mr-3">1.</span>
+                                  Yes - I can upload course file or provide detailed description
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setAnswers(prev => ({
+                                      ...prev,
+                                      courseDetails: {
+                                        ...prev.courseDetails!,
+                                        hasSpecificCourse: false
+                                      }
+                                    }));
+                                    setCurrentCourseStep(2);
+                                  }}
+                                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                                >
+                                  <span className="font-medium text-gray-500 mr-3">2.</span>
+                                  No - I'll provide general course characteristics
+                                </button>
+                              </div>
+                            </div>
+                          ) : currentCourseStep === 1 ? (
+                            <div className="space-y-4">
+                              <h3 className="text-lg font-medium">Course Description</h3>
+                              <p className="text-sm text-gray-600">
+                                Describe the course in detail. Include elevation profiles, key climbs, technical sections, 
+                                weather conditions, or paste Strava/race website links.
+                              </p>
+                              <textarea
+                                value={textInput}
+                                onChange={(e) => setTextInput(e.target.value)}
+                                placeholder="Example: The course has three major climbs at miles 20, 45, and 80. The first climb is 800ft over 3 miles, the second is 1200ft over 2 miles... Hot and humid conditions expected..."
+                                rows={6}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                              />
+                              <div className="text-center">
+                                <button
+                                  onClick={() => {
+                                    setAnswers(prev => ({
+                                      ...prev,
+                                      courseDetails: {
+                                        ...prev.courseDetails!,
+                                        courseDescription: textInput
+                                      }
+                                    }));
+                                    setTextInput('');
+                                    advanceToNextQuestion();
+                                  }}
+                                  disabled={!textInput.trim()}
+                                  className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                                >
+                                  Continue
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            /* General Course Characteristics */
+                            <div className="space-y-6">
+                              <h3 className="text-lg font-medium">Course Characteristics</h3>
+                              
+                              {/* Elevation Gain */}
+                              <div className="space-y-3">
+                                <h4 className="font-medium">Elevation Gain:</h4>
+                                <select
+                                  value={answers.courseDetails?.elevationGain || ''}
+                                  onChange={(e) => setAnswers(prev => ({
+                                    ...prev,
+                                    courseDetails: {
+                                      ...prev.courseDetails!,
+                                      elevationGain: e.target.value
+                                    }
+                                  }))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                >
+                                  <option value="">Select elevation gain</option>
+                                  {getElevationGainOptions().map((option, index) => (
+                                    <option key={index} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Course Profile */}
+                              <div className="space-y-3">
+                                <h4 className="font-medium">Course Profile:</h4>
+                                <select
+                                  value={answers.courseDetails?.courseProfile || ''}
+                                  onChange={(e) => setAnswers(prev => ({
+                                    ...prev,
+                                    courseDetails: {
+                                      ...prev.courseDetails!,
+                                      courseProfile: e.target.value
+                                    }
+                                  }))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                >
+                                  <option value="">Select course profile</option>
+                                  {getCourseDetailOptions().courseProfile.map((option, index) => (
+                                    <option key={index} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Surface Type */}
+                              <div className="space-y-3">
+                                <h4 className="font-medium">Surface Type:</h4>
+                                <select
+                                  value={answers.courseDetails?.surfaceType || ''}
+                                  onChange={(e) => setAnswers(prev => ({
+                                    ...prev,
+                                    courseDetails: {
+                                      ...prev.courseDetails!,
+                                      surfaceType: e.target.value
+                                    }
+                                  }))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                >
+                                  <option value="">Select surface type</option>
+                                  {getCourseDetailOptions().surfaceType.map((option, index) => (
+                                    <option key={index} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Climate */}
+                              <div className="space-y-3">
+                                <h4 className="font-medium">Expected Climate:</h4>
+                                <select
+                                  value={answers.courseDetails?.climate || ''}
+                                  onChange={(e) => setAnswers(prev => ({
+                                    ...prev,
+                                    courseDetails: {
+                                      ...prev.courseDetails!,
+                                      climate: e.target.value
+                                    }
+                                  }))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                >
+                                  <option value="">Select climate</option>
+                                  {getCourseDetailOptions().climate.map((option, index) => (
+                                    <option key={index} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* Technical Difficulty */}
+                              <div className="space-y-3">
+                                <h4 className="font-medium">Technical Difficulty:</h4>
+                                <select
+                                  value={answers.courseDetails?.technicalDifficulty || ''}
+                                  onChange={(e) => setAnswers(prev => ({
+                                    ...prev,
+                                    courseDetails: {
+                                      ...prev.courseDetails!,
+                                      technicalDifficulty: e.target.value
+                                    }
+                                  }))}
+                                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                >
+                                  <option value="">Select difficulty</option>
+                                  {getCourseDetailOptions().technicalDifficulty.map((option, index) => (
+                                    <option key={index} value={option}>{option}</option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div className="text-center pt-4">
+                                <button
+                                  onClick={() => {
+                                    setCurrentCourseStep(0);
+                                    advanceToNextQuestion();
+                                  }}
+                                  disabled={!answers.courseDetails?.elevationGain || !answers.courseDetails?.courseProfile}
+                                  className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                                >
+                                  Continue
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : currentQ?.type === 'multiSelect' ? (
+                        /* FIXED: Multi-select for injury body regions with proper continue logic */
+                        <div className="space-y-6">
+                          <p className="text-sm text-gray-600">Select all areas that are currently affected:</p>
+                          <div className="space-y-2">
+                            {currentQ.options?.map((option, index) => (
+                              <button
+                                key={index}
+                                onClick={() => handleOptionSelect(option)}
+                                className={`w-full p-4 text-left transition-colors ${
+                                  (answers.injuryDetails?.bodyRegions || []).includes(option)
+                                    ? 'text-blue-600'
+                                    : 'hover:text-blue-600'
+                                }`}
+                              >
+                                <span className="font-medium text-gray-500 mr-3">
+                                  {(answers.injuryDetails?.bodyRegions || []).includes(option) ? '✓' : '○'}
+                                </span>
+                                {option}
+                              </button>
+                            ))}
+                          </div>
+                          <div className="text-center pt-4">
+                            <button
+                              onClick={handleContinue}
+                              disabled={(answers.injuryDetails?.bodyRegions || []).length === 0}
+                              className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                            >
+                              Continue ({(answers.injuryDetails?.bodyRegions || []).length} selected)
+                            </button>
+                          </div>
+                        </div>
+                      ) : currentQ?.type === 'equipment' ? (
+                        /* Equipment selection */
+                        <div className="space-y-6">
+                          {Object.entries(getEquipmentOptions()).map(([category, options]) => (
+                            <div key={category} className="space-y-3">
+                              <h3 className="text-lg font-medium capitalize">{category}:</h3>
+                              <div className="space-y-2">
+                                {options.map((option, index) => (
+                                  <button
+                                    key={index}
+                                    onClick={() => handleOptionSelect(option, category)}
+                                    className={`w-full p-4 text-left transition-colors ${
+                                      (answers.equipment[category as keyof typeof answers.equipment] || []).includes(option)
+                                        ? 'text-blue-600'
+                                        : 'hover:text-blue-600'
+                                    }`}
+                                  >
+                                    <span className="font-medium text-gray-500 mr-3">
+                                      {(answers.equipment[category as keyof typeof answers.equipment] || []).includes(option) ? '✓' : '○'}
+                                    </span>
+                                    {option}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="text-center pt-4">
+                            <button
+                              onClick={handleContinue}
+                              className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium"
+                            >
+                              Continue
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Multiple choice */
+                        <div className="space-y-3">
+                          {currentQ?.options?.map((option, index) => (
+                            <button
+                              key={index}
+                              onClick={() => handleOptionSelect(option)}
+                              className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                            >
+                              <span className="font-medium text-gray-500 mr-3">{index + 1}.</span>
+                              {option}
+                            </button>
+                          ))}
+                          
+                          {/* Input fields for single discipline benchmarks */}
+                          {currentQ?.id === 'benchmarks' && (
+                            <div className="mt-4 space-y-3">
+                              {/* FTP Input for Cycling */}
+                              {answers.focus === 'Cycling' && containsValue(answers.benchmarks.cycling, 'I know my FTP (watts)') && (
+                                <div className="p-3 bg-gray-50 rounded-lg">
+                                  <label className="text-sm font-medium">Your FTP (watts):</label>
+                                  <input
+                                    type="number"
+                                    placeholder="285"
+                                    value={answers.performanceNumbers.ftp || ''}
+                                    onChange={(e) => setAnswers(prev => ({
+                                      ...prev,
+                                      performanceNumbers: {
+                                        ...prev.performanceNumbers,
+                                        ftp: parseInt(e.target.value) || undefined
+                                      }
+                                    }))}
+                                    className="mt-1 w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* Swim Pace Input for Swimming */}
+                              {answers.focus === 'Swimming' && containsValue(answers.benchmarks.swimming, 'I know my 100-yard pace') && (
+                                <div className="p-3 bg-gray-50 rounded-lg">
+                                  <label className="text-sm font-medium">Your 100-yard pace (mm:ss):</label>
+                                  <input
+                                    type="text"
+                                    placeholder="1:25"
+                                    value={answers.performanceNumbers.swimPace || ''}
+                                    onChange={(e) => setAnswers(prev => ({
+                                      ...prev,
+                                      performanceNumbers: {
+                                        ...prev.performanceNumbers,
+                                        swimPace: e.target.value
+                                      }
+                                    }))}
+                                    className="mt-1 w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                                  />
+                                </div>
+                              )}
+                              
+                              {/* Strength Numbers Input for Strength Training */}
+                              {answers.focus === 'Strength Training' && containsValue(answers.benchmarks.strength, 'I know my compound 1RMs') && (
+                                <div className="p-3 bg-gray-50 rounded-lg">
+                                  <label className="text-sm font-medium mb-2 block">Your 1-Rep Maxes (lbs):</label>
+                                  <div className="grid grid-cols-3 gap-2">
+                                    <div>
+                                      <label className="text-xs text-gray-600">Squat</label>
+                                      <input
+                                        type="number"
+                                        placeholder="315"
+                                        value={answers.performanceNumbers.squat || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            squat: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Deadlift</label>
+                                      <input
+                                        type="number"
+                                        placeholder="405"
+                                        value={answers.performanceNumbers.deadlift || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            deadlift: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Bench</label>
+                                      <input
+                                        type="number"
+                                        placeholder="225"
+                                        value={answers.performanceNumbers.bench || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            bench: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Running Times Input for Running */}
+                              {answers.focus === 'Running' && containsValue(answers.benchmarks.running, 'I know my exact times/paces') && (
+                                <div className="p-3 bg-gray-50 rounded-lg">
+                                  <label className="text-sm font-medium mb-2 block">Your race times (optional):</label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                      <label className="text-xs text-gray-600">5K time</label>
+                                      <input
+                                        type="text"
+                                        placeholder="18:30"
+                                        value={answers.performanceNumbers.runningPaces?.fiveK || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            runningPaces: {
+                                              ...prev.performanceNumbers.runningPaces,
+                                              fiveK: e.target.value
+                                            }
+                                          }
+                                        }))}
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">10K time</label>
+                                      <input
+                                        type="text"
+                                        placeholder="38:15"
+                                        value={answers.performanceNumbers.runningPaces?.tenK || ''}
+                                        onChange={(e) => setAnswers(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            runningPaces: {
+                                              ...prev.performanceNumbers.runningPaces,
+                                              tenK: e.target.value
+                                            }
+                                          }
+                                        }))}
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                              
+                              {/* Show Continue button when input fields are present */}
+                              {needsManualContinue('benchmarks', answers.focus) && (
+                                <div className="text-center pt-4">
+                                  <button
+                                    onClick={handleContinue}
+                                    className="px-6 py-2 text-black hover:text-blue-600 transition-colors font-medium"
+                                  >
+                                    Continue
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    /* Question should be skipped - auto advance */
+                    <div className="text-center">
+                      <p className="text-gray-500">Processing...</p>
+                      {setTimeout(() => {
+                        console.log('Auto-advancing due to skipped question');
+                        advanceToNextQuestion();
+                      }, 100)}
+                    </div>
+                  )}
                 </div>
-                
-                {/* Generate Button */}
-                <div className="pt-4">
-                  <Button
-                    onClick={() => generatePlan()}
-                    disabled={!planPrompt.trim() || generatingPlan}
-                    className="w-full h-12 text-white hover:bg-gray-800"
-                    style={{ backgroundColor: generatingPlan ? '#6b7280' : '#000000' }}
+              ) : isComplete && !generatedPlan ? (
+                /* Assessment Complete */
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h2 className="text-2xl font-medium mb-4">Assessment Complete</h2>
+                    <p className="text-gray-600 mb-6">Ready to build your plan</p>
+                  </div>
+                  
+                  {/* Start Date */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-gray-700">Start Date</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="pl-10 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                      />
+                    </div>
+                  </div>
+                  
+                  <button
+                    onClick={generatePlanFromAssessment}
+                    disabled={generatingPlan}
+                    className="w-full h-12 px-4 py-2 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
                   >
                     {generatingPlan ? (
-                      <div className="flex items-center gap-2">
-                        <Kanban className="h-4 w-4 animate-spin" />
-                        Generating intelligent plan...
-                      </div>
+                      "Building your plan..."
                     ) : (
-                      <div className="flex items-center gap-2">
-                        <Kanban className="h-4 w-4" />
-                        Generate Intelligent Plan
-                      </div>
+                      "Build My Plan"
                     )}
-                  </Button>
+                  </button>
                 </div>
-              </div>
+              ) : generatedPlan ? (
+                /* Show Generated Plan */
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h2 className="text-2xl font-medium mb-2">{generatedPlan.name}</h2>
+                    <p className="text-gray-600">
+                      Your personalized training plan
+                    </p>
+                  </div>
+                  
+                  {/* Plan Overview */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-black">Plan Overview</h3>
+                    <p className="text-sm text-gray-700">{generatedPlan.description}</p>
+                    
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><span className="text-gray-600">Focus:</span> {generatedPlan.focus}</div>
+                      <div><span className="text-gray-600">Goal:</span> {generatedPlan.goal}</div>
+                      <div><span className="text-gray-600">Frequency:</span> {generatedPlan.daysPerWeek}</div>
+                      <div><span className="text-gray-600">Weekday Time:</span> {generatedPlan.weekdayTime}</div>
+                      <div><span className="text-gray-600">Weekend Time:</span> {generatedPlan.weekendTime}</div>
+                    </div>
+                  </div>
+
+                  {/* Weekly Schedule */}
+                  <div className="space-y-4">
+                    <h3 className="font-medium text-black">Your Training Week</h3>
+                    <div className="space-y-2">
+                      {generatedPlan.weeklySchedule.map((day: string, index: number) => (
+                        <div key={index} className="text-sm p-3 rounded border-l-4 border-gray-300">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => {
+                        alert('Plan refinement ready! You can chat to adjust the plan.');
+                      }}
+                      className="flex-1 px-4 py-3 text-black hover:text-blue-600 transition-colors font-medium"
+                    >
+                      Refine Plan
+                    </button>
+                    <button
+                      onClick={() => {
+                        alert('Plan saved to calendar! Individual workouts created and scheduled.');
+                      }}
+                      className="flex-1 px-4 py-3 text-black hover:text-blue-600 transition-colors font-medium"
+                    >
+                      Accept Plan
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
+          ) : (
+            /* Manual Tab - Now using the extracted component */
+            <ManualPlanBuilder
+              startDate={startDate}
+              onStartDateChange={setStartDate}
+              onPlanGenerated={setGeneratedPlan}
+              generatingPlan={generatingPlan}
+              onSetGeneratingPlan={setGeneratingPlan}
+            />
           )}
         </div>
       </main>

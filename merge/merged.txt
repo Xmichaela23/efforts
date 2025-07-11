@@ -127,9 +127,12 @@ const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout
 export default AllEffortsDropdown;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/AllPlansInterface.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 
 interface Plan {
@@ -159,20 +162,69 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   completedPlans = [],
   detailedPlans = {}
 }) => {
-  const [currentView, setCurrentView] = useState<'list' | 'detail'>('list');
+  const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>('list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
+  const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [planStatus, setPlanStatus] = useState<string>('active');
+  const [viewMode, setViewMode] = useState<'summary' | 'adjustments'>('summary');
+  
+  // Add workout edit mode state
+  const [workoutViewMode, setWorkoutViewMode] = useState<'summary' | 'edit'>('summary');
+
+  // Plan adjustment state
+  const [adjustmentInput, setAdjustmentInput] = useState('');
+  const [adjustmentHistory, setAdjustmentHistory] = useState<Array<{type: 'user' | 'system', message: string, timestamp: number}>>([]);
+  const [isProcessingAdjustment, setIsProcessingAdjustment] = useState(false);
+  const [adjustmentsUsed, setAdjustmentsUsed] = useState(0);
+  const [adjustmentLimit] = useState(3);
 
   const handlePlanClick = (planId: string) => {
-    console.log('Opening plan details for:', planId);
-    const planDetail = detailedPlans[planId as keyof typeof detailedPlans];
+    let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
+    
+    if (planDetail) {
+      if (typeof planDetail.weeks === 'string') {
+        try {
+          planDetail.weeks = JSON.parse(planDetail.weeks);
+        } catch (error) {
+          console.error('Error parsing weeks JSON:', error);
+        }
+      }
+    }
+    
+    if (!planDetail) {
+      const basicPlan = [...currentPlans, ...completedPlans].find(plan => plan.id === planId);
+      if (basicPlan) {
+        planDetail = {
+          ...basicPlan,
+          weeks: basicPlan.weeks || [],
+          duration: basicPlan.duration || 4,
+          totalWorkouts: basicPlan.totalWorkouts || 0,
+          currentWeek: basicPlan.currentWeek || 1
+        };
+      }
+    }
+    
     if (planDetail) {
       setSelectedPlanDetail(planDetail);
-      setSelectedWeek(planDetail.currentWeek);
-      setPlanStatus(planDetail.status);
+      setSelectedWeek(planDetail.currentWeek || 1);
+      setPlanStatus(planDetail.status || 'active');
       setCurrentView('detail');
+    } else {
+      alert('Plan details are not available. Please try again.');
     }
+  };
+
+  const handleWorkoutClick = (workout: any) => {
+    setSelectedWorkout(workout);
+    setWorkoutViewMode('summary'); // Reset to summary when opening workout
+    setCurrentView('day');
+  };
+
+  const handleBackToWeek = () => {
+    setCurrentView('detail');
+    setSelectedWorkout(null);
+    setWorkoutViewMode('summary');
   };
 
   const handleBack = () => {
@@ -182,26 +234,94 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   const handleDeletePlan = async () => {
     if (!selectedPlanDetail || !onDeletePlan) return;
-    
     try {
       await onDeletePlan(selectedPlanDetail.id);
-      // Navigate back to list after successful deletion
       handleBack();
     } catch (error) {
       console.error('Error deleting plan:', error);
-      // You could add a toast notification here for better UX
     }
   };
 
-  // Plan Detail View Functions
+  const handleAdjustmentSubmit = async () => {
+    if (!adjustmentInput.trim() || isProcessingAdjustment) return;
+    
+    if (adjustmentsUsed >= adjustmentLimit) {
+      setAdjustmentHistory(prev => [...prev, {
+        type: 'system',
+        message: 'You have reached your adjustment limit. Upgrade to make unlimited plan changes.',
+        timestamp: Date.now()
+      }]);
+      return;
+    }
+
+    const userMessage = adjustmentInput.trim();
+    setAdjustmentHistory(prev => [...prev, {
+      type: 'user',
+      message: userMessage,
+      timestamp: Date.now()
+    }]);
+
+    setAdjustmentInput('');
+    setIsProcessingAdjustment(true);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      const response = generateAdjustmentResponse(userMessage);
+      setAdjustmentHistory(prev => [...prev, {
+        type: 'system',
+        message: response,
+        timestamp: Date.now()
+      }]);
+      setAdjustmentsUsed(prev => prev + 1);
+    } catch (error) {
+      setAdjustmentHistory(prev => [...prev, {
+        type: 'system',
+        message: 'Sorry, there was an issue processing your adjustment. Please try again.',
+        timestamp: Date.now()
+      }]);
+    } finally {
+      setIsProcessingAdjustment(false);
+    }
+  };
+
+  const generateAdjustmentResponse = (request: string) => {
+    const requestLower = request.toLowerCase();
+    
+    if (requestLower.includes('strength') && requestLower.includes('thursday')) {
+      return 'I have moved your strength training sessions to Thursdays. This gives you better recovery between your Tuesday runs and weekend long sessions.';
+    }
+    
+    if (requestLower.includes('easier') || requestLower.includes('less intense')) {
+      return 'I have reduced the intensity across your plan by about 15%. Your interval sessions now target RPE 6-7 instead of 7-8.';
+    }
+    
+    if (requestLower.includes('more recovery') || requestLower.includes('rest day')) {
+      return 'I have added an extra recovery day to each week and reduced the consecutive training days.';
+    }
+    
+    if (requestLower.includes('weekend') || requestLower.includes('sunday')) {
+      return 'I have rearranged your schedule to avoid weekend commitments. Your longer sessions are now spread across weekdays.';
+    }
+    
+    if (requestLower.includes('shorter') || requestLower.includes('time')) {
+      return 'I have shortened your sessions to better fit your schedule. Most workouts are now 30-45 minutes.';
+    }
+    
+    if (requestLower.includes('week 3') || requestLower.includes('busy week')) {
+      return 'I have modified week 3 to be a lighter recovery week. This will work perfectly for your busy period.';
+    }
+    
+    return 'I have analyzed your request and made adjustments to your plan. The changes maintain the overall training progression while addressing your specific needs.';
+  };
+
   const getWorkoutIcon = (type: string) => {
     switch (type) {
-      case 'run': return '🏃';
-      case 'ride': return '🚴';
-      case 'swim': return '🏊';
-      case 'strength': return '💪';
-      case 'rest': return '😴';
-      default: return '⚡';
+      case 'run': return <Activity className="h-6 w-6" />;
+      case 'ride': return <Bike className="h-6 w-6" />;
+      case 'swim': return <Waves className="h-6 w-6" />;
+      case 'strength': return <Dumbbell className="h-6 w-6" />;
+      case 'rest': return <Moon className="h-6 w-6" />;
+      default: return <ArrowUpDown className="h-6 w-6" />;
     }
   };
   
@@ -245,49 +365,454 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
   };
 
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const getWeeklyVolume = (week: any) => {
+    if (!week || !week.workouts) return 0;
     return week.workouts.reduce((total: number, workout: any) => {
       return total + (workout.duration || 0);
     }, 0);
   };
 
-  // Plan Detail View Render
-  if (currentView === 'detail' && selectedPlanDetail) {
-    const progress = Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100);
-    const currentWeekData = selectedPlanDetail.weeks.find((w: any) => w.weekNumber === selectedWeek);
-    
-    const totalVolume = selectedPlanDetail.weeks.reduce((total: number, week: any) => {
-      return total + getWeeklyVolume(week);
-    }, 0);
+  // Day View Rendering with Summary/Edit modes
+  if (currentView === 'day' && selectedWorkout) {
+    const intervals = selectedWorkout.intervals || [];
+    const strengthExercises = selectedWorkout.strength_exercises || [];
+    const isStrengthWorkout = selectedWorkout.type === 'strength' || strengthExercises.length > 0;
+    const totalTime = isStrengthWorkout ? 2400 : intervals.reduce((sum: number, interval: any) => sum + (interval.duration || 0), 0);
 
-    const averageWeeklyVolume = Math.round(totalVolume / selectedPlanDetail.duration);
+    // SUMMARY MODE - Clean workout overview
+    if (workoutViewMode === 'summary') {
+      return (
+        <div key={selectedWorkout?.id} className="min-h-screen bg-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+          <main className="max-w-4xl mx-auto px-4 py-6">
+            <div className="flex justify-between items-center mb-6">
+              <button onClick={handleBackToWeek} className="text-gray-600 hover:text-black transition-colors">
+                ← Back to Week
+              </button>
+              <div className="flex items-center gap-4">
+                <div className="text-sm text-gray-500">
+                  {new Date(selectedWorkout.date).toLocaleDateString()}
+                </div>
+                <button onClick={() => setWorkoutViewMode('edit')} className="text-gray-600 hover:text-black transition-colors">
+                  Edit Workout
+                </button>
+              </div>
+            </div>
+
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                {selectedWorkout.name || 'Untitled Workout'}
+              </h1>
+              <div className="flex items-center gap-4 text-gray-600">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>{formatTime(totalTime)}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {getWorkoutIcon(selectedWorkout.type)}
+                  <span className="capitalize">{selectedWorkout.type}</span>
+                </div>
+              </div>
+            </div>
+
+            {isStrengthWorkout && strengthExercises.length > 0 && (
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h2 className="text-xl font-semibold mb-4">Workout Overview</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">{strengthExercises.length}</div>
+                      <div className="text-sm text-gray-600">Exercises</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {Math.round(strengthExercises.reduce((total: number, ex: any) => total + (ex.sets || 0), 0))}
+                      </div>
+                      <div className="text-sm text-gray-600">Total Sets</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">{formatTime(totalTime)}</div>
+                      <div className="text-sm text-gray-600">Estimated Time</div>
+                    </div>
+                  </div>
+                  {selectedWorkout.description && (
+                    <p className="text-gray-700 leading-relaxed">{selectedWorkout.description}</p>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Exercises</h2>
+                  <div className="space-y-3">
+                    {strengthExercises.map((exercise: any, index: number) => (
+                      <div key={exercise.id || index} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-gray-600">{index + 1}</span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">{exercise.name}</div>
+                            {exercise.note && (
+                              <div className="text-sm text-gray-600">{exercise.note}</div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className="font-medium text-gray-900">
+                            {exercise.sets} sets × {exercise.reps} reps
+                          </div>
+                          {exercise.weight && exercise.weight > 0 && (
+                            <div className="text-sm text-gray-600">{exercise.weight} lbs</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {!isStrengthWorkout && intervals.length > 0 && (
+              <div className="space-y-6">
+                <div className="bg-gray-50 p-6 rounded-lg">
+                  <h2 className="text-xl font-semibold mb-4">Workout Overview</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">{formatTime(totalTime)}</div>
+                      <div className="text-sm text-gray-600">Total Time</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">{intervals.length}</div>
+                      <div className="text-sm text-gray-600">Segments</div>
+                    </div>
+                    <div>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {intervals.filter((i: any) => parseInt(i.rpeTarget || '0') >= 7).length}
+                      </div>
+                      <div className="text-sm text-gray-600">Hard Efforts</div>
+                    </div>
+                  </div>
+                  {selectedWorkout.description && (
+                    <p className="text-gray-700 leading-relaxed">{selectedWorkout.description}</p>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="text-xl font-semibold mb-4">Workout Structure</h2>
+                  <div className="space-y-3">
+                    {intervals.map((interval: any, index: number) => (
+                      <div key={interval.id || index} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                            <span className="text-sm font-medium text-gray-600">{index + 1}</span>
+                          </div>
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {interval.effortLabel || `Segment ${index + 1}`}
+                            </div>
+                            <div className="text-sm text-gray-600">
+                              {interval.time || formatTime(interval.duration || 0)}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          {interval.rpeTarget && (
+                            <div className="font-medium text-gray-900">RPE {interval.rpeTarget}</div>
+                          )}
+                          {interval.paceTarget && (
+                            <div className="text-sm text-gray-600">{interval.paceTarget} pace</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {selectedWorkout.coachingNotes && (
+              <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-lg">
+                <h2 className="text-xl font-semibold text-blue-900 mb-4">Coaching Notes</h2>
+                <div className="text-blue-800 leading-relaxed whitespace-pre-line">
+                  {selectedWorkout.coachingNotes}
+                </div>
+              </div>
+            )}
+
+            <div className="mt-8 p-6 bg-gray-50 border border-gray-200 rounded-lg">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Plan Context</h2>
+              <p className="text-gray-700 leading-relaxed">
+                This workout is part of your Week {selectedWeek} training in the {selectedPlanDetail?.name} plan.
+                {isStrengthWorkout 
+                  ? ' This strength session supports your primary training by building the muscular foundation needed for improved performance and injury prevention.'
+                  : ' This endurance session builds your aerobic capacity and prepares you for the demands of your goal event.'
+                }
+              </p>
+            </div>
+          </main>
+        </div>
+      );
+    }
+
+    // EDIT MODE - Full workout builder interface
+    return (
+      <div className="min-h-screen bg-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <main className="max-w-7xl mx-auto px-3 py-2">
+          <div className="flex justify-between items-center mb-6">
+            <button
+              onClick={() => setWorkoutViewMode('summary')}
+              className="text-gray-600 hover:text-black transition-colors"
+            >
+              ← Back to Summary
+            </button>
+            <div className="text-right text-sm text-gray-500">
+              {new Date(selectedWorkout.date).toLocaleDateString()}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <Input
+              value={selectedWorkout.name || 'Untitled Workout'}
+              readOnly
+              className="border-gray-300 text-lg font-medium min-h-[44px]"
+            />
+          </div>
+
+          <div className="text-center mb-6">
+            <div className="flex items-center justify-center gap-2 text-gray-600">
+              <Clock className="h-4 w-4" />
+              <span>Total Time: {formatTime(totalTime)}</span>
+            </div>
+          </div>
+
+          {/* STRENGTH WORKOUT DISPLAY */}
+          {isStrengthWorkout && strengthExercises.length > 0 && (
+            <div className="space-y-4 mb-6">
+              {strengthExercises.map((exercise: any, index: number) => (
+                <div key={exercise.id || index} className="space-y-4 p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="w-4 h-4" />
+                    <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">
+                      <Dumbbell className="w-3 h-3 text-gray-400" />
+                    </div>
+                    <div className="font-medium">{exercise.name}</div>
+                    <button className="ml-auto text-gray-400 hover:text-gray-600">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    <button className="text-gray-400 hover:text-red-500">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Sets</label>
+                      <Input
+                        value={exercise.sets || ''}
+                        readOnly
+                        placeholder="3"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Reps</label>
+                      <Input
+                        value={exercise.reps || ''}
+                        readOnly
+                        placeholder="10"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Weight (lbs)</label>
+                      <Input
+                        value={exercise.weight || ''}
+                        readOnly
+                        placeholder="135"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+                  </div>
+
+                  {exercise.weightMode && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">
+                        Weight Mode: {exercise.weightMode === 'same' ? 'Same weight all sets' : 'Individual weight per set'}
+                      </span>
+                    </div>
+                  )}
+
+                  {exercise.note && (
+                    <div className="text-sm text-gray-600 italic">
+                      Note: {exercise.note}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* ENDURANCE WORKOUT DISPLAY */}
+          {!isStrengthWorkout && intervals.length > 0 && (
+            <div className="space-y-4 mb-6">
+              {intervals.map((interval: any, index: number) => (
+                <div key={interval.id || index} className="space-y-4 p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="w-4 h-4" />
+                    <div className="w-6 h-6 bg-gray-100 rounded flex items-center justify-center">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full"></div>
+                    </div>
+                    <Select defaultValue={interval.effortLabel || `Segment ${index + 1}`}>
+                      <SelectTrigger className="w-auto border-none shadow-none p-0 h-auto">
+                        <SelectValue />
+                        <ChevronDown className="h-4 w-4 ml-2" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Warmup">Warmup</SelectItem>
+                        <SelectItem value="Easy">Easy</SelectItem>
+                        <SelectItem value="Hard">Hard</SelectItem>
+                        <SelectItem value="Tempo">Tempo</SelectItem>
+                        <SelectItem value="Intervals">Intervals</SelectItem>
+                        <SelectItem value="Recovery">Recovery</SelectItem>
+                        <SelectItem value="Cooldown">Cooldown</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <button className="ml-auto text-gray-400 hover:text-gray-600">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
+                      </svg>
+                    </button>
+                    <button className="text-gray-400 hover:text-red-500">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Time</label>
+                      <Input
+                        value={interval.time || formatTime(interval.duration || 0)}
+                        readOnly
+                        className="min-h-[44px]"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Pace {selectedWorkout.type === 'run' ? '(per mi)' : ''}
+                      </label>
+                      <Input
+                        value={interval.paceTarget || ''}
+                        readOnly
+                        placeholder="8:30"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Distance {selectedWorkout.type === 'run' ? '(mi)' : '(km)'}
+                      </label>
+                      <Input
+                        value={interval.distance || ''}
+                        readOnly
+                        placeholder="5.0"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">BPM</label>
+                      <Input
+                        value={interval.bpmTarget || ''}
+                        readOnly
+                        placeholder="150-160"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">RPE</label>
+                      <Input
+                        value={interval.rpeTarget || ''}
+                        readOnly
+                        placeholder="6-7"
+                        className="min-h-[44px]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <input type="checkbox" className="w-4 h-4" />
+                    <span className="text-sm text-gray-600">Repeat?</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="text-center mb-6">
+            <button className="flex items-center gap-2 mx-auto px-4 py-2 text-gray-600 hover:text-black transition-colors">
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+              </svg>
+              {isStrengthWorkout ? 'Add Exercise' : 'Add Segment'}
+            </button>
+          </div>
+
+          {selectedWorkout.coachingNotes && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <h3 className="font-medium text-blue-900 mb-2">Coaching Notes</h3>
+              <div className="text-sm text-blue-800 whitespace-pre-line">
+                {selectedWorkout.coachingNotes}
+              </div>
+            </div>
+          )}
+
+          {selectedWorkout.description && (
+            <div className="mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+              <h3 className="font-medium text-gray-900 mb-2">Description</h3>
+              <div className="text-sm text-gray-700">
+                {selectedWorkout.description}
+              </div>
+            </div>
+          )}
+        </main>
+      </div>
+    );
+  }
+
+  // Plan Detail View
+  if (currentView === 'detail' && selectedPlanDetail) {
+    const progress = selectedPlanDetail.duration ? Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100) : 0;
+    const currentWeekData = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 ? selectedPlanDetail.weeks.find((w: any) => w.weekNumber === selectedWeek) : null;
+    const totalVolume = selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 ? selectedPlanDetail.weeks.reduce((total: number, week: any) => total + getWeeklyVolume(week), 0) : 0;
+    const averageWeeklyVolume = selectedPlanDetail.duration && selectedPlanDetail.duration > 0 ? Math.round(totalVolume / selectedPlanDetail.duration) : 0;
 
     return (
       <div className="space-y-6" style={{ fontFamily: 'Inter, sans-serif' }}>
-        {/* Header */}
         <div className="flex items-center justify-between">
-          <button 
-            onClick={handleBack}
-            className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black transition-colors"
-          >
+          <button onClick={handleBack} className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black transition-colors">
             <ArrowLeft className="h-4 w-4" />
             Plans
           </button>
           
           <div className="flex items-center gap-2">
             {planStatus === 'active' ? (
-              <button 
-                onClick={() => setPlanStatus('paused')}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors"
-              >
+              <button onClick={() => setPlanStatus('paused')} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                 <Pause className="h-4 w-4" />
                 Pause
               </button>
             ) : (
-              <button 
-                onClick={() => setPlanStatus('active')}
-                className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors"
-              >
+              <button onClick={() => setPlanStatus('active')} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                 <Play className="h-4 w-4" />
                 Resume
               </button>
@@ -298,7 +823,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               Modify
             </button>
             
-            {/* Fixed Delete Button with Confirmation Dialog */}
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <button className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 transition-colors">
@@ -315,10 +839,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 </AlertDialogHeader>
                 <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDeletePlan}
-                    className="bg-red-600 hover:bg-red-700"
-                  >
+                  <AlertDialogAction onClick={handleDeletePlan} className="bg-red-600 hover:bg-red-700">
                     Delete Plan
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -327,7 +848,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </div>
         </div>
 
-        {/* Plan Overview */}
         <div className="border border-gray-200 rounded-lg">
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
@@ -335,9 +855,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 <h1 className="text-2xl font-bold">{selectedPlanDetail.name}</h1>
                 <p className="text-gray-600 mt-1">{selectedPlanDetail.description}</p>
               </div>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                planStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-              }`}>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${planStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                 {planStatus}
               </span>
             </div>
@@ -345,11 +863,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           <div className="p-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
               <div className="text-center">
-                <div className="text-2xl font-bold">{selectedPlanDetail.duration}</div>
+                <div className="text-2xl font-bold">{selectedPlanDetail.duration || 0}</div>
                 <div className="text-sm text-gray-600">Weeks</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">{selectedPlanDetail.totalWorkouts}</div>
+                <div className="text-2xl font-bold">{selectedPlanDetail.totalWorkouts || 0}</div>
                 <div className="text-sm text-gray-600">Workouts</div>
               </div>
               <div className="text-center">
@@ -365,132 +883,200 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span>Progress</span>
-                <span>Week {selectedPlanDetail.currentWeek} of {selectedPlanDetail.duration}</span>
+                <span>Week {selectedPlanDetail.currentWeek || 1} of {selectedPlanDetail.duration || 0}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-black rounded-full h-2 transition-all duration-300" 
-                  style={{ width: `${progress}%` }}
-                ></div>
+                <div className="bg-black rounded-full h-2 transition-all duration-300" style={{ width: `${progress}%` }}></div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Week Navigation */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2">
-          {selectedPlanDetail.weeks.map((week: any) => (
+        {selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 && (
+          <div className="flex items-center gap-8 border-b border-gray-200">
             <button
-              key={week.weekNumber}
-              onClick={() => setSelectedWeek(week.weekNumber)}
-              className={`whitespace-nowrap px-4 py-2 rounded-lg font-medium transition-colors ${
-                selectedWeek === week.weekNumber 
-                  ? 'bg-black text-white' 
-                  : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
-              } ${
-                week.weekNumber === selectedPlanDetail.currentWeek ? 'ring-2 ring-blue-500' : ''
-              }`}
+              onClick={() => setViewMode('summary')}
+              className={`pb-3 transition-colors ${viewMode === 'summary' ? 'text-black border-b-2 border-black' : 'text-gray-600 hover:text-black'}`}
             >
-              Week {week.weekNumber}
-              {week.weekNumber === selectedPlanDetail.currentWeek && (
-                <span className="ml-2 px-2 py-0.5 bg-blue-100 text-blue-800 text-xs rounded-full">
-                  Current
-                </span>
-              )}
+              Summary
             </button>
-          ))}
-        </div>
+            <button
+              onClick={() => setViewMode('adjustments')}
+              className={`pb-3 transition-colors ${viewMode === 'adjustments' ? 'text-black border-b-2 border-black' : 'text-gray-600 hover:text-black'}`}
+            >
+              Ask for adjustments
+            </button>
+          </div>
+        )}
 
-        {/* Selected Week Details */}
-        {currentWeekData && (
-          <div className="border border-gray-200 rounded-lg">
-            <div className="p-6 border-b border-gray-200">
-              <h2 className="text-xl font-bold flex items-center gap-2 mb-2">
-                <Calendar className="h-5 w-5" />
-                Week {currentWeekData.weekNumber}: {currentWeekData.title}
-              </h2>
-              <p className="text-gray-600 mb-4">{currentWeekData.focus}</p>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Clock className="h-4 w-4" />
-                  {formatDuration(getWeeklyVolume(currentWeekData))} total
-                </div>
-                <div className="flex items-center gap-1">
-                  <Target className="h-4 w-4" />
-                  {currentWeekData.workouts.filter((w: any) => w.type !== 'rest').length} workouts
-                </div>
+        {viewMode === 'adjustments' ? (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="text-sm text-gray-600">
+                Plan adjustments: {adjustmentsUsed} of {adjustmentLimit} used
               </div>
+              {adjustmentsUsed >= adjustmentLimit && (
+                <button className="text-sm text-blue-600 hover:text-blue-800">
+                  Upgrade for unlimited adjustments
+                </button>
+              )}
             </div>
-            <div className="p-6">
-              <div className="space-y-3">
-                {currentWeekData.workouts.map((workout: any) => (
-                  <div
-                    key={workout.id}
-                    className={`p-4 rounded-lg border transition-colors cursor-pointer ${
-                      workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="text-2xl">{getWorkoutIcon(workout.type)}</div>
-                        <div className="flex-1">
-                          <div className="font-medium">{workout.name}</div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            {workout.description}
-                          </div>
-                          {workout.completed && workout.notes && (
-                            <div className="text-xs text-gray-500 mt-1 italic">
-                              "{workout.notes}"
-                            </div>
-                          )}
-                          {workout.completed && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              Completed {workout.completedDate}
-                              {workout.actualDuration && workout.duration && (
-                                <span className={`ml-2 ${workout.actualDuration > workout.duration ? 'text-orange-600' : workout.actualDuration < workout.duration ? 'text-blue-600' : 'text-green-600'}`}>
-                                  {formatDuration(workout.actualDuration)} 
-                                  {workout.actualDuration !== workout.duration && (
-                                    <span> (planned: {formatDuration(workout.duration)})</span>
-                                  )}
-                                </span>
-                              )}
-                              {workout.actualDistance && workout.distance && (
-                                <span className={`ml-2 ${workout.actualDistance > workout.distance ? 'text-orange-600' : workout.actualDistance < workout.distance ? 'text-blue-600' : 'text-green-600'}`}>
-                                  {workout.actualDistance}km
-                                  {workout.actualDistance !== workout.distance && (
-                                    <span> (planned: {workout.distance}km)</span>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {getCompletionBadge(workout)}
-                        {workout.intensity && (
-                          <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getIntensityColor(workout.intensity)}`}>
-                            {workout.intensity}
-                          </span>
-                        )}
-                        {!workout.completed && workout.duration && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                            {formatDuration(workout.duration)}
-                          </span>
-                        )}
-                        {!workout.completed && workout.distance && (
-                          <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                            {workout.distance}km
-                          </span>
-                        )}
-                      </div>
+
+            <div className="flex gap-2">
+              <Textarea
+                value={adjustmentInput}
+                onChange={(e) => setAdjustmentInput(e.target.value)}
+                placeholder="Describe what you'd like to change about your plan..."
+                className="flex-1 min-h-[44px] max-h-[120px] resize-none"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleAdjustmentSubmit();
+                  }
+                }}
+                disabled={adjustmentsUsed >= adjustmentLimit}
+              />
+              <button
+                onClick={handleAdjustmentSubmit}
+                disabled={!adjustmentInput.trim() || isProcessingAdjustment || adjustmentsUsed >= adjustmentLimit}
+                className="h-auto px-4 py-2 text-gray-600 hover:text-black transition-colors"
+              >
+                <Send className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-4 min-h-[200px] max-h-[400px] overflow-y-auto">
+              {adjustmentHistory.length === 0 ? (
+                <div className="text-center py-8">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">
+                    What would you like to adjust about your plan?
+                  </h3>
+                  
+                  <div className="space-y-2 max-w-md mx-auto">
+                    {[
+                      "Move strength training to Thursday",
+                      "Make week 2 easier",
+                      "I need more recovery days",
+                      "Avoid weekend workouts",
+                      "Shorter session times"
+                    ].map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setAdjustmentInput(suggestion)}
+                        className="block w-full p-3 text-left text-gray-700 hover:text-black hover:bg-gray-50 rounded-lg transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                adjustmentHistory.map((message, index) => (
+                  <div key={index} className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-2xl p-4 rounded-lg ${message.type === 'user' ? 'bg-black text-white' : 'bg-gray-100 text-gray-900'}`}>
+                      <p className="leading-relaxed">{message.message}</p>
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
+              
+              {isProcessingAdjustment && (
+                <div className="flex justify-start">
+                  <div className="bg-gray-100 text-gray-900 p-4 rounded-lg">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                      <span className="text-sm text-gray-600 ml-2">Processing your adjustment...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+        ) : (
+          <>
+            {selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 && (
+              <div className="flex items-center gap-6 overflow-x-auto py-4">
+                {selectedPlanDetail.weeks.map((week: any) => (
+                  <button
+                    key={week.weekNumber}
+                    onClick={() => setSelectedWeek(week.weekNumber)}
+                    className={`whitespace-nowrap pb-2 transition-colors ${selectedWeek === week.weekNumber ? 'text-black border-b-2 border-black font-medium' : 'text-gray-600 hover:text-black'}`}
+                  >
+                    Week {week.weekNumber}
+                    {week.weekNumber === selectedPlanDetail.currentWeek && (
+                      <span className="ml-2 text-xs text-blue-600">Current</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {currentWeekData && (
+              <div className="border border-gray-200 rounded-lg">
+                <div className="p-6 border-b border-gray-200">
+                  <h2 className="text-xl font-bold flex items-center gap-2 mb-2">
+                    <Calendar className="h-5 w-5" />
+                    Week {currentWeekData.weekNumber}: {currentWeekData.title}
+                  </h2>
+                  <p className="text-gray-600 mb-4">{currentWeekData.focus}</p>
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-4 w-4" />
+                      {formatDuration(getWeeklyVolume(currentWeekData))} total
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <Target className="h-4 w-4" />
+                      {currentWeekData.workouts ? currentWeekData.workouts.filter((w: any) => w.type !== 'rest').length : 0} workouts
+                    </div>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-3">
+                    {currentWeekData.workouts && currentWeekData.workouts.map((workout: any, index: number) => (
+                      <div
+                        key={workout.id || `workout-${index}`}
+                        onClick={() => handleWorkoutClick(workout)}
+                        className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="text-2xl">{getWorkoutIcon(workout.type)}</div>
+                            <div className="flex-1">
+                              <div className="font-medium">{workout.name}</div>
+                              <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-center gap-2">
+                            {getCompletionBadge(workout)}
+                            {workout.intensity && (
+                              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getIntensityColor(workout.intensity)}`}>
+                                {workout.intensity}
+                              </span>
+                            )}
+                            {!workout.completed && workout.duration && (
+                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                {formatDuration(workout.duration)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {(!selectedPlanDetail.weeks || selectedPlanDetail.weeks.length === 0) && (
+              <div className="text-center py-8">
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Plan Details Loading</h3>
+                <p className="text-gray-600 mb-4">Detailed workout information is being prepared...</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     );
@@ -499,7 +1085,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Plans List View
   return (
     <div className="space-y-6" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* Current Plans */}
+      <div className="flex items-center justify-between">
+        <button onClick={onClose} className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black transition-colors">
+          <ArrowLeft className="h-4 w-4" />
+          Dashboard
+        </button>
+      </div>
+
       {currentPlans.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium text-gray-900">Current Plans</h2>
@@ -516,7 +1108,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
       )}
 
-      {/* Completed Plans */}
       {completedPlans.length > 0 && (
         <div className="space-y-3">
           <h2 className="text-lg font-medium text-gray-900">Completed Plans</h2>
@@ -534,7 +1125,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
       )}
 
-      {/* Empty State */}
       {currentPlans.length === 0 && completedPlans.length === 0 && (
         <div className="text-center py-8">
           <h2 className="text-lg font-medium text-gray-900 mb-2">No Plans Yet</h2>
@@ -572,9 +1162,9 @@ interface AppLayoutProps {
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
-  const { 
-    workouts, 
-    loading, 
+  const {
+    workouts,
+    loading,
     deleteWorkout,
     addWorkout,
     currentPlans,
@@ -583,7 +1173,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     addPlan,
     deletePlan
   } = useAppContext();
-  
+
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
@@ -641,18 +1231,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       currentX = clientX;
       isPointerDown = true;
       hasMovedHorizontally = false;
-      
       // Disable CSS transition for live tracking
       wrapper.style.transition = 'none';
     };
 
     const handlePointerMove = (clientX: number, preventDefault: () => void) => {
       if (!isPointerDown) return;
-      
       currentX = clientX;
       const deltaX = currentX - startX;
       const deltaY = 0; // We don't track Y for simplicity
-      
+
       // Start horizontal movement immediately on any horizontal motion
       if (Math.abs(deltaX) > 2) {
         if (!hasMovedHorizontally) {
@@ -660,36 +1248,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           setIsSwipeDetected(true);
           preventDefault();
         }
-        
+
         // Live transform - content follows finger immediately
         const baseTransform = showSummary ? -50 : 0;
         const dragPercent = (deltaX / window.innerWidth) * 100;
         let newTransform = baseTransform + dragPercent;
-        
+
         // Soft bounds with resistance at edges
         if (newTransform > 0) {
           newTransform = newTransform * 0.3; // Resistance when going past calendar
         } else if (newTransform < -100) {
           newTransform = -100 + (newTransform + 100) * 0.3; // Resistance past summary
         }
-        
+
         wrapper.style.transform = `translateX(${newTransform}%)`;
       }
     };
 
     const handlePointerUp = () => {
       if (!isPointerDown) return;
-      
+
       // Re-enable CSS transition for snap animation
       wrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-      
+
       if (hasMovedHorizontally) {
         const deltaX = currentX - startX;
         const velocity = Math.abs(deltaX);
-        
+
         // Smart threshold - smaller swipe needed if fast, larger if slow
         const threshold = velocity > 100 ? 30 : 80;
-        
+
         if (Math.abs(deltaX) > threshold) {
           if (deltaX > 0 && showSummary) {
             // Swipe right: summary → calendar
@@ -711,7 +1299,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           wrapper.style.transform = `translateX(${showSummary ? -50 : 0}%)`;
         }
       }
-      
+
       // Reset everything
       isPointerDown = false;
       hasMovedHorizontally = false;
@@ -766,10 +1354,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const formatHeaderDate = () => {
     const today = new Date();
-    return today.toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric', 
-      year: 'numeric' 
+    return today.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric'
     });
   };
 
@@ -796,12 +1384,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // 🔧 ENHANCED: Complete FIT data extraction - pass through ALL fields that FitFileImporter extracts
   const handleWorkoutsImported = (importedWorkouts: any[]) => {
     console.log('📥 handleWorkoutsImported called with:', importedWorkouts);
-    
+
     importedWorkouts.forEach(async (workout) => {
       try {
         console.log('🔧 Processing workout with all fields:', workout.name);
         console.log('🔍 Full workout object:', workout);
-        
+
         const workoutToSave = {
           // CORE WORKOUT DATA
           name: workout.name,
@@ -813,7 +1401,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           userComments: "",
           completedManually: false,
           workout_status: 'completed',
-          
+
           // 🆕 NEW TOP-LEVEL FIELDS that CompletedTab expects
           timestamp: workout.timestamp,
           start_position_lat: workout.start_position_lat,
@@ -821,7 +1409,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           friendly_name: workout.friendly_name,
           moving_time: workout.moving_time,
           elapsed_time: workout.elapsed_time,
-          
+
           // EXISTING FIELDS - ensure proper data types
           avg_heart_rate: workout.metrics?.avg_heart_rate,
           max_heart_rate: workout.metrics?.max_heart_rate,
@@ -835,15 +1423,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           calories: workout.metrics?.calories,
           tss: workout.metrics?.training_stress_score,
           intensity_factor: workout.metrics?.intensity_factor,
-          
+
           // ELEVATION - check both locations for elevation_gain
-          elevation_gain: workout.metrics?.elevation_gain ? 
-            Math.round(Number(workout.metrics.elevation_gain)) : 
-            workout.elevation_gain ? 
-              Math.round(Number(workout.elevation_gain)) : 
+          elevation_gain: workout.metrics?.elevation_gain ?
+            Math.round(Number(workout.metrics.elevation_gain)) :
+            workout.elevation_gain ?
+              Math.round(Number(workout.elevation_gain)) :
               null,
           elevation_loss: workout.metrics?.elevation_loss,
-          
+
           // 🆕 NEW FIELDS - Pass through ALL the metrics that FitFileImporter extracts
           avg_temperature: workout.metrics?.avg_temperature,
           max_temperature: workout.metrics?.max_temperature,
@@ -854,13 +1442,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           avg_vam: workout.metrics?.avg_vam,
           total_training_effect: workout.metrics?.total_training_effect,
           total_anaerobic_effect: workout.metrics?.total_anaerobic_effect,
-          
+
           // 🆕 ZONES DATA
           functional_threshold_power: workout.metrics?.functional_threshold_power,
           threshold_heart_rate: workout.metrics?.threshold_heart_rate,
           hr_calc_type: workout.metrics?.hr_calc_type,
           pwr_calc_type: workout.metrics?.pwr_calc_type,
-          
+
           // 🆕 USER PROFILE DATA
           age: workout.metrics?.age,
           weight: workout.metrics?.weight,
@@ -870,7 +1458,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           resting_heart_rate: workout.metrics?.resting_heart_rate,
           dist_setting: workout.metrics?.dist_setting,
           weight_setting: workout.metrics?.weight_setting,
-          
+
           // 🆕 CYCLING DETAILS DATA
           avg_fractional_cadence: workout.metrics?.avg_fractional_cadence,
           avg_left_pedal_smoothness: workout.metrics?.avg_left_pedal_smoothness,
@@ -879,43 +1467,43 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           left_right_balance: workout.metrics?.left_right_balance,
           threshold_power: workout.metrics?.threshold_power,
           total_cycles: workout.metrics?.total_cycles,
-          
+
           // 🆕 DEVICE INFO
           deviceInfo: workout.deviceInfo,
-          
+
           // Keep complete metrics object for CompletedTab compatibility
           metrics: workout.metrics
         };
-        
+
         console.log('✅ Complete workout data being saved:', workoutToSave);
         console.log('🆕 NEW FIELDS being saved:');
-        console.log('  Location:', { lat: workoutToSave.start_position_lat, lng: workoutToSave.start_position_long });
-        console.log('  Temperature:', workoutToSave.avg_temperature);
-        console.log('  Device:', workoutToSave.friendly_name);
-        console.log('  Total Work:', workoutToSave.total_work);
-        console.log('  VAM:', workoutToSave.avg_vam);
-        console.log('  Training Effects:', { 
-          aerobic: workoutToSave.total_training_effect, 
-          anaerobic: workoutToSave.total_anaerobic_effect 
+        console.log(' Location:', { lat: workoutToSave.start_position_lat, lng: workoutToSave.start_position_long });
+        console.log(' Temperature:', workoutToSave.avg_temperature);
+        console.log(' Device:', workoutToSave.friendly_name);
+        console.log(' Total Work:', workoutToSave.total_work);
+        console.log(' VAM:', workoutToSave.avg_vam);
+        console.log(' Training Effects:', {
+          aerobic: workoutToSave.total_training_effect,
+          anaerobic: workoutToSave.total_anaerobic_effect
         });
-        console.log('  User Profile:', { 
-          age: workoutToSave.age, 
-          weight: workoutToSave.weight, 
-          height: workoutToSave.height 
+        console.log(' User Profile:', {
+          age: workoutToSave.age,
+          weight: workoutToSave.weight,
+          height: workoutToSave.height
         });
-        console.log('  Cycling Details:', {
+        console.log(' Cycling Details:', {
           left_right_balance: workoutToSave.left_right_balance,
           pedal_smoothness: workoutToSave.avg_left_pedal_smoothness,
           torque_effectiveness: workoutToSave.avg_left_torque_effectiveness
         });
-        
+
         await addWorkout(workoutToSave);
         console.log('✅ Successfully imported workout with ALL metrics:', workout.name);
       } catch (error) {
         console.error('❌ Error importing workout:', error);
       }
     });
-    
+
     console.log(`✅ Successfully imported ${importedWorkouts.length} workouts with complete data`);
     setShowImportPage(false);
   };
@@ -923,7 +1511,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handleBackToDashboard = () => {
     const comingFromPlanBuilder = showPlanBuilder;
     const shouldReturnToSummary = showBuilder && !comingFromPlanBuilder && selectedDate && workoutBeingEdited;
-    
+
     setShowStrengthLogger(false);
     setShowBuilder(false);
     setShowAllPlans(false);
@@ -935,7 +1523,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
-    
+
     if (shouldReturnToSummary) {
       const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
       if (workoutsForDate.length > 0) {
@@ -994,19 +1582,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     setSelectedWorkout(null);
-    
+
     if (date) {
       setSelectedDate(date);
     }
-    
+
     const cameFromSummary = showSummary;
-    
+
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
       setShowBuilder(true);
     }
-    
+
     if (cameFromSummary) {
       setShowSummary(false);
       setDateWorkouts([]);
@@ -1019,7 +1607,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setBuilderSourceContext('');
     setWorkoutBeingEdited(null);
     setSelectedWorkout(null);
-    
+
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
     } else {
@@ -1038,7 +1626,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const handleSelectDiscipline = (discipline: string) => {
     setSelectedWorkout(null);
-    
+
     if (discipline === 'strength') {
       setShowStrengthPlans(true);
     } else {
@@ -1077,14 +1665,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       const planWorkouts = workouts?.filter(w => {
         const matchesId = w.planId === planId;
         const matchesPattern = w.name && (
-          w.name.includes('Week 1') || 
-          w.name.includes('Week 2') || 
-          w.name.includes('Week 3') || 
+          w.name.includes('Week 1') ||
+          w.name.includes('Week 2') ||
+          w.name.includes('Week 3') ||
           w.name.includes('Week 4')
         );
         return matchesId || matchesPattern;
       }) || [];
-      
+
       for (const workout of planWorkouts) {
         try {
           await deleteWorkout(workout.id);
@@ -1092,10 +1680,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           console.error('Error deleting workout:', workout.id, error);
         }
       }
-      
+
       await deletePlan(planId);
       setShowAllPlans(true);
-      
+
     } catch (error) {
       console.error('Error deleting plan:', error);
       alert('Error deleting plan. Please try again.');
@@ -1123,7 +1711,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   // Show import page
   if (showImportPage) {
     return (
-      <FitFileImporter 
+      <FitFileImporter
         onWorkoutsImported={handleWorkoutsImported}
       />
     );
@@ -1178,9 +1766,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-              
+
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
-              
+
               {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
                 <Button
                   onClick={handleBackToDashboard}
@@ -1211,7 +1799,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showPlanBuilder ? (
             <div className="pt-4">
-              <PlanBuilder 
+              <PlanBuilder
                 onClose={handleBackToDashboard}
                 onPlanGenerated={handlePlanGenerated}
               />
@@ -1237,7 +1825,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : showStrengthLogger ? (
             <div className="pt-4">
-              <StrengthLogger onClose={handleBackToDashboard} />
+              <StrengthLogger 
+                onClose={handleBackToDashboard} 
+                onWorkoutSaved={(workout) => {
+                  setShowStrengthLogger(false);
+                  setSelectedWorkout(workout);
+                  setActiveTab('completed');
+                }}
+              />
             </div>
           ) : showBuilder ? (
             <div className="pt-4">
@@ -1261,7 +1856,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : (
-            <div 
+            <div
               ref={containerRef}
               className="relative w-full h-full"
               style={{
@@ -1270,7 +1865,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             >
               {/* Swipe capture overlay - only visible during potential swipes */}
               {isSwipeDetected && (
-                <div 
+                <div
                   className="absolute inset-0 z-50"
                   style={{
                     backgroundColor: 'transparent',
@@ -1278,8 +1873,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   }}
                 />
               )}
-              
-              <div 
+
+              <div
                 ref={wrapperRef}
                 className="flex h-full"
                 style={{
@@ -1321,8 +1916,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <div className="w-1/2 flex-shrink-0">
                   <div className="pt-4">
                     {currentWorkout ? (
-                      <WorkoutSummary 
-                        workout={currentWorkout} 
+                      <WorkoutSummary
+                        workout={currentWorkout}
                         onClose={() => {
                           setShowSummary(false);
                           setDateWorkouts([]);
@@ -1337,14 +1932,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                           Add a workout to get started
                         </p>
                         <div className="flex flex-col items-center gap-4">
-                          <NewEffortDropdown 
+                          <NewEffortDropdown
                             onSelectType={(type) => {
                               setShowSummary(false);
                               handleAddEffort(type, selectedDate);
                             }}
                             onOpenPlanBuilder={handleOpenPlanBuilder}
                           />
-                          
                           <button
                             onClick={() => {
                               setShowSummary(false);
@@ -4808,210 +5402,826 @@ export default NewEffortDropdown;
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Kanban } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { ArrowLeft, ArrowRight, Kanban, Calendar } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface PlanBuilderProps {
   onClose: () => void;
-  onPlanGenerated?: (plan: any) => void; // NEW: Callback for plan creation
+  onPlanGenerated?: (plan: any) => void;
 }
 
 export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderProps) {
   const { addWorkout } = useAppContext();
+  
+  // Tab state
+  const [activeTab, setActiveTab] = useState<'suggested' | 'free'>('suggested');
+  
+  // Free tab state (existing functionality)
   const [planPrompt, setPlanPrompt] = useState('');
+  const [startDate, setStartDate] = useState(() => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  });
   const [generatingPlan, setGeneratingPlan] = useState(false);
 
-  // Quick plan suggestions
+  // Suggested tab state
+  const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState({
+    category: '',
+    specificGoal: '',
+    experienceLevel: '',
+    trainingFrequency: '',
+    timePerSession: '',
+    equipmentLocation: '',
+    startDate: new Date().toISOString().split('T')[0]
+  });
+
+  // Enhanced quick plan suggestions with more variety
   const quickPlans = [
-    "Build me a 30-minute easy run",
-    "Create a 5K training workout", 
-    "I want a 45-minute bike ride with intervals",
-    "Design a full-body strength workout",
-    "Give me a swim workout for endurance",
+    "Build me a 30-minute easy run for recovery",
+    "Create a 5K training plan over 6 weeks", 
+    "I want a 45-minute bike ride with 6x3min intervals",
+    "Design a full-body strength workout for runners",
+    "Give me a 2000m swim workout for endurance",
     "Build me a 4-week marathon training plan",
-    "Create a triathlon program",
-    "I need a strength plan for runners"
+    "Create a 12-week triathlon program for beginners",
+    "I need a strength plan to prevent running injuries",
+    "Design a 2-week taper for my upcoming race",
+    "Create interval training for improving 10K speed"
   ];
 
-  const generatePlan = async () => {
-    if (!planPrompt.trim()) return;
+  // Suggested tab categories and options
+  const categories = {
+    '1': 'Running',
+    '2': 'Cycling', 
+    '3': 'Swimming',
+    '4': 'Strength',
+    '5': 'Mobility',
+    '6': 'Hybrid'
+  };
+
+  const specificGoals = {
+    '1': [ // Running
+      'Train for a 5K',
+      'Train for a 10K', 
+      'Train for a half marathon',
+      'Train for a marathon',
+      'Make me faster',
+      'Add strength to my running'
+    ],
+    '2': [ // Cycling
+      'Improve my FTP',
+      'Train for a century ride',
+      'Build cycling endurance', 
+      'Make me faster',
+      'Add strength to my cycling'
+    ],
+    '3': [ // Swimming
+      'Train for my first triathlon swim',
+      'Improve my swimming technique',
+      'Build swimming endurance',
+      'Make me faster'
+    ],
+    '4': [ // Strength
+      'Build muscle mass',
+      'Get stronger (powerlifting focus)',
+      'Functional strength for daily life',
+      'Make me stronger'
+    ],
+    '5': [ // Mobility
+      'Daily mobility routine',
+      'Runner\'s mobility plan',
+      'Cyclist\'s mobility plan',
+      'Make me more flexible'
+    ],
+    '6': [ // Hybrid
+      'Triathlon training (swim/bike/run)',
+      'Running + strength integration',
+      'Cycling + strength integration',
+      'Triathlon + strength integration'
+    ]
+  };
+
+  const experienceLevels = [
+    'New to this',
+    'Been doing it a while', 
+    'Experienced'
+  ];
+
+  const trainingFrequencies = [
+    '2 days per week',
+    '3 days per week',
+    '4 days per week',
+    '5 days per week',
+    '6 days per week',
+    '7 days per week'
+  ];
+
+  const timePerSessions = [
+    '15-30 minutes',
+    '30-45 minutes',
+    '45-60 minutes',
+    '60-90 minutes',
+    '90+ minutes'
+  ];
+
+  const getEquipmentOptions = () => {
+    const category = formData.category;
+    if (category === '1' || category === '2') { // Running/Cycling
+      return ['Indoor only', 'Outdoor only', 'Both indoor and outdoor'];
+    } else if (category === '4') { // Strength
+      return ['Full gym access', 'Home gym', 'Dumbbells only', 'Bodyweight only'];
+    } else if (category === '3') { // Swimming
+      return ['Pool access', 'Open water', 'Both pool and open water'];
+    } else if (category === '5') { // Mobility
+      return ['No equipment needed'];
+    } else { // Hybrid
+      return ['Full gym + outdoor access', 'Home gym + outdoor', 'Minimal equipment'];
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < 7) {
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  // 🧠 INTELLIGENT AI RESPONSE - Actually understands training
+  const simulateAIResponse = async (prompt: string, startDateStr: string) => {
+    // Simulate AI processing time
+    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    setGeneratingPlan(true);
-    try {
-      // Mock response for now - replace with real AI later
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate API delay
-      
-      // Generate a month of progressive workouts
-      const generateMonthOfWorkouts = (goal: string) => {
-        const workouts = [];
-        const startDate = new Date();
-        
-        // Example: 5K training plan over 4 weeks
-        for (let week = 0; week < 4; week++) {
-          for (let day = 0; day < 7; day++) {
-            const currentDate = new Date(startDate);
-            currentDate.setDate(startDate.getDate() + (week * 7) + day);
-            const dateStr = currentDate.toISOString().split('T')[0];
-            
-            // Skip some days (rest days)
-            if (day === 1 || day === 3 || day === 6) continue;
-            
-            let workout = null;
-            
-            if (day === 0) { // Monday - Long run
-              workout = {
-                date: dateStr,
-                type: 'run',
-                name: `Week ${week + 1} - Long Run`,
-                intervals: [
-                  {
-                    id: '1',
-                    time: '10:00',
-                    effortLabel: 'Easy Warmup',
-                    rpeTarget: '4',
-                    duration: 600,
-                    repeatCount: 1
-                  },
-                  {
-                    id: '2',
-                    time: `${30 + (week * 5)}:00`,
-                    effortLabel: 'Steady Pace',
-                    rpeTarget: '6',
-                    duration: (30 + (week * 5)) * 60,
-                    repeatCount: 1
-                  },
-                  {
-                    id: '3',
-                    time: '10:00',
-                    effortLabel: 'Easy Cool Down',
-                    rpeTarget: '3',
-                    duration: 600,
-                    repeatCount: 1
-                  }
-                ]
-              };
-            } else if (day === 2) { // Wednesday - Intervals
-              workout = {
-                date: dateStr,
-                type: 'run',
-                name: `Week ${week + 1} - Speed Work`,
-                intervals: [
-                  {
-                    id: '1',
-                    time: '15:00',
-                    effortLabel: 'Warmup',
-                    rpeTarget: '4',
-                    duration: 900,
-                    repeatCount: 1
-                  },
-                  {
-                    id: '2',
-                    time: `${4 + week}x(2:00 Hard/1:00 Easy)`,
-                    effortLabel: 'Intervals',
-                    rpeTarget: '8',
-                    duration: (4 + week) * 180,
-                    repeatCount: 1,
-                    isRepeatBlock: true
-                  },
-                  {
-                    id: '3',
-                    time: '10:00',
-                    effortLabel: 'Cool Down',
-                    rpeTarget: '3',
-                    duration: 600,
-                    repeatCount: 1
-                  }
-                ]
-              };
-            } else if (day === 4) { // Friday - Recovery
-              workout = {
-                date: dateStr,
-                type: 'run',
-                name: `Week ${week + 1} - Recovery Run`,
-                intervals: [
-                  {
-                    id: '1',
-                    time: '25:00',
-                    effortLabel: 'Easy Recovery',
-                    rpeTarget: '4',
-                    duration: 1500,
-                    repeatCount: 1
-                  }
-                ]
-              };
-            } else if (day === 5) { // Saturday - Strength
-              workout = {
-                date: dateStr,
-                type: 'strength',
-                name: `Week ${week + 1} - Strength Training`,
-                strength_exercises: [  // 🔥 FIXED: Changed from 'exercises' to 'strength_exercises'
-                  {
-                    id: '1',
-                    name: 'Squats',
-                    sets: 3,
-                    reps: 12,
-                    weight: 135,
-                    weightMode: 'same'
-                  },
-                  {
-                    id: '2',
-                    name: 'Lunges',
-                    sets: 3,
-                    reps: 10,
-                    weight: 0,
-                    weightMode: 'same'
-                  },
-                  {
-                    id: '3',
-                    name: 'Calf Raises',
-                    sets: 3,
-                    reps: 15,
-                    weight: 0,
-                    weightMode: 'same'
-                  }
-                ]
-              };
-            }
-            
-            if (workout) {
-              workouts.push(workout);
-            }
-          }
-        }
-        
-        return workouts;
-      };
-      
-      // Generate the month of workouts
-      const monthWorkouts = generateMonthOfWorkouts(planPrompt);
-      
-      // NEW: Create plan metadata for Plans dropdown
-      const planId = `plan-${Date.now()}`;
-      const planData = {
-        id: planId,
-        name: planPrompt.length > 30 ? `${planPrompt.substring(0, 30)}...` : planPrompt,
-        description: planPrompt,
-        type: 'run', // Could be determined by AI
-        duration: 4, // 4 weeks
-        level: 'intermediate',
-        goal: planPrompt,
+    const promptLower = prompt.toLowerCase();
+    
+    console.log('🧠 Intelligent AI analyzing prompt:', prompt);
+    
+    // 🧠 SMART DISCIPLINE DETECTION
+    const disciplines = [];
+    const isIntegration = promptLower.includes('integration') || promptLower.includes('hybrid') || promptLower.includes('+');
+    
+    if (promptLower.includes('run')) disciplines.push('run');
+    if (promptLower.includes('bike') || promptLower.includes('cycle') || promptLower.includes('ride')) disciplines.push('ride');
+    if (promptLower.includes('swim')) disciplines.push('swim');
+    if (promptLower.includes('strength') || promptLower.includes('gym') || promptLower.includes('weights')) disciplines.push('strength');
+    if (promptLower.includes('mobility') || promptLower.includes('flexibility')) disciplines.push('mobility');
+    
+    // Default to running if no discipline detected
+    if (disciplines.length === 0) disciplines.push('run');
+    
+    console.log('🧠 Detected disciplines:', disciplines, 'Integration:', isIntegration);
+    
+    // 🧠 SMART DURATION DETECTION
+    let weeks = 4; // default
+    const weekMatches = prompt.match(/(\d+)\s*weeks?/i);
+    if (weekMatches) {
+      weeks = Math.min(Math.max(parseInt(weekMatches[1]), 1), 16);
+    }
+    
+    // 🧠 SMART FREQUENCY DETECTION
+    let daysPerWeek = 4; // default
+    const frequencyMatches = prompt.match(/(\d+)\s*days?\s*per\s*week/i);
+    if (frequencyMatches) {
+      daysPerWeek = Math.min(Math.max(parseInt(frequencyMatches[1]), 2), 7);
+    }
+    
+    // 🧠 SMART LEVEL DETECTION
+    let level = 'intermediate';
+    if (promptLower.includes('beginner') || promptLower.includes('new to') || promptLower.includes('just started')) {
+      level = 'beginner';
+    } else if (promptLower.includes('advanced') || promptLower.includes('experienced') || promptLower.includes('competitive')) {
+      level = 'advanced';
+    }
+    
+    console.log('🧠 Plan parameters:', { weeks, daysPerWeek, level, disciplines, isIntegration });
+    
+    // 🧠 GENERATE INTELLIGENT WORKOUTS
+    const workouts = generateIntelligentWorkouts(disciplines, weeks, daysPerWeek, level, isIntegration, startDateStr, prompt);
+    
+    return {
+      plan: {
+        name: generateSmartPlanName(prompt, disciplines, isIntegration),
+        description: prompt,
+        type: disciplines[0],
+        duration: weeks,
+        level: level,
+        goal: extractGoal(prompt),
         status: 'active',
         currentWeek: 1,
         createdDate: new Date().toISOString().split('T')[0],
-        totalWorkouts: monthWorkouts.length,
-        weeks: [] // Could be populated with detailed week structure for plan detail view
+        totalWorkouts: workouts.length,
+        disciplines: disciplines,
+        isIntegrated: isIntegration
+      },
+      workouts: workouts
+    };
+  };
+
+  // 🧠 SMART PLAN NAME GENERATION
+  const generateSmartPlanName = (prompt: string, disciplines: string[], isIntegration: boolean) => {
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('5k')) return '5K Training Plan';
+    if (promptLower.includes('10k')) return '10K Training Plan';
+    if (promptLower.includes('marathon')) return 'Marathon Training Plan';
+    if (promptLower.includes('triathlon')) return 'Triathlon Training Plan';
+    
+    if (isIntegration && disciplines.length > 1) {
+      const disciplineNames = disciplines.map(d => {
+        const names = { 'run': 'Running', 'ride': 'Cycling', 'swim': 'Swimming', 'strength': 'Strength', 'mobility': 'Mobility' };
+        return names[d] || d;
+      });
+      return `${disciplineNames.join(' + ')} Integration Plan`;
+    }
+    
+    const disciplineNames = {
+      'run': 'Running',
+      'ride': 'Cycling', 
+      'swim': 'Swimming',
+      'strength': 'Strength',
+      'mobility': 'Mobility'
+    };
+    
+    return `${disciplineNames[disciplines[0]] || 'Training'} Plan`;
+  };
+
+  const extractGoal = (prompt: string) => {
+    const promptLower = prompt.toLowerCase();
+    
+    if (promptLower.includes('race') || promptLower.includes('5k') || promptLower.includes('10k')) {
+      return 'Race Performance';
+    }
+    if (promptLower.includes('endurance') || promptLower.includes('distance')) {
+      return 'Endurance Building';
+    }
+    if (promptLower.includes('speed') || promptLower.includes('fast')) {
+      return 'Speed Development';
+    }
+    if (promptLower.includes('strength') || promptLower.includes('muscle')) {
+      return 'Strength Building';
+    }
+    if (promptLower.includes('integration') || promptLower.includes('hybrid')) {
+      return 'Cross-Training';
+    }
+    
+    return 'General Fitness';
+  };
+
+  // 🧠 INTELLIGENT WORKOUT GENERATION
+  const generateIntelligentWorkouts = (
+    disciplines: string[], 
+    weeks: number, 
+    daysPerWeek: number, 
+    level: string, 
+    isIntegration: boolean,
+    startDateStr: string, 
+    prompt: string
+  ) => {
+    const workouts = [];
+    const startDate = new Date(startDateStr);
+    
+    console.log('🧠 Generating intelligent workouts:', { disciplines, weeks, daysPerWeek, isIntegration });
+    
+    for (let week = 0; week < weeks; week++) {
+      const isRecoveryWeek = (week + 1) % 4 === 0;
+      const phase = week < weeks * 0.5 ? 'base' : week < weeks * 0.8 ? 'build' : 'peak';
+      
+      // 🧠 SMART WEEKLY SCHEDULING
+      let weeklySchedule = [];
+      
+      if (isIntegration && disciplines.includes('run') && disciplines.includes('strength')) {
+        // 🧠 RUNNING + STRENGTH INTEGRATION
+        weeklySchedule = generateRunningStrengthSchedule(daysPerWeek, level);
+      } else if (isIntegration && disciplines.length > 1) {
+        // 🧠 MULTI-DISCIPLINE INTEGRATION  
+        weeklySchedule = generateMultiDisciplineSchedule(disciplines, daysPerWeek);
+      } else {
+        // 🧠 SINGLE DISCIPLINE FOCUS
+        weeklySchedule = generateSingleDisciplineSchedule(disciplines[0], daysPerWeek);
+      }
+      
+      console.log(`🧠 Week ${week + 1} schedule:`, weeklySchedule);
+      
+      // Generate workouts for each day in the schedule
+      weeklySchedule.forEach((dayPlan, dayIndex) => {
+        if (dayPlan.type === 'rest') return;
+        
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + (week * 7) + dayIndex);
+        const dateStr = currentDate.toISOString().split('T')[0];
+        
+        const workout = generateSmartWorkout(dayPlan, week, phase, level, isRecoveryWeek, dateStr);
+        if (workout) {
+          workouts.push(workout);
+        }
+      });
+    }
+    
+    console.log('🧠 Generated total workouts:', workouts.length);
+    return workouts;
+  };
+
+  // 🧠 SMART WEEKLY SCHEDULING
+  const generateRunningStrengthSchedule = (daysPerWeek: number, level: string) => {
+    const schedules = {
+      3: [ // 3 days: 2 run, 1 strength
+        { type: 'run', focus: 'easy' },
+        { type: 'rest' },
+        { type: 'strength', focus: 'full-body' },
+        { type: 'rest' },
+        { type: 'run', focus: 'long' },
+        { type: 'rest' },
+        { type: 'rest' }
+      ],
+      4: [ // 4 days: 2 run, 2 strength
+        { type: 'run', focus: 'easy' },
+        { type: 'strength', focus: 'upper' },
+        { type: 'rest' },
+        { type: 'run', focus: 'intervals' },
+        { type: 'rest' },
+        { type: 'strength', focus: 'lower' },
+        { type: 'rest' }
+      ],
+      5: [ // 5 days: 3 run, 2 strength
+        { type: 'run', focus: 'easy' },
+        { type: 'strength', focus: 'upper' },
+        { type: 'run', focus: 'intervals' },
+        { type: 'rest' },
+        { type: 'strength', focus: 'lower' },
+        { type: 'run', focus: 'long' },
+        { type: 'rest' }
+      ],
+      6: [ // 6 days: 3 run, 3 strength  
+        { type: 'run', focus: 'easy' },
+        { type: 'strength', focus: 'upper' },
+        { type: 'run', focus: 'intervals' },
+        { type: 'strength', focus: 'lower' },
+        { type: 'run', focus: 'tempo' },
+        { type: 'strength', focus: 'core' },
+        { type: 'rest' }
+      ]
+    };
+    
+    return schedules[Math.min(daysPerWeek, 6) as keyof typeof schedules] || schedules[4];
+  };
+
+  const generateMultiDisciplineSchedule = (disciplines: string[], daysPerWeek: number) => {
+    // Simple rotation through disciplines
+    const schedule = [];
+    let disciplineIndex = 0;
+    
+    for (let day = 0; day < 7; day++) {
+      if (day < daysPerWeek) {
+        schedule.push({ 
+          type: disciplines[disciplineIndex % disciplines.length], 
+          focus: 'base' 
+        });
+        disciplineIndex++;
+      } else {
+        schedule.push({ type: 'rest' });
+      }
+    }
+    
+    return schedule;
+  };
+
+  const generateSingleDisciplineSchedule = (discipline: string, daysPerWeek: number) => {
+    const schedule = [];
+    const focuses = discipline === 'run' ? ['easy', 'intervals', 'tempo', 'long'] : ['base', 'intervals', 'endurance', 'recovery'];
+    
+    for (let day = 0; day < 7; day++) {
+      if (day < daysPerWeek) {
+        schedule.push({ 
+          type: discipline, 
+          focus: focuses[day % focuses.length] 
+        });
+      } else {
+        schedule.push({ type: 'rest' });
+      }
+    }
+    
+    return schedule;
+  };
+
+  // 🧠 SMART WORKOUT GENERATION
+  const generateSmartWorkout = (dayPlan: any, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string) => {
+    const levelMultipliers = { beginner: 0.8, intermediate: 1.0, advanced: 1.2 };
+    const multiplier = levelMultipliers[level] || 1.0;
+    
+    if (dayPlan.type === 'run') {
+      return generateSmartRunWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr, multiplier);
+    } else if (dayPlan.type === 'strength') {
+      return generateSmartStrengthWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr);
+    } else if (dayPlan.type === 'ride') {
+      return generateSmartRideWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr, multiplier);
+    } else if (dayPlan.type === 'swim') {
+      return generateSmartSwimWorkout(dayPlan.focus, week, phase, level, isRecoveryWeek, dateStr, multiplier);
+    }
+    
+    return null;
+  };
+
+  // 🧠 INTELLIGENT RUNNING WORKOUTS WITH COACHING NOTES
+  const generateSmartRunWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string, multiplier: number) => {
+    const baseRPE = { beginner: 4, intermediate: 5, advanced: 5 }[level];
+    const hardRPE = { beginner: 7, intermediate: 8, advanced: 9 }[level];
+    
+    const workoutTypes = {
+      'easy': {
+        name: `Week ${week + 1} - Easy Run`,
+        description: `Aerobic base building run. This builds your aerobic engine and improves fat burning. Should feel conversational - you could talk in full sentences.`,
+        coachingNotes: `Purpose: Aerobic development & recovery\nKey: Nose breathing if possible, very relaxed effort\nNote: Common mistake is going too fast - slow down!`,
+        intervals: [
+          {
+            id: '1',
+            time: `${Math.round((35 + week * 5) * multiplier)}:00`,
+            effortLabel: 'Easy Pace',
+            rpeTarget: baseRPE.toString(),
+            duration: Math.round((35 + week * 5) * multiplier) * 60,
+            repeatCount: 1
+          }
+        ]
+      },
+      'intervals': {
+        name: `Week ${week + 1} - Interval Training`,
+        description: `VO2 max intervals to improve your top-end speed and oxygen processing. These should feel hard but controlled.`,
+        coachingNotes: `Purpose: VO2 max development, neuromuscular power\nKey: Strong effort but not all-out sprints\nNote: Recovery jogs are crucial - don't skip them!`,
+        intervals: [
+          {
+            id: '1',
+            time: '15:00',
+            effortLabel: 'Warmup',
+            rpeTarget: baseRPE.toString(),
+            duration: 900,
+            repeatCount: 1
+          },
+          {
+            id: '2',
+            time: '3:00',
+            effortLabel: 'Hard Interval',
+            rpeTarget: hardRPE.toString(),
+            duration: 180,
+            repeatCount: 1
+          },
+          {
+            id: '3',
+            time: '2:00',
+            effortLabel: 'Recovery Jog',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 120,
+            repeatCount: 1
+          },
+          {
+            id: '4',
+            time: '3:00',
+            effortLabel: 'Hard Interval',
+            rpeTarget: hardRPE.toString(),
+            duration: 180,
+            repeatCount: 1
+          },
+          {
+            id: '5',
+            time: '2:00',
+            effortLabel: 'Recovery Jog',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 120,
+            repeatCount: 1
+          },
+          {
+            id: '6',
+            time: '3:00',
+            effortLabel: 'Hard Interval',
+            rpeTarget: hardRPE.toString(),
+            duration: 180,
+            repeatCount: 1
+          },
+          {
+            id: '7',
+            time: '2:00',
+            effortLabel: 'Recovery Jog',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 120,
+            repeatCount: 1
+          },
+          {
+            id: '8',
+            time: '3:00',
+            effortLabel: 'Hard Interval',
+            rpeTarget: hardRPE.toString(),
+            duration: 180,
+            repeatCount: 1
+          },
+          {
+            id: '9',
+            time: '2:00',
+            effortLabel: 'Recovery Jog',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 120,
+            repeatCount: 1
+          },
+          ...(week >= 1 ? [{
+            id: '10',
+            time: '3:00',
+            effortLabel: 'Hard Interval',
+            rpeTarget: hardRPE.toString(),
+            duration: 180,
+            repeatCount: 1
+          },
+          {
+            id: '11',
+            time: '2:00',
+            effortLabel: 'Recovery Jog',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 120,
+            repeatCount: 1
+          }] : []),
+          ...(week >= 2 ? [{
+            id: '12',
+            time: '3:00',
+            effortLabel: 'Hard Interval',
+            rpeTarget: hardRPE.toString(),
+            duration: 180,
+            repeatCount: 1
+          },
+          {
+            id: '13',
+            time: '2:00',
+            effortLabel: 'Recovery Jog',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 120,
+            repeatCount: 1
+          }] : []),
+          {
+            id: '14',
+            time: '15:00',
+            effortLabel: 'Cooldown',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 900,
+            repeatCount: 1
+          }
+        ]
+      },
+      'tempo': {
+        name: `Week ${week + 1} - Tempo Run`,
+        description: `Lactate threshold training - the effort you could sustain for about 1 hour in a race. Comfortably hard.`,
+        coachingNotes: `Purpose: Lactate threshold improvement, race pace training\nKey: Steady, sustainable effort - not intervals\nNote: Should feel like 15k-half marathon race pace`,
+        intervals: [
+          {
+            id: '1',
+            time: '15:00',
+            effortLabel: 'Warmup',
+            rpeTarget: baseRPE.toString(),
+            duration: 900,
+            repeatCount: 1
+          },
+          {
+            id: '2',
+            time: `${15 + week * 2}:00`,
+            effortLabel: 'Tempo Pace',
+            rpeTarget: (baseRPE + 2).toString(),
+            duration: (15 + week * 2) * 60,
+            repeatCount: 1
+          },
+          {
+            id: '3',
+            time: '10:00',
+            effortLabel: 'Cooldown',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 600,
+            repeatCount: 1
+          }
+        ]
+      },
+      'long': {
+        name: `Week ${week + 1} - Long Run`,
+        description: `Aerobic endurance builder. Teaches your body to use fat for fuel and builds mental toughness for race day.`,
+        coachingNotes: `Purpose: Aerobic endurance, fat adaptation, mental training\nKey: Start easy, stay easy - it's about time on feet\nNote: Practice race day nutrition and hydration`,
+        intervals: [
+          {
+            id: '1',
+            time: '10:00',
+            effortLabel: 'Warmup',
+            rpeTarget: baseRPE.toString(),
+            duration: 600,
+            repeatCount: 1
+          },
+          {
+            id: '2',
+            time: `${Math.round((60 + week * 10) * multiplier)}:00`,
+            effortLabel: phase === 'base' ? 'Aerobic Base' : 'Steady Effort',
+            rpeTarget: (baseRPE + (phase === 'peak' ? 2 : 1)).toString(),
+            duration: Math.round((60 + week * 10) * multiplier) * 60,
+            repeatCount: 1
+          },
+          {
+            id: '3',
+            time: '10:00',
+            effortLabel: 'Cooldown',
+            rpeTarget: (baseRPE - 1).toString(),
+            duration: 600,
+            repeatCount: 1
+          }
+        ]
+      }
+    };
+    
+    const workout = workoutTypes[focus] || workoutTypes['easy'];
+    
+    return {
+      date: dateStr,
+      type: 'run',
+      ...workout
+    };
+  };
+
+  // 🧠 INTELLIGENT STRENGTH WORKOUTS WITH COACHING NOTES
+  const generateSmartStrengthWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string) => {
+    const coachingNotes = {
+      'upper': `Purpose: Upper body strength for improved posture & arm swing\nKey: Control the eccentric (lowering) phase\nNote: Focus on form over speed - quality reps only`,
+      'lower': `Purpose: Single-leg strength & power for running efficiency\nKey: Unilateral work prevents imbalances\nNote: Start lighter than you think - balance is harder than bilateral`,
+      'core': `Purpose: Core stability for efficient energy transfer\nKey: Anti-movement (planks) > movement (crunches)\nNote: Breathe normally - don't hold your breath`,
+      'full-body': `Purpose: Functional movement patterns for running\nKey: Focus on compound movements\nNote: Perfect form before adding weight`
+    };
+
+    const exerciseLibrary = {
+      'upper': [
+        { name: 'Push-ups', sets: 3, reps: 8 + week * 2, weight: 0, weightMode: 'same', note: 'Modify on knees if needed' },
+        { name: 'Pull-ups/Assisted Pull-ups', sets: 3, reps: 5 + week, weight: 0, weightMode: 'same', note: 'Use band assistance if needed' },
+        { name: 'Overhead Press', sets: 3, reps: 8 + week, weight: 65 + week * 5, weightMode: 'same', note: 'Keep core tight, press straight up' },
+        { name: 'Bent-over Rows', sets: 3, reps: 10 + week, weight: 85 + week * 5, weightMode: 'same', note: 'Squeeze shoulder blades together' },
+        { name: 'Chest Press', sets: 3, reps: 10 + week, weight: 95 + week * 5, weightMode: 'same', note: 'Control the negative' },
+        { name: 'Tricep Dips', sets: 3, reps: 8 + week, weight: 0, weightMode: 'same', note: 'Keep body close to bench' }
+      ],
+      'lower': [
+        { name: 'Squats', sets: 4, reps: 10 + week * 2, weight: 135 + week * 10, weightMode: 'same', note: 'Hip-width stance, knees track over toes' },
+        { name: 'Romanian Deadlifts', sets: 3, reps: 8 + week, weight: 155 + week * 10, weightMode: 'same', note: 'Hinge at hips, feel hamstring stretch' },
+        { name: 'Lunges (each leg)', sets: 3, reps: 10 + week, weight: 25 + week * 5, weightMode: 'same', note: 'Step back, not forward - safer for knees' },
+        { name: 'Calf Raises', sets: 3, reps: 15 + week * 2, weight: 45 + week * 5, weightMode: 'same', note: 'Full range of motion, pause at top' },
+        { name: 'Glute Bridges', sets: 3, reps: 15 + week * 2, weight: 45 + week * 5, weightMode: 'same', note: 'Squeeze glutes hard at top' },
+        { name: 'Single-leg RDL', sets: 3, reps: 8 + week, weight: 15 + week * 2, weightMode: 'same', note: 'Start with bodyweight, focus on balance' }
+      ],
+      'core': [
+        { name: 'Planks', sets: 3, reps: 45 + week * 15, weight: 0, weightMode: 'same', note: 'Hold time in seconds - maintain straight line' },
+        { name: 'Russian Twists', sets: 3, reps: 20 + week * 5, weight: 10 + week * 2, weightMode: 'same', note: 'Controlled rotation, heels off ground' },
+        { name: 'Dead Bugs', sets: 3, reps: 10 + week * 2, weight: 0, weightMode: 'same', note: 'Press low back into floor' },
+        { name: 'Bird Dogs', sets: 3, reps: 8 + week * 2, weight: 0, weightMode: 'same', note: 'Opposite arm/leg, hold 3 seconds' },
+        { name: 'Side Planks', sets: 3, reps: 30 + week * 10, weight: 0, weightMode: 'same', note: 'Each side - hold time in seconds' },
+        { name: 'Mountain Climbers', sets: 3, reps: 20 + week * 5, weight: 0, weightMode: 'same', note: 'Each leg - controlled, not frantic' }
+      ],
+      'full-body': [
+        { name: 'Squats', sets: 3, reps: 10 + week, weight: 135 + week * 5, weightMode: 'same', note: 'Foundation movement - perfect your form' },
+        { name: 'Push-ups', sets: 3, reps: 8 + week, weight: 0, weightMode: 'same', note: 'Modify on knees if needed' },
+        { name: 'Romanian Deadlifts', sets: 3, reps: 8 + week, weight: 115 + week * 5, weightMode: 'same', note: 'Hip hinge pattern - crucial for runners' },
+        { name: 'Overhead Press', sets: 3, reps: 8 + week, weight: 45 + week * 5, weightMode: 'same', note: 'Full body stability exercise' },
+        { name: 'Planks', sets: 3, reps: 45 + week * 10, weight: 0, weightMode: 'same', note: 'Hold time in seconds' },
+        { name: 'Lunges', sets: 3, reps: 10 + week, weight: 20 + week * 2, weightMode: 'same', note: 'Each leg - single leg strength' }
+      ]
+    };
+    
+    const exercises = exerciseLibrary[focus] || exerciseLibrary['full-body'];
+    
+    return {
+      date: dateStr,
+      type: 'strength',
+      name: `Week ${week + 1} - ${focus.charAt(0).toUpperCase() + focus.slice(1)} Strength`,
+      description: `Strength training session focused on ${focus} development for running performance.`,
+      coachingNotes: coachingNotes[focus] || coachingNotes['full-body'],
+      strength_exercises: exercises.map((exercise, index) => ({
+        id: (index + 1).toString(),
+        ...exercise
+      }))
+    };
+  };
+
+  // 🧠 INTELLIGENT RIDE WORKOUTS
+  const generateSmartRideWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string, multiplier: number) => {
+    const duration = Math.round((60 + week * 15) * multiplier);
+    
+    return {
+      date: dateStr,
+      type: 'ride',
+      name: `Week ${week + 1} - ${focus.charAt(0).toUpperCase() + focus.slice(1)} Ride`,
+      intervals: [
+        {
+          id: '1',
+          time: `${duration}:00`,
+          powerTarget: focus === 'intervals' ? 'Zone 4-5' : focus === 'tempo' ? 'Zone 3' : 'Zone 2',
+          duration: duration * 60,
+          repeatCount: 1
+        }
+      ]
+    };
+  };
+
+  // 🧠 INTELLIGENT SWIM WORKOUTS
+  const generateSmartSwimWorkout = (focus: string, week: number, phase: string, level: string, isRecoveryWeek: boolean, dateStr: string, multiplier: number) => {
+    const distance = Math.round((1500 + week * 300) * multiplier);
+    
+    return {
+      date: dateStr,
+      type: 'swim',
+      name: `Week ${week + 1} - ${focus.charAt(0).toUpperCase() + focus.slice(1)} Swim`,
+      intervals: [
+        {
+          id: '1',
+          distance: distance,
+          stroke: 'Freestyle',
+          targetRPE: focus === 'intervals' ? '7' : '5',
+          equipment: 'None',
+          repeatCount: 1
+        }
+      ]
+    };
+  };
+
+  const generatePlanFromSuggested = async () => {
+    const categoryName = categories[formData.category as keyof typeof categories];
+    const goalName = formData.specificGoal;
+    
+    const planPrompt = `${goalName}. Experience level: ${formData.experienceLevel}. Training frequency: ${formData.trainingFrequency}. Session duration: ${formData.timePerSession}. Equipment: ${formData.equipmentLocation}.`;
+    
+    return await generatePlan(planPrompt, formData.startDate);
+  };
+
+  const generatePlan = async (prompt?: string, startDateStr?: string) => {
+    const actualPrompt = prompt || planPrompt;
+    const actualStartDate = startDateStr || startDate;
+    
+    if (!actualPrompt.trim()) return;
+    
+    setGeneratingPlan(true);
+    try {
+      console.log('🧠 Generating INTELLIGENT AI plan for:', actualPrompt);
+      
+      // Generate AI-powered plan
+      const aiResult = await simulateAIResponse(actualPrompt, actualStartDate);
+      
+      // Create plan metadata
+      const planId = `plan-${Date.now()}`;
+      
+      // NEW: Organize workouts by week for detailed plan view
+      const organizeWorkoutsByWeek = (workouts: any[], startDate: string, planDuration: number) => {
+        const weeks = [];
+        
+        for (let weekNum = 1; weekNum <= planDuration; weekNum++) {
+          const weekWorkouts = workouts.filter(workout => {
+            const workoutDate = new Date(workout.date);
+            const startDateObj = new Date(startDate);
+            const weekStart = new Date(startDateObj);
+            weekStart.setDate(startDateObj.getDate() + ((weekNum - 1) * 7));
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekStart.getDate() + 6);
+            
+            return workoutDate >= weekStart && workoutDate <= weekEnd;
+          });
+          
+          weeks.push({
+            weekNumber: weekNum,
+            title: `Week ${weekNum}`,
+            focus: `Progressive training week ${weekNum}`,
+            workouts: weekWorkouts.map(w => ({
+              ...w,
+              completed: false,
+              intensity: w.intervals ? (
+                parseInt(w.intervals[0]?.rpeTarget || '5') > 7 ? 'Hard' : 
+                parseInt(w.intervals[0]?.rpeTarget || '5') > 5 ? 'Moderate' : 'Easy'
+              ) : 'Moderate',
+              duration: Math.floor((w.duration || 0) / 60) // Convert to minutes
+            }))
+          });
+        }
+        
+        return weeks;
       };
       
-      console.log('🚀 Generated plan data:', planData);
+      const weeks = organizeWorkoutsByWeek(aiResult.workouts, actualStartDate, aiResult.plan.duration);
       
-      // Save all workouts to your app
-      for (const workout of monthWorkouts) {
+      const planData = {
+        ...aiResult.plan,
+        id: planId,
+        weeks: weeks,
+        currentWeek: 1
+      };
+      
+      console.log('🧠 Generated INTELLIGENT plan data:', planData);
+      console.log('🧠 Generated workouts:', aiResult.workouts.length);
+      console.log('🧠 Organized weeks:', weeks.length);
+      
+      // Save all workouts to the app
+      for (const workout of aiResult.workouts) {
         const workoutData = {
           name: workout.name,
           type: workout.type,
           date: workout.date,
           description: workout.intervals ? 
-            workout.intervals.map(i => i.effortLabel || i.time).join(' + ') :
+            workout.intervals.map(i => `${i.effortLabel || i.time || ''}`).join(' + ') :
             workout.strength_exercises?.map(e => `${e.name} ${e.sets}x${e.reps}`).join(' + ') || '',
           duration: workout.intervals ? 
             workout.intervals.reduce((sum, i) => sum + (i.duration || 0), 0) : 
@@ -5019,9 +6229,9 @@ export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderPro
           workout_status: 'planned',
           intervals: workout.intervals || undefined,
           strength_exercises: workout.strength_exercises || undefined,
-          userComments: '',  // 🔥 FIXED: Added missing required fields
-          completedManually: false,  // 🔥 FIXED: Added missing required fields
-          planId: planId  // Link workouts to plan
+          userComments: '',
+          completedManually: false,
+          planId: planId
         };
         
         try {
@@ -5031,25 +6241,209 @@ export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderPro
         }
       }
       
-      // NEW: Call the plan generation callback
+      // Call the plan generation callback directly - NO POPUP
       if (onPlanGenerated) {
-        console.log('🚀 Calling onPlanGenerated with:', planData);
+        console.log('🧠 Calling onPlanGenerated with:', planData);
         onPlanGenerated(planData);
       }
       
-      setPlanPrompt('');
+      // Reset forms
+      if (activeTab === 'suggested') {
+        setFormData({
+          category: '', specificGoal: '', experienceLevel: '', 
+          trainingFrequency: '', timePerSession: '', equipmentLocation: '',
+          startDate: new Date().toISOString().split('T')[0]
+        });
+        setCurrentStep(1);
+      } else {
+        setPlanPrompt('');
+      }
       
-      // Show success message
-      alert(`Generated ${monthWorkouts.length} workouts for your training plan!`);
-      
-      // Don't close automatically - let AppLayout handle it
-      // onClose();
+      // REMOVED: Success alert popup - users flow directly to their plan
       
     } catch (error) {
       console.error('Error generating plan:', error);
       alert('Error generating plan. Please try again.');
     } finally {
       setGeneratingPlan(false);
+    }
+  };
+
+  const renderSuggestedStep = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">Pick your training interest:</h2>
+            <div className="space-y-3">
+              {Object.entries(categories).map(([key, category]) => (
+                <button
+                  key={key}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, category: key }));
+                    handleNext();
+                  }}
+                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 2:
+        const goalOptions = specificGoals[formData.category as keyof typeof specificGoals] || [];
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">{categories[formData.category as keyof typeof categories]}</h2>
+            <div className="space-y-3">
+              {goalOptions.map((goal, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, specificGoal: goal }));
+                    handleNext();
+                  }}
+                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                >
+                  {goal}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">What's your experience level?</h2>
+            <div className="space-y-3">
+              {experienceLevels.map((level) => (
+                <button
+                  key={level}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, experienceLevel: level }));
+                    handleNext();
+                  }}
+                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">How many days per week do you want to train?</h2>
+            <div className="space-y-3">
+              {trainingFrequencies.map((freq) => (
+                <button
+                  key={freq}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, trainingFrequency: freq }));
+                    handleNext();
+                  }}
+                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                >
+                  {freq}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 5:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">How much time do you have per session?</h2>
+            <div className="space-y-3">
+              {timePerSessions.map((time) => (
+                <button
+                  key={time}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, timePerSession: time }));
+                    handleNext();
+                  }}
+                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                >
+                  {time}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 6:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">What equipment do you have access to and where will you train?</h2>
+            <div className="space-y-3">
+              {getEquipmentOptions().map((option) => (
+                <button
+                  key={option}
+                  onClick={() => {
+                    setFormData(prev => ({ ...prev, equipmentLocation: option }));
+                    handleNext();
+                  }}
+                  className="w-full p-4 text-left hover:text-blue-600 transition-colors"
+                >
+                  {option}
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+      case 7:
+        return (
+          <div className="space-y-6">
+            <h2 className="text-xl font-medium">When do you want to start?</h2>
+            <Input
+              type="date"
+              value={formData.startDate}
+              onChange={(e) => setFormData(prev => ({ ...prev, startDate: e.target.value }))}
+              className="text-lg p-4 min-h-[44px]"
+            />
+            
+            <div className="space-y-4 p-4">
+              <h3 className="font-medium">Plan Summary:</h3>
+              <div className="space-y-2 text-sm">
+                <p><strong>Goal:</strong> {formData.specificGoal}</p>
+                <p><strong>Experience:</strong> {formData.experienceLevel}</p>
+                <p><strong>Frequency:</strong> {formData.trainingFrequency}</p>
+                <p><strong>Session Time:</strong> {formData.timePerSession}</p>
+                <p><strong>Equipment:</strong> {formData.equipmentLocation}</p>
+                <p><strong>Start Date:</strong> {formData.startDate}</p>
+              </div>
+            </div>
+            
+            <Button
+              onClick={generatePlanFromSuggested}
+              disabled={generatingPlan}
+              className="w-full h-12 text-white hover:bg-gray-800"
+              style={{ backgroundColor: generatingPlan ? '#6b7280' : '#000000' }}
+            >
+              {generatingPlan ? (
+                <div className="flex items-center gap-2">
+                  <Kanban className="h-4 w-4 animate-spin" />
+                  Generating intelligent plan...
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Kanban className="h-4 w-4" />
+                  Generate Intelligent Plan
+                </div>
+              )}
+            </Button>
+          </div>
+        );
+
+      default:
+        return null;
     }
   };
 
@@ -5068,62 +6462,141 @@ export default function PlanBuilder({ onClose, onPlanGenerated }: PlanBuilderPro
           </Button>
         </div>
 
-        {/* Main Content */}
-        <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-8">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 bg-gray-50 rounded-full">
-                <Kanban className="h-8 w-8 text-gray-600" />
-              </div>
-            </div>
-            <h1 className="text-2xl font-semibold mb-2">Build me a plan</h1>
-            <p className="text-gray-600">
-              Describe what you want to train for and I'll create a personalized plan
-            </p>
+        {/* Tabs */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('suggested')}
+              className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
+                activeTab === 'suggested'
+                  ? 'border-black text-black'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Suggested
+            </button>
+            <button
+              onClick={() => setActiveTab('free')}
+              className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
+                activeTab === 'free'
+                  ? 'border-black text-black'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Free
+            </button>
           </div>
+        </div>
 
-          <div className="space-y-6">
+        <div className="max-w-2xl mx-auto">
+          {activeTab === 'suggested' ? (
             <div>
-              <Textarea
-                value={planPrompt}
-                onChange={(e) => setPlanPrompt(e.target.value)}
-                placeholder="I want to train for a 5K race in 8 weeks..."
-                rows={4}
-                className="w-full min-h-[100px] border-gray-300"
-                style={{fontFamily: 'Inter, sans-serif'}}
-              />
-            </div>
-            
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600 font-medium">Quick suggestions:</p>
-              <div className="grid grid-cols-1 gap-2">
-                {quickPlans.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setPlanPrompt(suggestion)}
-                    className="text-left p-3 text-sm bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
-                    style={{fontFamily: 'Inter, sans-serif'}}
+              {/* Navigation for suggested mode */}
+              {currentStep > 1 && (
+                <div className="flex justify-between items-center mb-6">
+                  <Button
+                    onClick={handleBack}
+                    variant="ghost"
+                    className="flex items-center gap-2"
                   >
-                    {suggestion}
-                  </button>
-                ))}
+                    <ArrowLeft className="h-4 w-4" />
+                    Back
+                  </Button>
+                  <span className="text-sm text-gray-500">
+                    Step {currentStep} of 7
+                  </span>
+                </div>
+              )}
+              
+              {renderSuggestedStep()}
+            </div>
+          ) : (
+            <div>
+              <div className="text-center mb-8">
+                <div className="flex justify-center mb-4">
+                  <div className="p-4 rounded-full">
+                    <Kanban className="h-8 w-8 text-black" />
+                  </div>
+                </div>
+                <h1 className="text-2xl font-semibold mb-2">Build me a plan</h1>
+                <p className="text-gray-600">
+                  Describe your training goals and I'll create a personalized plan with progressive workouts
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* Start Date Input */}
+                <div className="space-y-2">
+                  <Label htmlFor="startDate" className="text-sm font-medium text-gray-700">
+                    Start Date
+                  </Label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="pl-10 min-h-[44px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Plan Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="planPrompt" className="text-sm font-medium text-gray-700">
+                    Describe Your Training Goal
+                  </Label>
+                  <Textarea
+                    id="planPrompt"
+                    value={planPrompt}
+                    onChange={(e) => setPlanPrompt(e.target.value)}
+                    placeholder="I want to train for a 5K race in 8 weeks. I'm a beginner runner who can currently run for 20 minutes without stopping..."
+                    rows={4}
+                    className="w-full min-h-[100px]"
+                  />
+                </div>
+                
+                {/* Quick Suggestions */}
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-600 font-medium">Quick suggestions:</p>
+                  <div className="grid grid-cols-1 gap-2">
+                    {quickPlans.map((suggestion, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setPlanPrompt(suggestion)}
+                        className="text-left p-3 text-sm hover:text-blue-600 transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Generate Button */}
+                <div className="pt-4">
+                  <Button
+                    onClick={() => generatePlan()}
+                    disabled={!planPrompt.trim() || generatingPlan}
+                    className="w-full h-12 text-white hover:bg-gray-800"
+                    style={{ backgroundColor: generatingPlan ? '#6b7280' : '#000000' }}
+                  >
+                    {generatingPlan ? (
+                      <div className="flex items-center gap-2">
+                        <Kanban className="h-4 w-4 animate-spin" />
+                        Generating intelligent plan...
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <Kanban className="h-4 w-4" />
+                        Generate Intelligent Plan
+                      </div>
+                    )}
+                  </Button>
+                </div>
               </div>
             </div>
-            
-            <div className="pt-4">
-              <Button
-                onClick={generatePlan}
-                disabled={!planPrompt.trim() || generatingPlan}
-                className="w-full h-12 bg-black text-white hover:bg-gray-800"
-                style={{
-                  fontFamily: 'Inter, sans-serif',
-                  fontWeight: 600
-                }}
-              >
-                {generatingPlan ? 'Generating plan...' : 'Generate Plan'}
-              </Button>
-            </div>
-          </div>
+          )}
         </div>
       </main>
     </div>
@@ -6531,10 +8004,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return planned;
   }, [workouts, workoutData.date, workoutData.id]);
 
-  // Calculate volume for an exercise
+  // FIXED: Calculate volume for an exercise - count sets with actual data
   const calculateExerciseVolume = (sets: Array<{ reps: number; weight: number; completed?: boolean }>) => {
     return sets
-      .filter(set => set.completed !== false)
+      .filter(set => set.reps > 0 && set.weight > 0) // Changed from completed check to data check
       .reduce((total, set) => total + (set.reps * set.weight), 0);
   };
 
@@ -6583,7 +8056,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const completedExercises = getCompletedExercises();
 
-  // Calculate total workout statistics
+  // FIXED: Calculate total workout statistics - count sets with data
   const workoutStats = useMemo(() => {
     let totalSets = 0;
     let totalReps = 0;
@@ -6592,10 +8065,11 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     completedExercises.forEach((exercise: CompletedExercise) => {
       if (!exercise.sets) return;
       
-      const completedSets = exercise.sets.filter(set => set.completed !== false);
-      totalSets += completedSets.length;
-      totalReps += completedSets.reduce((sum, set) => sum + (set.reps || 0), 0);
-      totalVolume += calculateExerciseVolume(completedSets);
+      // Changed: count sets with actual data instead of just completed sets
+      const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
+      totalSets += setsWithData.length;
+      totalReps += setsWithData.reduce((sum, set) => sum + (set.reps || 0), 0);
+      totalVolume += calculateExerciseVolume(exercise.sets);
     });
 
     return {
@@ -7400,6 +8874,7 @@ interface LoggedExercise {
 interface StrengthLoggerProps {
   onClose: () => void;
   scheduledWorkout?: any; // Optional scheduled workout to pre-populate
+  onWorkoutSaved?: (workout: any) => void; // NEW: Navigate to completed workout
 }
 
 // Simple volume calculator for save button
@@ -7407,8 +8882,9 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
   return exercises
     .filter(ex => ex.name.trim() && ex.sets.length > 0)
     .reduce((total, exercise) => {
-      const completedSets = exercise.sets.filter(set => set.completed);
-      const exerciseVolume = completedSets.reduce((sum, set) => sum + (set.reps * set.weight), 0);
+      // Count all sets that have actual reps and weight (not just completed ones)
+      const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
+      const exerciseVolume = setsWithData.reduce((sum, set) => sum + (set.reps * set.weight), 0);
       return total + exerciseVolume;
     }, 0);
 };
@@ -7503,7 +8979,7 @@ const PlateMath: React.FC<{
   );
 };
 
-export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLoggerProps) {
+export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved }: StrengthLoggerProps) {
   const { workouts, addWorkout } = useAppContext();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
@@ -7511,7 +8987,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   const [expandedPlates, setExpandedPlates] = useState<{[key: string]: boolean}>({});
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
-  const [isInitialized, setIsInitialized] = useState(false); // 🆕 Track initialization
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -7544,7 +9020,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     return calculateTotalVolume(exercises);
   }, [exercises]);
 
-  // 🆕 Create empty starter exercise
+  // Create empty starter exercise
   const createEmptyExercise = (): LoggedExercise => ({
     id: Date.now().toString(),
     name: '',
@@ -7558,11 +9034,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     expanded: true
   });
 
-  // 🔧 FIXED: Proper initialization with cleanup
+  // Proper initialization with cleanup
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
     
-    // 🆕 Always start fresh - clear any existing state
+    // Always start fresh - clear any existing state
     setExercises([]);
     setExpandedPlates({});
     setExpandedExercises({});
@@ -7598,7 +9074,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
-        id: exercise.id || `ex-${Date.now()}-${index}`,
+        id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
         name: exercise.name || '',
         expanded: true,
         sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
@@ -7618,9 +9094,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     }
     
     setIsInitialized(true);
-  }, [scheduledWorkout, workouts]); // 🆕 Depend on workouts to get fresh data
+  }, [scheduledWorkout, workouts]);
 
-  // 🆕 Cleanup when component unmounts
+  // Cleanup when component unmounts
   useEffect(() => {
     return () => {
       console.log('🧹 StrengthLogger cleanup - clearing state');
@@ -7678,6 +9154,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     setExercises([...exercises, newExercise]);
     setCurrentExercise('');
     setShowSuggestions(false);
+    
+    // Auto-expand the new exercise so you can immediately start logging
+    setExpandedExercises(prev => ({
+      ...prev,
+      [newExercise.id]: true
+    }));
+    
+    // Remove focus from any input to prevent keyboard from staying up
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
   };
 
   const updateExerciseName = (exerciseId: string, name: string, fromSuggestion = false) => {
@@ -7694,7 +9181,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
   const deleteExercise = (exerciseId: string) => {
     if (exercises.length === 1) {
-      // 🔧 FIXED: Use the helper function for consistency
       setExercises([createEmptyExercise()]);
     } else {
       setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
@@ -7713,8 +9199,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
   };
 
   const addSet = (exerciseId: string) => {
+    console.log('🔄 Adding set to exercise:', exerciseId);
     setExercises(exercises.map(exercise => {
       if (exercise.id === exerciseId) {
+        console.log('✅ Found exercise, current sets:', exercise.sets.length);
         const lastSet = exercise.sets[exercise.sets.length - 1];
         const newSet: LoggedSet = {
           reps: lastSet?.reps || 0,
@@ -7723,7 +9211,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
           rir: undefined,
           completed: false
         };
-        return { ...exercise, sets: [...exercise.sets, newSet] };
+        const updatedExercise = { ...exercise, sets: [...exercise.sets, newSet] };
+        console.log('✅ New exercise with sets:', updatedExercise.sets.length);
+        return updatedExercise;
+      }
+      return exercise;
+    }));
+  };
+
+  // NEW: Delete individual set
+  const deleteSet = (exerciseId: string, setIndex: number) => {
+    setExercises(exercises.map(exercise => {
+      if (exercise.id === exerciseId) {
+        const newSets = exercise.sets.filter((_, index) => index !== setIndex);
+        // Ensure at least one set remains
+        if (newSets.length === 0) {
+          return {
+            ...exercise,
+            sets: [{
+              reps: 0,
+              weight: 0,
+              barType: 'standard',
+              rir: undefined,
+              completed: false
+            }]
+          };
+        }
+        return { ...exercise, sets: newSets };
       }
       return exercise;
     }));
@@ -7748,7 +9262,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       type: 'strength' as const,
       date: scheduledWorkout?.date || new Date().toISOString().split('T')[0],
       description: validExercises
-        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.completed).length}/${ex.sets.length} sets`)
+        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.reps > 0 && s.weight > 0).length}/${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
       strength_exercises: validExercises,
@@ -7761,8 +9275,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
     // Use the app context to save - this will integrate with the main workout system
     addWorkout(completedWorkout);
 
-    alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
-    onClose();
+    // Navigate to completed view instead of showing alert
+    if (onWorkoutSaved) {
+      onWorkoutSaved(completedWorkout);
+    } else {
+      // Fallback to old behavior if no navigation callback provided
+      alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
+      onClose();
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -7790,7 +9310,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
 
   const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
 
-  // 🆕 Don't render until properly initialized
+  // Don't render until properly initialized
   if (!isInitialized) {
     return (
       <div className="min-h-screen pb-20">
@@ -7842,7 +9362,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
                       }}
                       className="h-10 text-base font-medium border-gray-300"
                       style={{ fontSize: '16px' }}
-                      autoFocus={exerciseIndex === 0 && !exercise.name}
                     />
                   </div>
                   {activeDropdown === exercise.id && exercise.name.length > 0 && (
@@ -7889,109 +9408,127 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
               <div className="px-3 py-2">
                 {exercise.sets.map((set, setIndex) => (
                   <div key={setIndex} className="mb-3 pb-3 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
-                      <button
-                        onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
-                        className={`text-xs px-2 py-1 rounded ${
-                          set.completed 
-                            ? 'bg-green-100 text-green-700' 
-                            : 'bg-gray-100 text-gray-600'
-                        }`}
-                      >
-                        {set.completed ? '✓ Done' : 'Done'}
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-3 gap-3 mb-2">
-                      <div className="flex flex-col">
-                        <label className="text-xs text-gray-500 mb-1">Reps</label>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.reps || ''}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-base border-gray-300"
-                          style={{ fontSize: '16px' }}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-xs text-gray-500 mb-1">Weight (lbs)</label>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.weight || ''}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                          className="h-9 text-center text-base border-gray-300"
-                          style={{ fontSize: '16px' }}
-                        />
-                      </div>
-                      <div className="flex flex-col">
-                        <label className="text-xs text-gray-500 mb-1">RIR</label>
-                        <Input
-                          type="number"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          value={set.rir || ''}
-                          onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                          className="h-9 text-center text-base border-gray-300"
-                          min="0"
-                          max="5"
-                          style={{ fontSize: '16px' }}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col">
-                      <div className="flex items-center justify-between">
-                        <button
-                          onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                          className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
-                        >
-                          Plates
-                          {expandedPlates[`${exercise.id}-${setIndex}`] ? 
-                            <ChevronUp className="h-3 w-3" /> : 
-                            <ChevronDown className="h-3 w-3" />
-                          }
-                        </button>
-                        
-                        <Select
-                          value={set.barType || 'standard'}
-                          onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
-                        >
-                          <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                            <SelectItem value="standard">Barbell (45lb)</SelectItem>
-                            <SelectItem value="womens">Women's (33lb)</SelectItem>
-                            <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
-                            <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
-                            <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
-                            <SelectItem value="cambered">Cambered (55lb)</SelectItem>
-                            <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
-                            <SelectItem value="technique">Technique (15lb)</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
+                        <div className="flex items-center gap-2">
+                          {exercise.sets.length > 1 && (
+                            <button
+                              onClick={() => deleteSet(exercise.id, setIndex)}
+                              className="text-gray-400 hover:text-red-600 p-1"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
+                            className={`text-xs px-3 py-2 rounded min-h-[32px] ${
+                              set.completed 
+                                ? 'bg-green-100 text-green-700' 
+                                : 'bg-gray-100 text-gray-600'
+                            }`}
+                          >
+                            {set.completed ? '✓ Done' : 'Done'}
+                          </button>
+                        </div>
                       </div>
                       
-                      {expandedPlates[`${exercise.id}-${setIndex}`] && (
-                        <PlateMath
-                          weight={set.weight}
-                          barType={set.barType || 'standard'}
-                          useImperial={true}
-                        />
-                      )}
+                      <div className="grid grid-cols-3 gap-3 mb-2">
+                        <div className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">Reps</label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.reps === 0 ? '' : set.reps.toString()}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                            className="h-9 text-center text-base border-gray-300"
+                            style={{ fontSize: '16px' }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">Weight (lbs)</label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.weight === 0 ? '' : set.weight.toString()}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                            className="h-9 text-center text-base border-gray-300"
+                            style={{ fontSize: '16px' }}
+                            placeholder="0"
+                          />
+                        </div>
+                        <div className="flex flex-col">
+                          <label className="text-xs text-gray-500 mb-1">RIR</label>
+                          <Input
+                            type="number"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={set.rir || ''}
+                            onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
+                            className="h-9 text-center text-base border-gray-300"
+                            min="0"
+                            max="5"
+                            style={{ fontSize: '16px' }}
+                            placeholder="RIR"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col">
+                        <div className="flex items-center justify-between">
+                          <button
+                            onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                            className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
+                          >
+                            Plates
+                            {expandedPlates[`${exercise.id}-${setIndex}`] ? 
+                              <ChevronUp className="h-3 w-3" /> : 
+                              <ChevronDown className="h-3 w-3" />
+                            }
+                          </button>
+                          
+                          <Select
+                            value={set.barType || 'standard'}
+                            onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
+                          >
+                            <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                              <SelectItem value="standard">Barbell (45lb)</SelectItem>
+                              <SelectItem value="womens">Women's (33lb)</SelectItem>
+                              <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
+                              <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
+                              <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
+                              <SelectItem value="cambered">Cambered (55lb)</SelectItem>
+                              <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
+                              <SelectItem value="technique">Technique (15lb)</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        {expandedPlates[`${exercise.id}-${setIndex}`] && (
+                          <PlateMath
+                            weight={set.weight}
+                            barType={set.barType || 'standard'}
+                            useImperial={true}
+                          />
+                        )}
+                      </div>
                     </div>
-                  </div>
                 ))}
                 
                 <Button 
-                  onClick={() => addSet(exercise.id)} 
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addSet(exercise.id);
+                  }}
                   variant="ghost"
                   className="w-full h-9 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                  type="button"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Add Set
@@ -8043,13 +9580,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout }: StrengthLo
       </div>
 
       {/* Fixed bottom save button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 z-40">
-        <Button 
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white">
+        <button 
           onClick={saveWorkout}
-          className="w-full h-12 bg-black text-white hover:bg-gray-800 text-base font-medium"
+          className="w-full h-12 text-black hover:text-blue-600 text-base font-medium"
         >
-          Save Workout • {currentTotalVolume.toLocaleString()}lbs total
-        </Button>
+          Save
+        </button>
       </div>
     </div>
   );
@@ -11130,6 +12667,9 @@ export default WorkoutMetrics;
 import React, { useState } from 'react';
 import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import WorkoutDetail from './WorkoutDetail';
+import CompletedTab from './CompletedTab';
 
 interface WorkoutSummaryProps {
   workout: any;
@@ -11144,6 +12684,7 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
   const { useImperial } = useAppContext();
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [workoutStatus, setWorkoutStatus] = useState(workout?.status || workout?.workout_status || 'planned');
+  const [activeTab, setActiveTab] = useState('summary');
 
   if (!workout) {
     return (
@@ -11191,6 +12732,24 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
     }
   };
 
+  const getWorkoutType = () => {
+    if (workout.type === 'run') return 'run';
+    if (workout.type === 'ride') return 'ride';
+    if (workout.type === 'swim') return 'swim';
+    if (workout.type === 'strength') return 'strength';
+    
+    // Fallback logic for legacy names
+    if (workout.name.toLowerCase().includes('run')) return 'run';
+    if (workout.name.toLowerCase().includes('cycle') || workout.name.toLowerCase().includes('ride')) return 'ride';
+    if (workout.name.toLowerCase().includes('swim')) return 'swim';
+    
+    return 'ride'; // default to ride for cycling files
+  };
+
+  const handleUpdateWorkout = (workoutId: string, updates: any) => {
+    console.log('Updating workout:', workoutId, updates);
+  };
+
   const isCompleted = workoutStatus === 'completed';
   const hasNotes = workout.notes || workout.description;
 
@@ -11205,116 +12764,121 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
           content: none !important;
         }
       `}</style>
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold">{workout.name || 'Untitled Workout'}</h1>
-          <p className="text-gray-500">{formatDate(workout.date)}</p>
-          <p className={`text-lg font-medium capitalize ${getWorkoutTypeColor(workout.type)}`}>
-            {workout.type} Workout
-          </p>
-        </div>
-        <div className="flex items-center gap-4">
-          {!isCompleted && (
-            <button
-              onClick={handleMarkComplete}
-              className="px-3 py-1 text-sm text-gray-500 hover:text-gray-700"
-            >
-              Mark done
-            </button>
+
+      {/* Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="summary" className="data-[state=active]:bg-gray-300 data-[state=active]:text-gray-800">Planned</TabsTrigger>
+          <TabsTrigger value="detail" className="data-[state=active]:bg-gray-300 data-[state=active]:text-gray-800">Compare</TabsTrigger>
+          <TabsTrigger value="completed" className="data-[state=active]:bg-gray-300 data-[state=active]:text-gray-800">Detail</TabsTrigger>
+        </TabsList>
+
+        {/* Summary Tab - Original WorkoutSummary Content */}
+        <TabsContent value="summary" className="space-y-4 mt-4">
+          {/* Description */}
+          {workout.description && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-lg">Description</h3>
+              <p className="text-gray-600">{workout.description}</p>
+            </div>
           )}
-          <button
-            onClick={handleDelete}
-            className="text-gray-400 hover:text-red-500 transition-colors"
-          >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
-      </div>
 
-      {/* Description */}
-      {workout.description && (
-        <div className="space-y-2">
-          <h3 className="font-semibold text-lg">Description</h3>
-          <p className="text-gray-600">{workout.description}</p>
-        </div>
-      )}
-
-      {/* Intervals - FIXED: Added CSS to prevent mobile ")) symbols */}
-      {workout.intervals && workout.intervals.length > 0 && (
-        <div className="space-y-3">
-          {workout.intervals.map((interval: any, index: number) => (
-            <div key={interval.id || index} className="space-y-1">
-              <h4 className="font-medium text-lg">
-                {interval.effortLabel || interval.name || `SEGMENT ${index + 1}`}
-              </h4>
-              <div className="space-y-1 text-gray-600">
-                {isCompleted ? (
-                  /* Completed view - unpack repeats */
-                  <div>
-                    {interval.isRepeatBlock ? (
-                      <div className="space-y-1">
-                        <p>{interval.time} planned:</p>
-                        <div className="ml-4 space-y-1">
-                          {Array.from({ length: interval.repeatCount || 1 }, (_, i) => (
-                            <div key={i} className="space-y-1">
-                              <p className="font-medium text-sm">Repeat {i + 1}:</p>
-                              <p className="ml-4">4:00 @ Hard planned → 4:02 actual (6:15 pace, HR: 165 avg)</p>
-                              <p className="ml-4">1:00 @ Easy planned → 58s actual (8:30 pace, HR: 145 avg)</p>
+          {/* Intervals */}
+          {workout.intervals && workout.intervals.length > 0 && (
+            <div className="space-y-3">
+              {workout.intervals.map((interval: any, index: number) => (
+                <div key={interval.id || index} className="space-y-1">
+                  <h4 className="font-medium text-lg">
+                    {interval.effortLabel || interval.name || `SEGMENT ${index + 1}`}
+                  </h4>
+                  <div className="space-y-1 text-gray-600">
+                    {isCompleted ? (
+                      /* Completed view - unpack repeats */
+                      <div>
+                        {interval.isRepeatBlock ? (
+                          <div className="space-y-1">
+                            <p>{interval.time} planned:</p>
+                            <div className="ml-4 space-y-1">
+                              {Array.from({ length: interval.repeatCount || 1 }, (_, i) => (
+                                <div key={i} className="space-y-1">
+                                  <p className="font-medium text-sm">Repeat {i + 1}:</p>
+                                  <p className="ml-4">4:00 @ Hard planned → 4:02 actual (6:15 pace, HR: 165 avg)</p>
+                                  <p className="ml-4">1:00 @ Easy planned → 58s actual (8:30 pace, HR: 145 avg)</p>
+                                </div>
+                              ))}
                             </div>
-                          ))}
-                        </div>
+                          </div>
+                        ) : (
+                          <p>{interval.time} planned → {interval.time} actual (N/A pace, HR: N/A avg)</p>
+                        )}
                       </div>
                     ) : (
-                      <p>{interval.time} planned → {interval.time} actual (N/A pace, HR: N/A avg)</p>
+                      /* Planned view - clean and simple */
+                      <div>
+                        <p>{interval.time} @ {interval.effortLabel || 'Easy'} pace</p>
+                        {interval.bpmTarget && <p>HR: {interval.bpmTarget} bpm</p>}
+                        {interval.paceTarget && <p>Pace: {interval.paceTarget}</p>}
+                      </div>
                     )}
                   </div>
-                ) : (
-                  /* Planned view - clean and simple */
-                  <div>
-                    <p>{interval.time} @ {interval.effortLabel || 'Easy'} pace</p>
-                    {interval.bpmTarget && <p>HR: {interval.bpmTarget} bpm</p>}
-                    {interval.paceTarget && <p>Pace: {interval.paceTarget}</p>}
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Strength Exercises */}
-      {workout.strength_exercises && workout.strength_exercises.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="font-semibold text-lg">EXERCISES</h3>
-          {workout.strength_exercises.map((exercise: any, index: number) => (
-            <div key={exercise.id || index} className="space-y-1">
-              <h4 className="font-medium text-lg">{exercise.name}</h4>
-              <div className="text-gray-600">
-                <p>{exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} {useImperial ? 'lbs' : 'kg'}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Expandable Notes */}
-      {hasNotes && (
-        <div className="space-y-2">
-          <button
-            onClick={() => setNotesExpanded(!notesExpanded)}
-            className="flex items-center gap-2 font-semibold text-lg hover:text-blue-600"
-          >
-            {notesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            NOTES
-          </button>
-          {notesExpanded && (
-            <div className="text-gray-600 whitespace-pre-wrap">
-              {workout.notes || workout.description}
+                </div>
+              ))}
             </div>
           )}
-        </div>
-      )}
+
+          {/* Strength Exercises */}
+          {workout.strength_exercises && workout.strength_exercises.length > 0 && (
+            <div className="space-y-3">
+              <h3 className="font-semibold text-lg">EXERCISES</h3>
+              {workout.strength_exercises.map((exercise: any, index: number) => (
+                <div key={exercise.id || index} className="space-y-1">
+                  <h4 className="font-medium text-lg">{exercise.name}</h4>
+                  <div className="text-gray-600">
+                    <p>{exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} {useImperial ? 'lbs' : 'kg'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Expandable Notes */}
+          {hasNotes && (
+            <div className="space-y-2">
+              <button
+                onClick={() => setNotesExpanded(!notesExpanded)}
+                className="flex items-center gap-2 font-semibold text-lg hover:text-blue-600"
+              >
+                {notesExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                NOTES
+              </button>
+              {notesExpanded && (
+                <div className="text-gray-600 whitespace-pre-wrap">
+                  {workout.notes || workout.description}
+                </div>
+              )}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* Detail Tab - Planned vs Executed Comparison */}
+        <TabsContent value="detail" className="mt-4">
+          <WorkoutDetail
+            workout={workout}
+            onUpdateWorkout={handleUpdateWorkout}
+            activeTab="summary"
+            onTabChange={() => {}}
+            onClose={onClose}
+          />
+        </TabsContent>
+
+        {/* Completed Tab - Full Analytics */}
+        <TabsContent value="completed" className="mt-4">
+          <CompletedTab
+            workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength'}
+            workoutData={workout}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
