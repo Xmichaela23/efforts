@@ -57,6 +57,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin 
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
         <p className="mt-2 text-gray-600">Create your account</p>
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-700 text-sm">
+            efforts is currently in development. By registering, you'll be notified when the app becomes available.
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleRegister} className="space-y-4">
