@@ -1999,39 +1999,29 @@ const AuthWrapper: React.FC = () => {
   const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
-    // Check if user is already logged in
-    const checkUser = async () => {
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-      } catch (error) {
-        console.error('Error checking user:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+    console.log('AuthWrapper mounted');
+    
+    // Simple user check
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      console.log('User check complete:', user?.email || 'no user');
+      setUser(user);
+      setLoading(false);
+    }).catch(err => {
+      console.error('Auth error:', err);
+      setLoading(false);
+    });
 
-    checkUser();
-
-    // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
-        setUser(session?.user ?? null);
-        setLoading(false);
-      }
-    );
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
 
     return () => subscription.unsubscribe();
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null);
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
+    await supabase.auth.signOut();
+    setUser(null);
   };
 
   if (loading) {
@@ -2042,22 +2032,21 @@ const AuthWrapper: React.FC = () => {
     );
   }
 
-  // If user is logged in, show the main app
+  // TEMPORARY: Skip approval check entirely
   if (user) {
     return <AppLayout onLogout={handleLogout} />;
   }
 
-  // If not logged in, show auth forms
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         {showRegister ? (
-          <RegisterForm 
+          <RegisterForm
             onSuccess={() => setShowRegister(false)}
             onSwitchToLogin={() => setShowRegister(false)}
           />
         ) : (
-          <LoginForm 
+          <LoginForm
             onSwitchToRegister={() => setShowRegister(true)}
           />
         )}
@@ -10127,6 +10116,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({ onSuccess, onSwitchToLogin 
       <div className="text-center">
         <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
         <p className="mt-2 text-gray-600">Create your account</p>
+        <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-700 text-sm">
+            efforts is currently in development. By registering, you'll be notified when the app becomes available.
+          </p>
+        </div>
       </div>
 
       <form onSubmit={handleRegister} className="space-y-4">
