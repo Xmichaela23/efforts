@@ -15,7 +15,10 @@ const AuthWrapper: React.FC = () => {
     // Check if user is already logged in
     const checkUser = async () => {
       try {
+        console.log('🔍 AuthWrapper: Starting user check...');
         const { data: { user } } = await supabase.auth.getUser();
+        console.log('🔍 AuthWrapper: User found:', user?.email || 'No user');
+        
         if (user) {
           setUser(user);
           // Check approval status AFTER setting user
@@ -25,8 +28,9 @@ const AuthWrapper: React.FC = () => {
           setIsApproved(null);
         }
       } catch (error) {
-        console.error('Error checking user:', error);
+        console.error('❌ Error checking user:', error);
       } finally {
+        console.log('🔍 AuthWrapper: Setting loading to false');
         setLoading(false);
       }
     };
@@ -36,7 +40,7 @@ const AuthWrapper: React.FC = () => {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event, session?.user?.email);
+        console.log('🔄 Auth state changed:', event, session?.user?.email);
         
         if (session?.user) {
           setUser(session.user);
@@ -55,6 +59,7 @@ const AuthWrapper: React.FC = () => {
   }, []);
 
   const checkApprovalStatus = async (userId: string) => {
+    console.log('🔐 Checking approval for userId:', userId);
     setCheckingApproval(true);
     try {
       const { data, error } = await supabase
@@ -63,26 +68,32 @@ const AuthWrapper: React.FC = () => {
         .eq('id', userId)
         .single();
 
+      console.log('🔐 Approval query result:', { data, error });
+
       if (error) {
-        console.error('Error checking approval status:', error);
+        console.error('❌ Error checking approval status:', error);
         // If no user record exists yet, create one (unapproved by default)
         if (error.code === 'PGRST116') {
+          console.log('🔐 Creating new user record...');
           const { error: insertError } = await supabase
             .from('users')
             .insert([{ id: userId, approved: false }]);
           
           if (insertError) {
-            console.error('Error creating user record:', insertError);
+            console.error('❌ Error creating user record:', insertError);
           }
           setIsApproved(false);
         }
       } else {
-        setIsApproved(data?.approved ?? false);
+        const approvalStatus = data?.approved ?? false;
+        console.log('🔐 User approval status:', approvalStatus);
+        setIsApproved(approvalStatus);
       }
     } catch (error) {
-      console.error('Error in approval check:', error);
+      console.error('❌ Error in approval check:', error);
       setIsApproved(false);
     } finally {
+      console.log('🔐 Setting checkingApproval to false');
       setCheckingApproval(false);
     }
   };
@@ -97,6 +108,13 @@ const AuthWrapper: React.FC = () => {
     }
   };
 
+  console.log('🎨 Render state:', { 
+    loading, 
+    checkingApproval, 
+    user: user?.email, 
+    isApproved 
+  });
+
   if (loading || checkingApproval) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -109,10 +127,12 @@ const AuthWrapper: React.FC = () => {
   if (user) {
     // If approved, show the app
     if (isApproved) {
+      console.log('✅ User approved, showing app');
       return <AppLayout onLogout={handleLogout} />;
     }
     
     // If not approved, show pending message
+    console.log('⏳ User not approved, showing pending message');
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
         <div className="max-w-md w-full text-center space-y-4">
@@ -139,6 +159,7 @@ const AuthWrapper: React.FC = () => {
   }
 
   // If not logged in, show auth forms
+  console.log('🔒 No user, showing login');
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
