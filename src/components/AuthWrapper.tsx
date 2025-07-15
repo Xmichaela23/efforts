@@ -6,40 +6,23 @@ import AppLayout from './AppLayout';
 
 const AuthWrapper: React.FC = () => {
   const [user, setUser] = useState<any>(null);
-  const [userApproved, setUserApproved] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [showRegister, setShowRegister] = useState(false);
-
-  const checkUserApproval = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('approved')
-        .eq('id', userId)
-        .single();
-
-      if (error) {
-        console.error('Error checking user approval:', error);
-        return false;
-      }
-
-      return data?.approved || false;
-    } catch (error) {
-      console.error('Error in checkUserApproval:', error);
-      return false;
-    }
-  };
+  const [isApproved, setIsApproved] = useState<boolean | null>(null);
+  const [checkingApproval, setCheckingApproval] = useState(false);
 
   useEffect(() => {
     // Check if user is already logged in
     const checkUser = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        setUser(user);
-        
         if (user) {
-          const approved = await checkUserApproval(user.id);
-          setUserApproved(approved);
+          setUser(user);
+          // Check approval status AFTER setting user
+          await checkApprovalStatus(user.id);
+        } else {
+          setUser(null);
+          setIsApproved(null);
         }
       } catch (error) {
         console.error('Error checking user:', error);
@@ -54,13 +37,14 @@ const AuthWrapper: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('Auth state changed:', event, session?.user?.email);
-        setUser(session?.user ?? null);
         
         if (session?.user) {
-          const approved = await checkUserApproval(session.user.id);
-          setUserApproved(approved);
+          setUser(session.user);
+          // Check approval status when user logs in
+          await checkApprovalStatus(session.user.id);
         } else {
-          setUserApproved(null);
+          setUser(null);
+          setIsApproved(null);
         }
         
         setLoading(false);
@@ -70,17 +54,50 @@ const AuthWrapper: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const checkApprovalStatus = async (userId: string) => {
+    setCheckingApproval(true);
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('approved')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        console.error('Error checking approval status:', error);
+        // If no user record exists yet, create one (unapproved by default)
+        if (error.code === 'PGRST116') {
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert([{ id: userId, approved: false }]);
+          
+          if (insertError) {
+            console.error('Error creating user record:', insertError);
+          }
+          setIsApproved(false);
+        }
+      } else {
+        setIsApproved(data?.approved ?? false);
+      }
+    } catch (error) {
+      console.error('Error in approval check:', error);
+      setIsApproved(false);
+    } finally {
+      setCheckingApproval(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       await supabase.auth.signOut();
       setUser(null);
-      setUserApproved(null);
+      setIsApproved(null);
     } catch (error) {
       console.error('Error signing out:', error);
     }
   };
 
-  if (loading) {
+  if (loading || checkingApproval) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <div className="text-lg">Loading...</div>
@@ -88,40 +105,37 @@ const AuthWrapper: React.FC = () => {
     );
   }
 
-  // If user is logged in but not approved, show pending message
-  if (user && userApproved === false) {
+  // If user is logged in
+  if (user) {
+    // If approved, show the app
+    if (isApproved) {
+      return <AppLayout onLogout={handleLogout} />;
+    }
+    
+    // If not approved, show pending message
     return (
       <div className="min-h-screen bg-white flex items-center justify-center px-4">
-        <div className="w-full max-w-md text-center space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
-            <p className="mt-4 text-gray-600">Account Pending Approval</p>
-          </div>
-          
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-700">
-              Your account has been created successfully! We'll notify you once your access has been approved.
+        <div className="max-w-md w-full text-center space-y-4">
+          <h1 className="text-3xl font-bold text-gray-900">efforts</h1>
+          <div className="p-6 bg-gray-50 rounded-lg space-y-3">
+            <h2 className="text-xl font-semibold">Account Pending Approval</h2>
+            <p className="text-gray-600">
+              Thank you for registering! Your account is pending approval. 
+              You'll be notified once your access has been granted.
+            </p>
+            <p className="text-sm text-gray-500">
+              Logged in as: {user.email}
             </p>
           </div>
-          
-          <div className="text-sm text-gray-500">
-            <p>Signed in as: {user.email}</p>
-          </div>
-          
           <button
             onClick={handleLogout}
-            className="text-black hover:underline text-sm"
+            className="text-gray-600 hover:text-gray-900 underline text-sm"
           >
             Sign out
           </button>
         </div>
       </div>
     );
-  }
-
-  // If user is logged in and approved, show the main app
-  if (user && userApproved === true) {
-    return <AppLayout onLogout={handleLogout} />;
   }
 
   // If not logged in, show auth forms
