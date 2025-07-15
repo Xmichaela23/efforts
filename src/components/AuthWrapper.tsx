@@ -7,24 +7,49 @@ import AppLayout from './AppLayout';
 const AuthWrapper: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [approved, setApproved] = useState<boolean | null>(null);
   const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     console.log('AuthWrapper mounted');
-    
-    // Simple user check
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      console.log('User check complete:', user?.email || 'no user');
-      setUser(user);
-      setLoading(false);
-    }).catch(err => {
-      console.error('Auth error:', err);
-      setLoading(false);
-    });
 
-    // Listen for auth changes
+    const fetchUserAndApproval = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+
+        if (!user) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+
+        setUser(user);
+
+        // Fetch approved flag from users table
+        const { data, error } = await supabase
+          .from('users')
+          .select('approved')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching approval:', error);
+          setApproved(false); // default to not approved
+        } else {
+          setApproved(data?.approved ?? false);
+        }
+      } catch (err) {
+        console.error('Auth error:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserAndApproval();
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) fetchUserAndApproval();
     });
 
     return () => subscription.unsubscribe();
@@ -33,6 +58,7 @@ const AuthWrapper: React.FC = () => {
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUser(null);
+    setApproved(null);
   };
 
   if (loading) {
@@ -43,28 +69,43 @@ const AuthWrapper: React.FC = () => {
     );
   }
 
-  // TEMPORARY: Skip approval check entirely
-  if (user) {
-    return <AppLayout onLogout={handleLogout} />;
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center px-4">
+        <div className="w-full max-w-md space-y-4">
+          {showRegister ? (
+            <RegisterForm
+              onSuccess={() => setShowRegister(false)}
+              onSwitchToLogin={() => setShowRegister(false)}
+            />
+          ) : (
+            <LoginForm
+              onSwitchToRegister={() => setShowRegister(true)}
+            />
+          )}
+        </div>
+      </div>
+    );
   }
 
-  return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-4">
-      <div className="w-full max-w-md space-y-4">
-        <div className="text-sm text-gray-500 text-center">[AUTHWRAPPER TEST COMMIT]</div>
-        {showRegister ? (
-          <RegisterForm
-            onSuccess={() => setShowRegister(false)}
-            onSwitchToLogin={() => setShowRegister(false)}
-          />
-        ) : (
-          <LoginForm
-            onSwitchToRegister={() => setShowRegister(true)}
-          />
-        )}
+  if (user && approved === false) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-white text-center">
+        <div className="text-xl font-medium mb-2">You're almost in!</div>
+        <div className="text-gray-600 text-sm">
+          Your account is pending approval. We’ll notify you as soon as it’s ready.
+        </div>
+        <button
+          onClick={handleLogout}
+          className="mt-6 text-sm text-blue-600 hover:text-blue-700"
+        >
+          Log out
+        </button>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return <AppLayout onLogout={handleLogout} />;
 };
 
 export default AuthWrapper;
