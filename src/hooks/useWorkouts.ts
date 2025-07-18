@@ -77,7 +77,7 @@ export interface Workout {
   workout_status?: "planned" | "completed" | "skipped" | "in_progress";
   created_at?: string;
   updated_at?: string;
-  
+
   // EXISTING FIT METRICS
   avg_heart_rate?: number;
   max_heart_rate?: number;
@@ -94,7 +94,7 @@ export interface Workout {
   tss?: number;
   intensity_factor?: number;
   distance?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Location & Device
   timestamp?: string;
   start_position_lat?: number;
@@ -102,32 +102,32 @@ export interface Workout {
   friendly_name?: string;
   moving_time?: number;
   elapsed_time?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Temperature
   avg_temperature?: number;
   max_temperature?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Time Data
   total_timer_time?: number;
   total_elapsed_time?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Work/Energy
   total_work?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Elevation
   total_descent?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Performance
   avg_vam?: number;
   total_training_effect?: number;
   total_anaerobic_effect?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Zones
   functional_threshold_power?: number;
   threshold_heart_rate?: number;
   hr_calc_type?: string;
   pwr_calc_type?: string;
-  
+
   // 🆕 NEW FIT FIELDS - User Profile
   age?: number;
   weight?: number;
@@ -137,7 +137,7 @@ export interface Workout {
   resting_heart_rate?: number;
   dist_setting?: string;
   weight_setting?: string;
-  
+
   // 🆕 NEW FIT FIELDS - Cycling Details
   avg_fractional_cadence?: number;
   avg_left_pedal_smoothness?: number;
@@ -146,10 +146,10 @@ export interface Workout {
   left_right_balance?: number;
   threshold_power?: number;
   total_cycles?: number;
-  
+
   // 🆕 NEW FIT FIELDS - Device Info
   deviceInfo?: any;
-  
+
   metrics?: any; // For CompletedTab compatibility
 }
 
@@ -161,7 +161,7 @@ export const useWorkouts = () => {
   const getCurrentUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      
+
       if (user) {
         console.log("Using authenticated user:", user.id);
         return user;
@@ -179,7 +179,7 @@ export const useWorkouts = () => {
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
-      
+
       const user = await getCurrentUser();
       if (!user) {
         console.log("No user authenticated, showing no workouts");
@@ -216,7 +216,7 @@ export const useWorkouts = () => {
         updated_at: w.updated_at,
         intervals: w.intervals ? JSON.parse(w.intervals) : [],
         strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
-        
+
         // EXISTING FIT METRICS
         avg_heart_rate: w.avg_heart_rate,
         max_heart_rate: w.max_heart_rate,
@@ -233,7 +233,7 @@ export const useWorkouts = () => {
         tss: w.tss,
         intensity_factor: w.intensity_factor,
         distance: w.distance,
-        
+
         // 🆕 NEW FIT FIELDS - Location & Device
         timestamp: w.timestamp,
         start_position_lat: w.start_position_lat,
@@ -241,32 +241,32 @@ export const useWorkouts = () => {
         friendly_name: w.friendly_name,
         moving_time: w.moving_time,
         elapsed_time: w.elapsed_time,
-        
+
         // 🆕 NEW FIT FIELDS - Temperature
         avg_temperature: w.avg_temperature,
         max_temperature: w.max_temperature,
-        
+
         // 🆕 NEW FIT FIELDS - Time Data
         total_timer_time: w.total_timer_time,
         total_elapsed_time: w.total_elapsed_time,
-        
+
         // 🆕 NEW FIT FIELDS - Work/Energy
         total_work: w.total_work,
-        
+
         // 🆕 NEW FIT FIELDS - Elevation
         total_descent: w.total_descent,
-        
+
         // 🆕 NEW FIT FIELDS - Performance
         avg_vam: w.avg_vam,
         total_training_effect: w.total_training_effect,
         total_anaerobic_effect: w.total_anaerobic_effect,
-        
+
         // 🆕 NEW FIT FIELDS - Zones
         functional_threshold_power: w.functional_threshold_power,
         threshold_heart_rate: w.threshold_heart_rate,
         hr_calc_type: w.hr_calc_type,
         pwr_calc_type: w.pwr_calc_type,
-        
+
         // 🆕 NEW FIT FIELDS - User Profile
         age: w.age,
         weight: w.weight,
@@ -276,7 +276,7 @@ export const useWorkouts = () => {
         resting_heart_rate: w.resting_heart_rate,
         dist_setting: w.dist_setting,
         weight_setting: w.weight_setting,
-        
+
         // 🆕 NEW FIT FIELDS - Cycling Details
         avg_fractional_cadence: w.avg_fractional_cadence,
         avg_left_pedal_smoothness: w.avg_left_pedal_smoothness,
@@ -285,10 +285,10 @@ export const useWorkouts = () => {
         left_right_balance: w.left_right_balance,
         threshold_power: w.threshold_power,
         total_cycles: w.total_cycles,
-        
+
         // 🆕 NEW FIT FIELDS - Device Info
         deviceInfo: w.device_info,
-        
+
         // 🔧 ENHANCED: Complete metrics object for CompletedTab with ALL fields
         metrics: {
           // Existing fields
@@ -306,7 +306,7 @@ export const useWorkouts = () => {
           calories: w.calories,
           training_stress_score: w.tss,
           intensity_factor: w.intensity_factor,
-          
+
           // 🆕 NEW FIELDS in metrics object
           avg_temperature: w.avg_temperature,
           max_temperature: w.max_temperature,
@@ -371,7 +371,7 @@ export const useWorkouts = () => {
         intervals: workoutData.intervals ? JSON.stringify(workoutData.intervals) : JSON.stringify([]),
         strength_exercises: workoutData.strength_exercises ? JSON.stringify(workoutData.strength_exercises) : JSON.stringify([]),
         user_id: user.id,
-        
+
         // EXISTING FIT METRICS
         avg_heart_rate: workoutData.avg_heart_rate,
         max_heart_rate: workoutData.max_heart_rate,
@@ -388,7 +388,7 @@ export const useWorkouts = () => {
         tss: workoutData.tss,
         intensity_factor: workoutData.intensity_factor,
         distance: workoutData.distance,
-        
+
         // 🆕 NEW FIT FIELDS - Location & Device
         timestamp: workoutData.timestamp,
         start_position_lat: workoutData.start_position_lat,
@@ -396,32 +396,32 @@ export const useWorkouts = () => {
         friendly_name: workoutData.friendly_name,
         moving_time: workoutData.moving_time ? Math.round(workoutData.moving_time) : null, // 🔧 FIX: Round to integer
         elapsed_time: workoutData.elapsed_time ? Math.round(workoutData.elapsed_time) : null, // 🔧 FIX: Round to integer
-        
+
         // 🆕 NEW FIT FIELDS - Temperature
         avg_temperature: workoutData.avg_temperature,
         max_temperature: workoutData.max_temperature,
-        
+
         // 🆕 NEW FIT FIELDS - Time Data
         total_timer_time: workoutData.total_timer_time ? Math.round(workoutData.total_timer_time) : null, // 🔧 FIX: Round to integer
         total_elapsed_time: workoutData.total_elapsed_time ? Math.round(workoutData.total_elapsed_time) : null, // 🔧 FIX: Round to integer
-        
+
         // 🆕 NEW FIT FIELDS - Work/Energy
         total_work: workoutData.total_work ? Math.round(workoutData.total_work) : null, // 🔧 FIX: Round to integer
-        
+
         // 🆕 NEW FIT FIELDS - Elevation
         total_descent: workoutData.total_descent ? Math.round(workoutData.total_descent) : null, // 🔧 FIX: Round to integer
-        
+
         // 🆕 NEW FIT FIELDS - Performance
         avg_vam: workoutData.avg_vam,
         total_training_effect: workoutData.total_training_effect,
         total_anaerobic_effect: workoutData.total_anaerobic_effect,
-        
+
         // 🆕 NEW FIT FIELDS - Zones
         functional_threshold_power: workoutData.functional_threshold_power,
         threshold_heart_rate: workoutData.threshold_heart_rate,
         hr_calc_type: workoutData.hr_calc_type,
         pwr_calc_type: workoutData.pwr_calc_type,
-        
+
         // 🆕 NEW FIT FIELDS - User Profile
         age: workoutData.age,
         weight: workoutData.weight,
@@ -431,7 +431,7 @@ export const useWorkouts = () => {
         resting_heart_rate: workoutData.resting_heart_rate,
         dist_setting: workoutData.dist_setting,
         weight_setting: workoutData.weight_setting,
-        
+
         // 🆕 NEW FIT FIELDS - Cycling Details
         avg_fractional_cadence: workoutData.avg_fractional_cadence,
         avg_left_pedal_smoothness: workoutData.avg_left_pedal_smoothness,
@@ -440,7 +440,7 @@ export const useWorkouts = () => {
         left_right_balance: workoutData.left_right_balance,
         threshold_power: workoutData.threshold_power,
         total_cycles: workoutData.total_cycles,
-        
+
         // 🆕 NEW FIT FIELDS - Device Info
         device_info: workoutData.deviceInfo,
       };
@@ -472,7 +472,7 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-        
+
         // EXISTING FIT METRICS
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
@@ -489,7 +489,7 @@ export const useWorkouts = () => {
         tss: data.tss,
         intensity_factor: data.intensity_factor,
         distance: data.distance,
-        
+
         // 🆕 NEW FIT FIELDS - All the new fields
         timestamp: data.timestamp,
         start_position_lat: data.start_position_lat,
@@ -526,7 +526,7 @@ export const useWorkouts = () => {
         threshold_power: data.threshold_power,
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
-        
+
         // 🔧 ENHANCED: Complete metrics object for CompletedTab
         metrics: {
           // Existing fields
@@ -544,7 +544,7 @@ export const useWorkouts = () => {
           calories: data.calories,
           training_stress_score: data.tss,
           intensity_factor: data.intensity_factor,
-          
+
           // 🆕 NEW FIELDS in metrics object
           avg_temperature: data.avg_temperature,
           max_temperature: data.max_temperature,
@@ -596,7 +596,7 @@ export const useWorkouts = () => {
       console.log("Using user for update:", user.id);
 
       const updateObject: any = {};
-      
+
       // Core fields
       if (updates.name !== undefined) updateObject.name = updates.name;
       if (updates.type !== undefined) updateObject.type = updates.type;
@@ -608,7 +608,7 @@ export const useWorkouts = () => {
       if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
       if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
       if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
-      
+
       // Existing FIT metrics
       if (updates.avg_heart_rate !== undefined) updateObject.avg_heart_rate = updates.avg_heart_rate;
       if (updates.max_heart_rate !== undefined) updateObject.max_heart_rate = updates.max_heart_rate;
@@ -625,7 +625,7 @@ export const useWorkouts = () => {
       if (updates.tss !== undefined) updateObject.tss = updates.tss;
       if (updates.intensity_factor !== undefined) updateObject.intensity_factor = updates.intensity_factor;
       if (updates.distance !== undefined) updateObject.distance = updates.distance;
-      
+
       // 🆕 NEW FIT FIELDS - Add ALL the new field updates
       if (updates.timestamp !== undefined) updateObject.timestamp = updates.timestamp;
       if (updates.start_position_lat !== undefined) updateObject.start_position_lat = updates.start_position_lat;
@@ -688,7 +688,7 @@ export const useWorkouts = () => {
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
         strength_exercises: data.strength_exercises ? JSON.parse(data.strength_exercises) : [],
-        
+
         // ALL FIT FIELDS (same as in fetchWorkouts)
         avg_heart_rate: data.avg_heart_rate,
         max_heart_rate: data.max_heart_rate,
@@ -740,7 +740,7 @@ export const useWorkouts = () => {
         threshold_power: data.threshold_power,
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
-        
+
         // Complete metrics object
         metrics: {
           avg_heart_rate: data.avg_heart_rate,
@@ -824,7 +824,12 @@ export const useWorkouts = () => {
   const getWorkoutsByType = (type: Workout["type"]) => workouts.filter((w) => w.type === type);
 
   useEffect(() => {
-    fetchWorkouts();
+    // Longer delay to allow authentication to fully settle
+    const timer = setTimeout(() => {
+      fetchWorkouts();
+    }, 1500);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   return {
