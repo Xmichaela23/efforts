@@ -429,6 +429,36 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
     return <Icon className="h-5 w-5" />;
   };
 
+  // NEW: Helper function to get specific performance numbers for display
+  const getPerformanceNumbers = (disciplineId: string) => {
+    const numbers = [];
+    
+    switch (disciplineId) {
+      case 'running':
+        if (data.performanceNumbers?.fiveK) numbers.push(`5K: ${data.performanceNumbers.fiveK}`);
+        if (data.performanceNumbers?.tenK) numbers.push(`10K: ${data.performanceNumbers.tenK}`);
+        if (data.performanceNumbers?.halfMarathon) numbers.push(`Half: ${data.performanceNumbers.halfMarathon}`);
+        if (data.performanceNumbers?.marathon) numbers.push(`Marathon: ${data.performanceNumbers.marathon}`);
+        break;
+      case 'cycling':
+        if (data.performanceNumbers?.ftp) numbers.push(`FTP: ${data.performanceNumbers.ftp}W`);
+        if (data.performanceNumbers?.avgSpeed) numbers.push(`Avg Speed: ${data.performanceNumbers.avgSpeed}`);
+        break;
+      case 'swimming':
+        if (data.performanceNumbers?.swimPace100) numbers.push(`100m: ${data.performanceNumbers.swimPace100}`);
+        if (data.performanceNumbers?.swim200Time) numbers.push(`200m: ${data.performanceNumbers.swim200Time}`);
+        if (data.performanceNumbers?.swim400Time) numbers.push(`400m: ${data.performanceNumbers.swim400Time}`);
+        break;
+      case 'strength':
+        if (data.performanceNumbers?.squat) numbers.push(`Squat: ${data.performanceNumbers.squat}lbs`);
+        if (data.performanceNumbers?.deadlift) numbers.push(`Deadlift: ${data.performanceNumbers.deadlift}lbs`);
+        if (data.performanceNumbers?.bench) numbers.push(`Bench: ${data.performanceNumbers.bench}lbs`);
+        break;
+    }
+    
+    return numbers;
+  };
+
   const hasInjuries = data.injuryHistory && data.injuryHistory !== "No current injuries or limitations";
 
   return (
@@ -958,6 +988,8 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                               const discipline = disciplineOptions.find(d => d.id === disciplineId);
                               if (!discipline) return null;
                               
+                              const performanceNumbers = getPerformanceNumbers(disciplineId);
+                              
                               return (
                                 <div key={disciplineId} className="p-3 bg-gray-50 rounded-lg">
                                   <div className="flex items-center gap-2 mb-2">
@@ -982,6 +1014,12 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                                       <span className="text-gray-600">Performance Level: </span>
                                       <span>{data.benchmarks?.[disciplineId] || 'Not set'}</span>
                                     </div>
+                                    {performanceNumbers.length > 0 && (
+                                      <div className="md:col-span-2">
+                                        <span className="text-gray-600">Performance Numbers: </span>
+                                        <span>{performanceNumbers.join(', ')}</span>
+                                      </div>
+                                    )}
                                     <div className="md:col-span-2">
                                       <span className="text-gray-600">Benchmark Recency: </span>
                                       <span>{data.benchmark_recency?.[disciplineId] || 'Not set'}</span>

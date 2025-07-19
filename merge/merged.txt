@@ -34,166 +34,6 @@ const App = () => (
 
 export default App;
 
-// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/StravaCallback.tsx
-import React, { useEffect, useState } from 'react';
-
-const StravaCallback: React.FC = () => {
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
-  const [message, setMessage] = useState('Processing Strava authorization...');
-
-  useEffect(() => {
-    const handleStravaCallback = async () => {
-      try {
-        // Get URL parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const error = urlParams.get('error');
-
-        if (error) {
-          throw new Error(`Strava authorization denied: ${error}`);
-        }
-
-        if (!code) {
-          throw new Error('No authorization code received from Strava');
-        }
-
-        setMessage('Exchanging authorization code for access token...');
-
-        // Exchange code for access token
-        const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-        const clientSecret = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
-
-        console.log('Client ID:', clientId); // Debug log
-        console.log('Client Secret exists:', !!clientSecret); // Debug log (don't log actual secret)
-
-        if (!clientId || !clientSecret) {
-          throw new Error('Strava client credentials not configured');
-        }
-
-        const tokenResponse = await fetch('https://www.strava.com/oauth/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: clientId,
-            client_secret: clientSecret,
-            code: code,
-            grant_type: 'authorization_code',
-          }),
-        });
-
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
-        }
-
-        const tokenData = await tokenResponse.json();
-        console.log('Token response:', tokenData); // Debug log
-
-        if (!tokenData.access_token) {
-          throw new Error('No access token received from Strava');
-        }
-
-        setMessage('Successfully connected to Strava!');
-        setStatus('success');
-
-        // Send token data back to parent window
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'STRAVA_AUTH_SUCCESS',
-            data: {
-              access_token: tokenData.access_token,
-              refresh_token: tokenData.refresh_token,
-              expires_at: tokenData.expires_at,
-              athlete: tokenData.athlete
-            }
-          }, window.location.origin);
-
-          // Close popup after short delay
-          setTimeout(() => {
-            window.close();
-          }, 1000);
-        } else {
-          // Fallback: store in localStorage and redirect
-          localStorage.setItem('strava_access_token', tokenData.access_token);
-          setMessage('Connected! You can close this window.');
-        }
-
-      } catch (error) {
-        console.error('Strava callback error:', error);
-        setStatus('error');
-        setMessage(error instanceof Error ? error.message : 'Unknown error occurred');
-
-        // Send error back to parent window
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'STRAVA_AUTH_ERROR',
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }, window.location.origin);
-
-          setTimeout(() => {
-            window.close();
-          }, 2000);
-        }
-      }
-    };
-
-    handleStravaCallback();
-  }, []);
-
-  return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
-      <div className="max-w-md w-full text-center space-y-4">
-        <div className="mb-8">
-          <h1 className="text-2xl font-bold text-black">Strava Connection</h1>
-        </div>
-
-        <div className="space-y-4">
-          {status === 'processing' && (
-            <div className="space-y-2">
-              <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
-              <p className="text-sm text-gray-600">{message}</p>
-            </div>
-          )}
-
-          {status === 'success' && (
-            <div className="space-y-2">
-              <div className="w-8 h-8 bg-green-500 rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <p className="text-sm text-green-600 font-medium">{message}</p>
-              <p className="text-xs text-gray-500">This window will close automatically...</p>
-            </div>
-          )}
-
-          {status === 'error' && (
-            <div className="space-y-2">
-              <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center mx-auto">
-                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </div>
-              <p className="text-sm text-red-600 font-medium">Connection Failed</p>
-              <p className="text-xs text-gray-500">{message}</p>
-              <button 
-                onClick={() => window.close()}
-                className="text-xs text-blue-600 hover:text-blue-700 underline"
-              >
-                Close Window
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default StravaCallback;
-
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/AllEffortsDropdown.tsx
 import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
@@ -11658,6 +11498,344 @@ const StravaCallback: React.FC = () => {
 
 export default StravaCallback;
 
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/StravaPreview.tsx
+import React, { useState } from 'react';
+import { Activity, Bike, Waves, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { StravaDataService, AnalyzedStravaData, DetectedMetric } from '@/services/StravaDataService';
+
+interface StravaPreviewProps {
+  accessToken: string;
+  currentBaselines: any;
+  onDataSelected: (selectedData: any) => void;
+}
+
+export default function StravaPreview({ accessToken, currentBaselines, onDataSelected }: StravaPreviewProps) {
+  const [loading, setLoading] = useState(false);
+  const [analyzedData, setAnalyzedData] = useState<AnalyzedStravaData | null>(null);
+  const [userSelections, setUserSelections] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [hasStarted, setHasStarted] = useState(false);
+
+  const fetchAndAnalyzeData = async () => {
+    setLoading(true);
+    setError(null);
+    setHasStarted(true);
+
+    try {
+      console.log('Fetching Strava activities...');
+      const activities = await StravaDataService.fetchRecentActivities(accessToken);
+      
+      console.log(`Found ${activities.length} activities`);
+      
+      if (activities.length === 0) {
+        setError('No activities found in your Strava account from the last 90 days.');
+        setLoading(false);
+        return;
+      }
+
+      console.log('Analyzing activities for baseline data...');
+      const analyzed = await StravaDataService.analyzeActivitiesForBaselines(activities, currentBaselines);
+      
+      console.log('Analysis complete:', analyzed);
+      setAnalyzedData(analyzed);
+
+      // Initialize all selections as true (accept all by default)
+      const initialSelections: Record<string, boolean> = {};
+      analyzed.detectedMetrics.forEach(metric => {
+        initialSelections[metric.key] = true;
+      });
+      setUserSelections(initialSelections);
+
+    } catch (err) {
+      console.error('Error fetching/analyzing Strava data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch training data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleSelection = (key: string) => {
+    setUserSelections(prev => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  const acceptAllForSport = (sport: string) => {
+    const sportMetrics = analyzedData?.detectedMetrics.filter(m => m.sport === sport) || [];
+    const updates: Record<string, boolean> = {};
+    
+    sportMetrics.forEach(metric => {
+      updates[metric.key] = true;
+    });
+
+    setUserSelections(prev => ({
+      ...prev,
+      ...updates
+    }));
+  };
+
+  const skipAllForSport = (sport: string) => {
+    const sportMetrics = analyzedData?.detectedMetrics.filter(m => m.sport === sport) || [];
+    const updates: Record<string, boolean> = {};
+    
+    sportMetrics.forEach(metric => {
+      updates[metric.key] = false;
+    });
+
+    setUserSelections(prev => ({
+      ...prev,
+      ...updates
+    }));
+  };
+
+  const applySelections = () => {
+    if (!analyzedData) return;
+
+    const selectedData: any = {};
+
+    // Build the data object based on selections
+    analyzedData.detectedMetrics.forEach(metric => {
+      if (userSelections[metric.key]) {
+        const keys = metric.key.split('.');
+        
+        if (keys.length === 2) {
+          // Handle nested objects like current_volume.running
+          const [category, sport] = keys;
+          if (!selectedData[category]) selectedData[category] = {};
+          
+          if (category === 'performanceNumbers') {
+            // Handle numeric values for performance numbers
+            if (metric.key.includes('ftp')) {
+              selectedData[category][sport] = parseInt(metric.detectedValue.replace(/[^\d]/g, ''));
+            } else {
+              selectedData[category][sport] = metric.detectedValue;
+            }
+          } else {
+            selectedData[category][sport] = metric.detectedValue;
+          }
+        } else if (keys.length === 1) {
+          // Handle direct properties
+          selectedData[keys[0]] = metric.detectedValue;
+        }
+      }
+    });
+
+    console.log('Applying selected data:', selectedData);
+    onDataSelected(selectedData);
+  };
+
+  const getSportIcon = (sport: string) => {
+    switch (sport) {
+      case 'running': return Activity;
+      case 'cycling': return Bike;
+      case 'swimming': return Waves;
+      default: return Activity;
+    }
+  };
+
+  const getConfidenceColor = (confidence: string) => {
+    switch (confidence) {
+      case 'high': return 'text-green-600';
+      case 'medium': return 'text-yellow-600';
+      case 'low': return 'text-red-600';
+      default: return 'text-gray-600';
+    }
+  };
+
+  const groupMetricsBySport = (metrics: DetectedMetric[]) => {
+    const grouped: Record<string, DetectedMetric[]> = {};
+    metrics.forEach(metric => {
+      if (!grouped[metric.sport]) grouped[metric.sport] = [];
+      grouped[metric.sport].push(metric);
+    });
+    return grouped;
+  };
+
+  if (!hasStarted) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <h4 className="font-medium mb-2">Ready to Import Training Data</h4>
+          <p className="text-sm text-gray-600 mb-4">
+            Analyze your recent Strava activities to auto-populate baseline data
+          </p>
+          <button
+            onClick={fetchAndAnalyzeData}
+            className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+          >
+            <TrendingUp className="h-4 w-4 inline mr-2" />
+            Fetch Training Data
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mb-3"></div>
+          <p className="text-sm text-gray-600">Analyzing your training data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="p-4 border border-red-200 rounded-md">
+          <p className="text-sm text-red-600">{error}</p>
+        </div>
+        <button
+          onClick={fetchAndAnalyzeData}
+          className="px-4 py-2 text-black hover:text-blue-600 transition-colors text-sm"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
+  if (!analyzedData || analyzedData.detectedMetrics.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center">
+          <p className="text-sm text-gray-600 mb-2">
+            Found {analyzedData?.totalActivities || 0} activities, but couldn't extract baseline data.
+          </p>
+          <p className="text-xs text-gray-500">
+            Need at least 3 activities per sport to detect patterns.
+          </p>
+        </div>
+        <div className="text-center">
+          <p className="text-sm text-gray-600">
+            Want to add baseline data manually? Use the Assessment tab.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const sportGroups = groupMetricsBySport(analyzedData.detectedMetrics);
+  const selectedCount = Object.values(userSelections).filter(Boolean).length;
+
+  return (
+    <div className="space-y-6">
+      {/* Summary */}
+      <div className="text-center">
+        <h4 className="font-medium mb-2">Detected training data from your Strava account</h4>
+        <p className="text-sm text-gray-600">
+          Found {analyzedData.totalActivities} activities from {analyzedData.sportsWithData.length} sport{analyzedData.sportsWithData.length !== 1 ? 's' : ''}
+        </p>
+        <p className="text-xs text-gray-500 mt-1">
+          {new Date(analyzedData.dateRange.end).toLocaleDateString()} - {new Date(analyzedData.dateRange.start).toLocaleDateString()}
+        </p>
+      </div>
+
+      {/* Sport Sections */}
+      <div className="space-y-6">
+        {Object.entries(sportGroups).map(([sport, metrics]) => {
+          const Icon = getSportIcon(sport);
+          const sportSelected = metrics.filter(m => userSelections[m.key]).length;
+          const sportTotal = metrics.length;
+
+          return (
+            <div key={sport} className="space-y-3">
+              {/* Sport Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Icon className="h-5 w-5" />
+                  <h5 className="font-medium capitalize">{sport}</h5>
+                  <span className="text-xs text-gray-500">({sportSelected}/{sportTotal})</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => acceptAllForSport(sport)}
+                    className="px-3 py-1 text-xs text-black hover:text-blue-600 transition-colors"
+                  >
+                    Accept All
+                  </button>
+                  <button
+                    onClick={() => skipAllForSport(sport)}
+                    className="px-3 py-1 text-xs text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    Skip All
+                  </button>
+                </div>
+              </div>
+
+              {/* Metrics */}
+              <div className="space-y-3 ml-7">
+                {metrics.map((metric) => (
+                  <div key={metric.key} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-gray-700">{metric.label}</label>
+                      <button
+                        onClick={() => toggleSelection(metric.key)}
+                        className={`px-3 py-1 text-xs transition-colors ${
+                          userSelections[metric.key] 
+                            ? 'text-blue-600 hover:text-blue-700' 
+                            : 'text-gray-500 hover:text-gray-700'
+                        }`}
+                      >
+                        {userSelections[metric.key] ? '✓ Accept' : '○ Skip'}
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Current: </span>
+                        <span>{metric.currentValue}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600">Detected: </span>
+                        <span className="font-medium">{metric.detectedValue}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-4 text-xs">
+                      <span className={`${getConfidenceColor(metric.confidence)}`}>
+                        {metric.confidence} confidence
+                      </span>
+                      <span className="text-gray-500">{metric.source}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Apply Button */}
+      {selectedCount > 0 && (
+        <div className="pt-4 border-t">
+          <div className="text-center">
+            <button
+              onClick={applySelections}
+              className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium"
+            >
+              <CheckCircle className="h-4 w-4 inline mr-2" />
+              Apply {selectedCount} Selected Change{selectedCount !== 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Manual option */}
+      <div className="text-center pt-4 border-t">
+        <p className="text-sm text-gray-600">
+          Don't see your sport or want to add details manually?{' '}
+          <span className="text-black">Complete the Assessment tab for full baseline setup.</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/StrengthCompletedView.tsx
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
@@ -14537,6 +14715,7 @@ export default TodaysEffort;
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Activity, Bike, Waves, Dumbbell } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import StravaPreview from '@/components/StravaPreview';
 
 interface TrainingBaselinesProps {
   onClose: () => void;
@@ -14705,7 +14884,7 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
 
   // NEW: Strava connection functions
   const connectStrava = () => {
-    const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
+    const clientId = (import.meta as any).env.VITE_STRAVA_CLIENT_ID;
     const redirectUri = `${window.location.origin}/strava/callback`;
     const scope = 'read,activity:read_all';
     
@@ -15537,18 +15716,18 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                     })()}
                   </div>
                 ) : (
-                  /* Data Import Tab - ONLY this section is new */
+                  /* Data Import Tab */
                   <div className="space-y-6">
                     <div className="text-center">
                       <h3 className="text-lg font-medium mb-2">Import Training Data</h3>
                       <p className="text-sm text-gray-600">Connect your fitness accounts to auto-populate baseline data</p>
                     </div>
                     
-                    {/* Strava Connection Test */}
+                    {/* Strava Connection */}
                     <div className="space-y-4">
                       <div className="flex items-center gap-3">
                         <Activity className="h-5 w-5 text-orange-500" />
-                        <h4 className="font-medium">Strava Integration Test</h4>
+                        <h4 className="font-medium">Strava Integration</h4>
                       </div>
 
                       {!stravaConnected ? (
@@ -15563,7 +15742,6 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                           <div className="p-3 bg-green-50 rounded-md">
                             <p className="text-sm text-green-800">✓ Connected to Strava</p>
                           </div>
-                          npm run dev
                           <div className="flex gap-3">
                             <button
                               onClick={testStravaApi}
@@ -15587,6 +15765,17 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                         </div>
                       )}
                     </div>
+
+                    {/* Strava Preview Component */}
+                    {stravaConnected && accessToken && (
+                      <StravaPreview 
+                        accessToken={accessToken}
+                        currentBaselines={data}
+                        onDataSelected={(selectedData) => {
+                          setData(prev => ({ ...prev, ...selectedData }));
+                        }}
+                      />
+                    )}
 
                     {/* Future integrations placeholder */}
                     <div className="space-y-4">
@@ -25028,6 +25217,428 @@ Include proper rest days and progression.`;
     });
 
     return workouts;
+  }
+}
+
+// File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/services/StravaDataService.ts
+// src/services/StravaDataService.ts
+
+export interface StravaActivity {
+  id: number;
+  name: string;
+  type: string;
+  sport_type: string;
+  start_date: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
+  average_speed: number;
+  max_speed: number;
+  average_heartrate?: number;
+  max_heartrate?: number;
+  average_watts?: number;
+  max_watts?: number;
+  weighted_average_watts?: number;
+  kilojoules?: number;
+  suffer_score?: number;
+  device_name?: string;
+  trainer?: boolean;
+}
+
+export interface DetectedMetric {
+  key: string;
+  label: string;
+  currentValue: string;
+  detectedValue: string;
+  confidence: 'high' | 'medium' | 'low';
+  source: string;
+  sport: string;
+}
+
+export interface AnalyzedStravaData {
+  activities: StravaActivity[];
+  totalActivities: number;
+  dateRange: {
+    start: string;
+    end: string;
+  };
+  sportsWithData: string[];
+  detectedMetrics: DetectedMetric[];
+}
+
+export class StravaDataService {
+  private static readonly BASE_URL = 'https://www.strava.com/api/v3';
+  private static readonly DAYS_TO_FETCH = 90;
+
+  static async fetchRecentActivities(accessToken: string): Promise<StravaActivity[]> {
+    const after = Math.floor((Date.now() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000)) / 1000);
+    
+    try {
+      const response = await fetch(
+        `${this.BASE_URL}/athlete/activities?after=${after}&per_page=200`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Strava API error: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error('Error fetching Strava activities:', error);
+      throw error;
+    }
+  }
+
+  static async analyzeActivitiesForBaselines(
+    activities: StravaActivity[], 
+    currentBaselines: any
+  ): Promise<AnalyzedStravaData> {
+    const detectedMetrics: DetectedMetric[] = [];
+    const sportsWithData: string[] = [];
+
+    // Group activities by sport
+    const sportGroups = this.groupActivitiesBySport(activities);
+
+    // Analyze each sport
+    Object.entries(sportGroups).forEach(([sport, sportActivities]) => {
+      if (sportActivities.length >= 3) { // Minimum threshold
+        sportsWithData.push(sport);
+        
+        switch (sport) {
+          case 'running':
+            detectedMetrics.push(...this.analyzeRunningData(sportActivities, currentBaselines));
+            break;
+          case 'cycling':
+            detectedMetrics.push(...this.analyzeCyclingData(sportActivities, currentBaselines));
+            break;
+          case 'swimming':
+            detectedMetrics.push(...this.analyzeSwimmingData(sportActivities, currentBaselines));
+            break;
+        }
+      }
+    });
+
+    return {
+      activities,
+      totalActivities: activities.length,
+      dateRange: {
+        start: activities.length > 0 ? activities[activities.length - 1].start_date : '',
+        end: activities.length > 0 ? activities[0].start_date : ''
+      },
+      sportsWithData,
+      detectedMetrics
+    };
+  }
+
+  private static groupActivitiesBySport(activities: StravaActivity[]): Record<string, StravaActivity[]> {
+    const groups: Record<string, StravaActivity[]> = {};
+
+    activities.forEach(activity => {
+      let sport = '';
+      
+      // Map Strava activity types to our sports
+      const type = activity.type?.toLowerCase() || activity.sport_type?.toLowerCase() || '';
+      
+      if (type.includes('run') || type === 'run') {
+        sport = 'running';
+      } else if (type.includes('ride') || type === 'ride' || type.includes('bike') || type.includes('cycling')) {
+        sport = 'cycling';
+      } else if (type.includes('swim') || type === 'swim') {
+        sport = 'swimming';
+      }
+
+      if (sport) {
+        if (!groups[sport]) groups[sport] = [];
+        groups[sport].push(activity);
+      }
+    });
+
+    return groups;
+  }
+
+  private static analyzeRunningData(activities: StravaActivity[], currentBaselines: any): DetectedMetric[] {
+    const metrics: DetectedMetric[] = [];
+
+    // Weekly volume calculation
+    const weeklyHours = this.calculateWeeklyVolume(activities);
+    const volumeRange = this.getVolumeRange(weeklyHours);
+    
+    metrics.push({
+      key: 'current_volume.running',
+      label: 'Weekly Running Volume',
+      currentValue: currentBaselines.current_volume?.running || 'Not set',
+      detectedValue: volumeRange,
+      confidence: 'high',
+      source: `${activities.length} runs in last 90 days`,
+      sport: 'running'
+    });
+
+    // Training status based on consistency
+    const trainingStatus = this.analyzeTrainingConsistency(activities);
+    metrics.push({
+      key: 'training_status.running',
+      label: 'Training Status',
+      currentValue: currentBaselines.training_status?.running || 'Not set',
+      detectedValue: trainingStatus,
+      confidence: 'high',
+      source: 'Activity frequency analysis',
+      sport: 'running'
+    });
+
+    // Best recent performances (race efforts)
+    const raceEfforts = this.findRaceEfforts(activities);
+    
+    // 5K estimate
+    const best5K = raceEfforts.find(effort => effort.distance >= 4800 && effort.distance <= 5200);
+    if (best5K) {
+      const pace = this.formatPace(best5K.time);
+      metrics.push({
+        key: 'performanceNumbers.fiveK',
+        label: '5K Time',
+        currentValue: currentBaselines.performanceNumbers?.fiveK || 'Not set',
+        detectedValue: pace,
+        confidence: 'high',
+        source: `${new Date(best5K.date).toLocaleDateString()}`,
+        sport: 'running'
+      });
+    }
+
+    // 10K estimate
+    const best10K = raceEfforts.find(effort => effort.distance >= 9800 && effort.distance <= 10500);
+    if (best10K) {
+      const pace = this.formatPace(best10K.time);
+      metrics.push({
+        key: 'performanceNumbers.tenK',
+        label: '10K Time',
+        currentValue: currentBaselines.performanceNumbers?.tenK || 'Not set',
+        detectedValue: pace,
+        confidence: 'high',
+        source: `${new Date(best10K.date).toLocaleDateString()}`,
+        sport: 'running'
+      });
+    }
+
+    // Performance level based on pace
+    if (best5K) {
+      const performanceLevel = this.classifyRunningPerformance(best5K.time / best5K.distance * 1000);
+      metrics.push({
+        key: 'benchmarks.running',
+        label: 'Performance Level',
+        currentValue: currentBaselines.benchmarks?.running || 'Not set',
+        detectedValue: performanceLevel,
+        confidence: 'medium',
+        source: 'Based on 5K pace',
+        sport: 'running'
+      });
+    }
+
+    return metrics;
+  }
+
+  private static analyzeCyclingData(activities: StravaActivity[], currentBaselines: any): DetectedMetric[] {
+    const metrics: DetectedMetric[] = [];
+
+    // Weekly volume
+    const weeklyHours = this.calculateWeeklyVolume(activities);
+    const volumeRange = this.getVolumeRange(weeklyHours);
+    
+    metrics.push({
+      key: 'current_volume.cycling',
+      label: 'Weekly Cycling Volume',
+      currentValue: currentBaselines.current_volume?.cycling || 'Not set',
+      detectedValue: volumeRange,
+      confidence: 'high',
+      source: `${activities.length} rides in last 90 days`,
+      sport: 'cycling'
+    });
+
+    // FTP estimate from power data
+    const powerActivities = activities.filter(a => a.average_watts && a.average_watts > 50);
+    if (powerActivities.length >= 3) {
+      const estimatedFTP = this.estimateFTP(powerActivities);
+      metrics.push({
+        key: 'performanceNumbers.ftp',
+        label: 'Functional Threshold Power (FTP)',
+        currentValue: currentBaselines.performanceNumbers?.ftp ? `${currentBaselines.performanceNumbers.ftp}W` : 'Not set',
+        detectedValue: `${estimatedFTP}W (estimated)`,
+        confidence: 'medium',
+        source: `${powerActivities.length} rides with power data`,
+        sport: 'cycling'
+      });
+    }
+
+    // Average speed
+    const avgSpeed = activities
+      .filter(a => a.average_speed > 0 && !a.trainer)
+      .reduce((sum, a) => sum + a.average_speed, 0) / activities.length;
+    
+    if (avgSpeed > 0) {
+      const speedMph = (avgSpeed * 2.237).toFixed(1); // Convert m/s to mph
+      metrics.push({
+        key: 'performanceNumbers.avgSpeed',
+        label: 'Average Speed',
+        currentValue: currentBaselines.performanceNumbers?.avgSpeed ? `${currentBaselines.performanceNumbers.avgSpeed} mph` : 'Not set',
+        detectedValue: `${speedMph} mph`,
+        confidence: 'high',
+        source: 'Outdoor rides average',
+        sport: 'cycling'
+      });
+    }
+
+    // Performance level based on power or speed
+    let performanceLevel = '';
+    if (powerActivities.length >= 3) {
+      const estimatedFTP = this.estimateFTP(powerActivities);
+      performanceLevel = this.classifyCyclingPerformance(estimatedFTP);
+    } else if (avgSpeed > 0) {
+      const speedMph = avgSpeed * 2.237;
+      performanceLevel = this.classifyCyclingPerformanceBySpeed(speedMph);
+    }
+    
+    if (performanceLevel) {
+      metrics.push({
+        key: 'benchmarks.cycling',
+        label: 'Performance Level',
+        currentValue: currentBaselines.benchmarks?.cycling || 'Not set',
+        detectedValue: performanceLevel,
+        confidence: 'medium',
+        source: powerActivities.length >= 3 ? 'Power data analysis' : 'Speed analysis',
+        sport: 'cycling'
+      });
+    }
+
+    return metrics;
+  }
+
+  private static analyzeSwimmingData(activities: StravaActivity[], currentBaselines: any): DetectedMetric[] {
+    const metrics: DetectedMetric[] = [];
+
+    // Weekly volume
+    const weeklyHours = this.calculateWeeklyVolume(activities);
+    const volumeRange = this.getVolumeRange(weeklyHours);
+    
+    metrics.push({
+      key: 'current_volume.swimming',
+      label: 'Weekly Swimming Volume',
+      currentValue: currentBaselines.current_volume?.swimming || 'Not set',
+      detectedValue: volumeRange,
+      confidence: 'high',
+      source: `${activities.length} swims in last 90 days`,
+      sport: 'swimming'
+    });
+
+    // 100m pace estimate (if we have pool swims)
+    const poolSwims = activities.filter(a => a.distance > 0 && a.moving_time > 0);
+    if (poolSwims.length >= 3) {
+      const avgPace = poolSwims.reduce((sum, swim) => {
+        const pace100m = (swim.moving_time / swim.distance) * 100; // seconds per 100m
+        return sum + pace100m;
+      }, 0) / poolSwims.length;
+
+      const paceFormatted = this.formatSwimPace(avgPace);
+      metrics.push({
+        key: 'performanceNumbers.swimPace100',
+        label: '100m Pace',
+        currentValue: currentBaselines.performanceNumbers?.swimPace100 || 'Not set',
+        detectedValue: paceFormatted,
+        confidence: 'medium',
+        source: `${poolSwims.length} pool swims`,
+        sport: 'swimming'
+      });
+    }
+
+    return metrics;
+  }
+
+  // Helper methods
+  private static calculateWeeklyVolume(activities: StravaActivity[]): number {
+    const totalHours = activities.reduce((sum, activity) => sum + activity.moving_time, 0) / 3600;
+    const weeks = this.DAYS_TO_FETCH / 7;
+    return totalHours / weeks;
+  }
+
+  private static getVolumeRange(weeklyHours: number): string {
+    if (weeklyHours < 2) return '0-2 hours';
+    if (weeklyHours < 4) return '2-4 hours';
+    if (weeklyHours < 6) return '4-6 hours';
+    if (weeklyHours < 8) return '6-8 hours';
+    return '8+ hours';
+  }
+
+  private static analyzeTrainingConsistency(activities: StravaActivity[]): string {
+    const weeksWithActivity = new Set();
+    activities.forEach(activity => {
+      const week = Math.floor(new Date(activity.start_date).getTime() / (7 * 24 * 60 * 60 * 1000));
+      weeksWithActivity.add(week);
+    });
+
+    const consistencyRate = weeksWithActivity.size / (this.DAYS_TO_FETCH / 7);
+    
+    if (consistencyRate > 0.8) return 'In regular training routine';
+    if (consistencyRate > 0.6) return 'Building base fitness';
+    if (consistencyRate > 0.3) return 'Maintaining current fitness';
+    return 'Returning after break (1-3 months)';
+  }
+
+  private static findRaceEfforts(activities: StravaActivity[]): Array<{distance: number, time: number, date: string}> {
+    return activities
+      .filter(activity => activity.distance > 1000 && activity.moving_time > 0) // At least 1km
+      .map(activity => ({
+        distance: activity.distance,
+        time: activity.moving_time,
+        date: activity.start_date
+      }))
+      .sort((a, b) => (a.time / a.distance) - (b.time / b.distance)) // Sort by pace
+      .slice(0, 10); // Top 10 efforts
+  }
+
+  private static formatPace(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  }
+
+  private static formatSwimPace(secondsPer100m: number): string {
+    const minutes = Math.floor(secondsPer100m / 60);
+    const seconds = Math.floor(secondsPer100m % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}/100m`;
+  }
+
+  private static estimateFTP(powerActivities: StravaActivity[]): number {
+    // Simple FTP estimation: ~95% of best 20-minute effort or ~88% of best hour effort
+    const longEfforts = powerActivities.filter(a => a.moving_time >= 1200); // 20+ minutes
+    if (longEfforts.length === 0) return 0;
+
+    const bestPower = Math.max(...longEfforts.map(a => a.average_watts || 0));
+    return Math.round(bestPower * 0.95);
+  }
+
+  private static classifyRunningPerformance(pacePerKm: number): string {
+    // Pace in seconds per km
+    if (pacePerKm < 240) return '5K under 20 minutes (competitive runner)';
+    if (pacePerKm < 300) return '5K in 20-25 minutes (trained runner)';
+    if (pacePerKm < 360) return '5K in 25-30 minutes (fitness runner)';
+    return '5K in 30+ minutes (recreational runner)';
+  }
+
+  private static classifyCyclingPerformance(ftp: number): string {
+    if (ftp > 300) return 'Average 22+ mph on flats (competitive cyclist)';
+    if (ftp > 250) return 'Average 19-21 mph on flats (trained cyclist)';
+    if (ftp > 200) return 'Average 16-18 mph on flats (fitness rider)';
+    return 'Average 12-15 mph on flats (recreational)';
+  }
+
+  private static classifyCyclingPerformanceBySpeed(speedMph: number): string {
+    if (speedMph > 22) return 'Average 22+ mph on flats (competitive cyclist)';
+    if (speedMph > 19) return 'Average 19-21 mph on flats (trained cyclist)';
+    if (speedMph > 16) return 'Average 16-18 mph on flats (fitness rider)';
+    return 'Average 12-15 mph on flats (recreational)';
   }
 }
 
