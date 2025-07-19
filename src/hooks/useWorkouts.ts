@@ -175,14 +175,22 @@ export const useWorkouts = () => {
     }
   };
 
-  // Fetch - WITH proper user filtering and ALL FIT metrics
+  // 🚀 OPTIMIZED: Fetch with auth retry - WITH proper user filtering and ALL FIT metrics
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
 
-      const user = await getCurrentUser();
+      // 🚀 OPTIMIZED: Try auth up to 3 times with brief delays
+      let user = null;
+      for (let i = 0; i < 3 && !user; i++) {
+        user = await getCurrentUser();
+        if (!user && i < 2) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+
       if (!user) {
-        console.log("No user authenticated, showing no workouts");
+        console.log("No user authenticated after retries, showing no workouts");
         setWorkouts([]);
         return;
       }
@@ -824,12 +832,8 @@ export const useWorkouts = () => {
   const getWorkoutsByType = (type: Workout["type"]) => workouts.filter((w) => w.type === type);
 
   useEffect(() => {
-    // Longer delay to allow authentication to fully settle
-    const timer = setTimeout(() => {
-      fetchWorkouts();
-    }, 1500);
-    
-    return () => clearTimeout(timer);
+    // 🚀 OPTIMIZED: No artificial delay, immediate fetch with auth retry
+    fetchWorkouts();
   }, []);
 
   return {

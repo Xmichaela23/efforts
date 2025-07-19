@@ -16,7 +16,6 @@ const AuthWrapper: React.FC = () => {
     const fetchUserAndApproval = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-
         if (!user) {
           setUser(null);
           setLoading(false);
@@ -49,7 +48,6 @@ const AuthWrapper: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) fetchUserAndApproval();
     });
 
     return () => subscription.unsubscribe();
@@ -93,7 +91,7 @@ const AuthWrapper: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-white text-center">
         <div className="text-xl font-medium mb-2">You're almost in!</div>
         <div className="text-gray-600 text-sm">
-          Your account is pending approval. We’ll notify you as soon as it’s ready.
+          Your account is pending approval. We'll notify you as soon as it's ready.
         </div>
         <button
           onClick={handleLogout}

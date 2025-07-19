@@ -141,15 +141,15 @@ export const useAppContext = () => useContext(AppContext);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
-  const [authReady, setAuthReady] = useState(false);
 
+  // 🔧 FIX: Remove the duplicate auth/refetch logic - let useWorkouts handle it
   const {
     workouts,
     loading,
     addWorkout,
     updateWorkout,
     deleteWorkout,
-    refetch,
+    refetch, // Keep this but don't call it automatically
   } = useWorkouts();
 
   const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
@@ -293,46 +293,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await loadPlans();
   };
 
+  // 🔧 FIX: Only load plans once on mount, let useWorkouts handle workout loading
   useEffect(() => {
     loadPlans();
   }, []);
 
-  useEffect(() => {
-    let authResolved = false;
-
-    const loadIfAuthenticated = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await refetch();
-      }
-      setAuthReady(true);
-      authResolved = true;
-    };
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          await refetch();
-          setAuthReady(true);
-        } else if (event === 'SIGNED_OUT') {
-          setAuthReady(true);
-        }
-      }
-    );
-
-    loadIfAuthenticated();
-
-    const retry = setTimeout(() => {
-      if (!authResolved) setAuthReady(true);
-    }, 1500);
-
-    return () => {
-      authListener.subscription.unsubscribe();
-      clearTimeout(retry);
-    };
-  }, []);
-
-  if (!authReady) return null;
+  // 🔧 REMOVED: The problematic useEffect that was causing infinite loops
+  // The useWorkouts hook already handles authentication and fetching
 
   return (
     <AppContext.Provider
