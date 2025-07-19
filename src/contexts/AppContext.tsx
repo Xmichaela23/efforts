@@ -142,20 +142,66 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
 
-  // 🔧 FIX: Remove the duplicate auth/refetch logic - let useWorkouts handle it
+  // ✅ FIXED: Remove sessionReady dependency - useWorkouts handles its own auth now
   const {
     workouts,
     loading,
     addWorkout,
     updateWorkout,
     deleteWorkout,
-    refetch, // Keep this but don't call it automatically
-  } = useWorkouts();
+  } = useWorkouts(); // No more { sessionReady: ready } prop!
 
   const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
   const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
   const [detailedPlans, setDetailedPlans] = useState<any>({});
   const [plansLoading, setPlansLoading] = useState(true);
+  const [plansAuthReady, setPlansAuthReady] = useState(false);
+
+  // ✅ FIXED: Plans get their own auth management similar to useWorkouts
+  useEffect(() => {
+    let mounted = true;
+
+    const initializePlansAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (mounted) {
+        if (session?.user) {
+          setPlansAuthReady(true);
+        } else {
+          setPlansLoading(false);
+        }
+      }
+    };
+
+    initializePlansAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (!mounted) return;
+        
+        if (session?.user) {
+          setPlansAuthReady(true);
+        } else {
+          setPlansAuthReady(false);
+          setCurrentPlans([]);
+          setCompletedPlans([]);
+          setDetailedPlans({});
+          setPlansLoading(false);
+        }
+      }
+    );
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (plansAuthReady) {
+      loadPlans();
+    }
+  }, [plansAuthReady]);
 
   const saveUserBaselines = async (data: BaselineData) => {
     try {
@@ -292,14 +338,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const refreshPlans = async () => {
     await loadPlans();
   };
-
-  // 🔧 FIX: Only load plans once on mount, let useWorkouts handle workout loading
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
-  // 🔧 REMOVED: The problematic useEffect that was causing infinite loops
-  // The useWorkouts hook already handles authentication and fetching
 
   return (
     <AppContext.Provider

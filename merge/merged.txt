@@ -33,95 +33,96 @@ const App = () => (
 export default App;
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/AllEffortsDropdown.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuItem,
+DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ChevronDown, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
 
 interface AllEffortsDropdownProps {
-  onSelectWorkout: (workout: any) => void;
+onSelectWorkout: (workout: any) => void;
 }
 
 const AllEffortsDropdown: React.FC<AllEffortsDropdownProps> = ({ onSelectWorkout }) => {
-  const { workouts } = useAppContext();
+const { workouts } = useAppContext();
 
-  const completedWorkouts = workouts.filter(workout =>
-    workout.workout_status === 'completed' || workout.completedManually
-  );
+const completedWorkouts = useMemo(() =>
+workouts.filter((workout: any) =>
+workout.workout_status === 'completed' || workout.completedManually
+), [workouts]);
 
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'swim': return <Waves className="h-5 w-5 mr-3" />;
-      case 'ride': return <Bike className="h-5 w-5 mr-3" />;
-      case 'run': return <Activity className="h-5 w-5 mr-3" />;
-      case 'strength': return <Dumbbell className="h-5 w-5 mr-3" />;
-      case 'mobility': return <Move className="h-5 w-5 mr-3" />;
-      default: return <Activity className="h-5 w-5 mr-3" />;
-    }
-  };
+const getIcon = (type: string) => {
+switch (type) {
+case 'swim': return <Waves className="h-5 w-5 mr-3" />;
+case 'ride': return <Bike className="h-5 w-5 mr-3" />;
+case 'run': return <Activity className="h-5 w-5 mr-3" />;
+case 'strength': return <Dumbbell className="h-5 w-5 mr-3" />;
+case 'mobility': return <Move className="h-5 w-5 mr-3" />;
+default: return <Activity className="h-5 w-5 mr-3" />;
+}
+};
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
-            padding: '14px 12px',
-            borderRadius: '8px',
-            fontSize: '15px',
-            minHeight: '48px',
-            flex: 1,
-            maxWidth: '140px'
-          }}
-        >
-          Completed ({completedWorkouts.length})
-          <ChevronDown className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="start"
-        className="max-h-80 overflow-y-auto bg-white border border-gray-200 shadow-xl"
-        style={{borderRadius: '12px', padding: '8px', minWidth: '280px'}}
-      >
-        {completedWorkouts.length === 0 ? (
-          <div className="px-4 py-6 text-sm text-gray-500 text-center">
-            No completed efforts yet
-          </div>
-        ) : (
-          completedWorkouts.map((workout) => (
-            <DropdownMenuItem
-              key={workout.id}
-              onClick={() => onSelectWorkout(workout)}
-              className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg flex items-start gap-3 cursor-pointer"
-              style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '56px'}}
-            >
-              {getIcon(workout.type)}
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-sm truncate text-gray-900">
-                  {workout.name || `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}`}
-                </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {workout.date ? new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                  }) : 'No date'}
-                  {workout.duration && ` • ${Math.floor(workout.duration / 60)}:${(workout.duration % 60).toString().padStart(2, '0')}`}
-                </div>
-              </div>
-            </DropdownMenuItem>
-          ))
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+return (
+<DropdownMenu>
+<DropdownMenuTrigger asChild>
+<Button
+className="flex items-center gap-2 bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 hover:text-gray-900 hover:border-gray-400 transition-all duration-200 shadow-sm hover:shadow-md"
+style={{
+fontFamily: 'Inter, sans-serif',
+fontWeight: 600,
+padding: '14px 12px',
+borderRadius: '8px',
+fontSize: '15px',
+minHeight: '48px',
+flex: 1,
+maxWidth: '140px'
+}}
+>
+Completed ({completedWorkouts.length})
+<ChevronDown className="h-4 w-4" />
+</Button>
+</DropdownMenuTrigger>
+<DropdownMenuContent
+align="start"
+className="max-h-80 overflow-y-auto bg-white border border-gray-200 shadow-xl"
+style={{borderRadius: '12px', padding: '8px', minWidth: '280px'}}
+>
+{completedWorkouts.length === 0 ? (
+<div className="px-4 py-6 text-sm text-gray-500 text-center">
+No completed efforts yet
+</div>
+) : (
+completedWorkouts.map((workout) => (
+<DropdownMenuItem
+key={workout.id}
+onClick={() => onSelectWorkout(workout)}
+className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg flex items-start gap-3 cursor-pointer"
+style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '56px'}}
+>
+{getIcon(workout.type)}
+<div className="flex-1 min-w-0">
+<div className="font-semibold text-sm truncate text-gray-900">
+{workout.name || `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}`}
+</div>
+<div className="text-xs text-gray-500 mt-1">
+{workout.date ? new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
+month: 'short',
+day: 'numeric'
+}) : 'No date'}
+{workout.duration && ` • ${Math.floor(workout.duration / 60)}:${(workout.duration % 60).toString().padStart(2, '0')}`}
+</div>
+</div>
+</DropdownMenuItem>
+))
+)}
+</DropdownMenuContent>
+</DropdownMenu>
+);
 };
 
 export default AllEffortsDropdown;
@@ -1996,17 +1997,37 @@ import AppLayout from './AppLayout';
 const AuthWrapper: React.FC = () => {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [approved, setApproved] = useState<boolean | null>(null);
   const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     console.log('AuthWrapper mounted');
 
-    // Simple user check
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      console.log('User check complete:', user?.email || 'no user');
-      setUser(user);
+    const fetchUserAndApproval = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setUser(null);
           setLoading(false);
-    }).catch(err => {
+          return;
+        }
+
+        setUser(user);
+
+        // Fetch approved flag from users table
+        const { data, error } = await supabase
+          .from('users')
+          .select('approved')
+          .eq('id', user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching approval:', error);
+          setApproved(false); // default to not approved
+        } else {
+          setApproved(data?.approved ?? false);
+        }
+      } catch (err) {
         console.error('Auth error:', err);
       } finally {
         setLoading(false);
@@ -2017,7 +2038,6 @@ const AuthWrapper: React.FC = () => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) fetchUserAndApproval();
     });
 
     return () => subscription.unsubscribe();
@@ -2061,7 +2081,7 @@ const AuthWrapper: React.FC = () => {
       <div className="min-h-screen flex flex-col items-center justify-center px-4 bg-white text-center">
         <div className="text-xl font-medium mb-2">You're almost in!</div>
         <div className="text-gray-600 text-sm">
-          Your account is pending approval. We’ll notify you as soon as it’s ready.
+          Your account is pending approval. We'll notify you as soon as it's ready.
         </div>
         <button
           onClick={handleLogout}
@@ -2077,7 +2097,6 @@ const AuthWrapper: React.FC = () => {
 };
 
 export default AuthWrapper;
-
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/components/BannerUpload.tsx
 import React, { useState, useRef } from 'react';
@@ -22729,7 +22748,8 @@ export const useAppContext = () => useContext(AppContext);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [useImperial, setUseImperial] = useState(true);
-  const [authReady, setAuthReady] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [ready, setReady] = useState(false);
 
   const {
     workouts,
@@ -22737,13 +22757,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addWorkout,
     updateWorkout,
     deleteWorkout,
-    refetch,
-  } = useWorkouts();
+  } = useWorkouts({ sessionReady: ready });
+
+  useEffect(() => {
+    const init = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setReady(true);
+    };
+    init();
+  }, []);
 
   const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
   const [completedPlans, setCompletedPlans] = useState<Plan[]>([]);
   const [detailedPlans, setDetailedPlans] = useState<any>({});
   const [plansLoading, setPlansLoading] = useState(true);
+
+  useEffect(() => {
+    if (ready) loadPlans();
+  }, [ready]);
 
   const saveUserBaselines = async (data: BaselineData) => {
     try {
@@ -22881,47 +22912,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await loadPlans();
   };
 
-  useEffect(() => {
-    loadPlans();
-  }, []);
-
-  useEffect(() => {
-    let authResolved = false;
-
-    const loadIfAuthenticated = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        await refetch();
-      }
-      setAuthReady(true);
-      authResolved = true;
-    };
-
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-          await refetch();
-          setAuthReady(true);
-        } else if (event === 'SIGNED_OUT') {
-          setAuthReady(true);
-        }
-      }
-    );
-
-    loadIfAuthenticated();
-
-    const retry = setTimeout(() => {
-      if (!authResolved) setAuthReady(true);
-    }, 1500);
-
-    return () => {
-      authListener.subscription.unsubscribe();
-      clearTimeout(retry);
-    };
-  }, []);
-
-  if (!authReady) return null;
-
   return (
     <AppContext.Provider
       value={{
@@ -22951,6 +22941,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     </AppContext.Provider>
   );
 };
+
 
 // File: /Users/michaelambp/Efforts_Local_Folder/Efforts_Local/src/hooks/use-mobile.tsx
 import * as React from "react"
@@ -23349,14 +23340,22 @@ export const useWorkouts = () => {
     }
   };
 
-  // Fetch - WITH proper user filtering and ALL FIT metrics
+  // 🚀 OPTIMIZED: Fetch with auth retry - WITH proper user filtering and ALL FIT metrics
   const fetchWorkouts = async () => {
     try {
       setLoading(true);
 
-      const user = await getCurrentUser();
+      // 🚀 OPTIMIZED: Try auth up to 3 times with brief delays
+      let user = null;
+      for (let i = 0; i < 3 && !user; i++) {
+        user = await getCurrentUser();
+        if (!user && i < 2) {
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+
       if (!user) {
-        console.log("No user authenticated, showing no workouts");
+        console.log("No user authenticated after retries, showing no workouts");
         setWorkouts([]);
         return;
       }
@@ -23998,12 +23997,8 @@ export const useWorkouts = () => {
   const getWorkoutsByType = (type: Workout["type"]) => workouts.filter((w) => w.type === type);
 
   useEffect(() => {
-    // Longer delay to allow authentication to fully settle
-    const timer = setTimeout(() => {
-      fetchWorkouts();
-    }, 1500);
-    
-    return () => clearTimeout(timer);
+    // 🚀 OPTIMIZED: No artificial delay, immediate fetch with auth retry
+    fetchWorkouts();
   }, []);
 
   return {
