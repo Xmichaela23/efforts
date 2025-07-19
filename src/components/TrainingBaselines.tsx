@@ -1,12 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Activity, Bike, Waves, Dumbbell } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import StravaPreview from '@/components/StravaPreview';
 
 interface TrainingBaselinesProps {
   onClose: () => void;
 }
 
 interface BaselineData {
+  // Enhanced user details
+  birthday?: string;
+  height?: number;
+  weight?: number;
+  gender?: 'male' | 'female' | 'prefer_not_to_say';
+  units?: 'metric' | 'imperial';
+  current_volume?: { [discipline: string]: string };
+  training_status?: { [discipline: string]: string };
+  benchmark_recency?: { [discipline: string]: string };
+  
+  // Existing fields
   age: number;
   disciplines: string[];
   disciplineFitness: {
@@ -63,26 +75,66 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
     injuryHistory: '',
     injuryRegions: [],
     trainingBackground: '',
-    equipment: {}
+    equipment: {},
+    units: 'imperial',
+    current_volume: {},
+    training_status: {},
+    benchmark_recency: {}
   });
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState('');
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'assessment' | 'baselines'>('assessment');
+  const [activeTab, setActiveTab] = useState<'assessment' | 'baselines' | 'data-import'>('assessment');
+
+  // NEW: Strava connection state
+  const [stravaConnected, setStravaConnected] = useState(false);
+  const [stravaMessage, setStravaMessage] = useState('');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
 
   // Load existing baselines on component mount
   useEffect(() => {
     loadBaselines();
   }, []);
 
+  // NEW: Check for existing Strava token
+  useEffect(() => {
+    const existingToken = localStorage.getItem('strava_access_token');
+    if (existingToken) {
+      setAccessToken(existingToken);
+      setStravaConnected(true);
+    }
+  }, []);
+
+  // NEW: Listen for OAuth callback messages
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+
+      if (event.data.type === 'STRAVA_AUTH_SUCCESS') {
+        const { access_token } = event.data.data;
+        setAccessToken(access_token);
+        setStravaConnected(true);
+        localStorage.setItem('strava_access_token', access_token);
+        setStravaMessage('Successfully connected to Strava!');
+      } else if (event.data.type === 'STRAVA_AUTH_ERROR') {
+        setStravaMessage(`Error: ${event.data.error}`);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
   const loadBaselines = async () => {
     try {
       setLoading(true);
       
-      // ✅ REPLACED: Use actual context function
       const baselines = await loadUserBaselines();
+      
+      console.log('Raw birthday from database:', baselines?.birthday);
+      console.log('Type of birthday:', typeof baselines?.birthday);
       
       if (baselines) {
         setData(baselines);
@@ -101,13 +153,11 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
       setSaving(true);
       setSaveMessage('');
       
-      // ✅ REPLACED: Use actual context function
       await saveUserBaselines(data);
       
       setSaveMessage('Saved successfully!');
       setLastUpdated(new Date().toISOString());
       
-      // Clear success message after 3 seconds
       setTimeout(() => setSaveMessage(''), 3000);
       
     } catch (error) {
@@ -115,6 +165,63 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
       setSaveMessage('Error saving. Please try again.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // NEW: Strava connection functions
+  const connectStrava = () => {
+    const clientId = (import.meta as any).env.VITE_STRAVA_CLIENT_ID;
+    const redirectUri = `${window.location.origin}/strava/callback`;
+    const scope = 'read,activity:read_all';
+    
+    console.log('Client ID:', clientId);
+    console.log('Redirect URI:', redirectUri);
+    
+    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    
+    console.log('Auth URL:', authUrl);
+    
+    // Open popup for OAuth
+    const popup = window.open(
+      authUrl,
+      'strava-auth',
+      'width=600,height=700,scrollbars=yes,resizable=yes'
+    );
+
+    // Check if popup was blocked
+    if (!popup) {
+      setStravaMessage('Popup was blocked. Please allow popups and try again.');
+      return;
+    }
+  };
+
+  const disconnectStrava = () => {
+    setStravaConnected(false);
+    setAccessToken(null);
+    localStorage.removeItem('strava_access_token');
+    setStravaMessage('Disconnected from Strava');
+  };
+
+  const testStravaApi = async () => {
+    if (!accessToken) return;
+
+    try {
+      setStravaMessage('Testing API call...');
+      
+      const response = await fetch('https://www.strava.com/api/v3/athlete', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setStravaMessage(`API test successful! Hello ${data.firstname} ${data.lastname}`);
+    } catch (error) {
+      setStravaMessage(`API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -217,6 +324,32 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
         return [];
     }
   };
+
+  const getVolumeOptions = () => [
+    "0-2 hours",
+    "2-4 hours", 
+    "4-6 hours",
+    "6-8 hours",
+    "8+ hours"
+  ];
+
+  const getTrainingStatusOptions = () => [
+    "Building base fitness",
+    "In regular training routine",
+    "Peak season / competing regularly",
+    "Maintaining current fitness",
+    "Returning after break (1-3 months)",
+    "Returning after extended break (3+ months)"
+  ];
+
+  const getBenchmarkRecencyOptions = () => [
+    "Within the last month",
+    "1-3 months ago",
+    "3-6 months ago", 
+    "6-12 months ago",
+    "Over a year ago",
+    "These are goals, not current fitness"
+  ];
 
   const injuryOptions = [
     "No current injuries or limitations",
@@ -354,686 +487,610 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                   >
                     Baselines
                   </button>
+                  <button
+                    onClick={() => setActiveTab('data-import')}
+                    className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
+                      activeTab === 'data-import'
+                        ? 'border-black text-black'
+                        : 'border-transparent text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    Data Import
+                  </button>
                 </div>
 
                 {activeTab === 'assessment' ? (
-                  /* Assessment Tab - Full Form Interface */
+                  /* Assessment Tab */
                   <div className="space-y-8">
-
-              {/* Basic Information */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-medium">Basic Information</h2>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Age</label>
-                  <input
-                    type="number"
-                    value={data.age || ''}
-                    onChange={(e) => setData(prev => ({ ...prev, age: parseInt(e.target.value) || 0 }))}
-                    placeholder="Enter your age"
-                    className="w-24 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
-                  />
-                </div>
-              </div>
-
-              {/* Disciplines */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-medium">Training Disciplines</h2>
-                <p className="text-sm text-gray-600">Select which sports you want to track baselines for</p>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  {disciplineOptions.map((discipline) => {
-                    const Icon = discipline.icon;
-                    const isSelected = data.disciplines.includes(discipline.id);
-                    return (
-                      <button
-                        key={discipline.id}
-                        onClick={() => toggleDiscipline(discipline.id)}
-                        className={`p-4 text-center transition-colors ${
-                          isSelected ? 'text-black' : 'text-gray-500 hover:text-gray-700'
-                        }`}
-                      >
-                        <Icon className="h-6 w-6 mx-auto mb-2" />
-                        <div className="text-sm font-medium">{discipline.name}</div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Performance Benchmarks */}
-              {data.disciplines.length > 0 && (
-                <div className="space-y-6">
-                  <h2 className="text-lg font-medium">Performance Benchmarks</h2>
-                  
-                  {data.disciplines.map((disciplineId) => {
-                    const discipline = disciplineOptions.find(d => d.id === disciplineId);
-                    if (!discipline) return null;
-                    
-                    return (
-                      <div key={disciplineId} className="space-y-4">
-                        <div className="flex items-center gap-2">
-                          <DisciplineIcon discipline={disciplineId} />
-                          <h3 className="font-medium capitalize">{discipline.name}</h3>
-                        </div>
-                        
-                        <div className="space-y-4 ml-7">
-                          {/* Discipline-Specific Fitness Level */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Fitness Level</label>
-                            <div className="space-y-2">
-                              {getDisciplineFitnessOptions(disciplineId).map((option, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => setData(prev => ({
-                                    ...prev,
-                                    disciplineFitness: {
-                                      ...prev.disciplineFitness,
-                                      [disciplineId]: option
-                                    }
-                                  }))}
-                                  className={`w-full p-3 text-left text-sm transition-colors ${
-                                    data.disciplineFitness[disciplineId as keyof typeof data.disciplineFitness] === option
-                                      ? 'text-blue-600' 
-                                      : 'hover:text-blue-600'
-                                  }`}
-                                >
-                                  <span className="font-medium text-gray-500 mr-3">
-                                    {data.disciplineFitness[disciplineId as keyof typeof data.disciplineFitness] === option ? '●' : '○'}
-                                  </span>
-                                  {option}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Performance Level */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Performance Level</label>
-                            <div className="space-y-2">
-                              {getBenchmarkOptions(disciplineId).map((option, index) => (
-                                <button
-                                  key={index}
-                                  onClick={() => setData(prev => ({
-                                    ...prev,
-                                    benchmarks: {
-                                      ...prev.benchmarks,
-                                      [disciplineId]: option
-                                    }
-                                  }))}
-                                  className={`w-full p-3 text-left text-sm transition-colors ${
-                                    data.benchmarks[disciplineId as keyof typeof data.benchmarks] === option
-                                      ? 'text-blue-600' 
-                                      : 'hover:text-blue-600'
-                                  }`}
-                                >
-                                  <span className="font-medium text-gray-500 mr-3">
-                                    {data.benchmarks[disciplineId as keyof typeof data.benchmarks] === option ? '●' : '○'}
-                                  </span>
-                                  {option}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Performance Numbers - Always Visible */}
-                          <div className="p-3 bg-gray-50 rounded-lg space-y-3">
-                            <label className="text-sm font-medium">Performance Numbers (Optional)</label>
-                            
-                            {disciplineId === 'running' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-xs text-gray-600">5K time</label>
-                                  <input
-                                    type="text"
-                                    placeholder="22:30"
-                                    value={data.performanceNumbers.fiveK || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        fiveK: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">10K time</label>
-                                  <input
-                                    type="text"
-                                    placeholder="46:45"
-                                    value={data.performanceNumbers.tenK || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        tenK: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">Half Marathon</label>
-                                  <input
-                                    type="text"
-                                    placeholder="1:42:30"
-                                    value={data.performanceNumbers.halfMarathon || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        halfMarathon: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">Marathon</label>
-                                  <input
-                                    type="text"
-                                    placeholder="3:45:00"
-                                    value={data.performanceNumbers.marathon || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        marathon: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {disciplineId === 'cycling' && (
-                              <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                  <label className="text-xs text-gray-600">FTP (watts)</label>
-                                  <input
-                                    type="number"
-                                    placeholder="285"
-                                    value={data.performanceNumbers.ftp || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        ftp: parseInt(e.target.value) || undefined
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">Average Speed (mph)</label>
-                                  <input
-                                    type="number"
-                                    placeholder="18"
-                                    value={data.performanceNumbers.avgSpeed || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        avgSpeed: parseInt(e.target.value) || undefined
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {disciplineId === 'swimming' && (
-                              <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                  <label className="text-xs text-gray-600">100-yard pace</label>
-                                  <input
-                                    type="text"
-                                    placeholder="1:25"
-                                    value={data.performanceNumbers.swimPace100 || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        swimPace100: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">200m time</label>
-                                  <input
-                                    type="text"
-                                    placeholder="3:15"
-                                    value={data.performanceNumbers.swim200Time || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        swim200Time: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">400m time</label>
-                                  <input
-                                    type="text"
-                                    placeholder="7:45"
-                                    value={data.performanceNumbers.swim400Time || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        swim400Time: e.target.value
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                              </div>
-                            )}
-
-                            {disciplineId === 'strength' && (
-                              <div className="grid grid-cols-3 gap-3">
-                                <div>
-                                  <label className="text-xs text-gray-600">Squat 1RM (lbs)</label>
-                                  <input
-                                    type="number"
-                                    placeholder="315"
-                                    value={data.performanceNumbers.squat || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        squat: parseInt(e.target.value) || undefined
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">Deadlift 1RM (lbs)</label>
-                                  <input
-                                    type="number"
-                                    placeholder="405"
-                                    value={data.performanceNumbers.deadlift || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        deadlift: parseInt(e.target.value) || undefined
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-xs text-gray-600">Bench 1RM (lbs)</label>
-                                  <input
-                                    type="number"
-                                    placeholder="225"
-                                    value={data.performanceNumbers.bench || ''}
-                                    onChange={(e) => setData(prev => ({
-                                      ...prev,
-                                      performanceNumbers: {
-                                        ...prev.performanceNumbers,
-                                        bench: parseInt(e.target.value) || undefined
-                                      }
-                                    }))}
-                                    className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-black"
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Equipment */}
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium text-gray-700">Equipment Access</label>
-                            <div className="space-y-2">
-                              {getEquipmentOptions(disciplineId).map((option, index) => {
-                                const isSelected = (data.equipment[disciplineId as keyof typeof data.equipment] || []).includes(option);
-                                return (
-                                  <button
-                                    key={index}
-                                    onClick={() => toggleEquipment(disciplineId, option)}
-                                    className={`w-full p-3 text-left text-sm transition-colors ${
-                                      isSelected ? 'text-blue-600' : 'hover:text-blue-600'
-                                    }`}
-                                  >
-                                    <span className="font-medium text-gray-500 mr-3">
-                                      {isSelected ? '✓' : '○'}
-                                    </span>
-                                    {option}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* Injury History */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-medium">Injury History</h2>
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-gray-700">Current Status</label>
-                  <div className="space-y-2">
-                    {injuryOptions.map((option, index) => (
-                      <button
-                        key={index}
-                        onClick={() => setData(prev => ({ ...prev, injuryHistory: option }))}
-                        className={`w-full p-3 text-left text-sm transition-colors ${
-                          data.injuryHistory === option ? 'text-blue-600' : 'hover:text-blue-600'
-                        }`}
-                      >
-                        <span className="font-medium text-gray-500 mr-3">
-                          {data.injuryHistory === option ? '●' : '○'}
-                        </span>
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Injury Regions - Show if they have injuries */}
-                {hasInjuries && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Affected Body Regions</label>
-                    <div className="space-y-2">
-                      {bodyRegionOptions.map((region, index) => {
-                        const isSelected = data.injuryRegions.includes(region);
-                        return (
-                          <button
-                            key={index}
-                            onClick={() => toggleInjuryRegion(region)}
-                            className={`w-full p-3 text-left text-sm transition-colors ${
-                              isSelected ? 'text-blue-600' : 'hover:text-blue-600'
-                            }`}
-                          >
-                            <span className="font-medium text-gray-500 mr-3">
-                              {isSelected ? '✓' : '○'}
-                            </span>
-                            {region}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Training Background */}
-              <div className="space-y-4">
-                <h2 className="text-lg font-medium">Training Background</h2>
-                
-                <div className="space-y-2">
-                  {trainingBackgroundOptions.map((option, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setData(prev => ({ ...prev, trainingBackground: option }))}
-                      className={`w-full p-3 text-left text-sm transition-colors ${
-                        data.trainingBackground === option ? 'text-blue-600' : 'hover:text-blue-600'
-                      }`}
-                    >
-                      <span className="font-medium text-gray-500 mr-3">
-                        {data.trainingBackground === option ? '●' : '○'}
-                      </span>
-                      {option}
-                    </button>
-                  ))}
-                </div>
-                                </div>
-                </div>
-              ) : (
-                /* Baselines Tab - Clean Data Summary */
-                <div className="space-y-8">
-                  <div className="text-center">
-                    <h3 className="text-lg font-medium mb-2">Your Training Baselines Summary</h3>
-                    <p className="text-sm text-gray-600">Quick view and edit of your key data</p>
-                  </div>
-
-                  {/* Basic Info Summary */}
-                  <div className="space-y-4">
-                    <h4 className="font-medium">Basic Information</h4>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-xs text-gray-600">Age</label>
-                        <p className="text-sm py-1">{data.age || 'Not set'}</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-600">Training Background</label>
-                        <p className="text-sm py-1">{data.trainingBackground || 'Not set'}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Disciplines Summary */}
-                  {data.disciplines.length > 0 && (
+                    {/* Basic Information */}
                     <div className="space-y-4">
-                      <h4 className="font-medium">Your Sports</h4>
+                      <h2 className="text-lg font-medium">Basic Information</h2>
+                      
                       <div className="space-y-4">
+                        {/* Birthday */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Birthday</label>
+                          <p className="text-xs text-gray-500">Used to calculate current age and training zones</p>
+                          <input
+                            type="date"
+                            value={data.birthday || ''}
+                            onChange={(e) => setData(prev => ({ ...prev, birthday: e.target.value }))}
+                            className="w-48 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          />
+                        </div>
+
+                        {/* Units Preference */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Units Preference</label>
+                          <div className="flex gap-4">
+                            <button
+                              onClick={() => setData(prev => ({ ...prev, units: 'imperial' }))}
+                              className={`px-4 py-2 text-sm transition-colors ${
+                                (data.units === 'imperial' || !data.units) ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              <span className="font-medium mr-2">
+                                {(data.units === 'imperial' || !data.units) ? '●' : '○'}
+                              </span>
+                              Imperial (lbs, ft/in)
+                            </button>
+                            <button
+                              onClick={() => setData(prev => ({ ...prev, units: 'metric' }))}
+                              className={`px-4 py-2 text-sm transition-colors ${
+                                data.units === 'metric' ? 'text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              <span className="font-medium mr-2">
+                                {data.units === 'metric' ? '●' : '○'}
+                              </span>
+                              Metric (kg, cm)
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Height */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">
+                            Height ({(data.units === 'metric') ? 'cm' : 'inches'})
+                          </label>
+                          <p className="text-xs text-gray-500">
+                            {(data.units === 'metric') ? 'Centimeters' : 'Total inches (5\'10" = 70 inches)'}
+                          </p>
+                          <input
+                            type="number"
+                            value={data.height || ''}
+                            onChange={(e) => setData(prev => ({ ...prev, height: parseInt(e.target.value) || undefined }))}
+                            placeholder={(data.units === 'metric') ? '178' : '70'}
+                            className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          />
+                        </div>
+
+                        {/* Weight */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">
+                            Weight ({(data.units === 'metric') ? 'kg' : 'lbs'})
+                          </label>
+                          <input
+                            type="number"
+                            value={data.weight || ''}
+                            onChange={(e) => setData(prev => ({ ...prev, weight: parseInt(e.target.value) || undefined }))}
+                            placeholder={(data.units === 'metric') ? '80' : '175'}
+                            className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
+                          />
+                        </div>
+
+                        {/* Gender */}
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Gender</label>
+                          <div className="space-y-2">
+                            {[
+                              { value: 'male', label: 'Male' },
+                              { value: 'female', label: 'Female' },
+                              { value: 'prefer_not_to_say', label: 'Prefer not to say' }
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                onClick={() => setData(prev => ({ ...prev, gender: option.value as any }))}
+                                className={`w-full p-3 text-left text-sm transition-colors ${
+                                  data.gender === option.value ? 'text-blue-600' : 'hover:text-blue-600'
+                                }`}
+                              >
+                                <span className="font-medium text-gray-500 mr-3">
+                                  {data.gender === option.value ? '●' : '○'}
+                                </span>
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Disciplines */}
+                    <div className="space-y-4">
+                      <h2 className="text-lg font-medium">Training Disciplines</h2>
+                      <p className="text-sm text-gray-600">Select which sports you want to track baselines for</p>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        {disciplineOptions.map((discipline) => {
+                          const Icon = discipline.icon;
+                          const isSelected = data.disciplines.includes(discipline.id);
+                          return (
+                            <button
+                              key={discipline.id}
+                              onClick={() => toggleDiscipline(discipline.id)}
+                              className={`p-4 text-center transition-colors ${
+                                isSelected ? 'text-black' : 'text-gray-500 hover:text-gray-700'
+                              }`}
+                            >
+                              <Icon className="h-6 w-6 mx-auto mb-2" />
+                              <div className="text-sm font-medium">{discipline.name}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Enhanced per-discipline sections */}
+                    {data.disciplines.length > 0 && (
+                      <div className="space-y-6">
+                        <h2 className="text-lg font-medium">Performance Benchmarks</h2>
+                        
                         {data.disciplines.map((disciplineId) => {
                           const discipline = disciplineOptions.find(d => d.id === disciplineId);
                           if (!discipline) return null;
                           
                           return (
-                            <div key={disciplineId} className="p-3 bg-gray-50 rounded-lg">
-                              <div className="flex items-center gap-2 mb-2">
+                            <div key={disciplineId} className="space-y-4">
+                              <div className="flex items-center gap-2">
                                 <DisciplineIcon discipline={disciplineId} />
-                                <h5 className="font-medium capitalize">{discipline.name}</h5>
+                                <h3 className="font-medium capitalize">{discipline.name}</h3>
                               </div>
                               
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
-                                <div>
-                                  <span className="text-gray-600">Fitness Level: </span>
-                                  <span>{data.disciplineFitness[disciplineId as keyof typeof data.disciplineFitness] || 'Not set'}</span>
+                              <div className="space-y-4 ml-7">
+                                {/* Current Volume */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">
+                                    How many hours per week do you currently {disciplineId}?
+                                  </label>
+                                  <div className="space-y-2">
+                                    {getVolumeOptions().map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => setData(prev => ({
+                                          ...prev,
+                                          current_volume: {
+                                            ...prev.current_volume,
+                                            [disciplineId]: option
+                                          }
+                                        }))}
+                                        className={`w-full p-3 text-left text-sm transition-colors ${
+                                          data.current_volume?.[disciplineId] === option
+                                            ? 'text-blue-600' 
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {data.current_volume?.[disciplineId] === option ? '●' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
-                                <div>
-                                  <span className="text-gray-600">Performance Level: </span>
-                                  <span>{data.benchmarks[disciplineId as keyof typeof data.benchmarks] || 'Not set'}</span>
+
+                                {/* Training Status */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">
+                                    Current {disciplineId} training status?
+                                  </label>
+                                  <div className="space-y-2">
+                                    {getTrainingStatusOptions().map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => setData(prev => ({
+                                          ...prev,
+                                          training_status: {
+                                            ...prev.training_status,
+                                            [disciplineId]: option
+                                          }
+                                        }))}
+                                        className={`w-full p-3 text-left text-sm transition-colors ${
+                                          data.training_status?.[disciplineId] === option
+                                            ? 'text-blue-600' 
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {data.training_status?.[disciplineId] === option ? '●' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Benchmark Recency */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">
+                                    When did you last achieve these performance numbers?
+                                  </label>
+                                  <div className="space-y-2">
+                                    {getBenchmarkRecencyOptions().map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => setData(prev => ({
+                                          ...prev,
+                                          benchmark_recency: {
+                                            ...prev.benchmark_recency,
+                                            [disciplineId]: option
+                                          }
+                                        }))}
+                                        className={`w-full p-3 text-left text-sm transition-colors ${
+                                          data.benchmark_recency?.[disciplineId] === option
+                                            ? 'text-blue-600' 
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {data.benchmark_recency?.[disciplineId] === option ? '●' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Existing fitness level and performance sections */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">Fitness Level</label>
+                                  <div className="space-y-2">
+                                    {getDisciplineFitnessOptions(disciplineId).map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => setData(prev => ({
+                                          ...prev,
+                                          disciplineFitness: {
+                                            ...prev.disciplineFitness,
+                                            [disciplineId]: option
+                                          }
+                                        }))}
+                                        className={`w-full p-3 text-left text-sm transition-colors ${
+                                          data.disciplineFitness[disciplineId as keyof typeof data.disciplineFitness] === option
+                                            ? 'text-blue-600' 
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {data.disciplineFitness[disciplineId as keyof typeof data.disciplineFitness] === option ? '●' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">Performance Level</label>
+                                  <div className="space-y-2">
+                                    {getBenchmarkOptions(disciplineId).map((option, index) => (
+                                      <button
+                                        key={index}
+                                        onClick={() => setData(prev => ({
+                                          ...prev,
+                                          benchmarks: {
+                                            ...prev.benchmarks,
+                                            [disciplineId]: option
+                                          }
+                                        }))}
+                                        className={`w-full p-3 text-left text-sm transition-colors ${
+                                          data.benchmarks[disciplineId as keyof typeof data.benchmarks] === option
+                                            ? 'text-blue-600' 
+                                            : 'hover:text-blue-600'
+                                        }`}
+                                      >
+                                        <span className="font-medium text-gray-500 mr-3">
+                                          {data.benchmarks[disciplineId as keyof typeof data.benchmarks] === option ? '●' : '○'}
+                                        </span>
+                                        {option}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Equipment */}
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium text-gray-700">Equipment Access</label>
+                                  <div className="space-y-2">
+                                    {getEquipmentOptions(disciplineId).map((option, index) => {
+                                      const isSelected = (data.equipment[disciplineId as keyof typeof data.equipment] || []).includes(option);
+                                      return (
+                                        <button
+                                          key={index}
+                                          onClick={() => toggleEquipment(disciplineId, option)}
+                                          className={`w-full p-3 text-left text-sm transition-colors ${
+                                            isSelected ? 'text-blue-600' : 'hover:text-blue-600'
+                                          }`}
+                                        >
+                                          <span className="font-medium text-gray-500 mr-3">
+                                            {isSelected ? '✓' : '○'}
+                                          </span>
+                                          {option}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
                                 </div>
                               </div>
-
-                              {/* Quick Edit Performance Numbers */}
-                              {disciplineId === 'running' && (
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="text-xs text-gray-600">5K time</label>
-                                    <input
-                                      type="text"
-                                      placeholder="22:30"
-                                      value={data.performanceNumbers.fiveK || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, fiveK: e.target.value }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-600">10K time</label>
-                                    <input
-                                      type="text"
-                                      placeholder="46:45"
-                                      value={data.performanceNumbers.tenK || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, tenK: e.target.value }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-
-                              {disciplineId === 'cycling' && (
-                                <div className="mt-3 grid grid-cols-2 gap-2">
-                                  <div>
-                                    <label className="text-xs text-gray-600">FTP (watts)</label>
-                                    <input
-                                      type="number"
-                                      placeholder="285"
-                                      value={data.performanceNumbers.ftp || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, ftp: parseInt(e.target.value) || undefined }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-600">Avg Speed (mph)</label>
-                                    <input
-                                      type="number"
-                                      placeholder="18"
-                                      value={data.performanceNumbers.avgSpeed || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, avgSpeed: parseInt(e.target.value) || undefined }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-
-                              {disciplineId === 'swimming' && (
-                                <div className="mt-3 grid grid-cols-3 gap-2">
-                                  <div>
-                                    <label className="text-xs text-gray-600">100-yard pace</label>
-                                    <input
-                                      type="text"
-                                      placeholder="1:25"
-                                      value={data.performanceNumbers.swimPace100 || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, swimPace100: e.target.value }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-600">200m time</label>
-                                    <input
-                                      type="text"
-                                      placeholder="3:15"
-                                      value={data.performanceNumbers.swim200Time || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, swim200Time: e.target.value }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-600">400m time</label>
-                                    <input
-                                      type="text"
-                                      placeholder="7:45"
-                                      value={data.performanceNumbers.swim400Time || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, swim400Time: e.target.value }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                </div>
-                              )}
-
-                              {disciplineId === 'strength' && (
-                                <div className="mt-3 grid grid-cols-3 gap-2">
-                                  <div>
-                                    <label className="text-xs text-gray-600">Squat (lbs)</label>
-                                    <input
-                                      type="number"
-                                      placeholder="315"
-                                      value={data.performanceNumbers.squat || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, squat: parseInt(e.target.value) || undefined }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-600">Deadlift (lbs)</label>
-                                    <input
-                                      type="number"
-                                      placeholder="405"
-                                      value={data.performanceNumbers.deadlift || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, deadlift: parseInt(e.target.value) || undefined }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="text-xs text-gray-600">Bench (lbs)</label>
-                                    <input
-                                      type="number"
-                                      placeholder="225"
-                                      value={data.performanceNumbers.bench || ''}
-                                      onChange={(e) => setData(prev => ({
-                                        ...prev,
-                                        performanceNumbers: { ...prev.performanceNumbers, bench: parseInt(e.target.value) || undefined }
-                                      }))}
-                                      className="w-full px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:border-black"
-                                    />
-                                  </div>
-                                </div>
-                              )}
                             </div>
                           );
                         })}
                       </div>
-                    </div>
-                  )}
-
-                  {/* Injury Summary */}
-                  <div className="space-y-3">
-                    <h4 className="font-medium">Injury Status</h4>
-                    <p className="text-sm">{data.injuryHistory || 'Not set'}</p>
-                    {data.injuryRegions.length > 0 && (
-                      <div>
-                        <p className="text-xs text-gray-600 mb-1">Affected regions:</p>
-                        <p className="text-sm">{data.injuryRegions.join(', ')}</p>
-                      </div>
                     )}
-                  </div>
-                </div>
-              )}
 
-              {/* Save Button - Shows on both tabs */}
-              <div className="pt-6 pb-8">
-                {saveMessage && (
-                  <div className={`text-center mb-4 text-sm ${
-                    saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'
-                  }`}>
-                    {saveMessage}
+                    {/* Injury History */}
+                    <div className="space-y-4">
+                      <h2 className="text-lg font-medium">Injury History</h2>
+                      
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">Current Status</label>
+                        <div className="space-y-2">
+                          {injuryOptions.map((option, index) => (
+                            <button
+                              key={index}
+                              onClick={() => setData(prev => ({ ...prev, injuryHistory: option }))}
+                              className={`w-full p-3 text-left text-sm transition-colors ${
+                                data.injuryHistory === option ? 'text-blue-600' : 'hover:text-blue-600'
+                              }`}
+                            >
+                              <span className="font-medium text-gray-500 mr-3">
+                                {data.injuryHistory === option ? '●' : '○'}
+                              </span>
+                              {option}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {hasInjuries && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Affected Body Regions</label>
+                          <div className="space-y-2">
+                            {bodyRegionOptions.map((region, index) => {
+                              const isSelected = data.injuryRegions.includes(region);
+                              return (
+                                <button
+                                  key={index}
+                                  onClick={() => toggleInjuryRegion(region)}
+                                  className={`w-full p-3 text-left text-sm transition-colors ${
+                                    isSelected ? 'text-blue-600' : 'hover:text-blue-600'
+                                  }`}
+                                >
+                                  <span className="font-medium text-gray-500 mr-3">
+                                    {isSelected ? '✓' : '○'}
+                                  </span>
+                                  {region}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Training Background */}
+                    <div className="space-y-4">
+                      <h2 className="text-lg font-medium">Training Background</h2>
+                      
+                      <div className="space-y-2">
+                        {trainingBackgroundOptions.map((option, index) => (
+                          <button
+                            key={index}
+                            onClick={() => setData(prev => ({ ...prev, trainingBackground: option }))}
+                            className={`w-full p-3 text-left text-sm transition-colors ${
+                              data.trainingBackground === option ? 'text-blue-600' : 'hover:text-blue-600'
+                            }`}
+                          >
+                            <span className="font-medium text-gray-500 mr-3">
+                              {data.trainingBackground === option ? '●' : '○'}
+                            </span>
+                            {option}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : activeTab === 'baselines' ? (
+                  /* Baselines Tab */
+                  <div className="space-y-8">
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium mb-2">Your Training Baselines Summary</h3>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="font-medium">Basic Information</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs text-gray-600">Age</label>
+                          <p className="text-sm py-1">{data.age || 'Not set'}</p>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Birthday</label>
+                          <p className="text-sm py-1">
+                            {data.birthday ? (() => {
+                              const [year, month, day] = data.birthday.split('-');
+                              return `${month}/${day}/${year}`;
+                            })() : 'Not set'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Height</label>
+                          <p className="text-sm py-1">
+                            {data.height ? `${data.height} ${data.units === 'imperial' ? 'in' : 'cm'}` : 'Not set'}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-xs text-gray-600">Weight</label>
+                          <p className="text-sm py-1">
+                            {data.weight ? `${data.weight} ${data.units === 'imperial' ? 'lbs' : 'kg'}` : 'Not set'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+{(() => {
+                      // Check ALL possible sports for saved data, regardless of current selection
+                      const allPossibleSports = ['running', 'cycling', 'swimming', 'strength'];
+                      const sportsWithData = allPossibleSports.filter(disciplineId => {
+                        return data.current_volume?.[disciplineId] || 
+                               data.training_status?.[disciplineId] || 
+                               data.benchmark_recency?.[disciplineId] ||
+                               data.disciplineFitness?.[disciplineId] || 
+                               data.benchmarks?.[disciplineId] || 
+                               (data.equipment?.[disciplineId] && data.equipment[disciplineId].length > 0);
+                      });
+
+                      return sportsWithData.length > 0 && (
+                        <div className="space-y-4">
+                          <h4 className="font-medium">Your Sports</h4>
+                          <div className="space-y-4">
+                            {sportsWithData.map((disciplineId) => {
+                              const discipline = disciplineOptions.find(d => d.id === disciplineId);
+                              if (!discipline) return null;
+                              
+                              return (
+                                <div key={disciplineId} className="p-3 bg-gray-50 rounded-lg">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <DisciplineIcon discipline={disciplineId} />
+                                    <h5 className="font-medium capitalize">{discipline.name}</h5>
+                                  </div>
+                                  
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                                    <div>
+                                      <span className="text-gray-600">Current Volume: </span>
+                                      <span>{data.current_volume?.[disciplineId] || 'Not set'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Training Status: </span>
+                                      <span>{data.training_status?.[disciplineId] || 'Not set'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Fitness Level: </span>
+                                      <span>{data.disciplineFitness?.[disciplineId] || 'Not set'}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-600">Performance Level: </span>
+                                      <span>{data.benchmarks?.[disciplineId] || 'Not set'}</span>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <span className="text-gray-600">Benchmark Recency: </span>
+                                      <span>{data.benchmark_recency?.[disciplineId] || 'Not set'}</span>
+                                    </div>
+                                    {data.equipment?.[disciplineId] && data.equipment[disciplineId].length > 0 && (
+                                      <div className="md:col-span-2">
+                                        <span className="text-gray-600">Equipment: </span>
+                                        <span>{data.equipment[disciplineId].join(', ')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                ) : (
+                  /* Data Import Tab */
+                  <div className="space-y-6">
+                    <div className="text-center">
+                      <h3 className="text-lg font-medium mb-2">Import Training Data</h3>
+                      <p className="text-sm text-gray-600">Connect your fitness accounts to auto-populate baseline data</p>
+                    </div>
+                    
+                    {/* Strava Connection */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <Activity className="h-5 w-5 text-orange-500" />
+                        <h4 className="font-medium">Strava Integration</h4>
+                      </div>
+
+                      {!stravaConnected ? (
+                        <button
+                          onClick={connectStrava}
+                          className="w-full px-4 py-3 text-white bg-orange-500 hover:bg-orange-600 transition-colors font-medium rounded-md"
+                        >
+                          Connect with Strava
+                        </button>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-green-50 rounded-md">
+                            <p className="text-sm text-green-800">✓ Connected to Strava</p>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={testStravaApi}
+                              className="flex-1 px-4 py-2 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+                            >
+                              Test API Call
+                            </button>
+                            <button
+                              onClick={disconnectStrava}
+                              className="px-4 py-2 text-red-600 hover:text-red-700 transition-colors text-sm"
+                            >
+                              Disconnect
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {stravaMessage && (
+                        <div className="p-3 bg-gray-50 rounded-md">
+                          <p className="text-sm text-gray-700">{stravaMessage}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Strava Preview Component */}
+                    {stravaConnected && accessToken && (
+                      <StravaPreview 
+                        accessToken={accessToken}
+                        currentBaselines={data}
+                        onDataSelected={(selectedData) => {
+                          setData(prev => ({ ...prev, ...selectedData }));
+                        }}
+                      />
+                    )}
+
+                    {/* Future integrations placeholder */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3 opacity-50">
+                        <div className="h-5 w-5 bg-gray-300 rounded"></div>
+                        <h4 className="font-medium text-gray-500">Garmin Integration</h4>
+                      </div>
+                      <p className="text-sm text-gray-400">Coming soon...</p>
+                    </div>
                   </div>
                 )}
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="w-full px-4 py-3 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
-                >
-                  {saving ? 'Saving...' : 'Save Training Baselines'}
-                </button>
-              </div>
+
+                {/* Save Button */}
+                <div className="pt-6 pb-8">
+                  {saveMessage && (
+                    <div className={`text-center mb-4 text-sm ${
+                      saveMessage.includes('Error') ? 'text-red-600' : 'text-green-600'
+                    }`}>
+                      {saveMessage}
+                    </div>
+                  )}
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="w-full px-4 py-3 text-black hover:text-blue-600 transition-colors font-medium disabled:text-gray-400"
+                  >
+                    {saving ? 'Saving...' : 'Save Training Baselines'}
+                  </button>
+                </div>
               </div>
             </>
           )}

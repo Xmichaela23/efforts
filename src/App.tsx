@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
+import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 
 const queryClient = new QueryClient();
 
@@ -21,6 +22,7 @@ const App = () => (
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

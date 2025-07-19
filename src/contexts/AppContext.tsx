@@ -48,6 +48,17 @@ interface Plan {
 }
 
 interface BaselineData {
+  // Enhanced user details
+  birthday?: string;
+  height?: number;
+  weight?: number;
+  gender?: 'male' | 'female' | 'prefer_not_to_say';
+  units?: 'metric' | 'imperial';
+  current_volume?: { [discipline: string]: string };
+  training_status?: { [discipline: string]: string };
+  benchmark_recency?: { [discipline: string]: string };
+  
+  // Existing fields
   age: number;
   disciplines: string[];
   disciplineFitness: {
@@ -209,6 +220,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!user) throw new Error('User must be authenticated to save baselines');
       const baselineRecord = {
         user_id: user.id,
+        // Enhanced user details
+        birthday: data.birthday,
+        height: data.height,
+        weight: data.weight,
+        gender: data.gender,
+        units: data.units,
+        current_volume: data.current_volume,
+        training_status: data.training_status,
+        benchmark_recency: data.benchmark_recency,
+        // Existing fields
         age: data.age,
         disciplines: data.disciplines,
         discipline_fitness: data.disciplineFitness,
@@ -240,7 +261,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
       if (error && error.code !== 'PGRST116') throw error;
       if (!data) return null;
+      
+      // Fix birthday timezone issue - ensure it's always YYYY-MM-DD format
+      let formattedBirthday = data.birthday;
+      if (data.birthday) {
+        if (typeof data.birthday === 'string' && data.birthday.includes('T')) {
+          // If it's an ISO string, extract just the date part
+          formattedBirthday = data.birthday.split('T')[0];
+        } else if (data.birthday instanceof Date) {
+          // If it's a Date object, format it properly
+          const year = data.birthday.getFullYear();
+          const month = String(data.birthday.getMonth() + 1).padStart(2, '0');
+          const day = String(data.birthday.getDate()).padStart(2, '0');
+          formattedBirthday = `${year}-${month}-${day}`;
+        }
+        // If it's already a YYYY-MM-DD string, keep it as is
+      }
+      
       return {
+        // Enhanced user details
+        birthday: formattedBirthday,
+        height: data.height,
+        weight: data.weight,
+        gender: data.gender,
+        units: data.units,
+        current_volume: data.current_volume,
+        training_status: data.training_status,
+        benchmark_recency: data.benchmark_recency,
+        // Existing fields
         age: data.age || 0,
         disciplines: data.disciplines || [],
         disciplineFitness: data.discipline_fitness || {},
