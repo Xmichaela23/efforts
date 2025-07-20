@@ -23,7 +23,7 @@ export interface StravaActivity {
   trainer?: boolean;
 }
 
-// NEW: Interface for splits data
+// Interface for splits data
 export interface StravaSplit {
   distance: number;
   elapsed_time: number;
@@ -34,11 +34,23 @@ export interface StravaSplit {
   pace_zone?: number;
 }
 
-// NEW: Interface for activity streams data
+// Interface for activity streams data
 export interface StravaStreams {
   time?: { data: number[] };
   distance?: { data: number[] };
   velocity_smooth?: { data: number[] };
+}
+
+// Interface for best efforts data
+export interface StravaBestEffort {
+  id: number;
+  name: string;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  start_index: number;
+  end_index: number;
+  pr_rank?: number | null;
 }
 
 export interface DetectedMetric {
@@ -83,14 +95,30 @@ export class StravaDataService {
         throw new Error(`Strava API error: ${response.status}`);
       }
 
-      return await response.json();
+      const activities = await response.json();
+      
+      // DEBUG: Log what activities we're getting
+      console.log('🔍 STRAVA DEBUG: Total activities found:', activities.length);
+      const runningActivities = activities.filter(a => 
+        (a.type?.toLowerCase() || '').includes('run') || 
+        (a.sport_type?.toLowerCase() || '').includes('run')
+      );
+      console.log('🏃 STRAVA DEBUG: Running activities found:', runningActivities.length);
+      console.log('🏃 STRAVA DEBUG: Running activities sample:', runningActivities.slice(0, 3).map(a => ({
+        name: a.name,
+        distance: a.distance,
+        moving_time: a.moving_time,
+        start_date: a.start_date
+      })));
+      
+      return activities;
     } catch (error) {
       console.error('Error fetching Strava activities:', error);
       throw error;
     }
   }
 
-  static async fetchActivityLaps(activityId: number, accessToken: string): Promise<StravaLap[]> {
+  static async fetchActivityLaps(activityId: number, accessToken: string): Promise<any[]> {
     // Debug token
     console.log('Fetching laps with token:', accessToken ? `${accessToken.substring(0, 10)}...` : 'NO TOKEN');
     
@@ -125,7 +153,7 @@ export class StravaDataService {
     }
   }
 
-  // NEW: Method to fetch splits data for an activity
+  // Method to fetch splits data for an activity
   static async fetchActivitySplits(activityId: number, accessToken: string): Promise<StravaSplit[]> {
     try {
       const response = await fetch(
@@ -149,7 +177,29 @@ export class StravaDataService {
     }
   }
 
-  // NEW: Method to fetch activity streams data
+  // Method to fetch detailed activity data with best efforts
+  static async fetchDetailedActivity(activityId: number, accessToken: string): Promise<any> {
+    try {
+      const response = await fetch(
+        `${this.BASE_URL}/activities/${activityId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.warn(`Could not fetch detailed activity ${activityId}: ${response.status}`);
+        return null;
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.warn(`Error fetching detailed activity ${activityId}:`, error);
+      return null;
+    }
+  }
   static async fetchActivityStreams(activityId: number, accessToken: string): Promise<StravaStreams | null> {
     try {
       const response = await fetch(
@@ -226,16 +276,6 @@ export class StravaDataService {
     };
   }
 
-  // NEW: Enhanced method that includes split analysis with access token
-  static async analyzeActivitiesForBaselinesWithSplits(
-    activities: StravaActivity[], 
-    currentBaselines: any,
-    accessToken: string
-  ): Promise<AnalyzedStravaData> {
-    // This method is now redundant - the main method includes split analysis
-    return this.analyzeActivitiesForBaselines(activities, currentBaselines, accessToken);
-  }
-
   private static groupActivitiesBySport(activities: StravaActivity[]): Record<string, StravaActivity[]> {
     const groups: Record<string, StravaActivity[]> = {};
 
@@ -262,86 +302,7 @@ export class StravaDataService {
     return groups;
   }
 
-  private static analyzeRunningData(activities: StravaActivity[], currentBaselines: any): DetectedMetric[] {
-    const metrics: DetectedMetric[] = [];
-
-    // Weekly volume calculation
-    const weeklyHours = this.calculateWeeklyVolume(activities);
-    const volumeRange = this.getVolumeRange(weeklyHours);
-    
-    metrics.push({
-      key: 'current_volume.running',
-      label: 'Weekly Running Volume',
-      currentValue: currentBaselines.current_volume?.running || 'Not set',
-      detectedValue: volumeRange,
-      confidence: 'high',
-      source: `${activities.length} runs in last 90 days`,
-      sport: 'running'
-    });
-
-    // Training status based on consistency
-    const trainingStatus = this.analyzeTrainingConsistency(activities);
-    metrics.push({
-      key: 'training_status.running',
-      label: 'Training Status',
-      currentValue: currentBaselines.training_status?.running || 'Not set',
-      detectedValue: trainingStatus,
-      confidence: 'high',
-      source: 'Activity frequency analysis',
-      sport: 'running'
-    });
-
-    // Best recent performances (race efforts)
-    const raceEfforts = this.findRaceEfforts(activities);
-    
-    // 5K estimate
-    const best5K = raceEfforts.find(effort => effort.distance >= 4800 && effort.distance <= 5200);
-    if (best5K) {
-      const pace = this.formatPace(best5K.time);
-      metrics.push({
-        key: 'performanceNumbers.fiveK',
-        label: '5K Time',
-        currentValue: currentBaselines.performanceNumbers?.fiveK || 'Not set',
-        detectedValue: pace,
-        confidence: 'high',
-        source: `${new Date(best5K.date).toLocaleDateString()}`,
-        sport: 'running'
-      });
-    }
-
-    // 10K estimate
-    const best10K = raceEfforts.find(effort => effort.distance >= 9800 && effort.distance <= 10500);
-    if (best10K) {
-      const pace = this.formatPace(best10K.time);
-      metrics.push({
-        key: 'performanceNumbers.tenK',
-        label: '10K Time',
-        currentValue: currentBaselines.performanceNumbers?.tenK || 'Not set',
-        detectedValue: pace,
-        confidence: 'high',
-        source: `${new Date(best10K.date).toLocaleDateString()}`,
-        sport: 'running'
-      });
-    }
-
-    // Performance level based on pace
-    if (best5K) {
-      const performanceLevel = this.classifyRunningPerformance(best5K.time / best5K.distance * 1000);
-      metrics.push({
-        key: 'benchmarks.running',
-        label: 'Performance Level',
-        currentValue: currentBaselines.benchmarks?.running || 'Not set',
-        detectedValue: performanceLevel,
-        confidence: 'medium',
-        source: 'Based on 5K pace',
-        sport: 'running'
-      });
-    }
-
-    return metrics;
-  }
-
-  // NEW: Enhanced running analysis that includes splits
+  // NEW: Clean running analysis with real 5K split extraction
   private static async analyzeRunningDataWithSplits(
     activities: StravaActivity[], 
     currentBaselines: any,
@@ -374,399 +335,163 @@ export class StravaDataService {
       sport: 'running'
     });
 
-    // NEW: Enhanced performance analysis with splits
-    const allEfforts = await this.findAllRunningEffortsWithSplits(activities, accessToken);
+    // NEW: Clean 5K detection - real PR data or transparent messaging
+    const fastest5K = await this.findFastest5KFromAllActivities(activities, accessToken);
     
-    // 5K analysis - take fastest efforts and average them
-    const fiveKEfforts = allEfforts.filter(effort => 
-      effort.distance >= 4800 && effort.distance <= 5200
-    );
-
-    if (fiveKEfforts.length > 0) {
-      const fastestEfforts = this.getFastestEfforts(fiveKEfforts, 3); // Top 3 fastest
-      
-      if (fastestEfforts.length > 0) {
-        const averageTime = fastestEfforts.reduce((sum, effort) => sum + effort.time, 0) / fastestEfforts.length;
-        const pace = this.formatPace(averageTime);
-        
-        metrics.push({
-          key: 'performanceNumbers.fiveK',
-          label: '5K Time',
-          currentValue: currentBaselines.performanceNumbers?.fiveK || 'Not set',
-          detectedValue: `${pace} (average of ${fastestEfforts.length} fastest efforts)`,
-          confidence: 'high',
-          source: `Top ${fastestEfforts.length} efforts in last 90 days`,
-          sport: 'running'
-        });
-
-        // Performance level based on fastest 5K efforts
-        const performanceLevel = this.classifyRunningPerformance(averageTime / 5000 * 1000);
-        metrics.push({
-          key: 'benchmarks.running',
-          label: 'Performance Level',
-          currentValue: currentBaselines.benchmarks?.running || 'Not set',
-          detectedValue: performanceLevel,
-          confidence: 'medium',
-          source: 'Based on fastest 5K efforts',
-          sport: 'running'
-        });
-      }
-    }
-
-    // 10K analysis - take fastest efforts and average them
-    const tenKEfforts = allEfforts.filter(effort => 
-      effort.distance >= 9800 && effort.distance <= 10500
-    );
-
-    if (tenKEfforts.length > 0) {
-      const fastestEfforts = this.getFastestEfforts(tenKEfforts, 3); // Top 3 fastest
-      
-      if (fastestEfforts.length > 0) {
-        const averageTime = fastestEfforts.reduce((sum, effort) => sum + effort.time, 0) / fastestEfforts.length;
-        const pace = this.formatPace(averageTime);
-        
-        metrics.push({
-          key: 'performanceNumbers.tenK',
-          label: '10K Time',
-          currentValue: currentBaselines.performanceNumbers?.tenK || 'Not set',
-          detectedValue: `${pace} (average of ${fastestEfforts.length} fastest efforts)`,
-          confidence: 'high',
-          source: `Top ${fastestEfforts.length} efforts in last 90 days`,
-          sport: 'running'
-        });
-      }
+    // Performance level based on real 5K time - ALWAYS show this metric
+    if (fastest5K) {
+      const pace = this.formatPace(fastest5K.time);
+      metrics.push({
+        key: 'benchmarks.running',
+        label: 'Performance Level',
+        currentValue: currentBaselines.benchmarks?.running || 'Not set',
+        detectedValue: pace,
+        confidence: 'medium',
+        source: 'Strava is giving us an estimated 5K time based on your average pace from longer runs. For a more accurate number, we recommend doing your own 5K time trial: 1. Warm up for 15 minutes at an easy pace 2. Start your GPS watch/device 3. Run 5K at your fastest sustainable pace (push yourself but don\'t sprint) 4. Stop your device when you hit 5K 5. Cool down for 10 minutes at an easy pace. This will give you your true 5K capability rather than an estimate from training runs.',
+        sport: 'running'
+      });
+    } else {
+      metrics.push({
+        key: 'benchmarks.running',
+        label: 'Performance Level',
+        currentValue: currentBaselines.benchmarks?.running || 'Not set',
+        detectedValue: 'Insufficient current data',
+        confidence: 'low',
+        source: 'Strava is giving us insufficient data. For a more accurate number, we recommend doing your own 5K time trial: 1. Warm up for 15 minutes at an easy pace 2. Start your GPS watch/device 3. Run 5K at your fastest sustainable pace (push yourself but don\'t sprint) 4. Stop your device when you hit 5K 5. Cool down for 10 minutes at an easy pace. This will give you your true 5K capability rather than an estimate from training runs.',
+        sport: 'running'
+      });
     }
 
     return metrics;
   }
 
-  // MODIFIED: Comprehensive 5K detection using intelligent analysis of basic activity data
-  private static async findAllRunningEffortsWithSplits(
+  // NEW: Extract 5K pace from longer runs (5K+ activities from past 3 months)
+  private static async findFastest5KFromAllActivities(
     activities: StravaActivity[], 
     accessToken: string
-  ): Promise<Array<{distance: number, time: number, date: string, source: string}>> {
-    const allEfforts: Array<{distance: number, time: number, date: string, source: string}> = [];
-
-    // 1. Add original race efforts (includes 10K detection) 
-    const originalEfforts = this.findRaceEfforts(activities);
-    originalEfforts.forEach(effort => {
-      allEfforts.push({
-        distance: effort.distance,
-        time: effort.time,
-        date: effort.date,
-        source: 'original-method'
-      });
+  ): Promise<{time: number, source: string} | null> {
+    
+    console.log('🔍 5K EXTRACTION: Looking for 5K+ runs from past 3 months across', activities.length, 'activities');
+    
+    // Get running activities 5K+ only
+    const runningActivities = activities.filter(activity => {
+      const type = activity.type?.toLowerCase() || activity.sport_type?.toLowerCase() || '';
+      return (type.includes('run') || type === 'run') && 
+             activity.distance >= 5000 && 
+             activity.moving_time > 0;
     });
-
-    // 2. Direct 5K activities (improved detection)
-    const direct5KEfforts = this.findDirect5KEfforts(activities);
-    allEfforts.push(...direct5KEfforts);
-
-    // 3. Estimated 5K efforts from longer activities
-    const estimated5KEfforts = this.estimate5KFromLongerActivities(activities);
-    allEfforts.push(...estimated5KEfforts);
-
-    // 4. Name-based detection (parkrun, 5K race, tempo, etc.)
-    const nameBased5KEfforts = this.find5KByActivityName(activities);
-    allEfforts.push(...nameBased5KEfforts);
-
-    // 5. Race-pattern detection (weekend activities likely to be races)
-    const racePattern5KEfforts = this.find5KByRacePatterns(activities);
-    allEfforts.push(...racePattern5KEfforts);
-
-    // 6. Threshold pace detection (fast sustained efforts)
-    const thresholdEfforts = this.find5KByThresholdPace(activities);
-    allEfforts.push(...thresholdEfforts);
-
-    console.log(`Comprehensive detection found ${allEfforts.length} total efforts across all methods`);
-    return allEfforts;
+    
+    console.log(`Found ${runningActivities.length} running activities 5K+ to analyze`);
+    
+    // Filter by recency (within 3 months)
+    const recent5KPlus = runningActivities.filter(activity => {
+      const prDate = new Date(activity.start_date);
+      const monthsOld = (Date.now() - prDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
+      return monthsOld <= 3;
+    });
+    
+    if (recent5KPlus.length === 0) {
+      console.log('📝 No 5K+ activities found from past 3 months');
+      return null;
+    }
+    
+    console.log(`Found ${recent5KPlus.length} runs 5K+ from past 3 months`);
+    
+    // Calculate first 5K pace for each run and find fastest
+    const calculated5Ks = recent5KPlus.map(activity => {
+      const first5KTime = (activity.moving_time / activity.distance) * 5000;
+      return {
+        time: first5KTime,
+        activity: activity
+      };
+    });
+    
+    // Sort by fastest calculated 5K time
+    const fastest5K = calculated5Ks.sort((a, b) => a.time - b.time)[0];
+    
+    const prDate = new Date(fastest5K.activity.start_date);
+    
+    console.log(`🎯 Best calculated 5K found: ${this.formatPace(fastest5K.time)} from "${fastest5K.activity.name}"`);
+    
+    return {
+      time: fastest5K.time,
+      source: `First 5K from: ${fastest5K.activity.name} on ${prDate.toLocaleDateString()}`
+    };
   }
 
-  // NEW: Method 1 - Find direct 5K activities (improved)
-  private static findDirect5KEfforts(
-    activities: StravaActivity[]
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    return activities
-      .filter(activity => 
-        activity.distance >= 4800 && 
-        activity.distance <= 5500 && // Slightly more lenient
-        activity.moving_time > 0 &&
-        activity.moving_time < 2400 // Under 40 minutes (reasonable 5K time)
-      )
-      .map(activity => ({
-        distance: activity.distance,
-        time: activity.moving_time,
-        date: activity.start_date,
-        source: 'direct-5K'
-      }));
-  }
-
-  // NEW: Method 2 - Estimate 5K pace from longer activities
-  private static estimate5KFromLongerActivities(
-    activities: StravaActivity[]
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    const efforts: Array<{distance: number, time: number, date: string, source: string}> = [];
-
-    activities.forEach(activity => {
-      if (activity.distance > 5500 && activity.moving_time > 0) {
-        const averagePacePerKm = activity.moving_time / (activity.distance / 1000);
+  // NEW: Find 5K best efforts from detailed activity data
+  private static async findBest5KFromBestEfforts(
+    activities: StravaActivity[], 
+    accessToken: string
+  ): Promise<{time: number, source: string} | null> {
+    
+    console.log('🔍 5K BEST EFFORTS: Checking detailed activities for 5K PRs');
+    
+    let best5KTime: number | null = null;
+    let best5KSource = '';
+    
+    // Look through running activities that are likely to contain 5K segments
+    const candidateRuns = activities.filter(activity => {
+      const type = activity.type?.toLowerCase() || activity.sport_type?.toLowerCase() || '';
+      return (type.includes('run') || type === 'run') && 
+             activity.distance >= 5000 && // Must be at least 5K to contain a 5K effort
+             activity.moving_time > 0;
+    });
+    
+    console.log(`Found ${candidateRuns.length} candidate runs >= 5K`);
+    
+    // Check detailed data for up to 20 recent runs (to avoid API limits)
+    const runsToCheck = candidateRuns.slice(0, 20);
+    
+    for (const run of runsToCheck) {
+      try {
+        const detailedActivity = await this.fetchDetailedActivity(run.id, accessToken);
         
-        // If this looks like a sustained effort (not easy training pace)
-        if (this.isPotentialRaceEffort(activity, averagePacePerKm)) {
-          // Estimate 5K time based on distance and pace
-          let estimated5KTime;
+        if (detailedActivity?.best_efforts) {
+          // Look for 5K best effort
+          const best5K = detailedActivity.best_efforts.find((effort: any) => 
+            effort.name === '5k' || effort.name === '5K' || 
+            (effort.distance >= 4990 && effort.distance <= 5010)
+          );
           
-          if (activity.distance >= 9500 && activity.distance <= 10500) {
-            // 10K - estimate 5K as first half with slight negative split
-            estimated5KTime = (activity.moving_time / 2) * 0.98; // Assume slight positive split
-          } else if (activity.distance >= 6000 && activity.distance <= 8000) {
-            // 6-8K tempo runs - estimate 5K pace
-            const kmPace = averagePacePerKm;
-            estimated5KTime = kmPace * 5 * 0.97; // Slightly faster than tempo pace
-          } else if (activity.distance >= 15000) {
-            // Half marathon or longer - estimate 5K pace (much faster)
-            const estimatedKmPace = averagePacePerKm * 0.88; // ~12% faster for 5K
-            estimated5KTime = estimatedKmPace * 5;
-          }
-
-          if (estimated5KTime && estimated5KTime > 900 && estimated5KTime < 2400) { // 15-40 minutes
-            efforts.push({
-              distance: 5000,
-              time: estimated5KTime,
-              date: activity.start_date,
-              source: `estimated-from-${Math.round(activity.distance)}m`
-            });
-          }
-        }
-      }
-    });
-
-    return efforts;
-  }
-
-  // NEW: Method 3 - Activity name analysis
-  private static find5KByActivityName(
-    activities: StravaActivity[]
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    const efforts: Array<{distance: number, time: number, date: string, source: string}> = [];
-
-    const fiveKKeywords = [
-      '5k', '5K', 'parkrun', 'park run', '5 k', '5-k',
-      'tempo 5', '5km', '5KM', 'five k', 'fivek'
-    ];
-
-    activities.forEach(activity => {
-      const name = activity.name?.toLowerCase() || '';
-      const hasFiveKKeyword = fiveKKeywords.some(keyword => 
-        name.includes(keyword.toLowerCase())
-      );
-
-      if (hasFiveKKeyword && activity.moving_time > 0) {
-        // If it's explicitly named as 5K-related, trust it more
-        if (activity.distance >= 4000 && activity.distance <= 6000) {
-          efforts.push({
-            distance: activity.distance,
-            time: activity.moving_time,
-            date: activity.start_date,
-            source: 'name-based-5K'
-          });
-        }
-      }
-    });
-
-    return efforts;
-  }
-
-  // NEW: Method 4 - Race pattern detection (weekends, fast efforts)
-  private static find5KByRacePatterns(
-    activities: StravaActivity[]
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    const efforts: Array<{distance: number, time: number, date: string, source: string}> = [];
-
-    activities.forEach(activity => {
-      const activityDate = new Date(activity.start_date);
-      const dayOfWeek = activityDate.getDay(); // 0 = Sunday, 6 = Saturday
-      const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-      
-      // Look for weekend activities that look like races
-      if (isWeekend && 
-          activity.distance >= 4500 && 
-          activity.distance <= 8000 && 
-          activity.moving_time > 0) {
-        
-        const averagePacePerKm = activity.moving_time / (activity.distance / 1000);
-        
-        // If it's a fast sustained effort on weekend
-        if (this.isPotentialRaceEffort(activity, averagePacePerKm)) {
-          // If it's close to 5K distance, use it directly
-          if (activity.distance >= 4500 && activity.distance <= 5500) {
-            efforts.push({
-              distance: activity.distance,
-              time: activity.moving_time,
-              date: activity.start_date,
-              source: 'weekend-race-5K'
-            });
-          }
-          // If it's longer, estimate the 5K portion
-          else if (activity.distance > 5500) {
-            const estimated5KTime = (activity.moving_time / activity.distance) * 5000 * 0.97;
-            if (estimated5KTime > 900 && estimated5KTime < 2400) {
-              efforts.push({
-                distance: 5000,
-                time: estimated5KTime,
-                date: activity.start_date,
-                source: 'weekend-race-estimated'
-              });
+          if (best5K && best5K.moving_time) {
+            console.log(`✅ Found 5K best effort: ${this.formatPace(best5K.moving_time)} in run: ${run.name}`);
+            
+            // Keep track of the fastest 5K found
+            if (!best5KTime || best5K.moving_time < best5KTime) {
+              best5KTime = best5K.moving_time;
+              best5KSource = `5K PR: ${this.formatPace(best5K.moving_time)} within "${run.name}" on ${new Date(run.start_date).toLocaleDateString()}`;
             }
           }
         }
+        
+        // Add small delay to be nice to Strava API
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+      } catch (error) {
+        console.warn(`Could not fetch detailed data for run ${run.id}:`, error);
+        continue;
       }
-    });
-
-    return efforts;
+    }
+    
+    if (best5KTime) {
+      console.log(`🎯 Best 5K found: ${this.formatPace(best5KTime)}`);
+      return {
+        time: best5KTime,
+        source: best5KSource
+      };
+    }
+    
+    console.log('📝 No 5K best efforts found in recent runs');
+    return null;
   }
 
-  // NEW: Method 5 - Threshold pace detection
-  private static find5KByThresholdPace(
+  // Remove the complex fallback method entirely
+  private static findFastest5KWithSimpleMethods(
     activities: StravaActivity[]
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    const efforts: Array<{distance: number, time: number, date: string, source: string}> = [];
-
-    // First, calculate this runner's typical easy pace
-    const easyPaceBaseline = this.calculateEasyPaceBaseline(activities);
-    
-    if (!easyPaceBaseline) return efforts;
-
-    activities.forEach(activity => {
-      if (activity.distance >= 4000 && 
-          activity.distance <= 8000 && 
-          activity.moving_time > 0) {
-        
-        const averagePacePerKm = activity.moving_time / (activity.distance / 1000);
-        const paceRatio = averagePacePerKm / easyPaceBaseline;
-        
-        // If this pace is significantly faster than easy pace (threshold effort)
-        if (paceRatio >= 0.75 && paceRatio <= 0.95) { // 25-5% faster than easy
-          
-          // Extract/estimate 5K effort
-          if (activity.distance >= 4800 && activity.distance <= 5200) {
-            efforts.push({
-              distance: activity.distance,
-              time: activity.moving_time,
-              date: activity.start_date,
-              source: 'threshold-pace-5K'
-            });
-          } else if (activity.distance > 5200) {
-            // Estimate 5K from threshold effort
-            const estimated5KTime = averagePacePerKm * 5;
-            if (estimated5KTime > 900 && estimated5KTime < 2400) {
-              efforts.push({
-                distance: 5000,
-                time: estimated5KTime,
-                date: activity.start_date,
-                source: 'threshold-estimated'
-              });
-            }
-          }
-        }
-      }
-    });
-
-    return efforts;
-  }
-
-  // NEW: Helper - Very lenient filtering to catch all potential efforts
-  private static isPotentialRaceEffort(activity: StravaActivity, averagePacePerKm: number): boolean {
-    // Cast a very wide net - let the "fastest efforts" sorting do the filtering
-    
-    // Only exclude obviously impossible paces
-    const notTooSlow = averagePacePerKm <= 900; // Faster than 15-minute/km (walking pace)
-    const notTooFast = averagePacePerKm >= 150; // Slower than 2:30/km (elite marathon pace)
-    
-    // Reasonable duration for any running effort
-    const reasonableDuration = activity.moving_time >= 300 && activity.moving_time <= 7200; // 5 minutes to 2 hours
-    
-    // Must be a meaningful distance
-    const reasonableDistance = activity.distance >= 1000; // At least 1K
-    
-    return notTooSlow && notTooFast && reasonableDuration && reasonableDistance;
-  }
-
-  // NEW: Helper - Calculate easy pace baseline
-  private static calculateEasyPaceBaseline(activities: StravaActivity[]): number | null {
-    const easyRuns = activities
-      .filter(activity => 
-        activity.distance >= 3000 && // At least 3K
-        activity.distance <= 15000 && // Not ultra long
-        activity.moving_time > 0
-      )
-      .map(activity => activity.moving_time / (activity.distance / 1000))
-      .sort((a, b) => b - a); // Sort slowest to fastest
-    
-    if (easyRuns.length < 5) return null;
-    
-    // Take the slower 60% of runs as "easy pace" baseline
-    const easyPaceRuns = easyRuns.slice(0, Math.floor(easyRuns.length * 0.6));
-    return easyPaceRuns.reduce((sum, pace) => sum + pace, 0) / easyPaceRuns.length;
-  }
-
-  // NEW: Extract 5K and 10K efforts from kilometer splits data
-  private static findSplitEffortsFromKmSplits(
-    splits: StravaSplit[], 
-    activity: StravaActivity
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    const efforts: Array<{distance: number, time: number, date: string, source: string}> = [];
-
-    if (splits.length === 0) return efforts;
-
-    // Strava metric splits are typically 1km each
-    // So split 5 would be the 5km time, split 10 would be the 10km time
-    
-    // Look for 5K split (5th kilometer split)
-    if (splits.length >= 5) {
-      const fiveKmSplit = splits[4]; // 5th split (0-indexed)
-      if (fiveKmSplit && fiveKmSplit.moving_time > 0) {
-        // Calculate cumulative time for first 5 splits
-        const cumulativeTime = splits.slice(0, 5).reduce((sum, split) => sum + split.moving_time, 0);
-        efforts.push({
-          distance: 5000, // exactly 5km
-          time: cumulativeTime,
-          date: activity.start_date,
-          source: 'split'
-        });
-      }
-    }
-
-    // Look for 10K split (10th kilometer split)
-    if (splits.length >= 10) {
-      const tenKmSplit = splits[9]; // 10th split (0-indexed)
-      if (tenKmSplit && tenKmSplit.moving_time > 0) {
-        // Calculate cumulative time for first 10 splits
-        const cumulativeTime = splits.slice(0, 10).reduce((sum, split) => sum + split.moving_time, 0);
-        efforts.push({
-          distance: 10000, // exactly 10km
-          time: cumulativeTime,
-          date: activity.start_date,
-          source: 'split'
-        });
-      }
-    }
-
-    return efforts;
-  }
-
-  // NEW: Get fastest efforts by pace (simple approach)
-  private static getFastestEfforts(
-    efforts: Array<{distance: number, time: number, date: string, source: string}>,
-    count: number
-  ): Array<{distance: number, time: number, date: string, source: string}> {
-    if (efforts.length === 0) return [];
-
-    // Sort by pace (fastest first)
-    const sortedByPace = efforts.sort((a, b) => (a.time / a.distance) - (b.time / b.distance));
-    
-    // Take the fastest efforts up to the requested count
-    return sortedByPace.slice(0, Math.min(count, efforts.length));
+  ): {time: number, source: string} | null {
+    // This method is no longer used - we only use real PR data
+    return null;
   }
 
   private static analyzeCyclingData(activities: StravaActivity[], currentBaselines: any): DetectedMetric[] {
@@ -912,18 +637,6 @@ export class StravaDataService {
     if (consistencyRate > 0.6) return 'Building base fitness';
     if (consistencyRate > 0.3) return 'Maintaining current fitness';
     return 'Returning after break (1-3 months)';
-  }
-
-  private static findRaceEfforts(activities: StravaActivity[]): Array<{distance: number, time: number, date: string}> {
-    return activities
-      .filter(activity => activity.distance > 1000 && activity.moving_time > 0) // At least 1km
-      .map(activity => ({
-        distance: activity.distance,
-        time: activity.moving_time,
-        date: activity.start_date
-      }))
-      .sort((a, b) => (a.time / a.distance) - (b.time / b.distance)) // Sort by pace
-      .slice(0, 10); // Top 10 efforts
   }
 
   private static formatPace(seconds: number): string {

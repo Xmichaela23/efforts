@@ -18,6 +18,20 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
 
   useEffect(() => {
     checkConnectionStatus();
+    
+    // Listen for OAuth callback
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'GARMIN_OAUTH_SUCCESS') {
+        handleOAuthSuccess(event.data.code);
+      } else if (event.data.type === 'GARMIN_OAUTH_ERROR') {
+        setConnectionStatus('error');
+      }
+    };
+    
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
   }, []);
 
   const checkConnectionStatus = async () => {
@@ -39,34 +53,56 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
     }
   };
 
+  // Generate PKCE code verifier and challenge
+  const generatePKCE = () => {
+    const codeVerifier = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier))
+      .then(hashBuffer => {
+        const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)))
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_')
+          .replace(/=/g, '');
+        
+        return { codeVerifier, codeChallenge };
+      });
+  };
+
   const initiateGarminAuth = async () => {
     setConnectionStatus('connecting');
     
     try {
-      // In a real implementation, this would redirect to Garmin OAuth
-      // For demo purposes, we'll simulate the connection
-      const authUrl = 'https://connect.garmin.com/oauth/authorize';
-      const clientId = 'your-garmin-client-id';
-      const redirectUri = window.location.origin + '/garmin-callback';
-      const scope = 'read:activities,read:profile';
+      const { codeVerifier, codeChallenge } = await generatePKCE();
       
-      const fullAuthUrl = `${authUrl}?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+      // Store code verifier for later use
+      sessionStorage.setItem('garmin_code_verifier', codeVerifier);
+      
+      const authUrl = 'https://connect.garmin.com/oauth2Confirm';
+      const clientId = '17e358e3-9e6c-45ae-9267-91a06d126e4b';
+      const redirectUri = 'http://localhost:8080/auth/garmin/callback';
+      
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        redirect_uri: redirectUri,
+        state: Math.random().toString(36).substring(2, 15)
+      });
+      
+      const fullAuthUrl = `${authUrl}?${params.toString()}`;
       
       // Open popup for OAuth
       const popup = window.open(fullAuthUrl, 'garmin-auth', 'width=600,height=600');
       
-      // Listen for popup close or message
-      const checkClosed = setInterval(() => {
-        if (popup?.closed) {
-          clearInterval(checkClosed);
-          // Simulate successful connection for demo
-          setTimeout(() => {
-            setConnectionStatus('connected');
-            setLastSync(new Date());
-            saveConnectionData();
-          }, 1000);
-        }
-      }, 1000);
+      // Check if popup was blocked
+      if (!popup) {
+        setConnectionStatus('error');
+        return;
+      }
       
     } catch (error) {
       setConnectionStatus('error');
@@ -74,17 +110,60 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
     }
   };
 
-  const saveConnectionData = async () => {
+  const handleOAuthSuccess = async (code: string) => {
+    try {
+      const codeVerifier = sessionStorage.getItem('garmin_code_verifier');
+      if (!codeVerifier) {
+        throw new Error('Code verifier not found');
+      }
+      
+      // Exchange code for access token
+      const tokenResponse = await fetch('https://connectapi.garmin.com/di-oauth2-service/oauth/token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: new URLSearchParams({
+          grant_type: 'authorization_code',
+          client_id: '17e358e3-9e6c-45ae-9267-91a06d126e4b',
+          client_secret: (import.meta as any).env.VITE_GARMIN_CLIENT_SECRET,
+          code: code,
+          code_verifier: codeVerifier,
+          redirect_uri: 'http://localhost:8080/auth/garmin/callback'
+        })
+      });
+      
+      if (!tokenResponse.ok) {
+        throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      }
+      
+      const tokenData = await tokenResponse.json();
+      
+      await saveConnectionData(tokenData);
+      setConnectionStatus('connected');
+      setLastSync(new Date());
+      
+      // Clean up
+      sessionStorage.removeItem('garmin_code_verifier');
+      
+    } catch (error) {
+      setConnectionStatus('error');
+      console.error('OAuth success handler error:', error);
+      sessionStorage.removeItem('garmin_code_verifier');
+    }
+  };
+
+  const saveConnectionData = async (tokenData: any) => {
     try {
       const connectionData = {
         provider: 'garmin',
-        access_token: 'demo-token',
-        refresh_token: 'demo-refresh',
-        expires_at: new Date(Date.now() + 3600000).toISOString(),
+        access_token: tokenData.access_token,
+        refresh_token: tokenData.refresh_token,
+        expires_at: new Date(Date.now() + (tokenData.expires_in * 1000)).toISOString(),
         last_sync: new Date().toISOString(),
         connection_data: {
-          user_id: 'garmin-user-123',
-          display_name: 'Garmin User'
+          token_type: tokenData.token_type,
+          scope: tokenData.scope
         }
       };
       
@@ -101,49 +180,62 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
     setSyncStatus('syncing');
     
     try {
-      // Simulate fetching workouts from Garmin
-      const mockWorkouts = [
-        {
-          name: 'Morning Run',
-          type: 'endurance',
-          date: new Date().toISOString(),
-          duration: 45,
-          distance: 8.5,
-          avg_heart_rate: 155,
-          max_heart_rate: 172,
-          calories: 420,
-          avg_pace: 330, // seconds per km
-          elevation_gain: 120
-        },
-        {
-          name: 'Bike Ride',
-          type: 'endurance', 
-          date: new Date(Date.now() - 86400000).toISOString(),
-          duration: 90,
-          distance: 35.2,
-          avg_heart_rate: 142,
-          max_heart_rate: 165,
-          avg_power: 185,
-          max_power: 245,
-          calories: 650,
-          elevation_gain: 450
+      // Get access token
+      const { data: connectionData } = await supabase
+        .from('user_connections')
+        .select('*')
+        .eq('provider', 'garmin')
+        .single();
+      
+      if (!connectionData) {
+        throw new Error('No Garmin connection found');
+      }
+      
+      // Check if token is expired
+      if (new Date() >= new Date(connectionData.expires_at)) {
+        // Refresh token logic would go here
+        throw new Error('Token expired');
+      }
+      
+      // Fetch activities from Garmin
+      const activitiesResponse = await fetch('https://connectapi.garmin.com/modern/proxy/activitylist-service/activities/search/activities', {
+        headers: {
+          'Authorization': `Bearer ${connectionData.access_token}`,
         }
-      ];
+      });
+      
+      if (!activitiesResponse.ok) {
+        throw new Error(`API call failed: ${activitiesResponse.status}`);
+      }
+      
+      const activitiesData = await activitiesResponse.json();
+      
+      // Process and save workouts
+      const workouts = activitiesData.map((activity: any) => ({
+        name: activity.activityName || 'Garmin Activity',
+        type: 'endurance',
+        date: activity.startTimeLocal,
+        duration: Math.round(activity.duration / 60), // Convert to minutes
+        distance: activity.distance ? activity.distance / 1000 : null, // Convert to km
+        avg_heart_rate: activity.averageHR,
+        max_heart_rate: activity.maxHR,
+        calories: activity.calories,
+        avg_pace: activity.averageSpeed ? (1000 / activity.averageSpeed) : null, // Convert to seconds per km
+        elevation_gain: activity.elevationGain,
+        source: 'garmin',
+        created_at: new Date().toISOString()
+      }));
       
       // Save to database
-      for (const workout of mockWorkouts) {
+      for (const workout of workouts) {
         await supabase
           .from('workouts')
-          .insert({
-            ...workout,
-            source: 'garmin',
-            created_at: new Date().toISOString()
-          });
+          .insert(workout);
       }
       
       setSyncStatus('success');
       setLastSync(new Date());
-      onWorkoutsImported?.(mockWorkouts);
+      onWorkoutsImported?.(workouts);
       
       setTimeout(() => setSyncStatus('idle'), 3000);
       

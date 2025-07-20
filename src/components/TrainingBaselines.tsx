@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Activity, Bike, Waves, Dumbbell } from 'lucide-react';
+import { ArrowLeft, Activity, Bike, Waves, Dumbbell, Watch } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import StravaPreview from '@/components/StravaPreview';
+import GarminPreview from '@/components/GarminPreview';
 
 interface TrainingBaselinesProps {
   onClose: () => void;
@@ -93,6 +94,11 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
   const [stravaMessage, setStravaMessage] = useState('');
   const [accessToken, setAccessToken] = useState<string | null>(null);
 
+  // NEW: Garmin connection state
+  const [garminConnected, setGarminConnected] = useState(false);
+  const [garminMessage, setGarminMessage] = useState('');
+  const [garminAccessToken, setGarminAccessToken] = useState<string | null>(null);
+
   // Load existing baselines on component mount
   useEffect(() => {
     loadBaselines();
@@ -104,6 +110,15 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
     if (existingToken) {
       setAccessToken(existingToken);
       setStravaConnected(true);
+    }
+  }, []);
+
+  // NEW: Check for existing Garmin token
+  useEffect(() => {
+    const existingToken = localStorage.getItem('garmin_access_token');
+    if (existingToken) {
+      setGarminAccessToken(existingToken);
+      setGarminConnected(true);
     }
   }, []);
 
@@ -120,6 +135,11 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
         setStravaMessage('Successfully connected to Strava!');
       } else if (event.data.type === 'STRAVA_AUTH_ERROR') {
         setStravaMessage(`Error: ${event.data.error}`);
+      } else if (event.data.type === 'GARMIN_AUTH_SUCCESS') {
+        const { code } = event.data;
+        handleGarminOAuthSuccess(code);
+      } else if (event.data.type === 'GARMIN_AUTH_ERROR') {
+        setGarminMessage(`Error: ${event.data.error}`);
       }
     };
 
@@ -222,6 +242,136 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
       setStravaMessage(`API test successful! Hello ${data.firstname} ${data.lastname}`);
     } catch (error) {
       setStravaMessage(`API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  // PKCE helper function
+  const generatePKCE = async () => {
+    const codeVerifier = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+    const codeChallenge = btoa(String.fromCharCode(...new Uint8Array(hashBuffer)))
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+    
+    return { codeVerifier, codeChallenge };
+  };
+
+  // Handle Garmin OAuth success
+  const handleGarminOAuthSuccess = async (code: string) => {
+    try {
+      const codeVerifier = sessionStorage.getItem('garmin_code_verifier');
+      if (!codeVerifier) {
+        throw new Error('Code verifier not found');
+      }
+
+      // Exchange code for access token using Supabase function
+      const tokenResponse = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/smart-api', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          code: code,
+          codeVerifier: codeVerifier,
+          redirectUri: 'https://efforts.work/auth/garmin/callback'
+        })
+      });
+
+      if (!tokenResponse.ok) {
+        throw new Error(`Token exchange failed: ${tokenResponse.status}`);
+      }
+
+      const tokenData = await tokenResponse.json();
+
+      setGarminAccessToken(tokenData.access_token);
+      setGarminConnected(true);
+      localStorage.setItem('garmin_access_token', tokenData.access_token);
+      setGarminMessage('Successfully connected to Garmin!');
+
+      // Clean up
+      sessionStorage.removeItem('garmin_code_verifier');
+
+    } catch (error) {
+      setGarminMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      sessionStorage.removeItem('garmin_code_verifier');
+    }
+  };
+
+  // NEW: Garmin connection functions - REAL OAUTH
+  const connectGarmin = async () => {
+    setGarminMessage('Connecting to Garmin...');
+    
+    try {
+      const { codeVerifier, codeChallenge } = await generatePKCE();
+      
+      // Store code verifier for later use
+      sessionStorage.setItem('garmin_code_verifier', codeVerifier);
+      
+      const authUrl = 'https://connect.garmin.com/oauth2Confirm';
+      const clientId = '17e358e3-9e6c-45ae-9267-91a06d126e4b';
+      const redirectUri = 'https://efforts.work/auth/garmin/callback';
+      
+      const params = new URLSearchParams({
+        response_type: 'code',
+        client_id: clientId,
+        code_challenge: codeChallenge,
+        code_challenge_method: 'S256',
+        redirect_uri: redirectUri,
+        state: Math.random().toString(36).substring(2, 15)
+      });
+      
+      const fullAuthUrl = `${authUrl}?${params.toString()}`;
+      
+      // Open popup for OAuth
+      const popup = window.open(fullAuthUrl, 'garmin-auth', 'width=600,height=600');
+      
+      // Check if popup was blocked
+      if (!popup) {
+        setGarminMessage('Popup was blocked. Please allow popups for this site and try again.');
+        sessionStorage.removeItem('garmin_code_verifier');
+        return;
+      }
+      
+    } catch (error) {
+      setGarminMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      sessionStorage.removeItem('garmin_code_verifier');
+    }
+  };
+
+  const disconnectGarmin = () => {
+    setGarminConnected(false);
+    setGarminAccessToken(null);
+    localStorage.removeItem('garmin_access_token');
+    setGarminMessage('Disconnected from Garmin');
+  };
+
+  const testGarminApi = async () => {
+    if (!garminAccessToken) return;
+
+    try {
+      setGarminMessage('Testing API call...');
+      
+      // Try the user permissions endpoint using Supabase function
+      const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/clever-task?path=/wellness-api/rest/user/permissions', {
+        headers: {
+          'Authorization': `Bearer ${garminAccessToken}`,
+          'Accept': 'application/json'
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`API call failed: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setGarminMessage(`API test successful! Connected to Garmin - Permissions: ${JSON.stringify(data)}`);
+    } catch (error) {
+      setGarminMessage(`API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -1101,14 +1251,59 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
                       />
                     )}
 
-                    {/* Future integrations placeholder */}
+                    {/* Garmin Connection */}
                     <div className="space-y-4">
-                      <div className="flex items-center gap-3 opacity-50">
-                        <div className="h-5 w-5 bg-gray-300 rounded"></div>
-                        <h4 className="font-medium text-gray-500">Garmin Integration</h4>
+                      <div className="flex items-center gap-3">
+                        <Watch className="h-5 w-5 text-blue-500" />
+                        <h4 className="font-medium">Garmin Integration</h4>
                       </div>
-                      <p className="text-sm text-gray-400">Coming soon...</p>
+
+                      {!garminConnected ? (
+                        <button
+                          onClick={connectGarmin}
+                          className="w-full px-4 py-3 text-white bg-blue-500 hover:bg-blue-600 transition-colors font-medium rounded-md"
+                        >
+                          Connect with Garmin
+                        </button>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="p-3 bg-green-50 rounded-md">
+                            <p className="text-sm text-green-800">✓ Connected to Garmin</p>
+                          </div>
+                          <div className="flex gap-3">
+                            <button
+                              onClick={testGarminApi}
+                              className="flex-1 px-4 py-2 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+                            >
+                              Test API Call
+                            </button>
+                            <button
+                              onClick={disconnectGarmin}
+                              className="px-4 py-2 text-red-600 hover:text-red-700 transition-colors text-sm"
+                            >
+                              Disconnect
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {garminMessage && (
+                        <div className="p-3 bg-gray-50 rounded-md">
+                          <p className="text-sm text-gray-700">{garminMessage}</p>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Garmin Preview Component */}
+                    {garminConnected && garminAccessToken && (
+                      <GarminPreview 
+                        accessToken={garminAccessToken}
+                        currentBaselines={data}
+                        onDataSelected={(selectedData) => {
+                          setData(prev => ({ ...prev, ...selectedData }));
+                        }}
+                      />
+                    )}
                   </div>
                 )}
 
