@@ -269,6 +269,8 @@ const handleGarminOAuthSuccess = async (code: string) => {
       throw new Error('Code verifier not found');
     }
 
+    console.log('🔍 GARMIN DEBUG: Starting token exchange...');
+
     // Exchange code for access token using Supabase function
     const tokenResponse = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/bright-service', {
       method: 'POST',
@@ -284,20 +286,27 @@ const handleGarminOAuthSuccess = async (code: string) => {
     });
 
     if (!tokenResponse.ok) {
+      const errorText = await tokenResponse.text();
+      console.error('🔍 GARMIN DEBUG: Token exchange failed:', errorText);
       throw new Error(`Token exchange failed: ${tokenResponse.status}`);
     }
 
     const tokenData = await tokenResponse.json();
+    console.log('🔍 GARMIN DEBUG: Token exchange successful, token starts with:', tokenData.access_token?.substring(0, 20) + '...');
 
+    // CRITICAL: Set both state and localStorage with the new token
     setGarminAccessToken(tokenData.access_token);
     setGarminConnected(true);
     localStorage.setItem('garmin_access_token', tokenData.access_token);
     setGarminMessage('Successfully connected to Garmin!');
 
+    console.log('🔍 GARMIN DEBUG: Token stored in state and localStorage');
+
     // Clean up
     sessionStorage.removeItem('garmin_code_verifier');
 
   } catch (error) {
+    console.error('🔍 GARMIN DEBUG: OAuth error:', error);
     setGarminMessage(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     sessionStorage.removeItem('garmin_code_verifier');
   }
@@ -352,10 +361,15 @@ const disconnectGarmin = () => {
 };
 
 const testGarminApi = async () => {
-  if (!garminAccessToken) return;
+  if (!garminAccessToken) {
+    setGarminMessage('No access token available');
+    return;
+  }
 
   try {
     setGarminMessage('Testing API call...');
+    
+    console.log('🔍 GARMIN DEBUG: Using access token:', garminAccessToken.substring(0, 20) + '...');
     
     // Try the user permissions endpoint using Supabase function
     const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/clever-task?path=/wellness-api/rest/user/permissions', {
@@ -365,13 +379,19 @@ const testGarminApi = async () => {
       },
     });
 
+    console.log('🔍 GARMIN DEBUG: API response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`API call failed: ${response.status}`);
+      const errorText = await response.text();
+      console.error('🔍 GARMIN DEBUG: API error response:', errorText);
+      throw new Error(`API call failed: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     setGarminMessage(`API test successful! Connected to Garmin - Permissions: ${JSON.stringify(data)}`);
+    console.log('🔍 GARMIN DEBUG: API success:', data);
   } catch (error) {
+    console.error('🔍 GARMIN DEBUG: API test error:', error);
     setGarminMessage(`API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };
