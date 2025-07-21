@@ -270,7 +270,7 @@ export default function TrainingBaselines({ onClose }: TrainingBaselinesProps) {
      }
 
      // Exchange code for access token using Supabase function
-     const tokenResponse = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/rapid-function', {
+     const tokenResponse = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/bright-service', {
        method: 'POST',
        headers: {
          'Content-Type': 'application/json',
