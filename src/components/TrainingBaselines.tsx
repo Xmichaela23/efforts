@@ -314,6 +314,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
 
 // NEW: Garmin connection functions - REAL OAUTH
 const connectGarmin = async () => {
+  localStorage.removeItem('garmin_access_token'); // THE 1-LINE FIX - CLEAR OLD TOKEN FIRST
   setGarminMessage('Connecting to Garmin...');
   
   try {
