@@ -1,7 +1,7 @@
 // src/services/GarminDataService.ts
 // Updated to use Supabase Edge Functions instead of local proxy
 
-const SUPABASE_FUNCTION_BASE = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/clever-task';
+const SUPABASE_FUNCTION_BASE = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task';
 
 export interface GarminActivity {
   activityId: number;
