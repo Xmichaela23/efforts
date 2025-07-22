@@ -373,7 +373,7 @@ const testGarminApi = async () => {
     console.log('🔍 GARMIN DEBUG: Using access token:', garminAccessToken.substring(0, 20) + '...');
     
     // Try the user permissions endpoint using Supabase function
-    const response = await fetch(`https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/clever-task?path=/wellness-api/rest/user/permissions&token=${garminAccessToken}`);
+    const response = await fetch(`https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/user/permissions&token=${garminAccessToken}`);
 
     console.log('🔍 GARMIN DEBUG: API response status:', response.status);
 
