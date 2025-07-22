@@ -82,12 +82,7 @@ export class GarminDataService {
     try {
       console.log('🔍 GARMIN DEBUG: Testing connection with user permissions endpoint');
       
-      const response = await fetch(`${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/user/permissions`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Accept': 'application/json'
-        }
-      });
+      const response = await fetch(`${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/user/permissions&token=${this.accessToken}`);
 
       console.log('🔍 GARMIN DEBUG: Permissions response status:', response.status);
       
@@ -128,16 +123,11 @@ export class GarminDataService {
       console.log('Days difference:', (endTime - startTime) / (24 * 60 * 60));
 
       // Use the Supabase function to proxy to Garmin wellness API
-      const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}`;
+      const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}&token=${this.accessToken}`;
       
       console.log('🔍 GARMIN DEBUG: Fetching from URL:', activitiesUrl);
 
-      const response = await fetch(activitiesUrl, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Accept': 'application/json'
-        }
-      });
+      const response = await fetch(activitiesUrl);
 
       console.log('🔍 GARMIN DEBUG: Activities response status:', response.status);
 
@@ -232,12 +222,7 @@ export class GarminDataService {
     }
 
     try {
-      const response = await fetch(`${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activityDetails/${activityId}`, {
-        headers: {
-          'Authorization': `Bearer ${this.accessToken}`,
-          'Accept': 'application/json'
-        }
-      });
+      const response = await fetch(`${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activityDetails/${activityId}&token=${this.accessToken}`);
 
       if (!response.ok) {
         throw new Error(`Garmin API error: ${response.status}`);
