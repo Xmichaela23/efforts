@@ -105,117 +105,71 @@ static async testConnection(): Promise<boolean> {
   }
 }
 
-// UPDATED: Now uses chunking to get 90 days of data
+// UPDATED: Now queries Supabase database for webhook-delivered activities
 static async fetchRecentActivities(): Promise<GarminActivity[]> {
-  if (!this.accessToken) {
-    throw new Error('Not authenticated with Garmin. Please connect first.');
-  }
-
   try {
-    // First test connection
-    await this.testConnection();
+    console.log('🔍 GARMIN DEBUG: Querying database for webhook activities');
 
-    // Calculate timestamp range (last 90 days)
-    const now = new Date();
-    const startDate = new Date(now.getTime() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000));
+    // Import Supabase client (you'll need to add this import at the top of your file)
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      'https://yyriamwvtvzlkumqrvpm.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+    );
 
-    console.log('🔍 GARMIN DEBUG: Starting chunked fetch for 90 days');
-    console.log('Start date:', startDate.toISOString());
-    console.log('End date:', now.toISOString());
+    // Query Supabase database for activities that came via webhooks
+    const { data, error } = await supabase
+      .from('garmin_activities')
+      .select('*')
+      .order('start_time_in_seconds', { ascending: false })
+      .limit(200);
 
-    const allActivities: any[] = [];
-
-    // Chunk into daily requests (90 separate API calls)
-    for (let day = 0; day < this.DAYS_TO_FETCH; day++) {
-      const dayStart = new Date(startDate.getTime() + (day * 24 * 60 * 60 * 1000));
-      const dayEnd = new Date(dayStart.getTime() + (24 * 60 * 60 * 1000) - 1000); // End of day
-
-      const startTime = Math.floor(dayStart.getTime() / 1000);
-      const endTime = Math.floor(dayEnd.getTime() / 1000);
-
-      console.log(`🔍 GARMIN DEBUG: Fetching day ${day + 1}/${this.DAYS_TO_FETCH}: ${dayStart.toISOString().split('T')[0]}`);
-
-      // Use the Supabase function to proxy to Garmin Activity API
-      const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}&token=${this.accessToken}`;
-
-      const response = await fetch(activitiesUrl, {
-        headers: {
-          'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
-        }
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`🔍 GARMIN DEBUG: Day ${day + 1} error:`, errorText);
-        // Continue with other days instead of failing completely
-        continue;
-      }
-
-      const dayActivities = await response.json();
-      if (dayActivities && Array.isArray(dayActivities)) {
-        if (dayActivities.length > 0) console.log('🔍 RAW ACTIVITY SAMPLE:', JSON.stringify(dayActivities[0], null, 2));
-        allActivities.push(...dayActivities);
-        console.log(`🔍 GARMIN DEBUG: Day ${day + 1} found ${dayActivities.length} activities`);
-      }
-
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 100));
+    if (error) {
+      console.error('🔍 GARMIN DEBUG: Database error:', error);
+      throw new Error(`Database query failed: ${error.message}`);
     }
 
-    console.log('🔍 GARMIN DEBUG: Total activities found across all days:', allActivities.length);
+    console.log('🔍 GARMIN DEBUG: Found activities in database:', data?.length || 0);
 
-    // Handle case where no activities are returned
-    if (!allActivities || !Array.isArray(allActivities)) {
-      console.log('🔍 GARMIN DEBUG: No activities array returned, returning empty array');
+    if (!data || data.length === 0) {
+      console.log('🔍 GARMIN DEBUG: No activities found in database');
       return [];
     }
 
-    // Filter to last 90 days (additional client-side filtering)
-    const endDate = new Date();
-    const startDateFilter = new Date(Date.now() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000));
-
-    const recentActivities = allActivities.filter((activity: any) => {
-      if (!activity.startTimeLocal) return false;
-      const activityDate = new Date(activity.startTimeLocal);
-      return activityDate >= startDateFilter && activityDate <= endDate;
-    });
-
-    console.log('🔍 GARMIN DEBUG: Activities after date filtering:', recentActivities.length);
-
-    // Convert to our interface format
-    const formattedActivities: GarminActivity[] = recentActivities.map((activity: any) => ({
-      activityId: activity.activityId || activity.id || 0,
-      activityName: activity.activityName || activity.name || 'Unknown Activity',
+    // Convert database records to our interface format
+    const formattedActivities: GarminActivity[] = data.map((activity: any) => ({
+      activityId: activity.activity_id || 0,
+      activityName: activity.activity_name || 'Unknown Activity',
       activityType: {
-        typeId: activity.activityType?.typeId || 0,
-        typeKey: activity.activityType?.typeKey || activity.type || 'unknown',
-        parentTypeId: activity.activityType?.parentTypeId
+        typeId: activity.activity_type_id || 0,
+        typeKey: activity.activity_type || 'unknown',
+        parentTypeId: activity.parent_type_id
       },
       eventType: {
-        typeId: activity.eventType?.typeId || 0,
-        typeKey: activity.eventType?.typeKey || 'unknown'
+        typeId: activity.event_type_id || 0,
+        typeKey: activity.event_type || 'unknown'
       },
-      startTimeLocal: activity.startTimeLocal || activity.startTime || '',
-      startTimeGMT: activity.startTimeGMT || activity.startTime || '',
-      distance: activity.distance || 0,
-      duration: activity.duration || activity.movingTime || 0,
-      movingDuration: activity.movingDuration || activity.movingTime || activity.duration || 0,
-      elapsedDuration: activity.elapsedDuration || activity.elapsedTime || activity.duration || 0,
-      elevationGain: activity.elevationGain || activity.totalElevationGain || 0,
-      elevationLoss: activity.elevationLoss || 0,
-      averageSpeed: activity.averageSpeed || activity.avgSpeed || 0,
-      maxSpeed: activity.maxSpeed || 0,
-      averageHR: activity.averageHR || activity.avgHeartRate,
-      maxHR: activity.maxHR || activity.maxHeartRate,
-      averagePower: activity.averagePower || activity.avgPower,
-      maxPower: activity.maxPower,
-      normalizedPower: activity.normalizedPower,
-      calories: activity.calories || 0,
-      averageRunningCadence: activity.averageRunningCadence || activity.avgRunCadence,
-      maxRunningCadence: activity.maxRunningCadence || activity.maxRunCadence,
+      startTimeLocal: activity.start_time_local || '',
+      startTimeGMT: activity.start_time_gmt || '',
+      distance: activity.distance_in_meters || 0,
+      duration: activity.duration_in_seconds || 0,
+      movingDuration: activity.moving_duration_in_seconds || activity.duration_in_seconds || 0,
+      elapsedDuration: activity.elapsed_duration_in_seconds || activity.duration_in_seconds || 0,
+      elevationGain: activity.elevation_gain_in_meters || 0,
+      elevationLoss: activity.elevation_loss_in_meters || 0,
+      averageSpeed: activity.average_speed_in_meters_per_second || 0,
+      maxSpeed: activity.max_speed_in_meters_per_second || 0,
+      averageHR: activity.average_heart_rate,
+      maxHR: activity.max_heart_rate,
+      averagePower: activity.average_power,
+      maxPower: activity.max_power,
+      normalizedPower: activity.normalized_power,
+      calories: activity.active_kilocalories || 0,
+      averageRunningCadence: activity.average_running_cadence,
+      maxRunningCadence: activity.max_running_cadence,
       strokes: activity.strokes,
-      poolLength: activity.poolLength,
-      unitOfPoolLength: activity.unitOfPoolLength
+      poolLength: activity.pool_length,
+      unitOfPoolLength: activity.unit_of_pool_length
     }));
 
     const runningActivities = formattedActivities.filter(a =>
@@ -223,7 +177,7 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
     );
     
     console.log('🏃 GARMIN DEBUG: Running activities found:', runningActivities.length);
-    console.log('🏃 GARMIN DEBUG: Running activities sample:', runningActivities.slice(0, 3).map(a => ({
+    console.log('🏃 GARMIN DEBUG: Activities sample:', formattedActivities.slice(0, 3).map(a => ({
       name: a.activityName,
       distance: a.distance,
       duration: a.duration,
@@ -232,7 +186,7 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
 
     return formattedActivities;
   } catch (error) {
-    console.error('Error fetching Garmin activities:', error);
+    console.error('Error fetching Garmin activities from database:', error);
     throw error;
   }
 }
@@ -262,15 +216,11 @@ static async fetchActivityDetails(activityId: number): Promise<any> {
   }
 }
 
-// UPDATED: Now accepts access token and fetches activities automatically
+// UPDATED: No longer needs access token since we're querying database
 static async analyzeActivitiesForBaselines(
-  accessToken: string,
   currentBaselines: any
 ): Promise<AnalyzedGarminData> {
-  // Set the access token
-  this.accessToken = accessToken;
-
-  // Fetch activities using the new API method
+  // Fetch activities from database (no token needed)
   const activities = await this.fetchRecentActivities();
   const detectedMetrics: DetectedMetric[] = [];
   const sportsWithData: string[] = [];
