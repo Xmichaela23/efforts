@@ -136,7 +136,7 @@ export class GarminDataService {
        console.log(`🔍 GARMIN DEBUG: Fetching day ${day + 1}/${this.DAYS_TO_FETCH}: ${dayStart.toISOString().split('T')[0]}`);
 
        // Use the Supabase function to proxy to Garmin wellness API
-       const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}&token=${this.accessToken}`;
+       const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/dailies&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}&token=${this.accessToken}`;
 
        const response = await fetch(activitiesUrl, {
          headers: {
