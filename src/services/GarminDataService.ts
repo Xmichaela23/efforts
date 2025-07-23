@@ -121,7 +121,7 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
     const { data, error } = await supabase
       .from('garmin_activities')
       .select('*')
-      .order('start_time_in_seconds', { ascending: false })
+      .order('start_time', { ascending: false })
       .limit(200);
 
     if (error) {
@@ -138,38 +138,38 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
 
     // Convert database records to our interface format
     const formattedActivities: GarminActivity[] = data.map((activity: any) => ({
-      activityId: activity.activity_id || 0,
-      activityName: activity.activity_name || 'Unknown Activity',
+      activityId: activity.garmin_activity_id || 0,
+      activityName: activity.activity_type || 'Unknown Activity',
       activityType: {
-        typeId: activity.activity_type_id || 0,
+        typeId: 0,
         typeKey: activity.activity_type || 'unknown',
-        parentTypeId: activity.parent_type_id
+        parentTypeId: 0
       },
       eventType: {
-        typeId: activity.event_type_id || 0,
-        typeKey: activity.event_type || 'unknown'
+        typeId: 0,
+        typeKey: 'unknown'
       },
-      startTimeLocal: activity.start_time_local || '',
-      startTimeGMT: activity.start_time_gmt || '',
-      distance: activity.distance_in_meters || 0,
-      duration: activity.duration_in_seconds || 0,
-      movingDuration: activity.moving_duration_in_seconds || activity.duration_in_seconds || 0,
-      elapsedDuration: activity.elapsed_duration_in_seconds || activity.duration_in_seconds || 0,
-      elevationGain: activity.elevation_gain_in_meters || 0,
-      elevationLoss: activity.elevation_loss_in_meters || 0,
-      averageSpeed: activity.average_speed_in_meters_per_second || 0,
-      maxSpeed: activity.max_speed_in_meters_per_second || 0,
-      averageHR: activity.average_heart_rate,
+      startTimeLocal: activity.start_time || '',
+      startTimeGMT: activity.start_time || '',
+      distance: activity.distance_meters || 0,
+      duration: activity.duration_seconds || 0,
+      movingDuration: activity.duration_seconds || 0,
+      elapsedDuration: activity.duration_seconds || 0,
+      elevationGain: activity.elevation_gain_meters || 0,
+      elevationLoss: activity.elevation_loss_meters || 0,
+      averageSpeed: activity.avg_speed_mps || 0,
+      maxSpeed: 0,
+      averageHR: activity.avg_heart_rate,
       maxHR: activity.max_heart_rate,
-      averagePower: activity.average_power,
+      averagePower: activity.avg_power,
       maxPower: activity.max_power,
-      normalizedPower: activity.normalized_power,
-      calories: activity.active_kilocalories || 0,
-      averageRunningCadence: activity.average_running_cadence,
-      maxRunningCadence: activity.max_running_cadence,
-      strokes: activity.strokes,
-      poolLength: activity.pool_length,
-      unitOfPoolLength: activity.unit_of_pool_length
+      normalizedPower: 0,
+      calories: activity.calories || 0,
+      averageRunningCadence: 0,
+      maxRunningCadence: 0,
+      strokes: 0,
+      poolLength: 0,
+      unitOfPoolLength: undefined
     }));
 
     const runningActivities = formattedActivities.filter(a =>
