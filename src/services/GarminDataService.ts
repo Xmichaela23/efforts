@@ -64,7 +64,7 @@ export interface AnalyzedGarminData {
 }
 
 export class GarminDataService {
- private static readonly DAYS_TO_FETCH = 7;
+ private static readonly DAYS_TO_FETCH = 90;
  private static accessToken: string | null = null;
 
  // NEW: Set access token from OAuth flow
@@ -105,7 +105,7 @@ export class GarminDataService {
    }
  }
 
- // UPDATED: Now uses Supabase function instead of direct API calls
+ // UPDATED: Now uses chunking to get 90 days of data
  static async fetchRecentActivities(): Promise<GarminActivity[]> {
    if (!this.accessToken) {
      throw new Error('Not authenticated with Garmin. Please connect first.');
@@ -117,53 +117,66 @@ export class GarminDataService {
 
      // Calculate timestamp range (last 90 days)
      const now = new Date();
-     const endTime = Math.floor(now.getTime() / 1000);
-     const startTime = Math.floor((now.getTime() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000)) / 1000);
+     const startDate = new Date(now.getTime() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000));
 
-     console.log('🔍 GARMIN DEBUG: Timestamp calculation');
-     console.log('Current time:', now.toISOString());
-     console.log('End timestamp:', endTime);
-     console.log('Start timestamp:', startTime);
-     console.log('Days difference:', (endTime - startTime) / (24 * 60 * 60));
+     console.log('🔍 GARMIN DEBUG: Starting chunked fetch for 90 days');
+     console.log('Start date:', startDate.toISOString());
+     console.log('End date:', now.toISOString());
 
-     // Use the Supabase function to proxy to Garmin wellness API
-     const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}&token=${this.accessToken}`;
-     
-     console.log('🔍 GARMIN DEBUG: Fetching from URL:', activitiesUrl);
+     const allActivities: any[] = [];
 
-     const response = await fetch(activitiesUrl, {
-       headers: {
-         'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+     // Chunk into daily requests (90 separate API calls)
+     for (let day = 0; day < this.DAYS_TO_FETCH; day++) {
+       const dayStart = new Date(startDate.getTime() + (day * 24 * 60 * 60 * 1000));
+       const dayEnd = new Date(dayStart.getTime() + (24 * 60 * 60 * 1000) - 1000); // End of day
+
+       const startTime = Math.floor(dayStart.getTime() / 1000);
+       const endTime = Math.floor(dayEnd.getTime() / 1000);
+
+       console.log(`🔍 GARMIN DEBUG: Fetching day ${day + 1}/${this.DAYS_TO_FETCH}: ${dayStart.toISOString().split('T')[0]}`);
+
+       // Use the Supabase function to proxy to Garmin wellness API
+       const activitiesUrl = `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startTime}&uploadEndTimeInSeconds=${endTime}&token=${this.accessToken}`;
+
+       const response = await fetch(activitiesUrl, {
+         headers: {
+           'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+         }
+       });
+
+       if (!response.ok) {
+         const errorText = await response.text();
+         console.error(`🔍 GARMIN DEBUG: Day ${day + 1} error:`, errorText);
+         // Continue with other days instead of failing completely
+         continue;
        }
-     });
 
-     console.log('🔍 GARMIN DEBUG: Activities response status:', response.status);
+       const dayActivities = await response.json();
+       if (dayActivities && Array.isArray(dayActivities)) {
+         allActivities.push(...dayActivities);
+         console.log(`🔍 GARMIN DEBUG: Day ${day + 1} found ${dayActivities.length} activities`);
+       }
 
-     if (!response.ok) {
-       const errorText = await response.text();
-       console.error('🔍 GARMIN DEBUG: Activities error response:', errorText);
-       throw new Error(`Garmin API error: ${response.status} ${response.statusText} - ${errorText}`);
+       // Small delay to avoid rate limiting
+       await new Promise(resolve => setTimeout(resolve, 100));
      }
 
-     const activities = await response.json();
-     console.log('🔍 GARMIN DEBUG: Total activities found:', activities ? activities.length : 0);
-     console.log('🔍 GARMIN DEBUG: Activities response type:', typeof activities);
-     console.log('🔍 GARMIN DEBUG: First few activities:', activities ? activities.slice(0, 2) : 'No activities');
+     console.log('🔍 GARMIN DEBUG: Total activities found across all days:', allActivities.length);
 
      // Handle case where no activities are returned
-     if (!activities || !Array.isArray(activities)) {
+     if (!allActivities || !Array.isArray(allActivities)) {
        console.log('🔍 GARMIN DEBUG: No activities array returned, returning empty array');
        return [];
      }
 
      // Filter to last 90 days (additional client-side filtering)
      const endDate = new Date();
-     const startDate = new Date(Date.now() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000));
+     const startDateFilter = new Date(Date.now() - (this.DAYS_TO_FETCH * 24 * 60 * 60 * 1000));
 
-     const recentActivities = activities.filter((activity: any) => {
+     const recentActivities = allActivities.filter((activity: any) => {
        if (!activity.startTimeLocal) return false;
        const activityDate = new Date(activity.startTimeLocal);
-       return activityDate >= startDate && activityDate <= endDate;
+       return activityDate >= startDateFilter && activityDate <= endDate;
      });
 
      console.log('🔍 GARMIN DEBUG: Activities after date filtering:', recentActivities.length);
