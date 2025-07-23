@@ -334,26 +334,16 @@ export class GarminDataService {
  }
 
  private static isRunningActivity(typeKey: string): boolean {
-   const runningTypes = [
-     'running', 'track_running', 'treadmill_running', 'trail_running',
-     'ultra_running', 'indoor_running', 'outdoor_running', 'run'
-   ];
-   return runningTypes.some(type => typeKey.includes(type));
+   return typeKey.toLowerCase().includes('run');
  }
 
  private static isCyclingActivity(typeKey: string): boolean {
-   const cyclingTypes = [
-     'cycling', 'road_biking', 'mountain_biking', 'indoor_cycling',
-     'cyclocross', 'recumbent', 'bike', 'virtual_ride', 'ride'
-   ];
-   return cyclingTypes.some(type => typeKey.includes(type));
+   const cycling = typeKey.toLowerCase();
+   return cycling.includes('cycl') || cycling.includes('bik') || cycling.includes('ride');
  }
 
  private static isSwimmingActivity(typeKey: string): boolean {
-   const swimmingTypes = [
-     'swimming', 'pool_swimming', 'open_water_swimming', 'lap_swimming', 'swim'
-   ];
-   return swimmingTypes.some(type => typeKey.includes(type));
+   return typeKey.toLowerCase().includes('swim');
  }
 
  private static async analyzeRunningData(
