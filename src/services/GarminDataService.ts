@@ -125,7 +125,7 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
 
     const allActivities: any[] = [];
 
-    // Chunk into daily requests (90 separate API calls) - BACK TO ORIGINAL FOR DEBUGGING
+    // Chunk into daily requests (90 separate API calls)
     for (let day = 0; day < this.DAYS_TO_FETCH; day++) {
       const dayStart = new Date(startDate.getTime() + (day * 24 * 60 * 60 * 1000));
       const dayEnd = new Date(dayStart.getTime() + (24 * 60 * 60 * 1000) - 1000); // End of day
