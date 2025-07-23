@@ -125,10 +125,10 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
 
     const allActivities: any[] = [];
 
-    // Chunk into 2-day requests (45 separate API calls)
-    for (let day = 0; day < this.DAYS_TO_FETCH; day += 2) {
-      const dayStart = new Date(startDate.getTime() + (day * 24 * 60 * 60 * 1000));
-      const dayEnd = new Date(dayStart.getTime() + (2 * 24 * 60 * 60 * 1000) - 1000); // 2-day window (just under 48 hours)
+    // Chunk into overlapping 20-hour windows to catch sync timing issues (stays under 24hr limit)
+    for (let day = 0; day < this.DAYS_TO_FETCH; day += 1) {
+      const dayStart = new Date(startDate.getTime() + (day * 18 * 60 * 60 * 1000)); // Every 18 hours
+      const dayEnd = new Date(dayStart.getTime() + (18 * 60 * 60 * 1000)); // 18-hour window (64800 seconds < 86400 limit)
 
       const startTime = Math.floor(dayStart.getTime() / 1000);
       const endTime = Math.floor(dayEnd.getTime() / 1000);
