@@ -588,5 +588,6 @@ private static classifyCyclingPerformanceBySpeed(speedMph: number): string {
   if (speedMph > 22) return 'Average 22+ mph on flats (competitive cyclist)';
   if (speedMph > 19) return 'Average 19-21 mph on flats (trained cyclist)';
   if (speedMph > 16) return 'Average 16-18 mph on flats (fitness rider)';
-  return 'Average 12-15 hours on flats (recreational)';
+  return 'Average 12-15 mph on flats (recreational)';
+}
 }
