@@ -82,9 +82,19 @@ static async testConnection(): Promise<boolean> {
   try {
     console.log('🔍 GARMIN DEBUG: Testing connection with user permissions endpoint');
     
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      'https://yyriamwvtvzlkumqrvpm.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+    );
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('User must be logged in');
+    }
+    
     const response = await fetch(`${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/user/permissions&token=${this.accessToken}`, {
       headers: {
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+        'Authorization': `Bearer ${session.access_token}`
       }
     });
 
@@ -206,9 +216,19 @@ static async fetchActivityDetails(activityId: number): Promise<any> {
   }
 
   try {
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      'https://yyriamwvtvzlkumqrvpm.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+    );
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('User must be logged in');
+    }
+
     const response = await fetch(`${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activityDetails/${activityId}&token=${this.accessToken}`, {
       headers: {
-        'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+        'Authorization': `Bearer ${session.access_token}`
       }
     });
 
