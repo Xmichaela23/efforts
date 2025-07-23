@@ -125,10 +125,10 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
 
     const allActivities: any[] = [];
 
-    // Chunk into overlapping 20-hour windows to catch sync timing issues (stays under 24hr limit)
-    for (let day = 0; day < this.DAYS_TO_FETCH; day += 1) {
-      const dayStart = new Date(startDate.getTime() + (day * 18 * 60 * 60 * 1000)); // Every 18 hours
-      const dayEnd = new Date(dayStart.getTime() + (18 * 60 * 60 * 1000)); // 18-hour window (64800 seconds < 86400 limit)
+    // Chunk into daily requests (90 separate API calls) - BACK TO ORIGINAL FOR DEBUGGING
+    for (let day = 0; day < this.DAYS_TO_FETCH; day++) {
+      const dayStart = new Date(startDate.getTime() + (day * 24 * 60 * 60 * 1000));
+      const dayEnd = new Date(dayStart.getTime() + (24 * 60 * 60 * 1000) - 1000); // End of day
 
       const startTime = Math.floor(dayStart.getTime() / 1000);
       const endTime = Math.floor(dayEnd.getTime() / 1000);
@@ -159,7 +159,7 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
       }
 
       // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
     console.log('🔍 GARMIN DEBUG: Total activities found across all days:', allActivities.length);
