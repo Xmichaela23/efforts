@@ -64,7 +64,7 @@ export interface AnalyzedGarminData {
 }
 
 export class GarminDataService {
- private static readonly DAYS_TO_FETCH = 1;
+ private static readonly DAYS_TO_FETCH = 7;
  private static accessToken: string | null = null;
 
  // NEW: Set access token from OAuth flow
