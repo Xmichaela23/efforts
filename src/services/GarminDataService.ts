@@ -117,10 +117,18 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
       'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
     );
 
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      console.log('🔍 GARMIN DEBUG: No authenticated user');
+      return [];
+    }
+
     // Query Supabase database for activities that came via webhooks
     const { data, error } = await supabase
       .from('garmin_activities')
       .select('*')
+      .eq('user_id', user.id)
       .order('start_time', { ascending: false })
       .limit(200);
 
@@ -580,6 +588,5 @@ private static classifyCyclingPerformanceBySpeed(speedMph: number): string {
   if (speedMph > 22) return 'Average 22+ mph on flats (competitive cyclist)';
   if (speedMph > 19) return 'Average 19-21 mph on flats (trained cyclist)';
   if (speedMph > 16) return 'Average 16-18 mph on flats (fitness rider)';
-  return 'Average 12-15 mph on flats (recreational)';
-}
+  return 'Average 12-15 hours on flats (recreational)';
 }
