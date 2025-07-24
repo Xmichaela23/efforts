@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Bike, Waves, ChevronDown, ChevronUp, TrendingUp } from 'lucide-react';
+import { Activity, Bike, Waves, ChevronDown, ChevronUp, TrendingUp, Download } from 'lucide-react';
 import { GarminDataService, type AnalyzedGarminData, type DetectedMetric } from '@/services/GarminDataService';
 
 interface GarminPreviewProps {
@@ -20,6 +20,10 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
   const [expandedSports, setExpandedSports] = useState<Set<string>>(new Set(['running']));
   const [hasStarted, setHasStarted] = useState(false);
 
+  // Backfill state
+  const [backfillStatus, setBackfillStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
+  const [backfillError, setBackfillError] = useState('');
+
   const fetchAndAnalyzeData = async () => {
     setLoading(true);
     setError('');
@@ -35,6 +39,43 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       setError(err instanceof Error ? err.message : 'Failed to fetch Garmin data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Backfill function
+  const requestHistoricalData = async () => {
+    setBackfillStatus('requesting');
+    setBackfillError('');
+
+    try {
+      // Calculate 6 months ago (max useful range)
+      const endDate = Math.floor(Date.now() / 1000);
+      const startDate = endDate - (180 * 24 * 60 * 60); // 6 months in seconds
+
+      // Call backfill API via swift-task proxy
+      const response = await fetch(
+        `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=${startDate}&summaryEndTimeInSeconds=${endDate}&token=${accessToken}`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (response.ok) {
+        setBackfillStatus('success');
+        // Auto-redirect after success message
+        setTimeout(() => {
+          // Navigate to main dashboard (user will see populated Completed dropdown)
+          window.location.href = '/';
+        }, 2000);
+      } else {
+        throw new Error(`Backfill request failed: ${response.status}`);
+      }
+    } catch (err) {
+      setBackfillError(err instanceof Error ? err.message : 'Failed to request historical data');
+      setBackfillStatus('error');
     }
   };
 
@@ -158,6 +199,54 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
             <TrendingUp className="h-4 w-4 inline mr-2" />
             Fetch Training Data
           </button>
+        </div>
+
+        {/* Backfill section */}
+        <div className="border-t border-gray-200 pt-4">
+          <div className="text-center">
+            <h4 className="font-medium mb-2">Import Workout History</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Get 6 months of your completed workouts from Garmin
+            </p>
+            
+            {backfillStatus === 'idle' && (
+              <button
+                onClick={requestHistoricalData}
+                className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+              >
+                <Download className="h-4 w-4 inline mr-2" />
+                Get My Historical Data
+              </button>
+            )}
+
+            {backfillStatus === 'requesting' && (
+              <div className="text-center">
+                <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mb-3"></div>
+                <p className="text-sm text-gray-600">Requesting your workout history...</p>
+              </div>
+            )}
+
+            {backfillStatus === 'success' && (
+              <div className="text-center">
+                <p className="text-sm text-green-600 mb-2">✅ Success! Your workout history is loading...</p>
+                <p className="text-xs text-gray-500">Taking you to see your workouts...</p>
+              </div>
+            )}
+
+            {backfillStatus === 'error' && (
+              <div className="space-y-3">
+                <div className="p-4 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{backfillError}</p>
+                </div>
+                <button
+                  onClick={requestHistoricalData}
+                  className="px-4 py-2 text-black hover:text-blue-600 transition-colors text-sm"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     );
