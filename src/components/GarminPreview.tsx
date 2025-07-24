@@ -34,10 +34,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setHasStarted(true);
 
     try {
-      // First do 90-day backfill to populate data for analysis
-      await requestTrainingData();
-      
-      // Then analyze the data
+      // Just analyze existing data - no backfill needed
       const analyzed = await GarminDataService.analyzeActivitiesForBaselines(
         accessToken,
         currentBaselines
@@ -50,42 +47,49 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     }
   };
 
-  // 90-day backfill for training analysis
+  // Separate 90-day backfill function  
   const requestTrainingData = async () => {
-    // Get user session token for Supabase authentication
-    const { createClient } = await import('@supabase/supabase-js');
-    const supabase = createClient(
-      'https://yyriamwvtvzlkumqrvpm.supabase.co',
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
-    );
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('User must be logged in');
-    }
+    setBackfillStatus('requesting');
+    setBackfillError('');
 
-    // Calculate 90 days ago (for training analysis)
-    const endDate = Math.floor(Date.now() / 1000);
-    const startDate = endDate - (90 * 24 * 60 * 60); // 90 days in seconds
-
-    // Call backfill API via swift-task proxy
-    const response = await fetch(
-      `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=${startDate}&summaryEndTimeInSeconds=${endDate}&token=${accessToken}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        }
+    try {
+      // Get user session token for Supabase authentication
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        'https://yyriamwvtvzlkumqrvpm.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User must be logged in');
       }
-    );
 
-    // Backfill returns 202 (accepted), not 200
-    if (response.status !== 202) {
-      throw new Error(`Training data backfill failed: ${response.status}`);
+      // Calculate 90 days ago (for training analysis)
+      const endDate = Math.floor(Date.now() / 1000);
+      const startDate = endDate - (90 * 24 * 60 * 60); // 90 days in seconds
+
+      // Call backfill API via swift-task proxy
+      const response = await fetch(
+        `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=${startDate}&summaryEndTimeInSeconds=${endDate}&token=${accessToken}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      // Accept both 202 and 409 as "success" since data might still flow via webhooks
+      if (response.status === 202 || response.status === 409) {
+        setBackfillStatus('success');
+      } else {
+        throw new Error(`Training data import failed: ${response.status}`);
+      }
+    } catch (err) {
+      setBackfillError(err instanceof Error ? err.message : 'Failed to import training data');
+      setBackfillStatus('error');
     }
-
-    // Wait a moment for webhooks to deliver data
-    await new Promise(resolve => setTimeout(resolve, 3000));
   };
 
   // 6+ month backfill for workout history
@@ -247,17 +251,65 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     return (
       <div className="space-y-4">
         <div className="text-center">
-          <h4 className="font-medium mb-2">Ready to Import Training Data</h4>
+          <h4 className="font-medium mb-2">Ready to Analyze Training Data</h4>
           <p className="text-sm text-gray-600 mb-4">
-            Import 3 months of data and analyze for baseline detection
+            Analyze your Garmin activities to auto-populate baseline data
           </p>
           <button
             onClick={fetchAndAnalyzeData}
             className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
           >
             <TrendingUp className="h-4 w-4 inline mr-2" />
-            Import & Analyze Training Data
+            Analyze Training Data
           </button>
+        </div>
+
+        {/* Backfill section for training data */}
+        <div className="border-t border-gray-200 pt-4">
+          <div className="text-center">
+            <h4 className="font-medium mb-2">Import Training Data</h4>
+            <p className="text-sm text-gray-600 mb-4">
+              Get 3 months of training data for better analysis
+            </p>
+            
+            {backfillStatus === 'idle' && (
+              <button
+                onClick={requestTrainingData}
+                className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+              >
+                <Download className="h-4 w-4 inline mr-2" />
+                Import Training Data
+              </button>
+            )}
+
+            {backfillStatus === 'requesting' && (
+              <div className="text-center">
+                <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mb-3"></div>
+                <p className="text-sm text-gray-600">Importing training data...</p>
+              </div>
+            )}
+
+            {backfillStatus === 'success' && (
+              <div className="text-center">
+                <p className="text-sm text-green-600 mb-2">✅ Training data imported!</p>
+                <p className="text-xs text-gray-500">Now try "Analyze Training Data" above</p>
+              </div>
+            )}
+
+            {backfillStatus === 'error' && (
+              <div className="space-y-3">
+                <div className="p-4 border border-red-200 rounded-md">
+                  <p className="text-sm text-red-600">{backfillError}</p>
+                </div>
+                <button
+                  onClick={requestTrainingData}
+                  className="px-4 py-2 text-black hover:text-blue-600 transition-colors text-sm"
+                >
+                  Try Again
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Second backfill section for workout history */}
