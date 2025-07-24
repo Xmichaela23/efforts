@@ -20,9 +20,13 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
   const [expandedSports, setExpandedSports] = useState<Set<string>>(new Set(['running']));
   const [hasStarted, setHasStarted] = useState(false);
 
-  // Backfill state
+  // Backfill state for training data (90 days)
   const [backfillStatus, setBackfillStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
   const [backfillError, setBackfillError] = useState('');
+  
+  // Backfill state for workout history (6+ months)
+  const [historyStatus, setHistoryStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
+  const [historyError, setHistoryError] = useState('');
 
   const fetchAndAnalyzeData = async () => {
     setLoading(true);
@@ -30,6 +34,10 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setHasStarted(true);
 
     try {
+      // First do 90-day backfill to populate data for analysis
+      await requestTrainingData();
+      
+      // Then analyze the data
       const analyzed = await GarminDataService.analyzeActivitiesForBaselines(
         accessToken,
         currentBaselines
@@ -42,10 +50,48 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     }
   };
 
-  // Backfill function
+  // 90-day backfill for training analysis
+  const requestTrainingData = async () => {
+    // Get user session token for Supabase authentication
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      'https://yyriamwvtvzlkumqrvpm.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+    );
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('User must be logged in');
+    }
+
+    // Calculate 90 days ago (for training analysis)
+    const endDate = Math.floor(Date.now() / 1000);
+    const startDate = endDate - (90 * 24 * 60 * 60); // 90 days in seconds
+
+    // Call backfill API via swift-task proxy
+    const response = await fetch(
+      `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=${startDate}&summaryEndTimeInSeconds=${endDate}&token=${accessToken}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    // Backfill returns 202 (accepted), not 200
+    if (response.status !== 202) {
+      throw new Error(`Training data backfill failed: ${response.status}`);
+    }
+
+    // Wait a moment for webhooks to deliver data
+    await new Promise(resolve => setTimeout(resolve, 3000));
+  };
+
+  // 6+ month backfill for workout history
   const requestHistoricalData = async () => {
-    setBackfillStatus('requesting');
-    setBackfillError('');
+    setHistoryStatus('requesting');
+    setHistoryError('');
 
     try {
       // Get user session token for Supabase authentication
@@ -59,9 +105,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         throw new Error('User must be logged in');
       }
 
-      // Calculate 90 days ago (within evaluation rate limits)
+      // Calculate 6 months ago (for workout history)
       const endDate = Math.floor(Date.now() / 1000);
-      const startDate = endDate - (90 * 24 * 60 * 60); // 90 days in seconds
+      const startDate = endDate - (180 * 24 * 60 * 60); // 6 months in seconds
 
       // Call backfill API via swift-task proxy
       const response = await fetch(
@@ -77,18 +123,18 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
 
       // Backfill returns 202 (accepted), not 200
       if (response.status === 202) {
-        setBackfillStatus('success');
+        setHistoryStatus('success');
         // Auto-redirect after success message
         setTimeout(() => {
           // Navigate to main dashboard (user will see populated Completed dropdown)
           window.location.href = '/';
         }, 2000);
       } else {
-        throw new Error(`Backfill request failed: ${response.status}`);
+        throw new Error(`Workout history backfill failed: ${response.status}`);
       }
     } catch (err) {
-      setBackfillError(err instanceof Error ? err.message : 'Failed to request historical data');
-      setBackfillStatus('error');
+      setHistoryError(err instanceof Error ? err.message : 'Failed to request workout history');
+      setHistoryStatus('error');
     }
   };
 
@@ -203,53 +249,53 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         <div className="text-center">
           <h4 className="font-medium mb-2">Ready to Import Training Data</h4>
           <p className="text-sm text-gray-600 mb-4">
-            Analyze your recent Garmin activities to auto-populate baseline data
+            Import 3 months of data and analyze for baseline detection
           </p>
           <button
             onClick={fetchAndAnalyzeData}
             className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
           >
             <TrendingUp className="h-4 w-4 inline mr-2" />
-            Fetch Training Data
+            Import & Analyze Training Data
           </button>
         </div>
 
-        {/* Backfill section */}
+        {/* Second backfill section for workout history */}
         <div className="border-t border-gray-200 pt-4">
           <div className="text-center">
-            <h4 className="font-medium mb-2">Import Workout History</h4>
+            <h4 className="font-medium mb-2">Import Complete Workout History</h4>
             <p className="text-sm text-gray-600 mb-4">
-              Get 3 months of your completed workouts from Garmin
+              Get 6 months of workouts to browse in your Completed tab
             </p>
             
-            {backfillStatus === 'idle' && (
+            {historyStatus === 'idle' && (
               <button
                 onClick={requestHistoricalData}
                 className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
               >
                 <Download className="h-4 w-4 inline mr-2" />
-                Get My Historical Data
+                Import Full Workout History
               </button>
             )}
 
-            {backfillStatus === 'requesting' && (
+            {historyStatus === 'requesting' && (
               <div className="text-center">
                 <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mb-3"></div>
-                <p className="text-sm text-gray-600">Requesting your workout history...</p>
+                <p className="text-sm text-gray-600">Importing your workout history...</p>
               </div>
             )}
 
-            {backfillStatus === 'success' && (
+            {historyStatus === 'success' && (
               <div className="text-center">
                 <p className="text-sm text-green-600 mb-2">✅ Success! Your workout history is loading...</p>
                 <p className="text-xs text-gray-500">Taking you to see your workouts...</p>
               </div>
             )}
 
-            {backfillStatus === 'error' && (
+            {historyStatus === 'error' && (
               <div className="space-y-3">
                 <div className="p-4 border border-red-200 rounded-md">
-                  <p className="text-sm text-red-600">{backfillError}</p>
+                  <p className="text-sm text-red-600">{historyError}</p>
                 </div>
                 <button
                   onClick={requestHistoricalData}
