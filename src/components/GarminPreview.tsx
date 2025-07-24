@@ -59,9 +59,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         throw new Error('User must be logged in');
       }
 
-      // Calculate 6 months ago (max useful range)
+      // Calculate 90 days ago (within evaluation rate limits)
       const endDate = Math.floor(Date.now() / 1000);
-      const startDate = endDate - (180 * 24 * 60 * 60); // 6 months in seconds
+      const startDate = endDate - (90 * 24 * 60 * 60); // 90 days in seconds
 
       // Call backfill API via swift-task proxy
       const response = await fetch(
@@ -219,7 +219,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           <div className="text-center">
             <h4 className="font-medium mb-2">Import Workout History</h4>
             <p className="text-sm text-gray-600 mb-4">
-              Get 6 months of your completed workouts from Garmin
+              Get 3 months of your completed workouts from Garmin
             </p>
             
             {backfillStatus === 'idle' && (
