@@ -314,9 +314,9 @@ static async analyzeActivitiesWithDetailedData(
       throw new Error('User must be logged in');
     }
 
-    // Call Activity Details API for 6 months of detailed data with samples
+    // Call Activities API for 6 months of activity data
     const response = await fetch(
-      `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activityDetails&uploadStartTimeInSeconds=${startDate}&uploadEndTimeInSeconds=${endDate}&token=${accessToken}`,
+      `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activities&uploadStartTimeInSeconds=${startDate}&uploadEndTimeInSeconds=${endDate}&token=${accessToken}`,
       {
         headers: {
           'Authorization': `Bearer ${session.access_token}`
@@ -325,14 +325,14 @@ static async analyzeActivitiesWithDetailedData(
     );
 
     if (!response.ok) {
-      throw new Error(`Activity Details API error: ${response.status} ${response.statusText}`);
+      throw new Error(`Activities API error: ${response.status} ${response.statusText}`);
     }
 
-    const detailedData = await response.json();
-    console.log('🔍 DETAILED ANALYSIS: Received detailed data for', detailedData.length, 'activities');
+    const activityData = await response.json();
+    console.log('🔍 DETAILED ANALYSIS: Received activity data for', activityData.length, 'activities');
 
-    // Convert detailed API response to our GarminActivity format
-    const activities = this.convertDetailedDataToActivities(detailedData);
+    // Convert API response to our GarminActivity format
+    const activities = this.convertDetailedDataToActivities(activityData);
     
     // Analyze the detailed data (same analysis methods but with richer data)
     const detectedMetrics: DetectedMetric[] = [];
