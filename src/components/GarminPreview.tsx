@@ -48,6 +48,17 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setBackfillError('');
 
     try {
+      // Get user session token for Supabase authentication
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        'https://yyriamwvtvzlkumqrvpm.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User must be logged in');
+      }
+
       // Calculate 6 months ago (max useful range)
       const endDate = Math.floor(Date.now() / 1000);
       const startDate = endDate - (180 * 24 * 60 * 60); // 6 months in seconds
@@ -58,12 +69,14 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         {
           method: 'GET',
           headers: {
+            'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json'
           }
         }
       );
 
-      if (response.ok) {
+      // Backfill returns 202 (accepted), not 200
+      if (response.status === 202) {
         setBackfillStatus('success');
         // Auto-redirect after success message
         setTimeout(() => {
