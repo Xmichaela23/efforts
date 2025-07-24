@@ -34,8 +34,8 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setHasStarted(true);
 
     try {
-      // Just analyze existing data - no backfill needed
-      const analyzed = await GarminDataService.analyzeActivitiesForBaselines(
+      // NEW: Use Activity Details API for enhanced analysis with power data
+      const analyzed = await GarminDataService.analyzeActivitiesWithDetailedData(
         accessToken,
         currentBaselines
       );

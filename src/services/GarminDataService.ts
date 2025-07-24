@@ -288,6 +288,138 @@ static async analyzeActivitiesForBaselines(
   };
 }
 
+// NEW: Enhanced analysis using Activity Details API with 6 months of detailed data
+static async analyzeActivitiesWithDetailedData(
+  accessToken: string,
+  currentBaselines: any
+): Promise<AnalyzedGarminData> {
+  if (!accessToken) {
+    throw new Error('Access token required for detailed analysis');
+  }
+
+  try {
+    // Set the date range for 6 months back
+    const endDate = Math.floor(Date.now() / 1000);
+    const startDate = endDate - (180 * 24 * 60 * 60); // 6 months = 180 days
+
+    console.log('🔍 DETAILED ANALYSIS: Fetching 6 months of detailed activity data');
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const supabase = createClient(
+      'https://yyriamwvtvzlkumqrvpm.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+    );
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      throw new Error('User must be logged in');
+    }
+
+    // Call Activity Details API for 6 months of detailed data with samples
+    const response = await fetch(
+      `${SUPABASE_FUNCTION_BASE}?path=/wellness-api/rest/activityDetails&uploadStartTimeInSeconds=${startDate}&uploadEndTimeInSeconds=${endDate}&token=${accessToken}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`Activity Details API error: ${response.status} ${response.statusText}`);
+    }
+
+    const detailedData = await response.json();
+    console.log('🔍 DETAILED ANALYSIS: Received detailed data for', detailedData.length, 'activities');
+
+    // Convert detailed API response to our GarminActivity format
+    const activities = this.convertDetailedDataToActivities(detailedData);
+    
+    // Analyze the detailed data (same analysis methods but with richer data)
+    const detectedMetrics: DetectedMetric[] = [];
+    const sportsWithData: string[] = [];
+
+    // Group activities by sport
+    const sportGroups = this.groupActivitiesBySport(activities);
+
+    // Analyze each sport with detailed data
+    for (const [sport, sportActivities] of Object.entries(sportGroups)) {
+      if (sportActivities.length >= 3) {
+        sportsWithData.push(sport);
+
+        switch (sport) {
+          case 'running':
+            const runningMetrics = await this.analyzeRunningData(sportActivities, currentBaselines);
+            detectedMetrics.push(...runningMetrics);
+            break;
+          case 'cycling':
+            detectedMetrics.push(...this.analyzeCyclingData(sportActivities, currentBaselines));
+            break;
+          case 'swimming':
+            detectedMetrics.push(...this.analyzeSwimmingData(sportActivities, currentBaselines));
+            break;
+        }
+      }
+    }
+
+    return {
+      activities,
+      totalActivities: activities.length,
+      dateRange: {
+        start: activities.length > 0 ? activities[activities.length - 1].startTimeLocal : '',
+        end: activities.length > 0 ? activities[0].startTimeLocal : ''
+      },
+      sportsWithData,
+      detectedMetrics
+    };
+
+  } catch (error) {
+    console.error('Error in detailed analysis:', error);
+    throw error;
+  }
+}
+
+// NEW: Convert Activity Details API response to our GarminActivity format
+private static convertDetailedDataToActivities(detailedData: any[]): GarminActivity[] {
+  return detailedData.map((item: any) => {
+    const summary = item.summary || item;
+    
+    return {
+      activityId: summary.activityId || 0,
+      activityName: summary.activityName || 'Unknown Activity',
+      activityType: {
+        typeId: summary.activityType?.typeId || 0,
+        typeKey: summary.activityType?.typeKey || 'unknown',
+        parentTypeId: summary.activityType?.parentTypeId
+      },
+      eventType: {
+        typeId: summary.eventType?.typeId || 0,
+        typeKey: summary.eventType?.typeKey || 'unknown'
+      },
+      startTimeLocal: summary.startTimeLocal || summary.startTimeInSeconds ? new Date(summary.startTimeInSeconds * 1000).toISOString() : '',
+      startTimeGMT: summary.startTimeGMT || summary.startTimeInSeconds ? new Date(summary.startTimeInSeconds * 1000).toISOString() : '',
+      distance: summary.distance || summary.distanceInMeters || 0,
+      duration: summary.duration || summary.durationInSeconds || 0,
+      movingDuration: summary.movingDuration || summary.movingDurationInSeconds || summary.durationInSeconds || 0,
+      elapsedDuration: summary.elapsedDuration || summary.elapsedDurationInSeconds || summary.durationInSeconds || 0,
+      elevationGain: summary.elevationGain || summary.elevationGainInMeters || 0,
+      elevationLoss: summary.elevationLoss || summary.elevationLossInMeters || 0,
+      averageSpeed: summary.averageSpeed || summary.averageSpeedInMetersPerSecond || 0,
+      maxSpeed: summary.maxSpeed || summary.maxSpeedInMetersPerSecond || 0,
+      averageHR: summary.averageHR || summary.averageHeartRateInBeatsPerMinute,
+      maxHR: summary.maxHR || summary.maxHeartRateInBeatsPerMinute,
+      averagePower: summary.averagePower || summary.averagePowerInWatts,
+      maxPower: summary.maxPower || summary.maxPowerInWatts,
+      normalizedPower: summary.normalizedPower || 0,
+      calories: summary.calories || summary.activeKilocalories || 0,
+      averageRunningCadence: summary.averageRunningCadence || summary.averageRunCadenceInStepsPerMinute,
+      maxRunningCadence: summary.maxRunningCadence || summary.maxRunCadenceInStepsPerMinute,
+      strokes: summary.strokes || 0,
+      poolLength: summary.poolLength || 0,
+      unitOfPoolLength: summary.unitOfPoolLength
+    };
+  });
+}
+
 private static groupActivitiesBySport(activities: GarminActivity[]): Record<string, GarminActivity[]> {
   const groups: Record<string, GarminActivity[]> = {};
 
