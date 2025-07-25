@@ -361,6 +361,144 @@ export const useWorkouts = () => {
     }
   }, [authReady]);
 
+  // 🆕 NEW FUNCTION: Import Garmin activities to workouts table
+  const importGarminActivities = async () => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error("User must be authenticated to import Garmin activities");
+      }
+
+      console.log("🔍 Importing Garmin activities for user:", user.id);
+
+      // Query garmin_activities table for this user
+      const { data: garminActivities, error } = await supabase
+        .from("garmin_activities")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("start_time", { ascending: false });
+
+      if (error) {
+        console.error("❌ Error fetching garmin activities:", error);
+        throw error;
+      }
+
+      if (!garminActivities || garminActivities.length === 0) {
+        console.log("📭 No Garmin activities found to import");
+        return { imported: 0, skipped: 0 };
+      }
+
+      console.log(`🔍 Found ${garminActivities.length} Garmin activities to process`);
+
+      let imported = 0;
+      let skipped = 0;
+
+      for (const activity of garminActivities) {
+        try {
+          // Skip if already imported (check by garmin_activity_id or date/name combination)
+          const existingWorkout = workouts.find(w => 
+            w.friendly_name?.includes(activity.garmin_activity_id?.toString()) ||
+            (w.date === activity.start_time?.split('T')[0] && w.name?.includes('Garmin'))
+          );
+
+          if (existingWorkout) {
+            console.log(`⏭️ Skipping already imported activity: ${activity.garmin_activity_id}`);
+            skipped++;
+            continue;
+          }
+
+          // Map activity type from Garmin to our workout types
+          const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" => {
+            const type = activityType?.toLowerCase() || '';
+            if (type.includes('run') || type.includes('jog')) return 'run';
+            if (type.includes('bike') || type.includes('cycling') || type.includes('cycle')) return 'ride';
+            if (type.includes('swim')) return 'swim';
+            if (type.includes('strength') || type.includes('weight')) return 'strength';
+            return 'run'; // Default to run for endurance activities
+          };
+
+          // Transform garmin_activities data to workout format
+          const workoutData: Omit<Workout, "id"> = {
+            name: activity.activity_name || `Garmin ${activity.activity_type || 'Activity'}`,
+            type: getWorkoutType(activity.activity_type),
+            date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
+            duration: Math.round((activity.duration_seconds || 0) / 60), // Convert seconds to minutes
+            distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined, // Convert meters to km
+            description: `Imported from Garmin Connect - ${activity.activity_type}`,
+            workout_status: "completed",
+            
+            // GPS and location data
+            timestamp: activity.start_time,
+            start_position_lat: activity.starting_latitude,
+            start_position_long: activity.starting_longitude,
+            friendly_name: `Garmin Activity ${activity.garmin_activity_id}`,
+            
+            // Performance metrics
+            avg_heart_rate: activity.avg_heart_rate,
+            max_heart_rate: activity.max_heart_rate,
+            avg_power: activity.avg_power,
+            max_power: activity.max_power,
+            calories: activity.calories,
+            elevation_gain: activity.elevation_gain_meters,
+            elevation_loss: activity.elevation_loss_meters,
+            
+            // Speed and pace (convert m/s to km/h for avg_speed)
+            avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
+            max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
+            
+            // Cadence data
+            avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
+            max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
+            
+            // Time data
+            moving_time: Math.round(activity.duration_seconds || 0),
+            elapsed_time: Math.round(activity.duration_seconds || 0),
+            
+            // Additional metrics that might be available
+            avg_temperature: activity.avg_temperature,
+            
+            // Create metrics object for CompletedTab compatibility
+            metrics: {
+              avg_heart_rate: activity.avg_heart_rate,
+              max_heart_rate: activity.max_heart_rate,
+              avg_power: activity.avg_power,
+              max_power: activity.max_power,
+              calories: activity.calories,
+              elevation_gain: activity.elevation_gain_meters,
+              elevation_loss: activity.elevation_loss_meters,
+              avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
+              max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
+              avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
+              max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
+              avg_temperature: activity.avg_temperature,
+            }
+          };
+
+          // Use existing addWorkout function to save the data
+          await addWorkout(workoutData);
+          
+          console.log(`✅ Imported Garmin activity: ${activity.garmin_activity_id} - ${workoutData.name}`);
+          imported++;
+
+        } catch (activityError) {
+          console.error(`❌ Error importing activity ${activity.garmin_activity_id}:`, activityError);
+          skipped++;
+        }
+      }
+
+      console.log(`🎉 Garmin import complete: ${imported} imported, ${skipped} skipped`);
+      
+      // Refresh workouts list to show newly imported activities
+      await fetchWorkouts();
+      
+      return { imported, skipped };
+
+    } catch (err) {
+      console.error("❌ Error in importGarminActivities:", err);
+      throw err;
+    }
+  };
+
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
     try {
       const user = await getCurrentUser();
@@ -800,5 +938,6 @@ export const useWorkouts = () => {
     getWorkoutsForDate,
     getWorkoutsByType,
     refetch: fetchWorkouts,
+    importGarminActivities, // 🆕 NEW: Export the Garmin import function
   };
 };
