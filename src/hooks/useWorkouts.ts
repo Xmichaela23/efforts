@@ -361,7 +361,7 @@ export const useWorkouts = () => {
     }
   }, [authReady]);
 
-  // 🆕 NEW FUNCTION: Import Garmin activities to workouts table
+  // 🆕 FIXED FUNCTION: Import Garmin activities to workouts table with proper user mapping
   const importGarminActivities = async () => {
     try {
       const user = await getCurrentUser();
@@ -371,11 +371,32 @@ export const useWorkouts = () => {
 
       console.log("🔍 Importing Garmin activities for user:", user.id);
 
-      // Query garmin_activities table for this user
+      // Step 1: Get user's Garmin connection to find their garmin_user_id
+      const { data: userConnection, error: connectionError } = await supabase
+        .from("user_connections")
+        .select("connection_data")
+        .eq("user_id", user.id)
+        .eq("provider", "garmin")
+        .single();
+
+      if (connectionError || !userConnection) {
+        console.log("🚫 No Garmin connection found for user");
+        return { imported: 0, skipped: 0 };
+      }
+
+      const garminUserId = userConnection.connection_data?.user_id;
+      if (!garminUserId) {
+        console.log("🚫 No Garmin user_id in connection data");
+        return { imported: 0, skipped: 0 };
+      }
+
+      console.log("🔗 Found Garmin user_id:", garminUserId);
+
+      // Step 2: Query garmin_activities by garmin_user_id instead of app user_id
       const { data: garminActivities, error } = await supabase
         .from("garmin_activities")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("garmin_user_id", garminUserId)
         .order("start_time", { ascending: false });
 
       if (error) {
@@ -938,6 +959,6 @@ export const useWorkouts = () => {
     getWorkoutsForDate,
     getWorkoutsByType,
     refetch: fetchWorkouts,
-    importGarminActivities, // 🆕 NEW: Export the Garmin import function
+    importGarminActivities, // 🆕 FIXED: Export the Garmin import function with proper user mapping
   };
 };
