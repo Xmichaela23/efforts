@@ -358,6 +358,11 @@ export const useWorkouts = () => {
     if (authReady) {
       console.log("🔄 Auth ready, fetching workouts...");
       fetchWorkouts();
+      
+      // 🆕 Auto-import from Garmin (silent failure if no connection)
+      importGarminActivities().catch(err => 
+        console.log("🔇 Auto-import skipped (no Garmin connection):", err.message)
+      );
     }
   }, [authReady]);
 
