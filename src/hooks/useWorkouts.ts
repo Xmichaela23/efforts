@@ -175,6 +175,7 @@ export const useWorkouts = () => {
 
       console.log("🔍 Fetching workouts for user:", user.id);
 
+      // Fetch manual/planned workouts from workouts table
       const { data, error } = await supabase
         .from("workouts")
         .select("*")
@@ -185,8 +186,6 @@ export const useWorkouts = () => {
         console.error("❌ Supabase error:", error);
         throw error;
       }
-
-      console.log(`✅ Found ${data?.length || 0} workouts in database`);
 
       const mapped = data.map((w) => ({
         id: w.id,
@@ -298,8 +297,56 @@ export const useWorkouts = () => {
         }
       }));
 
-      console.log(`✅ Successfully mapped ${mapped.length} workouts`);
-      setWorkouts(mapped);
+      console.log(`✅ Found ${mapped.length} manual workouts`);
+
+      // 🆕 Also fetch Garmin workouts
+      try {
+        const { data: userConnection } = await supabase
+          .from("user_connections")
+          .select("connection_data")
+          .eq("user_id", user.id)
+          .eq("provider", "garmin")
+          .single();
+
+        if (userConnection?.connection_data?.user_id) {
+          const { data: garminActivities } = await supabase
+            .from("garmin_activities")
+            .select("*")
+            .eq("garmin_user_id", userConnection.connection_data.user_id)
+            .order("start_time", { ascending: false });
+
+          if (garminActivities) {
+            const garminWorkouts = garminActivities.map((activity) => ({
+              id: `garmin-${activity.garmin_activity_id}`,
+              name: activity.activity_name || `${activity.activity_type}`,
+              type: activity.activity_type?.toLowerCase().includes('run') ? 'run' as const :
+                    activity.activity_type?.toLowerCase().includes('bike') ? 'ride' as const :
+                    activity.activity_type?.toLowerCase().includes('swim') ? 'swim' as const : 'run' as const,
+              date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
+              duration: Math.round((activity.duration_seconds || 0) / 60),
+              distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
+              workout_status: "completed" as const,
+              avg_heart_rate: activity.avg_heart_rate,
+              max_heart_rate: activity.max_heart_rate,
+              avg_power: activity.avg_power,
+              max_power: activity.max_power,
+              calories: activity.calories,
+              elevation_gain: activity.elevation_gain_meters,
+              avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
+            }));
+            console.log(`✅ Found ${garminWorkouts.length} Garmin workouts`);
+            mapped.push(...garminWorkouts);
+          }
+        }
+      } catch (garminError) {
+        console.log("🔇 No Garmin workouts found");
+      }
+
+      // Sort all workouts by date
+      const sorted = mapped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      
+      console.log(`✅ Total workouts: ${sorted.length}`);
+      setWorkouts(sorted);
     } catch (err) {
       console.error("❌ Error in fetchWorkouts:", err);
     } finally {
@@ -358,11 +405,6 @@ export const useWorkouts = () => {
     if (authReady) {
       console.log("🔄 Auth ready, fetching workouts...");
       fetchWorkouts();
-      
-      // 🆕 Auto-import from Garmin (silent failure if no connection)
-      importGarminActivities().catch(err => 
-        console.log("🔇 Auto-import skipped (no Garmin connection):", err.message)
-      );
     }
   }, [authReady]);
 
