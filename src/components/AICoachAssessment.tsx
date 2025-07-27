@@ -153,6 +153,7 @@ export default function AICoachAssessment() {
       { key: 'running', label: 'Running Relationship' },
       { key: 'philosophy', label: 'Training Philosophy' },
       { key: 'strength', label: 'Strength Training' },
+      { key: 'trainingFrequency', label: 'Training Frequency' },
       { key: 'sessionDuration', label: 'Session Duration' },
       { key: 'strengthGoal', label: 'Strength Goal' }
     ];
@@ -163,11 +164,11 @@ export default function AICoachAssessment() {
     // Simulate AI response generation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { goal, timeline, swimming, cycling, running, philosophy, strength, sessionDuration, strengthGoal } = responses;
+    const { goal, timeline, swimming, cycling, running, philosophy, strength, trainingFrequency, sessionDuration, strengthGoal } = responses;
 
     if (!goal) {
       return {
-        content: "Great! When is your 70.3?",
+        content: "When is your event?",
         options: ["4 months", "6 months", "8+ months", "No specific timeline"],
         isComplete: false
       };
@@ -175,7 +176,7 @@ export default function AICoachAssessment() {
 
     if (!timeline) {
       return {
-        content: "Perfect! What's your relationship with swimming?",
+        content: "What's your relationship with swimming?",
         options: ["I love it", "I tolerate it", "I hate it", "It's my strength"],
         isComplete: false
       };
@@ -224,7 +225,26 @@ export default function AICoachAssessment() {
     if (!strength) {
       return {
         content: "Do you want to add strength training to your plan?",
-        options: ["Yes", "No", "Maybe, tell me more"],
+        options: [
+          "No strength training",
+          "Injury prevention focus",
+          "Power development", 
+          "Sport-specific functional",
+          "Build muscle",
+          "General fitness"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!trainingFrequency) {
+      return {
+        content: "How many days per week can you train?",
+        options: [
+          "2-3 days",
+          "4-5 days",
+          "6+ days"
+        ],
         isComplete: false
       };
     }
@@ -422,7 +442,7 @@ export default function AICoachAssessment() {
                         key={index}
                         onClick={() => handleOptionSelect(option)}
                         disabled={isLoading}
-                        className="w-full text-left p-2 text-sm bg-gray-50 border border-gray-300 rounded hover:bg-gray-100 transition-colors disabled:opacity-50"
+                        className="w-full text-left p-2 text-sm bg-white border border-gray-400 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
                       >
                         {option}
                       </button>
