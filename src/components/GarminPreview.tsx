@@ -109,9 +109,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         throw new Error('User must be logged in');
       }
 
-      // Calculate 6 months ago (for workout history)
+      // Calculate 90 days ago (for workout history)
       const endDate = Math.floor(Date.now() / 1000);
-      const startDate = endDate - (180 * 24 * 60 * 60); // 6 months in seconds
+      const startDate = endDate - (90 * 24 * 60 * 60); // 90 days in seconds
 
       // Call backfill API via swift-task proxy
       const response = await fetch(
@@ -249,115 +249,25 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
 
   if (!hasStarted) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="text-center">
-          <h4 className="font-medium mb-2">Ready to Analyze Training Data</h4>
-          <p className="text-sm text-gray-600 mb-4">
-            Analyze your Garmin activities to auto-populate baseline data
-          </p>
           <button
             onClick={fetchAndAnalyzeData}
             className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
           >
             <TrendingUp className="h-4 w-4 inline mr-2" />
-            Analyze Training Data
+            Analyze
           </button>
         </div>
 
-        {/* Backfill section for training data */}
-        <div className="border-t border-gray-200 pt-4">
-          <div className="text-center">
-            <h4 className="font-medium mb-2">Import Training Data</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Get 3 months of training data for better analysis
-            </p>
-            
-            {backfillStatus === 'idle' && (
-              <button
-                onClick={requestTrainingData}
-                className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
-              >
-                <Download className="h-4 w-4 inline mr-2" />
-                Import Training Data
-              </button>
-            )}
-
-            {backfillStatus === 'requesting' && (
-              <div className="text-center">
-                <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mb-3"></div>
-                <p className="text-sm text-gray-600">Importing training data...</p>
-              </div>
-            )}
-
-            {backfillStatus === 'success' && (
-              <div className="text-center">
-                <p className="text-sm text-green-600 mb-2">✅ Training data imported!</p>
-                <p className="text-xs text-gray-500">Now try "Analyze Training Data" above</p>
-              </div>
-            )}
-
-            {backfillStatus === 'error' && (
-              <div className="space-y-3">
-                <div className="p-4 border border-red-200 rounded-md">
-                  <p className="text-sm text-red-600">{backfillError}</p>
-                </div>
-                <button
-                  onClick={requestTrainingData}
-                  className="px-4 py-2 text-black hover:text-blue-600 transition-colors text-sm"
-                >
-                  Try Again
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Second backfill section for workout history */}
-        <div className="border-t border-gray-200 pt-4">
-          <div className="text-center">
-            <h4 className="font-medium mb-2">Import Complete Workout History</h4>
-            <p className="text-sm text-gray-600 mb-4">
-              Get 6 months of workouts to browse in your Completed tab
-            </p>
-            
-            {historyStatus === 'idle' && (
-              <button
-                onClick={requestHistoricalData}
-                className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
-              >
-                <Download className="h-4 w-4 inline mr-2" />
-                Import Full Workout History
-              </button>
-            )}
-
-            {historyStatus === 'requesting' && (
-              <div className="text-center">
-                <div className="animate-spin mx-auto h-6 w-6 border-2 border-blue-500 border-t-transparent rounded-full mb-3"></div>
-                <p className="text-sm text-gray-600">Importing your workout history...</p>
-              </div>
-            )}
-
-            {historyStatus === 'success' && (
-              <div className="text-center">
-                <p className="text-sm text-green-600 mb-2">✅ Success! Your workout history is loading...</p>
-                <p className="text-xs text-gray-500">Taking you to see your workouts...</p>
-              </div>
-            )}
-
-            {historyStatus === 'error' && (
-              <div className="space-y-3">
-                <div className="p-4 border border-red-200 rounded-md">
-                  <p className="text-sm text-red-600">{historyError}</p>
-                </div>
-                <button
-                  onClick={requestHistoricalData}
-                  className="px-4 py-2 text-black hover:text-blue-600 transition-colors text-sm"
-                >
-                  Try Again
-                </button>
-              </div>
-            )}
-          </div>
+        <div className="text-center">
+          <button
+            onClick={requestHistoricalData}
+            className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+          >
+            <Download className="h-4 w-4 inline mr-2" />
+            Import 90 Day Workout History
+          </button>
         </div>
       </div>
     );
