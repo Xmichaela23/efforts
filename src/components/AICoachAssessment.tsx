@@ -342,7 +342,7 @@ export default function AICoachAssessment() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <MessageCircle className="h-6 w-6 text-blue-600" />
+            <MessageCircle className="h-6 w-6 text-gray-600" />
             <h1 className="text-xl font-semibold">Training Assessment</h1>
           </div>
           <button
@@ -364,7 +364,7 @@ export default function AICoachAssessment() {
                 className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
                   message.type === 'ai'
                     ? 'bg-gray-100 text-gray-900'
-                    : 'bg-blue-600 text-white'
+                    : 'bg-gray-800 text-white'
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -403,7 +403,7 @@ export default function AICoachAssessment() {
         {isLoading && (
           <div className="flex justify-center">
             <div className="flex items-center gap-2 text-gray-600">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
                              <span className="text-sm">Building your plan...</span>
             </div>
           </div>
@@ -432,7 +432,7 @@ export default function AICoachAssessment() {
             <button
               onClick={generatePlan}
               disabled={isLoading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+              className="px-6 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors disabled:opacity-50"
             >
               {isLoading ? "Generating your plan..." : "Generate My Plan"}
             </button>
