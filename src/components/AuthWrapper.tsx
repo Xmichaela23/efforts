@@ -13,49 +13,53 @@ const AuthWrapper: React.FC = () => {
   useEffect(() => {
     console.log('AuthWrapper mounted');
 
-    const fetchUserAndApproval = async () => {
-      try {
-        console.log('🔍 Starting approval check...');
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          console.log('❌ No user found, setting user to null');
-          setUser(null);
-          setLoading(false);
-          return;
-        }
-
-        console.log('✅ User found:', user.id);
-        setUser(user);
-
+    // Listen for auth state changes and check approval every time
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        console.log('🔍 Auth state changed, checking approval for user:', session.user.id);
         // Fetch approved flag from users table
-        console.log('🔍 Fetching approval status from database...');
         const { data, error } = await supabase
           .from('users')
           .select('approved')
-          .eq('id', user.id)
+          .eq('id', session.user.id)
           .single();
-
         if (error) {
           console.error('❌ Error fetching approval:', error);
-          console.log('🔧 Setting approved to false due to error');
-          setApproved(false); // default to not approved
+          setApproved(false);
         } else {
           console.log('✅ Approval data from database:', data);
-          console.log('🔧 Setting approved to:', data?.approved ?? false);
           setApproved(data?.approved ?? false);
         }
-      } catch (err) {
-        console.error('Auth error:', err);
-      } finally {
+      } else {
+        setApproved(null);
+      }
+      setLoading(false);
+    });
+
+    // On initial mount, check for an existing session
+    (async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        console.log('🔍 Initial session found, checking approval for user:', session.user.id);
+        const { data, error } = await supabase
+          .from('users')
+          .select('approved')
+          .eq('id', session.user.id)
+          .single();
+        if (error) {
+          console.error('❌ Error fetching approval (initial):', error);
+          setApproved(false);
+        } else {
+          console.log('✅ Approval data from database (initial):', data);
+          setApproved(data?.approved ?? false);
+        }
+      } else {
+        setApproved(null);
         setLoading(false);
       }
-    };
-
-    fetchUserAndApproval();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
+    })();
 
     return () => subscription.unsubscribe();
   }, []);
