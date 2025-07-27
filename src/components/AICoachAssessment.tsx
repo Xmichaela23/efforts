@@ -152,10 +152,12 @@ export default function AICoachAssessment() {
       { key: 'cycling', label: 'Cycling Relationship' },
       { key: 'running', label: 'Running Relationship' },
       { key: 'philosophy', label: 'Training Philosophy' },
-      { key: 'strength', label: 'Strength Training' },
       { key: 'trainingFrequency', label: 'Training Frequency' },
-      { key: 'sessionDuration', label: 'Session Duration' },
-      { key: 'strengthGoal', label: 'Strength Goal' }
+      { key: 'weekdayDuration', label: 'Weekday Duration' },
+      { key: 'weekendDuration', label: 'Weekend Duration' },
+      { key: 'strength', label: 'Strength Training' },
+      { key: 'strengthGoal', label: 'Strength Goal' },
+      { key: 'philosophy', label: 'Training Philosophy' }
     ];
     return questions[assessmentState.currentStep];
   };
@@ -164,7 +166,7 @@ export default function AICoachAssessment() {
     // Simulate AI response generation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { goal, timeline, swimming, cycling, running, philosophy, strength, trainingFrequency, sessionDuration, strengthGoal } = responses;
+    const { goal, timeline, swimming, cycling, running, trainingFrequency, weekdayDuration, weekendDuration, strength, strengthGoal, philosophy } = responses;
 
     if (!goal) {
       return {
@@ -200,29 +202,43 @@ export default function AICoachAssessment() {
 
     if (!running) {
       return {
-        content: "Excellent! What's your training philosophy preference?",
+        content: "How many days per week can you train?",
         options: [
-          "🟢 POLARIZED (80% easy, 20% hard)",
-          "⚡ PYRAMIDAL (70% easy, 20% moderate, 10% hard)",
-          "⚖️ BALANCED (strategic mix)"
+          "2-3 days",
+          "4-5 days",
+          "6+ days"
         ],
         isComplete: false
       };
     }
 
-    if (!philosophy) {
+    if (!trainingFrequency) {
       return {
-        content: "What's your training philosophy preference?",
+        content: "How long do you want your weekday sessions?",
         options: [
-          "🟢 POLARIZED (80% easy, 20% hard)",
-          "⚡ PYRAMIDAL (70% easy, 20% moderate, 10% hard)",
-          "⚖️ BALANCED (strategic mix)"
+          "30-45 minutes",
+          "45-60 minutes",
+          "60-90 minutes",
+          "90+ minutes"
         ],
         isComplete: false
       };
     }
 
-    if (!strength) {
+    if (!weekdayDuration) {
+      return {
+        content: "How long do you want your weekend sessions?",
+        options: [
+          "1-2 hours",
+          "2-3 hours",
+          "3-4 hours",
+          "4+ hours"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!weekendDuration) {
       return {
         content: "Do you want to add strength training to your plan?",
         options: [
@@ -237,32 +253,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!trainingFrequency) {
-      return {
-        content: "How many days per week can you train?",
-        options: [
-          "2-3 days",
-          "4-5 days",
-          "6+ days"
-        ],
-        isComplete: false
-      };
-    }
-
-    if (!sessionDuration) {
-      return {
-        content: "How long do you want your training sessions?",
-        options: [
-          "Weekdays: 30-45min, Weekends: 1-2hrs",
-          "Weekdays: 45-60min, Weekends: 2-3hrs", 
-          "Weekdays: 60-90min, Weekends: 3-4hrs",
-          "Weekdays: 90min+, Weekends: 4hrs+"
-        ],
-        isComplete: false
-      };
-    }
-
-    if (!strengthGoal) {
+    if (!strength) {
       return {
         content: "What's your strength training goal?",
         options: [
@@ -270,6 +261,18 @@ export default function AICoachAssessment() {
           "Hypertrophy (muscle building)",
           "Sport-specific (strength for your sport)",
           "General fitness"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!strengthGoal) {
+      return {
+        content: "What's your training philosophy preference?",
+        options: [
+          "🟢 POLARIZED (80% easy, 20% hard)",
+          "⚡ PYRAMIDAL (70% easy, 20% moderate, 10% hard)",
+          "⚖️ BALANCED (strategic mix)"
         ],
         isComplete: false
       };
