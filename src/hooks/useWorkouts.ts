@@ -326,13 +326,89 @@ export const useWorkouts = () => {
               duration: Math.round((activity.duration_seconds || 0) / 60),
               distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
               workout_status: "completed" as const,
+              
+              // GPS and location data
+              timestamp: activity.start_time,
+              start_position_lat: activity.starting_latitude,
+              start_position_long: activity.starting_longitude,
+              friendly_name: `Garmin Activity ${activity.garmin_activity_id}`,
+              
+              // Performance metrics
               avg_heart_rate: activity.avg_heart_rate,
               max_heart_rate: activity.max_heart_rate,
               avg_power: activity.avg_power,
               max_power: activity.max_power,
               calories: activity.calories,
               elevation_gain: activity.elevation_gain_meters,
+              elevation_loss: activity.elevation_loss_meters,
+              
+              // Speed and pace (convert m/s to km/h for avg_speed)
               avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
+              max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
+              
+              // Cadence data
+              avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
+              max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
+              
+              // Time data
+              moving_time: Math.round(activity.duration_seconds || 0),
+              elapsed_time: Math.round(activity.duration_seconds || 0),
+              
+              // Additional metrics
+              avg_temperature: activity.avg_temperature,
+              
+              // Create comprehensive metrics object for CompletedTab compatibility
+              metrics: {
+                avg_heart_rate: activity.avg_heart_rate,
+                max_heart_rate: activity.max_heart_rate,
+                avg_power: activity.avg_power,
+                max_power: activity.max_power,
+                calories: activity.calories,
+                elevation_gain: activity.elevation_gain_meters,
+                elevation_loss: activity.elevation_loss_meters,
+                avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
+                max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
+                avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
+                max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
+                avg_temperature: activity.avg_temperature,
+                moving_time: Math.round(activity.duration_seconds || 0),
+                elapsed_time: Math.round(activity.duration_seconds || 0),
+                distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
+                duration: Math.round((activity.duration_seconds || 0) / 60),
+                start_time: activity.start_time,
+                activity_type: activity.activity_type,
+                garmin_activity_id: activity.garmin_activity_id,
+                // Add any other metrics that might be available in the garmin_activities table
+                total_training_effect: activity.total_training_effect,
+                total_anaerobic_effect: activity.total_anaerobic_effect,
+                functional_threshold_power: activity.functional_threshold_power,
+                threshold_heart_rate: activity.threshold_heart_rate,
+                normalized_power: activity.normalized_power,
+                intensity_factor: activity.intensity_factor,
+                tss: activity.tss,
+                avg_vam: activity.avg_vam,
+                total_work: activity.total_work,
+                total_descent: activity.total_descent,
+                total_timer_time: activity.total_timer_time,
+                total_elapsed_time: activity.total_elapsed_time,
+                hr_calc_type: activity.hr_calc_type,
+                pwr_calc_type: activity.pwr_calc_type,
+                age: activity.age,
+                weight: activity.weight,
+                height: activity.height,
+                gender: activity.gender,
+                default_max_heart_rate: activity.default_max_heart_rate,
+                resting_heart_rate: activity.resting_heart_rate,
+                dist_setting: activity.dist_setting,
+                weight_setting: activity.weight_setting,
+                avg_fractional_cadence: activity.avg_fractional_cadence,
+                avg_left_pedal_smoothness: activity.avg_left_pedal_smoothness,
+                avg_left_torque_effectiveness: activity.avg_left_torque_effectiveness,
+                max_fractional_cadence: activity.max_fractional_cadence,
+                left_right_balance: activity.left_right_balance,
+                threshold_power: activity.threshold_power,
+                total_cycles: activity.total_cycles,
+              }
             }));
             console.log(`✅ Found ${garminWorkouts.length} Garmin workouts`);
             mapped.push(...garminWorkouts);

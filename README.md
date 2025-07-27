@@ -1,3 +1,54 @@
-# React + TypeScript + Vite
+# Efforts - Fitness Training App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A comprehensive fitness training application built with React, TypeScript, and Supabase, featuring AI-powered training plan generation and integration with fitness platforms like Garmin and Strava.
+
+## Development Status & Integration Guide
+
+### App Complexity & Architecture
+This app has reached a significant level of complexity requiring careful consideration of component interdependencies and backend integrations. The architecture includes:
+
+- **Frontend**: React + TypeScript + Vite with shadcn/ui components
+- **Backend**: Supabase (database, auth, Edge Functions)
+- **AI Integration**: RealTrainingAI service for plan generation
+- **Third-party APIs**: Garmin Connect, Strava integration
+- **Real-time Data**: Webhooks for live fitness data synchronization
+
+### Integration Status
+- ✅ **Garmin Connect**: Full integration with webhook processing and detailed sensor data
+- ✅ **Strava**: Basic integration implemented
+- ✅ **RealTrainingAI**: AI-powered training plan generation
+- 🔄 **Ongoing**: Continuous refinement of data processing and UI components
+
+### Critical Dependencies
+- **Supabase Edge Functions**: Handle webhook processing for real-time data
+- **User Connections**: Store API tokens and connection data for third-party services
+- **Database Schema**: Comprehensive workout and activity data structures
+- **Context Management**: AppContext for global state and data flow
+
+### Development Guidelines
+1. **Component Sensitivity**: Changes to components must consider impact on other working elements
+2. **Backend Integration**: Complex integrations require thorough understanding of API documentation
+3. **Data Flow**: Understand how data moves from webhooks → database → frontend components
+4. **Testing**: Physical activities may be required to test fitness integrations
+
+### Third-Party Integration Best Practices
+**CRITICAL**: When integrating any third-party service, ALWAYS request:
+- 📋 **Official API documentation** (manuals, guides, SDK docs)
+- 🔗 **Webhook/push notification specifications**
+- 📊 **Data structure examples** (sample payloads, response formats)
+- ⚙️ **Configuration requirements** (endpoints, authentication, rate limits)
+- 🧪 **Testing tools** (sandbox environments, data generators)
+
+**Why this matters**: The Garmin integration required multiple debugging cycles because we didn't have the official manual initially. The manual would have immediately revealed:
+- Push vs Ping service differences
+- Exact data structure (root-level vs nested fields)
+- Webhook payload formats
+- Required vs optional fields
+
+**Rule**: Request documentation FIRST, implement SECOND. This saves hours of debugging and prevents incorrect assumptions.
+
+### Session Continuity Notes
+- **Context Maintenance**: This AI maintains conversation context and code understanding across sessions
+- **Documentation**: Key architectural decisions and integration details are documented in this README
+- **Component Dependencies**: See `COMPONENT_DEPENDENCIES.md` for detailed component relationships
+- **Development Status**: See `DEVELOPMENT_STATUS.md` for current feature status
