@@ -152,7 +152,9 @@ export default function AICoachAssessment() {
       { key: 'cycling', label: 'Cycling Relationship' },
       { key: 'running', label: 'Running Relationship' },
       { key: 'philosophy', label: 'Training Philosophy' },
-      { key: 'strength', label: 'Strength Training' }
+      { key: 'strength', label: 'Strength Training' },
+      { key: 'sessionDuration', label: 'Session Duration' },
+      { key: 'strengthGoal', label: 'Strength Goal' }
     ];
     return questions[assessmentState.currentStep];
   };
@@ -161,7 +163,7 @@ export default function AICoachAssessment() {
     // Simulate AI response generation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { goal, timeline, swimming, cycling, running, philosophy, strength } = responses;
+    const { goal, timeline, swimming, cycling, running, philosophy, strength, sessionDuration, strengthGoal } = responses;
 
     if (!goal) {
       return {
@@ -223,6 +225,32 @@ export default function AICoachAssessment() {
       return {
         content: "Do you want to add strength training to your plan?",
         options: ["Yes", "No", "Maybe, tell me more"],
+        isComplete: false
+      };
+    }
+
+    if (!sessionDuration) {
+      return {
+        content: "How long do you want your training sessions?",
+        options: [
+          "Weekdays: 30-45min, Weekends: 1-2hrs",
+          "Weekdays: 45-60min, Weekends: 2-3hrs", 
+          "Weekdays: 60-90min, Weekends: 3-4hrs",
+          "Weekdays: 90min+, Weekends: 4hrs+"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!strengthGoal) {
+      return {
+        content: "What's your strength training goal?",
+        options: [
+          "Power (explosive strength)",
+          "Hypertrophy (muscle building)",
+          "Sport-specific (strength for your sport)",
+          "General fitness"
+        ],
         isComplete: false
       };
     }
@@ -310,7 +338,7 @@ export default function AICoachAssessment() {
   };
 
   const buildAIPrompt = (responses: Record<string, any>, baselineData: any) => {
-    const { goal, timeline, swimming, cycling, running, philosophy, strength } = responses;
+    const { goal, timeline, swimming, cycling, running, philosophy, strength, sessionDuration, strengthGoal } = responses;
     
     let prompt = `Create a training plan for ${goal}`;
     
@@ -326,6 +354,13 @@ export default function AICoachAssessment() {
     
     if (strength && strength !== "No") {
       prompt += `. Include strength training: ${strength}`;
+      if (strengthGoal) {
+        prompt += ` with goal: ${strengthGoal}`;
+      }
+    }
+    
+    if (sessionDuration) {
+      prompt += `. Session duration preference: ${sessionDuration}`;
     }
     
     if (baselineData) {
@@ -387,7 +422,7 @@ export default function AICoachAssessment() {
                         key={index}
                         onClick={() => handleOptionSelect(option)}
                         disabled={isLoading}
-                        className="w-full text-left p-2 text-sm bg-white border border-gray-200 rounded hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        className="w-full text-left p-2 text-sm bg-gray-50 border border-gray-300 rounded hover:bg-gray-100 transition-colors disabled:opacity-50"
                       >
                         {option}
                       </button>
