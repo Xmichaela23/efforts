@@ -10,55 +10,39 @@ const AuthWrapper: React.FC = () => {
   const [approved, setApproved] = useState<boolean | null>(null);
   const [showRegister, setShowRegister] = useState(false);
 
-  useEffect(() => {
-    console.log('AuthWrapper mounted');
+  // Helper to check approval for a given user
+  const checkApproval = async (userObj: any) => {
+    if (!userObj) {
+      setApproved(null);
+      setLoading(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from('users')
+      .select('approved')
+      .eq('id', userObj.id)
+      .single();
+    if (error) {
+      setApproved(false);
+    } else {
+      setApproved(data?.approved ?? false);
+    }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     // Listen for auth state changes and check approval every time
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) {
-        console.log('🔍 Auth state changed, checking approval for user:', session.user.id);
-        // Fetch approved flag from users table
-        const { data, error } = await supabase
-          .from('users')
-          .select('approved')
-          .eq('id', session.user.id)
-          .single();
-        if (error) {
-          console.error('❌ Error fetching approval:', error);
-          setApproved(false);
-        } else {
-          console.log('✅ Approval data from database:', data);
-          setApproved(data?.approved ?? false);
-        }
-      } else {
-        setApproved(null);
-      }
-      setLoading(false);
+      setLoading(true);
+      await checkApproval(session?.user ?? null);
     });
 
     // On initial mount, check for an existing session
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
-      if (session?.user) {
-        console.log('🔍 Initial session found, checking approval for user:', session.user.id);
-        const { data, error } = await supabase
-          .from('users')
-          .select('approved')
-          .eq('id', session.user.id)
-          .single();
-        if (error) {
-          console.error('❌ Error fetching approval (initial):', error);
-          setApproved(false);
-        } else {
-          console.log('✅ Approval data from database (initial):', data);
-          setApproved(data?.approved ?? false);
-        }
-      } else {
-        setApproved(null);
-        setLoading(false);
-      }
+      await checkApproval(session?.user ?? null);
     })();
 
     return () => subscription.unsubscribe();
