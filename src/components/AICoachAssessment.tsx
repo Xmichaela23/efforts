@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, MessageCircle, User } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import { RealTrainingAI } from '@/services/RealTrainingAI';
 
 interface ConversationMessage {
   id: string;
@@ -208,19 +209,30 @@ export default function AICoachAssessment() {
 
     if (!philosophy) {
       return {
-        content: "Do you want to add strength training to your plan?",
-        options: ["Yes", "No", "Maybe, tell me more"],
+        content: "What's your training philosophy preference?",
+        options: [
+          "🟢 POLARIZED (80% easy, 20% hard)",
+          "⚡ PYRAMIDAL (70% easy, 20% moderate, 10% hard)",
+          "⚖️ BALANCED (strategic mix)"
+        ],
         isComplete: false
       };
     }
 
     if (!strength) {
       return {
-        content: "Perfect! I'll build you a personalized training plan based on your responses. Here's what I understand:",
-        options: ["Generate my plan", "Review my responses", "Start over"],
-        isComplete: true
+        content: "Do you want to add strength training to your plan?",
+        options: ["Yes", "No", "Maybe, tell me more"],
+        isComplete: false
       };
     }
+
+    // All questions answered
+    return {
+      content: "Perfect! I'll build you a personalized training plan based on your responses. Here's what I understand:",
+      options: ["Generate my plan", "Review my responses", "Start over"],
+      isComplete: true
+    };
 
     return {
       content: "I'm ready to build your plan!",
@@ -241,28 +253,87 @@ export default function AICoachAssessment() {
 
   const generatePlan = async () => {
     setIsLoading(true);
-    // Simulate plan generation
-    await new Promise(resolve => setTimeout(resolve, 2000));
     
-    const plan = {
-      name: "Your Personalized Training Plan",
-      description: "Based on your assessment, here's your customized plan.",
-      weeklySchedule: [
-        "Monday: Swim technique + Strength",
-        "Tuesday: Bike intervals",
-        "Wednesday: Easy run + Core",
-        "Thursday: Swim endurance",
-        "Friday: Bike long ride",
-        "Saturday: Long run",
-        "Sunday: Rest or active recovery"
-      ]
-    };
+    try {
+      const ai = new RealTrainingAI();
+      
+      // Build comprehensive prompt from responses
+      const prompt = buildAIPrompt(assessmentState.responses, baselineData);
+      const startDate = new Date().toISOString().split('T')[0];
+      
+      console.log('Generating plan with prompt:', prompt);
+      
+      const aiPlan = await ai.generateTrainingPlan(prompt, startDate, {
+        baselineData,
+        responses: assessmentState.responses
+      });
+      
+      // Transform AI plan to display format
+      const plan = {
+        name: aiPlan.plan.name,
+        description: aiPlan.plan.description,
+        weeklySchedule: aiPlan.workouts.map(workout => 
+          `${workout.date}: ${workout.name} - ${workout.description}`
+        ).slice(0, 7), // Show first week
+        fullPlan: aiPlan
+      };
 
-    setAssessmentState(prev => ({
-      ...prev,
-      generatedPlan: plan
-    }));
+      setAssessmentState(prev => ({
+        ...prev,
+        generatedPlan: plan
+      }));
+      
+    } catch (error) {
+      console.error('Error generating plan:', error);
+      // Fallback to simple plan
+      const plan = {
+        name: "Your Training Plan",
+        description: "Here's your personalized plan based on your assessment.",
+        weeklySchedule: [
+          "Monday: Swim technique + Strength",
+          "Tuesday: Bike intervals", 
+          "Wednesday: Easy run + Core",
+          "Thursday: Swim endurance",
+          "Friday: Bike long ride",
+          "Saturday: Long run",
+          "Sunday: Rest or active recovery"
+        ]
+      };
+      
+      setAssessmentState(prev => ({
+        ...prev,
+        generatedPlan: plan
+      }));
+    }
+    
     setIsLoading(false);
+  };
+
+  const buildAIPrompt = (responses: Record<string, any>, baselineData: any) => {
+    const { goal, timeline, swimming, cycling, running, philosophy, strength } = responses;
+    
+    let prompt = `Create a training plan for ${goal}`;
+    
+    if (timeline && timeline !== "No specific timeline") {
+      prompt += ` with ${timeline} timeline`;
+    }
+    
+    prompt += `. The athlete's relationship with swimming is: ${swimming}, cycling: ${cycling}, running: ${running}`;
+    
+    if (philosophy) {
+      prompt += `. Training philosophy: ${philosophy}`;
+    }
+    
+    if (strength && strength !== "No") {
+      prompt += `. Include strength training: ${strength}`;
+    }
+    
+    if (baselineData) {
+      prompt += `. Current training volume: ${JSON.stringify(baselineData.current_volume)}`;
+      prompt += `. Training background: ${baselineData.trainingBackground}`;
+    }
+    
+    return prompt;
   };
 
   return (
