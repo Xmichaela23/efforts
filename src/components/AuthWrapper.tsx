@@ -15,16 +15,20 @@ const AuthWrapper: React.FC = () => {
 
     const fetchUserAndApproval = async () => {
       try {
+        console.log('🔍 Starting approval check...');
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
+          console.log('❌ No user found, setting user to null');
           setUser(null);
           setLoading(false);
           return;
         }
 
+        console.log('✅ User found:', user.id);
         setUser(user);
 
         // Fetch approved flag from users table
+        console.log('🔍 Fetching approval status from database...');
         const { data, error } = await supabase
           .from('users')
           .select('approved')
@@ -32,9 +36,12 @@ const AuthWrapper: React.FC = () => {
           .single();
 
         if (error) {
-          console.error('Error fetching approval:', error);
+          console.error('❌ Error fetching approval:', error);
+          console.log('🔧 Setting approved to false due to error');
           setApproved(false); // default to not approved
         } else {
+          console.log('✅ Approval data from database:', data);
+          console.log('🔧 Setting approved to:', data?.approved ?? false);
           setApproved(data?.approved ?? false);
         }
       } catch (err) {

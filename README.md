@@ -31,6 +31,17 @@ This app has reached a significant level of complexity requiring careful conside
 3. **Data Flow**: Understand how data moves from webhooks → database → frontend components
 4. **Testing**: Physical activities may be required to test fitness integrations
 
+### CRITICAL: SLOW DOWN AND UNDERSTAND FIRST
+**STOP RUSHING TO FIX THINGS!**
+- 🛑 **Ask questions** before making any changes
+- 🤔 **Understand the problem** completely before acting
+- 💬 **Discuss the approach** with the user first
+- ✅ **Get agreement** before touching any code
+- ❌ **Don't assume** you know what the user wants
+
+**The user has been burned by AI making changes before understanding the problem.**
+**SLOW DOWN. LISTEN. UNDERSTAND. THEN ACT.**
+
 ### Third-Party Integration Best Practices
 **CRITICAL**: When integrating any third-party service, ALWAYS request:
 - 📋 **Official API documentation** (manuals, guides, SDK docs)
