@@ -320,8 +320,9 @@ export const useWorkouts = () => {
               id: `garmin-${activity.garmin_activity_id}`,
               name: activity.activity_name || `${activity.activity_type}`,
               type: activity.activity_type?.toLowerCase().includes('run') ? 'run' as const :
-                    activity.activity_type?.toLowerCase().includes('bike') ? 'ride' as const :
-                    activity.activity_type?.toLowerCase().includes('swim') ? 'swim' as const : 'run' as const,
+                    activity.activity_type?.toLowerCase().includes('bike') || activity.activity_type?.toLowerCase().includes('cycling') ? 'ride' as const :
+                    activity.activity_type?.toLowerCase().includes('swim') ? 'swim' as const : 
+                    activity.activity_type?.toLowerCase().includes('strength') ? 'strength' as const : 'run' as const,
               date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
               duration: Math.round((activity.duration_seconds || 0) / 60),
               distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,

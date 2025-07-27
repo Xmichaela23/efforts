@@ -32,21 +32,32 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    return String(value);
  };
 
- const formatDuration = (seconds: any): string => {
-   const num = Number(seconds);
-   if (num === null || num === undefined || isNaN(num) || num === 0) {
-     return formatDuration(workoutData.duration || 0);
-   }
-   
-   const hours = Math.floor(num / 3600);
-   const minutes = Math.floor((num % 3600) / 60);
-   const secs = num % 60;
-   
-   if (hours > 0) {
-     return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-   }
-   return `${minutes}:${secs.toString().padStart(2, '0')}`;
- };
+   const formatDuration = (seconds: any): string => {
+    const num = Number(seconds);
+    if (num === null || num === undefined || isNaN(num) || num === 0) {
+      // Handle duration in minutes (from Garmin data) vs seconds
+      const durationMinutes = workoutData.duration || 0;
+      if (durationMinutes > 0) {
+        const hours = Math.floor(durationMinutes / 60);
+        const minutes = durationMinutes % 60;
+        if (hours > 0) {
+          return `${hours}:${minutes.toString().padStart(2, '0')}:00`;
+        }
+        return `${minutes}:00`;
+      }
+      return '0:00';
+    }
+    
+    // Handle duration in seconds
+    const hours = Math.floor(num / 3600);
+    const minutes = Math.floor((num % 3600) / 60);
+    const secs = num % 60;
+    
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
+  };
 
  const formatDistance = (km: any): string => {
    const num = Number(km);
@@ -265,7 +276,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    }
    // Fallback calculation if total_work not available
    else if (workoutData.metrics?.avg_power && workoutData.duration) {
-     const kj = Math.round((workoutData.metrics.avg_power * workoutData.duration) / 1000);
+     // Convert duration from minutes to seconds for proper kJ calculation
+     const durationSeconds = workoutData.duration * 60;
+     const kj = Math.round((workoutData.metrics.avg_power * durationSeconds) / 1000);
      console.log('✅ calculateTotalWork using fallback calc:', kj, 'kJ');
      return `${kj} kJ`;
    }
