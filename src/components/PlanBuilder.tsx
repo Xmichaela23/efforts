@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Calendar } from 'lucide-react';
+import AICoachAssessment from './AICoachAssessment';
 
 // Import the extracted manual component
 import ManualPlanBuilder from './ManualPlanBuilder';
@@ -88,7 +89,7 @@ export default function PlanBuilder() {
   const [realAI] = useState(() => new RealTrainingAI());
 
   // Tab management
-  const [activeTab, setActiveTab] = useState<'assessment' | 'manual'>('assessment');
+  const [activeTab, setActiveTab] = useState<'assessment' | 'manual' | 'ai-coach'>('ai-coach');
   
   // Assessment tab state
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -1085,6 +1086,16 @@ Be intelligent about interpreting their fitness and benchmark descriptions to cr
         <div className="max-w-2xl mx-auto mb-8">
           <div className="flex">
             <button
+              onClick={() => setActiveTab('ai-coach')}
+              className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
+                activeTab === 'ai-coach'
+                  ? 'border-black text-black'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              Training Assistant
+            </button>
+            <button
               onClick={() => setActiveTab('assessment')}
               className={`flex-1 py-3 px-4 text-center font-medium border-b-2 ${
                 activeTab === 'assessment'
@@ -1108,7 +1119,9 @@ Be intelligent about interpreting their fitness and benchmark descriptions to cr
         </div>
 
         <div className="max-w-2xl mx-auto">
-          {activeTab === 'assessment' ? (
+          {activeTab === 'ai-coach' ? (
+            <AICoachAssessment />
+          ) : activeTab === 'assessment' ? (
             /* Assessment Tab */
             <div className="space-y-6">
               {!isComplete && !generatedPlan ? (
