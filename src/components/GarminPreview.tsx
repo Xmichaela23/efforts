@@ -34,14 +34,57 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setHasStarted(true);
 
     try {
-      // NEW: Use Activity Details API for enhanced analysis with power data
-      const analyzed = await GarminDataService.analyzeActivitiesWithDetailedData(
-        accessToken,
+      // Get user session token for Supabase authentication
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        'https://yyriamwvtvzlkumqrvpm.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('User must be logged in');
+      }
+
+      // Get user's Garmin connection
+      const { data: userConnection } = await supabase
+        .from("user_connections")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .eq("provider", "garmin")
+        .single();
+
+      if (!userConnection) {
+        throw new Error("No Garmin connection found");
+      }
+
+      // Fetch activities from Supabase (90 days)
+      const endDate = new Date();
+      const startDate = new Date(endDate.getTime() - (90 * 24 * 60 * 60 * 1000)); // 90 days ago
+
+      const { data: activities, error } = await supabase
+        .from("garmin_activities")
+        .select("*")
+        .eq("garmin_user_id", userConnection.connection_data.user_id)
+        .gte("start_time", startDate.toISOString())
+        .lte("start_time", endDate.toISOString())
+        .order("start_time", { ascending: false });
+
+      if (error) {
+        throw new Error(`Database error: ${error.message}`);
+      }
+
+      if (!activities || activities.length === 0) {
+        throw new Error("No activities found in database");
+      }
+
+      // Analyze the activities from Supabase
+      const analyzed = await GarminDataService.analyzeActivitiesFromDatabase(
+        activities,
         currentBaselines
       );
       setAnalyzedData(analyzed);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch Garmin data');
+      setError(err instanceof Error ? err.message : 'Failed to analyze data');
     } finally {
       setLoading(false);
     }
@@ -252,21 +295,21 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       <div className="space-y-6">
         <div className="text-center">
           <button
-            onClick={fetchAndAnalyzeData}
-            className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
-          >
-            <TrendingUp className="h-4 w-4 inline mr-2" />
-            Analyze
-          </button>
-        </div>
-
-        <div className="text-center">
-          <button
             onClick={requestHistoricalData}
             className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
           >
             <Download className="h-4 w-4 inline mr-2" />
             Import 90 Day Workout History
+          </button>
+        </div>
+
+        <div className="text-center">
+          <button
+            onClick={fetchAndAnalyzeData}
+            className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+          >
+            <TrendingUp className="h-4 w-4 inline mr-2" />
+            Analyze
           </button>
         </div>
       </div>

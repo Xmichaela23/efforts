@@ -289,10 +289,94 @@ static async analyzeActivitiesForBaselines(
 }
 
 // NEW: Enhanced analysis using Activity Details API with 6 months of detailed data
-static async analyzeActivitiesWithDetailedData(
-  accessToken: string,
-  currentBaselines: any
-): Promise<AnalyzedGarminData> {
+  static async analyzeActivitiesFromDatabase(
+    activities: any[],
+    currentBaselines: any
+  ): Promise<AnalyzedGarminData> {
+    console.log('🔍 GARMIN DEBUG: Analyzing activities from database', activities.length);
+
+    // Convert database activities to GarminActivity format
+    const garminActivities: GarminActivity[] = activities.map(activity => ({
+      activityId: activity.garmin_activity_id,
+      activityName: activity.activity_name || 'Unknown Activity',
+      activityType: {
+        typeId: 0,
+        typeKey: activity.activity_type || 'unknown'
+      },
+      eventType: {
+        typeId: 0,
+        typeKey: 'manual'
+      },
+      startTimeLocal: activity.start_time || '',
+      startTimeGMT: activity.start_time || '',
+      distance: activity.distance_meters || 0,
+      duration: activity.duration_seconds || 0,
+      movingDuration: activity.duration_seconds || 0,
+      elapsedDuration: activity.duration_seconds || 0,
+      elevationGain: activity.elevation_gain_meters || 0,
+      elevationLoss: activity.elevation_loss_meters || 0,
+      averageSpeed: activity.avg_speed_mps || 0,
+      maxSpeed: activity.max_speed_mps || 0,
+      averageHR: activity.avg_heart_rate || undefined,
+      maxHR: activity.max_heart_rate || undefined,
+      averagePower: activity.avg_power_watts || undefined,
+      maxPower: activity.max_power_watts || undefined,
+      normalizedPower: activity.normalized_power_watts || undefined,
+      calories: activity.calories || 0,
+      averageRunningCadence: activity.avg_running_cadence || undefined,
+      maxRunningCadence: activity.max_running_cadence || undefined,
+      strokes: activity.strokes || undefined,
+      poolLength: activity.pool_length_meters || undefined,
+      unitOfPoolLength: activity.pool_length_meters ? {
+        unitId: 1,
+        unitKey: 'meter',
+        factor: 1
+      } : undefined
+    }));
+
+    // Analyze the activities directly
+    const detectedMetrics: DetectedMetric[] = [];
+    const sportsWithData: string[] = [];
+
+    // Group activities by sport
+    const sportGroups = this.groupActivitiesBySport(garminActivities);
+
+    // Analyze each sport
+    for (const [sport, sportActivities] of Object.entries(sportGroups)) {
+      if (sportActivities.length >= 3) { // Minimum threshold
+        sportsWithData.push(sport);
+
+        switch (sport) {
+          case 'running':
+            const runningMetrics = await this.analyzeRunningData(sportActivities, currentBaselines);
+            detectedMetrics.push(...runningMetrics);
+            break;
+          case 'cycling':
+            detectedMetrics.push(...this.analyzeCyclingData(sportActivities, currentBaselines));
+            break;
+          case 'swimming':
+            detectedMetrics.push(...this.analyzeSwimmingData(sportActivities, currentBaselines));
+            break;
+        }
+      }
+    }
+
+    return {
+      activities: garminActivities,
+      totalActivities: garminActivities.length,
+      dateRange: {
+        start: garminActivities.length > 0 ? garminActivities[garminActivities.length - 1].startTimeLocal : '',
+        end: garminActivities.length > 0 ? garminActivities[0].startTimeLocal : ''
+      },
+      sportsWithData,
+      detectedMetrics
+    };
+  }
+
+  static async analyzeActivitiesWithDetailedData(
+    accessToken: string,
+    currentBaselines: any
+  ): Promise<AnalyzedGarminData> {
   if (!accessToken) {
     throw new Error('Access token required for detailed analysis');
   }
