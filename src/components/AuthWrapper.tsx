@@ -10,40 +10,41 @@ const AuthWrapper: React.FC = () => {
   const [approved, setApproved] = useState<boolean | null>(null);
   const [showRegister, setShowRegister] = useState(false);
 
-  // Helper to check approval for a given user
-  const checkApproval = async (userObj: any) => {
-    if (!userObj) {
-      setApproved(null);
-      setLoading(false);
-      return;
-    }
-    const { data, error } = await supabase
-      .from('users')
-      .select('approved')
-      .eq('id', userObj.id)
-      .single();
-    if (error) {
-      setApproved(false);
-    } else {
-      setApproved(data?.approved ?? false);
-    }
-    setLoading(false);
-  };
-
   useEffect(() => {
-    // Listen for auth state changes and check approval every time
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(true);
-      await checkApproval(session?.user ?? null);
-    });
+    // Initial approval check on mount
+    const fetchUserAndApproval = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          setUser(null);
+          setLoading(false);
+          return;
+        }
+        setUser(user);
+        // Fetch approved flag from users table
+        const { data, error } = await supabase
+          .from('users')
+          .select('approved')
+          .eq('id', user.id)
+          .single();
+        if (error) {
+          setApproved(false); // default to not approved
+        } else {
+          setApproved(data?.approved ?? false);
+        }
+      } catch (err) {
+        setApproved(false);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    // On initial mount, check for an existing session
-    (async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+    fetchUserAndApproval();
+
+    // Listen for auth state changes (set user only)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      await checkApproval(session?.user ?? null);
-    })();
+    });
 
     return () => subscription.unsubscribe();
   }, []);
