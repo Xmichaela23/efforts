@@ -30,12 +30,12 @@ export default function AIPlanBuilder() {
 
   return (
     <div className="max-w-lg mx-auto mt-8 p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">Training Assistant</h2>
+      <h2 className="text-xl font-semibold mb-4">Create a Training Plan</h2>
       <div className="space-y-6">
         {/* Step 1: Focus selection */}
         {step === 0 && (
           <div>
-            <div className="mb-4 text-gray-800 font-medium">What are you training for?</div>
+            <div className="mb-4 text-gray-800 font-medium">What is your focus?</div>
             <div className="grid grid-cols-3 gap-3 mb-6">
               {FOCUS_OPTIONS.map((opt) => (
                 <button
