@@ -146,13 +146,14 @@ export default function AICoachAssessment() {
 
   const getCurrentQuestion = () => {
     const questions = [
-      { key: 'hasSpecificEvent', label: 'Specific Event' },
       { key: 'goal', label: 'Training Goal' },
+      { key: 'hasSpecificEvent', label: 'Specific Event' },
       { key: 'timeline', label: 'Timeline' },
+      { key: 'previousExperience', label: 'Previous Experience' },
+      { key: 'previousTimes', label: 'Previous Times' },
       { key: 'swimming', label: 'Swimming Relationship' },
       { key: 'cycling', label: 'Cycling Relationship' },
       { key: 'running', label: 'Running Relationship' },
-      { key: 'philosophy', label: 'Training Philosophy' },
       { key: 'trainingFrequency', label: 'Training Frequency' },
       { key: 'weekdayDuration', label: 'Weekday Duration' },
       { key: 'weekendDuration', label: 'Long Session Days' },
@@ -170,19 +171,6 @@ export default function AICoachAssessment() {
 
     const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration, strength, strengthGoal, philosophy } = responses;
 
-    if (!responses.hasSpecificEvent) {
-      return {
-        content: "Do you have a specific event in mind?",
-        options: [
-          "Yes, I'm registered for a specific event",
-          "Yes, but I haven't registered yet",
-          "No, just training for the distance",
-          "I'm looking for events to target"
-        ],
-        isComplete: false
-      };
-    }
-
     if (!goal) {
       return {
         content: "What are you training for?",
@@ -196,6 +184,19 @@ export default function AICoachAssessment() {
           "10K",
           "5K",
           "General fitness"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!responses.hasSpecificEvent) {
+      return {
+        content: "Do you have a specific event in mind?",
+        options: [
+          "Yes, I'm registered for a specific event",
+          "Yes, but I haven't registered yet",
+          "No, just training for the distance",
+          "I'm looking for events to target"
         ],
         isComplete: false
       };
@@ -352,7 +353,7 @@ export default function AICoachAssessment() {
       }
     }
 
-    if (!timeline) {
+    if (!swimming) {
       return {
         content: "What's your relationship with swimming?",
         options: ["I love it", "I tolerate it", "I hate it", "It's my strength"],
@@ -360,7 +361,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!swimming) {
+    if (!cycling) {
       return {
         content: "Got it. What's your relationship with cycling?",
         options: ["I love it", "I tolerate it", "I hate it", "It's my strength"],
@@ -368,7 +369,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!cycling) {
+    if (!running) {
       return {
         content: "And what's your relationship with running?",
         options: ["I love it", "I tolerate it", "I hate it", "It's my strength"],
@@ -376,12 +377,12 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!running) {
+    if (!responses.previousExperience) {
       return {
         content: "Have you completed similar events before?",
         options: [
           "Yes, multiple times",
-          "Yes, once or twice",
+          "Yes, once or twice", 
           "No, this would be my first",
           "Similar but shorter distance"
         ],
@@ -389,31 +390,22 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!responses.previousExperience) {
+    if (!responses.previousTimes) {
       return {
         content: "What were your previous finish times? (If applicable)",
         options: [
           "I don't remember the exact times",
-          "I was happy with my performance",
+          "I was happy with my performance", 
           "I struggled but finished",
           "I didn't finish (DNF)",
-          "This is my first attempt"
+          "This is my first attempt",
+          "I can enter my exact times"
         ],
         isComplete: false
       };
     }
 
-    if (!responses.previousTimes) {
-      return {
-        content: "How many days per week can you train?",
-        options: [
-          "2-3 days",
-          "4-5 days",
-          "6+ days"
-        ],
-        isComplete: false
-      };
-    }
+
 
     if (!trainingFrequency) {
       // 70.3-specific frequency options
