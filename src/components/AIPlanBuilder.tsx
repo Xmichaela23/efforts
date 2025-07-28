@@ -41,10 +41,10 @@ export default function AIPlanBuilder() {
                 <button
                   key={opt.key}
                   onClick={() => toggleFocus(opt.key)}
-                  className={`border rounded px-4 py-2 text-left transition-colors ${
+                  className={`rounded px-4 py-2 text-left transition-colors ${
                     selectedFocus.includes(opt.key)
-                      ? 'bg-gray-800 text-white border-gray-800'
-                      : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-100'
+                      ? 'bg-gray-800 text-white'
+                      : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
                   }`}
                 >
                   {opt.label}
@@ -55,10 +55,10 @@ export default function AIPlanBuilder() {
               <button
                 key="hybrid"
                 onClick={() => toggleFocus('hybrid')}
-                className={`border rounded px-4 py-2 text-left transition-colors w-1/2 ${
+                className={`rounded px-4 py-2 text-left transition-colors w-1/2 ${
                   selectedFocus.includes('hybrid')
-                    ? 'bg-gray-800 text-white border-gray-800'
-                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-100'
+                    ? 'bg-gray-800 text-white'
+                    : 'bg-gray-50 text-gray-800 hover:bg-gray-100'
                 }`}
               >
                 Hybrid (mix of these)
