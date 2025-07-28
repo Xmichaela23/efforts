@@ -38,11 +38,11 @@ export default function AIPlanBuilder() {
             <div className="mb-4 text-gray-800 font-medium">What is your focus?</div>
             <div className="grid grid-cols-3 gap-3 mb-6">
               {/* First row: Run, Triathlon (center), Ride */}
-              <div className="col-span-1 flex justify-center">
+              <div className="col-span-1">
                 <button
                   key="run"
                   onClick={() => toggleFocus('run')}
-                  className={`rounded px-4 py-2 text-center transition-colors w-full ${
+                  className={`rounded px-4 py-2 w-full text-center transition-colors ${
                     selectedFocus.includes('run')
                       ? 'bg-gray-200 text-black'
                       : 'bg-white text-black hover:bg-gray-100'
@@ -51,11 +51,11 @@ export default function AIPlanBuilder() {
                   Run
                 </button>
               </div>
-              <div className="col-span-1 flex justify-center">
+              <div className="col-span-1">
                 <button
                   key="triathlon"
                   onClick={() => toggleFocus('triathlon')}
-                  className={`rounded px-4 py-2 text-center transition-colors w-full ${
+                  className={`rounded px-4 py-2 w-full text-center transition-colors ${
                     selectedFocus.includes('triathlon')
                       ? 'bg-gray-200 text-black'
                       : 'bg-white text-black hover:bg-gray-100'
@@ -64,11 +64,11 @@ export default function AIPlanBuilder() {
                   Triathlon
                 </button>
               </div>
-              <div className="col-span-1 flex justify-center">
+              <div className="col-span-1">
                 <button
                   key="ride"
                   onClick={() => toggleFocus('ride')}
-                  className={`rounded px-4 py-2 text-center transition-colors w-full ${
+                  className={`rounded px-4 py-2 w-full text-center transition-colors ${
                     selectedFocus.includes('ride')
                       ? 'bg-gray-200 text-black'
                       : 'bg-white text-black hover:bg-gray-100'
@@ -78,11 +78,11 @@ export default function AIPlanBuilder() {
                 </button>
               </div>
               {/* Second row: Strength, Mobility, Swim */}
-              <div className="col-span-1 flex justify-center">
+              <div className="col-span-1">
                 <button
                   key="strength"
                   onClick={() => toggleFocus('strength')}
-                  className={`rounded px-4 py-2 text-center transition-colors w-full ${
+                  className={`rounded px-4 py-2 w-full text-center transition-colors ${
                     selectedFocus.includes('strength')
                       ? 'bg-gray-200 text-black'
                       : 'bg-white text-black hover:bg-gray-100'
@@ -91,11 +91,11 @@ export default function AIPlanBuilder() {
                   Strength
                 </button>
               </div>
-              <div className="col-span-1 flex justify-center">
+              <div className="col-span-1">
                 <button
                   key="mobility"
                   onClick={() => toggleFocus('mobility')}
-                  className={`rounded px-4 py-2 text-center transition-colors w-full ${
+                  className={`rounded px-4 py-2 w-full text-center transition-colors ${
                     selectedFocus.includes('mobility')
                       ? 'bg-gray-200 text-black'
                       : 'bg-white text-black hover:bg-gray-100'
@@ -104,11 +104,11 @@ export default function AIPlanBuilder() {
                   Mobility
                 </button>
               </div>
-              <div className="col-span-1 flex justify-center">
+              <div className="col-span-1">
                 <button
                   key="swim"
                   onClick={() => toggleFocus('swim')}
-                  className={`rounded px-4 py-2 text-center transition-colors w-full ${
+                  className={`rounded px-4 py-2 w-full text-center transition-colors ${
                     selectedFocus.includes('swim')
                       ? 'bg-gray-200 text-black'
                       : 'bg-white text-black hover:bg-gray-100'
