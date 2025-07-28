@@ -229,6 +229,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         gender: data.gender,
         units: data.units,
         current_volume: data.current_volume,
+        training_frequency: data.training_frequency,
+        volume_increase_capacity: data.volume_increase_capacity,
         training_status: data.training_status,
         benchmark_recency: data.benchmark_recency,
         // Existing fields
@@ -288,6 +290,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         gender: data.gender,
         units: data.units,
         current_volume: data.current_volume,
+        training_frequency: data.training_frequency,
+        volume_increase_capacity: data.volume_increase_capacity,
         training_status: data.training_status,
         benchmark_recency: data.benchmark_recency,
         // Existing fields
