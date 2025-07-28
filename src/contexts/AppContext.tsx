@@ -55,6 +55,8 @@ interface BaselineData {
   gender?: 'male' | 'female' | 'prefer_not_to_say';
   units?: 'metric' | 'imperial';
   current_volume?: { [discipline: string]: string };
+  training_frequency?: { [discipline: string]: string };
+  volume_increase_capacity?: { [discipline: string]: string };
   training_status?: { [discipline: string]: string };
   benchmark_recency?: { [discipline: string]: string };
   
