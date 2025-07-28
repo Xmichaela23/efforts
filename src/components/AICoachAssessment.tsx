@@ -146,6 +146,7 @@ export default function AICoachAssessment() {
 
   const getCurrentQuestion = () => {
     const questions = [
+      { key: 'hasSpecificEvent', label: 'Specific Event' },
       { key: 'goal', label: 'Training Goal' },
       { key: 'timeline', label: 'Timeline' },
       { key: 'swimming', label: 'Swimming Relationship' },
@@ -163,13 +164,13 @@ export default function AICoachAssessment() {
     return questions[assessmentState.currentStep];
   };
 
-  const generateNextResponse = async (selectedOption: string, responses: Record<string, any>) => {
+    const generateNextResponse = async (selectedOption: string, responses: Record<string, any>) => {
     // Simulate AI response generation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
     const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration, strength, strengthGoal, philosophy } = responses;
 
-    if (!goal) {
+    if (!responses.hasSpecificEvent) {
       return {
         content: "Do you have a specific event in mind?",
         options: [
@@ -182,7 +183,25 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!responses.hasSpecificEvent) {
+    if (!goal) {
+      return {
+        content: "What are you training for?",
+        options: [
+          "70.3 Triathlon",
+          "Olympic Triathlon", 
+          "Sprint Triathlon",
+          "Ironman",
+          "Marathon",
+          "Half Marathon",
+          "10K",
+          "5K",
+          "General fitness"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!timeline) {
       // Smart timeline recommendation based on baselines
       let timelineRecommendation = "6 months";
       let timelineExplanation = "";
