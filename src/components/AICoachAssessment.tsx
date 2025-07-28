@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MessageCircle, User } from 'lucide-react';
+import { ArrowLeft, MessageCircle, User, Calendar as CalendarIcon } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { RealTrainingAI } from '@/services/RealTrainingAI';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
+import { format } from 'date-fns';
 
 interface ConversationMessage {
   id: string;
@@ -10,6 +14,7 @@ interface ConversationMessage {
   options?: string[];
   selectedOption?: string;
   timestamp: Date;
+  showDatePicker?: boolean;
 }
 
 interface AssessmentState {
@@ -30,6 +35,8 @@ export default function AICoachAssessment() {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [baselineData, setBaselineData] = useState<any>(null);
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
   // Load baseline data and initialize conversation
   useEffect(() => {
@@ -249,7 +256,8 @@ export default function AICoachAssessment() {
           "Enter event date",
           "I'll enter it later"
         ],
-        isComplete: false
+        isComplete: false,
+        showDatePicker: true
       };
     }
 
@@ -761,6 +769,37 @@ export default function AICoachAssessment() {
                         {option}
                       </button>
                     ))}
+                    
+                    {/* Date Picker for Event Date */}
+                    {message.showDatePicker && (
+                      <div className="mt-3">
+                        <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={selectedDate}
+                              onSelect={(date) => {
+                                setSelectedDate(date);
+                                if (date) {
+                                  handleOptionSelect(date.toISOString().split('T')[0]);
+                                  setShowDatePicker(false);
+                                }
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
