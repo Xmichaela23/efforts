@@ -910,6 +910,68 @@ return (
                                 </div>
                               </div>
 
+                              {/* Training Frequency */}
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                  How many days per week do you currently {disciplineId}?
+                                </label>
+                                <div className="space-y-2">
+                                  {getTrainingFrequencyOptions().map((option, index) => (
+                                    <button
+                                      key={index}
+                                      onClick={() => setData(prev => ({
+                                        ...prev,
+                                        training_frequency: {
+                                          ...prev.training_frequency,
+                                          [disciplineId]: option
+                                        }
+                                      }))}
+                                      className={`w-full p-3 text-left text-sm transition-colors ${
+                                        data.training_frequency?.[disciplineId] === option
+                                          ? 'text-blue-600' 
+                                          : 'hover:text-blue-600'
+                                      }`}
+                                    >
+                                      <span className="font-medium text-gray-500 mr-3">
+                                        {data.training_frequency?.[disciplineId] === option ? '●' : '○'}
+                                      </span>
+                                      {option}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Volume Increase Capacity */}
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">
+                                  Can you currently increase your {disciplineId} training by 10% without issues?
+                                </label>
+                                <div className="space-y-2">
+                                  {getVolumeIncreaseOptions().map((option, index) => (
+                                    <button
+                                      key={index}
+                                      onClick={() => setData(prev => ({
+                                        ...prev,
+                                        volume_increase_capacity: {
+                                          ...prev.volume_increase_capacity,
+                                          [disciplineId]: option
+                                        }
+                                      }))}
+                                      className={`w-full p-3 text-left text-sm transition-colors ${
+                                        data.volume_increase_capacity?.[disciplineId] === option
+                                          ? 'text-blue-600' 
+                                          : 'hover:text-blue-600'
+                                      }`}
+                                    >
+                                      <span className="font-medium text-gray-500 mr-3">
+                                        {data.volume_increase_capacity?.[disciplineId] === option ? '●' : '○'}
+                                      </span>
+                                      {option}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
                               {/* Training Status */}
                               <div className="space-y-2">
                                 <label className="text-sm font-medium text-gray-700">
@@ -1174,6 +1236,8 @@ return (
                     const allPossibleSports = ['running', 'cycling', 'swimming', 'strength'];
                     const sportsWithData = allPossibleSports.filter(disciplineId => {
                       return data.current_volume?.[disciplineId] || 
+                             data.training_frequency?.[disciplineId] ||
+                             data.volume_increase_capacity?.[disciplineId] ||
                              data.training_status?.[disciplineId] || 
                              data.benchmark_recency?.[disciplineId] ||
                              data.disciplineFitness?.[disciplineId] || 
@@ -1202,6 +1266,14 @@ return (
                                   <div>
                                     <span className="text-gray-600">Current Volume: </span>
                                     <span>{data.current_volume?.[disciplineId] || 'Not set'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Training Frequency: </span>
+                                    <span>{data.training_frequency?.[disciplineId] || 'Not set'}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-600">Volume Increase Capacity: </span>
+                                    <span>{data.volume_increase_capacity?.[disciplineId] || 'Not set'}</span>
                                   </div>
                                   <div>
                                     <span className="text-gray-600">Training Status: </span>

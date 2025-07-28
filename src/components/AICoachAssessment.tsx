@@ -182,7 +182,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!assessmentState.responses.hasSpecificEvent) {
+    if (!responses.hasSpecificEvent) {
       // Smart timeline recommendation based on baselines
       let timelineRecommendation = "6 months";
       let timelineExplanation = "";
@@ -222,7 +222,7 @@ export default function AICoachAssessment() {
     }
 
     // If they have a specific event, validate timeline against fitness
-    if (assessmentState.responses.hasSpecificEvent === "Yes, I'm registered for a specific event" && !assessmentState.responses.eventDate) {
+    if (responses.hasSpecificEvent === "Yes, I'm registered for a specific event" && !responses.eventDate) {
       return {
         content: "When is your event? (This will help us validate your timeline)",
         options: [
@@ -234,7 +234,7 @@ export default function AICoachAssessment() {
     }
 
     // Course details for specific events
-    if (assessmentState.responses.hasSpecificEvent && assessmentState.responses.eventDate && !assessmentState.responses.courseProfile) {
+    if (responses.hasSpecificEvent && responses.eventDate && !responses.courseProfile) {
       return {
         content: "What's the course profile like?",
         options: [
@@ -247,7 +247,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (assessmentState.responses.courseProfile && !assessmentState.responses.surfaceType) {
+    if (responses.courseProfile && !responses.surfaceType) {
       return {
         content: "What's the surface type?",
         options: [
@@ -261,7 +261,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (assessmentState.responses.surfaceType && !assessmentState.responses.climate) {
+    if (responses.surfaceType && !responses.climate) {
       return {
         content: "What's the expected climate?",
         options: [
@@ -278,8 +278,8 @@ export default function AICoachAssessment() {
     }
 
     // Timeline validation for specific events
-    if (assessmentState.responses.hasSpecificEvent && assessmentState.responses.eventDate && !timeline) {
-      const eventDate = new Date(assessmentState.responses.eventDate);
+    if (responses.hasSpecificEvent && responses.eventDate && !timeline) {
+      const eventDate = new Date(responses.eventDate);
       const today = new Date();
       const weeksUntilEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 7));
       
@@ -317,7 +317,7 @@ export default function AICoachAssessment() {
     }
 
     // 70.3 Training Gate Check (for non-specific events)
-    if (goal && goal.includes("70.3") && !timeline && !assessmentState.responses.hasSpecificEvent) {
+    if (goal && goal.includes("70.3") && !timeline && !responses.hasSpecificEvent) {
       const currentVolume = baselineData?.current_volume || {};
       const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
         const hours = parseInt(vol as string) || 0;
@@ -370,7 +370,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!assessmentState.responses.previousExperience) {
+    if (!responses.previousExperience) {
       return {
         content: "What were your previous finish times? (If applicable)",
         options: [
@@ -384,7 +384,7 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!assessmentState.responses.previousTimes) {
+    if (!responses.previousTimes) {
       return {
         content: "How many days per week can you train?",
         options: [
