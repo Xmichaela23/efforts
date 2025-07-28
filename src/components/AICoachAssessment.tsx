@@ -246,12 +246,8 @@ export default function AICoachAssessment() {
     if (responses.hasSpecificEvent === "Yes, I'm registered for a specific event" && !responses.eventDate) {
       return {
         content: "When is your event? (This will help us validate your timeline)",
-        options: [
-          "Enter event date",
-          "I'll enter it later"
-        ],
         isComplete: false,
-        showDatePicker: true
+        showDatePicker: true // Show the date input directly
       };
     }
 
