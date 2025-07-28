@@ -12,10 +12,34 @@ const FOCUS_OPTIONS = [
   { key: 'swim', label: 'Swim' },
 ];
 
+const TIMELINE_OPTIONS = [
+  { key: '3-months', label: '3 months (experienced)' },
+  { key: '6-months', label: '6 months (recommended)' },
+  { key: '12-months', label: '12 months (beginner)' },
+  { key: 'no-timeline', label: 'No specific timeline' },
+];
+
+const EXPERIENCE_OPTIONS = [
+  { key: 'beginner', label: 'Beginner - new to structured training' },
+  { key: 'intermediate', label: 'Intermediate - some experience' },
+  { key: 'advanced', label: 'Advanced - consistent training history' },
+  { key: 'competitive', label: 'Competitive - racing regularly' },
+];
+
+const GOAL_OPTIONS = [
+  { key: 'finish', label: 'Finish the event' },
+  { key: 'improve-time', label: 'Improve my time' },
+  { key: 'build-fitness', label: 'Build general fitness' },
+  { key: 'maintain', label: 'Maintain current level' },
+];
+
 export default function AIPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
+  const [timeline, setTimeline] = useState<string>('');
+  const [experience, setExperience] = useState<string>('');
+  const [goal, setGoal] = useState<string>('');
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -28,12 +52,10 @@ export default function AIPlanBuilder() {
     );
   };
 
-  return (
-    <div className="max-w-lg mx-auto mt-8 p-4 bg-white rounded shadow">
-      <h2 className="text-xl font-semibold mb-4">Create a Training Plan</h2>
-      <div className="space-y-6">
-        {/* Step 1: Focus selection */}
-        {step === 0 && (
+  const getCurrentStepContent = () => {
+    switch (step) {
+      case 0:
+        return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">What is your focus?</div>
             <div className="grid grid-cols-3 gap-3 mb-6">
@@ -139,11 +161,143 @@ export default function AIPlanBuilder() {
               Next
             </button>
           </div>
-        )}
-        {/* Future steps go here */}
-        {step === 1 && (
-          <div className="text-gray-600">(TODO: Continue assessment and plan generation...)</div>
-        )}
+        );
+
+      case 1:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">What's your timeline?</div>
+            <div className="space-y-3 mb-6">
+              {TIMELINE_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => setTimeline(option.key)}
+                  className={`w-full p-3 text-left rounded transition-colors ${
+                    timeline === option.key
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                onClick={() => setStep(0)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                disabled={!timeline}
+                onClick={() => setStep(2)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 2:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">What's your experience level?</div>
+            <div className="space-y-3 mb-6">
+              {EXPERIENCE_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => setExperience(option.key)}
+                  className={`w-full p-3 text-left rounded transition-colors ${
+                    experience === option.key
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                onClick={() => setStep(1)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                disabled={!experience}
+                onClick={() => setStep(3)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">What's your primary goal?</div>
+            <div className="space-y-3 mb-6">
+              {GOAL_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => setGoal(option.key)}
+                  className={`w-full p-3 text-left rounded transition-colors ${
+                    goal === option.key
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                onClick={() => setStep(2)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                disabled={!goal}
+                onClick={() => setStep(4)}
+              >
+                Generate Plan
+              </button>
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="text-center">
+            <div className="mb-4 text-gray-800 font-medium">Generating your plan...</div>
+            <div className="text-gray-600 mb-6">
+              Based on your focus: {selectedFocus.join(', ')}<br />
+              Timeline: {TIMELINE_OPTIONS.find(t => t.key === timeline)?.label}<br />
+              Experience: {EXPERIENCE_OPTIONS.find(e => e.key === experience)?.label}<br />
+              Goal: {GOAL_OPTIONS.find(g => g.key === goal)?.label}
+            </div>
+            <div className="text-gray-500">(TODO: Connect to AI plan generation)</div>
+          </div>
+        );
+
+      default:
+        return <div>Something went wrong</div>;
+    }
+  };
+
+  return (
+    <div className="max-w-lg mx-auto mt-8 p-4 bg-white rounded shadow">
+      <h2 className="text-xl font-semibold mb-4">Create a Training Plan</h2>
+      <div className="space-y-6">
+        {getCurrentStepContent()}
       </div>
     </div>
   );
