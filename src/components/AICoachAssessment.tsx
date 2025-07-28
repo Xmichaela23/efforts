@@ -799,5 +799,4 @@ export default function AICoachAssessment() {
       </main>
     </div>
   );
-} 
-} 
+}
