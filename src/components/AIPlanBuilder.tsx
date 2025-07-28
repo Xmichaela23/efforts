@@ -9,7 +9,7 @@ const FOCUS_OPTIONS = [
   { key: 'triathlon', label: 'Triathlon' },
   { key: 'strength', label: 'Strength' },
   { key: 'mobility', label: 'Mobility' },
-  { key: 'hybrid', label: 'Hybrid (mix of these)' },
+  { key: 'swim', label: 'Swim' },
 ];
 
 export default function AIPlanBuilder() {
@@ -36,7 +36,7 @@ export default function AIPlanBuilder() {
         {step === 0 && (
           <div>
             <div className="mb-4 text-gray-800 font-medium">What are you training for?</div>
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-3 gap-3 mb-6">
               {FOCUS_OPTIONS.map((opt) => (
                 <button
                   key={opt.key}
@@ -50,6 +50,19 @@ export default function AIPlanBuilder() {
                   {opt.label}
                 </button>
               ))}
+            </div>
+            <div className="flex justify-center mb-6">
+              <button
+                key="hybrid"
+                onClick={() => toggleFocus('hybrid')}
+                className={`border rounded px-4 py-2 text-left transition-colors w-1/2 ${
+                  selectedFocus.includes('hybrid')
+                    ? 'bg-gray-800 text-white border-gray-800'
+                    : 'bg-white text-gray-800 border-gray-300 hover:bg-gray-100'
+                }`}
+              >
+                Hybrid (mix of these)
+              </button>
             </div>
             <button
               className="w-full bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
