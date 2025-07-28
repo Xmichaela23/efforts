@@ -154,7 +154,8 @@ export default function AICoachAssessment() {
       { key: 'philosophy', label: 'Training Philosophy' },
       { key: 'trainingFrequency', label: 'Training Frequency' },
       { key: 'weekdayDuration', label: 'Weekday Duration' },
-      { key: 'weekendDuration', label: 'Weekend Duration' },
+      { key: 'weekendDuration', label: 'Long Session Days' },
+      { key: 'longSessionDuration', label: 'Long Session Duration' },
       { key: 'strength', label: 'Strength Training' },
       { key: 'strengthGoal', label: 'Strength Goal' },
       { key: 'philosophy', label: 'Training Philosophy' }
@@ -166,14 +167,170 @@ export default function AICoachAssessment() {
     // Simulate AI response generation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { goal, timeline, swimming, cycling, running, trainingFrequency, weekdayDuration, weekendDuration, strength, strengthGoal, philosophy } = responses;
+    const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration, strength, strengthGoal, philosophy } = responses;
 
     if (!goal) {
       return {
-        content: "When is your event?",
-        options: ["4 months", "6 months", "8+ months", "No specific timeline"],
+        content: "Do you have a specific event in mind?",
+        options: [
+          "Yes, I'm registered for a specific event",
+          "Yes, but I haven't registered yet",
+          "No, just training for the distance",
+          "I'm looking for events to target"
+        ],
         isComplete: false
       };
+    }
+
+    if (!assessmentState.responses.hasSpecificEvent) {
+      // Smart timeline recommendation based on baselines
+      let timelineRecommendation = "6 months";
+      let timelineExplanation = "";
+      
+      if (baselineData) {
+        const currentVolume = baselineData.current_volume || {};
+        const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
+          const hours = parseInt(vol as string) || 0;
+          return sum + hours;
+        }, 0) as number;
+        
+        const trainingBackground = baselineData.trainingBackground || "";
+        const hasRaceExperience = baselineData.benchmarks?.running || baselineData.benchmarks?.cycling || baselineData.benchmarks?.swimming;
+        
+        // 3-month criteria
+        if (totalHours >= 8 && trainingBackground.includes("2+ years") && hasRaceExperience) {
+          timelineRecommendation = "3 months";
+          timelineExplanation = "You have excellent fitness and experience for a 3-month timeline.";
+        }
+        // 6-month criteria  
+        else if (totalHours >= 4 && trainingBackground.includes("6+ months")) {
+          timelineRecommendation = "6 months";
+          timelineExplanation = "You have a solid base for a 6-month timeline.";
+        }
+        // 12-month criteria
+        else if (totalHours < 4 || trainingBackground.includes("new") || trainingBackground.includes("inconsistent")) {
+          timelineRecommendation = "12 months";
+          timelineExplanation = "You'll benefit from a longer timeline to build your base safely.";
+        }
+      }
+      
+      return {
+        content: `Based on your baseline assessment, we recommend ${timelineRecommendation}. ${timelineExplanation} When is your event?`,
+        options: ["3 months (experienced)", "6 months (recommended)", "12 months (beginner)", "No specific timeline"],
+        isComplete: false
+      };
+    }
+
+    // If they have a specific event, validate timeline against fitness
+    if (assessmentState.responses.hasSpecificEvent === "Yes, I'm registered for a specific event" && !assessmentState.responses.eventDate) {
+      return {
+        content: "When is your event? (This will help us validate your timeline)",
+        options: [
+          "Enter event date",
+          "I'll enter it later"
+        ],
+        isComplete: false
+      };
+    }
+
+    // Course details for specific events
+    if (assessmentState.responses.hasSpecificEvent && assessmentState.responses.eventDate && !assessmentState.responses.courseProfile) {
+      return {
+        content: "What's the course profile like?",
+        options: [
+          "Flat/Rolling",
+          "Hilly",
+          "Mountainous", 
+          "Mixed terrain"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (assessmentState.responses.courseProfile && !assessmentState.responses.surfaceType) {
+      return {
+        content: "What's the surface type?",
+        options: [
+          "Road/Pavement",
+          "Trail/Dirt",
+          "Gravel",
+          "Mixed surfaces",
+          "Track"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (assessmentState.responses.surfaceType && !assessmentState.responses.climate) {
+      return {
+        content: "What's the expected climate?",
+        options: [
+          "Cool (under 60°F)",
+          "Moderate (60-75°F)",
+          "Warm (75-85°F)",
+          "Hot (85-95°F)",
+          "Very hot (95°F+)",
+          "Humid conditions",
+          "High altitude"
+        ],
+        isComplete: false
+      };
+    }
+
+    // Timeline validation for specific events
+    if (assessmentState.responses.hasSpecificEvent && assessmentState.responses.eventDate && !timeline) {
+      const eventDate = new Date(assessmentState.responses.eventDate);
+      const today = new Date();
+      const weeksUntilEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      
+      const currentVolume = baselineData?.current_volume || {};
+      const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
+        const hours = parseInt(vol as string) || 0;
+        return sum + hours;
+      }, 0) as number;
+      
+      const trainingBackground = baselineData?.trainingBackground || "";
+      
+      // Validate timeline against fitness level
+      if (goal && goal.includes("70.3")) {
+        if (weeksUntilEvent < 12 && totalHours < 6) {
+          return {
+            content: `Your event is in ${weeksUntilEvent} weeks, but you're currently training ${totalHours} hours per week. For a 70.3, you'll need at least 6+ hours per week. Consider:`,
+            options: ["Continue anyway", "Find a later event", "Build base first"],
+            isComplete: false
+          };
+        } else if (weeksUntilEvent < 16 && trainingBackground.includes("new")) {
+          return {
+            content: `Your event is in ${weeksUntilEvent} weeks, but you're new to structured training. Consider:`,
+            options: ["Continue anyway", "Find a later event", "Build base first"],
+            isComplete: false
+          };
+        }
+      }
+      
+      // Set timeline based on event date
+      return {
+        content: `Your event is in ${weeksUntilEvent} weeks. Based on your current fitness, this timeline is ${weeksUntilEvent >= 16 ? 'realistic' : weeksUntilEvent >= 12 ? 'challenging but possible' : 'aggressive'}.`,
+        options: ["Continue with this timeline", "Find a later event", "Build base first"],
+        isComplete: false
+      };
+    }
+
+    // 70.3 Training Gate Check (for non-specific events)
+    if (goal && goal.includes("70.3") && !timeline && !assessmentState.responses.hasSpecificEvent) {
+      const currentVolume = baselineData?.current_volume || {};
+      const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
+        const hours = parseInt(vol as string) || 0;
+        return sum + hours;
+      }, 0) as number;
+
+      if (totalHours < 4) {
+        return {
+          content: `For a 70.3, you'll need at least 4-5 hours per week to start. You're currently training ${totalHours} hours. Most successful 70.3 athletes build to 8-13 hours per week.`,
+          options: ["Continue anyway", "Extend timeline", "Build base first"],
+          isComplete: false
+        };
+      }
     }
 
     if (!timeline) {
@@ -202,6 +359,33 @@ export default function AICoachAssessment() {
 
     if (!running) {
       return {
+        content: "Have you completed similar events before?",
+        options: [
+          "Yes, multiple times",
+          "Yes, once or twice",
+          "No, this would be my first",
+          "Similar but shorter distance"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!assessmentState.responses.previousExperience) {
+      return {
+        content: "What were your previous finish times? (If applicable)",
+        options: [
+          "I don't remember the exact times",
+          "I was happy with my performance",
+          "I struggled but finished",
+          "I didn't finish (DNF)",
+          "This is my first attempt"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!assessmentState.responses.previousTimes) {
+      return {
         content: "How many days per week can you train?",
         options: [
           "2-3 days",
@@ -213,6 +397,44 @@ export default function AICoachAssessment() {
     }
 
     if (!trainingFrequency) {
+      // 70.3-specific frequency options
+      if (goal && goal.includes("70.3")) {
+        return {
+          content: "For a 70.3, you'll need at least 6 days per week (2 swims, 3 bikes, 2 runs). How many days can you train?",
+          options: [
+            "6 days (minimum for 70.3)",
+            "7 days (optimal)",
+            "5 days (challenging but possible)"
+          ],
+          isComplete: false
+        };
+      }
+      
+      return {
+        content: "How many days per week can you train?",
+        options: [
+          "2-3 days",
+          "4-5 days",
+          "6+ days"
+        ],
+        isComplete: false
+      };
+    }
+
+    if (!weekdayDuration) {
+      // 70.3-specific weekday options
+      if (goal && goal.includes("70.3")) {
+        return {
+          content: "For 70.3 training, weekday sessions should be 45-90 minutes. How long do you want your weekday sessions?",
+          options: [
+            "45-60 minutes (minimum)",
+            "60-75 minutes (recommended)",
+            "75-90 minutes (optimal)"
+          ],
+          isComplete: false
+        };
+      }
+      
       return {
         content: "How long do you want your weekday sessions?",
         options: [
@@ -225,9 +447,24 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!weekdayDuration) {
+    if (!weekendDuration) {
+      // 70.3-specific weekend options with back-to-back emphasis
+      if (goal && goal.includes("70.3")) {
+        return {
+          content: "For 70.3, you'll need long bike rides (up to 3 hours) and long runs (up to 90 minutes). When are your long training days?",
+          options: [
+            "Saturday & Sunday (traditional)",
+            "Tuesday & Wednesday (midweek)",
+            "Wednesday & Thursday (midweek)",
+            "Friday & Saturday (weekend start)",
+            "Sunday & Monday (weekend end)"
+          ],
+          isComplete: false
+        };
+      }
+      
       return {
-        content: "How long do you want your weekend sessions?",
+        content: "How long do you want your longer sessions?",
         options: [
           "1-2 hours",
           "2-3 hours",
@@ -238,16 +475,27 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (!weekendDuration) {
+    if (!longSessionDuration) {
+      // 70.3-specific long session duration
+      if (goal && goal.includes("70.3")) {
+        return {
+          content: "How long do you want your long sessions? (Bike rides up to 3 hours, runs up to 90 minutes)",
+          options: [
+            "1.5-2 hours (bike) / 60-75 min (run)",
+            "2-2.5 hours (bike) / 75-90 min (run)",
+            "2.5-3 hours (bike) / 90+ min (run)"
+          ],
+          isComplete: false
+        };
+      }
+      
       return {
-        content: "Do you want to add strength training to your plan?",
+        content: "How long do you want your longer sessions?",
         options: [
-          "No strength training",
-          "Injury prevention focus",
-          "Power development", 
-          "Sport-specific functional",
-          "Build muscle",
-          "General fitness"
+          "1-2 hours",
+          "2-3 hours",
+          "3-4 hours",
+          "4+ hours"
         ],
         isComplete: false
       };
@@ -265,6 +513,8 @@ export default function AICoachAssessment() {
         isComplete: false
       };
     }
+
+
 
     if (!strengthGoal) {
       return {
@@ -361,15 +611,42 @@ export default function AICoachAssessment() {
   };
 
   const buildAIPrompt = (responses: Record<string, any>, baselineData: any) => {
-    const { goal, timeline, swimming, cycling, running, philosophy, strength, sessionDuration, strengthGoal } = responses;
+    const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, philosophy, strength, sessionDuration, strengthGoal, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration } = responses;
     
-    let prompt = `Create a training plan for ${goal}`;
+    let prompt = `Create a ${timeline} training plan for ${goal}`;
     
-    if (timeline && timeline !== "No specific timeline") {
-      prompt += ` with ${timeline} timeline`;
+    // Timeline-specific guidance
+    if (timeline === "3 months (experienced)") {
+      prompt += `. This is for an experienced athlete with strong base fitness. Focus on high-intensity training and race-specific workouts.`;
+    } else if (timeline === "6 months (recommended)") {
+      prompt += `. This is for an intermediate athlete with solid base. Include proper periodization with base, build, and peak phases.`;
+    } else if (timeline === "12 months (beginner)") {
+      prompt += `. This is for a beginner athlete. Focus on building aerobic base, technique development, and injury prevention.`;
     }
     
     prompt += `. The athlete's relationship with swimming is: ${swimming}, cycling: ${cycling}, running: ${running}`;
+    
+    // Race experience context
+    if (previousExperience) {
+      prompt += `. Previous race experience: ${previousExperience}`;
+      if (previousTimes) {
+        prompt += `. Previous performance: ${previousTimes}`;
+      }
+    }
+
+    // Course details for specific events
+    if (hasSpecificEvent && eventDate) {
+      prompt += `. Specific event with date: ${eventDate}`;
+      if (courseProfile) {
+        prompt += `. Course profile: ${courseProfile}`;
+      }
+      if (surfaceType) {
+        prompt += `. Surface type: ${surfaceType}`;
+      }
+      if (climate) {
+        prompt += `. Expected climate: ${climate}`;
+      }
+    }
     
     if (philosophy) {
       prompt += `. Training philosophy: ${philosophy}`;
@@ -378,17 +655,40 @@ export default function AICoachAssessment() {
     if (strength && strength !== "No") {
       prompt += `. Include strength training: ${strength}`;
       if (strengthGoal) {
-        prompt += ` with goal: ${strengthGoal}`;
+        prompt += ` with focus on ${strengthGoal}`;
       }
     }
     
-    if (sessionDuration) {
-      prompt += `. Session duration preference: ${sessionDuration}`;
+    // Training frequency and duration
+    if (trainingFrequency) {
+      prompt += `. Training frequency: ${trainingFrequency}`;
+    }
+    if (weekdayDuration) {
+      prompt += `. Weekday session duration: ${weekdayDuration}`;
+    }
+    if (longSessionDuration) {
+      prompt += `. Long session duration: ${longSessionDuration}`;
     }
     
+    // Age-specific considerations for 40+ athletes
+    if (baselineData?.age >= 40) {
+      prompt += `. Athlete is ${baselineData.age} years old - prioritize recovery and injury prevention.`;
+    }
+    
+    // Baseline data for context
     if (baselineData) {
       prompt += `. Current training volume: ${JSON.stringify(baselineData.current_volume)}`;
       prompt += `. Training background: ${baselineData.trainingBackground}`;
+      if (baselineData.benchmarks) {
+        prompt += `. Performance benchmarks: ${JSON.stringify(baselineData.benchmarks)}`;
+      }
+    }
+    
+    prompt += `. Create a structured training plan with proper periodization: base phase (aerobic development), build phase (intensity increase), peak phase (race-specific), and taper phase (recovery). Include recovery weeks every 3-4 weeks with 50-70% volume reduction. Ensure progressive overload with appropriate intensity distribution based on training philosophy.`;
+    
+    // Add nutrition guidance for training sessions
+    if (goal && (goal.includes("70.3") || goal.includes("Ironman") || goal.includes("Marathon"))) {
+      prompt += ` Include training nutrition guidance: 30-60g carbs per hour for sessions over 60 minutes, hydration recommendations, and race day nutrition strategy.`;
     }
     
     return prompt;
@@ -499,4 +799,5 @@ export default function AICoachAssessment() {
       </main>
     </div>
   );
+} 
 } 

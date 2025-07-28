@@ -16,6 +16,8 @@ weight?: number;
 gender?: 'male' | 'female' | 'prefer_not_to_say';
 units?: 'metric' | 'imperial';
 current_volume?: { [discipline: string]: string };
+training_frequency?: { [discipline: string]: string };
+volume_increase_capacity?: { [discipline: string]: string };
 training_status?: { [discipline: string]: string };
 benchmark_recency?: { [discipline: string]: string };
 
@@ -79,6 +81,8 @@ const [data, setData] = useState<BaselineData>({
   equipment: {},
   units: 'imperial',
   current_volume: {},
+  training_frequency: {},
+  volume_increase_capacity: {},
   training_status: {},
   benchmark_recency: {}
 });
@@ -513,6 +517,21 @@ const getVolumeOptions = () => [
   "4-6 hours",
   "6-8 hours",
   "8+ hours"
+];
+
+const getTrainingFrequencyOptions = () => [
+  "1-2 days per week",
+  "3-4 days per week",
+  "5-6 days per week",
+  "7 days per week"
+];
+
+const getVolumeIncreaseOptions = () => [
+  "Yes, I can easily increase by 10% or more",
+  "Yes, but I'd need to be careful about it",
+  "Maybe, but I'd need to reduce intensity",
+  "No, I'm at my current limit",
+  "I'm not sure, haven't tried"
 ];
 
 const getTrainingStatusOptions = () => [
