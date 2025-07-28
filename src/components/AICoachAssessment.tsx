@@ -147,8 +147,8 @@ export default function AICoachAssessment() {
 
   const getCurrentQuestion = () => {
     const questions = [
-      { key: 'goal', label: 'Training Goal' },
       { key: 'hasSpecificEvent', label: 'Specific Event' },
+      { key: 'goal', label: 'Training Goal' },
       { key: 'timeline', label: 'Timeline' },
       { key: 'previousExperience', label: 'Previous Experience' },
       { key: 'previousTimes', label: 'Previous Times' },
@@ -172,6 +172,19 @@ export default function AICoachAssessment() {
 
     const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration, strength, strengthGoal, philosophy } = responses;
 
+    if (!responses.hasSpecificEvent) {
+      return {
+        content: "Do you have a specific event in mind?",
+        options: [
+          "Yes, I'm registered for a specific event",
+          "Yes, but I haven't registered yet",
+          "No, just training for the distance",
+          "I'm looking for events to target"
+        ],
+        isComplete: false
+      };
+    }
+
     if (!goal) {
       return {
         content: "What are you training for?",
@@ -185,19 +198,6 @@ export default function AICoachAssessment() {
           "10K",
           "5K",
           "General fitness"
-        ],
-        isComplete: false
-      };
-    }
-
-    if (!responses.hasSpecificEvent) {
-      return {
-        content: "Do you have a specific event in mind?",
-        options: [
-          "Yes, I'm registered for a specific event",
-          "Yes, but I haven't registered yet",
-          "No, just training for the distance",
-          "I'm looking for events to target"
         ],
         isComplete: false
       };
