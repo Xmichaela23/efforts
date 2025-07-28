@@ -183,12 +183,212 @@ export default function AIPlanBuilder() {
     return false;
   };
 
+  // Baseline-based validation and recommendations
+  const getBaselineInsights = () => {
+    if (!baselines) return null;
+
+    const currentVolume = baselines.current_volume || {};
+    const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
+      return sum + (parseInt(vol as string) || 0);
+    }, 0);
+
+    const trainingFrequency = baselines.training_frequency || {};
+    const volumeIncreaseCapacity = baselines.volume_increase_capacity || {};
+    const disciplineFitness = baselines.disciplineFitness || {};
+    const performanceNumbers = baselines.performanceNumbers || {};
+
+    return {
+      totalHours: totalHours as number,
+      currentVolume,
+      trainingFrequency,
+      volumeIncreaseCapacity,
+      disciplineFitness,
+      performanceNumbers,
+      trainingBackground: baselines.trainingBackground,
+      age: baselines.age as number,
+      injuryHistory: baselines.injuryHistory,
+      equipment: baselines.equipment || {}
+    };
+  };
+
+  const validateTimeline = (distance: string, timeline: string) => {
+    const insights = getBaselineInsights();
+    if (!insights) return { isValid: true, warning: null };
+
+    const { totalHours, trainingBackground, age } = insights;
+
+    // 70.3 validation
+    if (distance === '70.3') {
+      if (timeline === '8-12-weeks') {
+        if (totalHours < 6) {
+          return {
+            isValid: false,
+            warning: `You're currently training ${totalHours} hours/week. For a 70.3 in 8-12 weeks, you need at least 6+ hours/week. Consider a longer timeline or building your base first.`
+          };
+        }
+        if (trainingBackground?.includes('new')) {
+          return {
+            isValid: false,
+            warning: `You're new to structured training. A 70.3 in 8-12 weeks is very aggressive. Consider 16+ weeks for your first 70.3.`
+          };
+        }
+      }
+      if (timeline === '16-20-weeks' && totalHours < 4) {
+        return {
+          isValid: true,
+          warning: `You're currently training ${totalHours} hours/week. You'll need to build to 6-8 hours/week for a 70.3. This timeline is achievable but will require significant volume increases.`
+        };
+      }
+    }
+
+    // Ironman validation
+    if (distance === 'ironman') {
+      if (timeline === '16-20-weeks') {
+        if (totalHours < 8) {
+          return {
+            isValid: false,
+            warning: `You're currently training ${totalHours} hours/week. For an Ironman in 16-20 weeks, you need at least 8+ hours/week. Consider a longer timeline.`
+          };
+        }
+      }
+      if (timeline === '24-plus-weeks' && totalHours < 6) {
+        return {
+          isValid: true,
+          warning: `You're currently training ${totalHours} hours/week. You'll need to build to 10-15 hours/week for an Ironman. This timeline is achievable but will require significant volume increases.`
+        };
+      }
+    }
+
+    // Age considerations
+    if (age && age >= 40 && timeline === '8-12-weeks') {
+      return {
+        isValid: true,
+        warning: `At ${age} years old, consider a longer timeline for better recovery and injury prevention.`
+      };
+    }
+
+    return { isValid: true, warning: null };
+  };
+
+  const getRecommendedTimeline = (distance: string) => {
+    const insights = getBaselineInsights();
+    if (!insights) return null;
+
+    const { totalHours, trainingBackground, age } = insights;
+
+    if (distance === '70.3') {
+      if (totalHours >= 8 && trainingBackground?.includes('consistent')) return '8-12-weeks';
+      if (totalHours >= 6) return '16-20-weeks';
+      if (totalHours >= 4) return '24-plus-weeks';
+      return '24-plus-weeks'; // Need to build base
+    }
+
+    if (distance === 'ironman') {
+      if (totalHours >= 12 && trainingBackground?.includes('consistent')) return '16-20-weeks';
+      if (totalHours >= 8) return '24-plus-weeks';
+      return '24-plus-weeks'; // Need to build base
+    }
+
+    return null;
+  };
+
+  const getRecommendedFrequency = () => {
+    const insights = getBaselineInsights();
+    if (!insights) return null;
+
+    const { totalHours, trainingFrequency, volumeIncreaseCapacity } = insights;
+
+    // Check if they can handle more frequency
+    const canIncrease = volumeIncreaseCapacity?.triathlon?.includes('easily') || 
+                       volumeIncreaseCapacity?.triathlon?.includes('careful');
+
+    if (totalHours >= 8) return '6-days';
+    if (totalHours >= 6 && canIncrease) return '6-days';
+    if (totalHours >= 4) return '5-days';
+    return '4-days';
+  };
+
+  const getRecommendedStrength = () => {
+    const insights = getBaselineInsights();
+    if (!insights) return null;
+
+    const { injuryHistory, age, performanceNumbers } = insights;
+
+    // Always recommend injury prevention for 40+
+    if (age >= 40) return 'injury-prevention';
+
+    // Recommend injury prevention if they have injury history
+    if (injuryHistory?.includes('injury')) return 'injury-prevention';
+
+    // If they have strength numbers, they can do more advanced strength
+    if (performanceNumbers.squat && performanceNumbers.deadlift) return 'power-development';
+
+    return 'injury-prevention'; // Default to safest option
+  };
+
+  const prePopulateFromBaselines = () => {
+    const insights = getBaselineInsights();
+    if (!insights) return;
+
+    const { performanceNumbers, equipment, trainingFrequency } = insights;
+
+    // Pre-populate strength numbers if available
+    if (performanceNumbers.squat && !responses.squat1RM) {
+      updateResponse('squat1RM', performanceNumbers.squat.toString());
+    }
+    if (performanceNumbers.deadlift && !responses.deadlift1RM) {
+      updateResponse('deadlift1RM', performanceNumbers.deadlift.toString());
+    }
+    if (performanceNumbers.bench && !responses.bench1RM) {
+      updateResponse('bench1RM', performanceNumbers.bench.toString());
+    }
+
+    // Pre-populate equipment access
+    if (equipment.strength && equipment.strength.length > 0) {
+      updateResponse('equipmentAccess', equipment.strength);
+    }
+
+    // Pre-populate training frequency if available
+    if (trainingFrequency.triathlon && !responses.trainingFrequency) {
+      const freq = trainingFrequency.triathlon;
+      if (freq.includes('5-6')) updateResponse('trainingFrequency', '6-days');
+      else if (freq.includes('3-4')) updateResponse('trainingFrequency', '4-days');
+      else if (freq.includes('7')) updateResponse('trainingFrequency', '7-days');
+    }
+  };
+
+  // Run pre-population when baselines load
+  useEffect(() => {
+    if (baselines) {
+      prePopulateFromBaselines();
+    }
+  }, [baselines]);
+
   const getCurrentStepContent = () => {
+    const insights = getBaselineInsights();
+    const timelineValidation = responses.distance && responses.timeline ? 
+      validateTimeline(responses.distance, responses.timeline) : null;
+    const recommendedTimeline = responses.distance ? 
+      getRecommendedTimeline(responses.distance) : null;
+    const recommendedFrequency = getRecommendedFrequency();
+    const recommendedStrength = getRecommendedStrength();
+
     switch (step) {
       case 0:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">What triathlon distance and when is your goal event?</div>
+            
+            {insights && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-sm text-blue-800">
+                  <strong>Based on your baseline:</strong> You're currently training {insights.totalHours} hours/week across all disciplines.
+                  {recommendedTimeline && (
+                    <div className="mt-1">Recommended timeline: {TIMELINE_OPTIONS.find(t => t.key === recommendedTimeline)?.label}</div>
+                  )}
+                </div>
+              </div>
+            )}
             
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Distance:</div>
@@ -223,10 +423,29 @@ export default function AIPlanBuilder() {
                     }`}
                   >
                     {option.label}
+                    {option.key === recommendedTimeline && (
+                      <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                    )}
                   </button>
                 ))}
               </div>
             </div>
+
+            {timelineValidation?.warning && (
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
+                <div className="text-sm font-medium text-yellow-800 mb-3">
+                  ⚠️ Timeline Warning
+                </div>
+                <div className="text-sm text-yellow-700 mb-3">
+                  {timelineValidation.warning}
+                </div>
+                {!timelineValidation.isValid && (
+                  <div className="text-sm text-yellow-700">
+                    Consider selecting a longer timeline or building your base fitness first.
+                  </div>
+                )}
+              </div>
+            )}
 
             {isAggressiveTimeline() && (
               <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
@@ -284,7 +503,7 @@ export default function AIPlanBuilder() {
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
-                disabled={!responses.distance || !responses.timeline}
+                disabled={!responses.distance || !responses.timeline || (timelineValidation && !timelineValidation.isValid)}
                 onClick={() => setStep(1)}
               >
                 Next
@@ -401,6 +620,14 @@ export default function AIPlanBuilder() {
                 
                 <div>
                   <div className="text-sm text-gray-600 mb-3">What discipline needs the most work?</div>
+                  {insights && (
+                    <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                      <strong>Based on your baseline:</strong> 
+                      {insights.disciplineFitness.swimming === 'beginner' && ' Swimming appears to be your weakest discipline.'}
+                      {insights.disciplineFitness.cycling === 'beginner' && ' Cycling appears to be your weakest discipline.'}
+                      {insights.disciplineFitness.running === 'beginner' && ' Running appears to be your weakest discipline.'}
+                    </div>
+                  )}
                   <div className="space-y-2">
                     {DISCIPLINE_WEAKNESS_OPTIONS.map((option) => (
                       <button
@@ -444,6 +671,17 @@ export default function AIPlanBuilder() {
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
             <div className="text-sm text-gray-600 mb-4">Most 70.3 athletes train 5-6 days per week</div>
             
+            {insights && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-sm text-blue-800">
+                  <strong>Based on your baseline:</strong> You currently train {insights.trainingFrequency.triathlon || 'unknown frequency'}.
+                  {recommendedFrequency && (
+                    <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-3 mb-6">
               {TRAINING_FREQUENCY_OPTIONS.map((option) => (
                 <button
@@ -456,6 +694,9 @@ export default function AIPlanBuilder() {
                   }`}
                 >
                   {option.label}
+                  {option.key === recommendedFrequency && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -483,6 +724,18 @@ export default function AIPlanBuilder() {
           <div>
             <div className="mb-4 text-gray-800 font-medium">Do you want to add strength training to your triathlon plan?</div>
             
+            {insights && recommendedStrength && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-sm text-blue-800">
+                  <strong>Based on your baseline:</strong> 
+                  {insights.age >= 40 && ' At your age, injury prevention is recommended.'}
+                  {insights.injuryHistory?.includes('injury') && ' Given your injury history, injury prevention is recommended.'}
+                  {insights.performanceNumbers.squat && ' You have strength numbers, so power development is an option.'}
+                  <div className="mt-1">Recommended: {STRENGTH_OPTIONS.find(s => s.key === recommendedStrength)?.label}</div>
+                </div>
+              </div>
+            )}
+            
             <div className="space-y-3 mb-6">
               {STRENGTH_OPTIONS.map((option) => (
                 <button
@@ -495,6 +748,9 @@ export default function AIPlanBuilder() {
                   }`}
                 >
                   {option.label}
+                  {option.key === recommendedStrength && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                  )}
                 </button>
               ))}
             </div>
@@ -642,6 +898,16 @@ export default function AIPlanBuilder() {
             <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
             <div className="text-sm text-gray-600 mb-4">Longer weekend sessions important for endurance</div>
             
+            {insights && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-sm text-blue-800">
+                  <strong>Based on your baseline:</strong> You currently train {insights.totalHours} hours/week.
+                  {insights.totalHours < 6 && ' Consider longer sessions to build endurance.'}
+                  {insights.totalHours >= 8 && ' You have good volume, focus on quality over quantity.'}
+                </div>
+              </div>
+            )}
+            
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Weekday sessions:</div>
               <div className="space-y-2 mb-4">
@@ -702,6 +968,17 @@ export default function AIPlanBuilder() {
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">Choose your training approach:</div>
+            
+            {insights && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                <div className="text-sm text-blue-800">
+                  <strong>Based on your baseline:</strong> 
+                  {insights.age >= 40 && ' At your age, sustainable training is recommended for injury prevention.'}
+                  {insights.trainingBackground?.includes('new') && ' As a newer athlete, sustainable training will help build consistency.'}
+                  {insights.trainingBackground?.includes('consistent') && ' With your consistent training history, you can handle more intensity.'}
+                </div>
+              </div>
+            )}
             
             <div className="space-y-4 mb-6">
               {TRAINING_PHILOSOPHY_OPTIONS.map((option) => (
