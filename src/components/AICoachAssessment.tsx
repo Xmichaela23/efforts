@@ -737,13 +737,13 @@ export default function AICoachAssessment() {
               key={message.id}
               className={`flex ${message.type === 'ai' ? 'justify-start' : 'justify-end'}`}
             >
-              <div
-                className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
-                  message.type === 'ai'
-                    ? 'bg-gray-100 text-gray-900'
-                    : 'bg-gray-800 text-white'
-                }`}
-              >
+                              <div
+                  className={`max-w-xs lg:max-w-md px-4 py-3 rounded-lg ${
+                    message.type === 'ai'
+                      ? 'bg-gray-100 text-gray-900'
+                      : 'bg-gray-200 text-gray-900'
+                  }`}
+                >
                 <div className="flex items-center gap-2 mb-2">
                   {message.type === 'ai' ? (
                     <MessageCircle className="h-4 w-4" />
@@ -773,17 +773,17 @@ export default function AICoachAssessment() {
                     {/* Date Picker for Event Date */}
                     {message.showDatePicker && (
                       <div className="mt-3">
-                        <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left font-normal"
-                            >
-                              <CalendarIcon className="mr-2 h-4 w-4" />
-                              {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          onClick={() => setShowDatePicker(true)}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                        </Button>
+                        
+                        {showDatePicker && (
+                          <div className="mt-2 p-3 bg-white border border-gray-300 rounded-lg shadow-lg">
                             <Calendar
                               mode="single"
                               selected={selectedDate}
@@ -796,8 +796,8 @@ export default function AICoachAssessment() {
                               }}
                               initialFocus
                             />
-                          </PopoverContent>
-                        </Popover>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
