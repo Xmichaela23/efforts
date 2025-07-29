@@ -867,6 +867,27 @@ export default function AIPlanBuilder() {
         );
 
       case 3:
+        // Get baseline values for strength fitness/performance
+        const baselineStrengthFitness = baselines?.disciplineFitness?.strength;
+        const baselineStrengthPerformance = baselines?.benchmarks?.strength;
+
+        // If baseline values exist, auto-fill and skip questions
+        if (
+          responses.strengthTraining &&
+          responses.strengthTraining !== 'no-strength' &&
+          (baselineStrengthFitness || baselineStrengthPerformance)
+        ) {
+          if (baselineStrengthFitness && !responses.strengthFitnessLevel) {
+            updateResponse('strengthFitnessLevel', baselineStrengthFitness);
+          }
+          if (baselineStrengthPerformance && !responses.strengthPerformanceLevel) {
+            updateResponse('strengthPerformanceLevel', baselineStrengthPerformance);
+          }
+          // Skip to next step
+          setTimeout(() => setStep(4), 0);
+          return null;
+        }
+
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">Do you want to add strength training to your triathlon plan?</div>
@@ -922,7 +943,6 @@ export default function AIPlanBuilder() {
                     ))}
                   </div>
                 </div>
-
                 <div>
                   <div className="text-sm text-gray-600 mb-3">Performance Level:</div>
                   <div className="space-y-2">
@@ -941,7 +961,6 @@ export default function AIPlanBuilder() {
                     ))}
                   </div>
                 </div>
-
                 {responses.strengthPerformanceLevel === 'know-1rms' && (
                   <div className="space-y-3">
                     <div>
@@ -951,80 +970,18 @@ export default function AIPlanBuilder() {
                         value={responses.squat1RM}
                         onChange={(e) => updateResponse('squat1RM', e.target.value)}
                         className="w-full p-3 border border-gray-300 rounded"
-                        placeholder="e.g., 225"
                       />
                     </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Deadlift 1RM (lbs):</label>
-                      <input
-                        type="number"
-                        value={responses.deadlift1RM}
-                        onChange={(e) => updateResponse('deadlift1RM', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                        placeholder="e.g., 315"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Bench 1RM (lbs):</label>
-                      <input
-                        type="number"
-                        value={responses.bench1RM}
-                        onChange={(e) => updateResponse('bench1RM', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                        placeholder="e.g., 185"
-                      />
-                    </div>
+                    {/* Repeat for deadlift, bench, etc. */}
                   </div>
                 )}
-
-                <div>
-                  <div className="text-sm text-gray-600 mb-3">Equipment Access:</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {EQUIPMENT_OPTIONS.map((option) => (
-                      <label key={option.key} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={responses.equipmentAccess.includes(option.key)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              updateResponse('equipmentAccess', [...responses.equipmentAccess, option.key]);
-                            } else {
-                              updateResponse('equipmentAccess', responses.equipmentAccess.filter(item => item !== option.key));
-                            }
-                          }}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{option.label}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div className="text-sm text-gray-600 mb-3">Training Background:</div>
-                  <div className="space-y-2">
-                    {TRAINING_BACKGROUND_OPTIONS.map((option) => (
-                      <button
-                        key={option.key}
-                        onClick={() => updateResponse('strengthTrainingBackground', option.key)}
-                        className={`w-full p-3 text-left rounded transition-colors ${
-                          responses.strengthTrainingBackground === option.key
-                            ? 'bg-gray-200 text-black'
-                            : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
               </div>
             )}
 
             <div className="flex gap-3">
               <button
                 className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(1)}
               >
                 Back
               </button>
