@@ -102,6 +102,21 @@ const WEEKEND_DURATION_OPTIONS = [
   { key: '4-plus-hours', label: '4+ hours' },
 ];
 
+const WEEKEND_AVAILABILITY_OPTIONS = [
+  { key: 'both-days', label: 'Both Saturday and Sunday' },
+  { key: 'saturday-only', label: 'Saturday only' },
+  { key: 'sunday-only', label: 'Sunday only' },
+  { key: 'weekdays-only', label: 'Weekdays only (work weekends)' },
+  { key: 'flexible', label: 'Flexible - can adjust schedule' },
+];
+
+const LONG_SESSION_PREFERENCES = [
+  { key: 'saturday-long-ride', label: 'Saturday: Long ride, Sunday: Long run' },
+  { key: 'sunday-long-ride', label: 'Sunday: Long ride, Saturday: Long run' },
+  { key: 'weekday-long-sessions', label: 'Weekdays: Long sessions (if working weekends)' },
+  { key: 'ai-optimize', label: 'Let AI optimize based on my schedule' },
+];
+
 // Update training philosophy options to use only text
 const TRAINING_PHILOSOPHY_OPTIONS = [
   { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
@@ -238,6 +253,7 @@ export default function AIPlanBuilder() {
     // Question 2: Event Details
     hasSpecificEvent: '',
     raceName: '',
+    eventDate: '',
     courseProfile: '',
     climate: '',
     generalFitnessFocus: '',
@@ -266,6 +282,8 @@ export default function AIPlanBuilder() {
     // Question 5: Time Distribution
     weekdayDuration: '',
     weekendDuration: '',
+    weekendAvailability: '',
+    longSessionPreference: '',
     
     // Question 6: Training Philosophy
     trainingPhilosophy: '',
@@ -508,18 +526,29 @@ export default function AIPlanBuilder() {
       if (responses.hasSpecificEvent === 'yes' && responses.raceName) {
         prompt += `**Specific Event:** ${responses.raceName}\n`;
       }
-      if (responses.runningElevationGain) {
-        prompt += `**Running Course:** ${responses.runningElevationGain}, ${responses.runningCourseProfile || 'standard profile'}\n`;
-      }
-      if (responses.cyclingElevationGain) {
-        prompt += `**Cycling Course:** ${responses.cyclingElevationGain}, ${responses.cyclingCourseProfile || 'standard profile'}\n`;
+      if (responses.eventDate) {
+        prompt += `**Event Date:** ${responses.eventDate}\n`;
       }
       if (responses.waterConditions) {
         prompt += `**Swimming Conditions:** ${responses.waterConditions}\n`;
       }
+      if (responses.cyclingElevationGain) {
+        prompt += `**Cycling Course:** ${responses.cyclingElevationGain}, ${responses.cyclingCourseProfile || 'standard profile'}\n`;
+      }
+      if (responses.runningElevationGain) {
+        prompt += `**Running Course:** ${responses.runningElevationGain}, ${responses.runningCourseProfile || 'standard profile'}\n`;
+      }
       if (responses.climate) {
         prompt += `**Climate:** ${responses.climate}\n`;
       }
+    }
+    
+    // Weekend availability and long session preferences
+    if (responses.weekendAvailability) {
+      prompt += `**Weekend Availability:** ${WEEKEND_AVAILABILITY_OPTIONS.find(w => w.key === responses.weekendAvailability)?.label}\n`;
+    }
+    if (responses.longSessionPreference) {
+      prompt += `**Long Session Preference:** ${LONG_SESSION_PREFERENCES.find(l => l.key === responses.longSessionPreference)?.label}\n`;
     }
     
     // Training frequency and duration
@@ -894,7 +923,7 @@ export default function AIPlanBuilder() {
                 <button
                   className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
                   disabled={!responses.hasSpecificEvent}
-                  onClick={() => setStep(2)}
+                  onClick={() => setStep(3)}
                 >
                   Next
                 </button>
@@ -928,7 +957,7 @@ export default function AIPlanBuilder() {
               {/* ... */}
               <button
                 className="w-full bg-gray-800 text-white py-2 font-medium mt-4"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(5)}
               >
                 Next
               </button>
@@ -939,6 +968,86 @@ export default function AIPlanBuilder() {
         return null;
 
       case 2:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">When is your event?</div>
+            
+            {responses.hasSpecificEvent === 'yes' && (
+              <div className="mb-6">
+                <label className="block text-sm text-gray-600 mb-2">Event date:</label>
+                <input
+                  type="date"
+                  value={responses.eventDate}
+                  onChange={(e) => updateResponse('eventDate', e.target.value)}
+                  className="w-full p-3"
+                  min={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+            )}
+
+            <div className="mb-6">
+              <div className="mb-4 text-gray-800 font-medium">What's your weekend availability?</div>
+              <div className="text-sm text-gray-600 mb-4">This helps us schedule your long training sessions</div>
+              
+              <div className="space-y-3 mb-6">
+                {WEEKEND_AVAILABILITY_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => updateResponse('weekendAvailability', option.key)}
+                    className={`w-full p-3 text-left transition-colors ${
+                      responses.weekendAvailability === option.key
+                        ? 'bg-gray-200 text-black'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {responses.weekendAvailability && responses.weekendAvailability !== 'ai-optimize' && (
+              <div className="mb-6">
+                <div className="mb-4 text-gray-800 font-medium">Long session preferences:</div>
+                <div className="text-sm text-gray-600 mb-4">When would you prefer to do your long runs and rides?</div>
+                
+                <div className="space-y-3 mb-6">
+                  {LONG_SESSION_PREFERENCES.map((option) => (
+                    <button
+                      key={option.key}
+                      onClick={() => updateResponse('longSessionPreference', option.key)}
+                      className={`w-full p-3 text-left transition-colors ${
+                        responses.longSessionPreference === option.key
+                          ? 'bg-gray-200 text-black'
+                          : 'bg-transparent text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 text-gray-800 py-2 font-medium"
+                onClick={() => setStep(1)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
+                disabled={!responses.weekendAvailability || (responses.weekendAvailability !== 'ai-optimize' && !responses.longSessionPreference)}
+                onClick={() => setStep(4)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 4:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
@@ -984,7 +1093,7 @@ export default function AIPlanBuilder() {
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingFrequency}
-                onClick={() => setStep(3)}
+                onClick={() => setStep(6)}
               >
                 Next
               </button>
@@ -992,7 +1101,7 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 3:
+      case 5:
         // Get baseline values for strength fitness/performance
         const baselineStrengthFitness = baselines?.disciplineFitness?.strength;
         const baselineStrengthPerformance = baselines?.benchmarks?.strength;
@@ -1010,7 +1119,7 @@ export default function AIPlanBuilder() {
             updateResponse('strengthPerformanceLevel', baselineStrengthPerformance);
           }
           // Skip to next step
-          setTimeout(() => setStep(4), 0);
+          setTimeout(() => setStep(6), 0);
           return null;
         }
 
@@ -1186,7 +1295,7 @@ export default function AIPlanBuilder() {
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekdayDuration || !responses.weekendDuration}
-                onClick={() => setStep(5)}
+                onClick={() => setStep(6)}
               >
                 Next
               </button>
@@ -1194,7 +1303,7 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 5:
+      case 6:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">Choose your training approach:</div>
@@ -1231,14 +1340,14 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(4)}
+                onClick={() => setStep(6)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingPhilosophy}
-                onClick={() => setStep(6)}
+                onClick={() => setStep(7)}
               >
                 Generate Plan
               </button>
@@ -1246,7 +1355,7 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 6:
+      case 7:
         if (generatingPlan) {
           return (
             <div className="text-center">
