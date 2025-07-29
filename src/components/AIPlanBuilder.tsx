@@ -685,6 +685,26 @@ export default function AIPlanBuilder() {
                       </div>
                     </div>
                   </div>
+
+                  {/* Climate */}
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-800 mb-3">Climate</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                        <select
+                          value={responses.climate}
+                          onChange={e => updateResponse('climate', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select climate</option>
+                          {CLIMATE_OPTIONS.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
