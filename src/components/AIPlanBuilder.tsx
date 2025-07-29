@@ -838,27 +838,8 @@ export default function AIPlanBuilder() {
                       </div>
                     </div>
                   </div>
-                  </div>
 
-                  {/* Swimming Course Details */}
-                  <div className="pt-4">
-                    <h4 className="font-medium text-gray-800 mb-3"><FaSwimmer className="inline mr-2" /> Swimming Course</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
-                        <select
-                          value={responses.waterConditions}
-                          onChange={(e) => updateResponse('waterConditions', e.target.value)}
-                          className="w-full p-3"
-                        >
-                          <option value="">Select water conditions</option>
-                          {SWIMMING_COURSE_OPTIONS.waterConditions.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+
 
                   {/* Climate */}
                   <div className="pt-4">
@@ -1058,7 +1039,7 @@ export default function AIPlanBuilder() {
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekendAvailability || (responses.weekendAvailability !== 'optimize' && !responses.longSessionPreference)}
-                onClick={() => setStep(4)}
+                onClick={() => setStep(3)}
               >
                 Next
               </button>
@@ -1066,7 +1047,7 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
@@ -1105,14 +1086,86 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(2)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingFrequency}
-                onClick={() => setStep(6)}
+                onClick={() => setStep(4)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
+            <div className="text-sm text-gray-600 mb-4">Longer weekend sessions important for endurance</div>
+            
+            {insights && (
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div>
+                  <strong>Based on your baseline:</strong> You currently train {insights.totalHours} hours/week.
+                  {insights.totalHours < 6 && ' Consider longer sessions to build endurance.'}
+                  {insights.totalHours >= 8 && ' You have good volume, focus on quality over quantity.'}
+                </div>
+              </div>
+            )}
+            
+            <div className="mb-6">
+              <div className="text-sm text-gray-600 mb-3">Weekday sessions:</div>
+              <div className="space-y-2 mb-4">
+                {WEEKDAY_DURATION_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => updateResponse('weekdayDuration', option.key)}
+                    className={`w-full p-3 text-left transition-colors ${
+                      responses.weekdayDuration === option.key
+                        ? 'bg-gray-200 text-black'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <div className="text-sm text-gray-600 mb-3">Weekend sessions:</div>
+              <div className="space-y-2">
+                {WEEKEND_DURATION_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => updateResponse('weekendDuration', option.key)}
+                    className={`w-full p-3 text-left transition-colors ${
+                      responses.weekendDuration === option.key
+                        ? 'bg-gray-200 text-black'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 text-gray-800 py-2 font-medium"
+                onClick={() => setStep(3)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
+                disabled={!responses.weekdayDuration || !responses.weekendDuration}
+                onClick={() => setStep(5)}
               >
                 Next
               </button>
@@ -1215,85 +1268,13 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(4)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.strengthTraining}
-                onClick={() => setStep(4)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        );
-
-      case 4:
-        return (
-          <div>
-            <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
-            <div className="text-sm text-gray-600 mb-4">Longer weekend sessions important for endurance</div>
-            
-            {insights && (
-              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                <div>
-                  <strong>Based on your baseline:</strong> You currently train {insights.totalHours} hours/week.
-                  {insights.totalHours < 6 && ' Consider longer sessions to build endurance.'}
-                  {insights.totalHours >= 8 && ' You have good volume, focus on quality over quantity.'}
-                </div>
-              </div>
-            )}
-            
-            <div className="mb-6">
-              <div className="text-sm text-gray-600 mb-3">Weekday sessions:</div>
-              <div className="space-y-2 mb-4">
-                {WEEKDAY_DURATION_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('weekdayDuration', option.key)}
-                    className={`w-full p-3 text-left transition-colors ${
-                      responses.weekdayDuration === option.key
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-transparent text-black hover:bg-gray-100'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-6">
-              <div className="text-sm text-gray-600 mb-3">Weekend sessions:</div>
-              <div className="space-y-2">
-                {WEEKEND_DURATION_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('weekendDuration', option.key)}
-                    className={`w-full p-3 text-left transition-colors ${
-                      responses.weekendDuration === option.key
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-transparent text-black hover:bg-gray-100'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(3)}
-              >
-                Back
-              </button>
-              <button
-                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
-                disabled={!responses.weekdayDuration || !responses.weekendDuration}
                 onClick={() => setStep(6)}
               >
                 Next
@@ -1339,7 +1320,7 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(6)}
+                onClick={() => setStep(5)}
               >
                 Back
               </button>
