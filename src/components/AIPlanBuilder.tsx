@@ -120,6 +120,96 @@ const TRAINING_PHILOSOPHY_OPTIONS = [
   },
 ];
 
+// Separate course detail options for different disciplines
+const RUNNING_COURSE_OPTIONS = {
+  elevationGain: [
+    '0-500 ft (Flat)',
+    '500-1500 ft (Rolling)',
+    '1500-3000 ft (Hilly)',
+    '3000+ ft (Mountainous)'
+  ],
+  courseProfile: [
+    'Flat/Out and back',
+    'Rolling hills',
+    'Hilly with climbs',
+    'Mountainous with steep climbs',
+    'Mixed terrain'
+  ],
+  surfaceType: [
+    'Road/Pavement',
+    'Trail/Dirt',
+    'Gravel',
+    'Mixed surfaces',
+    'Track',
+    'Treadmill'
+  ],
+  climate: [
+    'Cool (under 60°F)',
+    'Moderate (60-75°F)',
+    'Warm (75-85°F)',
+    'Hot (85-95°F)',
+    'Very hot (95°F+)',
+    'Humid conditions',
+    'High altitude',
+    'Variable weather'
+  ]
+};
+
+const CYCLING_COURSE_OPTIONS = {
+  elevationGain: [
+    '0-1000 ft (Flat)',
+    '1000-3000 ft (Rolling)',
+    '3000-6000 ft (Hilly)',
+    '6000+ ft (Mountainous)'
+  ],
+  courseProfile: [
+    'Flat/Time trial style',
+    'Rolling hills',
+    'Hilly with climbs',
+    'Mountainous with steep climbs',
+    'Mixed terrain',
+    'Technical descents'
+  ],
+  surfaceType: [
+    'Road/Pavement',
+    'Gravel',
+    'Mixed surfaces',
+    'Indoor trainer',
+    'Mountain bike trails'
+  ],
+  climate: [
+    'Cool (under 60°F)',
+    'Moderate (60-75°F)',
+    'Warm (75-85°F)',
+    'Hot (85-95°F)',
+    'Very hot (95°F+)',
+    'Humid conditions',
+    'High altitude',
+    'Windy conditions',
+    'Variable weather'
+  ]
+};
+
+const SWIMMING_COURSE_OPTIONS = {
+  swimType: [
+    'Pool (25m)',
+    'Pool (50m)',
+    'Open water (Lake)',
+    'Open water (Ocean)',
+    'Open water (River)',
+    'Mixed pool/open water'
+  ],
+  waterConditions: [
+    'Calm water',
+    'Light chop',
+    'Moderate waves',
+    'Strong currents',
+    'Cold water',
+    'Warm water',
+    'Variable conditions'
+  ]
+};
+
 export default function AIPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
@@ -142,6 +232,17 @@ export default function AIPlanBuilder() {
     swimType: '',
     generalFitnessFocus: '',
     limitingDiscipline: '',
+    
+    // Course Details (Separated by discipline)
+    runningElevationGain: '',
+    runningCourseProfile: '',
+    runningSurfaceType: '',
+    runningClimate: '',
+    cyclingElevationGain: '',
+    cyclingCourseProfile: '',
+    cyclingSurfaceType: '',
+    cyclingClimate: '',
+    waterConditions: '',
     
     // Question 3: Training Frequency
     trainingFrequency: '',
@@ -559,7 +660,7 @@ export default function AIPlanBuilder() {
             </div>
 
             {responses.hasSpecificEvent === 'yes' && (
-              <div className="mb-6 space-y-4">
+              <div className="mb-6 space-y-6">
                 <div>
                   <label className="block text-sm text-gray-600 mb-2">Race name:</label>
                   <input
@@ -570,47 +671,156 @@ export default function AIPlanBuilder() {
                     placeholder="e.g., Ironman 70.3 World Championship"
                   />
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
-                  <select
-                    value={responses.courseProfile}
-                    onChange={(e) => updateResponse('courseProfile', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded"
-                  >
-                    <option value="">Select course profile</option>
-                    <option value="flat">Flat</option>
-                    <option value="rolling">Rolling hills</option>
-                    <option value="hilly">Hilly</option>
-                    <option value="mountainous">Mountainous</option>
-                  </select>
+
+                {/* Running Course Details */}
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-gray-800 mb-3">🏃‍♂️ Running Course</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
+                      <select
+                        value={responses.runningElevationGain}
+                        onChange={(e) => updateResponse('runningElevationGain', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select elevation gain</option>
+                        {RUNNING_COURSE_OPTIONS.elevationGain.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
+                      <select
+                        value={responses.runningCourseProfile}
+                        onChange={(e) => updateResponse('runningCourseProfile', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select course profile</option>
+                        {RUNNING_COURSE_OPTIONS.courseProfile.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
+                      <select
+                        value={responses.runningSurfaceType}
+                        onChange={(e) => updateResponse('runningSurfaceType', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select surface type</option>
+                        {RUNNING_COURSE_OPTIONS.surfaceType.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                      <select
+                        value={responses.runningClimate}
+                        onChange={(e) => updateResponse('runningClimate', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select climate</option>
+                        {RUNNING_COURSE_OPTIONS.climate.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Climate:</label>
-                  <select
-                    value={responses.climate}
-                    onChange={(e) => updateResponse('climate', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded"
-                  >
-                    <option value="">Select climate</option>
-                    <option value="hot">Hot</option>
-                    <option value="moderate">Moderate</option>
-                    <option value="cold">Cold</option>
-                    <option value="variable">Variable</option>
-                  </select>
+
+                {/* Cycling Course Details */}
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-gray-800 mb-3">🚴‍♂️ Cycling Course</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
+                      <select
+                        value={responses.cyclingElevationGain}
+                        onChange={(e) => updateResponse('cyclingElevationGain', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select elevation gain</option>
+                        {CYCLING_COURSE_OPTIONS.elevationGain.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
+                      <select
+                        value={responses.cyclingCourseProfile}
+                        onChange={(e) => updateResponse('cyclingCourseProfile', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select course profile</option>
+                        {CYCLING_COURSE_OPTIONS.courseProfile.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
+                      <select
+                        value={responses.cyclingSurfaceType}
+                        onChange={(e) => updateResponse('cyclingSurfaceType', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select surface type</option>
+                        {CYCLING_COURSE_OPTIONS.surfaceType.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                      <select
+                        value={responses.cyclingClimate}
+                        onChange={(e) => updateResponse('cyclingClimate', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select climate</option>
+                        {CYCLING_COURSE_OPTIONS.climate.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Swim type:</label>
-                  <select
-                    value={responses.swimType}
-                    onChange={(e) => updateResponse('swimType', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded"
-                  >
-                    <option value="">Select swim type</option>
-                    <option value="pool">Pool</option>
-                    <option value="open-water">Open water</option>
-                    <option value="ocean">Ocean</option>
-                    <option value="lake">Lake</option>
-                  </select>
+
+                {/* Swimming Course Details */}
+                <div className="border-t pt-4">
+                  <h4 className="font-medium text-gray-800 mb-3">🏊‍♂️ Swimming Course</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Swim type:</label>
+                      <select
+                        value={responses.swimType}
+                        onChange={(e) => updateResponse('swimType', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select swim type</option>
+                        {SWIMMING_COURSE_OPTIONS.swimType.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
+                      <select
+                        value={responses.waterConditions}
+                        onChange={(e) => updateResponse('waterConditions', e.target.value)}
+                        className="w-full p-3 border border-gray-300 rounded"
+                      >
+                        <option value="">Select water conditions</option>
+                        {SWIMMING_COURSE_OPTIONS.waterConditions.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
