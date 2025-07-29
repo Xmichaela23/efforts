@@ -43,11 +43,30 @@ const TRAINING_FREQUENCY_OPTIONS = [
 
 const STRENGTH_OPTIONS = [
   { key: 'no-strength', label: 'No strength training' },
-  { key: 'injury-prevention', label: 'Injury prevention' },
-  { key: 'power-development', label: 'Power development' },
-  { key: 'sport-specific', label: 'Sport-specific' },
-  { key: 'build-muscle', label: 'Build muscle' },
-  { key: 'general-fitness', label: 'General fitness' },
+  { key: 'power-development', label: 'Power development (plyometrics, explosive movements)' },
+  { key: 'power-lifting', label: 'Power lifting (compound lifts, heavy weight, low reps)' },
+  { key: 'injury-prevention', label: 'Injury prevention (mobility, stability, corrective work)' },
+  { key: 'sport-specific', label: 'Sport-specific (triathlon movements)' },
+  { key: 'build-muscle', label: 'Build muscle (hypertrophy, 8-12 reps)' },
+  { key: 'general-fitness', label: 'General fitness (basic conditioning)' },
+];
+
+const GOAL_OPTIONS = [
+  { key: 'speed-improvement', label: 'Speed Improvement', description: 'Improve pace/speed in one or more disciplines' },
+  { key: 'endurance-building', label: 'Endurance Building', description: 'Build stamina for longer distances' },
+  { key: 'strength-development', label: 'Strength Development', description: 'Get stronger for better performance' },
+  { key: 'technique-refinement', label: 'Technique Refinement', description: 'Improve form and efficiency' },
+  { key: 'complete-finish', label: 'Complete & Finish', description: 'Just complete the race successfully' },
+  { key: 'personal-best', label: 'Personal Best', description: 'Beat my previous race times' },
+  { key: 'qualify', label: 'Qualify', description: 'Qualify for championships or other events' },
+  { key: 'podium', label: 'Podium', description: 'Compete for age group placement' },
+  { key: 'swim-focus', label: 'Swim Focus', description: 'Improve swimming (my weakest discipline)' },
+  { key: 'bike-focus', label: 'Bike Focus', description: 'Improve cycling (my strongest discipline)' },
+  { key: 'run-focus', label: 'Run Focus', description: 'Improve running (my strongest discipline)' },
+  { key: 'balanced-improvement', label: 'Balanced Improvement', description: 'Improve all disciplines equally' },
+  { key: 'first-timer', label: 'First Timer', description: 'Complete my first triathlon' },
+  { key: 'building-experience', label: 'Building Experience', description: 'Gain more race experience' },
+  { key: 'advanced-training', label: 'Advanced Training', description: 'Take my training to the next level' },
 ];
 
 const STRENGTH_FITNESS_LEVELS = [
@@ -111,10 +130,12 @@ const WEEKEND_AVAILABILITY_OPTIONS = [
 ];
 
 const LONG_SESSION_PREFERENCES = [
-  { key: 'saturday-long-ride', label: 'Saturday: Long ride, Sunday: Long run' },
-  { key: 'sunday-long-ride', label: 'Sunday: Long ride, Saturday: Long run' },
-  { key: 'weekday-long-sessions', label: 'Weekdays: Long sessions (if working weekends)' },
-  { key: 'optimize', label: 'Let the system optimize based on my schedule' },
+  { key: 'traditional-weekend', label: 'Traditional: Saturday long ride, Sunday long run' },
+  { key: 'reverse-weekend', label: 'Reverse: Sunday long ride, Saturday long run' },
+  { key: 'weekday-long', label: 'Weekday long sessions (for weekend workers)' },
+  { key: 'split-weekend', label: 'Split: One long session each weekend day' },
+  { key: 'flexible-weekly', label: 'Flexible: I\'ll adjust based on my weekly schedule' },
+  { key: 'optimize', label: 'Let the system optimize based on my availability' },
 ];
 
 // Update training philosophy options to use only text
@@ -240,6 +261,7 @@ export default function AIPlanBuilder() {
   const [realAI] = useState(() => new RealTrainingAI());
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
+  const [currentWeek, setCurrentWeek] = useState(0); // Track current week being viewed
   
   // Assessment responses
   const [responses, setResponses] = useState({
@@ -287,6 +309,9 @@ export default function AIPlanBuilder() {
     
     // Question 6: Training Philosophy
     trainingPhilosophy: '',
+
+    // Question 7: Goals
+    goals: [] as string[],
   });
 
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
@@ -320,46 +345,51 @@ export default function AIPlanBuilder() {
   const getBaselineInsights = () => {
     if (!baselines) return null;
 
-    const currentVolume = baselines.current_volume || {};
-    const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
-      // Parse volume strings like "2-4 hours" to get the average
-      const volumeStr = vol as string;
-      if (!volumeStr) return sum;
-      
-      // Handle different volume formats
-      if (volumeStr.includes('-')) {
-        // "2-4 hours" format - take the average
-        const parts = volumeStr.split('-');
-        const low = parseInt(parts[0]) || 0;
-        const high = parseInt(parts[1]) || 0;
-        return sum + ((low + high) / 2);
-      } else if (volumeStr.includes('+')) {
-        // "8+ hours" format - take the minimum
-        const num = parseInt(volumeStr) || 0;
-        return sum + num;
-      } else {
-        // Single number format
-        return sum + (parseInt(volumeStr) || 0);
-      }
-    }, 0);
+    try {
+      const currentVolume = baselines.current_volume || {};
+      const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
+        // Parse volume strings like "2-4 hours" to get the average
+        const volumeStr = vol as string;
+        if (!volumeStr) return sum;
+        
+        // Handle different volume formats
+        if (volumeStr.includes('-')) {
+          // "2-4 hours" format - take the average
+          const parts = volumeStr.split('-');
+          const low = parseInt(parts[0]) || 0;
+          const high = parseInt(parts[1]) || 0;
+          return sum + ((low + high) / 2);
+        } else if (volumeStr.includes('+')) {
+          // "8+ hours" format - take the minimum
+          const num = parseInt(volumeStr) || 0;
+          return sum + num;
+        } else {
+          // Single number format
+          return sum + (parseInt(volumeStr) || 0);
+        }
+      }, 0);
 
-    const trainingFrequency = baselines.training_frequency || {};
-    const volumeIncreaseCapacity = baselines.volume_increase_capacity || {};
-    const disciplineFitness = baselines.disciplineFitness || {};
-    const performanceNumbers = baselines.performanceNumbers || {};
+      const trainingFrequency = baselines.training_frequency || {};
+      const volumeIncreaseCapacity = baselines.volume_increase_capacity || {};
+      const disciplineFitness = baselines.disciplineFitness || {};
+      const performanceNumbers = baselines.performanceNumbers || {};
 
-    return {
-      totalHours: totalHours as number,
-      currentVolume,
-      trainingFrequency,
-      volumeIncreaseCapacity,
-      disciplineFitness,
-      performanceNumbers,
-      trainingBackground: baselines.trainingBackground,
-      age: baselines.age as number,
-      injuryHistory: baselines.injuryHistory,
-      equipment: baselines.equipment || {}
-    };
+      return {
+        totalHours: totalHours as number,
+        currentVolume,
+        trainingFrequency,
+        volumeIncreaseCapacity,
+        disciplineFitness,
+        performanceNumbers,
+        trainingBackground: baselines.trainingBackground,
+        age: baselines.age as number,
+        injuryHistory: baselines.injuryHistory,
+        equipment: baselines.equipment || {}
+      };
+    } catch (error) {
+      console.error('Error in getBaselineInsights:', error);
+      return null;
+    }
   };
 
   const validateTimeline = (distance: string, timeline: string) => {
@@ -518,7 +548,64 @@ export default function AIPlanBuilder() {
   // Build comprehensive prompt from responses
   const buildPlanPrompt = () => {
     const insights = getBaselineInsights();
-    let prompt = `Create a comprehensive training plan for a triathlete with the following specifications:\n\n`;
+    let prompt = `Create a comprehensive training plan for a triathlete with the following specifications:
+
+**CRITICAL REQUIREMENT: You MUST generate a COMPLETE training plan with 8-12 WEEKS of training. DO NOT stop at 1 or 2 weeks. Generate the ENTIRE plan from start to finish.**
+
+**RESPONSE LENGTH: Use the FULL response length available. Do not truncate or shorten the plan. Generate a complete, detailed training program.**
+
+**MANDATORY: Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday). DO NOT skip any days. Include all 7 days in every week. NO REST DAYS unless specifically requested.**
+
+**INTENSITY REQUIREMENTS:**
+- **8+ hours/week training = Elite level intensity**
+- **Long sessions should be Zone 3-4, not Zone 1-2**
+- **Intervals should be Zone 4-5, not moderate**
+- **Use challenging paces, not easy spins**
+- **Progressive overload with real intensity**
+
+**SMART DISTRIBUTION FOR ELITE ATHLETES:**
+- **Swim:** 1 session/week (maintenance, technique focus)
+- **Strength:** 2-3 sessions/week (injury prevention, performance support)
+- **Bike/Run:** Priority focus (biggest impact on race time)
+- **Pyramid structure:** Zone 2 → Zone 3 → Zone 4 → Zone 3 → Zone 2 within sessions
+
+**STRENGTH TRAINING: If user selected strength training, include 2-3 strength sessions per week with detailed exercises, sets, and reps.**
+
+**Event Type:** ${responses.distance || 'Triathlon'}
+
+**USER ASSESSMENT DATA - USE THIS TO CUSTOMIZE THE PLAN:**
+
+**Baseline Fitness Data:**
+${insights ? `
+- Age: ${insights.age || 'Not specified'}
+- Current Training Volume: ${insights.totalHours || 'Unknown'} hours/week
+- Injury History: ${insights.injuryHistory || 'None reported'}
+- Performance Numbers: ${insights.performanceNumbers ? Object.entries(insights.performanceNumbers).map(([key, value]) => `${key}: ${value}`).join(', ') : 'None available'}
+- Equipment Access: ${insights.equipment && Array.isArray(insights.equipment) ? insights.equipment.join(', ') : 'Basic equipment'}
+${insights.age >= 40 ? `
+**AGE & BASELINE CONSIDERATIONS:**
+${insights.age >= 40 ? `
+- **Age 40+ with high fitness baseline:** Maintain current intensity, focus on recovery quality
+- **Age 40+ with injury history:** Include more strength training and mobility work
+- **Age 40+ with low fitness baseline:** More conservative progression, focus on consistency
+- **Recovery focus:** Quality recovery over quantity, active recovery on rest days
+- **Strength training:** Important for injury prevention and performance maintenance
+` : `
+- **Standard progression:** Based on current fitness level and training history
+- **Recovery:** Standard 24-48 hour recovery between high-intensity sessions
+`}
+` : ''}
+` : 'No baseline data available'}
+
+**User Responses - CUSTOMIZE BASED ON THESE:**
+- Training Philosophy: ${responses.trainingPhilosophy || 'Not selected'}
+- Goals: ${responses.goals && responses.goals.length > 0 ? responses.goals.map(g => GOAL_OPTIONS.find(opt => opt.key === g)?.label).join(', ') : 'Not specified'}
+- Strength Training: ${responses.strengthTraining ? STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label : 'Not selected'}
+- Training Frequency: ${responses.trainingFrequency ? TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label : 'Not selected'}
+- Weekend Availability: ${responses.weekendAvailability ? WEEKEND_AVAILABILITY_OPTIONS.find(w => w.key === responses.weekendAvailability)?.label : 'Not selected'}
+- Long Session Preference: ${responses.longSessionPreference ? LONG_SESSION_PREFERENCES.find(l => l.key === responses.longSessionPreference)?.label : 'Not selected'}
+- Event Date: ${responses.eventDate || 'Not specified'}
+`;
     
     // Focus and event details
     if (selectedFocus.includes('triathlon')) {
@@ -543,12 +630,62 @@ export default function AIPlanBuilder() {
       }
     }
     
-    // Weekend availability and long session preferences
+    // Event details
+    if (responses.hasSpecificEvent === 'yes') {
+      prompt += `**Event Details:**\n`;
+      prompt += `- Distance: ${responses.distance}\n`;
+      prompt += `- Race Name: ${responses.raceName}\n`;
+      prompt += `- Course Profile: ${responses.courseProfile}\n`;
+      prompt += `- Climate: ${responses.climate}\n`;
+      prompt += `- Running Elevation: ${responses.runningElevationGain}\n`;
+      prompt += `- Running Course: ${responses.runningCourseProfile}\n`;
+      prompt += `- Cycling Elevation: ${responses.cyclingElevationGain}\n`;
+      prompt += `- Cycling Course: ${responses.cyclingCourseProfile}\n`;
+      prompt += `- Water Conditions: ${responses.waterConditions}\n`;
+      if (responses.eventDate) {
+        prompt += `- Event Date: ${responses.eventDate}\n`;
+      }
+    }
+
+    // Goals
+    if (responses.goals && responses.goals.length > 0) {
+      prompt += `**Primary Goals:**\n`;
+      responses.goals.forEach(goalKey => {
+        const goal = GOAL_OPTIONS.find(g => g.key === goalKey);
+        if (goal) {
+          prompt += `- ${goal.label}: ${goal.description}\n`;
+        }
+      });
+    }
+    
+    // Weekend availability and long session preferences - CRITICAL for scheduling
     if (responses.weekendAvailability) {
       prompt += `**Weekend Availability:** ${WEEKEND_AVAILABILITY_OPTIONS.find(w => w.key === responses.weekendAvailability)?.label}\n`;
     }
     if (responses.longSessionPreference) {
       prompt += `**Long Session Preference:** ${LONG_SESSION_PREFERENCES.find(l => l.key === responses.longSessionPreference)?.label}\n`;
+      
+      // Add specific instructions based on preference
+      switch (responses.longSessionPreference) {
+        case 'traditional-weekend':
+          prompt += `**SCHEDULING:** Always schedule long rides on Saturdays and long runs on Sundays.\n`;
+          break;
+        case 'reverse-weekend':
+          prompt += `**SCHEDULING:** Always schedule long rides on Sundays and long runs on Saturdays.\n`;
+          break;
+        case 'weekday-long':
+          prompt += `**SCHEDULING:** Schedule long sessions on weekdays (Monday-Friday) since user works weekends.\n`;
+          break;
+        case 'split-weekend':
+          prompt += `**SCHEDULING:** Schedule one long session each weekend day (Saturday and Sunday).\n`;
+          break;
+        case 'flexible-weekly':
+          prompt += `**SCHEDULING:** User will adjust long sessions based on their weekly schedule - provide flexible options.\n`;
+          break;
+        case 'optimize':
+          prompt += `**SCHEDULING:** Optimize long session timing based on user's availability and recovery needs.\n`;
+          break;
+      }
     }
     
     // Training frequency and duration
@@ -564,10 +701,31 @@ export default function AIPlanBuilder() {
     
     // Strength training
     if (responses.strengthTraining && responses.strengthTraining !== 'no-strength') {
-      prompt += `**Strength Training:** ${STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}\n`;
-      if (responses.strengthFitnessLevel) {
-        prompt += `**Strength Level:** ${STRENGTH_FITNESS_LEVELS.find(s => s.key === responses.strengthFitnessLevel)?.label}\n`;
+      const strengthType = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label;
+      prompt += `**Strength Training:** ${strengthType}\n`;
+      
+      // Add specific frequency based on strength type
+      if (responses.strengthTraining === 'power-development') {
+        prompt += `**STRENGTH SCHEDULE:** Include 2-3 power development sessions per week with plyometrics and explosive movements.\n`;
+        prompt += `**POWER DEVELOPMENT REQUIREMENTS:** Use plyometrics, explosive movements, rate of force development. Include box jumps, medicine ball throws, jump squats, explosive push-ups, power cleans, snatches. Focus on speed and power.\n`;
+      } else if (responses.strengthTraining === 'power-lifting') {
+        prompt += `**STRENGTH SCHEDULE:** Include 2-3 power lifting sessions per week with compound lifts, heavy weight, low reps.\n`;
+        prompt += `**POWER LIFTING REQUIREMENTS:** Use compound movements (squat, bench, deadlift), heavy weight (80-90% 1RM), low reps (3-5), long rest periods (3-5 min). Focus on strength development.\n`;
+      } else if (responses.strengthTraining === 'injury-prevention') {
+        prompt += `**STRENGTH SCHEDULE:** Include 2-3 injury prevention strength sessions per week focusing on mobility, stability, and corrective exercises.\n`;
+        prompt += `**INJURY PREVENTION REQUIREMENTS:** Use mobility work, stability exercises, corrective movements. Include hip mobility, core stability, shoulder stability, single-leg balance, corrective exercises for common triathlon imbalances.\n`;
+      } else if (responses.strengthTraining === 'sport-specific') {
+        prompt += `**STRENGTH SCHEDULE:** Include 2-3 sport-specific strength sessions per week targeting triathlon-specific movements.\n`;
+        prompt += `**SPORT-SPECIFIC REQUIREMENTS:** Use triathlon-specific movements. Include swim pull exercises, bike-specific leg strength, run-specific plyometrics, transition practice, sport-specific core work.\n`;
+      } else if (responses.strengthTraining === 'build-muscle') {
+        prompt += `**STRENGTH SCHEDULE:** Include 2-3 muscle building sessions per week with hypertrophy focus.\n`;
+        prompt += `**BUILD MUSCLE REQUIREMENTS:** Use hypertrophy training (8-12 reps), moderate weight (70-80% 1RM), shorter rest periods (60-90 sec). Include compound and isolation exercises for muscle growth.\n`;
+      } else if (responses.strengthTraining === 'general-fitness') {
+        prompt += `**STRENGTH SCHEDULE:** Include 2-3 general fitness strength sessions per week.\n`;
+        prompt += `**GENERAL FITNESS REQUIREMENTS:** Use basic conditioning exercises, moderate intensity, full-body workouts. Include bodyweight exercises, light weights, circuit training for overall fitness.\n`;
       }
+      
+      prompt += `**IMPORTANT:** Include detailed strength training workouts with specific exercises, sets, reps, and weights if applicable.\n`;
     }
     
     // Training philosophy
@@ -586,17 +744,291 @@ export default function AIPlanBuilder() {
       if (insights.injuryHistory) {
         prompt += `- Injury history: ${insights.injuryHistory}\n`;
       }
+      
+      // Add performance numbers for specific pace/FTP targets
+      if (insights.performanceNumbers) {
+        prompt += `\n**Performance Numbers (USE THESE FOR SPECIFIC TARGETS):**\n`;
+        Object.entries(insights.performanceNumbers).forEach(([discipline, numbers]) => {
+          if (numbers && typeof numbers === 'object') {
+            prompt += `- ${discipline}: ${JSON.stringify(numbers)}\n`;
+          }
+        });
+      }
+      
+      // Add discipline fitness levels
+      if (insights.disciplineFitness) {
+        prompt += `\n**Discipline Fitness Levels:**\n`;
+        Object.entries(insights.disciplineFitness).forEach(([discipline, level]) => {
+          if (level) {
+            prompt += `- ${discipline}: ${level}\n`;
+          }
+        });
+      }
     }
     
-    prompt += `\nPlease create a detailed, progressive training plan that builds fitness safely and effectively toward the goal.`;
+    prompt += `**REQUIREMENTS:**
+
+1. **STRUCTURE:** Create a FULL training plan with MULTIPLE WEEKS (at least 8-12 weeks). Each week MUST have EXACTLY 7 DAYS (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday) with specific workouts. DO NOT skip any days.
+
+2. **WORKOUT DETAILS:** Each workout must include:
+   - **Running paces:** Specific pace targets (e.g., "8:30/mi", "7:45/mi") - ALWAYS INCLUDE ACTUAL PACE WHEN AVAILABLE, NOT JUST "Zone 2"
+   - **Swimming paces:** Specific pace targets (e.g., "2:05/100m", "1:15/100m") - ALWAYS INCLUDE ACTUAL PACE WHEN AVAILABLE
+   - **FTP percentages for cycling:** (e.g., "85% FTP (220 watts)", "Zone 3") - ALWAYS INCLUDE ACTUAL WATTAGE WHEN FTP IS AVAILABLE
+   - **Heart rate zones:** Where applicable - CALCULATE BASED ON BASELINE FITNESS
+   - **Specific intervals:** With times/distances - USE ACTUAL PACE/SPEED NUMBERS
+   - **Sets and reps for strength training:** (e.g., "3x5 squats @ 85% 1RM (191 lbs)") - ALWAYS INCLUDE ACTUAL WEIGHT WHEN 1RM IS AVAILABLE
+   - **Warm-up, main sets, and cool-down:** For each workout
+
+3. **STRENGTH TRAINING:** If requested, include 2-3 detailed strength workouts per week with:
+   - Specific exercises (squats, deadlifts, rows, etc.)
+   - Sets, reps, and weight recommendations
+   - Progression over weeks
+   - Full workout details (warm-up, main sets, cool-down)
+
+4. **PROGRESSION:** Show clear progression:
+   - Build phases with increasing intensity
+   - Recovery weeks
+   - Peak and taper phases
+   - Specific metrics that improve over time
+
+5. **PERIODIZATION & PROGRESSIVE OVERLOAD:**
+   - **Week 1-4:** Base building (aerobic foundation, technique)
+   - **Week 5-8:** Build phase (increasing volume and intensity)
+   - **Week 9-10:** Recovery week (reduced volume, maintain intensity)
+   - **Week 11-14:** Peak phase (high intensity, sport-specific)
+   - **Week 15-16:** Taper (reduced volume, maintain intensity)
+   - **Progressive overload:** Each week should show measurable increases in volume, intensity, or complexity
+   - **Recovery weeks:** Every 3-4 weeks, include a recovery week with 20-30% reduced volume
+   - **Deload periods:** Include proper deload periods to prevent overtraining
+
+6. **TRAINING APPROACHES - MAKE THESE DISTINCTLY DIFFERENT:**
+   - **PYRAMID TRAINING:** 
+     * Structure workouts with intensity progression: easy → moderate → hard → moderate → easy
+     * Example: 10min easy → 15min moderate → 10min hard → 15min moderate → 10min easy
+     * Build intensity within each session, then taper down
+     * Focus on gradual intensity changes and recovery within workouts
+   
+   - **POLARIZED TRAINING:**
+     * 80% of training at easy intensity (Zone 1-2, conversational pace)
+     * 20% of training at hard intensity (Zone 4-5, threshold and above)
+     * Minimal moderate intensity (Zone 3) - avoid "junk miles"
+     * Easy days should be truly easy, hard days should be very challenging
+     * Example: Monday easy run (Zone 1), Tuesday hard intervals (Zone 4-5), Wednesday easy swim (Zone 1)
+   
+   - **BALANCED TRAINING:**
+     * Distribute intensity across all zones: 40% easy (Zone 1-2), 40% moderate (Zone 3), 20% hard (Zone 4-5)
+     * Include steady-state work, tempo sessions, and intervals
+     * Mix of aerobic base, threshold work, and high-intensity intervals
+     * Example: Monday easy (Zone 2), Tuesday tempo (Zone 3), Wednesday intervals (Zone 4), Thursday easy (Zone 2)
+   
+   - **Intensity Distribution:** Base intensity levels on user's fitness level and training philosophy preference
+
+7. **BASELINE FITNESS INTEGRATION:**
+   - **Use baseline data:** Incorporate user's current fitness level, performance numbers, and training history
+   - **Customize intensity:** Adjust pace targets, FTP percentages, and HR zones based on baseline data
+   - **Progressive overload:** Start from current fitness level and build appropriately
+   - **Injury prevention:** Consider injury history and age for appropriate progression
+   - **Equipment access:** Include strength exercises based on available equipment
+   - **Time constraints:** Respect current training volume and available time
+
+8. **INTENSITY CUSTOMIZATION BASED ON BASELINE:**
+   - **CRITICAL:** Use the actual performance numbers provided in the baseline data
+   - **If user has FTP data:** Use actual FTP percentages (e.g., "85% FTP (220 watts)") - ALWAYS INCLUDE THE ACTUAL WATTAGE
+   - **If user has running pace data:** Use actual pace targets (e.g., "8:30/mi", "7:45/mi") - NEVER USE GENERIC "Zone 2" WITHOUT SPECIFIC PACE
+   - **If user has swimming pace data:** Use actual pace targets (e.g., "2:05/100m", "1:15/100m") - ALWAYS INCLUDE ACTUAL PACE
+   - **If user has HR zones:** Use actual HR zone targets (e.g., Zone 2, Zone 4) - CALCULATE FROM BASELINE
+   - **If user has strength numbers:** Use actual weight recommendations (e.g., "80% 1RM (180 lbs)") - ALWAYS INCLUDE THE ACTUAL WEIGHT
+   - **If no baseline data:** Use conservative estimates based on fitness level
+   - **Age considerations:** Adjust intensity for age-appropriate training (recovery, progression rate)
+   - **MANDATORY:** Every workout must have specific, actionable numbers - no generic descriptions
+   - **FORMAT:** Always show the calculation: "85% FTP (220 watts)" not just "85% FTP"
+   - **RUNNING FORMAT:** Always show specific pace: "8:30/mi" not just "Zone 2"
+   - **Injury history:** Modify exercises and intensity based on injury patterns
+
+9. **AGE & BASELINE MODIFICATIONS:**
+   - **For athletes 40+ with high fitness baseline:** 
+     * Maintain current intensity levels based on baseline data
+     * Focus on recovery quality over quantity
+     * Include active recovery sessions
+     * Strength training for performance maintenance
+     * Standard 24-48 hour recovery between high-intensity sessions
+   - **For athletes 40+ with injury history:** 
+     * Include more strength training and mobility work
+     * Conservative progression based on injury patterns
+     * Focus on technique and form
+   - **For athletes 40+ with low fitness baseline:** 
+     * More conservative progression, focus on consistency
+     * Build aerobic base before adding intensity
+     * Include strength training for injury prevention
+   - **For athletes under 40:** Standard progression based on baseline fitness level
+
+10. **SCHEDULING:** Respect the user's long session preferences:
+   - Schedule long runs/rides according to their preference
+   - Consider their weekend availability
+   - Balance training load throughout the week
+
+11. **OUTPUT FORMAT:** Return ONLY valid JSON in this exact structure with MULTIPLE WEEKS:
+{
+  "plan": {
+    "phase": "Complete Training Program - 16 Weeks",
+    "phaseDescription": "Progressive overload with proper periodization, recovery weeks, and taper",
+    "trainingPhilosophy": "pyramid", // or "polarized" or "balanced"
+    "weeks": [
+      {
+        "weekNumber": 1,
+        "focus": "Base Building - Aerobic Foundation",
+        "phase": "Base",
+        "workouts": [
+          {
+            "day": "Monday",
+            "type": "Swim",
+            "duration": "45 minutes",
+            "warmup": "400m easy @ 2:00/100m",
+            "main": "8x50m @ 1:15/100m, 30s rest",
+            "cooldown": "200m easy @ 2:30/100m",
+            "notes": "Focus on technique, build aerobic base"
+          },
+          {
+            "day": "Tuesday",
+            "type": "Bike",
+            "duration": "60 minutes",
+            "warmup": "15min easy @ Zone 1",
+            "main": "3x10min @ 85% FTP (220 watts), 5min rest",
+            "cooldown": "10min easy @ Zone 1",
+            "notes": "Build cycling strength, progressive overload"
+          },
+          {
+            "day": "Wednesday",
+            "type": "Run",
+            "duration": "45 minutes",
+            "warmup": "10min easy @ 9:30/mi",
+            "main": "20min @ 8:30/mi, 10min @ 7:45/mi",
+            "cooldown": "5min easy @ 9:30/mi",
+            "notes": "Build running endurance"
+          },
+          {
+            "day": "Thursday",
+            "type": "Strength",
+            "duration": "60 minutes",
+            "warmup": "10min dynamic stretching, 3x5 @ 50% 1RM",
+            "main": "3x5 squats @ 85% 1RM (191 lbs), 3x3 deadlifts @ 90% 1RM (225 lbs), 3x5 bench @ 80% 1RM (180 lbs)",
+            "cooldown": "5min static stretching",
+            "notes": "Power lifting - compound movements, heavy weight, low reps"
+          },
+          {
+            "day": "Friday",
+            "type": "Swim",
+            "duration": "30 minutes",
+            "warmup": "200m easy @ 2:00/100m",
+            "main": "6x50m @ 1:20/100m, 30s rest",
+            "cooldown": "200m easy @ 2:30/100m",
+            "notes": "Recovery swim, focus on technique"
+          },
+          {
+            "day": "Saturday",
+            "type": "Bike",
+            "duration": "90 minutes",
+            "warmup": "15min easy @ Zone 1",
+            "main": "60min @ Zone 2-3, long steady ride",
+            "cooldown": "15min easy @ Zone 1",
+            "notes": "Long ride to build endurance"
+          },
+          {
+            "day": "Sunday",
+            "type": "Run",
+            "duration": "60 minutes",
+            "warmup": "10min easy @ 9:30/mi",
+            "main": "45min @ 8:30/mi, long steady run",
+            "cooldown": "5min easy @ 9:30/mi",
+            "notes": "Long run to build endurance"
+          }
+        ]
+      },
+      {
+        "weekNumber": 4,
+        "focus": "Base Building - Recovery Week",
+        "phase": "Recovery",
+        "workouts": [
+          {
+            "day": "Monday",
+            "type": "Swim",
+            "duration": "30 minutes",
+            "warmup": "200m easy @ 2:00/100m",
+            "main": "4x50m @ 1:15/100m, 30s rest",
+            "cooldown": "200m easy @ 2:30/100m",
+            "notes": "Recovery week - reduced volume, maintain technique"
+          }
+        ]
+      },
+      {
+        "weekNumber": 8,
+        "focus": "Build Phase - Increasing Intensity",
+        "phase": "Build",
+        "workouts": [
+          {
+            "day": "Monday",
+            "type": "Swim",
+            "duration": "60 minutes",
+            "warmup": "400m easy @ 2:00/100m",
+            "main": "12x50m @ 1:10/100m, 30s rest",
+            "cooldown": "200m easy @ 2:30/100m",
+            "notes": "Increased volume and intensity - progressive overload"
+          }
+        ]
+      }
+    ]
+  }
+}
+
+**STRENGTH TRAINING EXAMPLES:**
+- **Power Development:** Box jumps, medicine ball throws, jump squats, explosive push-ups, power cleans, snatches
+- **Power Lifting:** Squats @ 85% 1RM, deadlifts @ 90% 1RM, bench @ 80% 1RM (3-5 reps, 3-5 min rest)
+- **Injury Prevention:** Hip mobility, core stability, shoulder stability, single-leg balance, corrective exercises
+- **Sport-Specific:** Swim pull exercises, bike-specific leg strength, run-specific plyometrics, transition practice
+- **Build Muscle:** Hypertrophy training (8-12 reps, 70-80% 1RM, 60-90 sec rest)
+- **General Fitness:** Bodyweight exercises, light weights, circuit training
+
+**CRITICAL:** 
+- Return ONLY the JSON object above
+- Include AT LEAST 8 WEEKS of training (NOT just 1 or 2 weeks)
+- Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday)
+- Make each workout specific and actionable with actual pace targets, FTP percentages, heart rate zones, and detailed instructions
+- This is for real training, not a template
+- DO NOT stop at 1 or 2 weeks - generate the FULL 8-12 week plan
+- Use the FULL response length available - do not truncate the plan
+- Generate a COMPLETE training program from start to finish
+- Include proper periodization: Base → Build → Peak → Taper phases
+- Include recovery weeks every 3-4 weeks with 20-30% reduced volume
+- Show progressive overload: increasing volume, intensity, or complexity each week
+- Include proper deload periods to prevent overtraining
+- **STRENGTH TRAINING:** If requested, include 2-3 strength sessions per week with detailed exercises
+- **CUSTOMIZE BASED ON USER RESPONSES:**
+  - Use the selected training philosophy (pyramid/polarized/balanced) to structure workouts
+  - Base intensity levels on user's fitness level from baseline data
+  - Adjust volume based on current training frequency and available time
+  - Include strength training if requested, using available equipment
+  - Respect long session preferences and weekend availability
+  - Consider injury history and age for appropriate progression
+- **MAKE TRAINING APPROACHES DISTINCTLY DIFFERENT:**
+  - Pyramid: Intensity progression within workouts (easy → moderate → hard → moderate → easy)
+  - Polarized: 80% easy (Zone 1-2), 20% hard (Zone 4-5), minimal moderate intensity
+  - Balanced: 40% easy, 40% moderate, 20% hard across all zones
+- **USE ALL BASELINE DATA:**
+  - Incorporate actual performance numbers (FTP, pace, strength)
+  - Base training intensity on current fitness level, not just age
+  - Consider injury history for appropriate progression
+  - Use available equipment for strength training
+  - Start from current fitness level and build appropriately
+  - **Age 40+ with high fitness:** Maintain intensity, focus on recovery quality
+  - **Age 40+ with low fitness:** Conservative progression, build base first`;
     
     return prompt;
   };
 
   // Generate plan
   const generatePlan = async () => {
-    setGeneratingPlan(true);
     try {
+      setGeneratingPlan(true);
       const prompt = buildPlanPrompt();
       const startDate = new Date().toISOString().split('T')[0];
       
@@ -609,45 +1041,23 @@ export default function AIPlanBuilder() {
       
       console.log('Plan generated:', result);
       
-      // Transform to display format
+      // Use the AI response directly - it should already be in the correct format
       const plan = {
         id: `plan-${Date.now()}`,
         name: result.plan.name || 'Your Training Plan',
         description: result.plan.description || 'Personalized training plan based on your assessment',
         focus: selectedFocus.join(', '),
-        weeklySchedule: result.workouts.map(workout => 
-          `${workout.date}: ${workout.name} - ${workout.description}`
-        ).slice(0, 7), // Show first week
-        currentWeek: 1,
-        totalWeeks: result.plan.duration || 8,
-        workouts: result.workouts,
+        plan: result.plan, // Use the AI-generated plan structure directly
         fullPlan: result
       };
       
       setGeneratedPlan(plan);
+      setCurrentWeek(0); // Reset to first week
       
     } catch (error) {
       console.error('Error generating plan:', error);
-      // Fallback plan
-      const fallbackPlan = {
-        id: `fallback-${Date.now()}`,
-        name: "Your Training Plan",
-        description: "Here's your personalized plan based on your assessment.",
-        focus: selectedFocus.join(', '),
-        weeklySchedule: [
-          "Monday: Swim technique + Strength",
-          "Tuesday: Bike intervals", 
-          "Wednesday: Easy run + Core",
-          "Thursday: Swim endurance",
-          "Friday: Bike long ride",
-          "Saturday: Long run",
-          "Sunday: Rest or active recovery"
-        ],
-        currentWeek: 1,
-        totalWeeks: 8,
-        workouts: []
-      };
-      setGeneratedPlan(fallbackPlan);
+      // No fallbacks - show error to user
+      setGeneratedPlan(null);
     } finally {
       setGeneratingPlan(false);
     }
@@ -752,6 +1162,17 @@ export default function AIPlanBuilder() {
                       onChange={(e) => updateResponse('raceName', e.target.value)}
                       className="w-full p-3"
                       placeholder="e.g., Ironman 70.3 World Championship"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Event date:</label>
+                    <input
+                      type="date"
+                      value={responses.eventDate}
+                      onChange={(e) => updateResponse('eventDate', e.target.value)}
+                      className="w-full p-3"
+                      min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
 
@@ -970,23 +1391,112 @@ export default function AIPlanBuilder() {
       case 2:
         return (
           <div>
-            <div className="mb-4 text-gray-800 font-medium">When is your event?</div>
+            <div className="mb-4 text-gray-800 font-medium">What are your primary goals for this training plan?</div>
+            <div className="text-sm text-gray-600 mb-4">Select up to 3 goals that matter most to you</div>
             
-            {responses.hasSpecificEvent === 'yes' && (
-              <div className="mb-6">
-                <label className="block text-sm text-gray-600 mb-2">Event date:</label>
-                <input
-                  type="date"
-                  value={responses.eventDate}
-                  onChange={(e) => updateResponse('eventDate', e.target.value)}
-                  className="w-full p-3"
-                  min={new Date().toISOString().split('T')[0]}
-                />
+            <div className="space-y-3 mb-6">
+              {GOAL_OPTIONS.map((option) => {
+                const isSelected = responses.goals.includes(option.key);
+                return (
+                  <button
+                    key={option.key}
+                    onClick={() => {
+                      const newGoals = isSelected 
+                        ? responses.goals.filter(g => g !== option.key)
+                        : responses.goals.length < 3 
+                          ? [...responses.goals, option.key]
+                          : responses.goals;
+                      updateResponse('goals', newGoals);
+                    }}
+                    className={`w-full p-3 text-left transition-colors ${
+                      isSelected
+                        ? 'bg-gray-200 text-black'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="font-medium">{option.label}</div>
+                    <div className="text-sm text-gray-600">{option.description}</div>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 text-gray-800 py-2 font-medium"
+                onClick={() => setStep(1)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
+                disabled={responses.goals.length === 0}
+                onClick={() => setStep(3)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 3:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">Do you want to add strength training to your triathlon plan?</div>
+            
+            {insights && recommendedStrength && (
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div>
+                  <strong>Based on your baseline:</strong> 
+                  {insights.age >= 40 && ' At your age, injury prevention is recommended.'}
+                  {insights.injuryHistory?.includes('injury') && ' Given your injury history, injury prevention is recommended.'}
+                  {insights.performanceNumbers.squat && ' You have strength numbers, so power development is an option.'}
+                  <div className="mt-1">Recommended: {STRENGTH_OPTIONS.find(s => s.key === recommendedStrength)?.label}</div>
+                </div>
               </div>
             )}
+            
+            <div className="space-y-3 mb-6">
+              {STRENGTH_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => updateResponse('strengthTraining', option.key)}
+                  className={`w-full p-3 text-left transition-colors ${
+                    responses.strengthTraining === option.key
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-transparent text-black hover:bg-gray-100'
+                  }`}
+                >
+                  {option.label}
+                  {option.key === recommendedStrength && (
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1">Recommended</span>
+                  )}
+                </button>
+              ))}
+            </div>
 
-            <div className="mb-6">
-              <div className="mb-4 text-gray-800 font-medium">What's your weekend availability?</div>
+            <div className="flex gap-3">
+              <button
+                className="flex-1 text-gray-800 py-2 font-medium"
+                onClick={() => setStep(2)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
+                disabled={!responses.strengthTraining}
+                onClick={() => setStep(4)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">What's your weekend availability?</div>
               <div className="text-sm text-gray-600 mb-4">This helps us schedule your long training sessions</div>
               
               <div className="space-y-3 mb-6">
@@ -1004,7 +1514,6 @@ export default function AIPlanBuilder() {
                   </button>
                 ))}
               </div>
-            </div>
 
             {responses.weekendAvailability && responses.weekendAvailability !== 'optimize' && (
               <div className="mb-6">
@@ -1032,14 +1541,14 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(1)}
+                onClick={() => setStep(3)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekendAvailability || (responses.weekendAvailability !== 'optimize' && !responses.longSessionPreference)}
-                onClick={() => setStep(3)}
+                onClick={() => setStep(5)}
               >
                 Next
               </button>
@@ -1047,7 +1556,7 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 3:
+      case 5:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
@@ -1086,14 +1595,14 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(2)}
+                onClick={() => setStep(4)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingFrequency}
-                onClick={() => setStep(4)}
+                onClick={() => setStep(6)}
               >
                 Next
               </button>
@@ -1101,18 +1610,18 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 4:
+      case 6:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
             <div className="text-sm text-gray-600 mb-4">Longer weekend sessions important for endurance</div>
             
-            {insights && (
+            {insights && insights.totalHours !== undefined && (
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
                 <div>
                   <strong>Based on your baseline:</strong> You currently train {insights.totalHours} hours/week.
                   {insights.totalHours < 6 && ' Consider longer sessions to build endurance.'}
-                  {insights.totalHours >= 8 && ' You have good volume, focus on quality over quantity.'}
+                  {insights.totalHours >= 8 && ' Elite level volume - use Zone 3-4 for long sessions, Zone 4-5 for intervals.'}
                 </div>
               </div>
             )}
@@ -1120,7 +1629,7 @@ export default function AIPlanBuilder() {
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Weekday sessions:</div>
               <div className="space-y-2 mb-4">
-                {WEEKDAY_DURATION_OPTIONS.map((option) => (
+                {WEEKDAY_DURATION_OPTIONS && WEEKDAY_DURATION_OPTIONS.map((option) => (
                   <button
                     key={option.key}
                     onClick={() => updateResponse('weekdayDuration', option.key)}
@@ -1139,7 +1648,7 @@ export default function AIPlanBuilder() {
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Weekend sessions:</div>
               <div className="space-y-2">
-                {WEEKEND_DURATION_OPTIONS.map((option) => (
+                {WEEKEND_DURATION_OPTIONS && WEEKEND_DURATION_OPTIONS.map((option) => (
                   <button
                     key={option.key}
                     onClick={() => updateResponse('weekendDuration', option.key)}
@@ -1158,14 +1667,14 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(3)}
+                onClick={() => setStep(5)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekdayDuration || !responses.weekendDuration}
-                onClick={() => setStep(5)}
+                onClick={() => setStep(7)}
               >
                 Next
               </button>
@@ -1173,117 +1682,7 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 5:
-
-        return (
-          <div>
-            <div className="mb-4 text-gray-800 font-medium">Do you want to add strength training to your triathlon plan?</div>
-            
-            {insights && recommendedStrength && (
-              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                <div>
-                  <strong>Based on your baseline:</strong> 
-                  {insights.age >= 40 && ' At your age, injury prevention is recommended.'}
-                  {insights.injuryHistory?.includes('injury') && ' Given your injury history, injury prevention is recommended.'}
-                  {insights.performanceNumbers.squat && ' You have strength numbers, so power development is an option.'}
-                  <div className="mt-1">Recommended: {STRENGTH_OPTIONS.find(s => s.key === recommendedStrength)?.label}</div>
-                </div>
-              </div>
-            )}
-            
-            <div className="space-y-3 mb-6">
-              {STRENGTH_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => updateResponse('strengthTraining', option.key)}
-                  className={`w-full p-3 text-left transition-colors ${
-                    responses.strengthTraining === option.key
-                      ? 'bg-gray-200 text-black'
-                      : 'bg-transparent text-black hover:bg-gray-100'
-                  }`}
-                >
-                  {option.label}
-                  {option.key === recommendedStrength && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1">Recommended</span>
-                  )}
-                </button>
-              ))}
-            </div>
-
-            {responses.strengthTraining && responses.strengthTraining !== 'no-strength' && (
-              <div className="mb-6 space-y-4">
-                <div>
-                  <div className="text-sm text-gray-600 mb-3">Fitness Level:</div>
-                  <div className="space-y-2">
-                    {STRENGTH_FITNESS_LEVELS.map((option) => (
-                      <button
-                        key={option.key}
-                        onClick={() => updateResponse('strengthFitnessLevel', option.key)}
-                        className={`w-full p-3 text-left transition-colors ${
-                          responses.strengthFitnessLevel === option.key
-                            ? 'bg-gray-200 text-black'
-                            : 'bg-transparent text-black hover:bg-gray-100'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-sm text-gray-600 mb-3">Performance Level:</div>
-                  <div className="space-y-2">
-                    {STRENGTH_PERFORMANCE_LEVELS.map((option) => (
-                      <button
-                        key={option.key}
-                        onClick={() => updateResponse('strengthPerformanceLevel', option.key)}
-                        className={`w-full p-3 text-left transition-colors ${
-                          responses.strengthPerformanceLevel === option.key
-                            ? 'bg-gray-200 text-black'
-                            : 'bg-transparent text-black hover:bg-gray-100'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {responses.strengthPerformanceLevel === 'know-1rms' && (
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Squat 1RM (lbs):</label>
-                      <input
-                        type="number"
-                        value={responses.squat1RM}
-                        onChange={(e) => updateResponse('squat1RM', e.target.value)}
-                        className="w-full p-3"
-                      />
-                    </div>
-                    {/* Repeat for deadlift, bench, etc. */}
-                  </div>
-                )}
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(4)}
-              >
-                Back
-              </button>
-              <button
-                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
-                disabled={!responses.strengthTraining}
-                onClick={() => setStep(6)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        );
-
-      case 6:
+      case 7:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">Choose your training approach:</div>
@@ -1320,14 +1719,14 @@ export default function AIPlanBuilder() {
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(5)}
+                onClick={() => setStep(6)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingPhilosophy}
-                onClick={() => setStep(7)}
+                onClick={() => setStep(8)}
               >
                 Generate Plan
               </button>
@@ -1335,23 +1734,13 @@ export default function AIPlanBuilder() {
           </div>
         );
 
-      case 7:
+      case 8:
         if (generatingPlan) {
           return (
-            <div className="text-center">
-              <div className="mb-4 text-gray-800 font-medium">Generating your training plan...</div>
-              <div className="text-gray-600 mb-6">
-                <div>Building your personalized plan based on:</div>
-                <div className="mt-2 text-sm">
-                  <div>• Focus: {selectedFocus.join(', ')}</div>
-                  <div>• Training Frequency: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label}</div>
-                  <div>• Training Philosophy: {responses.trainingPhilosophy?.toUpperCase()}</div>
-                  {responses.strengthTraining && responses.strengthTraining !== 'no-strength' && (
-                    <div>• Strength: {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
-                  )}
-                </div>
-              </div>
-              <div className="text-gray-500">This may take a moment...</div>
+            <div className="flex flex-col items-center justify-center min-h-[60vh]">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-800 mb-4"></div>
+              <div className="text-gray-800 font-medium">Generating your training plan...</div>
+              <div className="text-sm text-gray-600 mt-2">This may take a moment</div>
             </div>
           );
         }
@@ -1359,35 +1748,109 @@ export default function AIPlanBuilder() {
         if (generatedPlan) {
           return (
             <div>
-              <div className="mb-4 text-gray-800 font-medium">Your Training Plan</div>
-              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                <div><strong>{generatedPlan.name}</strong></div>
-                <div className="mt-1">{generatedPlan.description}</div>
-              </div>
-              
               <div className="mb-6">
-                <div className="text-sm text-gray-600 mb-3">Week 1 Schedule:</div>
-                <div className="space-y-2">
-                  {generatedPlan.weeklySchedule.map((session, index) => (
-                    <div key={index} className="p-3 bg-gray-50 text-sm">
-                      {session}
-                    </div>
+                <h2 className="text-2xl font-bold text-gray-800 mb-2">Your Training Plan</h2>
+                <div className="text-sm text-gray-600">
+                  {generatedPlan.plan?.phase || 'Intelligent training plan based on your assessment'}
+                </div>
+              </div>
+
+              {/* Phase Overview */}
+              {generatedPlan.plan?.phase && (
+                <div className="mb-6 p-4 bg-blue-50 text-blue-800 rounded-lg">
+                  <div className="font-medium mb-2">{generatedPlan.plan.phase}</div>
+                  <div className="text-sm">
+                    {generatedPlan.plan.phaseDescription || 'Progressive training plan building towards your race'}
+                  </div>
+                </div>
+              )}
+
+              {/* Week Navigation - Using app's tab design */}
+              <div className="mb-6">
+                <div className="flex border-b border-gray-200">
+                  {generatedPlan.plan?.weeks?.map((week: any, weekIndex: number) => (
+                    <button
+                      key={weekIndex}
+                      onClick={() => setCurrentWeek(weekIndex)}
+                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                        weekIndex === currentWeek 
+                          ? 'text-gray-900 border-b-2 border-gray-900' 
+                          : 'text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300'
+                      }`}
+                    >
+                      Week {weekIndex + 1}
+                    </button>
                   ))}
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              {/* Week View */}
+              {generatedPlan.plan?.weeks?.[currentWeek] && (
+                <div className="space-y-4">
+                  {/* Week Header */}
+                  <div className="text-lg font-semibold text-gray-800">
+                    Week {currentWeek + 1} - {generatedPlan.plan.weeks[currentWeek].focus || 'Build Phase'}
+                  </div>
+                  
+                  {/* Daily Workouts */}
+                  <div className="space-y-6">
+                    {generatedPlan.plan.weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => (
+                      <div key={dayIndex} className="border-b border-gray-100 pb-6">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className="font-medium text-gray-900 text-lg">
+                            {workout.day}: {workout.type}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {workout.duration}
+                          </div>
+                        </div>
+                        
+                        {/* Workout Details */}
+                        <div className="space-y-3 text-sm">
+                          {workout.warmup && (
+                            <div className="text-gray-700">
+                              <span className="font-medium">Warm-up:</span> {workout.warmup}
+                            </div>
+                          )}
+                          
+                          {workout.main && (
+                            <div className="text-gray-700">
+                              <span className="font-medium">Main:</span> {workout.main}
+                            </div>
+                          )}
+                          
+                          {workout.cooldown && (
+                            <div className="text-gray-700">
+                              <span className="font-medium">Cool-down:</span> {workout.cooldown}
+                            </div>
+                          )}
+                          
+                          {workout.notes && (
+                            <div className="text-gray-600 italic">
+                              {workout.notes}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+
+
+              <div className="flex gap-3 mt-8">
                 <button
                   className="flex-1 text-gray-800 py-2 font-medium"
-                  onClick={() => setStep(5)}
+                  onClick={() => setStep(7)}
                 >
                   Back
                 </button>
                 <button
                   className="flex-1 bg-gray-800 text-white py-2 font-medium"
                   onClick={() => {
-                    // TODO: Save plan and navigate to plan view
-                    console.log('Plan ready to save:', generatedPlan);
+                    // TODO: Implement save plan functionality
+                    console.log('Save plan:', generatedPlan);
                   }}
                 >
                   Save Plan
@@ -1399,7 +1862,8 @@ export default function AIPlanBuilder() {
 
         return (
           <div className="text-center">
-            <div className="mb-4 text-gray-800 font-medium">Something went wrong</div>
+            <div className="mb-4 text-gray-800 font-medium">AI plan generation failed</div>
+            <div className="text-sm text-gray-600 mb-4">The AI service is temporarily unavailable. Please try again in a moment.</div>
             <button
               className="bg-gray-800 text-white py-2 px-4 font-medium"
               onClick={generatePlan}

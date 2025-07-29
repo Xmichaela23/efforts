@@ -1114,6 +1114,176 @@ return (
                                   })}
                                 </div>
                               </div>
+
+                              {/* Performance Numbers */}
+                              <div className="space-y-2">
+                                <label className="text-sm font-medium text-gray-700">Performance Numbers</label>
+                                <p className="text-xs text-gray-500">Enter your current performance numbers for personalized training plans</p>
+                                
+                                {disciplineId === 'cycling' && data.benchmarks?.cycling === 'I know my FTP (watts)' && (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="text-xs text-gray-600">FTP (watts)</label>
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.ftp || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            ftp: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        placeholder="Enter your FTP"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {disciplineId === 'running' && (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="text-xs text-gray-600">5K Time (mm:ss)</label>
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.fiveK || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            fiveK: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="mm:ss"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">10K Time (mm:ss)</label>
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.tenK || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            tenK: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="mm:ss"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Half Marathon (hh:mm)</label>
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.halfMarathon || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            halfMarathon: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="hh:mm"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {disciplineId === 'swimming' && (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="text-xs text-gray-600">100m Pace (mm:ss)</label>
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.swimPace100 || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            swimPace100: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="mm:ss"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">200m Time (mm:ss)</label>
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.swim200Time || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            swim200Time: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="mm:ss"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+
+                                {disciplineId === 'strength' && (
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="text-xs text-gray-600">Squat 1RM (lbs)</label>
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.squat || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            squat: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        placeholder="Enter your 1RM"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Deadlift 1RM (lbs)</label>
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.deadlift || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            deadlift: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        placeholder="Enter your 1RM"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Bench Press 1RM (lbs)</label>
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.bench || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            bench: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        placeholder="Enter your 1RM"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
                         );

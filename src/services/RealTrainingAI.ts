@@ -13,6 +13,9 @@ export interface AITrainingPlan {
     totalWorkouts: number;
     disciplines: string[];
     isIntegrated: boolean;
+    weeks?: any[]; // Added for new UI
+    phase?: string; // Added for new UI
+    phaseDescription?: string; // Added for new UI
   };
   workouts: Array<{
     name: string;
@@ -36,6 +39,9 @@ export class RealTrainingAI {
                   (import.meta as any).env.VITE_AI_API_KEY || 
                   (import.meta as any).env.REACT_APP_OPENAI_API_KEY || '';
     this.baseURL = 'https://api.openai.com/v1/chat/completions';
+    
+    console.log('🔑 API Key check:', this.apiKey ? 'Found' : 'Not found');
+    console.log('🔑 API Key length:', this.apiKey.length);
     
     if (!this.apiKey) {
       console.warn('No OpenAI API key found. Check your .env file for OPENAI_API_KEY, VITE_OPENAI_API_KEY, VITE_AI_API_KEY, or REACT_APP_OPENAI_API_KEY');
@@ -67,7 +73,7 @@ export class RealTrainingAI {
       const timeoutId = setTimeout(() => {
         console.log('⏰ Request timeout, using fallback...');
         controller.abort();
-      }, 15000); // 15 second timeout
+      }, 45000); // 45 second timeout
 
       const response = await fetch(this.baseURL, {
         method: 'POST',
@@ -83,15 +89,19 @@ export class RealTrainingAI {
             { role: 'user', content: userPrompt }
           ],
           temperature: 0.3,
-          max_tokens: 2000, // Increased for better responses
+          max_tokens: 4000, // Increased significantly for full multi-week plans
         }),
       });
 
       clearTimeout(timeoutId);
       console.log('📥 Received response from OpenAI...');
+      console.log('📥 Response status:', response.status);
+      console.log('📥 Response ok:', response.ok);
 
       if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+        const errorText = await response.text();
+        console.error('📥 Error response:', errorText);
+        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
@@ -107,34 +117,87 @@ export class RealTrainingAI {
     } catch (error) {
       console.error('AI Plan Generation Error:', error);
       
-      // Fallback to science-based rules if AI fails
-      return this.generateFallbackPlan(prompt, startDate);
+      // No fallbacks - if AI fails, throw the error
+      throw new Error(`AI plan generation failed: ${error.message}`);
     }
   }
 
-  // FIXED: Much better training science system prompt
+  // FIXED: Evidence-based training science system prompt
   private buildTrainingSciencePrompt(): string {
     return `You are an intelligent training AI with expertise in exercise science, periodization, and personalized training design.
+
+EVIDENCE-BASED TRAINING SCIENCE PRINCIPLES:
+
+**PERIODIZATION (Based on Bompa & Haff research):**
+- Linear periodization: Volume → Intensity → Peak → Taper
+- Block periodization: Accumulation → Transmutation → Realization
+- Undulating periodization: Daily/weekly intensity variation
+- Recovery weeks every 3-4 weeks (20-30% volume reduction)
+
+**POLARIZED TRAINING (Based on Seiler & Tønnessen research):**
+- 80% of training at low intensity (Zone 1-2, <2 mmol/L lactate)
+- 20% of training at high intensity (Zone 4-5, >4 mmol/L lactate)
+- Minimal moderate intensity (Zone 3, "junk miles")
+- Proven effective for endurance performance improvement
+
+**PYRAMID TRAINING (Based on traditional strength training principles):**
+- Intensity progression within sessions: easy → moderate → hard → moderate → easy
+- Allows for proper warm-up and cool-down
+- Prevents overtraining within single sessions
+- Builds intensity tolerance gradually
+- **ELITE ATHLETES:** Use Zone 2 → Zone 3 → Zone 4 → Zone 3 → Zone 2 progression
+- **Example:** 10min easy → 15min moderate → 10min hard → 15min moderate → 10min easy
+
+**PROGRESSIVE OVERLOAD (Based on Selye's General Adaptation Syndrome):**
+- Systematic increase in training stress over time
+- 5-10% weekly volume/intensity increases
+- Deload periods every 3-4 weeks to prevent overtraining
+- Supercompensation principle for performance gains
+
+**MULTI-SPORT INTEGRATION (Based on triathlon research):**
+- Swim-bike-run order for optimal recovery
+- 24-48 hour recovery between high-intensity sessions
+- Cross-training benefits for injury prevention
+- Sport-specific strength training integration
+
+**AGE-APPROPRIATE TRAINING (Based on Masters athlete research):**
+- Increased recovery time with age (40+ years)
+- Focus on technique and efficiency over volume
+- Strength training for injury prevention
+- Reduced high-intensity volume, maintained quality
+
+**INJURY PREVENTION (Based on sports medicine research):**
+- Gradual progression (10% rule)
+- Proper warm-up and cool-down protocols
+- Strength training for injury resilience
+- Mobility and flexibility maintenance
+
+**HEART RATE ZONES (Based on Karvonen formula):**
+- Zone 1: 50-60% HRR (Recovery)
+- Zone 2: 60-70% HRR (Aerobic base)
+- Zone 3: 70-80% HRR (Tempo)
+- Zone 4: 80-90% HRR (Threshold)
+- Zone 5: 90-100% HRR (VO2 max)
+
+**STRENGTH TRAINING (Based on NSCA guidelines):**
+- Compound movements: squats, deadlifts, rows, presses
+- 2-3 sets, 8-12 reps for hypertrophy
+- 3-5 sets, 3-6 reps for strength
+- 2-3 sessions per week for triathletes
+
+**TAPER PRINCIPLES (Based on Mujika research):**
+- 7-21 days before competition
+- 40-60% volume reduction
+- Maintain intensity, reduce frequency
+- Peak performance typically 7-14 days post-taper
 
 INTELLIGENCE GUIDELINES:
 - "Complete beginner" = Very conservative, focus on consistency
 - "Some fitness" = Light structure, build base
 - "Pretty fit" = Moderate intensity, structured progression  
-- "Very fit" = Higher intensity, sport-specific training
-- "Competitive athlete" = Advanced periodization, precise zones
-
-BENCHMARK INTERPRETATION:
-- Running: Use pace/time info to set appropriate training zones
-- Cycling: Use speed/FTP data for power-based training
-- Swimming: Use stroke ability and distance capacity for workouts
-- Strength: Use relative strength for load progression
-- Multi-sport: Use experience level for training complexity
-
-TRAINING SCIENCE PRINCIPLES:
-- Polarized training (80% easy, 20% hard) for endurance
-- Progressive overload with recovery weeks every 3-4 weeks
-- Multi-sport integration without overtraining
-- Age-appropriate recovery and intensity
+- "Very fit" = Higher intensity, sport-specific training, Zone 3-4 work
+- "Competitive athlete" = Advanced periodization, precise zones, Zone 4-5 work
+- **8+ hours/week = Elite level training, use Zone 3-4 for long sessions, Zone 4-5 for intervals**
 
 RESPOND WITH ONLY JSON (no extra text):
 {
@@ -198,16 +261,22 @@ Include proper rest days and progression.`;
     return `${contextInfo}\nRequest: ${prompt}\n\nCreate a personalized training plan that matches their fitness level and constraints. Be intelligent about their descriptions and create appropriate workouts.`;
   }
 
-  // FIXED: Simplified parsing for flatter structure
+  // FIXED: Return weeks structure directly for new UI
   private parseAIResponse(aiResponse: string, startDate: string): AITrainingPlan {
+    let cleanResponse: string;
+    let jsonString: string;
+    
     try {
       console.log('🔍 Raw AI Response:', aiResponse.substring(0, 300) + '...');
       
       // Clean the response - remove any markdown, extra text
-      let cleanResponse = aiResponse.trim();
+      cleanResponse = aiResponse.trim();
       
       // Remove markdown code blocks if present
       cleanResponse = cleanResponse.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      
+      // Remove any leading/trailing non-JSON characters
+      cleanResponse = cleanResponse.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
       
       // Find the JSON object - look for the outermost braces
       const startIndex = cleanResponse.indexOf('{');
@@ -217,12 +286,40 @@ Include proper rest days and progression.`;
         throw new Error('No JSON braces found in response');
       }
       
-      const jsonString = cleanResponse.substring(startIndex, lastIndex + 1);
+      jsonString = cleanResponse.substring(startIndex, lastIndex + 1);
       console.log('🔍 Cleaned JSON:', jsonString.substring(0, 200) + '...');
       
       const parsedPlan = JSON.parse(jsonString);
       
-      // FIXED: Handle both flat workouts array and nested weeks structure
+      // Return the plan structure directly for new UI
+      if (parsedPlan.plan && parsedPlan.plan.weeks) {
+        console.log('✅ Parsed AI weeks successfully:', parsedPlan.plan.weeks.length);
+        
+        return {
+          plan: {
+            name: parsedPlan.plan.name || 'AI Training Plan',
+            description: parsedPlan.plan.description || 'Personalized training plan',
+            type: parsedPlan.plan.type || 'multi',
+            duration: parsedPlan.plan.duration || 8,
+            level: parsedPlan.plan.level || 'intermediate',
+            goal: parsedPlan.plan.goal || 'Training',
+            status: 'active',
+            currentWeek: 1,
+            createdDate: new Date().toISOString().split('T')[0],
+            totalWorkouts: parsedPlan.plan.weeks.reduce((total: number, week: any) => 
+              total + (week.workouts?.length || 0), 0),
+            disciplines: [parsedPlan.plan.type || 'multi'],
+            isIntegrated: (parsedPlan.plan.type || 'multi') === 'multi',
+            // Add the weeks structure for new UI
+            weeks: parsedPlan.plan.weeks,
+            phase: parsedPlan.plan.phase,
+            phaseDescription: parsedPlan.plan.phaseDescription
+          },
+          workouts: [] // Keep empty for compatibility
+        };
+      }
+
+      // Fallback to old structure if weeks not found
       let workouts: any[] = [];
       const startDateObj = new Date(startDate);
 
@@ -242,27 +339,6 @@ Include proper rest days and progression.`;
             strength_exercises: workout.type === 'strength' ? 
               this.parseStrengthExercises(workout.description || '') : undefined
           };
-        });
-      } else if (parsedPlan.weeks && Array.isArray(parsedPlan.weeks)) {
-        // Nested weeks structure
-        parsedPlan.weeks.forEach((week: any, weekIndex: number) => {
-          if (week.workouts && Array.isArray(week.workouts)) {
-            week.workouts.forEach((workout: any, dayIndex: number) => {
-              const workoutDate = new Date(startDateObj);
-              workoutDate.setDate(startDateObj.getDate() + (weekIndex * 7) + dayIndex);
-              
-              workouts.push({
-                name: workout.name || 'Training Session',
-                type: workout.type || 'run',
-                date: workoutDate.toISOString().split('T')[0],
-                duration: workout.duration || 2700,
-                description: workout.description || 'Training session',
-                intervals: this.parseIntervals(workout.intervals, workout.type),
-                strength_exercises: workout.type === 'strength' ? 
-                  this.parseStrengthExercises(workout.description || '') : undefined
-              });
-            });
-          }
         });
       }
 
@@ -289,6 +365,8 @@ Include proper rest days and progression.`;
     } catch (error) {
       console.error('Failed to parse AI response:', error);
       console.log('🔍 Full AI Response for debugging:', aiResponse);
+      console.log('🔍 Cleaned response:', cleanResponse);
+      console.log('🔍 JSON string extracted:', jsonString);
       
       // Throw error to trigger fallback
       throw error;
@@ -353,85 +431,5 @@ Include proper rest days and progression.`;
     return zoneRPE[zone as keyof typeof zoneRPE] || '5';
   }
 
-  // SIMPLIFIED: Better fallback plan
-  private generateFallbackPlan(prompt: string, startDate: string): AITrainingPlan {
-    console.log('🔄 Using intelligent fallback plan generation');
-    
-    // Detect discipline from prompt
-    const promptLower = prompt.toLowerCase();
-    let type = 'multi';
-    if (promptLower.includes('running') && !promptLower.includes('multi')) type = 'run';
-    else if (promptLower.includes('cycling') && !promptLower.includes('multi')) type = 'ride';
-    else if (promptLower.includes('swimming') && !promptLower.includes('multi')) type = 'swim';
-    else if (promptLower.includes('strength') && !promptLower.includes('multi')) type = 'strength';
 
-    // Generate one week of workouts
-    const workouts = this.generateIntelligentWorkouts(type, startDate);
-
-    return {
-      plan: {
-        name: `${type === 'multi' ? 'Multi-Sport' : type.charAt(0).toUpperCase() + type.slice(1)} Training Plan`,
-        description: 'Intelligent training plan based on your assessment',
-        type,
-        duration: 8,
-        level: 'intermediate',
-        goal: 'Progressive Training',
-        status: 'active',
-        currentWeek: 1,
-        createdDate: new Date().toISOString().split('T')[0],
-        totalWorkouts: workouts.length,
-        disciplines: [type],
-        isIntegrated: type === 'multi'
-      },
-      workouts
-    };
-  }
-
-  // Generate intelligent workouts for fallback
-  private generateIntelligentWorkouts(type: string, startDate: string): any[] {
-    const workouts = [];
-    const startDateObj = new Date(startDate);
-
-    const templates = {
-      run: [
-        { name: 'Easy Run', type: 'run', duration: 2700, description: 'Comfortable aerobic pace, conversational effort' },
-        { name: 'Rest Day', type: 'rest', duration: 0, description: 'Complete rest or light stretching' },
-        { name: 'Tempo Run', type: 'run', duration: 3000, description: 'Comfortably hard pace, sustainable for 20-30 minutes' },
-        { name: 'Easy Run', type: 'run', duration: 2400, description: 'Recovery pace, very comfortable' },
-        { name: 'Intervals', type: 'run', duration: 3000, description: 'Short hard intervals with recovery' },
-        { name: 'Long Run', type: 'run', duration: 4500, description: 'Extended aerobic run, build endurance' },
-        { name: 'Rest Day', type: 'rest', duration: 0, description: 'Complete rest' }
-      ],
-      multi: [
-        { name: 'Swim Technique', type: 'swim', duration: 2700, description: 'Focus on stroke mechanics and easy aerobic swimming' },
-        { name: 'Easy Run', type: 'run', duration: 2400, description: 'Recovery pace running' },
-        { name: 'Bike Intervals', type: 'ride', duration: 3000, description: 'Structured cycling intervals' },
-        { name: 'Strength Training', type: 'strength', duration: 2700, description: 'Full body functional strength' },
-        { name: 'Run Intervals', type: 'run', duration: 3000, description: 'Running speed work' },
-        { name: 'Long Bike', type: 'ride', duration: 4200, description: 'Endurance cycling session' },
-        { name: 'Rest Day', type: 'rest', duration: 0, description: 'Complete rest' }
-      ]
-    };
-
-    const template = templates[type as keyof typeof templates] || templates.run;
-
-    template.forEach((workout, index) => {
-      if (workout.type !== 'rest') {
-        const workoutDate = new Date(startDateObj);
-        workoutDate.setDate(startDateObj.getDate() + index);
-        
-        workouts.push({
-          name: workout.name,
-          type: workout.type,
-          date: workoutDate.toISOString().split('T')[0],
-          duration: workout.duration,
-          description: workout.description,
-          intervals: [],
-          strength_exercises: workout.type === 'strength' ? [] : undefined
-        });
-      }
-    });
-
-    return workouts;
-  }
 }
