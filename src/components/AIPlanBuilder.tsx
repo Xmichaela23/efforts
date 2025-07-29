@@ -191,14 +191,6 @@ const CYCLING_COURSE_OPTIONS = {
 };
 
 const SWIMMING_COURSE_OPTIONS = {
-  swimType: [
-    'Pool (25m)',
-    'Pool (50m)',
-    'Open water (Lake)',
-    'Open water (Ocean)',
-    'Open water (River)',
-    'Mixed pool/open water'
-  ],
   waterConditions: [
     'Calm water',
     'Light chop',
@@ -220,6 +212,23 @@ const FOCUS_OPTIONS = [
   { key: 'hybrid', label: 'Hybrid' },
 ];
 
+const SURFACE_TYPE_OPTIONS = [
+  'Road',
+  'Gravel',
+  'Dirt',
+  'Mixed'
+];
+
+const CLIMATE_OPTIONS = [
+  'Cool (under 60°F)',
+  'Moderate (60-75°F)',
+  'Warm (75-85°F)',
+  'Hot (85-95°F)',
+  'Very hot (95°F+)',
+  'Humid conditions',
+  'High altitude'
+];
+
 export default function AIPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
@@ -239,7 +248,7 @@ export default function AIPlanBuilder() {
     raceName: '',
     courseProfile: '',
     climate: '',
-    swimType: '',
+    surfaceType: '',
     generalFitnessFocus: '',
     limitingDiscipline: '',
     
@@ -627,27 +636,27 @@ export default function AIPlanBuilder() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
+                        <label className="block text-sm text-gray-600 mb-2">Surface Type:</label>
                         <select
-                          value={responses.runningSurfaceType}
-                          onChange={(e) => updateResponse('runningSurfaceType', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          value={responses.surfaceType}
+                          onChange={e => updateResponse('surfaceType', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
                         >
                           <option value="">Select surface type</option>
-                          {RUNNING_COURSE_OPTIONS.surfaceType.map((option, index) => (
+                          {SURFACE_TYPE_OPTIONS.map((option, index) => (
                             <option key={index} value={option}>{option}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                        <label className="block text-sm text-gray-600 mb-2 mt-4">Climate:</label>
                         <select
-                          value={responses.runningClimate}
-                          onChange={(e) => updateResponse('runningClimate', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          value={responses.climate}
+                          onChange={e => updateResponse('climate', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
                         >
                           <option value="">Select climate</option>
-                          {RUNNING_COURSE_OPTIONS.climate.map((option, index) => (
+                          {CLIMATE_OPTIONS.map((option, index) => (
                             <option key={index} value={option}>{option}</option>
                           ))}
                         </select>
@@ -686,27 +695,27 @@ export default function AIPlanBuilder() {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
+                        <label className="block text-sm text-gray-600 mb-2">Surface Type:</label>
                         <select
-                          value={responses.cyclingSurfaceType}
-                          onChange={(e) => updateResponse('cyclingSurfaceType', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          value={responses.surfaceType}
+                          onChange={e => updateResponse('surfaceType', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
                         >
                           <option value="">Select surface type</option>
-                          {CYCLING_COURSE_OPTIONS.surfaceType.map((option, index) => (
+                          {SURFACE_TYPE_OPTIONS.map((option, index) => (
                             <option key={index} value={option}>{option}</option>
                           ))}
                         </select>
                       </div>
                       <div>
-                        <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                        <label className="block text-sm text-gray-600 mb-2 mt-4">Climate:</label>
                         <select
-                          value={responses.cyclingClimate}
-                          onChange={(e) => updateResponse('cyclingClimate', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          value={responses.climate}
+                          onChange={e => updateResponse('climate', e.target.value)}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
                         >
                           <option value="">Select climate</option>
-                          {CYCLING_COURSE_OPTIONS.climate.map((option, index) => (
+                          {CLIMATE_OPTIONS.map((option, index) => (
                             <option key={index} value={option}>{option}</option>
                           ))}
                         </select>
@@ -718,19 +727,6 @@ export default function AIPlanBuilder() {
                   <div className="border-t pt-4">
                     <h4 className="font-medium text-gray-800 mb-3">🏊‍♂️ Swimming Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2">Swim type:</label>
-                        <select
-                          value={responses.swimType}
-                          onChange={(e) => updateResponse('swimType', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
-                        >
-                          <option value="">Select swim type</option>
-                          {SWIMMING_COURSE_OPTIONS.swimType.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
                       <div>
                         <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
                         <select
