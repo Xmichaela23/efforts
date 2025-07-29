@@ -536,7 +536,7 @@ export default function AIPlanBuilder() {
               </button>
             </div>
             <button
-              className="w-full bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                              className="w-full bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
               disabled={selectedFocus.length === 0}
               onClick={() => setStep(1)}
             >
@@ -789,7 +789,7 @@ export default function AIPlanBuilder() {
               {/* Repeat for deadlift, bench, equipment, etc. */}
               {/* ... */}
               <button
-                className="w-full bg-gray-800 text-white py-2 rounded font-medium mt-4"
+                className="w-full bg-gray-800 text-white py-2 font-medium mt-4"
                 onClick={() => setStep(2)}
               >
                 Next
@@ -838,13 +838,13 @@ export default function AIPlanBuilder() {
 
             <div className="flex gap-3">
               <button
-                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                className="flex-1 text-gray-800 py-2 font-medium"
                 onClick={() => setStep(1)}
               >
                 Back
               </button>
               <button
-                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingFrequency}
                 onClick={() => setStep(3)}
               >
@@ -968,13 +968,13 @@ export default function AIPlanBuilder() {
 
             <div className="flex gap-3">
               <button
-                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                className="flex-1 text-gray-800 py-2 font-medium"
                 onClick={() => setStep(1)}
               >
                 Back
               </button>
               <button
-                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.strengthTraining}
                 onClick={() => setStep(4)}
               >
@@ -1040,13 +1040,13 @@ export default function AIPlanBuilder() {
 
             <div className="flex gap-3">
               <button
-                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                className="flex-1 text-gray-800 py-2 font-medium"
                 onClick={() => setStep(3)}
               >
                 Back
               </button>
               <button
-                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekdayDuration || !responses.weekendDuration}
                 onClick={() => setStep(5)}
               >
@@ -1077,10 +1077,10 @@ export default function AIPlanBuilder() {
                 <div
                   key={option.key}
                   onClick={() => updateResponse('trainingPhilosophy', option.key)}
-                  className={`w-full p-4 rounded border cursor-pointer transition-colors ${
+                  className={`w-full p-4 cursor-pointer transition-colors ${
                     responses.trainingPhilosophy === option.key
-                      ? 'bg-gray-200 border-gray-300'
-                      : 'bg-transparent border-gray-200 hover:bg-gray-50'
+                      ? 'bg-gray-200'
+                      : 'bg-transparent hover:bg-gray-50'
                   }`}
                 >
                   <div className="font-medium mb-2">{option.label}</div>
@@ -1092,13 +1092,13 @@ export default function AIPlanBuilder() {
 
             <div className="flex gap-3">
               <button
-                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                className="flex-1 text-gray-800 py-2 font-medium"
                 onClick={() => setStep(4)}
               >
                 Back
               </button>
               <button
-                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingPhilosophy}
                 onClick={() => setStep(6)}
               >
@@ -1130,8 +1130,8 @@ export default function AIPlanBuilder() {
 
   return (
     <div className="w-full min-h-screen px-2 pt-8">
-      <h2 className="text-xl font-semibold mb-4">Create a Training Plan</h2>
-      <div className="space-y-6">
+      <h2 className="text-xl font-semibold mb-2">Create a Training Plan</h2>
+      <div className="space-y-4">
         {getCurrentStepContent()}
       </div>
     </div>
