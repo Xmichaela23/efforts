@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 // Import Font Awesome icons at the top
-import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaBalanceScale, FaMedal, FaChild, FaCog } from 'react-icons/fa';
+import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaBalanceScale, FaMedal, FaCircle, FaCog } from 'react-icons/fa';
 
 // Triathlon-specific assessment options
 const TRIATHLON_DISTANCES = [
@@ -195,7 +195,7 @@ const FOCUS_OPTIONS = [
   { key: 'ride', label: <><FaBiking className="inline mr-2" />Ride</> },
   { key: 'triathlon', label: <><FaMedal className="inline mr-2" />Triathlon</> },
   { key: 'strength', label: <><FaDumbbell className="inline mr-2" />Strength</> },
-  { key: 'mobility', label: <><FaChild className="inline mr-2" />Mobility</> },
+  { key: 'mobility', label: <><FaCircle className="inline mr-2" />Mobility</> },
   { key: 'swim', label: <><FaSwimmer className="inline mr-2" />Swim</> },
   { key: 'hybrid', label: <><FaCog className="inline mr-2" />Hybrid</> },
 ];
