@@ -210,6 +210,16 @@ const SWIMMING_COURSE_OPTIONS = {
   ]
 };
 
+const FOCUS_OPTIONS = [
+  { key: 'run', label: 'Run' },
+  { key: 'ride', label: 'Ride' },
+  { key: 'triathlon', label: 'Triathlon' },
+  { key: 'strength', label: 'Strength' },
+  { key: 'mobility', label: 'Mobility' },
+  { key: 'swim', label: 'Swim' },
+  { key: 'hybrid', label: 'Hybrid' },
+];
+
 export default function AIPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
@@ -264,6 +274,14 @@ export default function AIPlanBuilder() {
     // Question 6: Training Philosophy
     trainingPhilosophy: '',
   });
+
+  const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
+
+  const toggleFocus = (focus: string) => {
+    setSelectedFocus((prev) =>
+      prev.includes(focus) ? prev.filter((f) => f !== focus) : [...prev, focus]
+    );
+  };
 
   useEffect(() => {
     const loadBaselines = async () => {
@@ -494,404 +512,346 @@ export default function AIPlanBuilder() {
 
     switch (step) {
       case 0:
+        // Focus selection screen
         return (
           <div>
-            <div className="mb-4 text-gray-800 font-medium">What triathlon distance and when is your goal event?</div>
-            
-            {insights && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="text-sm text-blue-800">
-                  <strong>Based on your baseline:</strong> You're currently training {insights.totalHours} hours/week across all disciplines.
-                  {recommendedTimeline && (
-                    <div className="mt-1">Recommended timeline: {TIMELINE_OPTIONS.find(t => t.key === recommendedTimeline)?.label}</div>
-                  )}
-                </div>
-              </div>
-            )}
-            
-            <div className="mb-6">
-              <div className="text-sm text-gray-600 mb-3">Distance:</div>
-              <div className="space-y-2">
-                {TRIATHLON_DISTANCES.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('distance', option.key)}
-                    className={`w-full p-3 text-left rounded transition-colors ${
-                      responses.distance === option.key
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
+            <div className="mb-4 text-gray-800 font-medium">What is your focus?</div>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              {FOCUS_OPTIONS.filter(opt => opt.key !== 'hybrid').map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => toggleFocus(option.key)}
+                  className={`p-3 rounded text-center transition-colors border border-gray-200 ${
+                    selectedFocus.includes(option.key)
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-white text-black hover:bg-gray-100'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
-
-            <div className="mb-6">
-              <div className="text-sm text-gray-600 mb-3">Timeline:</div>
-              <div className="space-y-2">
-                {TIMELINE_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('timeline', option.key)}
-                    className={`w-full p-3 text-left rounded transition-colors ${
-                      responses.timeline === option.key
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                    }`}
-                  >
-                    {option.label}
-                    {option.key === recommendedTimeline && (
-                      <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {timelineValidation?.warning && (
-              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                <div className="text-sm font-medium text-yellow-800 mb-3">
-                  ⚠️ Timeline Warning
-                </div>
-                <div className="text-sm text-yellow-700 mb-3">
-                  {timelineValidation.warning}
-                </div>
-                {!timelineValidation.isValid && (
-                  <div className="text-sm text-yellow-700">
-                    Consider selecting a longer timeline or building your base fitness first.
-                  </div>
-                )}
-              </div>
-            )}
-
-            {isAggressiveTimeline() && (
-              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded">
-                <div className="text-sm font-medium text-yellow-800 mb-3">
-                  That's an aggressive timeline. Have you completed this distance before?
-                </div>
-                <div className="space-y-2 mb-4">
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="previousExperience"
-                      value="yes"
-                      onChange={(e) => updateResponse('previousExperience', e.target.value)}
-                      className="mr-2"
-                    />
-                    Yes - previous time: 
-                    <input
-                      type="text"
-                      placeholder="e.g., 5:30"
-                      value={responses.previousTime}
-                      onChange={(e) => updateResponse('previousTime', e.target.value)}
-                      className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-20"
-                    />
-                    (when: 
-                    <input
-                      type="text"
-                      placeholder="e.g., 2023"
-                      value={responses.previousEventDate}
-                      onChange={(e) => updateResponse('previousEventDate', e.target.value)}
-                      className="ml-2 px-2 py-1 border border-gray-300 rounded text-sm w-20"
-                    />
-                    )
-                  </label>
-                  <label className="flex items-center">
-                    <input
-                      type="radio"
-                      name="previousExperience"
-                      value="no"
-                      onChange={(e) => updateResponse('previousExperience', e.target.value)}
-                      className="mr-2"
-                    />
-                    No - this would be my first
-                  </label>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
+            <div className="flex justify-center mb-6">
               <button
-                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
-                onClick={() => setStep(step - 1)}
-                disabled={step === 0}
+                onClick={() => toggleFocus('hybrid')}
+                className={`p-3 rounded text-center transition-colors border border-gray-200 w-1/2 ${
+                  selectedFocus.includes('hybrid')
+                    ? 'bg-gray-200 text-black'
+                    : 'bg-white text-black hover:bg-gray-100'
+                }`}
               >
-                Back
-              </button>
-              <button
-                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
-                disabled={!responses.distance || !responses.timeline || (timelineValidation && !timelineValidation.isValid)}
-                onClick={() => setStep(1)}
-              >
-                Next
+                Hybrid
               </button>
             </div>
+            <button
+              className="w-full bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+              disabled={selectedFocus.length === 0}
+              onClick={() => setStep(1)}
+            >
+              Next
+            </button>
           </div>
         );
 
       case 1:
-        return (
-          <div>
-            <div className="mb-4 text-gray-800 font-medium">Are you training for a specific race?</div>
-            
-            <div className="space-y-3 mb-6">
-              <button
-                onClick={() => updateResponse('hasSpecificEvent', 'yes')}
-                className={`w-full p-3 text-left rounded transition-colors ${
-                  responses.hasSpecificEvent === 'yes'
-                    ? 'bg-gray-200 text-black'
-                    : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                Yes - specific event
-              </button>
-              <button
-                onClick={() => updateResponse('hasSpecificEvent', 'no')}
-                className={`w-full p-3 text-left rounded transition-colors ${
-                  responses.hasSpecificEvent === 'no'
-                    ? 'bg-gray-200 text-black'
-                    : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                }`}
-              >
-                No - general triathlon fitness
-              </button>
-            </div>
+        // Discipline-specific questions (example: triathlon)
+        if (selectedFocus.includes('triathlon')) {
+          return (
+            <div>
+              <div className="mb-4 text-gray-800 font-medium">Are you training for a specific race?</div>
+              
+              <div className="space-y-3 mb-6">
+                <button
+                  onClick={() => updateResponse('hasSpecificEvent', 'yes')}
+                  className={`w-full p-3 text-left rounded transition-colors ${
+                    responses.hasSpecificEvent === 'yes'
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  Yes - specific event
+                </button>
+                <button
+                  onClick={() => updateResponse('hasSpecificEvent', 'no')}
+                  className={`w-full p-3 text-left rounded transition-colors ${
+                    responses.hasSpecificEvent === 'no'
+                      ? 'bg-gray-200 text-black'
+                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                  }`}
+                >
+                  No - general triathlon fitness
+                </button>
+              </div>
 
-            {responses.hasSpecificEvent === 'yes' && (
-              <div className="mb-6 space-y-6">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Race name:</label>
+              {responses.hasSpecificEvent === 'yes' && (
+                <div className="mb-6 space-y-6">
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Race name:</label>
+                    <input
+                      type="text"
+                      value={responses.raceName}
+                      onChange={(e) => updateResponse('raceName', e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded"
+                      placeholder="e.g., Ironman 70.3 World Championship"
+                    />
+                  </div>
+
+                  {/* Running Course Details */}
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-800 mb-3">🏃‍♂️ Running Course</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
+                        <select
+                          value={responses.runningElevationGain}
+                          onChange={(e) => updateResponse('runningElevationGain', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select elevation gain</option>
+                          {RUNNING_COURSE_OPTIONS.elevationGain.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
+                        <select
+                          value={responses.runningCourseProfile}
+                          onChange={(e) => updateResponse('runningCourseProfile', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select course profile</option>
+                          {RUNNING_COURSE_OPTIONS.courseProfile.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
+                        <select
+                          value={responses.runningSurfaceType}
+                          onChange={(e) => updateResponse('runningSurfaceType', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select surface type</option>
+                          {RUNNING_COURSE_OPTIONS.surfaceType.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                        <select
+                          value={responses.runningClimate}
+                          onChange={(e) => updateResponse('runningClimate', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select climate</option>
+                          {RUNNING_COURSE_OPTIONS.climate.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Cycling Course Details */}
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-800 mb-3">🚴‍♂️ Cycling Course</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
+                        <select
+                          value={responses.cyclingElevationGain}
+                          onChange={(e) => updateResponse('cyclingElevationGain', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select elevation gain</option>
+                          {CYCLING_COURSE_OPTIONS.elevationGain.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
+                        <select
+                          value={responses.cyclingCourseProfile}
+                          onChange={(e) => updateResponse('cyclingCourseProfile', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select course profile</option>
+                          {CYCLING_COURSE_OPTIONS.courseProfile.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
+                        <select
+                          value={responses.cyclingSurfaceType}
+                          onChange={(e) => updateResponse('cyclingSurfaceType', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select surface type</option>
+                          {CYCLING_COURSE_OPTIONS.surfaceType.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Climate:</label>
+                        <select
+                          value={responses.cyclingClimate}
+                          onChange={(e) => updateResponse('cyclingClimate', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select climate</option>
+                          {CYCLING_COURSE_OPTIONS.climate.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Swimming Course Details */}
+                  <div className="border-t pt-4">
+                    <h4 className="font-medium text-gray-800 mb-3">🏊‍♂️ Swimming Course</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Swim type:</label>
+                        <select
+                          value={responses.swimType}
+                          onChange={(e) => updateResponse('swimType', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select swim type</option>
+                          {SWIMMING_COURSE_OPTIONS.swimType.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
+                        <select
+                          value={responses.waterConditions}
+                          onChange={(e) => updateResponse('waterConditions', e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded"
+                        >
+                          <option value="">Select water conditions</option>
+                          {SWIMMING_COURSE_OPTIONS.waterConditions.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {responses.hasSpecificEvent === 'no' && (
+                <div className="mb-6 space-y-4">
+                  <div>
+                    <div className="text-sm text-gray-600 mb-3">What's your main focus for general triathlon fitness?</div>
+                    <div className="space-y-2">
+                      {GENERAL_FITNESS_OPTIONS.map((option) => (
+                        <button
+                          key={option.key}
+                          onClick={() => updateResponse('generalFitnessFocus', option.key)}
+                          className={`w-full p-3 text-left rounded transition-colors ${
+                            responses.generalFitnessFocus === option.key
+                              ? 'bg-gray-200 text-black'
+                              : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <div className="text-sm text-gray-600 mb-3">What discipline needs the most work?</div>
+                    {insights && (
+                      <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                        <strong>Based on your baseline:</strong> 
+                        {insights.disciplineFitness.swimming === 'beginner' && ' Swimming appears to be your weakest discipline.'}
+                        {insights.disciplineFitness.cycling === 'beginner' && ' Cycling appears to be your weakest discipline.'}
+                        {insights.disciplineFitness.running === 'beginner' && ' Running appears to be your weakest discipline.'}
+                      </div>
+                    )}
+                    <div className="space-y-2">
+                      {DISCIPLINE_WEAKNESS_OPTIONS.map((option) => (
+                        <button
+                          key={option.key}
+                          onClick={() => updateResponse('limitingDiscipline', option.key)}
+                          className={`w-full p-3 text-left rounded transition-colors ${
+                            responses.limitingDiscipline === option.key
+                              ? 'bg-gray-200 text-black'
+                              : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
+                  onClick={() => setStep(0)}
+                >
+                  Back
+                </button>
+                <button
+                  className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
+                  disabled={!responses.hasSpecificEvent}
+                  onClick={() => setStep(2)}
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          );
+        }
+        // Add similar blocks for run, ride, strength, etc.
+        // For strength, skip/pre-fill questions already in baselines
+        if (selectedFocus.includes('strength')) {
+          // Example: Only ask for 1RM if not in baselines
+          const { performanceNumbers, equipment } = insights || {};
+          return (
+            <div>
+              <div className="mb-4 text-gray-800 font-medium">Strength Assessment</div>
+              {!performanceNumbers?.squat && (
+                <div className="mb-4">
+                  <label className="block text-sm text-gray-600 mb-2">Squat 1RM (lbs):</label>
                   <input
-                    type="text"
-                    value={responses.raceName}
-                    onChange={(e) => updateResponse('raceName', e.target.value)}
+                    type="number"
+                    value={responses.squat1RM}
+                    onChange={(e) => updateResponse('squat1RM', e.target.value)}
                     className="w-full p-3 border border-gray-300 rounded"
-                    placeholder="e.g., Ironman 70.3 World Championship"
                   />
                 </div>
-
-                {/* Running Course Details */}
-                <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-800 mb-3">🏃‍♂️ Running Course</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
-                      <select
-                        value={responses.runningElevationGain}
-                        onChange={(e) => updateResponse('runningElevationGain', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select elevation gain</option>
-                        {RUNNING_COURSE_OPTIONS.elevationGain.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
-                      <select
-                        value={responses.runningCourseProfile}
-                        onChange={(e) => updateResponse('runningCourseProfile', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select course profile</option>
-                        {RUNNING_COURSE_OPTIONS.courseProfile.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
-                      <select
-                        value={responses.runningSurfaceType}
-                        onChange={(e) => updateResponse('runningSurfaceType', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select surface type</option>
-                        {RUNNING_COURSE_OPTIONS.surfaceType.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Climate:</label>
-                      <select
-                        value={responses.runningClimate}
-                        onChange={(e) => updateResponse('runningClimate', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select climate</option>
-                        {RUNNING_COURSE_OPTIONS.climate.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Cycling Course Details */}
-                <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-800 mb-3">🚴‍♂️ Cycling Course</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
-                      <select
-                        value={responses.cyclingElevationGain}
-                        onChange={(e) => updateResponse('cyclingElevationGain', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select elevation gain</option>
-                        {CYCLING_COURSE_OPTIONS.elevationGain.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
-                      <select
-                        value={responses.cyclingCourseProfile}
-                        onChange={(e) => updateResponse('cyclingCourseProfile', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select course profile</option>
-                        {CYCLING_COURSE_OPTIONS.courseProfile.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Surface type:</label>
-                      <select
-                        value={responses.cyclingSurfaceType}
-                        onChange={(e) => updateResponse('cyclingSurfaceType', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select surface type</option>
-                        {CYCLING_COURSE_OPTIONS.surfaceType.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Climate:</label>
-                      <select
-                        value={responses.cyclingClimate}
-                        onChange={(e) => updateResponse('cyclingClimate', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select climate</option>
-                        {CYCLING_COURSE_OPTIONS.climate.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Swimming Course Details */}
-                <div className="border-t pt-4">
-                  <h4 className="font-medium text-gray-800 mb-3">🏊‍♂️ Swimming Course</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Swim type:</label>
-                      <select
-                        value={responses.swimType}
-                        onChange={(e) => updateResponse('swimType', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select swim type</option>
-                        {SWIMMING_COURSE_OPTIONS.swimType.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
-                      <select
-                        value={responses.waterConditions}
-                        onChange={(e) => updateResponse('waterConditions', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
-                      >
-                        <option value="">Select water conditions</option>
-                        {SWIMMING_COURSE_OPTIONS.waterConditions.map((option, index) => (
-                          <option key={index} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {responses.hasSpecificEvent === 'no' && (
-              <div className="mb-6 space-y-4">
-                <div>
-                  <div className="text-sm text-gray-600 mb-3">What's your main focus for general triathlon fitness?</div>
-                  <div className="space-y-2">
-                    {GENERAL_FITNESS_OPTIONS.map((option) => (
-                      <button
-                        key={option.key}
-                        onClick={() => updateResponse('generalFitnessFocus', option.key)}
-                        className={`w-full p-3 text-left rounded transition-colors ${
-                          responses.generalFitnessFocus === option.key
-                            ? 'bg-gray-200 text-black'
-                            : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                
-                <div>
-                  <div className="text-sm text-gray-600 mb-3">What discipline needs the most work?</div>
-                  {insights && (
-                    <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
-                      <strong>Based on your baseline:</strong> 
-                      {insights.disciplineFitness.swimming === 'beginner' && ' Swimming appears to be your weakest discipline.'}
-                      {insights.disciplineFitness.cycling === 'beginner' && ' Cycling appears to be your weakest discipline.'}
-                      {insights.disciplineFitness.running === 'beginner' && ' Running appears to be your weakest discipline.'}
-                    </div>
-                  )}
-                  <div className="space-y-2">
-                    {DISCIPLINE_WEAKNESS_OPTIONS.map((option) => (
-                      <button
-                        key={option.key}
-                        onClick={() => updateResponse('limitingDiscipline', option.key)}
-                        className={`w-full p-3 text-left rounded transition-colors ${
-                          responses.limitingDiscipline === option.key
-                            ? 'bg-gray-200 text-black'
-                            : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
-                        }`}
-                      >
-                        {option.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
+              )}
+              {performanceNumbers?.squat && (
+                <div className="mb-4 text-green-700">Squat 1RM on file: {performanceNumbers.squat} lbs</div>
+              )}
+              {/* Repeat for deadlift, bench, equipment, etc. */}
+              {/* ... */}
               <button
-                className="flex-1 bg-gray-100 text-gray-800 py-2 rounded font-medium"
-                onClick={() => setStep(0)}
-              >
-                Back
-              </button>
-              <button
-                className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
-                disabled={!responses.hasSpecificEvent}
+                className="w-full bg-gray-800 text-white py-2 rounded font-medium mt-4"
                 onClick={() => setStep(2)}
               >
                 Next
               </button>
             </div>
-          </div>
-        );
+          );
+        }
+        // ... handle other disciplines ...
+        return null;
 
       case 2:
         return (
