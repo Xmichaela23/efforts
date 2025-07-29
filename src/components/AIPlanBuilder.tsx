@@ -191,12 +191,12 @@ const SWIMMING_COURSE_OPTIONS = {
 };
 
 const FOCUS_OPTIONS = [
-  { key: 'run', label: 'Run' },
-  { key: 'ride', label: 'Ride' },
+  { key: 'run', label: <><FaRunning className="inline mr-2" />Run</> },
+  { key: 'ride', label: <><FaBiking className="inline mr-2" />Ride</> },
   { key: 'triathlon', label: 'Triathlon' },
-  { key: 'strength', label: 'Strength' },
+  { key: 'strength', label: <><FaDumbbell className="inline mr-2" />Strength</> },
   { key: 'mobility', label: 'Mobility' },
-  { key: 'swim', label: 'Swim' },
+  { key: 'swim', label: <><FaSwimmer className="inline mr-2" />Swim</> },
   { key: 'hybrid', label: 'Hybrid' },
 ];
 
@@ -590,7 +590,7 @@ export default function AIPlanBuilder() {
 
                   {/* Running Course Details */}
                   <div className="border-t pt-4">
-                    <h4 className="font-medium text-gray-800 mb-3">🏃‍♂️ Running Course</h4>
+                    <h4 className="font-medium text-gray-800 mb-3"><FaRunning className="inline mr-2" /> Running Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
@@ -623,7 +623,7 @@ export default function AIPlanBuilder() {
 
                   {/* Cycling Course Details */}
                   <div className="border-t pt-4">
-                    <h4 className="font-medium text-gray-800 mb-3">🚴‍♂️ Cycling Course</h4>
+                    <h4 className="font-medium text-gray-800 mb-3"><FaBiking className="inline mr-2" /> Cycling Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
@@ -656,7 +656,7 @@ export default function AIPlanBuilder() {
 
                   {/* Swimming Course Details */}
                   <div className="border-t pt-4">
-                    <h4 className="font-medium text-gray-800 mb-3">🏊‍♂️ Swimming Course</h4>
+                    <h4 className="font-medium text-gray-800 mb-3"><FaSwimmer className="inline mr-2" /> Swimming Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
