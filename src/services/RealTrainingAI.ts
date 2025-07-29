@@ -30,12 +30,15 @@ export class RealTrainingAI {
   private baseURL: string;
 
   constructor() {
-    // Get API key from environment - using import.meta.env for Vite
-    this.apiKey = import.meta.env.VITE_OPENAI_API_KEY || '';
+    // Get API key from environment - try multiple common variable names
+    this.apiKey = (import.meta as any).env.VITE_OPENAI_API_KEY || 
+                  (import.meta as any).env.OPENAI_API_KEY || 
+                  (import.meta as any).env.VITE_AI_API_KEY || 
+                  (import.meta as any).env.REACT_APP_OPENAI_API_KEY || '';
     this.baseURL = 'https://api.openai.com/v1/chat/completions';
     
     if (!this.apiKey) {
-      console.warn('No OpenAI API key found. Add VITE_OPENAI_API_KEY to your .env file');
+      console.warn('No OpenAI API key found. Check your .env file for OPENAI_API_KEY, VITE_OPENAI_API_KEY, VITE_AI_API_KEY, or REACT_APP_OPENAI_API_KEY');
     }
   }
 
