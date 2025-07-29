@@ -114,7 +114,7 @@ const LONG_SESSION_PREFERENCES = [
   { key: 'saturday-long-ride', label: 'Saturday: Long ride, Sunday: Long run' },
   { key: 'sunday-long-ride', label: 'Sunday: Long ride, Saturday: Long run' },
   { key: 'weekday-long-sessions', label: 'Weekdays: Long sessions (if working weekends)' },
-  { key: 'ai-optimize', label: 'Let AI optimize based on my schedule' },
+  { key: 'optimize', label: 'Let the system optimize based on my schedule' },
 ];
 
 // Update training philosophy options to use only text
@@ -755,36 +755,21 @@ export default function AIPlanBuilder() {
                     />
                   </div>
 
-                  {/* Running Course Details */}
+                  {/* Swimming Course Details */}
                   <div className="pt-4">
-                    <h4 className="font-medium text-gray-800 mb-3"><FaRunning className="inline mr-2" /> Running Course</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
-                        <select
-                          value={responses.runningElevationGain}
-                          onChange={(e) => updateResponse('runningElevationGain', e.target.value)}
-                          className="w-full p-3"
-                        >
-                          <option value="">Select elevation gain</option>
-                          {RUNNING_COURSE_OPTIONS.elevationGain.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
-                        <select
-                          value={responses.runningCourseProfile}
-                          onChange={(e) => updateResponse('runningCourseProfile', e.target.value)}
-                          className="w-full p-3"
-                        >
-                          <option value="">Select course profile</option>
-                          {RUNNING_COURSE_OPTIONS.courseProfile.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
+                    <h4 className="font-medium text-gray-800 mb-3"><FaSwimmer className="inline mr-2" /> Swimming Course</h4>
+                    <div>
+                      <label className="block text-sm text-gray-600 mb-2">Water conditions:</label>
+                      <select
+                        value={responses.waterConditions}
+                        onChange={(e) => updateResponse('waterConditions', e.target.value)}
+                        className="w-full p-3"
+                      >
+                        <option value="">Select water conditions</option>
+                        {SWIMMING_COURSE_OPTIONS.waterConditions.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
 
@@ -819,6 +804,40 @@ export default function AIPlanBuilder() {
                         </select>
                       </div>
                     </div>
+                  </div>
+
+                  {/* Running Course Details */}
+                  <div className="pt-4">
+                    <h4 className="font-medium text-gray-800 mb-3"><FaRunning className="inline mr-2" /> Running Course</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Elevation gain:</label>
+                        <select
+                          value={responses.runningElevationGain}
+                          onChange={(e) => updateResponse('runningElevationGain', e.target.value)}
+                          className="w-full p-3"
+                        >
+                          <option value="">Select elevation gain</option>
+                          {RUNNING_COURSE_OPTIONS.elevationGain.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm text-gray-600 mb-2">Course profile:</label>
+                        <select
+                          value={responses.runningCourseProfile}
+                          onChange={(e) => updateResponse('runningCourseProfile', e.target.value)}
+                          className="w-full p-3"
+                        >
+                          <option value="">Select course profile</option>
+                          {RUNNING_COURSE_OPTIONS.courseProfile.map((option, index) => (
+                            <option key={index} value={option}>{option}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                   </div>
 
                   {/* Swimming Course Details */}
@@ -1006,7 +1025,7 @@ export default function AIPlanBuilder() {
               </div>
             </div>
 
-            {responses.weekendAvailability && responses.weekendAvailability !== 'ai-optimize' && (
+            {responses.weekendAvailability && responses.weekendAvailability !== 'optimize' && (
               <div className="mb-6">
                 <div className="mb-4 text-gray-800 font-medium">Long session preferences:</div>
                 <div className="text-sm text-gray-600 mb-4">When would you prefer to do your long runs and rides?</div>
@@ -1038,7 +1057,7 @@ export default function AIPlanBuilder() {
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
-                disabled={!responses.weekendAvailability || (responses.weekendAvailability !== 'ai-optimize' && !responses.longSessionPreference)}
+                disabled={!responses.weekendAvailability || (responses.weekendAvailability !== 'optimize' && !responses.longSessionPreference)}
                 onClick={() => setStep(4)}
               >
                 Next
@@ -1102,26 +1121,6 @@ export default function AIPlanBuilder() {
         );
 
       case 5:
-        // Get baseline values for strength fitness/performance
-        const baselineStrengthFitness = baselines?.disciplineFitness?.strength;
-        const baselineStrengthPerformance = baselines?.benchmarks?.strength;
-
-        // If baseline values exist, auto-fill and skip questions
-        if (
-          responses.strengthTraining &&
-          responses.strengthTraining !== 'no-strength' &&
-          (baselineStrengthFitness || baselineStrengthPerformance)
-        ) {
-          if (baselineStrengthFitness && !responses.strengthFitnessLevel) {
-            updateResponse('strengthFitnessLevel', baselineStrengthFitness);
-          }
-          if (baselineStrengthPerformance && !responses.strengthPerformanceLevel) {
-            updateResponse('strengthPerformanceLevel', baselineStrengthPerformance);
-          }
-          // Skip to next step
-          setTimeout(() => setStep(6), 0);
-          return null;
-        }
 
         return (
           <div>
