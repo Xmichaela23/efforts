@@ -499,16 +499,24 @@ export default function AICoachAssessment() {
     }
 
     if (!strength) {
-      return {
-        content: "What's your strength training goal?",
-        options: [
-          "Power (explosive strength)",
-          "Hypertrophy (muscle building)",
-          "Sport-specific (strength for your sport)",
-          "General fitness"
-        ],
-        isComplete: false
-      };
+      // Check baselineData for strength info
+      const baselineStrength = baselineData?.disciplineFitness?.strength || baselineData?.benchmarks?.strength;
+      if (baselineStrength) {
+        responses.strength = baselineStrength;
+        // Continue to next question by recursively calling generateNextResponse
+        return await generateNextResponse(selectedOption, responses);
+      } else {
+        return {
+          content: "What's your strength training goal?",
+          options: [
+            "Power (explosive strength)",
+            "Hypertrophy (muscle building)",
+            "Sport-specific (strength for your sport)",
+            "General fitness"
+          ],
+          isComplete: false
+        };
+      }
     }
 
 
