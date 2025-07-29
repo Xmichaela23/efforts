@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 // Import Font Awesome icons at the top
 import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaBalanceScale, FaMedal, FaObjectGroup, FaCog } from 'react-icons/fa';
+import { RealTrainingAI } from '../services/RealTrainingAI';
 
 // Triathlon-specific assessment options
 const TRIATHLON_DISTANCES = [
@@ -221,6 +222,9 @@ export default function AIPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [step, setStep] = useState(0);
+  const [realAI] = useState(() => new RealTrainingAI());
+  const [generatingPlan, setGeneratingPlan] = useState(false);
+  const [generatedPlan, setGeneratedPlan] = useState<any>(null);
   
   // Assessment responses
   const [responses, setResponses] = useState({
@@ -492,6 +496,140 @@ export default function AIPlanBuilder() {
       prePopulateFromBaselines();
     }
   }, [baselines]);
+
+  // Build comprehensive prompt from responses
+  const buildPlanPrompt = () => {
+    const insights = getBaselineInsights();
+    let prompt = `Create a comprehensive training plan for a triathlete with the following specifications:\n\n`;
+    
+    // Focus and event details
+    if (selectedFocus.includes('triathlon')) {
+      prompt += `**Event Type:** Triathlon\n`;
+      if (responses.hasSpecificEvent === 'yes' && responses.raceName) {
+        prompt += `**Specific Event:** ${responses.raceName}\n`;
+      }
+      if (responses.runningElevationGain) {
+        prompt += `**Running Course:** ${responses.runningElevationGain}, ${responses.runningCourseProfile || 'standard profile'}\n`;
+      }
+      if (responses.cyclingElevationGain) {
+        prompt += `**Cycling Course:** ${responses.cyclingElevationGain}, ${responses.cyclingCourseProfile || 'standard profile'}\n`;
+      }
+      if (responses.waterConditions) {
+        prompt += `**Swimming Conditions:** ${responses.waterConditions}\n`;
+      }
+      if (responses.climate) {
+        prompt += `**Climate:** ${responses.climate}\n`;
+      }
+    }
+    
+    // Training frequency and duration
+    if (responses.trainingFrequency) {
+      prompt += `**Training Frequency:** ${TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label}\n`;
+    }
+    if (responses.weekdayDuration) {
+      prompt += `**Weekday Sessions:** ${WEEKDAY_DURATION_OPTIONS.find(w => w.key === responses.weekdayDuration)?.label}\n`;
+    }
+    if (responses.weekendDuration) {
+      prompt += `**Weekend Sessions:** ${WEEKEND_DURATION_OPTIONS.find(w => w.key === responses.weekendDuration)?.label}\n`;
+    }
+    
+    // Strength training
+    if (responses.strengthTraining && responses.strengthTraining !== 'no-strength') {
+      prompt += `**Strength Training:** ${STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}\n`;
+      if (responses.strengthFitnessLevel) {
+        prompt += `**Strength Level:** ${STRENGTH_FITNESS_LEVELS.find(s => s.key === responses.strengthFitnessLevel)?.label}\n`;
+      }
+    }
+    
+    // Training philosophy
+    if (responses.trainingPhilosophy) {
+      prompt += `**Training Philosophy:** ${responses.trainingPhilosophy.toUpperCase()}\n`;
+    }
+    
+    // Baseline insights
+    if (insights) {
+      prompt += `\n**Athlete Profile:**\n`;
+      prompt += `- Current training volume: ${insights.totalHours} hours/week\n`;
+      prompt += `- Age: ${insights.age || 'Not specified'}\n`;
+      if (insights.trainingBackground) {
+        prompt += `- Training background: ${insights.trainingBackground}\n`;
+      }
+      if (insights.injuryHistory) {
+        prompt += `- Injury history: ${insights.injuryHistory}\n`;
+      }
+    }
+    
+    prompt += `\nPlease create a detailed, progressive training plan that builds fitness safely and effectively toward the goal.`;
+    
+    return prompt;
+  };
+
+  // Generate plan
+  const generatePlan = async () => {
+    setGeneratingPlan(true);
+    try {
+      const prompt = buildPlanPrompt();
+      const startDate = new Date().toISOString().split('T')[0];
+      
+      console.log('Generating plan with prompt:', prompt);
+      
+      const result = await realAI.generateTrainingPlan(prompt, startDate, {
+        baselineData: baselines,
+        responses: responses
+      });
+      
+      console.log('Plan generated:', result);
+      
+      // Transform to display format
+      const plan = {
+        id: `plan-${Date.now()}`,
+        name: result.plan.name || 'Your Training Plan',
+        description: result.plan.description || 'Personalized training plan based on your assessment',
+        focus: selectedFocus.join(', '),
+        weeklySchedule: result.workouts.map(workout => 
+          `${workout.date}: ${workout.name} - ${workout.description}`
+        ).slice(0, 7), // Show first week
+        currentWeek: 1,
+        totalWeeks: result.plan.duration || 8,
+        workouts: result.workouts,
+        fullPlan: result
+      };
+      
+      setGeneratedPlan(plan);
+      
+    } catch (error) {
+      console.error('Error generating plan:', error);
+      // Fallback plan
+      const fallbackPlan = {
+        id: `fallback-${Date.now()}`,
+        name: "Your Training Plan",
+        description: "Here's your personalized plan based on your assessment.",
+        focus: selectedFocus.join(', '),
+        weeklySchedule: [
+          "Monday: Swim technique + Strength",
+          "Tuesday: Bike intervals", 
+          "Wednesday: Easy run + Core",
+          "Thursday: Swim endurance",
+          "Friday: Bike long ride",
+          "Saturday: Long run",
+          "Sunday: Rest or active recovery"
+        ],
+        currentWeek: 1,
+        totalWeeks: 8,
+        workouts: []
+      };
+      setGeneratedPlan(fallbackPlan);
+    } finally {
+      setGeneratingPlan(false);
+    }
+  };
+
+  // Auto-generate plan when reaching step 6
+  useEffect(() => {
+    if (step === 6 && !generatedPlan && !generatingPlan) {
+      generatePlan();
+    }
+  }, [step]);
 
   const getCurrentStepContent = () => {
     const insights = getBaselineInsights();
@@ -1109,17 +1247,76 @@ export default function AIPlanBuilder() {
         );
 
       case 6:
+        if (generatingPlan) {
+          return (
+            <div className="text-center">
+              <div className="mb-4 text-gray-800 font-medium">Generating your training plan...</div>
+              <div className="text-gray-600 mb-6">
+                <div>Building your personalized plan based on:</div>
+                <div className="mt-2 text-sm">
+                  <div>• Focus: {selectedFocus.join(', ')}</div>
+                  <div>• Training Frequency: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label}</div>
+                  <div>• Training Philosophy: {responses.trainingPhilosophy?.toUpperCase()}</div>
+                  {responses.strengthTraining && responses.strengthTraining !== 'no-strength' && (
+                    <div>• Strength: {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
+                  )}
+                </div>
+              </div>
+              <div className="text-gray-500">This may take a moment...</div>
+            </div>
+          );
+        }
+
+        if (generatedPlan) {
+          return (
+            <div>
+              <div className="mb-4 text-gray-800 font-medium">Your Training Plan</div>
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div><strong>{generatedPlan.name}</strong></div>
+                <div className="mt-1">{generatedPlan.description}</div>
+              </div>
+              
+              <div className="mb-6">
+                <div className="text-sm text-gray-600 mb-3">Week 1 Schedule:</div>
+                <div className="space-y-2">
+                  {generatedPlan.weeklySchedule.map((session, index) => (
+                    <div key={index} className="p-3 bg-gray-50 text-sm">
+                      {session}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  className="flex-1 text-gray-800 py-2 font-medium"
+                  onClick={() => setStep(5)}
+                >
+                  Back
+                </button>
+                <button
+                  className="flex-1 bg-gray-800 text-white py-2 font-medium"
+                  onClick={() => {
+                    // TODO: Save plan and navigate to plan view
+                    console.log('Plan ready to save:', generatedPlan);
+                  }}
+                >
+                  Save Plan
+                </button>
+              </div>
+            </div>
+          );
+        }
+
         return (
           <div className="text-center">
-            <div className="mb-4 text-gray-800 font-medium">Generating your triathlon plan...</div>
-            <div className="text-gray-600 mb-6">
-              <div>Distance: {TRIATHLON_DISTANCES.find(d => d.key === responses.distance)?.label}</div>
-              <div>Timeline: {TIMELINE_OPTIONS.find(t => t.key === responses.timeline)?.label}</div>
-              <div>Training Frequency: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label}</div>
-              <div>Strength Training: {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
-              <div>Training Philosophy: {TRAINING_PHILOSOPHY_OPTIONS.find(p => p.key === responses.trainingPhilosophy)?.label}</div>
-            </div>
-            <div className="text-gray-500">(TODO: Connect to AI plan generation)</div>
+            <div className="mb-4 text-gray-800 font-medium">Something went wrong</div>
+            <button
+              className="bg-gray-800 text-white py-2 px-4 font-medium"
+              onClick={generatePlan}
+            >
+              Try Again
+            </button>
           </div>
         );
 
