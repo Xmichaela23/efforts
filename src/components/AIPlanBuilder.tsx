@@ -513,10 +513,10 @@ export default function AIPlanBuilder() {
                 <button
                   key={option.key}
                   onClick={() => toggleFocus(option.key)}
-                  className={`p-3 rounded text-center transition-colors border border-gray-200 ${
+                  className={`w-full p-3 text-center transition-colors ${
                     selectedFocus.includes(option.key)
                       ? 'bg-gray-200 text-black'
-                      : 'bg-white text-black hover:bg-gray-100'
+                      : 'bg-transparent text-black hover:bg-gray-100'
                   }`}
                 >
                   {option.label}
@@ -526,10 +526,10 @@ export default function AIPlanBuilder() {
             <div className="flex justify-center mb-6">
               <button
                 onClick={() => toggleFocus('hybrid')}
-                className={`p-3 rounded text-center transition-colors border border-gray-200 w-1/2 ${
+                className={`w-full p-3 text-center transition-colors ${
                   selectedFocus.includes('hybrid')
                     ? 'bg-gray-200 text-black'
-                    : 'bg-white text-black hover:bg-gray-100'
+                    : 'bg-transparent text-black hover:bg-gray-100'
                 }`}
               >
                 Hybrid
@@ -555,20 +555,20 @@ export default function AIPlanBuilder() {
               <div className="space-y-3 mb-6">
                 <button
                   onClick={() => updateResponse('hasSpecificEvent', 'yes')}
-                  className={`w-full p-3 text-left rounded transition-colors ${
+                  className={`w-full p-3 text-left transition-colors ${
                     responses.hasSpecificEvent === 'yes'
                       ? 'bg-gray-200 text-black'
-                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                      : 'bg-transparent text-black hover:bg-gray-100'
                   }`}
                 >
                   Yes - specific event
                 </button>
                 <button
                   onClick={() => updateResponse('hasSpecificEvent', 'no')}
-                  className={`w-full p-3 text-left rounded transition-colors ${
+                  className={`w-full p-3 text-left transition-colors ${
                     responses.hasSpecificEvent === 'no'
                       ? 'bg-gray-200 text-black'
-                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                      : 'bg-transparent text-black hover:bg-gray-100'
                   }`}
                 >
                   No - general triathlon fitness
@@ -705,10 +705,10 @@ export default function AIPlanBuilder() {
                         <button
                           key={option.key}
                           onClick={() => updateResponse('generalFitnessFocus', option.key)}
-                          className={`w-full p-3 text-left rounded transition-colors ${
+                          className={`w-full p-3 text-left transition-colors ${
                             responses.generalFitnessFocus === option.key
                               ? 'bg-gray-200 text-black'
-                              : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                              : 'bg-transparent text-black hover:bg-gray-100'
                           }`}
                         >
                           {option.label}
@@ -720,7 +720,7 @@ export default function AIPlanBuilder() {
                   <div>
                     <div className="text-sm text-gray-600 mb-3">What discipline needs the most work?</div>
                     {insights && (
-                      <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                      <div className="mb-3 p-2 bg-blue-100 text-blue-800 text-sm">
                         <strong>Based on your baseline:</strong> 
                         {insights.disciplineFitness.swimming === 'beginner' && <><FaSwimmer className="inline mr-2" /> Swimming appears to be your weakest discipline.</>}
                         {insights.disciplineFitness.cycling === 'beginner' && <><FaBiking className="inline mr-2" /> Cycling appears to be your weakest discipline.</>}
@@ -732,10 +732,10 @@ export default function AIPlanBuilder() {
                         <button
                           key={option.key}
                           onClick={() => updateResponse('limitingDiscipline', option.key)}
-                          className={`w-full p-3 text-left rounded transition-colors ${
+                          className={`w-full p-3 text-left transition-colors ${
                             responses.limitingDiscipline === option.key
                               ? 'bg-gray-200 text-black'
-                              : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                              : 'bg-transparent text-black hover:bg-gray-100'
                           }`}
                         >
                           {option.label}
@@ -807,8 +807,8 @@ export default function AIPlanBuilder() {
             <div className="text-sm text-gray-600 mb-4">Most 70.3 athletes train 5-6 days per week</div>
             
             {insights && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="text-sm text-blue-800">
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div>
                   <strong>Based on your baseline:</strong> You currently train {insights.trainingFrequency.triathlon || 'unknown frequency'}.
                   {recommendedFrequency && (
                     <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
@@ -822,10 +822,10 @@ export default function AIPlanBuilder() {
                 <button
                   key={option.key}
                   onClick={() => updateResponse('trainingFrequency', option.key)}
-                  className={`w-full p-3 text-left rounded transition-colors ${
+                  className={`w-full p-3 text-left transition-colors ${
                     responses.trainingFrequency === option.key
                       ? 'bg-gray-200 text-black'
-                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                      : 'bg-transparent text-black hover:bg-gray-100'
                   }`}
                 >
                   {option.label}
@@ -881,8 +881,8 @@ export default function AIPlanBuilder() {
             <div className="mb-4 text-gray-800 font-medium">Do you want to add strength training to your triathlon plan?</div>
             
             {insights && recommendedStrength && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="text-sm text-blue-800">
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div>
                   <strong>Based on your baseline:</strong> 
                   {insights.age >= 40 && ' At your age, injury prevention is recommended.'}
                   {insights.injuryHistory?.includes('injury') && ' Given your injury history, injury prevention is recommended.'}
@@ -897,10 +897,10 @@ export default function AIPlanBuilder() {
                 <button
                   key={option.key}
                   onClick={() => updateResponse('strengthTraining', option.key)}
-                  className={`w-full p-3 text-left rounded transition-colors ${
+                  className={`w-full p-3 text-left transition-colors ${
                     responses.strengthTraining === option.key
                       ? 'bg-gray-200 text-black'
-                      : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                      : 'bg-transparent text-black hover:bg-gray-100'
                   }`}
                 >
                   {option.label}
@@ -920,10 +920,10 @@ export default function AIPlanBuilder() {
                       <button
                         key={option.key}
                         onClick={() => updateResponse('strengthFitnessLevel', option.key)}
-                        className={`w-full p-3 text-left rounded transition-colors ${
+                        className={`w-full p-3 text-left transition-colors ${
                           responses.strengthFitnessLevel === option.key
                             ? 'bg-gray-200 text-black'
-                            : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                            : 'bg-transparent text-black hover:bg-gray-100'
                         }`}
                       >
                         {option.label}
@@ -938,10 +938,10 @@ export default function AIPlanBuilder() {
                       <button
                         key={option.key}
                         onClick={() => updateResponse('strengthPerformanceLevel', option.key)}
-                        className={`w-full p-3 text-left rounded transition-colors ${
+                        className={`w-full p-3 text-left transition-colors ${
                           responses.strengthPerformanceLevel === option.key
                             ? 'bg-gray-200 text-black'
-                            : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                            : 'bg-transparent text-black hover:bg-gray-100'
                         }`}
                       >
                         {option.label}
@@ -991,8 +991,8 @@ export default function AIPlanBuilder() {
             <div className="text-sm text-gray-600 mb-4">Longer weekend sessions important for endurance</div>
             
             {insights && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="text-sm text-blue-800">
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div>
                   <strong>Based on your baseline:</strong> You currently train {insights.totalHours} hours/week.
                   {insights.totalHours < 6 && ' Consider longer sessions to build endurance.'}
                   {insights.totalHours >= 8 && ' You have good volume, focus on quality over quantity.'}
@@ -1007,10 +1007,10 @@ export default function AIPlanBuilder() {
                   <button
                     key={option.key}
                     onClick={() => updateResponse('weekdayDuration', option.key)}
-                    className={`w-full p-3 text-left rounded transition-colors ${
+                    className={`w-full p-3 text-left transition-colors ${
                       responses.weekdayDuration === option.key
                         ? 'bg-gray-200 text-black'
-                        : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                        : 'bg-transparent text-black hover:bg-gray-100'
                     }`}
                   >
                     {option.label}
@@ -1026,10 +1026,10 @@ export default function AIPlanBuilder() {
                   <button
                     key={option.key}
                     onClick={() => updateResponse('weekendDuration', option.key)}
-                    className={`w-full p-3 text-left rounded transition-colors ${
+                    className={`w-full p-3 text-left transition-colors ${
                       responses.weekendDuration === option.key
                         ? 'bg-gray-200 text-black'
-                        : 'bg-white text-black hover:bg-gray-100 border border-gray-200'
+                        : 'bg-transparent text-black hover:bg-gray-100'
                     }`}
                   >
                     {option.label}
@@ -1062,8 +1062,8 @@ export default function AIPlanBuilder() {
             <div className="mb-4 text-gray-800 font-medium">Choose your training approach:</div>
             
             {insights && (
-              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-                <div className="text-sm text-blue-800">
+              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                <div>
                   <strong>Based on your baseline:</strong> 
                   {insights.age >= 40 && ' At your age, sustainable training is recommended for injury prevention.'}
                   {insights.trainingBackground?.includes('new') && ' As a newer athlete, sustainable training will help build consistency.'}
@@ -1077,10 +1077,10 @@ export default function AIPlanBuilder() {
                 <div
                   key={option.key}
                   onClick={() => updateResponse('trainingPhilosophy', option.key)}
-                  className={`p-4 rounded border cursor-pointer transition-colors ${
+                  className={`w-full p-4 rounded border cursor-pointer transition-colors ${
                     responses.trainingPhilosophy === option.key
                       ? 'bg-gray-200 border-gray-300'
-                      : 'bg-white border-gray-200 hover:bg-gray-50'
+                      : 'bg-transparent border-gray-200 hover:bg-gray-50'
                   }`}
                 >
                   <div className="font-medium mb-2">{option.label}</div>
@@ -1129,7 +1129,7 @@ export default function AIPlanBuilder() {
   };
 
   return (
-    <div className="max-w-lg mx-auto mt-8 p-4 bg-white rounded shadow">
+    <div className="w-full min-h-screen px-2 pt-8">
       <h2 className="text-xl font-semibold mb-4">Create a Training Plan</h2>
       <div className="space-y-6">
         {getCurrentStepContent()}
