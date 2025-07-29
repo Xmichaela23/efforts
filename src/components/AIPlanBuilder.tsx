@@ -189,7 +189,25 @@ export default function AIPlanBuilder() {
 
     const currentVolume = baselines.current_volume || {};
     const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
-      return sum + (parseInt(vol as string) || 0);
+      // Parse volume strings like "2-4 hours" to get the average
+      const volumeStr = vol as string;
+      if (!volumeStr) return sum;
+      
+      // Handle different volume formats
+      if (volumeStr.includes('-')) {
+        // "2-4 hours" format - take the average
+        const parts = volumeStr.split('-');
+        const low = parseInt(parts[0]) || 0;
+        const high = parseInt(parts[1]) || 0;
+        return sum + ((low + high) / 2);
+      } else if (volumeStr.includes('+')) {
+        // "8+ hours" format - take the minimum
+        const num = parseInt(volumeStr) || 0;
+        return sum + num;
+      } else {
+        // Single number format
+        return sum + (parseInt(volumeStr) || 0);
+      }
     }, 0);
 
     const trainingFrequency = baselines.training_frequency || {};
