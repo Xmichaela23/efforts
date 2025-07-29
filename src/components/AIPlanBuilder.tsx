@@ -248,19 +248,14 @@ export default function AIPlanBuilder() {
     raceName: '',
     courseProfile: '',
     climate: '',
-    surfaceType: '',
     generalFitnessFocus: '',
     limitingDiscipline: '',
     
     // Course Details (Separated by discipline)
     runningElevationGain: '',
     runningCourseProfile: '',
-    runningSurfaceType: '',
-    runningClimate: '',
     cyclingElevationGain: '',
     cyclingCourseProfile: '',
-    cyclingSurfaceType: '',
-    cyclingClimate: '',
     waterConditions: '',
     
     // Question 3: Training Frequency
@@ -635,32 +630,6 @@ export default function AIPlanBuilder() {
                           ))}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2">Surface Type:</label>
-                        <select
-                          value={responses.surfaceType}
-                          onChange={e => updateResponse('surfaceType', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
-                        >
-                          <option value="">Select surface type</option>
-                          {SURFACE_TYPE_OPTIONS.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2 mt-4">Climate:</label>
-                        <select
-                          value={responses.climate}
-                          onChange={e => updateResponse('climate', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
-                        >
-                          <option value="">Select climate</option>
-                          {CLIMATE_OPTIONS.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
                     </div>
                   </div>
 
@@ -690,32 +659,6 @@ export default function AIPlanBuilder() {
                         >
                           <option value="">Select course profile</option>
                           {CYCLING_COURSE_OPTIONS.courseProfile.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2">Surface Type:</label>
-                        <select
-                          value={responses.surfaceType}
-                          onChange={e => updateResponse('surfaceType', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
-                        >
-                          <option value="">Select surface type</option>
-                          {SURFACE_TYPE_OPTIONS.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-sm text-gray-600 mb-2 mt-4">Climate:</label>
-                        <select
-                          value={responses.climate}
-                          onChange={e => updateResponse('climate', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black"
-                        >
-                          <option value="">Select climate</option>
-                          {CLIMATE_OPTIONS.map((option, index) => (
                             <option key={index} value={option}>{option}</option>
                           ))}
                         </select>
