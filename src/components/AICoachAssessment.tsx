@@ -20,6 +20,16 @@ interface AssessmentState {
   generatedPlan: any;
 }
 
+const CLIMATE_OPTIONS = [
+  'Cool (under 60°F)',
+  'Moderate (60-75°F)',
+  'Warm (75-85°F)',
+  'Hot (85-95°F)',
+  'Very hot (95°F+)',
+  'Humid conditions',
+  'High altitude'
+];
+
 export default function AICoachAssessment() {
   const { loadUserBaselines } = useAppContext();
   const [conversation, setConversation] = useState<ConversationMessage[]>([]);
@@ -170,7 +180,7 @@ export default function AICoachAssessment() {
     // Simulate AI response generation
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration, strength, strengthGoal, philosophy } = responses;
+    const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, climate, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration, strength, strengthGoal, philosophy } = responses;
 
     if (!responses.hasSpecificEvent) {
       return {
@@ -265,32 +275,10 @@ export default function AICoachAssessment() {
       };
     }
 
-    if (responses.courseProfile && !responses.surfaceType) {
-      return {
-        content: "What's the surface type?",
-        options: [
-          "Road/Pavement",
-          "Trail/Dirt",
-          "Gravel",
-          "Mixed surfaces",
-          "Track"
-        ],
-        isComplete: false
-      };
-    }
-
-    if (responses.surfaceType && !responses.climate) {
+    if (responses.courseProfile && !responses.climate) {
       return {
         content: "What's the expected climate?",
-        options: [
-          "Cool (under 60°F)",
-          "Moderate (60-75°F)",
-          "Warm (75-85°F)",
-          "Hot (85-95°F)",
-          "Very hot (95°F+)",
-          "Humid conditions",
-          "High altitude"
-        ],
+        options: CLIMATE_OPTIONS,
         isComplete: false
       };
     }
@@ -620,7 +608,7 @@ export default function AICoachAssessment() {
   };
 
   const buildAIPrompt = (responses: Record<string, any>, baselineData: any) => {
-    const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, surfaceType, climate, philosophy, strength, sessionDuration, strengthGoal, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration } = responses;
+    const { goal, timeline, swimming, cycling, running, previousExperience, previousTimes, hasSpecificEvent, eventDate, courseProfile, climate, philosophy, strength, sessionDuration, strengthGoal, trainingFrequency, weekdayDuration, weekendDuration, longSessionDuration } = responses;
     
     let prompt = `Create a ${timeline} training plan for ${goal}`;
     
@@ -648,9 +636,6 @@ export default function AICoachAssessment() {
       prompt += `. Specific event with date: ${eventDate}`;
       if (courseProfile) {
         prompt += `. Course profile: ${courseProfile}`;
-      }
-      if (surfaceType) {
-        prompt += `. Surface type: ${surfaceType}`;
       }
       if (climate) {
         prompt += `. Expected climate: ${climate}`;
