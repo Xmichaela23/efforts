@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+// Import Font Awesome icons at the top
+import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaBalanceScale } from 'react-icons/fa';
 
 // Triathlon-specific assessment options
 const TRIATHLON_DISTANCES = [
@@ -99,25 +101,11 @@ const WEEKEND_DURATION_OPTIONS = [
   { key: '4-plus-hours', label: '4+ hours' },
 ];
 
+// Update training philosophy options to use only text
 const TRAINING_PHILOSOPHY_OPTIONS = [
-  { 
-    key: 'sustainable', 
-    label: '🟢 SUSTAINABLE (POLARIZED)',
-    description: '80% easy, 20% hard, skip the middle',
-    bestFor: 'Long-term gains, limited time, injury prevention'
-  },
-  { 
-    key: 'accelerated', 
-    label: '⚡ ACCELERATED (PYRAMIDAL)',
-    description: '70% easy, 20% moderate, 10% hard',
-    bestFor: 'Getting race-ready faster, building speed, experienced athletes'
-  },
-  { 
-    key: 'balanced', 
-    label: '⚖️ BALANCED',
-    description: 'Strategic combination of both approaches',
-    bestFor: 'Peak performance, competition prep, breaking plateaus'
-  },
+  { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
+  { key: 'pyramidal', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (70% easy, 20% moderate, 10% hard)</> },
+  { key: 'balanced', label: <><FaBalanceScale className="inline mr-2" />BALANCED (strategic mix)</> },
 ];
 
 // Separate course detail options for different disciplines
@@ -734,9 +722,9 @@ export default function AIPlanBuilder() {
                     {insights && (
                       <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
                         <strong>Based on your baseline:</strong> 
-                        {insights.disciplineFitness.swimming === 'beginner' && ' Swimming appears to be your weakest discipline.'}
-                        {insights.disciplineFitness.cycling === 'beginner' && ' Cycling appears to be your weakest discipline.'}
-                        {insights.disciplineFitness.running === 'beginner' && ' Running appears to be your weakest discipline.'}
+                        {insights.disciplineFitness.swimming === 'beginner' && <><FaSwimmer className="inline mr-2" /> Swimming appears to be your weakest discipline.</>}
+                        {insights.disciplineFitness.cycling === 'beginner' && <><FaBiking className="inline mr-2" /> Cycling appears to be your weakest discipline.</>}
+                        {insights.disciplineFitness.running === 'beginner' && <><FaRunning className="inline mr-2" /> Running appears to be your weakest discipline.</>}
                       </div>
                     )}
                     <div className="space-y-2">
@@ -1096,8 +1084,8 @@ export default function AIPlanBuilder() {
                   }`}
                 >
                   <div className="font-medium mb-2">{option.label}</div>
-                  <div className="text-sm text-gray-600 mb-2">{option.description}</div>
-                  <div className="text-sm text-gray-500">Best for: {option.bestFor}</div>
+                  <div className="text-sm text-gray-600 mb-2">{option.label}</div>
+                  <div className="text-sm text-gray-500">Best for: {option.label}</div>
                 </div>
               ))}
             </div>
