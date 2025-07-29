@@ -923,7 +923,7 @@ export default function AIPlanBuilder() {
                 <button
                   className="flex-1 bg-gray-800 text-white py-2 rounded font-medium disabled:bg-gray-300"
                   disabled={!responses.hasSpecificEvent}
-                  onClick={() => setStep(3)}
+                  onClick={() => setStep(2)}
                 >
                   Next
                 </button>
