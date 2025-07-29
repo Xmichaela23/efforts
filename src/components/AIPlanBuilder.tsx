@@ -583,13 +583,13 @@ export default function AIPlanBuilder() {
                       type="text"
                       value={responses.raceName}
                       onChange={(e) => updateResponse('raceName', e.target.value)}
-                      className="w-full p-3 border border-gray-300 rounded"
+                      className="w-full p-3"
                       placeholder="e.g., Ironman 70.3 World Championship"
                     />
                   </div>
 
                   {/* Running Course Details */}
-                  <div className="border-t pt-4">
+                  <div className="pt-4">
                     <h4 className="font-medium text-gray-800 mb-3"><FaRunning className="inline mr-2" /> Running Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -597,7 +597,7 @@ export default function AIPlanBuilder() {
                         <select
                           value={responses.runningElevationGain}
                           onChange={(e) => updateResponse('runningElevationGain', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          className="w-full p-3"
                         >
                           <option value="">Select elevation gain</option>
                           {RUNNING_COURSE_OPTIONS.elevationGain.map((option, index) => (
@@ -610,7 +610,7 @@ export default function AIPlanBuilder() {
                         <select
                           value={responses.runningCourseProfile}
                           onChange={(e) => updateResponse('runningCourseProfile', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          className="w-full p-3"
                         >
                           <option value="">Select course profile</option>
                           {RUNNING_COURSE_OPTIONS.courseProfile.map((option, index) => (
@@ -622,7 +622,7 @@ export default function AIPlanBuilder() {
                   </div>
 
                   {/* Cycling Course Details */}
-                  <div className="border-t pt-4">
+                  <div className="pt-4">
                     <h4 className="font-medium text-gray-800 mb-3"><FaBiking className="inline mr-2" /> Cycling Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -630,7 +630,7 @@ export default function AIPlanBuilder() {
                         <select
                           value={responses.cyclingElevationGain}
                           onChange={(e) => updateResponse('cyclingElevationGain', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          className="w-full p-3"
                         >
                           <option value="">Select elevation gain</option>
                           {CYCLING_COURSE_OPTIONS.elevationGain.map((option, index) => (
@@ -643,7 +643,7 @@ export default function AIPlanBuilder() {
                         <select
                           value={responses.cyclingCourseProfile}
                           onChange={(e) => updateResponse('cyclingCourseProfile', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          className="w-full p-3"
                         >
                           <option value="">Select course profile</option>
                           {CYCLING_COURSE_OPTIONS.courseProfile.map((option, index) => (
@@ -655,7 +655,7 @@ export default function AIPlanBuilder() {
                   </div>
 
                   {/* Swimming Course Details */}
-                  <div className="border-t pt-4">
+                  <div className="pt-4">
                     <h4 className="font-medium text-gray-800 mb-3"><FaSwimmer className="inline mr-2" /> Swimming Course</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -663,7 +663,7 @@ export default function AIPlanBuilder() {
                         <select
                           value={responses.waterConditions}
                           onChange={(e) => updateResponse('waterConditions', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          className="w-full p-3"
                         >
                           <option value="">Select water conditions</option>
                           {SWIMMING_COURSE_OPTIONS.waterConditions.map((option, index) => (
@@ -675,7 +675,7 @@ export default function AIPlanBuilder() {
                   </div>
 
                   {/* Climate */}
-                  <div className="border-t pt-4">
+                  <div className="pt-4">
                     <h4 className="font-medium text-gray-800 mb-3">Climate</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
@@ -683,7 +683,7 @@ export default function AIPlanBuilder() {
                         <select
                           value={responses.climate}
                           onChange={e => updateResponse('climate', e.target.value)}
-                          className="w-full p-3 border border-gray-300 rounded"
+                          className="w-full p-3"
                         >
                           <option value="">Select climate</option>
                           {CLIMATE_OPTIONS.map((option, index) => (
@@ -779,7 +779,7 @@ export default function AIPlanBuilder() {
                     type="number"
                     value={responses.squat1RM}
                     onChange={(e) => updateResponse('squat1RM', e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded"
+                    className="w-full p-3"
                   />
                 </div>
               )}
@@ -830,7 +830,7 @@ export default function AIPlanBuilder() {
                 >
                   {option.label}
                   {option.key === recommendedFrequency && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1">Recommended</span>
                   )}
                 </button>
               ))}
@@ -905,7 +905,7 @@ export default function AIPlanBuilder() {
                 >
                   {option.label}
                   {option.key === recommendedStrength && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1">Recommended</span>
                   )}
                 </button>
               ))}
@@ -957,7 +957,7 @@ export default function AIPlanBuilder() {
                         type="number"
                         value={responses.squat1RM}
                         onChange={(e) => updateResponse('squat1RM', e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded"
+                        className="w-full p-3"
                       />
                     </div>
                     {/* Repeat for deadlift, bench, etc. */}

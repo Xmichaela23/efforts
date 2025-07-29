@@ -13,7 +13,7 @@ export default function PlanBuilder() {
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
 
   return (
-    <div className="max-w-2xl mx-auto mt-8 p-4 bg-white rounded shadow">
+    <div className="w-full">
       <div className="flex border-b border-gray-200 mb-6">
         <button
           className={`px-4 py-2 -mb-px font-medium border-b-2 transition-colors ${
