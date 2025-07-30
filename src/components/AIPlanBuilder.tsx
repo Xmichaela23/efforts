@@ -1780,15 +1780,120 @@ ${insights.age >= 40 ? `
                 )}
               </div>
 
-              {/* Display the raw plan data for now */}
-              <div className="mb-6">
-                <div className="text-lg font-semibold text-gray-800 mb-4">Generated Plan</div>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                    {JSON.stringify(generatedPlan, null, 2)}
-                  </pre>
-                </div>
-              </div>
+              {/* Parse and display the actual plan */}
+              {(() => {
+                try {
+                  // Parse the raw response from the AI
+                  const rawResponse = generatedPlan.fullPlan?.rawResponse;
+                  if (!rawResponse) return <div>No plan data available</div>;
+                  
+                  // Clean the JSON string (remove markdown code blocks)
+                  const cleanJson = rawResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                  
+                  // Parse the JSON
+                  const parsedPlan = JSON.parse(cleanJson);
+                  const weeks = parsedPlan.plan?.weeks || [];
+                  
+                  if (weeks.length === 0) return <div>No weeks found in plan</div>;
+                  
+                  return (
+                    <div className="space-y-6">
+                      {/* Plan Overview */}
+                      <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
+                        <div className="font-medium mb-2">{parsedPlan.plan.phase}</div>
+                        <div className="text-sm">{parsedPlan.plan.phaseDescription}</div>
+                        <div className="text-sm mt-1">Training Philosophy: {parsedPlan.plan.trainingPhilosophy}</div>
+                      </div>
+                      
+                      {/* Week Navigation */}
+                      <div className="mb-6">
+                        <div className="flex border-b border-gray-200 overflow-x-auto">
+                          {weeks.map((week: any, weekIndex: number) => (
+                            <button
+                              key={weekIndex}
+                              onClick={() => setCurrentWeek(weekIndex)}
+                              className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
+                                weekIndex === currentWeek 
+                                  ? 'text-gray-900 border-b-2 border-gray-900' 
+                                  : 'text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300'
+                              }`}
+                            >
+                              Week {week.weekNumber}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {/* Current Week View */}
+                      {weeks[currentWeek] && (
+                        <div className="space-y-4">
+                          <div className="text-lg font-semibold text-gray-800">
+                            Week {weeks[currentWeek].weekNumber} - {weeks[currentWeek].focus}
+                          </div>
+                          <div className="text-sm text-gray-600 mb-4">
+                            Phase: {weeks[currentWeek].phase}
+                          </div>
+                          
+                          {/* Daily Workouts */}
+                          <div className="space-y-6">
+                            {weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => (
+                              <div key={dayIndex} className="border-b border-gray-100 pb-6">
+                                <div className="flex justify-between items-start mb-4">
+                                  <div className="font-medium text-gray-900 text-lg">
+                                    {workout.day}: {workout.type}
+                                  </div>
+                                  <div className="text-sm text-gray-500">
+                                    {workout.duration}
+                                  </div>
+                                </div>
+                                
+                                {/* Workout Details */}
+                                <div className="space-y-3 text-sm">
+                                  {workout.warmup && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">Warm-up:</span> {workout.warmup}
+                                    </div>
+                                  )}
+                                  
+                                  {workout.main && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">Main:</span> {workout.main}
+                                    </div>
+                                  )}
+                                  
+                                  {workout.cooldown && (
+                                    <div className="text-gray-700">
+                                      <span className="font-medium">Cool-down:</span> {workout.cooldown}
+                                    </div>
+                                  )}
+                                  
+                                  {workout.notes && (
+                                    <div className="text-gray-600 italic">
+                                      {workout.notes}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                } catch (error) {
+                  console.error('Error parsing plan:', error);
+                  return (
+                    <div className="mb-6">
+                      <div className="text-lg font-semibold text-gray-800 mb-4">Plan Data (Debug)</div>
+                      <div className="bg-gray-50 p-4 rounded-lg">
+                        <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {JSON.stringify(generatedPlan, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  );
+                }
+              })()}
 
 
 
