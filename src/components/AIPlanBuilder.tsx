@@ -1776,9 +1776,9 @@ ${insights.age >= 40 ? `
 
               {/* Plan Overview */}
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
-                <div className="font-medium mb-2">{generatedPlan.plan?.name || 'Your Training Plan'}</div>
+                <div className="font-medium mb-2">Your Training Plan</div>
                 <div className="text-sm text-gray-600">
-                  {generatedPlan.plan?.description || 'Personalized training plan based on your assessment'}
+                  Personalized training plan based on your assessment
                 </div>
                 {generatedPlan.plan?.duration && (
                   <div className="text-sm text-gray-500 mt-1">
@@ -1794,7 +1794,10 @@ ${insights.age >= 40 ? `
                   const planData = generatedPlan.plan;
                   if (!planData) return <div>No plan data available</div>;
                   
+                  // Check if weeks exist in the plan structure
                   const weeks = planData.weeks || [];
+                  console.log('Plan data:', planData);
+                  console.log('Weeks found:', weeks.length);
                   
                   if (weeks.length === 0) return <div>No weeks found in plan</div>;
                   
