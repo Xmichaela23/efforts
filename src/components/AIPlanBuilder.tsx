@@ -1793,6 +1793,12 @@ ${insights.age >= 40 ? `
                   // Remove JavaScript comments that break JSON parsing
                   cleanJson = cleanJson.replace(/\/\/.*$/gm, '');
                   
+                  // Find the last complete JSON object by finding the last closing brace
+                  const lastBraceIndex = cleanJson.lastIndexOf('}');
+                  if (lastBraceIndex > 0) {
+                    cleanJson = cleanJson.substring(0, lastBraceIndex + 1);
+                  }
+                  
                   // Parse the JSON
                   const parsedPlan = JSON.parse(cleanJson);
                   const weeks = parsedPlan.plan?.weeks || [];
