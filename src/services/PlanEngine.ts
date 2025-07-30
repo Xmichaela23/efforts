@@ -43,7 +43,339 @@ export interface UserBaselines {
   trainingPhilosophy: string;
   strengthTraining?: string;
   distance: string;
+  equipment?: any;
+  injuryHistory?: string;
+  injuryRegions?: string[];
 }
+
+// Strength Exercise Library
+interface StrengthExercise {
+  name: string;
+  category: 'powerlifting' | 'power_development' | 'injury_prevention' | 'sport_specific' | 'muscle_building' | 'general_fitness';
+  equipment: string[];
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  primaryMuscles: string[];
+  secondaryMuscles: string[];
+  sets: number;
+  reps: string;
+  rest: string;
+  notes?: string;
+}
+
+// Strength Exercise Library
+const STRENGTH_EXERCISES: StrengthExercise[] = [
+  // Powerlifting - Compound Lifts
+  {
+    name: 'Squat',
+    category: 'powerlifting',
+    equipment: ['barbell', 'plates', 'squat_rack'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['hamstrings', 'core'],
+    sets: 3,
+    reps: '3-5',
+    rest: '3-5 minutes',
+    notes: 'Focus on depth and form'
+  },
+  {
+    name: 'Deadlift',
+    category: 'powerlifting',
+    equipment: ['barbell', 'plates'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['hamstrings', 'glutes', 'lower_back'],
+    secondaryMuscles: ['quadriceps', 'core', 'traps'],
+    sets: 3,
+    reps: '3-5',
+    rest: '3-5 minutes',
+    notes: 'Keep bar close to shins'
+  },
+  {
+    name: 'Bench Press',
+    category: 'powerlifting',
+    equipment: ['barbell', 'plates', 'bench'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['chest', 'triceps'],
+    secondaryMuscles: ['shoulders', 'core'],
+    sets: 3,
+    reps: '3-5',
+    rest: '3-5 minutes',
+    notes: 'Retract shoulder blades'
+  },
+  {
+    name: 'Overhead Press',
+    category: 'powerlifting',
+    equipment: ['barbell', 'plates'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['shoulders', 'triceps'],
+    secondaryMuscles: ['core', 'traps'],
+    sets: 3,
+    reps: '3-5',
+    rest: '3-5 minutes',
+    notes: 'Keep core tight'
+  },
+
+  // Power Development - Explosive Movements
+  {
+    name: 'Box Jump',
+    category: 'power_development',
+    equipment: ['plyo_box'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['hamstrings', 'calves'],
+    sets: 3,
+    reps: '5-8',
+    rest: '2-3 minutes',
+    notes: 'Land softly, focus on height'
+  },
+  {
+    name: 'Medicine Ball Throw',
+    category: 'power_development',
+    equipment: ['medicine_ball'],
+    difficulty: 'beginner',
+    primaryMuscles: ['chest', 'shoulders'],
+    secondaryMuscles: ['triceps', 'core'],
+    sets: 3,
+    reps: '8-10',
+    rest: '2-3 minutes',
+    notes: 'Explosive movement'
+  },
+  {
+    name: 'Clean Pull',
+    category: 'power_development',
+    equipment: ['barbell', 'plates'],
+    difficulty: 'advanced',
+    primaryMuscles: ['hamstrings', 'glutes', 'traps'],
+    secondaryMuscles: ['quadriceps', 'shoulders'],
+    sets: 3,
+    reps: '3-5',
+    rest: '2-3 minutes',
+    notes: 'Explosive hip extension'
+  },
+  {
+    name: 'Snatch Pull',
+    category: 'power_development',
+    equipment: ['barbell', 'plates'],
+    difficulty: 'advanced',
+    primaryMuscles: ['hamstrings', 'glutes', 'traps'],
+    secondaryMuscles: ['quadriceps', 'shoulders'],
+    sets: 3,
+    reps: '3-5',
+    rest: '2-3 minutes',
+    notes: 'Wide grip, explosive movement'
+  },
+  {
+    name: 'Broad Jump',
+    category: 'power_development',
+    equipment: [],
+    difficulty: 'intermediate',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['hamstrings', 'calves'],
+    sets: 3,
+    reps: '5-8',
+    rest: '2-3 minutes',
+    notes: 'Focus on distance'
+  },
+
+  // Injury Prevention - Mobility & Stability
+  {
+    name: 'Bird Dog',
+    category: 'injury_prevention',
+    equipment: [],
+    difficulty: 'beginner',
+    primaryMuscles: ['core', 'glutes'],
+    secondaryMuscles: ['shoulders'],
+    sets: 3,
+    reps: '10-12 each side',
+    rest: '30 seconds',
+    notes: 'Maintain neutral spine'
+  },
+  {
+    name: 'Dead Bug',
+    category: 'injury_prevention',
+    equipment: [],
+    difficulty: 'beginner',
+    primaryMuscles: ['core'],
+    secondaryMuscles: ['hip_flexors'],
+    sets: 3,
+    reps: '10-12 each side',
+    rest: '30 seconds',
+    notes: 'Keep lower back pressed to floor'
+  },
+  {
+    name: 'Side Plank',
+    category: 'injury_prevention',
+    equipment: [],
+    difficulty: 'intermediate',
+    primaryMuscles: ['obliques', 'shoulders'],
+    secondaryMuscles: ['glutes'],
+    sets: 3,
+    reps: '30-60 seconds each side',
+    rest: '30 seconds',
+    notes: 'Maintain straight line'
+  },
+  {
+    name: 'Glute Bridge',
+    category: 'injury_prevention',
+    equipment: [],
+    difficulty: 'beginner',
+    primaryMuscles: ['glutes', 'hamstrings'],
+    secondaryMuscles: ['core'],
+    sets: 3,
+    reps: '12-15',
+    rest: '30 seconds',
+    notes: 'Squeeze glutes at top'
+  },
+
+  // Sport-Specific - Triathlon Movements
+  {
+    name: 'Swimmer\'s Pull',
+    category: 'sport_specific',
+    equipment: ['resistance_bands'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['lats', 'rhomboids'],
+    secondaryMuscles: ['biceps', 'shoulders'],
+    sets: 3,
+    reps: '12-15',
+    rest: '60 seconds',
+    notes: 'Simulate swimming pull motion'
+  },
+  {
+    name: 'Bike Squat',
+    category: 'sport_specific',
+    equipment: ['barbell', 'plates', 'squat_rack'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['hamstrings', 'core'],
+    sets: 3,
+    reps: '8-12',
+    rest: '2-3 minutes',
+    notes: 'Focus on cycling-specific range'
+  },
+  {
+    name: 'Running Lunge',
+    category: 'sport_specific',
+    equipment: ['dumbbells'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['hamstrings', 'core'],
+    sets: 3,
+    reps: '10-12 each leg',
+    rest: '60 seconds',
+    notes: 'Simulate running stride'
+  },
+  {
+    name: 'Transition Burpee',
+    category: 'sport_specific',
+    equipment: [],
+    difficulty: 'intermediate',
+    primaryMuscles: ['full_body'],
+    secondaryMuscles: ['cardio'],
+    sets: 3,
+    reps: '8-10',
+    rest: '90 seconds',
+    notes: 'Simulate triathlon transitions'
+  },
+
+  // Muscle Building - Hypertrophy
+  {
+    name: 'Dumbbell Bench Press',
+    category: 'muscle_building',
+    equipment: ['dumbbells', 'bench'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['chest', 'triceps'],
+    secondaryMuscles: ['shoulders'],
+    sets: 3,
+    reps: '8-12',
+    rest: '2-3 minutes',
+    notes: 'Control the movement'
+  },
+  {
+    name: 'Dumbbell Row',
+    category: 'muscle_building',
+    equipment: ['dumbbells'],
+    difficulty: 'beginner',
+    primaryMuscles: ['lats', 'rhomboids'],
+    secondaryMuscles: ['biceps', 'traps'],
+    sets: 3,
+    reps: '8-12 each arm',
+    rest: '60 seconds',
+    notes: 'Keep elbow close to body'
+  },
+  {
+    name: 'Goblet Squat',
+    category: 'muscle_building',
+    equipment: ['dumbbell'],
+    difficulty: 'beginner',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['core'],
+    sets: 3,
+    reps: '12-15',
+    rest: '90 seconds',
+    notes: 'Hold dumbbell at chest'
+  },
+  {
+    name: 'Romanian Deadlift',
+    category: 'muscle_building',
+    equipment: ['dumbbells'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['hamstrings', 'glutes'],
+    secondaryMuscles: ['lower_back'],
+    sets: 3,
+    reps: '10-12',
+    rest: '90 seconds',
+    notes: 'Keep bar close to legs'
+  },
+
+  // General Fitness - Basic Conditioning
+  {
+    name: 'Push-up',
+    category: 'general_fitness',
+    equipment: [],
+    difficulty: 'beginner',
+    primaryMuscles: ['chest', 'triceps'],
+    secondaryMuscles: ['shoulders', 'core'],
+    sets: 3,
+    reps: '10-15',
+    rest: '60 seconds',
+    notes: 'Maintain plank position'
+  },
+  {
+    name: 'Pull-up',
+    category: 'general_fitness',
+    equipment: ['pull_up_bar'],
+    difficulty: 'intermediate',
+    primaryMuscles: ['lats', 'biceps'],
+    secondaryMuscles: ['rhomboids', 'traps'],
+    sets: 3,
+    reps: '5-10',
+    rest: '2-3 minutes',
+    notes: 'Full range of motion'
+  },
+  {
+    name: 'Bodyweight Squat',
+    category: 'general_fitness',
+    equipment: [],
+    difficulty: 'beginner',
+    primaryMuscles: ['quadriceps', 'glutes'],
+    secondaryMuscles: ['hamstrings', 'core'],
+    sets: 3,
+    reps: '15-20',
+    rest: '60 seconds',
+    notes: 'Go to parallel or below'
+  },
+  {
+    name: 'Plank',
+    category: 'general_fitness',
+    equipment: [],
+    difficulty: 'beginner',
+    primaryMuscles: ['core'],
+    secondaryMuscles: ['shoulders'],
+    sets: 3,
+    reps: '30-60 seconds',
+    rest: '30 seconds',
+    notes: 'Keep body straight'
+  }
+];
 
 export class PlanEngine {
   private userBaselines: UserBaselines;
@@ -106,7 +438,7 @@ export class PlanEngine {
     return workouts;
   }
 
-  // Generate a single workout
+  // Generate workout with all components
   private generateWorkout(day: string, weekNumber: number, dayIndex: number): Workout {
     const workoutType = this.getWorkoutType(day, dayIndex);
     const duration = this.getWorkoutDuration(workoutType, weekNumber);
@@ -117,7 +449,7 @@ export class PlanEngine {
       type: workoutType,
       duration,
       warmup: this.generateWarmup(workoutType),
-      main: this.generateMainSet(workoutType, intensity),
+      main: this.generateMainSet(workoutType, intensity, weekNumber),
       cooldown: this.generateCooldown(workoutType),
       notes: this.generateNotes(workoutType, weekNumber)
     };
@@ -335,8 +667,8 @@ export class PlanEngine {
     }
   }
 
-  // Generate main set
-  private generateMainSet(type: string, intensity: string): string {
+  // Generate main set with intelligent exercise selection
+  private generateMainSet(type: string, intensity: string, weekNumber: number): string {
     switch (type) {
       case 'swim':
         return `8x50m @ 1:15/100m, 30s rest`;
@@ -345,10 +677,147 @@ export class PlanEngine {
       case 'run':
         return `20min @ ${intensity}`;
       case 'strength':
-        return `3x5 squats @ ${intensity}, 3x3 deadlifts @ ${intensity}`;
+        return this.generateStrengthWorkout(intensity, weekNumber);
       default:
         return '';
     }
+  }
+
+  // Generate intelligent strength workout
+  private generateStrengthWorkout(intensity: string, weekNumber: number): string {
+    const strengthType = this.responses.strengthTraining || 'general_fitness';
+    const userEquipment = this.userBaselines.equipment?.strength || [];
+    const injuryHistory = this.userBaselines.injuryHistory;
+    const injuryRegions = this.userBaselines.injuryRegions || [];
+    
+    // Select exercises based on strength type and equipment
+    const selectedExercises = this.selectStrengthExercises(
+      strengthType, 
+      userEquipment, 
+      injuryHistory, 
+      injuryRegions,
+      weekNumber
+    );
+    
+    // Format the workout
+    return selectedExercises.map(exercise => {
+      const weight = this.calculateExerciseWeight(exercise, intensity);
+      return `${exercise.sets}x${exercise.reps} ${exercise.name}${weight ? ` @ ${weight}` : ''}`;
+    }).join(', ');
+  }
+
+  // Select appropriate strength exercises
+  private selectStrengthExercises(
+    strengthType: string, 
+    userEquipment: string[], 
+    injuryHistory: string, 
+    injuryRegions: string[],
+    weekNumber: number
+  ): StrengthExercise[] {
+    // Filter exercises by category
+    let availableExercises = STRENGTH_EXERCISES.filter(exercise => {
+      // Match strength type
+      if (exercise.category !== strengthType) return false;
+      
+      // Check equipment availability
+      const hasEquipment = exercise.equipment.every(equip => 
+        userEquipment.includes(equip) || equip === ''
+      );
+      if (!hasEquipment) return false;
+      
+      // Check injury history
+      if (injuryHistory && injuryHistory !== 'No current injuries or limitations') {
+        const hasInjuryConflict = this.checkInjuryConflict(exercise, injuryRegions);
+        if (hasInjuryConflict) return false;
+      }
+      
+      return true;
+    });
+    
+    // If no exercises found for category, fall back to general fitness
+    if (availableExercises.length === 0) {
+      availableExercises = STRENGTH_EXERCISES.filter(exercise => 
+        exercise.category === 'general_fitness' &&
+        exercise.equipment.every(equip => 
+          userEquipment.includes(equip) || equip === ''
+        )
+      );
+    }
+    
+    // Select 3-4 exercises for a complete workout
+    const numExercises = weekNumber <= 2 ? 3 : 4; // Start simple, build complexity
+    const selectedExercises = this.selectExerciseProgression(availableExercises, numExercises, weekNumber);
+    
+    return selectedExercises;
+  }
+
+  // Check for injury conflicts
+  private checkInjuryConflict(exercise: StrengthExercise, injuryRegions: string[]): boolean {
+    const injuryKeywords = {
+      'lower_back': ['deadlift', 'squat', 'overhead', 'clean', 'snatch'],
+      'knee': ['squat', 'lunge', 'jump', 'box'],
+      'shoulder': ['press', 'bench', 'pull', 'snatch', 'clean'],
+      'wrist': ['press', 'bench', 'clean', 'snatch'],
+      'ankle': ['jump', 'box', 'lunge', 'squat']
+    };
+    
+    for (const region of injuryRegions) {
+      const keywords = injuryKeywords[region.toLowerCase()] || [];
+      if (keywords.some(keyword => 
+        exercise.name.toLowerCase().includes(keyword)
+      )) {
+        return true;
+      }
+    }
+    
+    return false;
+  }
+
+  // Select exercise progression based on week
+  private selectExerciseProgression(
+    exercises: StrengthExercise[], 
+    numExercises: number, 
+    weekNumber: number
+  ): StrengthExercise[] {
+    // Sort by difficulty (beginner first)
+    const sortedExercises = exercises.sort((a, b) => {
+      const difficultyOrder = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
+      return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
+    });
+    
+    // Week 1-2: Focus on form and basic movements
+    if (weekNumber <= 2) {
+      return sortedExercises
+        .filter(ex => ex.difficulty === 'beginner' || ex.difficulty === 'intermediate')
+        .slice(0, numExercises);
+    }
+    
+    // Week 3-4: Add more complex movements
+    return sortedExercises.slice(0, numExercises);
+  }
+
+  // Calculate exercise weight based on intensity and exercise type
+  private calculateExerciseWeight(exercise: StrengthExercise, intensity: string): string {
+    // Extract percentage from intensity string (e.g., "75% 1RM (180 lbs)" -> 75)
+    const percentageMatch = intensity.match(/(\d+)%/);
+    if (!percentageMatch) return '';
+    
+    const percentage = parseInt(percentageMatch[1]);
+    
+    // Get user's 1RM for this exercise type
+    let oneRM = 0;
+    if (exercise.name.toLowerCase().includes('squat')) {
+      oneRM = this.userBaselines.performanceNumbers.squat || 0;
+    } else if (exercise.name.toLowerCase().includes('deadlift')) {
+      oneRM = this.userBaselines.performanceNumbers.deadlift || 0;
+    } else if (exercise.name.toLowerCase().includes('bench')) {
+      oneRM = this.userBaselines.performanceNumbers.bench || 0;
+    }
+    
+    if (oneRM === 0) return '';
+    
+    const weight = Math.round((percentage / 100) * oneRM);
+    return `${weight} lbs`;
   }
 
   // Generate cooldown
