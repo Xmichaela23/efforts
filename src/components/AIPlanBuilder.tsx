@@ -550,9 +550,9 @@ export default function AIPlanBuilder() {
     const insights = getBaselineInsights();
     let prompt = `Create a comprehensive training plan for a triathlete with the following specifications:
 
-**CRITICAL REQUIREMENT: You MUST generate a COMPLETE training plan with 8-12 WEEKS of training. DO NOT stop at 1 or 2 weeks. Generate the ENTIRE plan from start to finish.**
+**CRITICAL REQUIREMENT: Generate a 4-WEEK PREVIEW of the training plan. This is a preview showing the first month of training. The full plan will be available in the app.**
 
-**RESPONSE LENGTH: Use the FULL response length available. Do not truncate or shorten the plan. Generate a complete, detailed training program.**
+**RESPONSE LENGTH: Generate exactly 4 weeks with detailed workouts. This is a preview, not the complete plan.**
 
 **MANDATORY: Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday). DO NOT skip any days. Include all 7 days in every week. NO REST DAYS unless specifically requested.**
 
@@ -874,13 +874,13 @@ ${insights.age >= 40 ? `
    - Consider their weekend availability
    - Balance training load throughout the week
 
-11. **OUTPUT FORMAT:** Return ONLY valid JSON in this exact structure with MULTIPLE WEEKS:
+11. **OUTPUT FORMAT:** Return ONLY valid JSON in this exact structure with 4 WEEKS:
 {
   "plan": {
     "name": "Your Training Plan",
     "description": "Personalized training plan based on your assessment",
-    "phase": "Complete Training Program - 16 Weeks",
-    "phaseDescription": "Progressive overload with proper periodization, recovery weeks, and taper",
+    "phase": "4-Week Training Preview",
+    "phaseDescription": "First month of training - full plan available in app",
     "trainingPhilosophy": "pyramid", // or "polarized" or "balanced"
     "weeks": [
       {
@@ -999,14 +999,12 @@ ${insights.age >= 40 ? `
 
 **CRITICAL:** 
 - Return ONLY the JSON object above
-- Include AT LEAST 8 WEEKS of training (NOT just 1 or 2 weeks)
+- Generate EXACTLY 4 WEEKS of training (preview only)
 - Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday)
 - Make each workout specific and actionable with actual pace targets, FTP percentages, heart rate zones, and detailed instructions
-- This is for real training, not a template
-- DO NOT stop at 1 or 2 weeks - generate the FULL 8-12 week plan
-- Use the FULL response length available - do not truncate the plan
-- Generate a COMPLETE training program from start to finish
-- Include proper periodization: Base → Build → Peak → Taper phases
+- This is a preview - full plan will be available in the app
+- Generate 4 weeks with proper progression and structure
+- Focus on Base building phase for the first month
 - **VERCEL TEST:** Force deploy with environment variables
 - Include recovery weeks every 3-4 weeks with 20-30% reduced volume
 - Show progressive overload: increasing volume, intensity, or complexity each week
