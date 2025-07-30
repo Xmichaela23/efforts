@@ -834,7 +834,12 @@ ${insights.age >= 40 ? `
 8. **INTENSITY CUSTOMIZATION BASED ON BASELINE:**
    - **CRITICAL:** Use the actual performance numbers provided in the baseline data
    - **If user has FTP data:** Use actual FTP percentages (e.g., "85% FTP (220 watts)") - ALWAYS INCLUDE THE ACTUAL WATTAGE
-   - **If user has running pace data:** Use actual pace targets (e.g., "8:30/mi", "7:45/mi") - NEVER USE GENERIC "Zone 2" WITHOUT SPECIFIC PACE
+   - **RUNNING PACE HIERARCHY - USE APPROPRIATE PACE FOR EACH WORKOUT TYPE:**
+     * **Intervals/High Intensity:** Use 5K pace or faster (e.g., "8:00/mi intervals")
+     * **Tempo/Threshold:** Use 10K pace (e.g., "8:30/mi tempo")
+     * **Long Runs:** Use half marathon pace or easy pace if available (e.g., "9:30/mi long run")
+     * **Easy/Recovery:** Use easy pace if available, or 5K pace + 1-2 min/mi (e.g., "10:00/mi easy")
+     * **NEVER USE GENERIC "Zone 2" WITHOUT SPECIFIC PACE**
    - **If user has swimming pace data:** Use actual pace targets (e.g., "2:05/100m", "1:15/100m") - ALWAYS INCLUDE ACTUAL PACE
    - **If user has HR zones:** Use actual HR zone targets (e.g., Zone 2, Zone 4) - CALCULATE FROM BASELINE
    - **If user has strength numbers:** Use actual weight recommendations (e.g., "80% 1RM (180 lbs)") - ALWAYS INCLUDE THE ACTUAL WEIGHT
@@ -1046,8 +1051,8 @@ ${insights.age >= 40 ? `
       // Use the AI response directly - it should already be in the correct format
       const plan = {
         id: `plan-${Date.now()}`,
-        name: result.plan.name || 'Your Training Plan',
-        description: result.plan.description || 'Personalized training plan based on your assessment',
+        name: result.plan?.name || 'Your Training Plan',
+        description: result.plan?.description || 'Personalized training plan based on your assessment',
         focus: selectedFocus.join(', '),
         plan: result.plan, // Use the AI-generated plan structure directly
         fullPlan: result
@@ -1783,39 +1788,11 @@ ${insights.age >= 40 ? `
               {/* Parse and display the actual plan */}
               {(() => {
                 try {
-                  // Parse the raw response from the AI
-                  const rawResponse = generatedPlan.fullPlan?.rawResponse;
-                  if (!rawResponse) return <div>No plan data available</div>;
+                  // The AI now returns the plan directly in the correct format
+                  const planData = generatedPlan.plan;
+                  if (!planData) return <div>No plan data available</div>;
                   
-                  // Clean the JSON string (remove markdown code blocks and comments)
-                  let cleanJson = rawResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-                  
-                  // Remove JavaScript comments that break JSON parsing
-                  cleanJson = cleanJson.replace(/\/\/.*$/gm, '');
-                  
-                  // Find the complete JSON object by counting braces
-                  let braceCount = 0;
-                  let endIndex = -1;
-                  
-                  for (let i = 0; i < cleanJson.length; i++) {
-                    if (cleanJson[i] === '{') {
-                      braceCount++;
-                    } else if (cleanJson[i] === '}') {
-                      braceCount--;
-                      if (braceCount === 0) {
-                        endIndex = i;
-                        break;
-                      }
-                    }
-                  }
-                  
-                  if (endIndex > 0) {
-                    cleanJson = cleanJson.substring(0, endIndex + 1);
-                  }
-                  
-                  // Parse the JSON
-                  const parsedPlan = JSON.parse(cleanJson);
-                  const weeks = parsedPlan.plan?.weeks || [];
+                  const weeks = planData.weeks || [];
                   
                   if (weeks.length === 0) return <div>No weeks found in plan</div>;
                   
@@ -1823,9 +1800,9 @@ ${insights.age >= 40 ? `
                     <div className="space-y-6">
                       {/* Plan Overview */}
                       <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
-                        <div className="font-medium mb-2">{parsedPlan.plan.phase}</div>
-                        <div className="text-sm">{parsedPlan.plan.phaseDescription}</div>
-                        <div className="text-sm mt-1">Training Philosophy: {parsedPlan.plan.trainingPhilosophy}</div>
+                        <div className="font-medium mb-2">{planData.phase}</div>
+                        <div className="text-sm">{planData.phaseDescription}</div>
+                        <div className="text-sm mt-1">Training Philosophy: {planData.trainingPhilosophy}</div>
                       </div>
                       
                       {/* Week Navigation */}
