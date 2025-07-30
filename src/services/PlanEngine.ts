@@ -423,7 +423,7 @@ export class PlanEngine {
 
   // Generate intelligent strength workout
   private generateStrengthWorkout(intensity: string, weekNumber: number): string {
-    const strengthType = this.responses.strengthTraining || 'general_fitness';
+    const strengthType = this.mapStrengthTrainingToCategory(this.responses.strengthTraining) || 'general_fitness';
     const userEquipment = this.userBaselines.equipment?.strength || [];
     const injuryHistory = this.userBaselines.injuryHistory;
     const injuryRegions = this.userBaselines.injuryRegions || [];
@@ -442,6 +442,21 @@ export class PlanEngine {
       const weight = this.calculateExerciseWeight(exercise, intensity);
       return `${exercise.sets}x${exercise.reps} ${exercise.name}${weight ? ` @ ${weight}` : ''}`;
     }).join(', ');
+  }
+
+  // Map UI strength training keys to ExerciseLibrary categories
+  private mapStrengthTrainingToCategory(uiKey: string): string {
+    const mapping: { [key: string]: string } = {
+      'power-lifting': 'powerlifting',
+      'power-development': 'power_development',
+      'injury-prevention': 'injury_prevention',
+      'sport-specific': 'sport_specific',
+      'build-muscle': 'muscle_building',
+      'general-fitness': 'general_fitness',
+      'no-strength': 'general_fitness' // Fallback for no strength
+    };
+    
+    return mapping[uiKey] || 'general_fitness';
   }
 
   // Select appropriate strength exercises
