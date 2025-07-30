@@ -180,8 +180,9 @@ function parseAIResponse(aiResponse: string, startDate: string) {
     // Remove markdown code blocks
     cleanResponse = cleanResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
     
-    // Remove JavaScript comments
+    // Remove JavaScript comments and any trailing text
     cleanResponse = cleanResponse.replace(/\/\/.*$/gm, '');
+    cleanResponse = cleanResponse.replace(/\n\s*\/\/.*$/gm, '');
     
     // Find the complete JSON object by counting braces
     let braceCount = 0;
@@ -202,6 +203,8 @@ function parseAIResponse(aiResponse: string, startDate: string) {
     if (endIndex > 0) {
       cleanResponse = cleanResponse.substring(0, endIndex + 1);
     }
+    
+    console.log('Cleaned JSON:', cleanResponse.substring(0, 500) + '...');
     
     // Try to parse the cleaned JSON
     const parsed = JSON.parse(cleanResponse);
