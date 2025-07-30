@@ -998,7 +998,7 @@ ${insights.age >= 40 ? `
 - Use the FULL response length available - do not truncate the plan
 - Generate a COMPLETE training program from start to finish
 - Include proper periodization: Base → Build → Peak → Taper phases
-- **CLEAN DEPLOY:** Fresh build with environment variables
+- **VERCEL TEST:** Force deploy with environment variables
 - Include recovery weeks every 3-4 weeks with 20-30% reduced volume
 - Show progressive overload: increasing volume, intensity, or complexity each week
 - Include proper deload periods to prevent overtraining
