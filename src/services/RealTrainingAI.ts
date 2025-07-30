@@ -29,23 +29,13 @@ export interface AITrainingPlan {
 }
 
 export class RealTrainingAI {
-  private apiKey: string;
   private baseURL: string;
 
   constructor() {
-    // Get API key from environment - try multiple common variable names
-    this.apiKey = (import.meta as any).env.VITE_OPENAI_API_KEY || 
-                  (import.meta as any).env.OPENAI_API_KEY || 
-                  (import.meta as any).env.VITE_AI_API_KEY || 
-                  (import.meta as any).env.REACT_APP_OPENAI_API_KEY || '';
-    this.baseURL = 'https://api.openai.com/v1/chat/completions';
+    // Use Supabase Edge Function instead of direct OpenAI calls
+    this.baseURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/generate-plan';
     
-    console.log('🔑 API Key check:', this.apiKey ? 'Found' : 'Not found');
-    console.log('🔑 API Key length:', this.apiKey.length);
-    
-    if (!this.apiKey) {
-      console.warn('No OpenAI API key found. Check your .env file for OPENAI_API_KEY, VITE_OPENAI_API_KEY, VITE_AI_API_KEY, or REACT_APP_OPENAI_API_KEY');
-    }
+    console.log('🔗 Using Supabase Edge Function for AI plan generation');
   }
 
   // Real AI plan generation with training science
@@ -55,64 +45,59 @@ export class RealTrainingAI {
     userContext: any = {}
   ): Promise<AITrainingPlan> {
     
-    if (!this.apiKey) {
-      throw new Error('OpenAI API key not configured');
-    }
-
-    console.log('🤖 Starting AI plan generation...');
+    console.log('🤖 Starting AI plan generation via Edge Function...');
     
     // Build context-aware prompt with real training science
     const systemPrompt = this.buildTrainingSciencePrompt();
     const userPrompt = this.buildUserPrompt(prompt, startDate, userContext);
+    
+    // Combine system and user prompts for edge function
+    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
 
-    console.log('📤 Sending request to OpenAI...');
+    console.log('📤 Sending request to Supabase Edge Function...');
 
     try {
       // Add timeout to prevent hanging
       const controller = new AbortController();
       const timeoutId = setTimeout(() => {
-        console.log('⏰ Request timeout, using fallback...');
+        console.log('⏰ Request timeout, aborting...');
         controller.abort();
       }, 45000); // 45 second timeout
 
       const response = await fetch(this.baseURL, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         signal: controller.signal,
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: 4000, // Increased significantly for full multi-week plans
+          prompt: fullPrompt,
+          startDate,
+          userContext
         }),
       });
 
       clearTimeout(timeoutId);
-      console.log('📥 Received response from OpenAI...');
+      console.log('📥 Received response from Edge Function...');
       console.log('📥 Response status:', response.status);
       console.log('📥 Response ok:', response.ok);
 
       if (!response.ok) {
         const errorText = await response.text();
         console.error('📥 Error response:', errorText);
-        throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+        throw new Error(`Edge Function error: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      const aiResponse = data.choices[0]?.message?.content;
-
-      if (!aiResponse) {
-        throw new Error('No response from AI');
+      
+      // The edge function returns the parsed plan directly
+      if (data.error) {
+        console.error('❌ Edge Function returned error:', data.error);
+        throw new Error(`Edge Function error: ${data.error}`);
       }
 
-      // Parse AI response into structured plan
-      return this.parseAIResponse(aiResponse, startDate);
+      console.log('🤖 Plan generated successfully via Edge Function');
+      return data;
 
     } catch (error) {
       console.error('AI Plan Generation Error:', error);
