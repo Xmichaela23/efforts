@@ -638,6 +638,7 @@ const getPerformanceNumbers = (disciplineId: string) => {
   switch (disciplineId) {
     case 'running':
       if (data.performanceNumbers?.fiveK) numbers.push(`5K: ${data.performanceNumbers.fiveK}`);
+      if (data.performanceNumbers?.easyPace) numbers.push(`Easy Pace: ${data.performanceNumbers.easyPace}`);
       if (data.performanceNumbers?.tenK) numbers.push(`10K: ${data.performanceNumbers.tenK}`);
       if (data.performanceNumbers?.halfMarathon) numbers.push(`Half: ${data.performanceNumbers.halfMarathon}`);
       if (data.performanceNumbers?.marathon) numbers.push(`Marathon: ${data.performanceNumbers.marathon}`);
@@ -1065,7 +1066,7 @@ return (
                               </div>
 
                               <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Performance Level</label>
+                                <label className="text-sm font-medium text-gray-700">Current Fitness</label>
                                 <div className="space-y-2">
                                   {getBenchmarkOptions(disciplineId).map((option, index) => (
                                     <button
@@ -1118,7 +1119,7 @@ return (
 
                               {/* Performance Numbers */}
                               <div className="space-y-2">
-                                <label className="text-sm font-medium text-gray-700">Performance Numbers</label>
+                                <label className="text-sm font-medium text-gray-700">Personal Records</label>
                                 <p className="text-xs text-gray-500">Enter your current performance numbers for personalized training plans</p>
                                 
                                 {disciplineId === 'cycling' && data.benchmarks?.cycling === 'I know my FTP (watts)' && (
@@ -1472,12 +1473,12 @@ return (
                                     <span>{data.disciplineFitness?.[disciplineId] || 'Not set'}</span>
                                   </div>
                                   <div>
-                                    <span className="text-gray-600">Performance Level: </span>
+                                    <span className="text-gray-600">Current Fitness: </span>
                                     <span>{data.benchmarks?.[disciplineId] || 'Not set'}</span>
                                   </div>
                                   {performanceNumbers.length > 0 && (
                                     <div className="md:col-span-2">
-                                      <span className="text-gray-600">Performance Numbers: </span>
+                                      <span className="text-gray-600">Personal Records: </span>
                                       <span>{performanceNumbers.join(', ')}</span>
                                     </div>
                                   )}
