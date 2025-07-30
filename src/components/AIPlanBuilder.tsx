@@ -1793,10 +1793,24 @@ ${insights.age >= 40 ? `
                   // Remove JavaScript comments that break JSON parsing
                   cleanJson = cleanJson.replace(/\/\/.*$/gm, '');
                   
-                  // Find the last complete JSON object by finding the last closing brace
-                  const lastBraceIndex = cleanJson.lastIndexOf('}');
-                  if (lastBraceIndex > 0) {
-                    cleanJson = cleanJson.substring(0, lastBraceIndex + 1);
+                  // Find the complete JSON object by counting braces
+                  let braceCount = 0;
+                  let endIndex = -1;
+                  
+                  for (let i = 0; i < cleanJson.length; i++) {
+                    if (cleanJson[i] === '{') {
+                      braceCount++;
+                    } else if (cleanJson[i] === '}') {
+                      braceCount--;
+                      if (braceCount === 0) {
+                        endIndex = i;
+                        break;
+                      }
+                    }
+                  }
+                  
+                  if (endIndex > 0) {
+                    cleanJson = cleanJson.substring(0, endIndex + 1);
                   }
                   
                   // Parse the JSON
