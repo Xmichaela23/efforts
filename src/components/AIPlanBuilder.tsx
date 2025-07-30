@@ -1787,8 +1787,11 @@ ${insights.age >= 40 ? `
                   const rawResponse = generatedPlan.fullPlan?.rawResponse;
                   if (!rawResponse) return <div>No plan data available</div>;
                   
-                  // Clean the JSON string (remove markdown code blocks)
-                  const cleanJson = rawResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                  // Clean the JSON string (remove markdown code blocks and comments)
+                  let cleanJson = rawResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                  
+                  // Remove JavaScript comments that break JSON parsing
+                  cleanJson = cleanJson.replace(/\/\/.*$/gm, '');
                   
                   // Parse the JSON
                   const parsedPlan = JSON.parse(cleanJson);
