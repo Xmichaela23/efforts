@@ -1162,7 +1162,7 @@ return (
                                       />
                                     </div>
                                     <div>
-                                      <label className="text-xs text-gray-600">Easy/Long Run Pace (mm:ss/mi)</label>
+                                      <label className="text-xs text-gray-600">Easy/Long Run Pace - Zone 2 (mm:ss/mi)</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.easyPace || ''}
@@ -1176,7 +1176,7 @@ return (
                                         placeholder="mm:ss/mi"
                                         className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
                                       />
-                                      <p className="text-xs text-gray-500">Your comfortable pace for long runs (usually 1-2 min/mi slower than 5K pace)</p>
+                                      <p className="text-xs text-gray-500">Your Zone 2 pace for long runs and easy days (conversational pace - can speak in complete sentences, 60-70% max HR, 1-2 min/mi slower than 5K pace)</p>
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600">10K Time (mm:ss)</label>

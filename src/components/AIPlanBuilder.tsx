@@ -837,9 +837,11 @@ ${insights.age >= 40 ? `
    - **RUNNING PACE HIERARCHY - USE APPROPRIATE PACE FOR EACH WORKOUT TYPE:**
      * **Intervals/High Intensity:** Use 5K pace or faster (e.g., "8:00/mi intervals")
      * **Tempo/Threshold:** Use 10K pace (e.g., "8:30/mi tempo")
-     * **Long Runs:** Use half marathon pace or easy pace if available (e.g., "9:30/mi long run")
-     * **Easy/Recovery:** Use easy pace if available, or 5K pace + 1-2 min/mi (e.g., "10:00/mi easy")
+     * **Long Runs:** Use easy pace if available (e.g., "10:00/mi long run - easy pace, Zone 2")
+     * **Easy/Recovery:** Use easy pace if available (e.g., "10:00/mi easy - easy pace, Zone 2")
+     * **If no easy pace available:** Use 5K pace + 1-2 min/mi as estimate
      * **NEVER USE GENERIC "Zone 2" WITHOUT SPECIFIC PACE**
+     * **PRIORITIZE USER'S EASY PACE:** Always use their actual easy pace when available
    - **If user has swimming pace data:** Use actual pace targets (e.g., "2:05/100m", "1:15/100m") - ALWAYS INCLUDE ACTUAL PACE
    - **If user has HR zones:** Use actual HR zone targets (e.g., Zone 2, Zone 4) - CALCULATE FROM BASELINE
    - **If user has strength numbers:** Use actual weight recommendations (e.g., "80% 1RM (180 lbs)") - ALWAYS INCLUDE THE ACTUAL WEIGHT
