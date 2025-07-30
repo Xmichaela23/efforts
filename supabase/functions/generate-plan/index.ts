@@ -211,8 +211,8 @@ function parseAIResponse(aiResponse: string, startDate: string) {
       return parsed;
     }
     
-    // If it doesn't have the right structure, create a fallback
-    throw new Error('Invalid plan structure');
+    // If it doesn't have the right structure, throw error
+    throw new Error('Invalid plan structure - missing weeks array');
     
   } catch (error) {
     console.log(`❌ PARSE ERROR: ${error.message}`);

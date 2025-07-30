@@ -875,6 +875,8 @@ ${insights.age >= 40 ? `
 11. **OUTPUT FORMAT:** Return ONLY valid JSON in this exact structure with MULTIPLE WEEKS:
 {
   "plan": {
+    "name": "Your Training Plan",
+    "description": "Personalized training plan based on your assessment",
     "phase": "Complete Training Program - 16 Weeks",
     "phaseDescription": "Progressive overload with proper periodization, recovery weeks, and taper",
     "trainingPhilosophy": "pyramid", // or "polarized" or "balanced"
@@ -1048,13 +1050,13 @@ ${insights.age >= 40 ? `
       console.log('Plan generated:', result);
       console.log('Plan structure:', JSON.stringify(result, null, 2));
       
-      // Use the AI response directly - it should already be in the correct format
+      // Use the response directly - it should already be in the correct format
       const plan = {
         id: `plan-${Date.now()}`,
         name: result.plan?.name || 'Your Training Plan',
         description: result.plan?.description || 'Personalized training plan based on your assessment',
         focus: selectedFocus.join(', '),
-        plan: result.plan, // Use the AI-generated plan structure directly
+        plan: result.plan, // Use the generated plan structure directly
         fullPlan: result
       };
       
@@ -1758,7 +1760,7 @@ ${insights.age >= 40 ? `
               <div className="mb-6">
                 <h2 className="text-2xl font-bold text-gray-800 mb-2">Your Training Plan</h2>
                 <div className="text-sm text-gray-600">
-                  {generatedPlan.plan?.phase || 'Intelligent training plan based on your assessment'}
+                  {generatedPlan.plan?.phase || 'Personalized training plan based on your assessment'}
                 </div>
               </div>
 
@@ -1776,7 +1778,7 @@ ${insights.age >= 40 ? `
               <div className="mb-6 p-4 bg-gray-50 rounded-lg">
                 <div className="font-medium mb-2">{generatedPlan.plan?.name || 'Your Training Plan'}</div>
                 <div className="text-sm text-gray-600">
-                  {generatedPlan.plan?.description || 'Intelligent training plan based on your assessment'}
+                  {generatedPlan.plan?.description || 'Personalized training plan based on your assessment'}
                 </div>
                 {generatedPlan.plan?.duration && (
                   <div className="text-sm text-gray-500 mt-1">
@@ -1788,7 +1790,7 @@ ${insights.age >= 40 ? `
               {/* Parse and display the actual plan */}
               {(() => {
                 try {
-                  // The AI now returns the plan directly in the correct format
+                  // The system now returns the plan directly in the correct format
                   const planData = generatedPlan.plan;
                   if (!planData) return <div>No plan data available</div>;
                   
@@ -1920,8 +1922,8 @@ ${insights.age >= 40 ? `
 
         return (
           <div className="text-center">
-            <div className="mb-4 text-gray-800 font-medium">AI plan generation failed</div>
-            <div className="text-sm text-gray-600 mb-4">The AI service is temporarily unavailable. Please try again in a moment.</div>
+            <div className="mb-4 text-gray-800 font-medium">Plan generation failed</div>
+            <div className="text-sm text-gray-600 mb-4">The service is temporarily unavailable. Please try again in a moment.</div>
             <button
               className="bg-gray-800 text-white py-2 px-4 font-medium"
               onClick={generatePlan}
