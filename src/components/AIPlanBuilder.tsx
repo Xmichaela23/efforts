@@ -1041,6 +1041,7 @@ ${insights.age >= 40 ? `
       });
       
       console.log('Plan generated:', result);
+      console.log('Plan structure:', JSON.stringify(result, null, 2));
       
       // Use the AI response directly - it should already be in the correct format
       const plan = {
