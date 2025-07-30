@@ -82,6 +82,7 @@ interface BaselineData {
     swim200Time?: string;
     swim400Time?: string;
     fiveK?: string;
+    easyPace?: string;
     tenK?: string;
     halfMarathon?: string;
     marathon?: string;

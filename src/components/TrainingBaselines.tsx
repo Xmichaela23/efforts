@@ -46,6 +46,7 @@ performanceNumbers: {
   swim400Time?: string;
   // Running
   fiveK?: string;
+  easyPace?: string;
   tenK?: string;
   halfMarathon?: string;
   marathon?: string;
@@ -1158,6 +1159,23 @@ return (
                                         placeholder="mm:ss"
                                         className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
                                       />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Easy/Long Run Pace (mm:ss/mi)</label>
+                                      <input
+                                        type="text"
+                                        value={data.performanceNumbers?.easyPace || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            easyPace: e.target.value
+                                          }
+                                        }))}
+                                        placeholder="mm:ss/mi"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                      <p className="text-xs text-gray-500">Your comfortable pace for long runs (usually 1-2 min/mi slower than 5K pace)</p>
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600">10K Time (mm:ss)</label>
