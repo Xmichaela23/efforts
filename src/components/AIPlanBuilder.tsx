@@ -1767,77 +1767,28 @@ ${insights.age >= 40 ? `
                 </div>
               )}
 
-              {/* Week Navigation - Using app's tab design */}
-              <div className="mb-6">
-                <div className="flex border-b border-gray-200">
-                  {generatedPlan.plan?.weeks?.map((week: any, weekIndex: number) => (
-                    <button
-                      key={weekIndex}
-                      onClick={() => setCurrentWeek(weekIndex)}
-                      className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
-                        weekIndex === currentWeek 
-                          ? 'text-gray-900 border-b-2 border-gray-900' 
-                          : 'text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300'
-                      }`}
-                    >
-                      Week {weekIndex + 1}
-                    </button>
-                  ))}
+              {/* Plan Overview */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                <div className="font-medium mb-2">{generatedPlan.plan?.name || 'Your Training Plan'}</div>
+                <div className="text-sm text-gray-600">
+                  {generatedPlan.plan?.description || 'Intelligent training plan based on your assessment'}
                 </div>
+                {generatedPlan.plan?.duration && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    Duration: {generatedPlan.plan.duration} weeks
+                  </div>
+                )}
               </div>
 
-              {/* Week View */}
-              {generatedPlan.plan?.weeks?.[currentWeek] && (
-                <div className="space-y-4">
-                  {/* Week Header */}
-                  <div className="text-lg font-semibold text-gray-800">
-                    Week {currentWeek + 1} - {generatedPlan.plan.weeks[currentWeek].focus || 'Build Phase'}
-                  </div>
-                  
-                  {/* Daily Workouts */}
-                  <div className="space-y-6">
-                    {generatedPlan.plan.weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => (
-                      <div key={dayIndex} className="border-b border-gray-100 pb-6">
-                        <div className="flex justify-between items-start mb-4">
-                          <div className="font-medium text-gray-900 text-lg">
-                            {workout.day}: {workout.type}
-                          </div>
-                          <div className="text-sm text-gray-500">
-                            {workout.duration}
-                          </div>
-                        </div>
-                        
-                        {/* Workout Details */}
-                        <div className="space-y-3 text-sm">
-                          {workout.warmup && (
-                            <div className="text-gray-700">
-                              <span className="font-medium">Warm-up:</span> {workout.warmup}
-                            </div>
-                          )}
-                          
-                          {workout.main && (
-                            <div className="text-gray-700">
-                              <span className="font-medium">Main:</span> {workout.main}
-                            </div>
-                          )}
-                          
-                          {workout.cooldown && (
-                            <div className="text-gray-700">
-                              <span className="font-medium">Cool-down:</span> {workout.cooldown}
-                            </div>
-                          )}
-                          
-                          {workout.notes && (
-                            <div className="text-gray-600 italic">
-                              {workout.notes}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {/* Display the raw plan data for now */}
+              <div className="mb-6">
+                <div className="text-lg font-semibold text-gray-800 mb-4">Generated Plan</div>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">
+                    {JSON.stringify(generatedPlan, null, 2)}
+                  </pre>
                 </div>
-              )}
+              </div>
 
 
 
