@@ -188,58 +188,95 @@ export class PlanEngine {
     }
   }
 
-  // Calculate paces from user baselines
+  // Calculate paces with ranges for Garmin compatibility
   private calculatePaces() {
     const fiveKPace = this.userBaselines.performanceNumbers.fiveK;
     const easyPace = this.userBaselines.performanceNumbers.easyPace;
     const tenKPace = this.userBaselines.performanceNumbers.tenK;
+    const halfMarathonPace = this.userBaselines.performanceNumbers.halfMarathon;
+    
+    // Convert single paces to ranges (add 30-60 seconds for range)
+    const createRange = (pace: string, addSeconds: number = 30) => {
+      if (!pace) return null;
+      const [minutes, seconds] = pace.split(':').map(Number);
+      const totalSeconds = minutes * 60 + seconds;
+      const rangeEnd = totalSeconds + addSeconds;
+      const rangeEndMinutes = Math.floor(rangeEnd / 60);
+      const rangeEndSeconds = rangeEnd % 60;
+      return `${pace}-${rangeEndMinutes}:${rangeEndSeconds.toString().padStart(2, '0')}/mi`;
+    };
     
     return {
       fiveK: fiveKPace || '8:00/mi',
+      fiveKRange: createRange(fiveKPace, 30) || '8:00-8:30/mi',
       easy: easyPace || '10:00/mi',
-      tenK: tenKPace || '8:30/mi'
+      easyRange: createRange(easyPace, 60) || '10:00-11:00/mi',
+      tenK: tenKPace || '8:30/mi',
+      tenKRange: createRange(tenKPace, 45) || '8:30-9:15/mi',
+      halfMarathon: halfMarathonPace || '9:00/mi',
+      halfMarathonRange: createRange(halfMarathonPace, 60) || '9:00-10:00/mi'
     };
   }
 
-  // Get run intensity with pace ranges
+  // Get run intensity with proper pace ranges and goal consideration
   private getRunIntensity(weekNumber: number, paces: any): string {
-    const { fiveK, easy, tenK } = paces;
+    const { easyRange, tenKRange, fiveKRange, halfMarathonRange } = paces;
+    const primaryGoal = this.responses.primaryGoal || 'base';
     
-    // Week 1: Easy runs
-    if (weekNumber === 1) {
-      return `${easy} (easy pace, Zone 2)`;
+    // Base building focus - more easy running
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
+      if (weekNumber === 2) return `${easyRange} (easy pace, Zone 2)`;
+      if (weekNumber === 3) return `${tenKRange} (tempo pace, Zone 3)`;
+      if (weekNumber === 4) return `${easyRange} (easy pace, Zone 2)`;
     }
     
-    // Week 2: Add some tempo
-    if (weekNumber === 2) {
-      return `${tenK} (tempo pace, Zone 3)`;
+    // Performance focus - more intensity
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
+      if (weekNumber === 2) return `${tenKRange} (tempo pace, Zone 3)`;
+      if (weekNumber === 3) return `${fiveKRange} (threshold pace, Zone 4)`;
+      if (weekNumber === 4) return `${tenKRange} (tempo pace, Zone 3)`;
     }
     
-    // Week 3: Mix of paces
-    if (weekNumber === 3) {
-      return `${fiveK} (threshold pace, Zone 4)`;
-    }
+    // Default progression
+    if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
+    if (weekNumber === 2) return `${tenKRange} (tempo pace, Zone 3)`;
+    if (weekNumber === 3) return `${fiveKRange} (threshold pace, Zone 4)`;
+    if (weekNumber === 4) return `${easyRange} (easy pace, Zone 2)`;
     
-    // Week 4: Progressive
-    if (weekNumber === 4) {
-      return `${tenK} (tempo pace, Zone 3)`;
-    }
-    
-    return `${easy} (easy pace, Zone 2)`;
+    return `${easyRange} (easy pace, Zone 2)`;
   }
 
-  // Get bike intensity with FTP percentages
+  // Get bike intensity with goal consideration
   private getBikeIntensity(weekNumber: number): string {
     const ftp = this.userBaselines.performanceNumbers.ftp;
+    const primaryGoal = this.responses.primaryGoal || 'base';
     
     if (!ftp) {
       return 'Zone 2-3 (moderate effort)';
     }
     
-    const percentages = [75, 80, 85, 80]; // Progressive overload
+    // Base building - lower intensity, higher volume
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      const percentages = [70, 75, 80, 70]; // More conservative
+      const percentage = percentages[weekNumber - 1] || 75;
+      const watts = Math.round((percentage / 100) * ftp);
+      return `${percentage}% FTP (${watts} watts)`;
+    }
+    
+    // Performance - higher intensity
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      const percentages = [75, 80, 85, 80]; // More aggressive
+      const percentage = percentages[weekNumber - 1] || 80;
+      const watts = Math.round((percentage / 100) * ftp);
+      return `${percentage}% FTP (${watts} watts)`;
+    }
+    
+    // Default progression
+    const percentages = [75, 80, 85, 80];
     const percentage = percentages[weekNumber - 1] || 80;
     const watts = Math.round((percentage / 100) * ftp);
-    
     return `${percentage}% FTP (${watts} watts)`;
   }
 
@@ -250,18 +287,35 @@ export class PlanEngine {
     return `${swimPace} (moderate pace)`;
   }
 
-  // Get strength intensity
+  // Get strength intensity with goal consideration
   private getStrengthIntensity(weekNumber: number): string {
     const squat = this.userBaselines.performanceNumbers.squat;
+    const primaryGoal = this.responses.primaryGoal || 'base';
     
     if (!squat) {
       return 'Bodyweight exercises';
     }
     
-    const percentages = [70, 75, 80, 75]; // Progressive overload
+    // Base building - focus on form and endurance
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      const percentages = [65, 70, 75, 65]; // More conservative
+      const percentage = percentages[weekNumber - 1] || 70;
+      const weight = Math.round((percentage / 100) * squat);
+      return `${percentage}% 1RM (${weight} lbs)`;
+    }
+    
+    // Performance - focus on power and strength
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      const percentages = [70, 75, 80, 75]; // More aggressive
+      const percentage = percentages[weekNumber - 1] || 75;
+      const weight = Math.round((percentage / 100) * squat);
+      return `${percentage}% 1RM (${weight} lbs)`;
+    }
+    
+    // Default progression
+    const percentages = [70, 75, 80, 75];
     const percentage = percentages[weekNumber - 1] || 75;
     const weight = Math.round((percentage / 100) * squat);
-    
     return `${percentage}% 1RM (${weight} lbs)`;
   }
 
@@ -313,26 +367,78 @@ export class PlanEngine {
     }
   }
 
-  // Generate notes
+  // Generate notes with goal-specific guidance
   private generateNotes(type: string, weekNumber: number): string {
+    const primaryGoal = this.responses.primaryGoal || 'base';
+    
     switch (type) {
       case 'swim':
+        if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+          return 'Focus on technique and aerobic base building';
+        } else if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+          return 'Build swim fitness and technique efficiency';
+        }
         return 'Focus on technique, build aerobic base';
+        
       case 'bike':
+        if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+          return 'Build cycling endurance and aerobic capacity';
+        } else if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+          return 'Build cycling strength and power development';
+        }
         return 'Build cycling strength, progressive overload';
+        
       case 'run':
+        if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+          return 'Build running endurance and aerobic base';
+        } else if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+          return 'Build running speed and threshold capacity';
+        }
         return 'Build running endurance';
+        
       case 'strength':
+        if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+          return 'Focus on form and muscular endurance';
+        } else if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+          return 'Power development - compound movements, heavy weight, low reps';
+        }
         return 'Power lifting - compound movements, heavy weight, low reps';
+        
       case 'rest':
         return 'Active recovery - light stretching or walking';
+        
       default:
         return '';
     }
   }
 
-  // Get week focus
+  // Get week focus with goal consideration
   private getWeekFocus(weekNumber: number): string {
+    const primaryGoal = this.responses.primaryGoal || 'base';
+    
+    // Base building focus
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      const focuses = [
+        'Base Building - Aerobic Foundation',
+        'Base Building - Increasing Volume',
+        'Base Building - Adding Intensity',
+        'Base Building - Recovery Week'
+      ];
+      return focuses[weekNumber - 1] || 'Base Building';
+    }
+    
+    // Performance focus
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      const focuses = [
+        'Performance Prep - Aerobic Foundation',
+        'Performance Prep - Building Intensity',
+        'Performance Prep - Threshold Development',
+        'Performance Prep - Recovery Week'
+      ];
+      return focuses[weekNumber - 1] || 'Performance Prep';
+    }
+    
+    // Default base building
     const focuses = [
       'Base Building - Aerobic Foundation',
       'Base Building - Increasing Volume',
