@@ -142,7 +142,7 @@ const LONG_SESSION_PREFERENCES = [
 // Update training philosophy options to use only text
 const TRAINING_PHILOSOPHY_OPTIONS = [
   { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
-  { key: 'pyramidal', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (70% easy, 20% moderate, 10% hard)</> },
+  { key: 'pyramid', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (70% easy, 20% moderate, 10% hard)</> },
   { key: 'balanced', label: <><FaBalanceScale className="inline mr-2" />BALANCED (strategic mix)</> },
 ];
 

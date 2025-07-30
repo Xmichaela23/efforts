@@ -9,6 +9,7 @@ import WorkoutDetail from './WorkoutDetail';
 import GarminAutoSync from './GarminAutoSync';
 import TodaysEffort from './TodaysEffort';
 import StrengthLogger from './StrengthLogger';
+import MobilityLogger from './MobilityLogger';
 import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
@@ -37,6 +38,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
+  const [showMobilityLogger, setShowMobilityLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
@@ -459,6 +461,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
     if (type === 'strength_logger' || type === 'log-strength') {
       setShowStrengthLogger(true);
+    } else if (type === 'log-mobility') {
+      setShowMobilityLogger(true);
     } else {
       setShowBuilder(true);
     }
@@ -710,6 +714,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onClose={handleBackToDashboard} 
                 onWorkoutSaved={(workout) => {
                   setShowStrengthLogger(false);
+                  setSelectedWorkout(workout);
+                  setActiveTab('completed');
+                }}
+              />
+            </div>
+          ) : showMobilityLogger ? (
+            <div className="pt-4">
+              <MobilityLogger 
+                onClose={handleBackToDashboard} 
+                onWorkoutSaved={(workout) => {
+                  setShowMobilityLogger(false);
                   setSelectedWorkout(workout);
                   setActiveTab('completed');
                 }}

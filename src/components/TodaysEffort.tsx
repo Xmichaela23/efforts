@@ -168,6 +168,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               <Dumbbell className="h-4 w-4 mr-2" />
               Log Strength
             </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => onAddEffort('log-mobility', activeDate)}
+              className="cursor-pointer"
+            >
+              <Activity className="h-4 w-4 mr-2" />
+              Log Mobility
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
