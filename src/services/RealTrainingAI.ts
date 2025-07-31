@@ -76,6 +76,26 @@ export class RealTrainingAI {
   async analyzeUserProfile(userBaselines: any, userResponses: any): Promise<AIAnalysisResult> {
     console.log('🧠 Starting AI user profile analysis...');
     
+    // FAIL-FAST VALIDATION - Check baseline data before any AI calls
+    console.log('🔍 Baseline Data Validation:');
+    if (!userBaselines) {
+      throw new Error('❌ MISSING: No userBaselines object found');
+    }
+    
+    const performanceNumbers = userBaselines.performanceNumbers;
+    if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
+    if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
+    if (!performanceNumbers?.bench) throw new Error('❌ MISSING: Bench 1RM');
+    if (!performanceNumbers?.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
+    if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace');
+    if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
+    if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
+    if (!userBaselines.age) throw new Error('❌ MISSING: Age');
+    if (!userBaselines.equipment?.strength || userBaselines.equipment.strength.length === 0) throw new Error('❌ MISSING: Strength equipment');
+    if (!userBaselines.injuryHistory) throw new Error('❌ MISSING: Injury history');
+    
+    console.log('✅ All required baseline data present');
+    
     try {
       // Build analysis prompt
       const analysisPrompt = this.buildAnalysisPrompt(userBaselines, userResponses);
@@ -154,11 +174,7 @@ export class RealTrainingAI {
     const trainingFrequency = userResponses.trainingFrequency;
     const goals = userResponses.goals || [];
     
-    // Require baseline data - fail fast if missing
-    if (!userBaselines) {
-      throw new Error('❌ MISSING: No userBaselines object found');
-    }
-    
+    // Safely access baseline data (validation already done above)
     const equipment = userBaselines.equipment;
     const injuryHistory = userBaselines.injuryHistory;
     const injuryRegions = userBaselines.injuryRegions;
@@ -176,21 +192,6 @@ export class RealTrainingAI {
     const trainingFrequencyBaseline = userBaselines.training_frequency;
     const disciplines = userBaselines.disciplines;
     const units = userBaselines.units;
-    
-    // Validate required baseline data
-    console.log('🔍 Baseline Data Validation:');
-    if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
-    if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
-    if (!performanceNumbers?.bench) throw new Error('❌ MISSING: Bench 1RM');
-    if (!performanceNumbers?.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
-    if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace');
-    if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
-    if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
-    if (!age) throw new Error('❌ MISSING: Age');
-    if (!equipment?.strength || equipment.strength.length === 0) throw new Error('❌ MISSING: Strength equipment');
-    if (!injuryHistory) throw new Error('❌ MISSING: Injury history');
-    
-    console.log('✅ All required baseline data present');
     
     return `You are an expert exercise physiologist and training coach. Your task is to analyze ALL user answers holistically and create a scientifically-based training plan.
 
