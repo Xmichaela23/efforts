@@ -125,28 +125,8 @@ export class RealTrainingAI {
     const raceDistance = userResponses.distance;
     const strengthChoice = userResponses.strengthTraining;
     
-    // Calculate timeline from event date
-    let timeline = 'Not specified';
-    if (userResponses.eventDate) {
-      const eventDate = new Date(userResponses.eventDate);
-      const today = new Date();
-      const weeksUntilEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      timeline = `${weeksUntilEvent} weeks`;
-    }
-    
-    // Calculate eventType from race distance
-    let eventType = 'Not specified';
-    if (userResponses.distance) {
-      if (userResponses.distance === 'ironman') {
-        eventType = 'Ironman';
-      } else if (userResponses.distance === '70.3') {
-        eventType = '70.3';
-      } else if (userResponses.distance === 'olympic') {
-        eventType = 'Olympic';
-      } else if (userResponses.distance === 'sprint') {
-        eventType = 'Sprint';
-      }
-    }
+    // Get today's date for AI calculation
+    const today = new Date().toISOString().split('T')[0]; // "2025-07-30"
     
     const trainingFrequency = userResponses.trainingFrequency;
     const goals = userResponses.goals || [];
@@ -166,8 +146,9 @@ COMPLETE USER PROFILE MAPPING:
 - Running Course Profile: ${userResponses.runningCourseProfile || 'Not specified'}
 - Climate: ${userResponses.climate || 'Not specified'}
 - Strength Training Choice: ${strengthChoice || 'Not specified'}
-- Timeline: ${timeline || 'Not specified'}
-- Event Type: ${eventType || 'Not specified'}
+- Today's Date: ${today}
+- Event Date: ${userResponses.eventDate || 'Not specified'}
+- Race Distance: ${raceDistance || 'Not specified'}
 - Training Frequency: ${trainingFrequency || 'Not specified'}
 - Weekend Availability: ${userResponses.weekendAvailability || 'Not specified'}
 - Long Session Preferences: ${userResponses.longSessionPreferences || 'Not specified'}
