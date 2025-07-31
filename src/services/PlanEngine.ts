@@ -171,7 +171,9 @@ export class PlanEngine {
 
     const { focusAreas, trainingPhilosophy, weeklyVolume } = this.aiAnalysis;
     
-    // Base distribution
+    console.log('🔧 Calculating workout distribution for:', { focusAreas, trainingPhilosophy, weeklyVolume });
+    
+    // Start with base distribution
     let distribution = {
       swim: 1,
       bike: 2,
@@ -180,34 +182,70 @@ export class PlanEngine {
       rest: 1
     };
 
-    // Adjust based on focus areas
-    if (focusAreas.includes('swim')) {
-      distribution.swim = 2;
-    }
-    if (focusAreas.includes('bike')) {
-      distribution.bike = 3;
-    }
-    if (focusAreas.includes('run')) {
-      distribution.run = 3;
-    }
-    if (focusAreas.includes('strength')) {
-      distribution.strength = 2;
-    }
-
+    // Smart distribution based on focus areas and weekly volume
+    const availableSlots = 7 - distribution.rest; // Available workout slots
+    
+    // Calculate priority scores for each sport
+    const priorities = {
+      swim: focusAreas.includes('swim') ? 2 : 1,
+      bike: focusAreas.includes('bike') ? 2 : 1,
+      run: focusAreas.includes('run') ? 2 : 1,
+      strength: focusAreas.includes('strength') ? 2 : 1
+    };
+    
     // Adjust based on training philosophy
     if (trainingPhilosophy === 'pyramid') {
-      distribution.strength = 2; // More strength for pyramid
+      priorities.strength += 1; // More strength for pyramid
     } else if (trainingPhilosophy === 'polarized') {
       distribution.rest = 2; // More rest for polarized
     }
-
+    
     // Adjust based on weekly volume
     if (weeklyVolume >= 10) {
       distribution.rest = 0; // No rest days for high volume
     } else if (weeklyVolume <= 4) {
       distribution.rest = 2; // More rest for low volume
     }
-
+    
+    // Recalculate available workout slots after rest adjustments
+    const finalAvailableSlots = 7 - distribution.rest;
+    
+    // Distribute workouts based on priorities
+    const totalPriority = Object.values(priorities).reduce((sum, p) => sum + p, 0);
+    
+    distribution.swim = Math.round((priorities.swim / totalPriority) * finalAvailableSlots);
+    distribution.bike = Math.round((priorities.bike / totalPriority) * finalAvailableSlots);
+    distribution.run = Math.round((priorities.run / totalPriority) * finalAvailableSlots);
+    distribution.strength = Math.round((priorities.strength / totalPriority) * finalAvailableSlots);
+    
+    // Ensure we have exactly the right number of workouts
+    const totalWorkouts = distribution.swim + distribution.bike + distribution.run + distribution.strength;
+    const difference = finalAvailableSlots - totalWorkouts;
+    
+    if (difference > 0) {
+      // Add extra workouts to highest priority sport
+      const maxPriority = Math.max(...Object.values(priorities));
+      if (priorities.swim === maxPriority) distribution.swim += difference;
+      else if (priorities.bike === maxPriority) distribution.bike += difference;
+      else if (priorities.run === maxPriority) distribution.run += difference;
+      else if (priorities.strength === maxPriority) distribution.strength += difference;
+    } else if (difference < 0) {
+      // Remove workouts from lowest priority sport
+      const minPriority = Math.min(...Object.values(priorities));
+      if (priorities.swim === minPriority && distribution.swim > 0) distribution.swim += difference;
+      else if (priorities.bike === minPriority && distribution.bike > 0) distribution.bike += difference;
+      else if (priorities.run === minPriority && distribution.run > 0) distribution.run += difference;
+      else if (priorities.strength === minPriority && distribution.strength > 0) distribution.strength += difference;
+    }
+    
+    // Ensure minimum values
+    distribution.swim = Math.max(1, distribution.swim);
+    distribution.bike = Math.max(1, distribution.bike);
+    distribution.run = Math.max(1, distribution.run);
+    distribution.strength = Math.max(0, distribution.strength);
+    
+    console.log('🔧 Final workout distribution:', distribution);
+    
     return distribution;
   }
 
