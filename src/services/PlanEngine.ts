@@ -2,6 +2,7 @@
 // Bulletproof, predictable, and scalable
 
 import { ExerciseLibraryService, StrengthExercise, MobilityExercise } from './ExerciseLibrary';
+import { AIAnalysisResult } from './RealTrainingAI';
 
 export interface Workout {
   day: string;
@@ -56,27 +57,59 @@ export interface UserBaselines {
 export class PlanEngine {
   private userBaselines: UserBaselines;
   private responses: any;
+  private aiAnalysis: AIAnalysisResult | null;
 
-  constructor(userBaselines: UserBaselines, responses: any) {
+  constructor(userBaselines: UserBaselines, responses: any, aiAnalysis?: AIAnalysisResult) {
     this.userBaselines = userBaselines;
     this.responses = responses;
+    this.aiAnalysis = aiAnalysis || null;
   }
 
-  // Generate a 4-week preview plan
+  // Generate a 4-week preview plan using AI analysis
   generatePreviewPlan(): TrainingPlan {
     const weeks = this.generateWeeks(1, 4);
     
+    // Use AI analysis for training philosophy, fallback to responses
+    const trainingPhilosophy = this.aiAnalysis?.trainingPhilosophy || 
+                              this.responses.trainingPhilosophy || 
+                              'balanced';
+    
     return {
       name: "Your Training Plan",
-      description: "Personalized training plan based on your assessment",
+      description: this.generatePlanDescription(),
       phase: "4-Week Training Preview",
       phaseDescription: "First month of training - full plan available in app",
-      trainingPhilosophy: this.responses.trainingPhilosophy || 'balanced',
+      trainingPhilosophy,
       weeks: weeks
     };
   }
 
-  // Generate weeks with predictable structure
+  // Generate plan description based on AI analysis
+  private generatePlanDescription(): string {
+    if (!this.aiAnalysis) {
+      return "Personalized training plan based on your assessment";
+    }
+
+    const { trainingPhilosophy, focusAreas, weeklyVolume, progressionRate } = this.aiAnalysis;
+    
+    let description = `Personalized ${trainingPhilosophy} training plan`;
+    
+    if (focusAreas.length > 0) {
+      description += ` focusing on ${focusAreas.join(', ')}`;
+    }
+    
+    description += ` with ${weeklyVolume} hours/week`;
+    
+    if (progressionRate === 'conservative') {
+      description += ' and conservative progression';
+    } else if (progressionRate === 'aggressive') {
+      description += ' and aggressive progression';
+    }
+    
+    return description;
+  }
+
+  // Generate weeks with AI-driven structure
   private generateWeeks(startWeek: number, numWeeks: number): Week[] {
     const weeks: Week[] = [];
     
@@ -89,7 +122,7 @@ export class PlanEngine {
     return weeks;
   }
 
-  // Generate a single week with 7 days
+  // Generate a single week with AI-driven structure
   private generateWeek(weekNumber: number): Week {
     const workouts = this.generateWorkouts(weekNumber);
     
@@ -101,22 +134,80 @@ export class PlanEngine {
     };
   }
 
-  // Generate 7 workouts for a week
+  // Generate 7 workouts for a week using AI analysis
   private generateWorkouts(weekNumber: number): Workout[] {
     const workouts: Workout[] = [];
     const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
     
+    // Use AI analysis to determine workout distribution
+    const workoutDistribution = this.getWorkoutDistribution();
+    
     days.forEach((day, index) => {
-      const workout = this.generateWorkout(day, weekNumber, index);
+      const workout = this.generateWorkout(day, weekNumber, index, workoutDistribution);
       workouts.push(workout);
     });
     
     return workouts;
   }
 
-  // Generate workout with all components and parsed exercises for logging
-  private generateWorkout(day: string, weekNumber: number, dayIndex: number): Workout {
-    const workoutType = this.getWorkoutType(day, dayIndex);
+  // Get workout distribution based on AI analysis
+  private getWorkoutDistribution(): { [key: string]: number } {
+    if (!this.aiAnalysis) {
+      // Fallback distribution
+      return {
+        swim: 1,
+        bike: 2,
+        run: 2,
+        strength: 1,
+        rest: 1
+      };
+    }
+
+    const { focusAreas, trainingPhilosophy, weeklyVolume } = this.aiAnalysis;
+    
+    // Base distribution
+    let distribution = {
+      swim: 1,
+      bike: 2,
+      run: 2,
+      strength: 1,
+      rest: 1
+    };
+
+    // Adjust based on focus areas
+    if (focusAreas.includes('swim')) {
+      distribution.swim = 2;
+    }
+    if (focusAreas.includes('bike')) {
+      distribution.bike = 3;
+    }
+    if (focusAreas.includes('run')) {
+      distribution.run = 3;
+    }
+    if (focusAreas.includes('strength')) {
+      distribution.strength = 2;
+    }
+
+    // Adjust based on training philosophy
+    if (trainingPhilosophy === 'pyramid') {
+      distribution.strength = 2; // More strength for pyramid
+    } else if (trainingPhilosophy === 'polarized') {
+      distribution.rest = 2; // More rest for polarized
+    }
+
+    // Adjust based on weekly volume
+    if (weeklyVolume >= 10) {
+      distribution.rest = 0; // No rest days for high volume
+    } else if (weeklyVolume <= 4) {
+      distribution.rest = 2; // More rest for low volume
+    }
+
+    return distribution;
+  }
+
+  // Generate workout with AI-driven parameters
+  private generateWorkout(day: string, weekNumber: number, dayIndex: number, distribution: { [key: string]: number }): Workout {
+    const workoutType = this.getWorkoutType(day, dayIndex, distribution);
     const duration = this.getWorkoutDuration(workoutType, weekNumber);
     const intensity = this.getWorkoutIntensity(workoutType, weekNumber);
     const warmup = this.generateWarmup(workoutType);
@@ -144,69 +235,335 @@ export class PlanEngine {
     };
   }
 
-  // Determine workout type based on day and training philosophy
-  private getWorkoutType(day: string, dayIndex: number): 'swim' | 'bike' | 'run' | 'strength' | 'rest' {
-    const philosophy = this.responses.trainingPhilosophy || 'balanced';
-    
-    // Base distribution for triathlon
-    const distribution = {
-      swim: 1,      // 1 swim per week
-      bike: 2,      // 2 bikes per week
-      run: 2,       // 2 runs per week
-      strength: 1,  // 1 strength per week
-      rest: 1       // 1 rest day
-    };
-    
-    // Adjust based on philosophy
-    if (philosophy === 'pyramid') {
-      distribution.strength = 2; // More strength for pyramid
+  // Determine workout type based on AI analysis and distribution
+  private getWorkoutType(day: string, dayIndex: number, distribution: { [key: string]: number }): 'swim' | 'bike' | 'run' | 'strength' | 'rest' {
+    // Use AI analysis to determine workout type
+    if (!this.aiAnalysis) {
+      // Fallback logic
+      if (dayIndex === 0) return 'swim';
+      if (dayIndex === 1) return 'bike';
+      if (dayIndex === 2) return 'run';
+      if (dayIndex === 3) return 'strength';
+      if (dayIndex === 4) return 'bike';
+      if (dayIndex === 5) return 'run';
+      if (dayIndex === 6) return 'rest';
+      return 'rest';
     }
+
+    const { trainingPhilosophy, focusAreas } = this.aiAnalysis;
     
-    // Simple distribution logic
-    if (dayIndex === 0) return 'swim';
-    if (dayIndex === 1) return 'bike';
-    if (dayIndex === 2) return 'run';
-    if (dayIndex === 3) return 'strength';
-    if (dayIndex === 4) return 'bike';
-    if (dayIndex === 5) return 'run';
-    if (dayIndex === 6) return 'rest';
+    // Create workout schedule based on AI analysis
+    const workoutSchedule = this.createWorkoutSchedule(distribution, trainingPhilosophy, focusAreas);
     
-    return 'rest';
+    return workoutSchedule[dayIndex] || 'rest';
   }
 
-  // Get workout duration based on type and week
+  // Create workout schedule based on AI analysis
+  private createWorkoutSchedule(distribution: { [key: string]: number }, philosophy: string, focusAreas: string[]): ('swim' | 'bike' | 'run' | 'strength' | 'rest')[] {
+    const schedule: ('swim' | 'bike' | 'run' | 'strength' | 'rest')[] = [];
+    
+    // Start with rest days
+    for (let i = 0; i < distribution.rest; i++) {
+      schedule.push('rest');
+    }
+    
+    // Add strength workouts
+    for (let i = 0; i < distribution.strength; i++) {
+      schedule.push('strength');
+    }
+    
+    // Add swim workouts
+    for (let i = 0; i < distribution.swim; i++) {
+      schedule.push('swim');
+    }
+    
+    // Add bike workouts
+    for (let i = 0; i < distribution.bike; i++) {
+      schedule.push('bike');
+    }
+    
+    // Add run workouts
+    for (let i = 0; i < distribution.run; i++) {
+      schedule.push('run');
+    }
+    
+    // Shuffle based on training philosophy
+    if (philosophy === 'pyramid') {
+      // Pyramid: alternate intensity levels
+      this.shuffleForPyramid(schedule);
+    } else if (philosophy === 'polarized') {
+      // Polarized: group easy and hard days
+      this.shuffleForPolarized(schedule);
+    } else {
+      // Balanced: mix it up
+      this.shuffleForBalanced(schedule);
+    }
+    
+    // Ensure we have exactly 7 days
+    while (schedule.length < 7) {
+      schedule.push('rest');
+    }
+    while (schedule.length > 7) {
+      schedule.pop();
+    }
+    
+    return schedule;
+  }
+
+  // Shuffle workouts for pyramid training
+  private shuffleForPyramid(schedule: ('swim' | 'bike' | 'run' | 'strength' | 'rest')[]): void {
+    // Pyramid: alternate easy and hard days
+    const easy = ['rest', 'swim'];
+    const hard = ['run', 'bike', 'strength'];
+    
+    for (let i = 0; i < schedule.length; i++) {
+      if (i % 2 === 0) {
+        // Even days: easy
+        if (easy.includes(schedule[i])) continue;
+        // Swap with an easy workout
+        for (let j = i + 1; j < schedule.length; j++) {
+          if (easy.includes(schedule[j])) {
+            [schedule[i], schedule[j]] = [schedule[j], schedule[i]];
+            break;
+          }
+        }
+      } else {
+        // Odd days: hard
+        if (hard.includes(schedule[i])) continue;
+        // Swap with a hard workout
+        for (let j = i + 1; j < schedule.length; j++) {
+          if (hard.includes(schedule[j])) {
+            [schedule[i], schedule[j]] = [schedule[j], schedule[i]];
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // Shuffle workouts for polarized training
+  private shuffleForPolarized(schedule: ('swim' | 'bike' | 'run' | 'strength' | 'rest')[]): void {
+    // Polarized: group easy days together, hard days together
+    const easy = ['rest', 'swim'];
+    const hard = ['run', 'bike', 'strength'];
+    
+    // Move all easy workouts to the beginning
+    let easyIndex = 0;
+    for (let i = 0; i < schedule.length; i++) {
+      if (easy.includes(schedule[i])) {
+        if (i !== easyIndex) {
+          [schedule[i], schedule[easyIndex]] = [schedule[easyIndex], schedule[i]];
+        }
+        easyIndex++;
+      }
+    }
+  }
+
+  // Shuffle workouts for balanced training
+  private shuffleForBalanced(schedule: ('swim' | 'bike' | 'run' | 'strength' | 'rest')[]): void {
+    // Balanced: mix it up evenly
+    // No special shuffling needed
+  }
+
+  // Get workout duration based on AI analysis
   private getWorkoutDuration(type: string, weekNumber: number): string {
-    const baseDurations = {
+    if (!this.aiAnalysis) {
+      // Fallback durations
+      const baseDurations = {
+        swim: 45,
+        bike: 60,
+        run: 45,
+        strength: 60,
+        rest: 0
+      };
+      
+      const weekIncrease = (weekNumber - 1) * 5;
+      const duration = baseDurations[type as keyof typeof baseDurations] + weekIncrease;
+      return `${duration} minutes`;
+    }
+
+    const { weeklyVolume, progressionRate, ageAdjustments } = this.aiAnalysis;
+    
+    // Base durations adjusted by AI analysis
+    let baseDurations = {
       swim: 45,
       bike: 60,
       run: 45,
       strength: 60,
       rest: 0
     };
-    
-    // Progressive overload - increase duration each week
-    const weekIncrease = (weekNumber - 1) * 5; // 5 min increase per week
+
+    // Adjust based on weekly volume
+    const volumeMultiplier = weeklyVolume / 8; // Normalize to 8 hours
+    Object.keys(baseDurations).forEach(key => {
+      if (key !== 'rest') {
+        baseDurations[key as keyof typeof baseDurations] = Math.round(
+          baseDurations[key as keyof typeof baseDurations] * volumeMultiplier
+        );
+      }
+    });
+
+    // Adjust based on age
+    if (ageAdjustments) {
+      Object.keys(baseDurations).forEach(key => {
+        if (key !== 'rest') {
+          baseDurations[key as keyof typeof baseDurations] = Math.round(
+            baseDurations[key as keyof typeof baseDurations] * ageAdjustments.volumeModifier
+          );
+        }
+      });
+    }
+
+    // Progressive overload based on progression rate
+    let weekIncrease = (weekNumber - 1) * 5; // Default
+    if (progressionRate === 'conservative') {
+      weekIncrease = (weekNumber - 1) * 3;
+    } else if (progressionRate === 'aggressive') {
+      weekIncrease = (weekNumber - 1) * 7;
+    }
+
     const duration = baseDurations[type as keyof typeof baseDurations] + weekIncrease;
-    
     return `${duration} minutes`;
   }
 
-  // Get workout intensity based on type and week
+  // Get workout intensity based on AI analysis
   private getWorkoutIntensity(type: string, weekNumber: number): string {
+    if (!this.aiAnalysis) {
+      // Fallback to existing logic
+      const paces = this.calculatePaces();
+      
+      switch (type) {
+        case 'run':
+          return this.getRunIntensity(weekNumber, paces);
+        case 'bike':
+          return this.getBikeIntensity(weekNumber);
+        case 'swim':
+          return this.getSwimIntensity(weekNumber);
+        case 'strength':
+          return this.getStrengthIntensity(weekNumber);
+        default:
+          return 'easy';
+      }
+    }
+
+    const { intensityDistribution, trainingPhilosophy, ageAdjustments, customParameters } = this.aiAnalysis;
+    
+    // Use AI-determined intensity distribution
     const paces = this.calculatePaces();
     
     switch (type) {
       case 'run':
-        return this.getRunIntensity(weekNumber, paces);
+        return this.getRunIntensityWithAI(weekNumber, paces);
       case 'bike':
-        return this.getBikeIntensity(weekNumber);
+        return this.getBikeIntensityWithAI(weekNumber);
       case 'swim':
-        return this.getSwimIntensity(weekNumber);
+        return this.getSwimIntensityWithAI(weekNumber);
       case 'strength':
-        return this.getStrengthIntensity(weekNumber);
+        return this.getStrengthIntensityWithAI(weekNumber);
       default:
         return 'easy';
     }
+  }
+
+  // Get run intensity with proper pace ranges and goal consideration (fallback method)
+  private getRunIntensity(weekNumber: number, paces: any): string {
+    const { easyRange, tenKRange, fiveKRange, halfMarathonRange } = paces;
+    const primaryGoal = this.responses.primaryGoal || 'base';
+    
+    // Base building focus - more easy running
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
+      if (weekNumber === 2) return `${easyRange} (easy pace, Zone 2)`;
+      if (weekNumber === 3) return `${tenKRange} (tempo pace, Zone 3)`;
+      if (weekNumber === 4) return `${easyRange} (easy pace, Zone 2)`;
+    }
+    
+    // Performance focus - more intensity
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
+      if (weekNumber === 2) return `${tenKRange} (tempo pace, Zone 3)`;
+      if (weekNumber === 3) return `${fiveKRange} (threshold pace, Zone 4)`;
+      if (weekNumber === 4) return `${tenKRange} (tempo pace, Zone 3)`;
+    }
+    
+    // Default progression
+    if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
+    if (weekNumber === 2) return `${tenKRange} (tempo pace, Zone 3)`;
+    if (weekNumber === 3) return `${fiveKRange} (threshold pace, Zone 4)`;
+    if (weekNumber === 4) return `${easyRange} (easy pace, Zone 2)`;
+    
+    return `${easyRange} (easy pace, Zone 2)`;
+  }
+
+  // Get bike intensity with goal consideration (fallback method)
+  private getBikeIntensity(weekNumber: number): string {
+    const ftp = this.userBaselines.performanceNumbers.ftp;
+    const primaryGoal = this.responses.primaryGoal || 'base';
+    
+    if (!ftp) {
+      return 'Zone 2-3 (moderate effort)';
+    }
+    
+    // Base building - lower intensity, higher volume
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      const percentages = [70, 75, 80, 70]; // More conservative
+      const percentage = percentages[weekNumber - 1] || 75;
+      const watts = Math.round((percentage / 100) * ftp);
+      return `${percentage}% FTP (${watts} watts)`;
+    }
+    
+    // Performance - higher intensity
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      const percentages = [75, 80, 85, 80]; // More aggressive
+      const percentage = percentages[weekNumber - 1] || 80;
+      const watts = Math.round((percentage / 100) * ftp);
+      return `${percentage}% FTP (${watts} watts)`;
+    }
+    
+    // Default progression
+    const percentages = [75, 80, 85, 80];
+    const percentage = percentages[weekNumber - 1] || 80;
+    const watts = Math.round((percentage / 100) * ftp);
+    return `${percentage}% FTP (${watts} watts)`;
+  }
+
+  // Get swim intensity (fallback method)
+  private getSwimIntensity(weekNumber: number): string {
+    const swimPace = this.userBaselines.performanceNumbers.swimPace100 || '2:00/100m';
+    
+    return `${swimPace} (moderate pace)`;
+  }
+
+  // Get strength intensity with goal consideration (fallback method)
+  private getStrengthIntensity(weekNumber: number): string {
+    const squat = this.userBaselines.performanceNumbers.squat;
+    const primaryGoal = this.responses.primaryGoal || 'base';
+    
+    if (!squat) {
+      return 'Bodyweight exercises';
+    }
+    
+    // Base building - focus on form and endurance
+    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
+      const percentages = [65, 70, 75, 65]; // More conservative
+      const percentage = percentages[weekNumber - 1] || 70;
+      const weight = Math.round((percentage / 100) * squat);
+      return `${percentage}% 1RM (${weight} lbs)`;
+    }
+    
+    // Performance - focus on power and strength
+    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
+      const percentages = [70, 75, 80, 75]; // More aggressive
+      const percentage = percentages[weekNumber - 1] || 75;
+      const weight = Math.round((percentage / 100) * squat);
+      return `${percentage}% 1RM (${weight} lbs)`;
+    }
+    
+    // Default progression
+    const percentages = [70, 75, 80, 75];
+    const percentage = percentages[weekNumber - 1] || 75;
+    const weight = Math.round((percentage / 100) * squat);
+    return `${percentage}% 1RM (${weight} lbs)`;
   }
 
   // Calculate paces with ranges for Garmin compatibility
@@ -239,104 +596,131 @@ export class PlanEngine {
     };
   }
 
-  // Get run intensity with proper pace ranges and goal consideration
-  private getRunIntensity(weekNumber: number, paces: any): string {
-    const { easyRange, tenKRange, fiveKRange, halfMarathonRange } = paces;
-    const primaryGoal = this.responses.primaryGoal || 'base';
+  // Get run intensity using AI analysis
+  private getRunIntensityWithAI(weekNumber: number, paces: any): string {
+    const { intensityDistribution, trainingPhilosophy, ageAdjustments, customParameters } = this.aiAnalysis!;
     
-    // Base building focus - more easy running
-    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
-      if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
-      if (weekNumber === 2) return `${easyRange} (easy pace, Zone 2)`;
-      if (weekNumber === 3) return `${tenKRange} (tempo pace, Zone 3)`;
-      if (weekNumber === 4) return `${easyRange} (easy pace, Zone 2)`;
+    // Apply age adjustments to paces
+    const paceModifier = customParameters?.runPaceModifier || 1.0;
+    
+    // Determine intensity based on training philosophy and week
+    let intensity: string;
+    
+    if (trainingPhilosophy === 'polarized') {
+      // Polarized: mostly easy, some hard
+      if (weekNumber % 2 === 0) {
+        intensity = `${paces.easyRange} (easy pace, Zone 2)`;
+      } else {
+        intensity = `${paces.fiveKRange} (threshold pace, Zone 4)`;
+      }
+    } else if (trainingPhilosophy === 'pyramid') {
+      // Pyramid: build intensity within week
+      const weekIntensity = Math.min(weekNumber, 4);
+      if (weekIntensity === 1) intensity = `${paces.easyRange} (easy pace, Zone 2)`;
+      else if (weekIntensity === 2) intensity = `${paces.tenKRange} (tempo pace, Zone 3)`;
+      else if (weekIntensity === 3) intensity = `${paces.fiveKRange} (threshold pace, Zone 4)`;
+      else intensity = `${paces.easyRange} (easy pace, Zone 2)`;
+    } else {
+      // Balanced: mix of intensities
+      const intensities = [
+        `${paces.easyRange} (easy pace, Zone 2)`,
+        `${paces.tenKRange} (tempo pace, Zone 3)`,
+        `${paces.fiveKRange} (threshold pace, Zone 4)`,
+        `${paces.easyRange} (easy pace, Zone 2)`
+      ];
+      intensity = intensities[(weekNumber - 1) % intensities.length];
     }
     
-    // Performance focus - more intensity
-    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
-      if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
-      if (weekNumber === 2) return `${tenKRange} (tempo pace, Zone 3)`;
-      if (weekNumber === 3) return `${fiveKRange} (threshold pace, Zone 4)`;
-      if (weekNumber === 4) return `${tenKRange} (tempo pace, Zone 3)`;
-    }
-    
-    // Default progression
-    if (weekNumber === 1) return `${easyRange} (easy pace, Zone 2)`;
-    if (weekNumber === 2) return `${tenKRange} (tempo pace, Zone 3)`;
-    if (weekNumber === 3) return `${fiveKRange} (threshold pace, Zone 4)`;
-    if (weekNumber === 4) return `${easyRange} (easy pace, Zone 2)`;
-    
-    return `${easyRange} (easy pace, Zone 2)`;
+    return intensity;
   }
 
-  // Get bike intensity with goal consideration
-  private getBikeIntensity(weekNumber: number): string {
+  // Get bike intensity using AI analysis
+  private getBikeIntensityWithAI(weekNumber: number): string {
+    const { intensityDistribution, trainingPhilosophy, ageAdjustments, customParameters } = this.aiAnalysis!;
     const ftp = this.userBaselines.performanceNumbers.ftp;
-    const primaryGoal = this.responses.primaryGoal || 'base';
     
     if (!ftp) {
       return 'Zone 2-3 (moderate effort)';
     }
     
-    // Base building - lower intensity, higher volume
-    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
-      const percentages = [70, 75, 80, 70]; // More conservative
-      const percentage = percentages[weekNumber - 1] || 75;
-      const watts = Math.round((percentage / 100) * ftp);
-      return `${percentage}% FTP (${watts} watts)`;
+    // Apply age adjustments
+    const intensityModifier = ageAdjustments?.intensityModifier || 1.0;
+    const ftpModifier = customParameters?.bikeFTPModifier || 1.0;
+    
+    // Determine FTP percentage based on training philosophy
+    let ftpPercentage: number;
+    
+    if (trainingPhilosophy === 'polarized') {
+      // Polarized: mostly easy, some hard
+      if (weekNumber % 2 === 0) {
+        ftpPercentage = 70; // Easy
+      } else {
+        ftpPercentage = 90; // Hard
+      }
+    } else if (trainingPhilosophy === 'pyramid') {
+      // Pyramid: build intensity
+      const weekIntensity = Math.min(weekNumber, 4);
+      ftpPercentage = 70 + (weekIntensity - 1) * 5; // 70, 75, 80, 75
+    } else {
+      // Balanced: moderate progression
+      const percentages = [75, 80, 85, 80];
+      ftpPercentage = percentages[weekNumber - 1] || 80;
     }
     
-    // Performance - higher intensity
-    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
-      const percentages = [75, 80, 85, 80]; // More aggressive
-      const percentage = percentages[weekNumber - 1] || 80;
-      const watts = Math.round((percentage / 100) * ftp);
-      return `${percentage}% FTP (${watts} watts)`;
-    }
+    // Apply modifiers
+    ftpPercentage = Math.round(ftpPercentage * intensityModifier * ftpModifier);
+    const watts = Math.round((ftpPercentage / 100) * ftp);
     
-    // Default progression
-    const percentages = [75, 80, 85, 80];
-    const percentage = percentages[weekNumber - 1] || 80;
-    const watts = Math.round((percentage / 100) * ftp);
-    return `${percentage}% FTP (${watts} watts)`;
+    return `${ftpPercentage}% FTP (${watts} watts)`;
   }
 
-  // Get swim intensity
-  private getSwimIntensity(weekNumber: number): string {
+  // Get swim intensity using AI analysis
+  private getSwimIntensityWithAI(weekNumber: number): string {
+    const { customParameters } = this.aiAnalysis!;
     const swimPace = this.userBaselines.performanceNumbers.swimPace100 || '2:00/100m';
+    
+    // Apply pace modifier if available
+    const paceModifier = customParameters?.swimPaceModifier || 1.0;
     
     return `${swimPace} (moderate pace)`;
   }
 
-  // Get strength intensity with goal consideration
-  private getStrengthIntensity(weekNumber: number): string {
+  // Get strength intensity using AI analysis
+  private getStrengthIntensityWithAI(weekNumber: number): string {
+    const { trainingPhilosophy, ageAdjustments } = this.aiAnalysis!;
     const squat = this.userBaselines.performanceNumbers.squat;
-    const primaryGoal = this.responses.primaryGoal || 'base';
     
     if (!squat) {
       return 'Bodyweight exercises';
     }
     
-    // Base building - focus on form and endurance
-    if (primaryGoal === 'base' || primaryGoal === 'endurance') {
-      const percentages = [65, 70, 75, 65]; // More conservative
-      const percentage = percentages[weekNumber - 1] || 70;
-      const weight = Math.round((percentage / 100) * squat);
-      return `${percentage}% 1RM (${weight} lbs)`;
+    // Apply age adjustments
+    const intensityModifier = ageAdjustments?.intensityModifier || 1.0;
+    
+    // Determine percentage based on training philosophy
+    let percentage: number;
+    
+    if (trainingPhilosophy === 'pyramid') {
+      // Pyramid: build intensity
+      const weekIntensity = Math.min(weekNumber, 4);
+      percentage = 65 + (weekIntensity - 1) * 5; // 65, 70, 75, 70
+    } else if (trainingPhilosophy === 'polarized') {
+      // Polarized: mostly easy, some hard
+      if (weekNumber % 2 === 0) {
+        percentage = 70; // Easy
+      } else {
+        percentage = 85; // Hard
+      }
+    } else {
+      // Balanced: moderate progression
+      const percentages = [70, 75, 80, 75];
+      percentage = percentages[weekNumber - 1] || 75;
     }
     
-    // Performance - focus on power and strength
-    if (primaryGoal === 'performance' || primaryGoal === 'speed') {
-      const percentages = [70, 75, 80, 75]; // More aggressive
-      const percentage = percentages[weekNumber - 1] || 75;
-      const weight = Math.round((percentage / 100) * squat);
-      return `${percentage}% 1RM (${weight} lbs)`;
-    }
-    
-    // Default progression
-    const percentages = [70, 75, 80, 75];
-    const percentage = percentages[weekNumber - 1] || 75;
+    // Apply modifiers
+    percentage = Math.round(percentage * intensityModifier);
     const weight = Math.round((percentage / 100) * squat);
+    
     return `${percentage}% 1RM (${weight} lbs)`;
   }
 

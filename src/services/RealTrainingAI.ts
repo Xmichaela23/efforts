@@ -28,6 +28,38 @@ export interface AITrainingPlan {
   }>;
 }
 
+// Add interface for AI analysis results
+export interface AIAnalysisResult {
+  trainingPhilosophy: 'pyramid' | 'polarized' | 'balanced';
+  focusAreas: string[];
+  weeklyVolume: number;
+  intensityDistribution: {
+    easy: number;
+    moderate: number;
+    hard: number;
+  };
+  strengthFocus: string;
+  progressionRate: 'conservative' | 'moderate' | 'aggressive';
+  recoveryNeeds: 'high' | 'moderate' | 'low';
+  injuryConsiderations: string[];
+  equipmentOptimization: string[];
+  ageAdjustments: {
+    recoveryTime: number;
+    intensityModifier: number;
+    volumeModifier: number;
+  };
+  baselineFitness: {
+    overallLevel: 'beginner' | 'intermediate' | 'advanced' | 'elite';
+    swimLevel: string;
+    bikeLevel: string;
+    runLevel: string;
+    strengthLevel: string;
+  };
+  customParameters: {
+    [key: string]: any;
+  };
+}
+
 export class RealTrainingAI {
   private baseURL: string;
 
@@ -36,6 +68,334 @@ export class RealTrainingAI {
     this.baseURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/generate-plan';
     
     console.log('🔗 Using Supabase Edge Function for AI plan generation');
+  }
+
+  // NEW: Analyze user profile to determine training parameters
+  async analyzeUserProfile(userBaselines: any, userResponses: any): Promise<AIAnalysisResult> {
+    console.log('🧠 Starting AI user profile analysis...');
+    
+    try {
+      // Build analysis prompt
+      const analysisPrompt = this.buildAnalysisPrompt(userBaselines, userResponses);
+      
+      // Use the same edge function but with analysis-specific prompt
+      const authToken = await this.getAuthToken();
+      const response = await fetch(this.baseURL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          prompt: analysisPrompt,
+          startDate: new Date().toISOString().split('T')[0],
+          userContext: { analysis: true }
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Analysis failed: ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(`Analysis error: ${data.error}`);
+      }
+
+      // Parse the analysis result
+      const analysisResult = this.parseAnalysisResult(data);
+      console.log('✅ AI analysis completed:', analysisResult);
+      
+      return analysisResult;
+
+    } catch (error) {
+      console.error('AI Analysis Error:', error);
+      
+      // Return intelligent fallback based on user data
+      return this.generateFallbackAnalysis(userBaselines, userResponses);
+    }
+  }
+
+  // Build analysis-specific prompt
+  private buildAnalysisPrompt(userBaselines: any, userResponses: any): string {
+    return `You are an expert exercise physiologist and training coach. Analyze the following user profile and determine optimal training parameters.
+
+USER BASELINES:
+${JSON.stringify(userBaselines, null, 2)}
+
+USER RESPONSES:
+${JSON.stringify(userResponses, null, 2)}
+
+ANALYSIS TASK:
+Analyze the user's fitness level, goals, constraints, and preferences to determine optimal training parameters. Consider:
+
+1. **Training Philosophy Selection:**
+   - Pyramid: For users needing gradual intensity progression within sessions
+   - Polarized: For users with good base fitness seeking performance gains
+   - Balanced: For users needing moderate intensity distribution
+
+2. **Focus Areas:**
+   - Identify limiting factors (swim/bike/run weaknesses)
+   - Determine priority training areas
+   - Consider injury history and age
+
+3. **Volume & Intensity:**
+   - Calculate appropriate weekly volume based on current fitness
+   - Determine intensity distribution (easy/moderate/hard percentages)
+   - Consider progression rate based on experience and age
+
+4. **Strength Training:**
+   - Determine appropriate strength focus
+   - Consider equipment availability and injury history
+
+5. **Recovery & Progression:**
+   - Assess recovery needs based on age and current volume
+   - Determine safe progression rate
+
+6. **Baseline Fitness Assessment:**
+   - Evaluate overall fitness level
+   - Assess individual sport levels
+   - Consider performance numbers and training history
+
+RESPOND WITH ONLY JSON:
+{
+  "trainingPhilosophy": "pyramid|polarized|balanced",
+  "focusAreas": ["swim", "bike", "run", "strength"],
+  "weeklyVolume": 8,
+  "intensityDistribution": {
+    "easy": 60,
+    "moderate": 25,
+    "hard": 15
+  },
+  "strengthFocus": "injury_prevention|power_development|muscle_building|general_fitness",
+  "progressionRate": "conservative|moderate|aggressive",
+  "recoveryNeeds": "high|moderate|low",
+  "injuryConsiderations": ["lower_back", "knee"],
+  "equipmentOptimization": ["barbell", "dumbbells"],
+  "ageAdjustments": {
+    "recoveryTime": 48,
+    "intensityModifier": 0.9,
+    "volumeModifier": 0.85
+  },
+  "baselineFitness": {
+    "overallLevel": "beginner|intermediate|advanced|elite",
+    "swimLevel": "beginner|intermediate|advanced",
+    "bikeLevel": "beginner|intermediate|advanced", 
+    "runLevel": "beginner|intermediate|advanced",
+    "strengthLevel": "beginner|intermediate|advanced"
+  },
+  "customParameters": {
+    "swimPaceModifier": 1.1,
+    "bikeFTPModifier": 0.9,
+    "runPaceModifier": 1.05
+  }
+}`;
+  }
+
+  // Parse analysis result from AI response
+  private parseAnalysisResult(data: any): AIAnalysisResult {
+    try {
+      // The edge function should return the analysis result directly
+      if (data.trainingPhilosophy) {
+        return data as AIAnalysisResult;
+      }
+      
+      // If not in expected format, try to parse from response
+      const responseText = typeof data === 'string' ? data : JSON.stringify(data);
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        return parsed as AIAnalysisResult;
+      }
+      
+      throw new Error('Could not parse analysis result');
+      
+    } catch (error) {
+      console.error('Failed to parse analysis result:', error);
+      throw error;
+    }
+  }
+
+  // Generate intelligent fallback analysis
+  private generateFallbackAnalysis(userBaselines: any, userResponses: any): AIAnalysisResult {
+    console.log('🔄 Generating fallback analysis...');
+    
+    const age = userBaselines?.age || 30;
+    const currentHours = this.calculateCurrentHours(userBaselines);
+    const primaryGoal = userResponses?.primaryGoal || 'base';
+    const injuryHistory = userBaselines?.injuryHistory;
+    
+    // Determine training philosophy based on goal and fitness
+    let trainingPhilosophy: 'pyramid' | 'polarized' | 'balanced' = 'balanced';
+    if (primaryGoal === 'performance' && currentHours >= 8) {
+      trainingPhilosophy = 'polarized';
+    } else if (primaryGoal === 'base' || currentHours < 6) {
+      trainingPhilosophy = 'pyramid';
+    }
+    
+    // Determine progression rate based on age and experience
+    let progressionRate: 'conservative' | 'moderate' | 'aggressive' = 'moderate';
+    if (age >= 40 || injuryHistory) {
+      progressionRate = 'conservative';
+    } else if (currentHours >= 10 && age < 30) {
+      progressionRate = 'aggressive';
+    }
+    
+    // Determine recovery needs
+    let recoveryNeeds: 'high' | 'moderate' | 'low' = 'moderate';
+    if (age >= 40 || injuryHistory) {
+      recoveryNeeds = 'high';
+    } else if (currentHours < 4) {
+      recoveryNeeds = 'low';
+    }
+    
+    // Calculate intensity distribution based on philosophy
+    let intensityDistribution = { easy: 60, moderate: 25, hard: 15 };
+    if (trainingPhilosophy === 'polarized') {
+      intensityDistribution = { easy: 80, moderate: 5, hard: 15 };
+    } else if (trainingPhilosophy === 'pyramid') {
+      intensityDistribution = { easy: 40, moderate: 40, hard: 20 };
+    }
+    
+    // Determine baseline fitness levels
+    const baselineFitness = this.assessBaselineFitness(userBaselines, currentHours);
+    
+    return {
+      trainingPhilosophy,
+      focusAreas: this.determineFocusAreas(userResponses),
+      weeklyVolume: Math.min(currentHours + 2, 12), // Conservative increase
+      intensityDistribution,
+      strengthFocus: this.determineStrengthFocus(userResponses, injuryHistory),
+      progressionRate,
+      recoveryNeeds,
+      injuryConsiderations: injuryHistory ? this.parseInjuryRegions(userBaselines?.injuryRegions) : [],
+      equipmentOptimization: this.optimizeEquipment(userBaselines?.equipment),
+      ageAdjustments: this.calculateAgeAdjustments(age),
+      baselineFitness,
+      customParameters: this.calculateCustomParameters(userBaselines)
+    };
+  }
+
+  // Helper methods for fallback analysis
+  private calculateCurrentHours(baselines: any): number {
+    // Extract current training hours from baselines
+    const volumeData = baselines?.volumeIncreaseCapacity;
+    if (volumeData?.triathlon) {
+      const match = volumeData.triathlon.match(/(\d+)/);
+      return match ? parseInt(match[1]) : 6;
+    }
+    return 6; // Default
+  }
+
+  private determineFocusAreas(responses: any): string[] {
+    const focusAreas = ['swim', 'bike', 'run'];
+    const weakness = responses?.disciplineWeakness;
+    
+    if (weakness === 'swimming') return ['swim'];
+    if (weakness === 'biking') return ['bike'];
+    if (weakness === 'running') return ['run'];
+    
+    return focusAreas;
+  }
+
+  private determineStrengthFocus(responses: any, injuryHistory: string): string {
+    if (injuryHistory && injuryHistory !== 'No current injuries or limitations') {
+      return 'injury_prevention';
+    }
+    
+    const strengthTraining = responses?.strengthTraining;
+    const mapping: { [key: string]: string } = {
+      'power-development': 'power_development',
+      'power-lifting': 'powerlifting',
+      'injury-prevention': 'injury_prevention',
+      'sport-specific': 'sport_specific',
+      'build-muscle': 'muscle_building',
+      'general-fitness': 'general_fitness',
+      'no-strength': 'general_fitness'
+    };
+    
+    return mapping[strengthTraining] || 'general_fitness';
+  }
+
+  private parseInjuryRegions(regions: string[]): string[] {
+    return regions || [];
+  }
+
+  private optimizeEquipment(equipment: any): string[] {
+    if (!equipment?.strength) return ['bodyweight'];
+    return equipment.strength;
+  }
+
+  private calculateAgeAdjustments(age: number) {
+    if (age >= 40) {
+      return {
+        recoveryTime: 48,
+        intensityModifier: 0.9,
+        volumeModifier: 0.85
+      };
+    } else if (age >= 30) {
+      return {
+        recoveryTime: 36,
+        intensityModifier: 0.95,
+        volumeModifier: 0.9
+      };
+    } else {
+      return {
+        recoveryTime: 24,
+        intensityModifier: 1.0,
+        volumeModifier: 1.0
+      };
+    }
+  }
+
+  private assessBaselineFitness(baselines: any, currentHours: number): any {
+    let overallLevel = 'intermediate';
+    if (currentHours >= 10) overallLevel = 'advanced';
+    else if (currentHours >= 6) overallLevel = 'intermediate';
+    else overallLevel = 'beginner';
+    
+    return {
+      overallLevel,
+      swimLevel: 'intermediate',
+      bikeLevel: 'intermediate',
+      runLevel: 'intermediate',
+      strengthLevel: 'intermediate'
+    };
+  }
+
+  private calculateCustomParameters(baselines: any): any {
+    const age = baselines?.age || 30;
+    const ageModifier = age >= 40 ? 0.9 : age >= 30 ? 0.95 : 1.0;
+    
+    return {
+      swimPaceModifier: ageModifier,
+      bikeFTPModifier: ageModifier,
+      runPaceModifier: ageModifier
+    };
+  }
+
+  private async getAuthToken(): Promise<string> {
+    try {
+      // Get Supabase session for authentication
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        'https://yyriamwvtvzlkumqrvpm.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error('User must be logged in to generate training plans');
+      }
+      
+      return session.access_token;
+    } catch (error) {
+      console.error('Failed to get auth token:', error);
+      throw new Error('Authentication required for AI analysis');
+    }
   }
 
   // Real AI plan generation with training science
