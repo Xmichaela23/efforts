@@ -36,6 +36,7 @@ export interface TrainingPlan {
 export interface UserBaselines {
   age?: number;
   birthday?: string;
+  currentFitness?: string;
   performanceNumbers: {
     fiveK?: string;
     easyPace?: string;
@@ -88,7 +89,7 @@ export class PlanEngine {
     if (!performanceNumbers.squat) throw new Error('❌ MISSING: Squat 1RM');
     if (!performanceNumbers.bench) throw new Error('❌ MISSING: Bench 1RM');
     if (!performanceNumbers.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
-    if (!performanceNumbers.fiveK) throw new Error('❌ MISSING: 5K pace');
+    if (!this.userBaselines.currentFitness) throw new Error('❌ MISSING: Current Fitness (5K pace)');
     if (!performanceNumbers.tenK) throw new Error('❌ MISSING: 10K pace');
     if (!performanceNumbers.swimPace100) throw new Error('❌ MISSING: Swim pace');
     
@@ -991,7 +992,10 @@ export class PlanEngine {
 
   // Generate intelligent strength workout
   private generateStrengthWorkout(intensity: string, weekNumber: number): string {
-    const strengthType = this.mapStrengthTrainingToCategory(this.responses.strengthTraining) || 'general_fitness';
+    // Use AI analysis strength focus if available, otherwise fall back to form response
+    const strengthType = this.aiAnalysis?.strengthFocus || 
+                        this.mapStrengthTrainingToCategory(this.responses.strengthTraining) || 
+                        'general_fitness';
     const userEquipment = this.userBaselines.equipment?.strength || [];
     const injuryHistory = this.userBaselines.injuryHistory;
     const injuryRegions = this.userBaselines.injuryRegions;
