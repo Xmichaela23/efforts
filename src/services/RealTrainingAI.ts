@@ -120,7 +120,21 @@ export class RealTrainingAI {
 
   // Build analysis-specific prompt
   private buildAnalysisPrompt(userBaselines: any, userResponses: any): string {
+    // Extract key user preferences for emphasis
+    const raceDistance = userResponses.distance;
+    const strengthChoice = userResponses.strengthTraining;
+    const timeline = userResponses.timeline;
+    const trainingFrequency = userResponses.trainingFrequency;
+    const goals = userResponses.goals || [];
+    
     return `You are an expert exercise physiologist and training coach. Analyze the following user profile and determine optimal training parameters.
+
+CRITICAL USER PREFERENCES (PRIORITIZE THESE):
+- Race Distance: ${raceDistance || 'Not specified'}
+- Strength Training Choice: ${strengthChoice || 'Not specified'}
+- Timeline: ${timeline || 'Not specified'}
+- Training Frequency: ${trainingFrequency || 'Not specified'}
+- Goals: ${goals.join(', ') || 'Not specified'}
 
 USER BASELINES:
 ${JSON.stringify(userBaselines, null, 2)}
@@ -129,49 +143,50 @@ USER RESPONSES:
 ${JSON.stringify(userResponses, null, 2)}
 
 ANALYSIS TASK:
-Analyze the user's fitness level, goals, constraints, and preferences to determine optimal training parameters. Consider:
+Analyze the user's specific preferences and determine optimal training parameters. PAY SPECIAL ATTENTION TO:
 
-1. **Training Philosophy Selection:**
-   - Pyramid: For users needing gradual intensity progression within sessions
-   - Polarized: For users with good base fitness seeking performance gains
-   - Balanced: For users needing moderate intensity distribution
+1. **RACE DISTANCE IMPACT:**
+   - Sprint (750m/20km/5km): 6-8 hours/week, shorter sessions
+   - Olympic (1.5km/40km/10km): 8-12 hours/week, moderate sessions
+   - 70.3 (1.9km/90km/21km): 12-18 hours/week, longer sessions, weekend bricks
+   - Ironman (3.8km/180km/42km): 15-25 hours/week, very long sessions
 
-2. **Focus Areas:**
-   - Identify limiting factors (swim/bike/run weaknesses)
-   - Determine priority training areas
-   - Consider injury history and age
+2. **STRENGTH TRAINING INTERPRETATION:**
+   - "power-lifting": Heavy compound lifts (Squat, Deadlift, Bench Press), 3-5 reps, 80-90% 1RM
+   - "power-development": Explosive movements, plyometrics
+   - "injury-prevention": Mobility, stability, corrective work
+   - "sport-specific": Triathlon-specific movements
+   - "build-muscle": Hypertrophy focus, 8-12 reps
+   - "general-fitness": Basic conditioning
 
-3. **Volume & Intensity:**
-   - Calculate appropriate weekly volume based on current fitness
-   - Determine intensity distribution (easy/moderate/hard percentages)
-   - Consider progression rate based on experience and age
+3. **TRAINING FREQUENCY & DURATION:**
+   - Use the user's specified training frequency preference
+   - Consider timeline constraints and race distance requirements
+   - Balance volume with recovery needs
 
-4. **Strength Training:**
-   - Determine appropriate strength focus
-   - Consider equipment availability and injury history
+4. **WEEKLY VOLUME CALCULATION:**
+   - Base volume on race distance requirements
+   - Adjust for user's current fitness level and experience
+   - Consider timeline and progression needs
 
-5. **Recovery & Progression:**
-   - Assess recovery needs based on age and current volume
-   - Determine safe progression rate
-
-6. **Baseline Fitness Assessment:**
-   - Evaluate overall fitness level
-   - Assess individual sport levels
-   - Consider performance numbers and training history
+5. **INTENSITY DISTRIBUTION:**
+   - Match to training philosophy and race distance
+   - Consider user's goals and current fitness
+   - Balance hard/easy sessions appropriately
 
 RESPOND WITH ONLY JSON:
 {
   "trainingPhilosophy": "pyramid|polarized|balanced",
   "focusAreas": ["swim", "bike", "run", "strength"],
-  "weeklyVolume": 8,
+  "weeklyVolume": 12,
   "intensityDistribution": {
     "easy": 60,
     "moderate": 25,
     "hard": 15
   },
-  "strengthFocus": "injury_prevention|power_development|muscle_building|general_fitness",
-  "progressionRate": "conservative|moderate|aggressive",
-  "recoveryNeeds": "high|moderate|low",
+  "strengthApproach": "power-lifting|power-development|injury-prevention|sport-specific|build-muscle|general-fitness",
+  "progressionType": "conservative|moderate|aggressive",
+  "recoveryEmphasis": "high|moderate|low",
   "injuryConsiderations": ["lower_back", "knee"],
   "equipmentOptimization": ["barbell", "dumbbells"],
   "ageAdjustments": {
@@ -189,7 +204,8 @@ RESPOND WITH ONLY JSON:
   "customParameters": {
     "swimPaceModifier": 1.1,
     "bikeFTPModifier": 0.9,
-    "runPaceModifier": 1.05
+    "runPaceModifier": 1.05,
+    "workoutDurationPreference": "90min_weekdays_4hour_weekends"
   }
 }`;
   }
