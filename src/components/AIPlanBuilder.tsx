@@ -335,6 +335,28 @@ export default function AIPlanBuilder() {
     setResponses(prev => ({ ...prev, [key]: value }));
   };
 
+  const calculateTimeline = (eventDate: string): number => {
+    if (!eventDate) return 0;
+    const event = new Date(eventDate);
+    const today = new Date();
+    return Math.ceil((event.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 7));
+  };
+
+  const getEventType = (distance: string): string => {
+    switch (distance) {
+      case 'ironman':
+        return 'Ironman';
+      case '70.3':
+        return '70.3';
+      case 'olympic':
+        return 'Olympic';
+      case 'sprint':
+        return 'Sprint';
+      default:
+        return 'Unknown';
+    }
+  };
+
   const isAggressiveTimeline = () => {
     const { distance, timeline } = responses;
     if (distance === '70.3' && timeline === '8-12-weeks') return true;
@@ -1222,6 +1244,13 @@ ${insights.age >= 40 ? `
                       className="w-full p-3"
                       min={new Date().toISOString().split('T')[0]}
                     />
+                    {responses.eventDate && (
+                      <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          📅 {calculateTimeline(responses.eventDate)} weeks until your event
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1236,6 +1265,13 @@ ${insights.age >= 40 ? `
                         <option key={option.key} value={option.key}>{option.label}</option>
                       ))}
                     </select>
+                    {responses.distance && (
+                      <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded-md">
+                        <p className="text-sm text-green-800">
+                          🏁 Event Type: {getEventType(responses.distance)}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
 
