@@ -36,7 +36,6 @@ export interface TrainingPlan {
 export interface UserBaselines {
   age?: number;
   birthday?: string;
-  currentFitness?: string;
   performanceNumbers: {
     fiveK?: string;
     easyPace?: string;

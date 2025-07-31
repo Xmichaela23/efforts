@@ -63,7 +63,6 @@ interface BaselineData {
   // Existing fields
   age: number;
   disciplines: string[];
-  currentFitness?: string;
   disciplineFitness: {
     running?: string;
     cycling?: string;
