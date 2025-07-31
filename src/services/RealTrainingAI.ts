@@ -1,4 +1,3 @@
-// src/services/RealTrainingAI.ts
 export interface AITrainingPlan {
   plan: {
     name: string;
@@ -28,7 +27,6 @@ export interface AITrainingPlan {
   }>;
 }
 
-// Add interface for AI analysis results
 export interface AIAnalysisResult {
   trainingPhilosophy: 'pyramid' | 'polarized' | 'threshold';
   focusAreas: string[];
@@ -65,23 +63,20 @@ export class RealTrainingAI {
   private planURL: string;
 
   constructor() {
-    // Use Supabase Edge Functions instead of direct OpenAI calls
+    // Use Supabase Edge Functions for AI analysis and plan generation
     this.analysisURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/analyze-user-profile';
     this.planURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/generate-plan';
-    
-    console.log('🔗 Using Supabase Edge Functions for AI analysis and plan generation');
   }
 
-  // NEW: Analyze user profile to determine training parameters
   async analyzeUserProfile(userBaselines: any, userResponses: any): Promise<AIAnalysisResult> {
     console.log('🧠 Starting AI user profile analysis...');
-    
+
     // FAIL-FAST VALIDATION - Check baseline data before any AI calls
     console.log('🔍 Baseline Data Validation:');
     if (!userBaselines) {
       throw new Error('❌ MISSING: No userBaselines object found');
     }
-    
+
     const performanceNumbers = userBaselines.performanceNumbers;
     if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
     if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
@@ -90,6 +85,7 @@ export class RealTrainingAI {
     if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace');
     if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
     if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
+
     // Calculate age from birthday if not set
     if (!userBaselines.age && userBaselines.birthday) {
       const birthDate = new Date(userBaselines.birthday);
@@ -97,28 +93,27 @@ export class RealTrainingAI {
       userBaselines.age = today.getFullYear() - birthDate.getFullYear();
       console.log('✅ Calculated age from birthday:', userBaselines.age);
     }
-    
+
     if (!userBaselines.age) throw new Error('❌ MISSING: Age (no birthday provided)');
     if (!userBaselines.equipment?.strength || userBaselines.equipment.strength.length === 0) throw new Error('❌ MISSING: Strength equipment');
     if (!userBaselines.injuryHistory) throw new Error('❌ MISSING: Injury history');
-    
+
     console.log('✅ All required baseline data present');
-    
+
     try {
-      // Build analysis prompt
-      const analysisPrompt = this.buildAnalysisPrompt(userBaselines, userResponses);
-      
-      // Use the dedicated analysis edge function
-      const authToken = await this.getAuthToken();
+      // Build the analysis prompt
+      const prompt = this.buildAnalysisPrompt(userBaselines, userResponses);
+      console.log('📝 Analysis prompt built, calling AI...');
+
+      // Call the AI analysis Edge Function
+      const token = await this.getAuthToken();
       const response = await fetch(this.analysisURL, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          prompt: analysisPrompt
-        }),
+        body: JSON.stringify({ prompt })
       });
 
       if (!response.ok) {
@@ -128,10 +123,6 @@ export class RealTrainingAI {
 
       const data = await response.json();
       console.log('🔍 AI Analysis Response:', data);
-      
-      if (data.error) {
-        throw new Error(`Analysis error: ${data.error}`);
-      }
 
       // Parse the analysis result
       const analysisResult = this.parseAnalysisResult(data);
@@ -142,8 +133,8 @@ export class RealTrainingAI {
     } catch (error) {
       console.error('AI Analysis Error:', error);
       
-      // Return intelligent fallback based on user data
-      return this.generateFallbackAnalysis(userBaselines, userResponses);
+      // NO FALLBACKS - THROW THE ERROR
+      throw error;
     }
   }
 
@@ -242,137 +233,70 @@ COMPLETE USER PROFILE MAPPING:
 - Disciplines: ${JSON.stringify(disciplines)}
 - Units: ${units}
 
-USER BASELINES:
-${JSON.stringify(userBaselines, null, 2)}
+TRAINING SCIENCE FRAMEWORK:
+1. Training Philosophies:
+   - PYRAMID: Builds from high volume/low intensity to low volume/high intensity. Best for: Beginners, base building, injury prevention, those with limited time.
+   - POLARIZED: 80% easy, 20% hard with minimal moderate work. Best for: Advanced athletes, performance focus, those with high training capacity.
+   - THRESHOLD: Focuses on lactate threshold work. Best for: Time-crunched athletes, specific performance goals, intermediate athletes.
 
-USER RESPONSES:
-${JSON.stringify(userResponses, null, 2)}
+2. Strength Training Approaches:
+   - POWER-LIFTING: Compound lifts (squat, bench, deadlift) with progressive overload. Best for: Building maximal strength, power development.
+   - POWER-DEVELOPMENT: Olympic lifts, plyometrics, explosive movements. Best for: Athletic performance, power output.
+   - INJURY-PREVENTION: Mobility work, corrective exercises, stability training. Best for: Injury history, prevention focus.
+   - SPORT-SPECIFIC: Movements that mimic sport demands. Best for: Performance athletes, sport-specific goals.
+   - BUILD-MUSCLE: Hypertrophy focus with moderate rep ranges. Best for: Muscle building, aesthetic goals.
+   - GENERAL-FITNESS: Balanced approach with variety. Best for: General health, maintenance.
 
-ANALYSIS TASK:
-You must map and understand EVERY SINGLE ANSWER to create the optimal training plan. Consider how ALL answers interact:
+3. Progression Types:
+   - CONSERVATIVE: 5-10% increases, longer adaptation periods. Best for: Beginners, injury history, older athletes.
+   - MODERATE: 10-15% increases, balanced progression. Best for: Most athletes, intermediate level.
+   - AGGRESSIVE: 15-25% increases, rapid progression. Best for: Advanced athletes, high training capacity.
 
-1. **RACE DISTANCE + COURSE CONDITIONS + TIMELINE + FREQUENCY:**
-   - How does race distance interact with timeline and training frequency?
-   - How do course conditions affect training focus?
-   - Analyze how water conditions, elevation, course profile, and climate affect training
-   - Let the scientific analysis determine the optimal training approach
+4. Recovery Emphasis:
+   - HIGH: More rest days, lower intensity, longer recovery periods. Best for: Injury history, older athletes, high stress.
+   - MODERATE: Balanced recovery approach. Best for: Most athletes.
+   - LOW: Minimal recovery focus, higher intensity. Best for: Young athletes, high training capacity.
 
-2. **STRENGTH TRAINING + EQUIPMENT + INJURY HISTORY:**
-   - Each strength option requires completely different programming:
-   - No strength training = Focus on sport-specific conditioning
-   - Power development = Plyometrics, explosive movements, rate of force development
-   - Power lifting = Compound lifts, heavy weight, low reps, progressive overload
-   - Injury prevention = Mobility, stability, corrective work, movement patterns
-   - Sport-specific = Triathlon movements, functional strength, sport transfer
-   - Build muscle = Hypertrophy focus, 8-12 reps, muscle building protocols
-   - General fitness = Basic conditioning, foundational strength, general health
-   - Analyze how equipment limitations and injury history affect exercise selection within the chosen approach
-
-3. **PERFORMANCE NUMBERS + CURRENT VOLUME + CAPACITY:**
-   - How do current performance numbers affect training intensity?
-   - How does current volume affect progression rate?
-   - How does volume increase capacity affect training load?
-
-4. **AGE + GENDER + TRAINING BACKGROUND:**
-   - How does age affect recovery needs and progression rate?
-   - How does training background affect starting point?
-   - How do these factors interact with race distance and timeline?
-
-5. **DISCIPLINE FITNESS + TRAINING STATUS:**
-   - How do current fitness levels in each discipline affect focus areas?
-   - How does training status affect progression and volume?
-
-6. **TRAINING GOALS + RACE DISTANCE + TIMELINE:**
-   - How do selected goals affect training focus and intensity?
-   - Analyze how each goal interacts with race distance and timeline
-   - Determine optimal training approach based on goal combinations
-   - Consider how goals affect volume, intensity, and session structure
-   - Let the scientific analysis determine the specific training approach
-
-7. **BENCHMARK RECENCY + UNITS:**
-   - How recent are performance numbers? This affects starting point
-   - Units (imperial/metric) affect all calculations
-
-8. **WEEKEND AVAILABILITY + LONG SESSION PREFERENCES:**
-   - How does weekend availability affect training schedule?
-   - Both Saturday and Sunday = Full weekend training
-   - Saturday only = Compressed weekend training
-   - Sunday only = Alternative weekend structure
-   - Weekdays only = Completely different schedule
-   - Flexible = Adaptive scheduling
-   - Long session preferences affect brick training and recovery
-   - Traditional (Saturday ride, Sunday run) vs Reverse vs Split vs Flexible
-   - This determines the entire weekly training structure
-
-9. **WEEKDAY VS WEEKEND SESSION DURATIONS:**
-   - How do weekday vs weekend session preferences affect training structure?
-   - Weekday sessions (30-45, 45-60, 60-90, 90+ minutes) determine daily training load
-   - Weekend sessions (1-2, 2-3, 3-4, 4+ hours) determine long session planning
-   - This affects the entire training schedule and workout distribution
-   - Longer weekday sessions = fewer but more intense sessions
-   - Shorter weekday sessions = more frequent but shorter sessions
-   - Weekend duration affects brick training and long endurance sessions
-   - This determines how to distribute training load across the week
-
-10. **WORKOUT DURATION DETERMINATION:**
-    - Determine optimal workout durations based on ALL factors
-    - Race distance affects session length (70.3 needs longer sessions than Sprint)
-    - Training frequency affects session duration (high frequency = shorter sessions)
-    - Current volume and capacity affect progression
-    - Age and recovery needs affect session length
-    - Equipment availability affects strength session duration
-    - Goals affect session structure (speed work = shorter, endurance = longer)
-    - Weekend availability affects long session planning
-    - Weekday vs weekend session preferences determine actual workout lengths
-
-SCIENTIFIC PRINCIPLES TO APPLY:
-- Progressive overload based on current capacity
-- Periodization theory adapted to timeline
-- Recovery science adjusted for age and injury history
-- Sport-specific adaptations for race distance
-- Injury prevention protocols based on history
-
-RESPOND WITH ONLY JSON:
+ANALYSIS REQUIREMENTS:
+You MUST return a JSON object with these EXACT fields:
 {
-  "trainingPhilosophy": "pyramid|polarized|threshold",
+  "trainingPhilosophy": "pyramid" or "polarized" or "threshold",
+  "weeklyVolume": { "swim": number, "bike": number, "run": number, "strength": number },
+  "intensityDistribution": { "easy": number, "moderate": number, "hard": number },
+  "progressionType": "conservative" or "moderate" or "aggressive",
+  "focusAreas": ["array", "of", "focus", "areas"],
+  "strengthApproach": "power-lifting" or "power-development" or "injury-prevention" or "sport-specific" or "build-muscle" or "general-fitness",
+  "recoveryEmphasis": "high" or "moderate" or "low",
+  "timeline": number,
+  "eventType": "string"
+}
+
+CRITICAL INSTRUCTIONS:
+1. You MUST include BOTH "timeline" and "eventType" fields in your JSON response
+2. Use the timeline and eventType values provided in the user data - do not calculate them yourself
+3. If the user data shows "Timeline: 11 weeks" and "Event Type: 70.3", then include:
+   - "timeline": 11
+   - "eventType": "70.3"
+4. If timeline or eventType are not provided in user data, use defaults:
+   - "timeline": 12
+   - "eventType": "General Training"
+
+EXAMPLE RESPONSE:
+{
+  "trainingPhilosophy": "pyramid",
+  "weeklyVolume": { "swim": 2, "bike": 4, "run": 4, "strength": 2 },
+  "intensityDistribution": { "easy": 60, "moderate": 25, "hard": 15 },
+  "progressionType": "moderate",
   "focusAreas": ["swim", "bike", "run", "strength"],
-  "weeklyVolume": 8,
-  "intensityDistribution": {
-    "easy": 60,
-    "moderate": 25,
-    "hard": 15
-  },
-  "strengthApproach": "power-lifting|power-development|injury-prevention|sport-specific|build-muscle|general-fitness",
-  "progressionType": "conservative|moderate|aggressive",
-  "recoveryEmphasis": "high|moderate|low",
-  "injuryConsiderations": ["lower_back", "knee"],
-  "equipmentOptimization": ["barbell", "dumbbells"],
-  "ageAdjustments": {
-    "recoveryTime": 48,
-    "intensityModifier": 0.9,
-    "volumeModifier": 0.85
-  },
-  "baselineFitness": {
-    "overallLevel": "beginner|intermediate|advanced|elite",
-    "swimLevel": "beginner|intermediate|advanced",
-    "bikeLevel": "beginner|intermediate|advanced", 
-    "runLevel": "beginner|intermediate|advanced",
-    "strengthLevel": "beginner|intermediate|advanced"
-  },
-  "customParameters": {
-    "swimPaceModifier": 1.1,
-    "bikeFTPModifier": 0.9,
-    "runPaceModifier": 1.05,
-    "workoutDurationPreference": "90min_weekdays_4hour_weekends",
-    "swimDuration": 45,
-    "bikeDuration": 60,
-    "runDuration": 45,
-    "strengthDuration": 60
-  }
-}`;
+  "strengthApproach": "power-lifting",
+  "recoveryEmphasis": "moderate",
+  "timeline": 11,
+  "eventType": "70.3"
+}
+
+YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
   }
 
-  // Parse analysis result from AI response
   private parseAnalysisResult(data: any): AIAnalysisResult {
     try {
       console.log('🔍 Parsing AI analysis result:', data);
@@ -427,7 +351,7 @@ RESPOND WITH ONLY JSON:
       const volumes = Object.values(aiResponse.weeklyVolume);
       weeklyVolume = volumes.reduce((sum: number, volume: unknown) => {
         const numVolume = typeof volume === 'number' ? volume : Number(volume) || 0;
-        return sum + numVolume;
+        return sum + (numVolume as number);
       }, 0);
     } else if (typeof aiResponse.weeklyVolume === 'number') {
       weeklyVolume = aiResponse.weeklyVolume;
@@ -497,164 +421,6 @@ RESPOND WITH ONLY JSON:
     
     console.log('✅ Transformation complete:', transformed);
     return transformed;
-  }
-
-  // Generate intelligent fallback analysis
-  private generateFallbackAnalysis(userBaselines: any, userResponses: any): AIAnalysisResult {
-    console.log('🔄 Generating fallback analysis...');
-    
-    const age = userBaselines?.age || 30;
-    const currentHours = this.calculateCurrentHours(userBaselines);
-    const primaryGoal = userResponses?.primaryGoal || 'base';
-    const injuryHistory = userBaselines?.injuryHistory;
-    
-    // Determine training philosophy based on goal and fitness
-    let trainingPhilosophy: 'pyramid' | 'polarized' | 'threshold' = 'threshold';
-    if (primaryGoal === 'performance' && currentHours >= 8) {
-      trainingPhilosophy = 'polarized';
-    } else if (primaryGoal === 'base' || currentHours < 6) {
-      trainingPhilosophy = 'pyramid';
-    }
-    
-    // Determine progression rate based on age and experience
-    let progressionRate: 'conservative' | 'moderate' | 'aggressive' = 'moderate';
-    if (age >= 40 || injuryHistory) {
-      progressionRate = 'conservative';
-    } else if (currentHours >= 10 && age < 30) {
-      progressionRate = 'aggressive';
-    }
-    
-    // Determine recovery needs
-    let recoveryNeeds: 'high' | 'moderate' | 'low' = 'moderate';
-    if (age >= 40 || injuryHistory) {
-      recoveryNeeds = 'high';
-    } else if (currentHours < 4) {
-      recoveryNeeds = 'low';
-    }
-    
-    // Calculate intensity distribution based on philosophy
-    let intensityDistribution = { easy: 60, moderate: 25, hard: 15 };
-    if (trainingPhilosophy === 'polarized') {
-      intensityDistribution = { easy: 80, moderate: 5, hard: 15 };
-    } else if (trainingPhilosophy === 'pyramid') {
-      intensityDistribution = { easy: 40, moderate: 40, hard: 20 };
-    }
-    
-    // Determine baseline fitness levels
-    const baselineFitness = this.assessBaselineFitness(userBaselines, currentHours);
-    
-    return {
-      trainingPhilosophy,
-      focusAreas: this.determineFocusAreas(userResponses),
-      weeklyVolume: Math.min(currentHours + 2, 12), // Conservative increase
-      intensityDistribution,
-      strengthFocus: this.determineStrengthFocus(userResponses, injuryHistory),
-      progressionRate,
-      recoveryNeeds,
-      injuryConsiderations: injuryHistory ? this.parseInjuryRegions(userBaselines?.injuryRegions) : [],
-      equipmentOptimization: this.optimizeEquipment(userBaselines?.equipment),
-      ageAdjustments: this.calculateAgeAdjustments(age),
-      baselineFitness,
-      customParameters: this.calculateCustomParameters(userBaselines)
-    };
-  }
-
-  // Helper methods for fallback analysis
-  private calculateCurrentHours(baselines: any): number {
-    // Extract current training hours from baselines
-    const volumeData = baselines?.volumeIncreaseCapacity;
-    if (volumeData?.triathlon) {
-      const match = volumeData.triathlon.match(/(\d+)/);
-      return match ? parseInt(match[1]) : 6;
-    }
-    return 6; // Default
-  }
-
-  private determineFocusAreas(responses: any): string[] {
-    const focusAreas = ['swim', 'bike', 'run'];
-    const weakness = responses?.disciplineWeakness;
-    
-    if (weakness === 'swimming') return ['swim'];
-    if (weakness === 'biking') return ['bike'];
-    if (weakness === 'running') return ['run'];
-    
-    return focusAreas;
-  }
-
-  private determineStrengthFocus(responses: any, injuryHistory: string): string {
-    if (injuryHistory && injuryHistory !== 'No current injuries or limitations') {
-      return 'injury_prevention';
-    }
-    
-    const strengthTraining = responses?.strengthTraining;
-    const mapping: { [key: string]: string } = {
-      'power-development': 'power_development',
-      'power-lifting': 'powerlifting',
-      'injury-prevention': 'injury_prevention',
-      'sport-specific': 'sport_specific',
-      'build-muscle': 'muscle_building',
-      'general-fitness': 'general_fitness',
-      'no-strength': 'general_fitness'
-    };
-    
-    return mapping[strengthTraining] || 'general_fitness';
-  }
-
-  private parseInjuryRegions(regions: string[]): string[] {
-    return regions || [];
-  }
-
-  private optimizeEquipment(equipment: any): string[] {
-    if (!equipment?.strength) return ['bodyweight'];
-    return equipment.strength;
-  }
-
-  private calculateAgeAdjustments(age: number) {
-    if (age >= 40) {
-      return {
-        recoveryTime: 48,
-        intensityModifier: 0.9,
-        volumeModifier: 0.85
-      };
-    } else if (age >= 30) {
-      return {
-        recoveryTime: 36,
-        intensityModifier: 0.95,
-        volumeModifier: 0.9
-      };
-    } else {
-      return {
-        recoveryTime: 24,
-        intensityModifier: 1.0,
-        volumeModifier: 1.0
-      };
-    }
-  }
-
-  private assessBaselineFitness(baselines: any, currentHours: number): any {
-    let overallLevel = 'intermediate';
-    if (currentHours >= 10) overallLevel = 'advanced';
-    else if (currentHours >= 6) overallLevel = 'intermediate';
-    else overallLevel = 'beginner';
-    
-    return {
-      overallLevel,
-      swimLevel: 'intermediate',
-      bikeLevel: 'intermediate',
-      runLevel: 'intermediate',
-      strengthLevel: 'intermediate'
-    };
-  }
-
-  private calculateCustomParameters(baselines: any): any {
-    const age = baselines?.age || 30;
-    const ageModifier = age >= 40 ? 0.9 : age >= 30 ? 0.95 : 1.0;
-    
-    return {
-      swimPaceModifier: ageModifier,
-      bikeFTPModifier: ageModifier,
-      runPaceModifier: ageModifier
-    };
   }
 
   private async getAuthToken(): Promise<string> {
@@ -753,125 +519,111 @@ RESPOND WITH ONLY JSON:
       return data;
 
     } catch (error) {
-      console.error('AI Plan Generation Error:', error);
+      console.error('❌ Plan generation failed:', error);
       
-      // No fallbacks - if AI fails, throw the error
-      throw new Error(`AI plan generation failed: ${error.message}`);
+      // NO FALLBACKS - THROW THE ERROR
+      throw error;
     }
   }
 
-  // FIXED: Evidence-based training science system prompt
+  // Build comprehensive training science prompt
   private buildTrainingSciencePrompt(): string {
-    return `You are an intelligent training AI with expertise in exercise science, periodization, and personalized training design.
+    return `You are an expert exercise physiologist and training coach specializing in endurance sports and strength training. Your task is to create scientifically-based, personalized training plans.
 
-EVIDENCE-BASED TRAINING SCIENCE PRINCIPLES:
+TRAINING SCIENCE PRINCIPLES:
 
-**PERIODIZATION (Based on Bompa & Haff research):**
-- Linear periodization: Volume → Intensity → Peak → Taper
-- Block periodization: Accumulation → Transmutation → Realization
-- Undulating periodization: Daily/weekly intensity variation
-- Recovery weeks every 3-4 weeks (20-30% volume reduction)
+1. PERIODIZATION:
+   - Base Phase: Build aerobic capacity and strength foundation
+   - Build Phase: Increase intensity and sport-specific work
+   - Peak Phase: Taper and race-specific preparation
+   - Recovery: Active recovery and maintenance
 
-**POLARIZED TRAINING (Based on Seiler & Tønnessen research):**
-- 80% of training at low intensity (Zone 1-2, <2 mmol/L lactate)
-- 20% of training at high intensity (Zone 4-5, >4 mmol/L lactate)
-- Minimal moderate intensity (Zone 3, "junk miles")
-- Proven effective for endurance performance improvement
+2. INTENSITY ZONES:
+   - Zone 1 (Recovery): 50-60% FTP/HR, very easy effort
+   - Zone 2 (Aerobic): 60-75% FTP/HR, conversational pace
+   - Zone 3 (Tempo): 75-85% FTP/HR, moderate-hard effort
+   - Zone 4 (Threshold): 85-95% FTP/HR, hard but sustainable
+   - Zone 5 (VO2max): 95-105% FTP/HR, very hard intervals
+   - Zone 6 (Anaerobic): 105%+ FTP/HR, sprint efforts
 
-**PYRAMID TRAINING (Based on endurance training research):**
-- Weekly intensity progression: easy → moderate → hard → moderate → easy
-- Builds intensity tolerance throughout the week
-- Allows proper recovery between hard sessions
-- Prevents overtraining with structured progression
-- **ENDURANCE ATHLETES:** Use Zone 2 → Zone 3 → Zone 4 → Zone 3 → Zone 2 weekly progression
-- **Example:** Monday easy → Tuesday moderate → Wednesday hard → Thursday moderate → Friday easy
+3. STRENGTH TRAINING PROGRESSION:
+   - Week 1-2: 65-70% 1RM, 3x10-12 reps, focus on form
+   - Week 3-4: 70-75% 1RM, 3x8-10 reps, build strength
+   - Week 5-6: 75-80% 1RM, 3x6-8 reps, strength focus
+   - Week 7-8: 80-85% 1RM, 3x4-6 reps, power development
 
-**THRESHOLD TRAINING (Based on Coggan & Allen research):**
-- 40% of training at moderate intensity (Zone 3, lactate threshold)
-- 40% of training at easy intensity (Zone 2, aerobic base)
-- 20% of training at high intensity (Zone 4-5, VO2 max)
-- Focus on lactate threshold improvement
-- Proven effective for time trial and sustained power performance
-- **Example:** 20min @ Zone 3 threshold, 30min @ Zone 2 aerobic, 10min @ Zone 4 intervals
+4. RECOVERY PRINCIPLES:
+   - Hard days followed by easy days
+   - Weekly recovery day (active recovery or complete rest)
+   - Progressive overload with adequate recovery
+   - Listen to body signals (fatigue, soreness, motivation)
 
-**PROGRESSIVE OVERLOAD (Based on Selye's General Adaptation Syndrome):**
-- Systematic increase in training stress over time
-- 5-10% weekly volume/intensity increases
-- Deload periods every 3-4 weeks to prevent overtraining
-- Supercompensation principle for performance gains
+5. SPORT-SPECIFIC CONSIDERATIONS:
+   - SWIM: Technique focus, stroke efficiency, open water skills
+   - BIKE: Power development, cadence work, bike handling
+   - RUN: Running economy, form, terrain specificity
+   - STRENGTH: Sport-specific movements, injury prevention
 
-**MULTI-SPORT INTEGRATION (Based on triathlon research):**
-- Swim-bike-run order for optimal recovery
-- 24-48 hour recovery between high-intensity sessions
-- Cross-training benefits for injury prevention
-- Sport-specific strength training integration
+6. NUTRITION TIMING:
+   - Pre-workout: 2-3 hours before, balanced meal
+   - During: 30-60g carbs/hour for sessions >90 minutes
+   - Post-workout: 20-30g protein + carbs within 30 minutes
 
-**AGE-APPROPRIATE TRAINING (Based on Masters athlete research):**
-- Increased recovery time with age (40+ years)
-- Focus on technique and efficiency over volume
-- Strength training for injury prevention
-- Reduced high-intensity volume, maintained quality
+7. EQUIPMENT OPTIMIZATION:
+   - Use available equipment efficiently
+   - Adapt exercises to equipment limitations
+   - Progressive equipment upgrades as needed
 
-**INJURY PREVENTION (Based on sports medicine research):**
-- Gradual progression (10% rule)
-- Proper warm-up and cool-down protocols
-- Strength training for injury resilience
-- Mobility and flexibility maintenance
+8. INJURY PREVENTION:
+   - Proper warm-up and cool-down
+   - Gradual progression in volume and intensity
+   - Mobility and flexibility work
+   - Listen to warning signs
 
-**HEART RATE ZONES (Based on Karvonen formula):**
-- Zone 1: 50-60% HRR (Recovery)
-- Zone 2: 60-70% HRR (Aerobic base)
-- Zone 3: 70-80% HRR (Tempo)
-- Zone 4: 80-90% HRR (Threshold)
-- Zone 5: 90-100% HRR (VO2 max)
+CRITICAL REQUIREMENTS:
+1. ALWAYS return a valid JSON object with the exact structure specified
+2. Include ALL required fields: name, description, type, duration, level, goal, status, currentWeek, createdDate, totalWorkouts, disciplines, isIntegrated, weeks
+3. Each workout MUST have: name, type, date, duration, description
+4. Use realistic durations and intensities based on user's fitness level
+5. Include proper warm-up and cool-down for each workout
+6. Ensure progressive overload throughout the plan
+7. Balance training stress with recovery
+8. Consider user's equipment limitations and preferences
+9. Adapt to user's schedule and availability
+10. Include specific instructions for each workout
 
-**STRENGTH TRAINING (Based on NSCA guidelines):**
-- Compound movements: squats, deadlifts, rows, presses
-- 2-3 sets, 8-12 reps for hypertrophy
-- 3-5 sets, 3-6 reps for strength
-- 2-3 sessions per week for triathletes
-
-**TAPER PRINCIPLES (Based on Mujika research):**
-- 7-21 days before competition
-- 40-60% volume reduction
-- Maintain intensity, reduce frequency
-- Peak performance typically 7-14 days post-taper
-
-INTELLIGENCE GUIDELINES:
-- "Complete beginner" = Very conservative, focus on consistency
-- "Some fitness" = Light structure, build base
-- "Pretty fit" = Moderate intensity, structured progression  
-- "Very fit" = Higher intensity, sport-specific training, Zone 3-4 work
-- "Competitive athlete" = Advanced periodization, precise zones, Zone 4-5 work
-- **8+ hours/week = Elite level training, use Zone 3-4 for long sessions, Zone 4-5 for intervals**
-
-RESPOND WITH ONLY JSON (no extra text):
+EXAMPLE PLAN STRUCTURE:
 {
   "plan": {
-    "name": "Descriptive Plan Name",
-    "description": "Intelligent explanation of training approach",
-    "type": "run|ride|swim|strength|multi",
-    "duration": 8,
-    "level": "beginner|intermediate|advanced",
-    "goal": "User's goal"
-  },
-  "workouts": [
-    {
-      "name": "Workout Name",
-      "type": "run|ride|swim|strength|rest",
-      "date": "2025-07-10",
-      "duration": 2700,
-      "description": "Specific workout with intensity and purpose",
-      "intervals": "Detailed intervals if applicable"
-    }
-  ]
+    "name": "4-Week Training Preview",
+    "description": "Personalized training plan focusing on [user goals]",
+    "type": "triathlon",
+    "duration": 4,
+    "level": "intermediate",
+    "goal": "performance",
+    "status": "active",
+    "currentWeek": 1,
+    "createdDate": "2024-01-01",
+    "totalWorkouts": 20,
+    "disciplines": ["swim", "bike", "run", "strength"],
+    "isIntegrated": true,
+    "weeks": [
+      {
+        "weekNumber": 1,
+        "workouts": [
+          {
+            "day": "Monday",
+            "type": "strength",
+            "duration": 60,
+            "description": "Full body strength session focusing on compound movements..."
+          }
+        ]
+      }
+    ]
+  }
 }
 
-Create 7 days of workouts (Week 1) that match the user's fitness level and goals. 
-IMPORTANT: Structure workouts based on weekday vs weekend time:
-- Monday-Friday: Use weekday time constraints  
-- Saturday-Sunday: Use weekend time availability
-Include proper rest days and progression.`;
+REMEMBER: This is a 4-week preview plan. Focus on building a solid foundation and establishing good training habits.`;
   }
 
   // Build user-specific prompt
@@ -880,165 +632,87 @@ Include proper rest days and progression.`;
     startDate: string, 
     userContext: any = {}
   ): string {
-    let contextInfo = `Start date: ${startDate}\n`;
-    
-    if (userContext?.focus) {
-      contextInfo += `Primary focus: ${userContext.focus}\n`;
-    }
-    if (userContext?.currentFitness) {
-      contextInfo += `Fitness level: ${userContext.currentFitness}\n`;
-    }
-    if (userContext?.benchmark) {
-      contextInfo += `Performance benchmark: ${userContext.benchmark}\n`;
-    }
-    if (userContext?.frequency) {
-      contextInfo += `Training frequency: ${userContext.frequency}\n`;
-    }
-    if (userContext?.weekdayTime) {
-      contextInfo += `Weekday time: ${userContext.weekdayTime}\n`;
-    }
-    if (userContext?.weekendTime) {
-      contextInfo += `Weekend time: ${userContext.weekendTime}\n`;
-    }
-    if (userContext?.goal) {
-      contextInfo += `Main goal: ${userContext.goal}\n`;
-    }
+    return `USER REQUEST: ${prompt}
 
-    return `${contextInfo}\nRequest: ${prompt}\n\nCreate a personalized training plan that matches their fitness level and constraints. Be intelligent about their descriptions and create appropriate workouts.`;
+START DATE: ${startDate}
+
+USER CONTEXT: ${JSON.stringify(userContext, null, 2)}
+
+Please create a 4-week training plan that:
+1. Matches the user's goals and current fitness level
+2. Uses their available equipment and schedule
+3. Follows proper training science principles
+4. Includes specific workout details and instructions
+5. Provides a solid foundation for continued training
+
+Return ONLY the JSON plan object, no additional text.`;
   }
 
-  // FIXED: Return weeks structure directly for new UI
+  // Parse AI response into structured plan
   private parseAIResponse(aiResponse: string, startDate: string): AITrainingPlan {
-    let cleanResponse: string;
-    let jsonString: string;
-    
     try {
-      console.log('🔍 Raw AI Response:', aiResponse.substring(0, 300) + '...');
+      console.log('🔍 Parsing AI plan response...');
       
-      // Clean the response - remove any markdown, extra text
-      cleanResponse = aiResponse.trim();
+      // Clean the response
+      let cleanResponse = aiResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '');
       
-      // Remove markdown code blocks if present
-      cleanResponse = cleanResponse.replace(/```json\s*/g, '').replace(/```\s*$/g, '');
+      // Parse the JSON
+      const parsed = JSON.parse(cleanResponse);
       
-      // Remove any leading/trailing non-JSON characters
-      cleanResponse = cleanResponse.replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-      
-      // Find the JSON object - look for the outermost braces
-      const startIndex = cleanResponse.indexOf('{');
-      const lastIndex = cleanResponse.lastIndexOf('}');
-      
-      if (startIndex === -1 || lastIndex === -1) {
-        throw new Error('No JSON braces found in response');
+      // Validate the structure
+      if (!parsed.plan || !parsed.plan.weeks) {
+        throw new Error('Invalid plan structure - missing plan or weeks');
       }
       
-      jsonString = cleanResponse.substring(startIndex, lastIndex + 1);
-      console.log('🔍 Cleaned JSON:', jsonString.substring(0, 200) + '...');
-      
-      const parsedPlan = JSON.parse(jsonString);
-      
-      // Return the plan structure directly for new UI
-      if (parsedPlan.plan && parsedPlan.plan.weeks) {
-        console.log('✅ Parsed AI weeks successfully:', parsedPlan.plan.weeks.length);
-        
-        return {
-          plan: {
-            name: parsedPlan.plan.name || 'AI Training Plan',
-            description: parsedPlan.plan.description || 'Personalized training plan',
-            type: parsedPlan.plan.type || 'multi',
-            duration: parsedPlan.plan.duration || 8,
-            level: parsedPlan.plan.level || 'intermediate',
-            goal: parsedPlan.plan.goal || 'Training',
-            status: 'active',
-            currentWeek: 1,
-            createdDate: new Date().toISOString().split('T')[0],
-            totalWorkouts: parsedPlan.plan.weeks.reduce((total: number, week: any) => 
-              total + (week.workouts?.length || 0), 0),
-            disciplines: [parsedPlan.plan.type || 'multi'],
-            isIntegrated: (parsedPlan.plan.type || 'multi') === 'multi',
-            // Add the weeks structure for new UI
-            weeks: parsedPlan.plan.weeks,
-            phase: parsedPlan.plan.phase,
-            phaseDescription: parsedPlan.plan.phaseDescription
-          },
-          workouts: [] // Keep empty for compatibility
-        };
-      }
-
-      // Fallback to old structure if weeks not found
-      let workouts: any[] = [];
-      const startDateObj = new Date(startDate);
-
-      if (parsedPlan.workouts && Array.isArray(parsedPlan.workouts)) {
-        // Direct workouts array
-        workouts = parsedPlan.workouts.map((workout: any, index: number) => {
-          const workoutDate = new Date(startDateObj);
-          workoutDate.setDate(startDateObj.getDate() + index);
-          
-          return {
-            name: workout.name || 'Training Session',
-            type: workout.type || 'run',
-            date: workoutDate.toISOString().split('T')[0],
-            duration: workout.duration || 2700,
-            description: workout.description || 'Training session',
-            intervals: this.parseIntervals(workout.intervals, workout.type),
-            strength_exercises: workout.type === 'strength' ? 
-              this.parseStrengthExercises(workout.description || '') : undefined
-          };
-        });
-      }
-
-      console.log('✅ Parsed AI workouts successfully:', workouts.length);
-
-      return {
-        plan: {
-          name: parsedPlan.plan?.name || 'AI Training Plan',
-          description: parsedPlan.plan?.description || 'Personalized training plan',
-          type: parsedPlan.plan?.type || 'multi',
-          duration: parsedPlan.plan?.duration || 8,
-          level: parsedPlan.plan?.level || 'intermediate',
-          goal: parsedPlan.plan?.goal || 'Training',
-          status: 'active',
-          currentWeek: 1,
-          createdDate: new Date().toISOString().split('T')[0],
-          totalWorkouts: workouts.length,
-          disciplines: [parsedPlan.plan?.type || 'multi'],
-          isIntegrated: (parsedPlan.plan?.type || 'multi') === 'multi'
-        },
-        workouts
+      // Add default values if missing
+      const plan = {
+        name: parsed.plan.name || 'Your Training Plan',
+        description: parsed.plan.description || 'Personalized training plan',
+        type: parsed.plan.type || 'triathlon',
+        duration: parsed.plan.duration || 4,
+        level: parsed.plan.level || 'intermediate',
+        goal: parsed.plan.goal || 'performance',
+        status: parsed.plan.status || 'active',
+        currentWeek: parsed.plan.currentWeek || 1,
+        createdDate: parsed.plan.createdDate || new Date().toISOString().split('T')[0],
+        totalWorkouts: parsed.plan.totalWorkouts || 0,
+        disciplines: parsed.plan.disciplines || ['swim', 'bike', 'run'],
+        isIntegrated: parsed.plan.isIntegrated !== undefined ? parsed.plan.isIntegrated : true,
+        weeks: parsed.plan.weeks || []
       };
-
-    } catch (error) {
-      console.error('Failed to parse AI response:', error);
-      console.log('🔍 Full AI Response for debugging:', aiResponse);
-      console.log('🔍 Cleaned response:', cleanResponse);
-      console.log('🔍 JSON string extracted:', jsonString);
       
-      // Throw error to trigger fallback
-      throw error;
+      // Calculate total workouts
+      plan.totalWorkouts = plan.weeks.reduce((total: number, week: any) => {
+        return total + (week.workouts ? week.workouts.length : 0);
+      }, 0);
+      
+      console.log('✅ Plan parsed successfully');
+      return { plan, workouts: [] };
+      
+    } catch (error) {
+      console.error('❌ Failed to parse AI plan response:', error);
+      throw new Error(`Plan parsing failed: ${error.message}`);
     }
   }
 
-  // Parse intervals from AI description
+  // Parse intervals from workout description
   private parseIntervals(intervalStr: string, type: string): any[] {
-    if (!intervalStr || type === 'strength') return [];
-
     const intervals = [];
     
-    // Example: "5x3min @ Zone 4"
-    const intervalMatch = intervalStr.match(/(\d+)x(\d+)min.*Zone (\d+)/i);
-    if (intervalMatch) {
-      const [, reps, duration, zone] = intervalMatch;
-      
-      intervals.push({
-        duration: parseInt(duration) * 60,
-        intensity: `Zone ${zone}`,
-        rpeTarget: this.zoneToRPE(parseInt(zone)),
-        repeatCount: parseInt(reps),
-        effortLabel: `${duration}min @ Zone ${zone}`
+    // Simple interval parsing - can be enhanced
+    const intervalMatches = intervalStr.match(/(\d+)x(\d+)(\w+)/g);
+    if (intervalMatches) {
+      intervalMatches.forEach(match => {
+        const [reps, duration, unit] = match.match(/(\d+)x(\d+)(\w+)/)?.slice(1) || [];
+        intervals.push({
+          reps: parseInt(reps),
+          duration: parseInt(duration),
+          unit: unit,
+          intensity: 'moderate'
+        });
       });
     }
-
+    
     return intervals;
   }
 
@@ -1046,36 +720,33 @@ Include proper rest days and progression.`;
   private parseStrengthExercises(description: string): any[] {
     const exercises = [];
     
-    // Look for exercise patterns like "Squats 3x8"
-    const exerciseMatches = description.match(/([A-Za-z\s]+)\s+(\d+)x(\d+)/g);
-    
-    exerciseMatches?.forEach(match => {
-      const parts = match.match(/([A-Za-z\s]+)\s+(\d+)x(\d+)/);
-      if (parts) {
+    // Simple exercise parsing - can be enhanced
+    const exerciseMatches = description.match(/(\d+)x(\d+)\s+([^,]+)/g);
+    if (exerciseMatches) {
+      exerciseMatches.forEach(match => {
+        const [sets, reps, exercise] = match.match(/(\d+)x(\d+)\s+(.+)/)?.slice(1) || [];
         exercises.push({
-          name: parts[1].trim(),
-          sets: parseInt(parts[2]),
-          reps: parseInt(parts[3]),
-          weight: null,
-          rpe: 7
+          name: exercise.trim(),
+          sets: parseInt(sets),
+          reps: parseInt(reps),
+          weight: 'bodyweight'
         });
-      }
-    });
-
+      });
+    }
+    
     return exercises;
   }
 
-  // Convert training zone to RPE
+  // Convert zone to RPE
   private zoneToRPE(zone: number): string {
-    const zoneRPE = {
-      1: '3',
-      2: '4', 
-      3: '6',
-      4: '8',
-      5: '9'
+    const rpeMap: { [key: number]: string } = {
+      1: 'Very Easy (RPE 1-2)',
+      2: 'Easy (RPE 3-4)',
+      3: 'Moderate (RPE 5-6)',
+      4: 'Hard (RPE 7-8)',
+      5: 'Very Hard (RPE 9-10)',
+      6: 'Maximum (RPE 10)'
     };
-    return zoneRPE[zone as keyof typeof zoneRPE] || '5';
+    return rpeMap[zone] || 'Moderate (RPE 5-6)';
   }
-
-
-}
+} 
