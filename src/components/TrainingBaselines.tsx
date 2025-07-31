@@ -1146,7 +1146,7 @@ return (
                                 {disciplineId === 'running' && (
                                   <div className="space-y-3">
                                     <div>
-                                      <label className="text-xs text-gray-600">5K Time (mm:ss)</label>
+                                      <label className="text-xs text-gray-600">5K Pace/Time (mm:ss)</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.fiveK || ''}
@@ -1160,6 +1160,7 @@ return (
                                         placeholder="mm:ss"
                                         className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
                                       />
+                                      <p className="text-xs text-gray-500">Your current 5K race time (e.g., 24:00 for 24 minutes)</p>
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600">Easy/Long Run Pace - Zone 2 (mm:ss/mi)</label>

@@ -78,6 +78,10 @@ export class RealTrainingAI {
     }
 
     const performanceNumbers = userBaselines.performanceNumbers;
+    console.log('🔍 Performance Numbers:', performanceNumbers);
+    console.log('🔍 FiveK value:', performanceNumbers?.fiveK);
+    console.log('🔍 Current Fitness (5K):', userBaselines.currentFitness);
+    
     if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
     if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
     if (!performanceNumbers?.bench) throw new Error('❌ MISSING: Bench 1RM');
