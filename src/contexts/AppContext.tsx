@@ -286,6 +286,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       
       console.log('🔍 Database data loaded:', data);
+      console.log('🔍 All database fields:', Object.keys(data));
       console.log('🔍 current_fitness from database:', data.current_fitness);
       
       return {

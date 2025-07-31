@@ -79,14 +79,14 @@ export class RealTrainingAI {
 
     const performanceNumbers = userBaselines.performanceNumbers;
     console.log('🔍 Performance Numbers:', performanceNumbers);
-    console.log('🔍 Current Fitness (5K):', userBaselines.currentFitness);
+    console.log('🔍 FiveK value:', performanceNumbers?.fiveK);
     console.log('🔍 Full userBaselines object:', userBaselines);
     
     if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
     if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
     if (!performanceNumbers?.bench) throw new Error('❌ MISSING: Bench 1RM');
     if (!performanceNumbers?.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
-    if (!userBaselines.currentFitness) throw new Error('❌ MISSING: Current Fitness (5K pace)');
+    if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace (fiveK)');
     if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
     if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
 

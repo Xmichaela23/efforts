@@ -89,7 +89,7 @@ export class PlanEngine {
     if (!performanceNumbers.squat) throw new Error('❌ MISSING: Squat 1RM');
     if (!performanceNumbers.bench) throw new Error('❌ MISSING: Bench 1RM');
     if (!performanceNumbers.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
-    if (!this.userBaselines.currentFitness) throw new Error('❌ MISSING: Current Fitness (5K pace)');
+    if (!performanceNumbers.fiveK) throw new Error('❌ MISSING: 5K pace (fiveK)');
     if (!performanceNumbers.tenK) throw new Error('❌ MISSING: 10K pace');
     if (!performanceNumbers.swimPace100) throw new Error('❌ MISSING: Swim pace');
     
