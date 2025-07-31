@@ -330,7 +330,7 @@ RESPOND WITH ONLY JSON:
     try {
       console.log('🔍 Parsing AI analysis result:', data);
       
-      // The edge function should return the analysis result directly
+      // Handle the case where data is already a parsed object
       if (data.trainingPhilosophy) {
         // Transform the AI response to match expected format
         const transformed = this.transformAIResponse(data);
@@ -338,8 +338,21 @@ RESPOND WITH ONLY JSON:
         return transformed;
       }
       
-      // If not in expected format, try to parse from response
-      const responseText = typeof data === 'string' ? data : JSON.stringify(data);
+      // Handle the case where data is a string (from Edge Function)
+      if (typeof data === 'string') {
+        console.log('📝 Parsing string response from Edge Function');
+        const jsonMatch = data.match(/\{[\s\S]*\}/);
+        
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          console.log('✅ Parsed JSON from string:', parsed);
+          const transformed = this.transformAIResponse(parsed);
+          return transformed;
+        }
+      }
+      
+      // Handle the case where data is an object but needs parsing
+      const responseText = JSON.stringify(data);
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       
       if (jsonMatch) {
