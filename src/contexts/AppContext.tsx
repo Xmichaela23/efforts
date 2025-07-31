@@ -285,6 +285,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // If it's already a YYYY-MM-DD string, keep it as is
       }
       
+      console.log('🔍 Database data loaded:', data);
+      console.log('🔍 current_fitness from database:', data.current_fitness);
+      
       return {
         // Enhanced user details
         birthday: formattedBirthday,
