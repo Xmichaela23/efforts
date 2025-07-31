@@ -63,6 +63,7 @@ interface BaselineData {
   // Existing fields
   age: number;
   disciplines: string[];
+  currentFitness?: string;
   disciplineFitness: {
     running?: string;
     cycling?: string;
@@ -237,6 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Existing fields
         age: data.age,
         disciplines: data.disciplines,
+        current_fitness: data.currentFitness,
         discipline_fitness: data.disciplineFitness,
         benchmarks: data.benchmarks,
         performance_numbers: data.performanceNumbers,
@@ -298,6 +300,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Existing fields
         age: data.age || 0,
         disciplines: data.disciplines || [],
+        currentFitness: data.current_fitness,
         disciplineFitness: data.discipline_fitness || {},
         benchmarks: data.benchmarks || {},
         performanceNumbers: data.performance_numbers || {},
