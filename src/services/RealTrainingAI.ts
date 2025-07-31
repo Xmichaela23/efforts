@@ -71,24 +71,39 @@ export class RealTrainingAI {
   async analyzeUserProfile(userBaselines: any, userResponses: any): Promise<AIAnalysisResult> {
     console.log('🧠 Starting AI user profile analysis...');
 
-    // FAIL-FAST VALIDATION - Check baseline data before any AI calls
+    // FLEXIBLE VALIDATION - Check baseline data based on user's disciplines
     console.log('🔍 Baseline Data Validation:');
     if (!userBaselines) {
       throw new Error('❌ MISSING: No userBaselines object found');
     }
 
-    const performanceNumbers = userBaselines.performanceNumbers;
+    const performanceNumbers = userBaselines.performanceNumbers || {};
+    const disciplines = userBaselines.disciplines || [];
     console.log('🔍 Performance Numbers:', performanceNumbers);
-    console.log('🔍 FiveK value:', performanceNumbers?.fiveK);
+    console.log('🔍 Disciplines:', disciplines);
     console.log('🔍 Full userBaselines object:', userBaselines);
     
-    if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
-    if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
-    if (!performanceNumbers?.bench) throw new Error('❌ MISSING: Bench 1RM');
-    if (!performanceNumbers?.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
-    if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace (fiveK)');
-    if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
-    if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
+    // Validate based on disciplines
+    const missingFields: string[] = [];
+    
+    if (disciplines.includes('cycling') && !performanceNumbers.ftp) {
+      missingFields.push('FTP for cycling');
+    }
+    
+    if (disciplines.includes('strength')) {
+      if (!performanceNumbers.squat) missingFields.push('Squat 1RM');
+      if (!performanceNumbers.bench) missingFields.push('Bench 1RM');
+      if (!performanceNumbers.deadlift) missingFields.push('Deadlift 1RM');
+    }
+    
+    if (disciplines.includes('running')) {
+      if (!performanceNumbers.fiveK) missingFields.push('5K pace');
+      if (!performanceNumbers.tenK) missingFields.push('10K pace');
+    }
+    
+    if (disciplines.includes('swimming') && !performanceNumbers.swimPace100) {
+      missingFields.push('Swim pace');
+    }
 
     // Calculate age from birthday if not set
     if (!userBaselines.age && userBaselines.birthday) {
@@ -98,11 +113,23 @@ export class RealTrainingAI {
       console.log('✅ Calculated age from birthday:', userBaselines.age);
     }
 
-    if (!userBaselines.age) throw new Error('❌ MISSING: Age (no birthday provided)');
-    if (!userBaselines.equipment?.strength || userBaselines.equipment.strength.length === 0) throw new Error('❌ MISSING: Strength equipment');
-    if (!userBaselines.injuryHistory) throw new Error('❌ MISSING: Injury history');
+    if (!userBaselines.age) {
+      missingFields.push('Age (no birthday provided)');
+    }
+    
+    if (disciplines.includes('strength') && (!userBaselines.equipment?.strength || userBaselines.equipment.strength.length === 0)) {
+      missingFields.push('Strength equipment');
+    }
+    
+    if (!userBaselines.injuryHistory) {
+      missingFields.push('Injury history');
+    }
 
-    console.log('✅ All required baseline data present');
+    if (missingFields.length > 0) {
+      throw new Error(`❌ MISSING REQUIRED DATA: ${missingFields.join(', ')}`);
+    }
+
+    console.log('✅ All required baseline data present for selected disciplines');
 
     try {
       // Build the analysis prompt
@@ -355,7 +382,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       const volumes = Object.values(aiResponse.weeklyVolume);
       weeklyVolume = volumes.reduce((sum: number, volume: unknown) => {
         const numVolume = typeof volume === 'number' ? volume : Number(volume) || 0;
-        return sum + (numVolume as number);
+        return sum + Number(numVolume);
       }, 0);
     } else if (typeof aiResponse.weeklyVolume === 'number') {
       weeklyVolume = aiResponse.weeklyVolume;
