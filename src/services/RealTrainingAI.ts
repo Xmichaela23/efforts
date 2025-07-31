@@ -197,9 +197,14 @@ RESPOND WITH ONLY JSON:
   // Parse analysis result from AI response
   private parseAnalysisResult(data: any): AIAnalysisResult {
     try {
+      console.log('🔍 Parsing AI analysis result:', data);
+      
       // The edge function should return the analysis result directly
       if (data.trainingPhilosophy) {
-        return data as AIAnalysisResult;
+        // Transform the AI response to match expected format
+        const transformed = this.transformAIResponse(data);
+        console.log('✅ Transformed AI response:', transformed);
+        return transformed;
       }
       
       // If not in expected format, try to parse from response
@@ -208,7 +213,8 @@ RESPOND WITH ONLY JSON:
       
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
-        return parsed as AIAnalysisResult;
+        const transformed = this.transformAIResponse(parsed);
+        return transformed;
       }
       
       throw new Error('Could not parse analysis result');
@@ -217,6 +223,89 @@ RESPOND WITH ONLY JSON:
       console.error('Failed to parse analysis result:', error);
       throw error;
     }
+  }
+
+  // Transform AI response to match expected AIAnalysisResult format
+  private transformAIResponse(aiResponse: any): AIAnalysisResult {
+    console.log('🔄 Transforming AI response to expected format');
+    
+    // Transform weeklyVolume from object to number
+    let weeklyVolume = 8; // Default
+    if (aiResponse.weeklyVolume && typeof aiResponse.weeklyVolume === 'object') {
+      // Sum up all sport volumes
+      const volumes = Object.values(aiResponse.weeklyVolume);
+      weeklyVolume = volumes.reduce((sum: number, volume: unknown) => {
+        const numVolume = typeof volume === 'number' ? volume : Number(volume) || 0;
+        return sum + numVolume;
+      }, 0);
+    } else if (typeof aiResponse.weeklyVolume === 'number') {
+      weeklyVolume = aiResponse.weeklyVolume;
+    }
+    
+    // Transform intensityDistribution
+    let intensityDistribution = { easy: 60, moderate: 25, hard: 15 }; // Default
+    if (aiResponse.intensityDistribution) {
+      const ai = aiResponse.intensityDistribution;
+      intensityDistribution = {
+        easy: ai.easy || ai.threshold || 60,
+        moderate: ai.moderate || ai.threshold || 25,
+        hard: ai.hard || ai.vo2max || 15
+      };
+    }
+    
+    // Transform strength approach
+    let strengthFocus = 'general_fitness'; // Default
+    if (aiResponse.strengthApproach) {
+      const mapping: { [key: string]: string } = {
+        'power-lifting': 'powerlifting',
+        'power-development': 'power_development',
+        'injury-prevention': 'injury_prevention',
+        'sport-specific': 'sport_specific',
+        'build-muscle': 'muscle_building',
+        'general-fitness': 'general_fitness'
+      };
+      strengthFocus = mapping[aiResponse.strengthApproach] || 'general_fitness';
+    }
+    
+    // Transform progression type
+    let progressionRate: 'conservative' | 'moderate' | 'aggressive' = 'moderate'; // Default
+    if (aiResponse.progressionType) {
+      progressionRate = aiResponse.progressionType as 'conservative' | 'moderate' | 'aggressive';
+    }
+    
+    // Transform recovery emphasis
+    let recoveryNeeds: 'high' | 'moderate' | 'low' = 'moderate'; // Default
+    if (aiResponse.recoveryEmphasis) {
+      recoveryNeeds = aiResponse.recoveryEmphasis as 'high' | 'moderate' | 'low';
+    }
+    
+    const transformed: AIAnalysisResult = {
+      trainingPhilosophy: aiResponse.trainingPhilosophy || 'balanced',
+      focusAreas: aiResponse.focusAreas || ['swim', 'bike', 'run'],
+      weeklyVolume,
+      intensityDistribution,
+      strengthFocus,
+      progressionRate,
+      recoveryNeeds,
+      injuryConsiderations: aiResponse.injuryConsiderations || [],
+      equipmentOptimization: aiResponse.equipmentOptimization || [],
+      ageAdjustments: aiResponse.ageAdjustments || {
+        recoveryTime: 24,
+        intensityModifier: 1.0,
+        volumeModifier: 1.0
+      },
+      baselineFitness: aiResponse.baselineFitness || {
+        overallLevel: 'intermediate',
+        swimLevel: 'intermediate',
+        bikeLevel: 'intermediate',
+        runLevel: 'intermediate',
+        strengthLevel: 'intermediate'
+      },
+      customParameters: aiResponse.customParameters || {}
+    };
+    
+    console.log('✅ Transformation complete:', transformed);
+    return transformed;
   }
 
   // Generate intelligent fallback analysis

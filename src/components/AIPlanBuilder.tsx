@@ -1040,10 +1040,17 @@ ${insights.age >= 40 ? `
       setGeneratingPlan(true);
       
       console.log('🧠 Starting AI analysis of user profile...');
+      console.log('📊 Baselines:', baselines);
+      console.log('📝 Responses:', responses);
       
       // Step 1: AI Analysis - analyze user profile to get training parameters
       const aiAnalysis = await realAI.analyzeUserProfile(baselines, responses);
       console.log('✅ AI analysis completed:', aiAnalysis);
+      
+      if (!aiAnalysis) {
+        console.error('❌ AI analysis returned null/undefined!');
+        throw new Error('AI analysis failed - returned null');
+      }
       
       // Step 2: Deterministic Generation - use AI parameters to generate unique plan
       const planEngine = new PlanEngine(baselines, responses, aiAnalysis);
@@ -1066,7 +1073,9 @@ ${insights.age >= 40 ? `
       setCurrentWeek(0); // Reset to first week
       
     } catch (error) {
-      console.error('Error generating plan:', error);
+      console.error('❌ Error generating plan:', error);
+      console.error('❌ Error details:', error.message);
+      console.error('❌ Error stack:', error.stack);
       // Show error to user
       setGeneratedPlan(null);
     } finally {

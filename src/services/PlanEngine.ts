@@ -67,12 +67,18 @@ export class PlanEngine {
 
   // Generate a 4-week preview plan using AI analysis
   generatePreviewPlan(): TrainingPlan {
+    console.log('🔧 PlanEngine.generatePreviewPlan() called');
+    console.log('🔧 AI Analysis available:', !!this.aiAnalysis);
+    console.log('🔧 AI Analysis data:', this.aiAnalysis);
+    
     const weeks = this.generateWeeks(1, 4);
     
     // Use AI analysis for training philosophy, fallback to responses
     const trainingPhilosophy = this.aiAnalysis?.trainingPhilosophy || 
                               this.responses.trainingPhilosophy || 
                               'balanced';
+    
+    console.log('🔧 Using training philosophy:', trainingPhilosophy);
     
     return {
       name: "Your Training Plan",
