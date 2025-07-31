@@ -131,24 +131,20 @@ export class RealTrainingAI {
       const eventDate = new Date(userResponses.eventDate);
       const today = new Date();
       const weeksUntilEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      
-      if (weeksUntilEvent <= 12) {
-        timeline = '8-12-weeks';
-      } else if (weeksUntilEvent <= 20) {
-        timeline = '16-20-weeks';
-      } else {
-        timeline = '24-plus-weeks';
-      }
-    } else {
-      // Fallback timeline based on race distance
-      if (raceDistance === 'ironman') {
-        timeline = '24-plus-weeks';
-      } else if (raceDistance === '70.3') {
-        timeline = '16-20-weeks';
-      } else if (raceDistance === 'olympic') {
-        timeline = '8-12-weeks';
-      } else if (raceDistance === 'sprint') {
-        timeline = '8-12-weeks';
+      timeline = `${weeksUntilEvent} weeks`;
+    }
+    
+    // Calculate eventType from race distance
+    let eventType = 'Not specified';
+    if (userResponses.distance) {
+      if (userResponses.distance === 'ironman') {
+        eventType = 'Ironman';
+      } else if (userResponses.distance === '70.3') {
+        eventType = '70.3';
+      } else if (userResponses.distance === 'olympic') {
+        eventType = 'Olympic';
+      } else if (userResponses.distance === 'sprint') {
+        eventType = 'Sprint';
       }
     }
     
@@ -171,6 +167,7 @@ COMPLETE USER PROFILE MAPPING:
 - Climate: ${userResponses.climate || 'Not specified'}
 - Strength Training Choice: ${strengthChoice || 'Not specified'}
 - Timeline: ${timeline || 'Not specified'}
+- Event Type: ${eventType || 'Not specified'}
 - Training Frequency: ${trainingFrequency || 'Not specified'}
 - Weekend Availability: ${userResponses.weekendAvailability || 'Not specified'}
 - Long Session Preferences: ${userResponses.longSessionPreferences || 'Not specified'}
