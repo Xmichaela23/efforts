@@ -238,7 +238,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Existing fields
         age: data.age,
         disciplines: data.disciplines,
-        current_fitness: data.currentFitness,
         discipline_fitness: data.disciplineFitness,
         benchmarks: data.benchmarks,
         performance_numbers: data.performanceNumbers,
@@ -287,7 +286,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       console.log('🔍 Database data loaded:', data);
       console.log('🔍 All database fields:', Object.keys(data));
-      console.log('🔍 current_fitness from database:', data.current_fitness);
       
       return {
         // Enhanced user details
@@ -304,7 +302,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Existing fields
         age: data.age || 0,
         disciplines: data.disciplines || [],
-        currentFitness: data.current_fitness,
         disciplineFitness: data.discipline_fitness || {},
         benchmarks: data.benchmarks || {},
         performanceNumbers: data.performance_numbers || {},
