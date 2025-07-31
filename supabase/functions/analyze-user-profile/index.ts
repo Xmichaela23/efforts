@@ -55,11 +55,28 @@ serve(async (req) => {
   "eventType": "string"
 }
 
-CRITICAL: Use the timeline and eventType values provided in the user data. Do not calculate them yourself.
+CRITICAL INSTRUCTIONS:
+1. You MUST include BOTH "timeline" and "eventType" fields in your JSON response
+2. Use the timeline and eventType values provided in the user data - do not calculate them yourself
+3. If the user data shows "Timeline: 11 weeks" and "Event Type: 70.3", then include:
+   - "timeline": 11
+   - "eventType": "70.3"
+4. If timeline or eventType are not provided in user data, use defaults:
+   - "timeline": 12
+   - "eventType": "General Training"
 
-EXAMPLE: If the user data shows "Timeline: 11 weeks" and "Event Type: 70.3", then include:
-- "timeline": 11
-- "eventType": "70.3"
+EXAMPLE RESPONSE:
+{
+  "trainingPhilosophy": "pyramid",
+  "weeklyVolume": { "swim": 2, "bike": 4, "run": 4, "strength": 2 },
+  "intensityDistribution": { "easy": 60, "moderate": 25, "hard": 15 },
+  "progressionType": "moderate",
+  "focusAreas": ["swim", "bike", "run", "strength"],
+  "strengthApproach": "power-lifting",
+  "recoveryEmphasis": "moderate",
+  "timeline": 11,
+  "eventType": "70.3"
+}
 
 YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`
         },
@@ -106,6 +123,9 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`
 
     // Parse and validate the response
     const analysisResult = parseAnalysisResponse(aiResponse);
+    
+    // Log the final result for debugging
+    console.log('Final Analysis Result:', JSON.stringify(analysisResult, null, 2));
     
     return new Response(JSON.stringify(analysisResult), {
       status: 200, headers

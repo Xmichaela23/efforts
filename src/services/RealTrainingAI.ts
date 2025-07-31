@@ -154,6 +154,44 @@ export class RealTrainingAI {
     const trainingFrequency = userResponses.trainingFrequency;
     const goals = userResponses.goals || [];
     
+    // Require baseline data - fail fast if missing
+    if (!userBaselines) {
+      throw new Error('❌ MISSING: No userBaselines object found');
+    }
+    
+    const equipment = userBaselines.equipment;
+    const injuryHistory = userBaselines.injuryHistory;
+    const injuryRegions = userBaselines.injuryRegions;
+    const performanceNumbers = userBaselines.performanceNumbers;
+    const currentVolume = userBaselines.current_volume;
+    const trainingBackground = userBaselines.trainingBackground;
+    const age = userBaselines.age;
+    const gender = userBaselines.gender;
+    const height = userBaselines.height;
+    const weight = userBaselines.weight;
+    const disciplineFitness = userBaselines.disciplineFitness;
+    const trainingStatus = userBaselines.training_status;
+    const volumeIncreaseCapacity = userBaselines.volume_increase_capacity;
+    const benchmarkRecency = userBaselines.benchmark_recency;
+    const trainingFrequencyBaseline = userBaselines.training_frequency;
+    const disciplines = userBaselines.disciplines;
+    const units = userBaselines.units;
+    
+    // Validate required baseline data
+    console.log('🔍 Baseline Data Validation:');
+    if (!performanceNumbers?.ftp) throw new Error('❌ MISSING: FTP');
+    if (!performanceNumbers?.squat) throw new Error('❌ MISSING: Squat 1RM');
+    if (!performanceNumbers?.bench) throw new Error('❌ MISSING: Bench 1RM');
+    if (!performanceNumbers?.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
+    if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace');
+    if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
+    if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
+    if (!age) throw new Error('❌ MISSING: Age');
+    if (!equipment?.strength || equipment.strength.length === 0) throw new Error('❌ MISSING: Strength equipment');
+    if (!injuryHistory) throw new Error('❌ MISSING: Injury history');
+    
+    console.log('✅ All required baseline data present');
+    
     return `You are an expert exercise physiologist and training coach. Your task is to analyze ALL user answers holistically and create a scientifically-based training plan.
 
 CRITICAL INSTRUCTION: You MUST map and understand EVERY SINGLE ANSWER. Do not focus on individual answers. Instead, understand how ALL answers interact to create the optimal training plan.
@@ -177,23 +215,23 @@ COMPLETE USER PROFILE MAPPING:
 - Weekday Session Duration: ${userResponses.weekdayDuration || 'Not specified'}
 - Weekend Session Duration: ${userResponses.weekendDuration || 'Not specified'}
 - Goals: ${goals.join(', ') || 'Not specified'}
-- Equipment Available: ${JSON.stringify(userBaselines.equipment || {})}
-- Injury History: ${userBaselines.injuryHistory || 'None'}
-- Injury Regions: ${JSON.stringify(userBaselines.injuryRegions || [])}
-- Performance Numbers: ${JSON.stringify(userBaselines.performanceNumbers || {})}
-- Current Training Volume: ${JSON.stringify(userBaselines.current_volume || {})}
-- Training Background: ${userBaselines.trainingBackground || 'Not specified'}
-- Age: ${userBaselines.age || 'Not specified'}
-- Gender: ${userBaselines.gender || 'Not specified'}
-- Height: ${userBaselines.height || 'Not specified'}
-- Weight: ${userBaselines.weight || 'Not specified'}
-- Discipline Fitness: ${JSON.stringify(userBaselines.disciplineFitness || {})}
-- Training Status: ${JSON.stringify(userBaselines.training_status || {})}
-- Volume Increase Capacity: ${JSON.stringify(userBaselines.volume_increase_capacity || {})}
-- Benchmark Recency: ${JSON.stringify(userBaselines.benchmark_recency || {})}
-- Training Frequency: ${JSON.stringify(userBaselines.training_frequency || {})}
-- Disciplines: ${JSON.stringify(userBaselines.disciplines || [])}
-- Units: ${userBaselines.units || 'Not specified'}
+- Equipment Available: ${JSON.stringify(equipment)}
+- Injury History: ${injuryHistory}
+- Injury Regions: ${JSON.stringify(injuryRegions)}
+- Performance Numbers: ${JSON.stringify(performanceNumbers)}
+- Current Training Volume: ${JSON.stringify(currentVolume)}
+- Training Background: ${trainingBackground}
+- Age: ${age}
+- Gender: ${gender}
+- Height: ${height}
+- Weight: ${weight}
+- Discipline Fitness: ${JSON.stringify(disciplineFitness)}
+- Training Status: ${JSON.stringify(trainingStatus)}
+- Volume Increase Capacity: ${JSON.stringify(volumeIncreaseCapacity)}
+- Benchmark Recency: ${JSON.stringify(benchmarkRecency)}
+- Training Frequency: ${JSON.stringify(trainingFrequencyBaseline)}
+- Disciplines: ${JSON.stringify(disciplines)}
+- Units: ${units}
 
 USER BASELINES:
 ${JSON.stringify(userBaselines, null, 2)}

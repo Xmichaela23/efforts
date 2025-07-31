@@ -71,6 +71,28 @@ export class PlanEngine {
     console.log('🔧 AI Analysis available:', !!this.aiAnalysis);
     console.log('🔧 AI Analysis data:', this.aiAnalysis);
     
+    // Require complete baseline data - fail fast
+    if (!this.userBaselines) {
+      throw new Error('❌ MISSING: No userBaselines object');
+    }
+    
+    if (!this.userBaselines.performanceNumbers) {
+      throw new Error('❌ MISSING: No performanceNumbers object');
+    }
+    
+    const performanceNumbers = this.userBaselines.performanceNumbers;
+    
+    // Validate required performance data
+    if (!performanceNumbers.ftp) throw new Error('❌ MISSING: FTP');
+    if (!performanceNumbers.squat) throw new Error('❌ MISSING: Squat 1RM');
+    if (!performanceNumbers.bench) throw new Error('❌ MISSING: Bench 1RM');
+    if (!performanceNumbers.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
+    if (!performanceNumbers.fiveK) throw new Error('❌ MISSING: 5K pace');
+    if (!performanceNumbers.tenK) throw new Error('❌ MISSING: 10K pace');
+    if (!performanceNumbers.swimPace100) throw new Error('❌ MISSING: Swim pace');
+    
+    console.log('✅ All required performance data present');
+    
     const weeks = this.generateWeeks(1, 4);
     
     // Use AI analysis for training philosophy, fallback to responses
@@ -573,7 +595,7 @@ export class PlanEngine {
 
   // Get swim intensity (fallback method)
   private getSwimIntensity(weekNumber: number): string {
-    const swimPace = this.userBaselines.performanceNumbers.swimPace100 || '2:00/100m';
+    const swimPace = this.userBaselines.performanceNumbers.swimPace100;
     
     return `${swimPace} (moderate pace)`;
   }
@@ -612,10 +634,12 @@ export class PlanEngine {
 
   // Calculate paces with ranges for Garmin compatibility
   private calculatePaces() {
-    const fiveKPace = this.userBaselines.performanceNumbers.fiveK;
-    const easyPace = this.userBaselines.performanceNumbers.easyPace;
-    const tenKPace = this.userBaselines.performanceNumbers.tenK;
-    const halfMarathonPace = this.userBaselines.performanceNumbers.halfMarathon;
+    const performanceNumbers = this.userBaselines.performanceNumbers;
+    
+    const fiveKPace = performanceNumbers.fiveK;
+    const easyPace = performanceNumbers.easyPace;
+    const tenKPace = performanceNumbers.tenK;
+    const halfMarathonPace = performanceNumbers.halfMarathon;
     
     // Convert single paces to ranges (add 30-60 seconds for range)
     const createRange = (pace: string, addSeconds: number = 30) => {
@@ -721,7 +745,7 @@ export class PlanEngine {
   // Get swim intensity using AI analysis
   private getSwimIntensityWithAI(weekNumber: number): string {
     const { customParameters } = this.aiAnalysis!;
-    const swimPace = this.userBaselines.performanceNumbers.swimPace100 || '2:00/100m';
+    const swimPace = this.userBaselines.performanceNumbers.swimPace100;
     
     // Apply pace modifier if available
     const paceModifier = customParameters?.swimPaceModifier || 1.0;
@@ -873,7 +897,7 @@ export class PlanEngine {
   // Generate AI-driven swim workout
   private generateAISwimWorkout(intensity: string, weekNumber: number): string {
     const { trainingPhilosophy, weeklyVolume } = this.aiAnalysis!;
-    const swimPace = this.userBaselines.performanceNumbers.swimPace100 || '2:00/100m';
+    const swimPace = this.userBaselines.performanceNumbers.swimPace100;
     
     // Different workout structures based on training philosophy
     if (trainingPhilosophy === 'pyramid') {
@@ -961,7 +985,7 @@ export class PlanEngine {
     const strengthType = this.mapStrengthTrainingToCategory(this.responses.strengthTraining) || 'general_fitness';
     const userEquipment = this.userBaselines.equipment?.strength || [];
     const injuryHistory = this.userBaselines.injuryHistory;
-    const injuryRegions = this.userBaselines.injuryRegions || [];
+    const injuryRegions = this.userBaselines.injuryRegions;
     
     // Select exercises based on strength type and equipment
     const selectedExercises = this.selectStrengthExercises(
@@ -1091,11 +1115,11 @@ export class PlanEngine {
     // Get user's 1RM for this exercise type
     let oneRM = 0;
     if (exercise.name.toLowerCase().includes('squat')) {
-      oneRM = this.userBaselines.performanceNumbers.squat || 0;
+      oneRM = this.userBaselines.performanceNumbers.squat;
     } else if (exercise.name.toLowerCase().includes('deadlift')) {
-      oneRM = this.userBaselines.performanceNumbers.deadlift || 0;
+      oneRM = this.userBaselines.performanceNumbers.deadlift;
     } else if (exercise.name.toLowerCase().includes('bench')) {
-      oneRM = this.userBaselines.performanceNumbers.bench || 0;
+      oneRM = this.userBaselines.performanceNumbers.bench;
     }
     
     if (oneRM === 0) return '';
