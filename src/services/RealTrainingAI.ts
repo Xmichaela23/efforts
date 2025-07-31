@@ -30,7 +30,7 @@ export interface AITrainingPlan {
 
 // Add interface for AI analysis results
 export interface AIAnalysisResult {
-  trainingPhilosophy: 'pyramid' | 'polarized' | 'balanced';
+  trainingPhilosophy: 'pyramid' | 'polarized' | 'threshold';
   focusAreas: string[];
   weeklyVolume: number;
   intensityDistribution: {
@@ -127,14 +127,45 @@ export class RealTrainingAI {
     const trainingFrequency = userResponses.trainingFrequency;
     const goals = userResponses.goals || [];
     
-    return `You are an expert exercise physiologist and training coach. Analyze the following user profile and determine optimal training parameters.
+    return `You are an expert exercise physiologist and training coach. Your task is to analyze ALL user answers holistically and create a scientifically-based training plan.
 
-CRITICAL USER PREFERENCES (PRIORITIZE THESE):
+CRITICAL INSTRUCTION: You MUST map and understand EVERY SINGLE ANSWER. Do not focus on individual answers. Instead, understand how ALL answers interact to create the optimal training plan.
+
+COMPLETE USER PROFILE MAPPING:
 - Race Distance: ${raceDistance || 'Not specified'}
+- Race Name: ${userResponses.raceName || 'Not specified'}
+- Event Date: ${userResponses.eventDate || 'Not specified'}
+- Water Conditions: ${userResponses.waterConditions || 'Not specified'}
+- Cycling Elevation: ${userResponses.cyclingElevationGain || 'Not specified'}
+- Cycling Course Profile: ${userResponses.cyclingCourseProfile || 'Not specified'}
+- Running Elevation: ${userResponses.runningElevationGain || 'Not specified'}
+- Running Course Profile: ${userResponses.runningCourseProfile || 'Not specified'}
+- Climate: ${userResponses.climate || 'Not specified'}
 - Strength Training Choice: ${strengthChoice || 'Not specified'}
 - Timeline: ${timeline || 'Not specified'}
 - Training Frequency: ${trainingFrequency || 'Not specified'}
+- Weekend Availability: ${userResponses.weekendAvailability || 'Not specified'}
+- Long Session Preferences: ${userResponses.longSessionPreferences || 'Not specified'}
+- Weekday Session Duration: ${userResponses.weekdayDuration || 'Not specified'}
+- Weekend Session Duration: ${userResponses.weekendDuration || 'Not specified'}
 - Goals: ${goals.join(', ') || 'Not specified'}
+- Equipment Available: ${JSON.stringify(userBaselines.equipment || {})}
+- Injury History: ${userBaselines.injuryHistory || 'None'}
+- Injury Regions: ${JSON.stringify(userBaselines.injuryRegions || [])}
+- Performance Numbers: ${JSON.stringify(userBaselines.performanceNumbers || {})}
+- Current Training Volume: ${JSON.stringify(userBaselines.current_volume || {})}
+- Training Background: ${userBaselines.trainingBackground || 'Not specified'}
+- Age: ${userBaselines.age || 'Not specified'}
+- Gender: ${userBaselines.gender || 'Not specified'}
+- Height: ${userBaselines.height || 'Not specified'}
+- Weight: ${userBaselines.weight || 'Not specified'}
+- Discipline Fitness: ${JSON.stringify(userBaselines.disciplineFitness || {})}
+- Training Status: ${JSON.stringify(userBaselines.training_status || {})}
+- Volume Increase Capacity: ${JSON.stringify(userBaselines.volume_increase_capacity || {})}
+- Benchmark Recency: ${JSON.stringify(userBaselines.benchmark_recency || {})}
+- Training Frequency: ${JSON.stringify(userBaselines.training_frequency || {})}
+- Disciplines: ${JSON.stringify(userBaselines.disciplines || [])}
+- Units: ${userBaselines.units || 'Not specified'}
 
 USER BASELINES:
 ${JSON.stringify(userBaselines, null, 2)}
@@ -143,36 +174,92 @@ USER RESPONSES:
 ${JSON.stringify(userResponses, null, 2)}
 
 ANALYSIS TASK:
-Analyze the user's specific preferences and determine optimal training parameters. PAY SPECIAL ATTENTION TO:
+You must map and understand EVERY SINGLE ANSWER to create the optimal training plan. Consider how ALL answers interact:
 
-1. **RACE DISTANCE CONSIDERATION:**
-   - Consider the specific race distance and its training requirements
-   - Analyze user's current fitness level and experience
-   - Determine appropriate training volume based on scientific principles
+1. **RACE DISTANCE + COURSE CONDITIONS + TIMELINE + FREQUENCY:**
+   - How does race distance interact with timeline and training frequency?
+   - How do course conditions affect training focus?
+   - Analyze how water conditions, elevation, course profile, and climate affect training
+   - Let the scientific analysis determine the optimal training approach
 
-2. **STRENGTH TRAINING ANALYSIS:**
-   - Analyze the user's strength training choice and equipment availability
-   - Consider injury history and movement patterns
-   - Determine appropriate exercise selection and intensity
+2. **STRENGTH TRAINING + EQUIPMENT + INJURY HISTORY:**
+   - Each strength option requires completely different programming:
+   - No strength training = Focus on sport-specific conditioning
+   - Power development = Plyometrics, explosive movements, rate of force development
+   - Power lifting = Compound lifts, heavy weight, low reps, progressive overload
+   - Injury prevention = Mobility, stability, corrective work, movement patterns
+   - Sport-specific = Triathlon movements, functional strength, sport transfer
+   - Build muscle = Hypertrophy focus, 8-12 reps, muscle building protocols
+   - General fitness = Basic conditioning, foundational strength, general health
+   - Analyze how equipment limitations and injury history affect exercise selection within the chosen approach
 
-3. **TRAINING FREQUENCY & DURATION:**
-   - Analyze the user's training frequency preferences
-   - Consider timeline constraints and recovery needs
-   - Determine optimal session durations
+3. **PERFORMANCE NUMBERS + CURRENT VOLUME + CAPACITY:**
+   - How do current performance numbers affect training intensity?
+   - How does current volume affect progression rate?
+   - How does volume increase capacity affect training load?
 
-4. **WEEKLY VOLUME CALCULATION:**
-   - Base volume on scientific training principles
-   - Consider user's current fitness level and experience
-   - Balance progression with recovery
+4. **AGE + GENDER + TRAINING BACKGROUND:**
+   - How does age affect recovery needs and progression rate?
+   - How does training background affect starting point?
+   - How do these factors interact with race distance and timeline?
 
-5. **INTENSITY DISTRIBUTION:**
-   - Determine optimal intensity distribution based on training science
-   - Consider user's goals and current fitness level
-   - Balance training stress and recovery appropriately
+5. **DISCIPLINE FITNESS + TRAINING STATUS:**
+   - How do current fitness levels in each discipline affect focus areas?
+   - How does training status affect progression and volume?
+
+6. **TRAINING GOALS + RACE DISTANCE + TIMELINE:**
+   - How do selected goals affect training focus and intensity?
+   - Analyze how each goal interacts with race distance and timeline
+   - Determine optimal training approach based on goal combinations
+   - Consider how goals affect volume, intensity, and session structure
+   - Let the scientific analysis determine the specific training approach
+
+7. **BENCHMARK RECENCY + UNITS:**
+   - How recent are performance numbers? This affects starting point
+   - Units (imperial/metric) affect all calculations
+
+8. **WEEKEND AVAILABILITY + LONG SESSION PREFERENCES:**
+   - How does weekend availability affect training schedule?
+   - Both Saturday and Sunday = Full weekend training
+   - Saturday only = Compressed weekend training
+   - Sunday only = Alternative weekend structure
+   - Weekdays only = Completely different schedule
+   - Flexible = Adaptive scheduling
+   - Long session preferences affect brick training and recovery
+   - Traditional (Saturday ride, Sunday run) vs Reverse vs Split vs Flexible
+   - This determines the entire weekly training structure
+
+9. **WEEKDAY VS WEEKEND SESSION DURATIONS:**
+   - How do weekday vs weekend session preferences affect training structure?
+   - Weekday sessions (30-45, 45-60, 60-90, 90+ minutes) determine daily training load
+   - Weekend sessions (1-2, 2-3, 3-4, 4+ hours) determine long session planning
+   - This affects the entire training schedule and workout distribution
+   - Longer weekday sessions = fewer but more intense sessions
+   - Shorter weekday sessions = more frequent but shorter sessions
+   - Weekend duration affects brick training and long endurance sessions
+   - This determines how to distribute training load across the week
+
+10. **WORKOUT DURATION DETERMINATION:**
+    - Determine optimal workout durations based on ALL factors
+    - Race distance affects session length (70.3 needs longer sessions than Sprint)
+    - Training frequency affects session duration (high frequency = shorter sessions)
+    - Current volume and capacity affect progression
+    - Age and recovery needs affect session length
+    - Equipment availability affects strength session duration
+    - Goals affect session structure (speed work = shorter, endurance = longer)
+    - Weekend availability affects long session planning
+    - Weekday vs weekend session preferences determine actual workout lengths
+
+SCIENTIFIC PRINCIPLES TO APPLY:
+- Progressive overload based on current capacity
+- Periodization theory adapted to timeline
+- Recovery science adjusted for age and injury history
+- Sport-specific adaptations for race distance
+- Injury prevention protocols based on history
 
 RESPOND WITH ONLY JSON:
 {
-  "trainingPhilosophy": "pyramid|polarized|balanced",
+  "trainingPhilosophy": "pyramid|polarized|threshold",
   "focusAreas": ["swim", "bike", "run", "strength"],
   "weeklyVolume": 8,
   "intensityDistribution": {
@@ -201,7 +288,11 @@ RESPOND WITH ONLY JSON:
     "swimPaceModifier": 1.1,
     "bikeFTPModifier": 0.9,
     "runPaceModifier": 1.05,
-    "workoutDurationPreference": "90min_weekdays_4hour_weekends"
+    "workoutDurationPreference": "90min_weekdays_4hour_weekends",
+    "swimDuration": 45,
+    "bikeDuration": 60,
+    "runDuration": 45,
+    "strengthDuration": 60
   }
 }`;
   }
@@ -292,7 +383,7 @@ RESPOND WITH ONLY JSON:
     }
     
     const transformed: AIAnalysisResult = {
-      trainingPhilosophy: aiResponse.trainingPhilosophy || 'balanced',
+      trainingPhilosophy: aiResponse.trainingPhilosophy || 'threshold',
       focusAreas: aiResponse.focusAreas || ['swim', 'bike', 'run'],
       weeklyVolume,
       intensityDistribution,
@@ -330,7 +421,7 @@ RESPOND WITH ONLY JSON:
     const injuryHistory = userBaselines?.injuryHistory;
     
     // Determine training philosophy based on goal and fitness
-    let trainingPhilosophy: 'pyramid' | 'polarized' | 'balanced' = 'balanced';
+    let trainingPhilosophy: 'pyramid' | 'polarized' | 'threshold' = 'threshold';
     if (primaryGoal === 'performance' && currentHours >= 8) {
       trainingPhilosophy = 'polarized';
     } else if (primaryGoal === 'base' || currentHours < 6) {
@@ -599,13 +690,21 @@ EVIDENCE-BASED TRAINING SCIENCE PRINCIPLES:
 - Minimal moderate intensity (Zone 3, "junk miles")
 - Proven effective for endurance performance improvement
 
-**PYRAMID TRAINING (Based on traditional strength training principles):**
-- Intensity progression within sessions: easy → moderate → hard → moderate → easy
-- Allows for proper warm-up and cool-down
-- Prevents overtraining within single sessions
-- Builds intensity tolerance gradually
-- **ELITE ATHLETES:** Use Zone 2 → Zone 3 → Zone 4 → Zone 3 → Zone 2 progression
-- **Example:** 10min easy → 15min moderate → 10min hard → 15min moderate → 10min easy
+**PYRAMID TRAINING (Based on endurance training research):**
+- Weekly intensity progression: easy → moderate → hard → moderate → easy
+- Builds intensity tolerance throughout the week
+- Allows proper recovery between hard sessions
+- Prevents overtraining with structured progression
+- **ENDURANCE ATHLETES:** Use Zone 2 → Zone 3 → Zone 4 → Zone 3 → Zone 2 weekly progression
+- **Example:** Monday easy → Tuesday moderate → Wednesday hard → Thursday moderate → Friday easy
+
+**THRESHOLD TRAINING (Based on Coggan & Allen research):**
+- 40% of training at moderate intensity (Zone 3, lactate threshold)
+- 40% of training at easy intensity (Zone 2, aerobic base)
+- 20% of training at high intensity (Zone 4-5, VO2 max)
+- Focus on lactate threshold improvement
+- Proven effective for time trial and sustained power performance
+- **Example:** 20min @ Zone 3 threshold, 30min @ Zone 2 aerobic, 10min @ Zone 4 intervals
 
 **PROGRESSIVE OVERLOAD (Based on Selye's General Adaptation Syndrome):**
 - Systematic increase in training stress over time

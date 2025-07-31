@@ -142,8 +142,8 @@ const LONG_SESSION_PREFERENCES = [
 // Update training philosophy options to use only text
 const TRAINING_PHILOSOPHY_OPTIONS = [
   { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
-  { key: 'pyramid', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (70% easy, 20% moderate, 10% hard)</> },
-  { key: 'balanced', label: <><FaBalanceScale className="inline mr-2" />BALANCED (strategic mix)</> },
+  { key: 'pyramid', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (weekly intensity progression)</> },
+  { key: 'threshold', label: <><FaBalanceScale className="inline mr-2" />THRESHOLD (40% moderate, 40% easy, 20% hard)</> },
 ];
 
 // Separate course detail options for different disciplines
@@ -479,11 +479,39 @@ export default function AIPlanBuilder() {
     if (!insights) return null;
 
     const { totalHours, trainingFrequency, volumeIncreaseCapacity } = insights;
+    const distance = responses.distance;
 
     // Check if they can handle more frequency
     const canIncrease = volumeIncreaseCapacity?.triathlon?.includes('easily') || 
                        volumeIncreaseCapacity?.triathlon?.includes('careful');
 
+    // Race-distance specific recommendations
+    if (distance === 'ironman') {
+      if (totalHours >= 12) return '6-days';
+      if (totalHours >= 8 && canIncrease) return '6-days';
+      if (totalHours >= 6) return '5-days';
+      return '4-days';
+    }
+
+    if (distance === '70.3') {
+      if (totalHours >= 8) return '6-days';
+      if (totalHours >= 6 && canIncrease) return '6-days';
+      if (totalHours >= 4) return '5-days';
+      return '4-days';
+    }
+
+    if (distance === 'olympic') {
+      if (totalHours >= 6) return '5-days';
+      if (totalHours >= 4) return '4-days';
+      return '3-days';
+    }
+
+    if (distance === 'sprint') {
+      if (totalHours >= 4) return '4-days';
+      return '3-days';
+    }
+
+    // Default fallback
     if (totalHours >= 8) return '6-days';
     if (totalHours >= 6 && canIncrease) return '6-days';
     if (totalHours >= 4) return '5-days';
@@ -1594,7 +1622,13 @@ ${insights.age >= 40 ? `
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
-            <div className="text-sm text-gray-600 mb-4">Most 70.3 athletes train 5-6 days per week</div>
+            <div className="text-sm text-gray-600 mb-4">
+              {responses.distance === 'ironman' && 'Most Ironman athletes train 6 days per week'}
+              {responses.distance === '70.3' && 'Most 70.3 athletes train 5-6 days per week'}
+              {responses.distance === 'olympic' && 'Most Olympic athletes train 4-5 days per week'}
+              {responses.distance === 'sprint' && 'Most Sprint athletes train 3-4 days per week'}
+              {!responses.distance && 'Training frequency varies by race distance and current fitness'}
+            </div>
             
             {insights && (
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
@@ -1648,7 +1682,7 @@ ${insights.age >= 40 ? `
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
-            <div className="text-sm text-gray-600 mb-4">Longer weekend sessions important for endurance</div>
+            <div className="text-sm text-gray-600 mb-4">Long sessions (longer rides and runs) important for endurance</div>
             
             {insights && insights.totalHours !== undefined && (
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
@@ -1661,7 +1695,7 @@ ${insights.age >= 40 ? `
             )}
             
             <div className="mb-6">
-              <div className="text-sm text-gray-600 mb-3">Weekday sessions:</div>
+              <div className="text-sm text-gray-600 mb-3">Focused training sessions (weekdays):</div>
               <div className="space-y-2 mb-4">
                 {WEEKDAY_DURATION_OPTIONS && WEEKDAY_DURATION_OPTIONS.map((option) => (
                   <button
@@ -1680,7 +1714,7 @@ ${insights.age >= 40 ? `
             </div>
 
             <div className="mb-6">
-              <div className="text-sm text-gray-600 mb-3">Weekend sessions:</div>
+              <div className="text-sm text-gray-600 mb-3">Long sessions (longer rides and runs):</div>
               <div className="space-y-2">
                 {WEEKEND_DURATION_OPTIONS && WEEKEND_DURATION_OPTIONS.map((option) => (
                   <button
@@ -1733,21 +1767,74 @@ ${insights.age >= 40 ? `
             )}
             
             <div className="space-y-4 mb-6">
-              {TRAINING_PHILOSOPHY_OPTIONS.map((option) => (
-                <div
-                  key={option.key}
-                  onClick={() => updateResponse('trainingPhilosophy', option.key)}
-                  className={`w-full p-4 cursor-pointer transition-colors ${
-                    responses.trainingPhilosophy === option.key
-                      ? 'bg-gray-200'
-                      : 'bg-transparent hover:bg-gray-50'
-                  }`}
-                >
-                  <div className="font-medium mb-2">{option.label}</div>
-                  <div className="text-sm text-gray-600 mb-2">{option.label}</div>
-                  <div className="text-sm text-gray-500">Best for: {option.label}</div>
+              <div
+                onClick={() => updateResponse('trainingPhilosophy', 'polarized')}
+                className={`w-full p-4 cursor-pointer transition-colors border rounded-lg ${
+                  responses.trainingPhilosophy === 'polarized'
+                    ? 'bg-gray-200 border-gray-400'
+                    : 'bg-transparent hover:bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="font-medium mb-2 flex items-center">
+                  <FaRoad className="inline mr-2" />
+                  POLARIZED (80% easy, 20% hard)
                 </div>
-              ))}
+                <div className="text-sm text-gray-600 mb-2">
+                  Based on Seiler & Tønnessen research. 80% of training at low intensity (Zone 1-2), 20% at high intensity (Zone 4-5), minimal moderate intensity.
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Best for:</strong> Endurance performance improvement, avoiding "junk miles"
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Why choose this:</strong> Proven effective for endurance athletes, especially those with limited time
+                </div>
+              </div>
+
+              <div
+                onClick={() => updateResponse('trainingPhilosophy', 'pyramid')}
+                className={`w-full p-4 cursor-pointer transition-colors border rounded-lg ${
+                  responses.trainingPhilosophy === 'pyramid'
+                    ? 'bg-gray-200 border-gray-400'
+                    : 'bg-transparent hover:bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="font-medium mb-2 flex items-center">
+                  <FaChartArea className="inline mr-2" />
+                  PYRAMIDAL (weekly intensity progression)
+                </div>
+                <div className="text-sm text-gray-600 mb-2">
+                  Weekly intensity progression: easy → moderate → hard → moderate → easy. Builds intensity tolerance throughout the week.
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Best for:</strong> Building intensity tolerance, structured progression
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Why choose this:</strong> Prevents overtraining with structured progression, good for beginners
+                </div>
+              </div>
+
+              <div
+                onClick={() => updateResponse('trainingPhilosophy', 'threshold')}
+                className={`w-full p-4 cursor-pointer transition-colors border rounded-lg ${
+                  responses.trainingPhilosophy === 'threshold'
+                    ? 'bg-gray-200 border-gray-400'
+                    : 'bg-transparent hover:bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="font-medium mb-2 flex items-center">
+                  <FaBalanceScale className="inline mr-2" />
+                  THRESHOLD (40% moderate, 40% easy, 20% hard)
+                </div>
+                <div className="text-sm text-gray-600 mb-2">
+                  Based on Coggan & Allen research. 40% moderate intensity (Zone 3), 40% easy (Zone 2), 20% hard (Zone 4-5).
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Best for:</strong> Time trial performance, sustained power improvement
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Why choose this:</strong> Focuses on lactate threshold improvement, great for cyclists and time trialists
+                </div>
+              </div>
             </div>
 
             <div className="flex gap-3">
