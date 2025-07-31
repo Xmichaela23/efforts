@@ -145,40 +145,36 @@ ${JSON.stringify(userResponses, null, 2)}
 ANALYSIS TASK:
 Analyze the user's specific preferences and determine optimal training parameters. PAY SPECIAL ATTENTION TO:
 
-1. **RACE DISTANCE IMPACT:**
-   - Sprint (750m/20km/5km): 6-8 hours/week, shorter sessions
-   - Olympic (1.5km/40km/10km): 8-12 hours/week, moderate sessions
-   - 70.3 (1.9km/90km/21km): 12-18 hours/week, longer sessions, weekend bricks
-   - Ironman (3.8km/180km/42km): 15-25 hours/week, very long sessions
+1. **RACE DISTANCE CONSIDERATION:**
+   - Consider the specific race distance and its training requirements
+   - Analyze user's current fitness level and experience
+   - Determine appropriate training volume based on scientific principles
 
-2. **STRENGTH TRAINING INTERPRETATION:**
-   - "power-lifting": Heavy compound lifts (Squat, Deadlift, Bench Press), 3-5 reps, 80-90% 1RM
-   - "power-development": Explosive movements, plyometrics
-   - "injury-prevention": Mobility, stability, corrective work
-   - "sport-specific": Triathlon-specific movements
-   - "build-muscle": Hypertrophy focus, 8-12 reps
-   - "general-fitness": Basic conditioning
+2. **STRENGTH TRAINING ANALYSIS:**
+   - Analyze the user's strength training choice and equipment availability
+   - Consider injury history and movement patterns
+   - Determine appropriate exercise selection and intensity
 
 3. **TRAINING FREQUENCY & DURATION:**
-   - Use the user's specified training frequency preference
-   - Consider timeline constraints and race distance requirements
-   - Balance volume with recovery needs
+   - Analyze the user's training frequency preferences
+   - Consider timeline constraints and recovery needs
+   - Determine optimal session durations
 
 4. **WEEKLY VOLUME CALCULATION:**
-   - Base volume on race distance requirements
-   - Adjust for user's current fitness level and experience
-   - Consider timeline and progression needs
+   - Base volume on scientific training principles
+   - Consider user's current fitness level and experience
+   - Balance progression with recovery
 
 5. **INTENSITY DISTRIBUTION:**
-   - Match to training philosophy and race distance
-   - Consider user's goals and current fitness
-   - Balance hard/easy sessions appropriately
+   - Determine optimal intensity distribution based on training science
+   - Consider user's goals and current fitness level
+   - Balance training stress and recovery appropriately
 
 RESPOND WITH ONLY JSON:
 {
   "trainingPhilosophy": "pyramid|polarized|balanced",
   "focusAreas": ["swim", "bike", "run", "strength"],
-  "weeklyVolume": 12,
+  "weeklyVolume": 8,
   "intensityDistribution": {
     "easy": 60,
     "moderate": 25,
