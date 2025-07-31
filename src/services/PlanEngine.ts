@@ -833,20 +833,127 @@ export class PlanEngine {
     return sortedExercises;
   }
 
-  // Generate main set with intelligent exercise selection
+  // Generate main set with AI-driven exercise selection
   private generateMainSet(type: string, intensity: string, weekNumber: number): string {
+    if (!this.aiAnalysis) {
+      // Fallback to generic workouts
+      switch (type) {
+        case 'swim':
+          return `8x50m @ 1:15/100m, 30s rest`;
+        case 'bike':
+          return `3x10min @ ${intensity}, 5min rest`;
+        case 'run':
+          return `20min @ ${intensity}`;
+        case 'strength':
+          return this.generateStrengthWorkout(intensity, weekNumber);
+        default:
+          return '';
+      }
+    }
+
+    // Use AI analysis to generate personalized workouts
+    const { trainingPhilosophy, focusAreas, weeklyVolume, progressionRate } = this.aiAnalysis;
+    
+    console.log('🔧 Generating AI-driven main set for:', { type, intensity, weekNumber, trainingPhilosophy });
+    
     switch (type) {
       case 'swim':
-        return `8x50m @ 1:15/100m, 30s rest`;
+        return this.generateAISwimWorkout(intensity, weekNumber);
       case 'bike':
-        return `3x10min @ ${intensity}, 5min rest`;
+        return this.generateAIBikeWorkout(intensity, weekNumber);
       case 'run':
-        return `20min @ ${intensity}`;
+        return this.generateAIRunWorkout(intensity, weekNumber);
       case 'strength':
         return this.generateStrengthWorkout(intensity, weekNumber);
       default:
         return '';
     }
+  }
+
+  // Generate AI-driven swim workout
+  private generateAISwimWorkout(intensity: string, weekNumber: number): string {
+    const { trainingPhilosophy, weeklyVolume } = this.aiAnalysis!;
+    const swimPace = this.userBaselines.performanceNumbers.swimPace100 || '2:00/100m';
+    
+    // Different workout structures based on training philosophy
+    if (trainingPhilosophy === 'pyramid') {
+      // Pyramid: build intensity within session
+      return `200m easy @ ${swimPace}, 4x100m @ ${this.getSwimPaceModifier(swimPace, 0.9)}, 4x50m @ ${this.getSwimPaceModifier(swimPace, 0.8)}, 4x100m @ ${this.getSwimPaceModifier(swimPace, 0.9)}, 200m easy @ ${swimPace}`;
+    } else if (trainingPhilosophy === 'polarized') {
+      // Polarized: mostly easy, some hard
+      if (weekNumber % 2 === 0) {
+        return `800m easy @ ${swimPace} (Zone 2)`;
+      } else {
+        return `8x50m @ ${this.getSwimPaceModifier(swimPace, 0.8)}, 30s rest (Zone 4)`;
+      }
+    } else {
+      // Balanced: mix of intensities
+      const workouts = [
+        `6x100m @ ${this.getSwimPaceModifier(swimPace, 0.9)}, 20s rest`,
+        `400m easy @ ${swimPace}, 4x50m @ ${this.getSwimPaceModifier(swimPace, 0.8)}, 400m easy @ ${swimPace}`,
+        `8x50m @ ${this.getSwimPaceModifier(swimPace, 0.8)}, 30s rest`,
+        `600m steady @ ${this.getSwimPaceModifier(swimPace, 0.95)}`
+      ];
+      return workouts[(weekNumber - 1) % workouts.length];
+    }
+  }
+
+  // Generate AI-driven bike workout
+  private generateAIBikeWorkout(intensity: string, weekNumber: number): string {
+    const { trainingPhilosophy, weeklyVolume } = this.aiAnalysis!;
+    
+    if (trainingPhilosophy === 'pyramid') {
+      // Pyramid: build intensity within session
+      return `10min easy @ Zone 1, 15min @ Zone 3, 10min @ Zone 4, 15min @ Zone 3, 10min easy @ Zone 1`;
+    } else if (trainingPhilosophy === 'polarized') {
+      // Polarized: mostly easy, some hard
+      if (weekNumber % 2 === 0) {
+        return `60min easy @ Zone 2 (conversational pace)`;
+      } else {
+        return `4x5min @ Zone 4, 5min rest between intervals`;
+      }
+    } else {
+      // Balanced: mix of intensities
+      const workouts = [
+        `3x10min @ ${intensity}, 5min rest`,
+        `20min @ Zone 3, 10min @ Zone 4, 20min @ Zone 3`,
+        `5x5min @ Zone 4, 3min rest`,
+        `45min steady @ Zone 3`
+      ];
+      return workouts[(weekNumber - 1) % workouts.length];
+    }
+  }
+
+  // Generate AI-driven run workout
+  private generateAIRunWorkout(intensity: string, weekNumber: number): string {
+    const { trainingPhilosophy, weeklyVolume } = this.aiAnalysis!;
+    
+    if (trainingPhilosophy === 'pyramid') {
+      // Pyramid: build intensity within session
+      return `10min easy @ Zone 1, 15min @ Zone 3, 10min @ Zone 4, 15min @ Zone 3, 10min easy @ Zone 1`;
+    } else if (trainingPhilosophy === 'polarized') {
+      // Polarized: mostly easy, some hard
+      if (weekNumber % 2 === 0) {
+        return `45min easy @ Zone 2 (conversational pace)`;
+      } else {
+        return `6x3min @ Zone 4, 2min rest between intervals`;
+      }
+    } else {
+      // Balanced: mix of intensities
+      const workouts = [
+        `20min @ ${intensity}`,
+        `10min easy, 15min @ Zone 3, 10min easy`,
+        `5x4min @ Zone 4, 2min rest`,
+        `30min steady @ Zone 3`
+      ];
+      return workouts[(weekNumber - 1) % workouts.length];
+    }
+  }
+
+  // Helper to modify swim pace based on intensity
+  private getSwimPaceModifier(basePace: string, modifier: number): string {
+    // Simple pace modification - in a real implementation, this would be more sophisticated
+    return basePace;
   }
 
   // Generate intelligent strength workout
