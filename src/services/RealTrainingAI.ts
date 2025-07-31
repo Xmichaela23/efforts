@@ -61,13 +61,15 @@ export interface AIAnalysisResult {
 }
 
 export class RealTrainingAI {
-  private baseURL: string;
+  private analysisURL: string;
+  private planURL: string;
 
   constructor() {
-    // Use Supabase Edge Function instead of direct OpenAI calls
-    this.baseURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/generate-plan';
+    // Use Supabase Edge Functions instead of direct OpenAI calls
+    this.analysisURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/analyze-user-profile';
+    this.planURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/generate-plan';
     
-    console.log('🔗 Using Supabase Edge Function for AI plan generation');
+    console.log('🔗 Using Supabase Edge Functions for AI analysis and plan generation');
   }
 
   // NEW: Analyze user profile to determine training parameters
@@ -78,18 +80,16 @@ export class RealTrainingAI {
       // Build analysis prompt
       const analysisPrompt = this.buildAnalysisPrompt(userBaselines, userResponses);
       
-      // Use the same edge function but with analysis-specific prompt
+      // Use the dedicated analysis edge function
       const authToken = await this.getAuthToken();
-      const response = await fetch(this.baseURL, {
+      const response = await fetch(this.analysisURL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${authToken}`
         },
         body: JSON.stringify({
-          prompt: analysisPrompt,
-          startDate: new Date().toISOString().split('T')[0],
-          userContext: { analysis: true }
+          prompt: analysisPrompt
         }),
       });
 
@@ -99,6 +99,7 @@ export class RealTrainingAI {
       }
 
       const data = await response.json();
+      console.log('🔍 AI Analysis Response:', data);
       
       if (data.error) {
         throw new Error(`Analysis error: ${data.error}`);
@@ -137,6 +138,17 @@ export class RealTrainingAI {
         timeline = '16-20-weeks';
       } else {
         timeline = '24-plus-weeks';
+      }
+    } else {
+      // Fallback timeline based on race distance
+      if (raceDistance === 'ironman') {
+        timeline = '24-plus-weeks';
+      } else if (raceDistance === '70.3') {
+        timeline = '16-20-weeks';
+      } else if (raceDistance === 'olympic') {
+        timeline = '8-12-weeks';
+      } else if (raceDistance === 'sprint') {
+        timeline = '8-12-weeks';
       }
     }
     
@@ -644,7 +656,7 @@ RESPOND WITH ONLY JSON:
         throw new Error('User must be logged in to generate training plans');
       }
 
-      const response = await fetch(this.baseURL, {
+      const response = await fetch(this.planURL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

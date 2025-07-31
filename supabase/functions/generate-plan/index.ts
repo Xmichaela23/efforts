@@ -73,13 +73,19 @@ serve(async (req) => {
     console.log(`📅 START DATE: ${startDate}`);
     console.log(`👤 USER CONTEXT: ${JSON.stringify(userContext)}`);
 
+    // Check if this is an analysis request
+    const isAnalysis = userContext?.analysis === true;
+    console.log(`🔍 IS ANALYSIS REQUEST: ${isAnalysis}`);
+
     // Build OpenAI request
     const openaiRequest = {
       model: 'gpt-3.5-turbo',
       messages: [
         {
           role: 'system',
-          content: `You are an intelligent training AI with expertise in exercise science, periodization, and personalized training design.
+          content: isAnalysis 
+            ? `You are an expert exercise physiologist and training coach. Your task is to analyze user data and return ONLY a JSON object with training parameters. Do not include any text outside the JSON.`
+            : `You are an intelligent training AI with expertise in exercise science, periodization, and personalized training design.
 
 EVIDENCE-BASED TRAINING SCIENCE PRINCIPLES:
 - **Periodization:** Linear, Block, Undulating periodization models
@@ -149,14 +155,22 @@ You must generate detailed, specific training plans with actual numbers, not gen
 
     console.log(`✅ AI RESPONSE RECEIVED: ${aiResponse.substring(0, 200)}...`);
 
-    // Parse AI response into structured plan
-    const trainingPlan = parseAIResponse(aiResponse, startDate);
-
-    console.log(`🏁 RETURNING TRAINING PLAN`);
-    return new Response(JSON.stringify(trainingPlan), {
-      status: 200,
-      headers
-    });
+    if (isAnalysis) {
+      // For analysis requests, return the AI response directly
+      console.log(`🏁 RETURNING ANALYSIS RESULT`);
+      return new Response(aiResponse, {
+        status: 200,
+        headers
+      });
+    } else {
+      // For plan generation requests, parse into structured plan
+      const trainingPlan = parseAIResponse(aiResponse, startDate);
+      console.log(`🏁 RETURNING TRAINING PLAN`);
+      return new Response(JSON.stringify(trainingPlan), {
+        status: 200,
+        headers
+      });
+    }
 
   } catch (error) {
     console.error(`💥 GENERATE-PLAN ERROR: ${error.message}`);
