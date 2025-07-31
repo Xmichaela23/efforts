@@ -63,6 +63,7 @@ interface BaselineData {
   // Existing fields
   age: number;
   disciplines: string[];
+  currentFitness?: string;
   disciplineFitness: {
     running?: string;
     cycling?: string;
@@ -221,9 +222,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to save baselines');
-      
-      console.log('Saving baselines for user:', user.id);
-      
       const baselineRecord = {
         user_id: user.id,
         // Enhanced user details
@@ -240,6 +238,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Existing fields
         age: data.age,
         disciplines: data.disciplines,
+        current_fitness: data.currentFitness,
         discipline_fitness: data.disciplineFitness,
         benchmarks: data.benchmarks,
         performance_numbers: data.performanceNumbers,
@@ -248,32 +247,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         training_background: data.trainingBackground,
         equipment: data.equipment,
       };
-      
-      console.log('Baseline record to save:', baselineRecord);
-      
-      const { data: existingData, error: checkError } = await supabase.from('user_baselines').select('id').eq('user_id', user.id).single();
-      
-      if (checkError && checkError.code !== 'PGRST116') {
-        console.error('Error checking existing baselines:', checkError);
-        throw checkError;
-      }
-      
+      const { data: existingData } = await supabase.from('user_baselines').select('id').eq('user_id', user.id).single();
       if (existingData) {
-        console.log('Updating existing baseline record');
         const { error } = await supabase.from('user_baselines').update(baselineRecord).eq('user_id', user.id);
-        if (error) {
-          console.error('Error updating baselines:', error);
-          throw error;
-        }
-        console.log('Successfully updated baselines');
+        if (error) throw error;
       } else {
-        console.log('Creating new baseline record');
         const { error } = await supabase.from('user_baselines').insert([baselineRecord]);
-        if (error) {
-          console.error('Error inserting baselines:', error);
-          throw error;
-        }
-        console.log('Successfully created baselines');
+        if (error) throw error;
       }
     } catch (error) {
       console.error('Error in saveUserBaselines:', error);
@@ -285,26 +265,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
-      
-      console.log('Loading baselines for user:', user.id);
-      
-      // Add proper headers to avoid 406 error
-      const { data, error } = await supabase
-        .from('user_baselines')
-        .select('*')
-        .eq('user_id', user.id)
-        .single();
-        
-      if (error) {
-        console.error('Supabase error loading baselines:', error);
-        if (error.code === 'PGRST116') {
-          console.log('No baseline data found for user');
-          return null;
-        }
-        throw error;
-      }
-      
-      console.log('Successfully loaded baseline data:', data);
+      const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+      if (error && error.code !== 'PGRST116') throw error;
       if (!data) return null;
       
       // Fix birthday timezone issue - ensure it's always YYYY-MM-DD format
@@ -323,6 +285,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // If it's already a YYYY-MM-DD string, keep it as is
       }
       
+      console.log('🔍 Database data loaded:', data);
+      console.log('🔍 current_fitness from database:', data.current_fitness);
+      
       return {
         // Enhanced user details
         birthday: formattedBirthday,
@@ -338,6 +303,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Existing fields
         age: data.age || 0,
         disciplines: data.disciplines || [],
+        currentFitness: data.current_fitness,
         disciplineFitness: data.discipline_fitness || {},
         benchmarks: data.benchmarks || {},
         performanceNumbers: data.performance_numbers || {},
