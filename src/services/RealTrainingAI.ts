@@ -123,7 +123,23 @@ export class RealTrainingAI {
     // Extract key user preferences for emphasis
     const raceDistance = userResponses.distance;
     const strengthChoice = userResponses.strengthTraining;
-    const timeline = userResponses.timeline || 'Not specified';
+    
+    // Calculate timeline from event date
+    let timeline = 'Not specified';
+    if (userResponses.eventDate) {
+      const eventDate = new Date(userResponses.eventDate);
+      const today = new Date();
+      const weeksUntilEvent = Math.ceil((eventDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      
+      if (weeksUntilEvent <= 12) {
+        timeline = '8-12-weeks';
+      } else if (weeksUntilEvent <= 20) {
+        timeline = '16-20-weeks';
+      } else {
+        timeline = '24-plus-weeks';
+      }
+    }
+    
     const trainingFrequency = userResponses.trainingFrequency;
     const goals = userResponses.goals || [];
     
