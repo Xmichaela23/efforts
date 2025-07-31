@@ -123,7 +123,7 @@ export class RealTrainingAI {
     // Extract key user preferences for emphasis
     const raceDistance = userResponses.distance;
     const strengthChoice = userResponses.strengthTraining;
-    const timeline = userResponses.timeline;
+    const timeline = userResponses.timeline || 'Not specified';
     const trainingFrequency = userResponses.trainingFrequency;
     const goals = userResponses.goals || [];
     
