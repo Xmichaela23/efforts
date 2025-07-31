@@ -34,7 +34,8 @@ export interface TrainingPlan {
 }
 
 export interface UserBaselines {
-  age: number;
+  age?: number;
+  birthday?: string;
   performanceNumbers: {
     fiveK?: string;
     easyPace?: string;
@@ -90,6 +91,14 @@ export class PlanEngine {
     if (!performanceNumbers.fiveK) throw new Error('❌ MISSING: 5K pace');
     if (!performanceNumbers.tenK) throw new Error('❌ MISSING: 10K pace');
     if (!performanceNumbers.swimPace100) throw new Error('❌ MISSING: Swim pace');
+    
+    // Calculate age from birthday if needed
+    if (!this.userBaselines.age && this.userBaselines.birthday) {
+      const birthDate = new Date(this.userBaselines.birthday);
+      const today = new Date();
+      this.userBaselines.age = today.getFullYear() - birthDate.getFullYear();
+      console.log('✅ Calculated age from birthday:', this.userBaselines.age);
+    }
     
     console.log('✅ All required performance data present');
     

@@ -90,7 +90,15 @@ export class RealTrainingAI {
     if (!performanceNumbers?.fiveK) throw new Error('❌ MISSING: 5K pace');
     if (!performanceNumbers?.tenK) throw new Error('❌ MISSING: 10K pace');
     if (!performanceNumbers?.swimPace100) throw new Error('❌ MISSING: Swim pace');
-    if (!userBaselines.age) throw new Error('❌ MISSING: Age');
+    // Calculate age from birthday if not set
+    if (!userBaselines.age && userBaselines.birthday) {
+      const birthDate = new Date(userBaselines.birthday);
+      const today = new Date();
+      userBaselines.age = today.getFullYear() - birthDate.getFullYear();
+      console.log('✅ Calculated age from birthday:', userBaselines.age);
+    }
+    
+    if (!userBaselines.age) throw new Error('❌ MISSING: Age (no birthday provided)');
     if (!userBaselines.equipment?.strength || userBaselines.equipment.strength.length === 0) throw new Error('❌ MISSING: Strength equipment');
     if (!userBaselines.injuryHistory) throw new Error('❌ MISSING: Injury history');
     
