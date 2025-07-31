@@ -1238,6 +1238,20 @@ ${insights.age >= 40 ? `
                     </select>
                   </div>
 
+                  <div>
+                    <label className="block text-sm text-gray-600 mb-2">Timeline:</label>
+                    <select
+                      value={responses.timeline}
+                      onChange={(e) => updateResponse('timeline', e.target.value)}
+                      className="w-full p-3"
+                    >
+                      <option value="">Select timeline</option>
+                      {TIMELINE_OPTIONS.map((option) => (
+                        <option key={option.key} value={option.key}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Swimming Course Details */}
                   <div className="pt-4">
                     <h4 className="font-medium text-gray-800 mb-3"><FaSwimmer className="inline mr-2" /> Swimming Course</h4>
