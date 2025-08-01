@@ -1660,131 +1660,40 @@ Return a valid JSON plan structure.`;
                 )}
               </div>
 
-              {/* Parse and display the actual plan */}
-              {(() => {
-                console.log('Starting plan rendering...');
-                try {
-                  // The system now returns the plan directly in the correct format
-                  const planData = generatedPlan.plan;
-                  // The plan structure from the Edge Function has weeks directly on the plan object
-                  const weeks = planData?.weeks || generatedPlan.plan?.weeks || generatedPlan.weeks || [];
-                  console.log('Plan data:', planData);
-                  console.log('Generated plan structure:', generatedPlan);
-                  console.log('Weeks found:', weeks.length);
-                  console.log('First week structure:', weeks[0]);
-                  console.log('First week workouts:', weeks[0]?.workouts);
-                  
-                  if (weeks.length === 0) return <div>No weeks found in plan</div>;
-                  
-                  console.log('About to render plan with weeks:', weeks.length);
-                  console.log('Current week index:', currentWeek);
-                  console.log('Current week data:', weeks[currentWeek]);
-                  
-                  return (
-                    <div className="space-y-6">
-                      {/* Plan Overview */}
-                      <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
-                        <div className="font-medium mb-2">{planData?.phase || generatedPlan.plan?.phase || 'Training Plan'}</div>
-                        <div className="text-sm">{planData?.phaseDescription || generatedPlan.plan?.phaseDescription || 'Personalized training plan'}</div>
-                        <div className="text-sm mt-1">Training Philosophy: {planData?.user?.training_philosophy || planData?.trainingPhilosophy || generatedPlan.plan?.trainingPhilosophy || 'Not specified'}</div>
-                      </div>
-                      
-                      {/* Week Navigation */}
-                      <div className="mb-6">
-                        <div className="flex border-b border-gray-200 overflow-x-auto">
-                          {weeks.map((week: any, weekIndex: number) => (
-                            <button
-                              key={weekIndex}
-                              onClick={() => setCurrentWeek(weekIndex)}
-                              className={`px-6 py-3 text-sm font-medium whitespace-nowrap ${
-                                weekIndex === currentWeek 
-                                  ? 'text-gray-900 border-b-2 border-gray-900' 
-                                  : 'text-gray-500 hover:text-gray-700 hover:border-b-2 hover:border-gray-300'
-                              }`}
-                            >
-                              Week {week.weekNumber}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                      
-                      {/* Current Week View */}
-                      {weeks[currentWeek] && (
-                        <div className="space-y-4">
-                          <div className="text-lg font-semibold text-gray-800">
-                            Week {weeks[currentWeek].weekNumber} - {weeks[currentWeek].focus}
-                          </div>
-                          <div className="text-sm text-gray-600 mb-4">
-                            Phase: {weeks[currentWeek].phase}
-                          </div>
-                          
-                          {/* Daily Workouts */}
-                          <div className="space-y-6">
-                            {(() => {
-                              console.log('Current week workouts:', weeks[currentWeek].workouts);
-                              return null;
-                            })()}
-                            {weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => {
-                              console.log('Workout structure:', workout);
-                              return (
-                                <div key={dayIndex} className="border-b border-gray-100 pb-6">
-                                <div className="flex justify-between items-start mb-4">
-                                  <div className="font-medium text-gray-900 text-lg">
-                                    {workout.day}: {workout.type}
-                                  </div>
-                                  <div className="text-sm text-gray-500">
-                                    {workout.duration}
-                                  </div>
-                                </div>
-                                
-                                {/* Workout Details */}
-                                <div className="space-y-3 text-sm">
-                                  {workout.warmup && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">Warm-up:</span> {workout.warmup}
-                                    </div>
-                                  )}
-                                  
-                                  {workout.main && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">Main:</span> {workout.main}
-                                    </div>
-                                  )}
-                                  
-                                  {workout.cooldown && (
-                                    <div className="text-gray-700">
-                                      <span className="font-medium">Cool-down:</span> {workout.cooldown}
-                                    </div>
-                                  )}
-                                  
-                                  {workout.notes && (
-                                    <div className="text-gray-600 italic">
-                                      {workout.notes}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                            })}
-                          </div>
-                        </div>
-                      )}
+              {/* Simple Plan Display */}
+              <div className="space-y-6">
+                <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
+                  <div className="font-medium mb-2">Your Training Plan</div>
+                  <div className="text-sm">Personalized training plan based on your assessment</div>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="font-medium mb-2">Plan Generated Successfully!</div>
+                  <div className="text-sm text-gray-600">
+                    Your personalized training plan has been created with {generatedPlan.plan?.duration || 4} weeks of training.
+                  </div>
+                  <div className="mt-4">
+                    <div className="text-sm">
+                      <strong>Plan Name:</strong> {generatedPlan.name}
                     </div>
-                  );
-                } catch (error) {
-                  console.error('Error parsing plan:', error);
-                  return (
-                    <div className="mb-6">
-                      <div className="text-lg font-semibold text-gray-800 mb-4">Plan Data (Debug)</div>
-                      <div className="bg-gray-50 p-4 rounded-lg">
-                        <pre className="text-sm text-gray-700 whitespace-pre-wrap">
-                          {JSON.stringify(generatedPlan, null, 2)}
-                        </pre>
-                      </div>
+                    <div className="text-sm">
+                      <strong>Focus:</strong> {generatedPlan.focus}
                     </div>
-                  );
-                }
-              })()}
+                    <div className="text-sm">
+                      <strong>Training Philosophy:</strong> {generatedPlan.plan?.trainingPhilosophy || 'Not specified'}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="font-medium mb-2">Plan Structure (Debug)</div>
+                  <div className="text-sm text-gray-600">
+                    <pre className="whitespace-pre-wrap text-xs">
+                      {JSON.stringify(generatedPlan, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              </div>
 
 
 
