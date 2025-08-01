@@ -21,10 +21,10 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, userContext } = await req.json();
     
-    if (!prompt) {
-      return new Response(JSON.stringify({ error: 'Missing prompt parameter' }), {
+    if (!prompt || !userContext) {
+      return new Response(JSON.stringify({ error: 'Missing prompt or userContext parameter' }), {
         status: 400, headers
       });
     }
@@ -41,8 +41,29 @@ serve(async (req) => {
       messages: [
         {
           role: 'system',
-          content: `You are a training coach. You MUST return a JSON object with these EXACT fields:
+          content: `You are a training analysis AI. Your task is to analyze user data and determine appropriate training parameters.
 
+HOW TO ANALYZE USER DATA:
+
+1. USE THE USER'S DATA: Analyze their baseline fitness metrics, assessment answers, and preferences to determine appropriate training parameters.
+
+2. DETERMINE TRAINING PHILOSOPHY: Based on their assessment choice (pyramid, polarized, or threshold), set the training approach.
+
+3. CALCULATE WEEKLY VOLUME: Based on their training frequency, availability, and event distance, determine appropriate volume for each discipline.
+
+4. SET INTENSITY DISTRIBUTION: Based on their fitness level, age, and training philosophy, determine the right mix of easy, moderate, and hard sessions.
+
+5. ASSESS PROGRESSION: Based on their timeline, experience level, and goals, determine if progression should be conservative, moderate, or aggressive.
+
+6. IDENTIFY FOCUS AREAS: Based on their selected disciplines and goals, determine which areas need focus.
+
+7. SET STRENGTH APPROACH: Based on their strength training choice, determine the appropriate approach.
+
+8. EVALUATE RECOVERY NEEDS: Based on their age, fitness level, and training volume, determine recovery emphasis.
+
+9. USE ACTUAL TIMELINE AND EVENT TYPE: Use the exact timeline and event type from their assessment data.
+
+Return a JSON object with these exact fields:
 {
   "trainingPhilosophy": "pyramid" or "polarized" or "threshold",
   "weeklyVolume": { "swim": number, "bike": number, "run": number, "strength": number },
@@ -55,28 +76,7 @@ serve(async (req) => {
   "eventType": "string"
 }
 
-CRITICAL INSTRUCTIONS:
-1. You MUST include BOTH "timeline" and "eventType" fields in your JSON response
-2. Use the timeline and eventType values provided in the user data - do not calculate them yourself
-3. If the user data shows "Timeline: 11 weeks" and "Event Type: 70.3", then include:
-   - "timeline": 11
-   - "eventType": "70.3"
-4. If timeline or eventType are not provided in user data, THROW AN ERROR - do not use defaults
-
-EXAMPLE RESPONSE:
-{
-  "trainingPhilosophy": "pyramid",
-  "weeklyVolume": { "swim": 2, "bike": 4, "run": 4, "strength": 2 },
-  "intensityDistribution": { "easy": 60, "moderate": 25, "hard": 15 },
-  "progressionType": "moderate",
-  "focusAreas": ["swim", "bike", "run", "strength"],
-  "strengthApproach": "power-lifting",
-  "recoveryEmphasis": "moderate",
-  "timeline": 11,
-  "eventType": "70.3"
-}
-
-YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`
+CRITICAL: Use the actual timeline and eventType from user data. If not provided, throw an error - no defaults.`
         },
         {
           role: 'user',

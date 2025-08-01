@@ -645,9 +645,6 @@ Return a valid JSON plan structure.`;
     
     return { prompt, userData };
   };
-    
-    return prompt;
-  };
 
   // Generate plan using AI analysis + PlanEngine
   const generatePlan = async () => {
