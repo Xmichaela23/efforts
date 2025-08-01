@@ -105,7 +105,45 @@ HOW TO CREATE PERSONALIZED PLANS:
 
 4. USE ACTUAL NUMBERS: Always use their specific baseline data for pace targets, FTP percentages, and strength weights. Never use generic descriptions.
 
-5. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with weeks, workouts, and specific details.
+5. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with this exact structure:
+
+{
+  "plan": {
+    "name": "Your Training Plan",
+    "description": "Personalized training plan based on your assessment",
+    "type": "endurance",
+    "duration": 4,
+    "level": "intermediate",
+    "goal": "70.3",
+    "status": "active",
+    "currentWeek": 0,
+    "createdDate": "2025-01-27",
+    "totalWorkouts": 28,
+    "disciplines": ["swimming"],
+    "isIntegrated": true,
+    "phase": "Build Phase",
+    "phaseDescription": "Building endurance and technique",
+    "trainingPhilosophy": "pyramid"
+  },
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "focus": "Foundation",
+      "phase": "Build",
+      "workouts": [
+        {
+          "day": "Monday",
+          "type": "Swim",
+          "duration": "45 minutes",
+          "warmup": "200m easy freestyle",
+          "main": "8x100m at 1:45 pace with 30s rest",
+          "cooldown": "200m easy freestyle",
+          "notes": "Focus on technique"
+        }
+      ]
+    }
+  ]
+}
 
 Your job is to take the user's unique data and apply training science to create a plan that's personalized to them.`
         },
