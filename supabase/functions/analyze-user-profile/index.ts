@@ -61,9 +61,7 @@ CRITICAL INSTRUCTIONS:
 3. If the user data shows "Timeline: 11 weeks" and "Event Type: 70.3", then include:
    - "timeline": 11
    - "eventType": "70.3"
-4. If timeline or eventType are not provided in user data, use defaults:
-   - "timeline": 12
-   - "eventType": "General Training"
+4. If timeline or eventType are not provided in user data, THROW AN ERROR - do not use defaults
 
 EXAMPLE RESPONSE:
 {

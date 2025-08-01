@@ -317,7 +317,7 @@ CRITICAL INSTRUCTIONS:
    - "eventType": "70.3"
 4. If timeline or eventType are not provided in user data, use defaults:
    - "timeline": 12
-   - "eventType": "General Training"
+   - "eventType": "[USER'S ACTUAL EVENT TYPE]"
 
 EXAMPLE RESPONSE:
 {

@@ -111,7 +111,7 @@ export class PlanEngine {
     return {
       name: "Your Training Plan",
       description: this.generatePlanDescription(),
-      phase: "4-Week Training Preview",
+      phase: "[USER'S ACTUAL GOAL] Training Plan",
       phaseDescription: "First month of training - full plan available in app",
       trainingPhilosophy,
       weeks: weeks

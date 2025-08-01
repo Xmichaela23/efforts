@@ -930,7 +930,7 @@ ${insights.age >= 40 ? `
   "plan": {
     "name": "Your Training Plan",
     "description": "Personalized training plan based on your assessment",
-    "phase": "4-Week Training Preview",
+    "phase": "[USER'S ACTUAL GOAL] Training Plan",
     "phaseDescription": "First month of training - full plan available in app",
     "trainingPhilosophy": "pyramid", // or "polarized" or "balanced"
     "weeks": [
