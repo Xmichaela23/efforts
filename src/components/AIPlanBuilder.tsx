@@ -912,7 +912,19 @@ Return a valid JSON plan structure.`;
                     <input
                       type="date"
                       value={responses.eventDate}
-                      onChange={(e) => updateResponse('eventDate', e.target.value)}
+                      onChange={(e) => {
+                        const eventDate = e.target.value;
+                        updateResponse('eventDate', eventDate);
+                        
+                        // Auto-calculate and save timeline
+                        if (eventDate) {
+                          const weeks = calculateTimeline(eventDate);
+                          updateResponse('timeline', `${weeks} weeks`);
+                        } else {
+                          // Clear timeline if event date is removed
+                          updateResponse('timeline', '');
+                        }
+                      }}
                       className="w-full p-3"
                       min={new Date().toISOString().split('T')[0]}
                     />
