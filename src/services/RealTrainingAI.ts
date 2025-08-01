@@ -324,7 +324,11 @@ You MUST return a JSON object with these EXACT fields:
   "strengthApproach": "power-lifting" or "power-development" or "injury-prevention" or "sport-specific" or "build-muscle" or "general-fitness",
   "recoveryEmphasis": "high" or "moderate" or "low",
   "timeline": number,
-  "eventType": "string"
+  "eventType": "string",
+  "injuryConsiderations": ["array", "of", "injury", "considerations"],
+  "equipmentOptimization": ["array", "of", "equipment", "optimizations"],
+  "ageAdjustments": { "recoveryTime": number, "intensityModifier": number, "volumeModifier": number },
+  "baselineFitness": { "overallLevel": "beginner" or "intermediate" or "advanced" or "elite", "swimLevel": "string", "bikeLevel": "string", "runLevel": "string", "strengthLevel": "string" }
 }
 
 CRITICAL INSTRUCTIONS:
@@ -347,7 +351,11 @@ EXAMPLE RESPONSE:
   "strengthApproach": "power-lifting",
   "recoveryEmphasis": "moderate",
   "timeline": 11,
-  "eventType": "70.3"
+  "eventType": "70.3",
+  "injuryConsiderations": ["focus on form", "gradual progression", "listen to body"],
+  "equipmentOptimization": ["use available weights", "bodyweight alternatives", "progressive overload"],
+  "ageAdjustments": { "recoveryTime": 48, "intensityModifier": 0.9, "volumeModifier": 0.8 },
+  "baselineFitness": { "overallLevel": "intermediate", "swimLevel": "intermediate", "bikeLevel": "intermediate", "runLevel": "intermediate", "strengthLevel": "beginner" }
 }
 
 YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
