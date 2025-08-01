@@ -262,6 +262,11 @@ export default function AIPlanBuilder() {
   const [realAI] = useState(() => new RealTrainingAI());
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
+  
+  // Debug effect to track generatedPlan changes
+  useEffect(() => {
+    console.log('🎯 generatedPlan state changed:', generatedPlan);
+  }, [generatedPlan]);
   const [currentWeek, setCurrentWeek] = useState(0); // Track current week being viewed
   
   // Assessment responses
@@ -776,7 +781,9 @@ Return a valid JSON plan structure.`;
         workouts: aiPlan.workouts
       };
       
+      console.log('🎯 About to set generatedPlan with:', plan);
       setGeneratedPlan(plan);
+      console.log('🎯 setGeneratedPlan called - plan should now be set');
       setCurrentWeek(0); // Reset to first week
       
     } catch (error) {
