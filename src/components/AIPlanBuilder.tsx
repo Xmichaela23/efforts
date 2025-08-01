@@ -1591,9 +1591,14 @@ Return a valid JSON plan structure.`;
         );
 
       case 8:
+        console.log('🎯 STEP 8 - Current step:', step);
+        console.log('🎯 generatedPlan state:', generatedPlan);
+        console.log('🎯 generatingPlan state:', generatingPlan);
+        
         // Auto-trigger plan generation when reaching step 8
         useEffect(() => {
           if (!generatedPlan && !generatingPlan) {
+            console.log('🎯 Auto-triggering plan generation...');
             generatePlan();
           }
         }, []);
@@ -1609,6 +1614,8 @@ Return a valid JSON plan structure.`;
         }
 
         if (generatedPlan) {
+          console.log('🎯 RENDERING PLAN - Step 8, generatedPlan exists:', generatedPlan);
+          console.log('🎯 Plan structure:', JSON.stringify(generatedPlan, null, 2));
           return (
             <div>
               <div className="mb-6">
