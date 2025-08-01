@@ -156,7 +156,13 @@ export class RealTrainingAI {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ prompt })
+        body: JSON.stringify({ 
+          prompt,
+          userContext: {
+            userBaselines,
+            userResponses
+          }
+        })
       });
 
       if (!response.ok) {
