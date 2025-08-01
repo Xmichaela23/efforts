@@ -270,9 +270,13 @@ function parseAIResponse(aiResponse: string, startDate: string) {
     const parsed = JSON.parse(cleanResponse);
     
     console.log('Parsed plan structure:', JSON.stringify(parsed, null, 2));
+    console.log('Plan object exists:', !!parsed.plan);
+    console.log('Weeks array exists:', !!parsed.weeks);
+    console.log('Plan keys:', parsed.plan ? Object.keys(parsed.plan) : 'No plan object');
+    console.log('Root keys:', Object.keys(parsed));
     
     // Ensure it has the expected structure
-    if (parsed.plan && parsed.plan.weeks) {
+    if (parsed.plan && parsed.weeks) {
       // Remove AI language from the plan
       if (parsed.plan.name) {
         parsed.plan.name = parsed.plan.name.replace('AI Generated Training Plan', 'Your Training Plan');
