@@ -1525,6 +1525,10 @@ Return a valid JSON plan structure.`;
                   
                   if (weeks.length === 0) return <div>No weeks found in plan</div>;
                   
+                  console.log('About to render plan with weeks:', weeks.length);
+                  console.log('Current week index:', currentWeek);
+                  console.log('Current week data:', weeks[currentWeek]);
+                  
                   return (
                     <div className="space-y-6">
                       {/* Plan Overview */}
