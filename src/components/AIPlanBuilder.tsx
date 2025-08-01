@@ -1519,6 +1519,8 @@ Return a valid JSON plan structure.`;
                   console.log('Plan data:', planData);
                   console.log('Generated plan structure:', generatedPlan);
                   console.log('Weeks found:', weeks.length);
+                  console.log('First week structure:', weeks[0]);
+                  console.log('First week workouts:', weeks[0]?.workouts);
                   
                   if (weeks.length === 0) return <div>No weeks found in plan</div>;
                   
@@ -1562,7 +1564,9 @@ Return a valid JSON plan structure.`;
                           
                           {/* Daily Workouts */}
                           <div className="space-y-6">
+                            {console.log('Current week workouts:', weeks[currentWeek].workouts)}
                             {weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => (
+                              console.log('Workout structure:', workout),
                               <div key={dayIndex} className="border-b border-gray-100 pb-6">
                                 <div className="flex justify-between items-start mb-4">
                                   <div className="font-medium text-gray-900 text-lg">
