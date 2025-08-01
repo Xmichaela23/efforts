@@ -1661,39 +1661,127 @@ Return a valid JSON plan structure.`;
                 )}
               </div>
 
-              {/* Simple Plan Display */}
+              {/* Beautiful Plan Display */}
               <div className="space-y-6">
-                <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
-                  <div className="font-medium mb-2">Your Training Plan</div>
-                  <div className="text-sm">Personalized training plan based on your assessment</div>
-                </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="font-medium mb-2">Plan Generated Successfully!</div>
-                  <div className="text-sm text-gray-600">
-                    Your personalized training plan has been created with {generatedPlan.plan?.duration || 4} weeks of training.
-                  </div>
-                  <div className="mt-4">
-                    <div className="text-sm">
-                      <strong>Plan Name:</strong> {generatedPlan.name}
+                {/* Plan Header */}
+                <div className="mb-6">
+                  <h1 className="text-2xl font-bold text-gray-800 mb-2">{generatedPlan.name}</h1>
+                  <p className="text-gray-600 mb-4">{generatedPlan.description}</p>
+                  <div className="flex flex-wrap gap-4 text-sm">
+                    <div className="text-gray-700">
+                      <span className="font-medium">Focus:</span> {generatedPlan.focus}
                     </div>
-                    <div className="text-sm">
-                      <strong>Focus:</strong> {generatedPlan.focus}
+                    <div className="text-gray-700">
+                      <span className="font-medium">Philosophy:</span> {generatedPlan.plan?.trainingPhilosophy}
                     </div>
-                    <div className="text-sm">
-                      <strong>Training Philosophy:</strong> {generatedPlan.plan?.trainingPhilosophy || 'Not specified'}
+                    <div className="text-gray-700">
+                      <span className="font-medium">Duration:</span> {generatedPlan.plan?.duration} weeks
+                    </div>
+                    <div className="text-gray-700">
+                      <span className="font-medium">Level:</span> {generatedPlan.plan?.level}
                     </div>
                   </div>
                 </div>
-                
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="font-medium mb-2">Plan Structure (Debug)</div>
-                  <div className="text-sm text-gray-600">
-                    <pre className="whitespace-pre-wrap text-xs">
-                      {JSON.stringify(generatedPlan, null, 2)}
-                    </pre>
+
+                {/* AI Analysis Summary */}
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+                  <h2 className="text-lg font-semibold mb-4 text-gray-800">Training Analysis</h2>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-800">{generatedPlan.aiAnalysis?.weeklyVolume || 0}</div>
+                      <div className="text-sm text-gray-600">Weekly Hours</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-800">{generatedPlan.aiAnalysis?.intensityDistribution?.easy || 0}%</div>
+                      <div className="text-sm text-gray-600">Easy</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-800">{generatedPlan.aiAnalysis?.intensityDistribution?.moderate || 0}%</div>
+                      <div className="text-sm text-gray-600">Moderate</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-gray-800">{generatedPlan.aiAnalysis?.intensityDistribution?.hard || 0}%</div>
+                      <div className="text-sm text-gray-600">Hard</div>
+                    </div>
                   </div>
                 </div>
+
+                {/* Week Navigation */}
+                {generatedPlan.fullPlan?.weeks && (
+                  <div className="bg-white">
+                    <div className="flex overflow-x-auto border-b border-gray-200">
+                      {generatedPlan.fullPlan.weeks.map((week: any, weekIndex: number) => (
+                        <button
+                          key={weekIndex}
+                          onClick={() => setCurrentWeek(weekIndex)}
+                          className={`px-6 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                            weekIndex === currentWeek 
+                              ? 'text-gray-900 border-gray-900' 
+                              : 'text-gray-500 border-transparent hover:text-gray-700 hover:border-gray-300'
+                          }`}
+                        >
+                          Week {week.weekNumber}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Current Week Workouts */}
+                    {generatedPlan.fullPlan.weeks[currentWeek] && (
+                      <div className="p-4">
+                        <div className="mb-4">
+                          <h3 className="text-lg font-semibold text-gray-800 mb-1">
+                            Week {generatedPlan.fullPlan.weeks[currentWeek].weekNumber} - {generatedPlan.fullPlan.weeks[currentWeek].focus}
+                          </h3>
+                          <p className="text-sm text-gray-600">Phase: {generatedPlan.fullPlan.weeks[currentWeek].phase}</p>
+                        </div>
+
+                        <div className="space-y-3">
+                          {generatedPlan.fullPlan.weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => (
+                            <div key={dayIndex} className="border-b border-gray-100 pb-4">
+                              <div className="flex items-start justify-between mb-2">
+                                <div>
+                                  <h4 className="font-medium text-gray-900">
+                                    {workout.day}: {workout.type}
+                                  </h4>
+                                  {workout.duration && (
+                                    <div className="text-sm text-gray-600">{workout.duration}</div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Workout Details */}
+                              <div className="space-y-2 text-sm">
+                                {workout.warmup && (
+                                  <div className="text-gray-700">
+                                    <span className="font-medium">Warm-up:</span> {workout.warmup}
+                                  </div>
+                                )}
+                                
+                                {workout.main && (
+                                  <div className="text-gray-700">
+                                    <span className="font-medium">Main:</span> {workout.main}
+                                  </div>
+                                )}
+                                
+                                {workout.cooldown && (
+                                  <div className="text-gray-700">
+                                    <span className="font-medium">Cool-down:</span> {workout.cooldown}
+                                  </div>
+                                )}
+                                
+                                {workout.notes && (
+                                  <div className="text-gray-600 italic">
+                                    {workout.notes}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
 
