@@ -1515,7 +1515,8 @@ Return a valid JSON plan structure.`;
                 try {
                   // The system now returns the plan directly in the correct format
                   const planData = generatedPlan.plan;
-                  const weeks = generatedPlan.weeks || planData?.weeks || [];
+                  // The plan structure from the Edge Function has weeks nested inside plan
+                  const weeks = generatedPlan.plan?.weeks || generatedPlan.weeks || planData?.weeks || [];
                   console.log('Plan data:', planData);
                   console.log('Generated plan structure:', generatedPlan);
                   console.log('Weeks found:', weeks.length);
@@ -1528,9 +1529,9 @@ Return a valid JSON plan structure.`;
                     <div className="space-y-6">
                       {/* Plan Overview */}
                       <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
-                        <div className="font-medium mb-2">{planData?.phase || 'Training Plan'}</div>
-                        <div className="text-sm">{planData?.phaseDescription || 'Personalized training plan'}</div>
-                        <div className="text-sm mt-1">Training Philosophy: {planData?.trainingPhilosophy || 'Not specified'}</div>
+                        <div className="font-medium mb-2">{planData?.phase || generatedPlan.plan?.phase || 'Training Plan'}</div>
+                        <div className="text-sm">{planData?.phaseDescription || generatedPlan.plan?.phaseDescription || 'Personalized training plan'}</div>
+                        <div className="text-sm mt-1">Training Philosophy: {planData?.trainingPhilosophy || generatedPlan.plan?.trainingPhilosophy || generatedPlan.training_philosophy || 'Not specified'}</div>
                       </div>
                       
                       {/* Week Navigation */}
