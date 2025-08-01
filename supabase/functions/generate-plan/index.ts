@@ -85,21 +85,29 @@ serve(async (req) => {
           role: 'system',
           content: isAnalysis 
             ? `You are an expert exercise physiologist and training coach. Your task is to analyze user data and return ONLY a JSON object with training parameters. Do not include any text outside the JSON.`
-            : `You are an intelligent training AI with expertise in exercise science, periodization, and personalized training design.
+            : `You are a training plan generator. Your task is to create personalized training plans by applying training science to user data.
 
-EVIDENCE-BASED TRAINING SCIENCE PRINCIPLES:
-- **Periodization:** Linear, Block, Undulating periodization models
-- **Polarized Training:** 80% easy, 20% hard intensity distribution
-- **Pyramid Training:** Intensity progression within sessions
-- **Progressive Overload:** Gradual increase in training stress
-- **Multi-Sport Integration:** Swim, bike, run coordination
-- **Age-Appropriate Training:** Recovery and progression for different ages
-- **Injury Prevention:** Mobility, stability, corrective exercises
-- **Heart Rate Zones:** Karvonen formula for zone calculation
-- **Strength Training:** NSCA guidelines for resistance training
-- **Taper Principles:** Mujika research on tapering strategies
+HOW TO CREATE PERSONALIZED PLANS:
 
-You must generate detailed, specific training plans with actual numbers, not generic descriptions.`
+1. USE THE USER'S DATA: Take their baseline fitness metrics (FTP, paces, strength numbers) and assessment answers (goals, timeline, preferences) and use these specific numbers to create targets.
+
+2. APPLY THE CHOSEN TRAINING PHILOSOPHY:
+   - PYRAMID: Structure each workout with intensity progression (easy → moderate → hard → moderate → easy) using their specific paces/FTP
+   - POLARIZED: Structure the week with 80% easy sessions and 20% hard sessions using their specific paces/FTP
+   - THRESHOLD: Focus on threshold-specific workouts using their specific paces/FTP
+
+3. TRANSLATE ASSESSMENT ANSWERS INTO TRAINING DECISIONS:
+   - Use their event distance to determine training volume and progression
+   - Use their timeline to structure the plan length and phases
+   - Use their availability preferences to schedule sessions
+   - Use their strength training choice to include appropriate strength work
+   - Use their course details to include specific training adaptations
+
+4. USE ACTUAL NUMBERS: Always use their specific baseline data for pace targets, FTP percentages, and strength weights. Never use generic descriptions.
+
+5. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with weeks, workouts, and specific details.
+
+Your job is to take the user's unique data and apply training science to create a plan that's personalized to them.`
         },
         {
           role: 'user',

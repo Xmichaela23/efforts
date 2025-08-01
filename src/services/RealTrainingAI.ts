@@ -491,14 +491,14 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     
     console.log('🤖 Starting AI plan generation via Edge Function...');
     
-    // Build context-aware prompt with real training science
-    const systemPrompt = this.buildTrainingSciencePrompt();
-    const userPrompt = this.buildUserPrompt(prompt, startDate, userContext);
-    
-    // Combine system and user prompts for edge function
-    const fullPrompt = `${systemPrompt}\n\n${userPrompt}`;
+    // Send structured data instead of massive prompt
+    const requestData = {
+      prompt: prompt,
+      startDate: startDate,
+      userContext: userContext
+    };
 
-    console.log('📤 Sending request to Supabase Edge Function...');
+    console.log('📤 Sending structured data to Supabase Edge Function...');
 
     try {
       // Add timeout to prevent hanging
@@ -506,7 +506,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       const timeoutId = setTimeout(() => {
         console.log('⏰ Request timeout, aborting...');
         controller.abort();
-      }, 45000); // 45 second timeout
+      }, 120000); // 2 minute timeout - AI needs more time for complex plans
 
       // Get Supabase session for authentication
       const { createClient } = await import('@supabase/supabase-js');
@@ -527,11 +527,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
           'Authorization': `Bearer ${session.access_token}`
         },
         signal: controller.signal,
-        body: JSON.stringify({
-          prompt: fullPrompt,
-          startDate,
-          userContext
-        }),
+        body: JSON.stringify(requestData),
       });
 
       clearTimeout(timeoutId);

@@ -599,487 +599,52 @@ export default function AIPlanBuilder() {
   // Build comprehensive prompt from responses
   const buildPlanPrompt = () => {
     const insights = getBaselineInsights();
-    let prompt = `Create a comprehensive training plan for a triathlete with the following specifications:
-
-**CRITICAL REQUIREMENT: Generate a COMPLETE, PERSONALIZED training plan based on ALL user assessment data. This is NOT a preview - generate the full plan.**
-
-**RESPONSE LENGTH: Generate exactly 4 weeks with detailed workouts. This is the complete plan based on user assessment.**
-
-**MANDATORY: Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday). DO NOT skip any days. Include all 7 days in every week. NO REST DAYS unless specifically requested.**
-
-**INTENSITY REQUIREMENTS:**
-- **8+ hours/week training = Elite level intensity**
-- **Long sessions should be Zone 3-4, not Zone 1-2**
-- **Intervals should be Zone 4-5, not moderate**
-- **Use challenging paces, not easy spins**
-- **Progressive overload with real intensity**
-
-**SMART DISTRIBUTION FOR ELITE ATHLETES:**
-- **Swim:** 1 session/week (maintenance, technique focus)
-- **Strength:** 2-3 sessions/week (injury prevention, performance support)
-- **Bike/Run:** Priority focus (biggest impact on race time)
-- **Pyramid structure:** Zone 2 → Zone 3 → Zone 4 → Zone 3 → Zone 2 within sessions
-
-**STRENGTH TRAINING: If user selected strength training, include 2-3 strength sessions per week with detailed exercises, sets, and reps.**
-
-**Event Type:** ${responses.distance || 'Triathlon'}
-
-**USER ASSESSMENT DATA - USE THIS TO CUSTOMIZE THE PLAN:**
-
-**Baseline Fitness Data:**
-${insights ? `
-- Age: ${insights.age || 'Not specified'}
-- Current Training Volume: ${insights.totalHours || 'Unknown'} hours/week
-- Injury History: ${insights.injuryHistory || 'None reported'}
-- Performance Numbers: ${insights.performanceNumbers ? Object.entries(insights.performanceNumbers).map(([key, value]) => `${key}: ${value}`).join(', ') : 'None available'}
-- Equipment Access: ${insights.equipment && Array.isArray(insights.equipment) ? insights.equipment.join(', ') : 'Basic equipment'}
-${insights.age >= 40 ? `
-**AGE & BASELINE CONSIDERATIONS:**
-${insights.age >= 40 ? `
-- **Age 40+ with high fitness baseline:** Maintain current intensity, focus on recovery quality
-- **Age 40+ with injury history:** Include more strength training and mobility work
-- **Age 40+ with low fitness baseline:** More conservative progression, focus on consistency
-- **Recovery focus:** Quality recovery over quantity, active recovery on rest days
-- **Strength training:** Important for injury prevention and performance maintenance
-` : `
-- **Standard progression:** Based on current fitness level and training history
-- **Recovery:** Standard 24-48 hour recovery between high-intensity sessions
-`}
-` : ''}
-` : 'No baseline data available'}
-
-**User Responses - CUSTOMIZE BASED ON THESE:**
-- Training Philosophy: ${responses.trainingPhilosophy || 'Not selected'}
-- Goals: ${responses.goals && responses.goals.length > 0 ? responses.goals.map(g => GOAL_OPTIONS.find(opt => opt.key === g)?.label).join(', ') : 'Not specified'}
-- Strength Training: ${responses.strengthTraining ? STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label : 'Not selected'}
-- Training Frequency: ${responses.trainingFrequency ? TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label : 'Not selected'}
-- Weekend Availability: ${responses.weekendAvailability ? WEEKEND_AVAILABILITY_OPTIONS.find(w => w.key === responses.weekendAvailability)?.label : 'Not selected'}
-- Long Session Preference: ${responses.longSessionPreference ? LONG_SESSION_PREFERENCES.find(l => l.key === responses.longSessionPreference)?.label : 'Not selected'}
-- Event Date: ${responses.eventDate || 'Not specified'}
-`;
     
-    // Focus and event details
-    if (selectedFocus.includes('triathlon')) {
-      prompt += `**Event Type:** Triathlon\n`;
-      if (responses.hasSpecificEvent === 'yes' && responses.raceName) {
-        prompt += `**Specific Event:** ${responses.raceName}\n`;
-      }
-      if (responses.eventDate) {
-        prompt += `**Event Date:** ${responses.eventDate}\n`;
-      }
-      if (responses.waterConditions) {
-        prompt += `**Swimming Conditions:** ${responses.waterConditions}\n`;
-      }
-      if (responses.cyclingElevationGain) {
-        prompt += `**Cycling Course:** ${responses.cyclingElevationGain}, ${responses.cyclingCourseProfile || 'standard profile'}\n`;
-      }
-      if (responses.runningElevationGain) {
-        prompt += `**Running Course:** ${responses.runningElevationGain}, ${responses.runningCourseProfile || 'standard profile'}\n`;
-      }
-      if (responses.climate) {
-        prompt += `**Climate:** ${responses.climate}\n`;
-      }
-    }
-    
-    // Event details
-    if (responses.hasSpecificEvent === 'yes') {
-      prompt += `**Event Details:**\n`;
-      prompt += `- Distance: ${responses.distance}\n`;
-      prompt += `- Race Name: ${responses.raceName}\n`;
-      prompt += `- Course Profile: ${responses.courseProfile}\n`;
-      prompt += `- Climate: ${responses.climate}\n`;
-      prompt += `- Running Elevation: ${responses.runningElevationGain}\n`;
-      prompt += `- Running Course: ${responses.runningCourseProfile}\n`;
-      prompt += `- Cycling Elevation: ${responses.cyclingElevationGain}\n`;
-      prompt += `- Cycling Course: ${responses.cyclingCourseProfile}\n`;
-      prompt += `- Water Conditions: ${responses.waterConditions}\n`;
-      if (responses.eventDate) {
-        prompt += `- Event Date: ${responses.eventDate}\n`;
-      }
-    }
-
-    // Goals
-    if (responses.goals && responses.goals.length > 0) {
-      prompt += `**Primary Goals:**\n`;
-      responses.goals.forEach(goalKey => {
-        const goal = GOAL_OPTIONS.find(g => g.key === goalKey);
-        if (goal) {
-          prompt += `- ${goal.label}: ${goal.description}\n`;
-        }
-      });
-    }
-    
-    // Weekend availability and long session preferences - CRITICAL for scheduling
-    if (responses.weekendAvailability) {
-      prompt += `**Weekend Availability:** ${WEEKEND_AVAILABILITY_OPTIONS.find(w => w.key === responses.weekendAvailability)?.label}\n`;
-    }
-    if (responses.longSessionPreference) {
-      prompt += `**Long Session Preference:** ${LONG_SESSION_PREFERENCES.find(l => l.key === responses.longSessionPreference)?.label}\n`;
+    // Build structured user data instead of massive prompt
+    const userData = {
+      // Assessment responses
+      distance: responses.distance,
+      trainingPhilosophy: responses.trainingPhilosophy,
+      goals: responses.goals,
+      strengthTraining: responses.strengthTraining,
+      trainingFrequency: responses.trainingFrequency,
+      weekendAvailability: responses.weekendAvailability,
+      longSessionPreference: responses.longSessionPreference,
+      eventDate: responses.eventDate,
       
-      // Add specific instructions based on preference
-      switch (responses.longSessionPreference) {
-        case 'traditional-weekend':
-          prompt += `**SCHEDULING:** Always schedule long rides on Saturdays and long runs on Sundays.\n`;
-          break;
-        case 'reverse-weekend':
-          prompt += `**SCHEDULING:** Always schedule long rides on Sundays and long runs on Saturdays.\n`;
-          break;
-        case 'weekday-long':
-          prompt += `**SCHEDULING:** Schedule long sessions on weekdays (Monday-Friday) since user works weekends.\n`;
-          break;
-        case 'split-weekend':
-          prompt += `**SCHEDULING:** Schedule one long session each weekend day (Saturday and Sunday).\n`;
-          break;
-        case 'flexible-weekly':
-          prompt += `**SCHEDULING:** User will adjust long sessions based on their weekly schedule - provide flexible options.\n`;
-          break;
-        case 'optimize':
-          prompt += `**SCHEDULING:** Optimize long session timing based on user's availability and recovery needs.\n`;
-          break;
-      }
-    }
-    
-    // Training frequency and duration
-    if (responses.trainingFrequency) {
-      prompt += `**Training Frequency:** ${TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label}\n`;
-    }
-    if (responses.weekdayDuration) {
-      prompt += `**Weekday Sessions:** ${WEEKDAY_DURATION_OPTIONS.find(w => w.key === responses.weekdayDuration)?.label}\n`;
-    }
-    if (responses.weekendDuration) {
-      prompt += `**Weekend Sessions:** ${WEEKEND_DURATION_OPTIONS.find(w => w.key === responses.weekendDuration)?.label}\n`;
-    }
-    
-    // Strength training
-    if (responses.strengthTraining && responses.strengthTraining !== 'no-strength') {
-      const strengthType = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label;
-      prompt += `**Strength Training:** ${strengthType}\n`;
+      // Event details
+      hasSpecificEvent: responses.hasSpecificEvent,
+      raceName: responses.raceName,
+      courseProfile: responses.courseProfile,
+      climate: responses.climate,
+      runningElevationGain: responses.runningElevationGain,
+      runningCourseProfile: responses.runningCourseProfile,
+      cyclingElevationGain: responses.cyclingElevationGain,
+      cyclingCourseProfile: responses.cyclingCourseProfile,
+      waterConditions: responses.waterConditions,
       
-      // Add specific frequency based on strength type
-      if (responses.strengthTraining === 'power-development') {
-        prompt += `**STRENGTH SCHEDULE:** Include 2-3 power development sessions per week with plyometrics and explosive movements.\n`;
-        prompt += `**POWER DEVELOPMENT REQUIREMENTS:** Use plyometrics, explosive movements, rate of force development. Include box jumps, medicine ball throws, jump squats, explosive push-ups, power cleans, snatches. Focus on speed and power.\n`;
-      } else if (responses.strengthTraining === 'power-lifting') {
-        prompt += `**STRENGTH SCHEDULE:** Include 2-3 power lifting sessions per week with compound lifts, heavy weight, low reps.\n`;
-        prompt += `**POWER LIFTING REQUIREMENTS:** Use compound movements (squat, bench, deadlift), heavy weight (80-90% 1RM), low reps (3-5), long rest periods (3-5 min). Focus on strength development.\n`;
-      } else if (responses.strengthTraining === 'injury-prevention') {
-        prompt += `**STRENGTH SCHEDULE:** Include 2-3 injury prevention strength sessions per week focusing on mobility, stability, and corrective exercises.\n`;
-        prompt += `**INJURY PREVENTION REQUIREMENTS:** Use mobility work, stability exercises, corrective movements. Include hip mobility, core stability, shoulder stability, single-leg balance, corrective exercises for common triathlon imbalances.\n`;
-      } else if (responses.strengthTraining === 'sport-specific') {
-        prompt += `**STRENGTH SCHEDULE:** Include 2-3 sport-specific strength sessions per week targeting triathlon-specific movements.\n`;
-        prompt += `**SPORT-SPECIFIC REQUIREMENTS:** Use triathlon-specific movements. Include swim pull exercises, bike-specific leg strength, run-specific plyometrics, transition practice, sport-specific core work.\n`;
-      } else if (responses.strengthTraining === 'build-muscle') {
-        prompt += `**STRENGTH SCHEDULE:** Include 2-3 muscle building sessions per week with hypertrophy focus.\n`;
-        prompt += `**BUILD MUSCLE REQUIREMENTS:** Use hypertrophy training (8-12 reps), moderate weight (70-80% 1RM), shorter rest periods (60-90 sec). Include compound and isolation exercises for muscle growth.\n`;
-      } else if (responses.strengthTraining === 'general-fitness') {
-        prompt += `**STRENGTH SCHEDULE:** Include 2-3 general fitness strength sessions per week.\n`;
-        prompt += `**GENERAL FITNESS REQUIREMENTS:** Use basic conditioning exercises, moderate intensity, full-body workouts. Include bodyweight exercises, light weights, circuit training for overall fitness.\n`;
-      }
-      
-      prompt += `**IMPORTANT:** Include detailed strength training workouts with specific exercises, sets, reps, and weights if applicable.\n`;
-    }
+      // Baseline data
+      baseline: insights ? {
+        age: insights.age,
+        totalHours: insights.totalHours,
+        injuryHistory: insights.injuryHistory,
+        performanceNumbers: insights.performanceNumbers,
+        equipment: insights.equipment,
+        disciplineFitness: insights.disciplineFitness
+      } : null
+    };
     
-    // Training philosophy
-    if (responses.trainingPhilosophy) {
-      prompt += `**Training Philosophy:** ${responses.trainingPhilosophy.toUpperCase()}\n`;
-    }
+    // Simple, clear prompt that references the structured data
+    const prompt = `Create a personalized training plan using the provided user data.
+
+User has selected: ${userData.distance} distance, ${userData.trainingPhilosophy} training philosophy.
+
+Generate a 4-week plan with 7 days per week, using their specific baseline data and preferences.
+
+Return a valid JSON plan structure.`;
     
-    // Baseline insights
-    if (insights) {
-      prompt += `\n**Athlete Profile:**\n`;
-      prompt += `- Current training volume: ${insights.totalHours} hours/week\n`;
-      prompt += `- Age: ${insights.age || 'Not specified'}\n`;
-      if (insights.trainingBackground) {
-        prompt += `- Training background: ${insights.trainingBackground}\n`;
-      }
-      if (insights.injuryHistory) {
-        prompt += `- Injury history: ${insights.injuryHistory}\n`;
-      }
-      
-      // Add performance numbers for specific pace/FTP targets
-      if (insights.performanceNumbers) {
-        prompt += `\n**Performance Numbers (USE THESE FOR SPECIFIC TARGETS):**\n`;
-        Object.entries(insights.performanceNumbers).forEach(([discipline, numbers]) => {
-          if (numbers && typeof numbers === 'object') {
-            prompt += `- ${discipline}: ${JSON.stringify(numbers)}\n`;
-          }
-        });
-      }
-      
-      // Add discipline fitness levels
-      if (insights.disciplineFitness) {
-        prompt += `\n**Discipline Fitness Levels:**\n`;
-        Object.entries(insights.disciplineFitness).forEach(([discipline, level]) => {
-          if (level) {
-            prompt += `- ${discipline}: ${level}\n`;
-          }
-        });
-      }
-    }
-    
-    prompt += `**REQUIREMENTS:**
-
-1. **STRUCTURE:** Create a FULL training plan with MULTIPLE WEEKS (at least 8-12 weeks). Each week MUST have EXACTLY 7 DAYS (Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday) with specific workouts. DO NOT skip any days.
-
-2. **WORKOUT DETAILS:** Each workout must include:
-   - **Running paces:** Specific pace targets (e.g., "8:30/mi", "7:45/mi") - ALWAYS INCLUDE ACTUAL PACE WHEN AVAILABLE, NOT JUST "Zone 2"
-   - **Swimming paces:** Specific pace targets (e.g., "2:05/100m", "1:15/100m") - ALWAYS INCLUDE ACTUAL PACE WHEN AVAILABLE
-   - **FTP percentages for cycling:** (e.g., "85% FTP (220 watts)", "Zone 3") - ALWAYS INCLUDE ACTUAL WATTAGE WHEN FTP IS AVAILABLE
-   - **Heart rate zones:** Where applicable - CALCULATE BASED ON BASELINE FITNESS
-   - **Specific intervals:** With times/distances - USE ACTUAL PACE/SPEED NUMBERS
-   - **Sets and reps for strength training:** (e.g., "3x5 squats @ 85% 1RM (191 lbs)") - ALWAYS INCLUDE ACTUAL WEIGHT WHEN 1RM IS AVAILABLE
-   - **Warm-up, main sets, and cool-down:** For each workout
-
-3. **STRENGTH TRAINING:** If requested, include 2-3 detailed strength workouts per week with:
-   - Specific exercises (squats, deadlifts, rows, etc.)
-   - Sets, reps, and weight recommendations
-   - Progression over weeks
-   - Full workout details (warm-up, main sets, cool-down)
-
-4. **PROGRESSION:** Show clear progression:
-   - Build phases with increasing intensity
-   - Recovery weeks
-   - Peak and taper phases
-   - Specific metrics that improve over time
-
-5. **PERIODIZATION & PROGRESSIVE OVERLOAD:**
-   - **Week 1-4:** Base building (aerobic foundation, technique)
-   - **Week 5-8:** Build phase (increasing volume and intensity)
-   - **Week 9-10:** Recovery week (reduced volume, maintain intensity)
-   - **Week 11-14:** Peak phase (high intensity, sport-specific)
-   - **Week 15-16:** Taper (reduced volume, maintain intensity)
-   - **Progressive overload:** Each week should show measurable increases in volume, intensity, or complexity
-   - **Recovery weeks:** Every 3-4 weeks, include a recovery week with 20-30% reduced volume
-   - **Deload periods:** Include proper deload periods to prevent overtraining
-
-6. **TRAINING APPROACHES - MAKE THESE DISTINCTLY DIFFERENT:**
-   - **PYRAMID TRAINING:** 
-     * Structure workouts with intensity progression: easy → moderate → hard → moderate → easy
-     * Example: 10min easy → 15min moderate → 10min hard → 15min moderate → 10min easy
-     * Build intensity within each session, then taper down
-     * Focus on gradual intensity changes and recovery within workouts
-   
-   - **POLARIZED TRAINING:**
-     * 80% of training at easy intensity (Zone 1-2, conversational pace)
-     * 20% of training at hard intensity (Zone 4-5, threshold and above)
-     * Minimal moderate intensity (Zone 3) - avoid "junk miles"
-     * Easy days should be truly easy, hard days should be very challenging
-     * Example: Monday easy run (Zone 1), Tuesday hard intervals (Zone 4-5), Wednesday easy swim (Zone 1)
-   
-   - **BALANCED TRAINING:**
-     * Distribute intensity across all zones: 40% easy (Zone 1-2), 40% moderate (Zone 3), 20% hard (Zone 4-5)
-     * Include steady-state work, tempo sessions, and intervals
-     * Mix of aerobic base, threshold work, and high-intensity intervals
-     * Example: Monday easy (Zone 2), Tuesday tempo (Zone 3), Wednesday intervals (Zone 4), Thursday easy (Zone 2)
-   
-   - **Intensity Distribution:** Base intensity levels on user's fitness level and training philosophy preference
-
-7. **BASELINE FITNESS INTEGRATION:**
-   - **Use baseline data:** Incorporate user's current fitness level, performance numbers, and training history
-   - **Customize intensity:** Adjust pace targets, FTP percentages, and HR zones based on baseline data
-   - **Progressive overload:** Start from current fitness level and build appropriately
-   - **Injury prevention:** Consider injury history and age for appropriate progression
-   - **Equipment access:** Include strength exercises based on available equipment
-   - **Time constraints:** Respect current training volume and available time
-
-8. **INTENSITY CUSTOMIZATION BASED ON BASELINE:**
-   - **CRITICAL:** Use the actual performance numbers provided in the baseline data
-   - **If user has FTP data:** Use actual FTP percentages (e.g., "85% FTP (220 watts)") - ALWAYS INCLUDE THE ACTUAL WATTAGE
-   - **RUNNING PACE HIERARCHY - USE APPROPRIATE PACE FOR EACH WORKOUT TYPE:**
-     * **Intervals/High Intensity:** Use 5K pace or faster (e.g., "8:00/mi intervals")
-     * **Tempo/Threshold:** Use 10K pace (e.g., "8:30/mi tempo")
-     * **Long Runs:** Use easy pace if available (e.g., "10:00/mi long run - easy pace, Zone 2")
-     * **Easy/Recovery:** Use easy pace if available (e.g., "10:00/mi easy - easy pace, Zone 2")
-     * **If no easy pace available:** Use 5K pace + 1-2 min/mi as estimate
-     * **NEVER USE GENERIC "Zone 2" WITHOUT SPECIFIC PACE**
-     * **PRIORITIZE USER'S EASY PACE:** Always use their actual easy pace when available
-   - **If user has swimming pace data:** Use actual pace targets (e.g., "2:05/100m", "1:15/100m") - ALWAYS INCLUDE ACTUAL PACE
-   - **If user has HR zones:** Use actual HR zone targets (e.g., Zone 2, Zone 4) - CALCULATE FROM BASELINE
-   - **If user has strength numbers:** Use actual weight recommendations (e.g., "80% 1RM (180 lbs)") - ALWAYS INCLUDE THE ACTUAL WEIGHT
-   - **If no baseline data:** Use conservative estimates based on fitness level
-   - **Age considerations:** Adjust intensity for age-appropriate training (recovery, progression rate)
-   - **MANDATORY:** Every workout must have specific, actionable numbers - no generic descriptions
-   - **FORMAT:** Always show the calculation: "85% FTP (220 watts)" not just "85% FTP"
-   - **RUNNING FORMAT:** Always show specific pace: "8:30/mi" not just "Zone 2"
-   - **Injury history:** Modify exercises and intensity based on injury patterns
-
-9. **AGE & BASELINE MODIFICATIONS:**
-   - **For athletes 40+ with high fitness baseline:** 
-     * Maintain current intensity levels based on baseline data
-     * Focus on recovery quality over quantity
-     * Include active recovery sessions
-     * Strength training for performance maintenance
-     * Standard 24-48 hour recovery between high-intensity sessions
-   - **For athletes 40+ with injury history:** 
-     * Include more strength training and mobility work
-     * Conservative progression based on injury patterns
-     * Focus on technique and form
-   - **For athletes 40+ with low fitness baseline:** 
-     * More conservative progression, focus on consistency
-     * Build aerobic base before adding intensity
-     * Include strength training for injury prevention
-   - **For athletes under 40:** Standard progression based on baseline fitness level
-
-10. **SCHEDULING:** Respect the user's long session preferences:
-   - Schedule long runs/rides according to their preference
-   - Consider their weekend availability
-   - Balance training load throughout the week
-
-11. **OUTPUT FORMAT:** Return ONLY valid JSON in this exact structure with 4 WEEKS:
-{
-  "plan": {
-    "name": "Your Training Plan",
-    "description": "Personalized training plan based on your assessment",
-    "phase": "[USER'S ACTUAL GOAL] Training Plan",
-    "phaseDescription": "First month of training - full plan available in app",
-    "trainingPhilosophy": "pyramid", // or "polarized" or "balanced"
-    "weeks": [
-      {
-        "weekNumber": 1,
-        "focus": "Base Building - Aerobic Foundation",
-        "phase": "Base",
-        "workouts": [
-          {
-            "day": "Monday",
-            "type": "Swim",
-            "duration": "45 minutes",
-            "warmup": "400m easy @ 2:00/100m",
-            "main": "8x50m @ 1:15/100m, 30s rest",
-            "cooldown": "200m easy @ 2:30/100m",
-            "notes": "Focus on technique, build aerobic base"
-          },
-          {
-            "day": "Tuesday",
-            "type": "Bike",
-            "duration": "60 minutes",
-            "warmup": "15min easy @ Zone 1",
-            "main": "3x10min @ 85% FTP (220 watts), 5min rest",
-            "cooldown": "10min easy @ Zone 1",
-            "notes": "Build cycling strength, progressive overload"
-          },
-          {
-            "day": "Wednesday",
-            "type": "Run",
-            "duration": "45 minutes",
-            "warmup": "10min easy @ 9:30/mi",
-            "main": "20min @ 8:30/mi, 10min @ 7:45/mi",
-            "cooldown": "5min easy @ 9:30/mi",
-            "notes": "Build running endurance"
-          },
-          {
-            "day": "Thursday",
-            "type": "Strength",
-            "duration": "60 minutes",
-            "warmup": "10min dynamic stretching, 3x5 @ 50% 1RM",
-            "main": "3x5 squats @ 85% 1RM (191 lbs), 3x3 deadlifts @ 90% 1RM (225 lbs), 3x5 bench @ 80% 1RM (180 lbs)",
-            "cooldown": "5min static stretching",
-            "notes": "Power lifting - compound movements, heavy weight, low reps"
-          },
-          {
-            "day": "Friday",
-            "type": "Swim",
-            "duration": "30 minutes",
-            "warmup": "200m easy @ 2:00/100m",
-            "main": "6x50m @ 1:20/100m, 30s rest",
-            "cooldown": "200m easy @ 2:30/100m",
-            "notes": "Recovery swim, focus on technique"
-          },
-          {
-            "day": "Saturday",
-            "type": "Bike",
-            "duration": "90 minutes",
-            "warmup": "15min easy @ Zone 1",
-            "main": "60min @ Zone 2-3, long steady ride",
-            "cooldown": "15min easy @ Zone 1",
-            "notes": "Long ride to build endurance"
-          },
-          {
-            "day": "Sunday",
-            "type": "Run",
-            "duration": "60 minutes",
-            "warmup": "10min easy @ 9:30/mi",
-            "main": "45min @ 8:30/mi, long steady run",
-            "cooldown": "5min easy @ 9:30/mi",
-            "notes": "Long run to build endurance"
-          }
-        ]
-      },
-      {
-        "weekNumber": 4,
-        "focus": "Base Building - Recovery Week",
-        "phase": "Recovery",
-        "workouts": [
-          {
-            "day": "Monday",
-            "type": "Swim",
-            "duration": "30 minutes",
-            "warmup": "200m easy @ 2:00/100m",
-            "main": "4x50m @ 1:15/100m, 30s rest",
-            "cooldown": "200m easy @ 2:30/100m",
-            "notes": "Recovery week - reduced volume, maintain technique"
-          }
-        ]
-      },
-      {
-        "weekNumber": 8,
-        "focus": "Build Phase - Increasing Intensity",
-        "phase": "Build",
-        "workouts": [
-          {
-            "day": "Monday",
-            "type": "Swim",
-            "duration": "60 minutes",
-            "warmup": "400m easy @ 2:00/100m",
-            "main": "12x50m @ 1:10/100m, 30s rest",
-            "cooldown": "200m easy @ 2:30/100m",
-            "notes": "Increased volume and intensity - progressive overload"
-          }
-        ]
-      }
-    ]
-  }
-}
-
-**STRENGTH TRAINING EXAMPLES:**
-- **Power Development:** Box jumps, medicine ball throws, jump squats, explosive push-ups, power cleans, snatches
-- **Power Lifting:** Squats @ 85% 1RM, deadlifts @ 90% 1RM, bench @ 80% 1RM (3-5 reps, 3-5 min rest)
-- **Injury Prevention:** Hip mobility, core stability, shoulder stability, single-leg balance, corrective exercises
-- **Sport-Specific:** Swim pull exercises, bike-specific leg strength, run-specific plyometrics, transition practice
-- **Build Muscle:** Hypertrophy training (8-12 reps, 70-80% 1RM, 60-90 sec rest)
-- **General Fitness:** Bodyweight exercises, light weights, circuit training
-
-**CRITICAL:** 
-- Return ONLY the JSON object above
-- Generate EXACTLY 4 WEEKS of training (preview only)
-- Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday)
-- Make each workout specific and actionable with actual pace targets, FTP percentages, heart rate zones, and detailed instructions
-- This is a preview - full plan will be available in the app
-- Generate 4 weeks with proper progression and structure
-- Focus on Base building phase for the first month
-- **VERCEL TEST:** Force deploy with environment variables
-- Include recovery weeks every 3-4 weeks with 20-30% reduced volume
-- Show progressive overload: increasing volume, intensity, or complexity each week
-- Include proper deload periods to prevent overtraining
-- **STRENGTH TRAINING:** If requested, include 2-3 strength sessions per week with detailed exercises
-- **CUSTOMIZE BASED ON USER RESPONSES:**
-  - Use the selected training philosophy (pyramid/polarized/balanced) to structure workouts
-  - Base intensity levels on user's fitness level from baseline data
-  - Adjust volume based on current training frequency and available time
-  - Include strength training if requested, using available equipment
-  - Respect long session preferences and weekend availability
-  - Consider injury history and age for appropriate progression
-- **MAKE TRAINING APPROACHES DISTINCTLY DIFFERENT:**
-  - Pyramid: Intensity progression within workouts (easy → moderate → hard → moderate → easy)
-  - Polarized: 80% easy (Zone 1-2), 20% hard (Zone 4-5), minimal moderate intensity
-  - Balanced: 40% easy, 40% moderate, 20% hard across all zones
-- **USE ALL BASELINE DATA:**
-  - Incorporate actual performance numbers (FTP, pace, strength)
-  - Base training intensity on current fitness level, not just age
-  - Consider injury history for appropriate progression
-  - Use available equipment for strength training
-  - Start from current fitness level and build appropriately
-  - **Age 40+ with high fitness:** Maintain intensity, focus on recovery quality
-  - **Age 40+ with low fitness:** Conservative progression, build base first`;
+    return { prompt, userData };
+  };
     
     return prompt;
   };
@@ -1103,9 +668,10 @@ ${insights.age >= 40 ? `
       }
       
       // Step 2: AI Plan Generation - use Edge Function to generate unique plan
-      const prompt = buildPlanPrompt();
+      const { prompt, userData } = buildPlanPrompt();
       const startDate = new Date().toISOString().split('T')[0];
       const userContext = {
+        ...userData,
         baselines,
         responses,
         aiAnalysis,
