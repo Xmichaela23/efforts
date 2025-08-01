@@ -267,6 +267,15 @@ export default function AIPlanBuilder() {
   useEffect(() => {
     console.log('🎯 generatedPlan state changed:', generatedPlan);
   }, [generatedPlan]);
+  
+  // Auto-trigger plan generation when reaching step 8
+  useEffect(() => {
+    if (step === 8 && !generatedPlan && !generatingPlan) {
+      console.log('🎯 Auto-triggering plan generation...');
+      generatePlan();
+    }
+  }, [step, generatedPlan, generatingPlan]);
+  
   const [currentWeek, setCurrentWeek] = useState(0); // Track current week being viewed
   
   // Assessment responses
@@ -1605,14 +1614,6 @@ Return a valid JSON plan structure.`;
         console.log('🎯 STEP 8 - Current step:', step);
         console.log('🎯 generatedPlan state:', generatedPlan);
         console.log('🎯 generatingPlan state:', generatingPlan);
-        
-        // Auto-trigger plan generation when reaching step 8
-        useEffect(() => {
-          if (!generatedPlan && !generatingPlan) {
-            console.log('🎯 Auto-triggering plan generation...');
-            generatePlan();
-          }
-        }, []);
         
         if (generatingPlan) {
           return (
