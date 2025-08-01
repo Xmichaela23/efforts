@@ -304,17 +304,9 @@ export class PlanEngine {
 
   // Determine workout type based on AI analysis and distribution
   private getWorkoutType(day: string, dayIndex: number, distribution: { [key: string]: number }): 'swim' | 'bike' | 'run' | 'strength' | 'rest' {
-    // Use AI analysis to determine workout type
+    // NO FALLBACKS - Require AI analysis for workout type
     if (!this.aiAnalysis) {
-      // Fallback logic
-      if (dayIndex === 0) return 'swim';
-      if (dayIndex === 1) return 'bike';
-      if (dayIndex === 2) return 'run';
-      if (dayIndex === 3) return 'strength';
-      if (dayIndex === 4) return 'bike';
-      if (dayIndex === 5) return 'run';
-      if (dayIndex === 6) return 'rest';
-      return 'rest';
+      throw new Error('AI analysis required for workout type determination. Cannot generate workouts without AI analysis.');
     }
 
     const { trainingPhilosophy, focusAreas } = this.aiAnalysis;
@@ -434,19 +426,9 @@ export class PlanEngine {
 
   // Get workout duration based on AI analysis
   private getWorkoutDuration(type: string, weekNumber: number): string {
+    // NO FALLBACKS - Require AI analysis for workout duration
     if (!this.aiAnalysis) {
-      // Fallback durations
-      const baseDurations = {
-        swim: 45,
-        bike: 60,
-        run: 45,
-        strength: 60,
-        rest: 0
-      };
-      
-      const weekIncrease = (weekNumber - 1) * 5;
-      const duration = baseDurations[type as keyof typeof baseDurations] + weekIncrease;
-      return `${duration} minutes`;
+      throw new Error('AI analysis required for workout duration calculation. Cannot generate workouts without AI analysis.');
     }
 
     const { weeklyVolume, progressionRate, ageAdjustments } = this.aiAnalysis;
@@ -984,10 +966,11 @@ export class PlanEngine {
 
   // Generate intelligent strength workout
   private generateStrengthWorkout(intensity: string, weekNumber: number): string {
-    // Use AI analysis strength focus if available, otherwise fall back to form response
-    const strengthType = this.aiAnalysis?.strengthFocus || 
-                        this.mapStrengthTrainingToCategory(this.responses.strengthTraining) || 
-                        'general_fitness';
+    // NO FALLBACKS - Require AI analysis for strength focus
+    if (!this.aiAnalysis?.strengthFocus) {
+      throw new Error('AI analysis strength focus required. Cannot generate strength workouts without AI analysis.');
+    }
+    const strengthType = this.aiAnalysis.strengthFocus;
     const userEquipment = this.userBaselines.equipment?.strength || [];
     const injuryHistory = this.userBaselines.injuryHistory;
     const injuryRegions = this.userBaselines.injuryRegions;
