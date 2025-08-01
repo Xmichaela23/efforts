@@ -250,6 +250,7 @@ COMPLETE USER PROFILE MAPPING:
 - Injury History: ${injuryHistory}
 - Injury Regions: ${JSON.stringify(injuryRegions)}
 - Performance Numbers: ${JSON.stringify(performanceNumbers)}
+- RUNNING PACE CLARIFICATION: easyPace and fiveK are separate, distinct paces - do not calculate one from the other
 - Current Training Volume: ${JSON.stringify(currentVolume)}
 - Training Background: ${trainingBackground}
 - Age: ${age}
@@ -577,35 +578,40 @@ TRAINING SCIENCE PRINCIPLES:
    - Zone 5 (VO2max): 95-105% FTP/HR, very hard intervals
    - Zone 6 (Anaerobic): 105%+ FTP/HR, sprint efforts
 
-3. STRENGTH TRAINING PROGRESSION:
+3. RUNNING PACE REFERENCE:
+   - easyPace field: user's conversational Zone 2 pace
+   - fiveK field: user's maximum effort pace
+   - These are separate, distinct paces - do not calculate one from the other
+
+  4. STRENGTH TRAINING PROGRESSION:
    - Week 1-2: 65-70% 1RM, 3x10-12 reps, focus on form
    - Week 3-4: 70-75% 1RM, 3x8-10 reps, build strength
    - Week 5-6: 75-80% 1RM, 3x6-8 reps, strength focus
    - Week 7-8: 80-85% 1RM, 3x4-6 reps, power development
 
-4. RECOVERY PRINCIPLES:
+  5. RECOVERY PRINCIPLES:
    - Hard days followed by easy days
    - Weekly recovery day (active recovery or complete rest)
    - Progressive overload with adequate recovery
    - Listen to body signals (fatigue, soreness, motivation)
 
-5. SPORT-SPECIFIC CONSIDERATIONS:
+  6. SPORT-SPECIFIC CONSIDERATIONS:
    - SWIM: Technique focus, stroke efficiency, open water skills
    - BIKE: Power development, cadence work, bike handling
    - RUN: Running economy, form, terrain specificity
    - STRENGTH: Sport-specific movements, injury prevention
 
-6. NUTRITION TIMING:
+  7. NUTRITION TIMING:
    - Pre-workout: 2-3 hours before, balanced meal
    - During: 30-60g carbs/hour for sessions >90 minutes
    - Post-workout: 20-30g protein + carbs within 30 minutes
 
-7. EQUIPMENT OPTIMIZATION:
+  8. EQUIPMENT OPTIMIZATION:
    - Use available equipment efficiently
    - Adapt exercises to equipment limitations
    - Progressive equipment upgrades as needed
 
-8. INJURY PREVENTION:
+  9. INJURY PREVENTION:
    - Proper warm-up and cool-down
    - Gradual progression in volume and intensity
    - Mobility and flexibility work
