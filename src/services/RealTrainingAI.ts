@@ -171,6 +171,12 @@ export class RealTrainingAI {
 
   // Build analysis-specific prompt
   private buildAnalysisPrompt(userBaselines: any, userResponses: any): string {
+    // Debug: Log what we're getting
+    console.log('🔍 DEBUG - userResponses received:', userResponses);
+    console.log('🔍 DEBUG - distance:', userResponses.distance);
+    console.log('🔍 DEBUG - eventDate:', userResponses.eventDate);
+    console.log('🔍 DEBUG - timeline:', userResponses.timeline);
+    
     // Extract key user preferences for emphasis
     const raceDistance = userResponses.distance;
     const strengthChoice = userResponses.strengthTraining;

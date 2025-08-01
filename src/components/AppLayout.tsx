@@ -234,7 +234,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   const handleOpenPlanBuilder = () => {
+    console.log('🚀 handleOpenPlanBuilder called');
     setShowPlanBuilder(true);
+    console.log('✅ showPlanBuilder set to true');
     setShowSummary(false);
     setDateWorkouts([]);
     setCurrentWorkoutIndex(0);

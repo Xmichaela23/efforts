@@ -1,5 +1,25 @@
 # EFFORTS APP BIBLE 📚
 
+## 🎯 DEVELOPMENT PHILOSOPHY
+
+### **Holistic Problem-Solving Approach**
+- **NEVER fix one component in isolation** - always consider system-wide impact
+- **Understand the full data flow** before making any changes
+- **Context-first development** - read this bible before starting any work
+- **Test the entire system** after any changes, not just the modified component
+
+### **Success Pattern: AI Plan Generation Fix**
+- **Problem**: Validation errors blocking AI plan generation
+- **Wrong approach**: Fix validation in isolation → breaks other components
+- **Right approach**: Understand full flow (TrainingBaselines → AppContext → RealTrainingAI → PlanEngine) → fix root cause → enable full AI generation
+- **Result**: Working AI plans with hundreds of combinations
+
+### **Anti-Patterns to Avoid**
+- ❌ Making changes without understanding the full system
+- ❌ Fixing symptoms instead of root causes
+- ❌ Breaking working components to fix broken ones
+- ❌ Ignoring data flow between components
+
 ## 🎯 APP OVERVIEW
 
 **Efforts** is a comprehensive training app that creates personalized training plans based on individual fitness assessments and goals. The app integrates with Garmin/Strava for data import and uses intelligent analysis to generate unique training plans.

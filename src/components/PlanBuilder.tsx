@@ -4,6 +4,7 @@ import AIPlanBuilder from './AIPlanBuilder';
 import ManualPlanBuilder from './ManualPlanBuilder';
 
 export default function PlanBuilder() {
+  console.log('🎯 PlanBuilder component rendering');
   const [activeTab, setActiveTab] = useState<'ai' | 'manual'>('ai');
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
