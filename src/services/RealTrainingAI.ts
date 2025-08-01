@@ -638,17 +638,17 @@ CRITICAL REQUIREMENTS:
 EXAMPLE PLAN STRUCTURE:
 {
   "plan": {
-    "name": "4-Week Training Preview",
-    "description": "Personalized training plan focusing on [user goals]",
-    "type": "triathlon",
-    "duration": 4,
-    "level": "intermediate",
-    "goal": "performance",
+    "name": "[USER'S ACTUAL GOAL] Training Plan",
+    "description": "[PERSONALIZED DESCRIPTION BASED ON USER DATA]",
+    "type": "[USER'S SELECTED DISCIPLINES]",
+    "duration": [CALCULATED FROM USER TIMELINE],
+    "level": "[BASED ON USER FITNESS ASSESSMENT]",
+    "goal": "[USER'S SPECIFIC GOAL]",
     "status": "active",
     "currentWeek": 1,
-    "createdDate": "2024-01-01",
-    "totalWorkouts": 20,
-    "disciplines": ["swim", "bike", "run", "strength"],
+    "createdDate": "[START DATE]",
+    "totalWorkouts": [CALCULATED TOTAL],
+    "disciplines": "[USER'S SELECTED DISCIPLINES]",
     "isIntegrated": true,
     "weeks": [
       {
@@ -656,9 +656,9 @@ EXAMPLE PLAN STRUCTURE:
         "workouts": [
           {
             "day": "Monday",
-            "type": "strength",
-            "duration": 60,
-            "description": "Full body strength session focusing on compound movements..."
+            "type": "[DISCIPLINE]",
+            "duration": [CALCULATED DURATION],
+            "description": "[DETAILED WORKOUT BASED ON USER FITNESS]"
           }
         ]
       }
@@ -666,7 +666,7 @@ EXAMPLE PLAN STRUCTURE:
   }
 }
 
-REMEMBER: This is a 4-week preview plan. Focus on building a solid foundation and establishing good training habits.`;
+REMEMBER: Generate a COMPLETE, PERSONALIZED plan based on ALL user data. No generic fallbacks.`;
   }
 
   // Build user-specific prompt
@@ -707,21 +707,21 @@ Return ONLY the JSON plan object, no additional text.`;
         throw new Error('Invalid plan structure - missing plan or weeks');
       }
       
-      // Add default values if missing
+      // NO FALLBACKS - require all fields from AI
       const plan = {
-        name: parsed.plan.name || 'Your Training Plan',
-        description: parsed.plan.description || 'Personalized training plan',
-        type: parsed.plan.type || 'triathlon',
-        duration: parsed.plan.duration || 4,
-        level: parsed.plan.level || 'intermediate',
-        goal: parsed.plan.goal || 'performance',
-        status: parsed.plan.status || 'active',
-        currentWeek: parsed.plan.currentWeek || 1,
-        createdDate: parsed.plan.createdDate || new Date().toISOString().split('T')[0],
-        totalWorkouts: parsed.plan.totalWorkouts || 0,
-        disciplines: parsed.plan.disciplines || ['swim', 'bike', 'run'],
-        isIntegrated: parsed.plan.isIntegrated !== undefined ? parsed.plan.isIntegrated : true,
-        weeks: parsed.plan.weeks || []
+        name: parsed.plan.name,
+        description: parsed.plan.description,
+        type: parsed.plan.type,
+        duration: parsed.plan.duration,
+        level: parsed.plan.level,
+        goal: parsed.plan.goal,
+        status: parsed.plan.status,
+        currentWeek: parsed.plan.currentWeek,
+        createdDate: parsed.plan.createdDate,
+        totalWorkouts: parsed.plan.totalWorkouts,
+        disciplines: parsed.plan.disciplines,
+        isIntegrated: parsed.plan.isIntegrated,
+        weeks: parsed.plan.weeks
       };
       
       // Calculate total workouts
