@@ -3,7 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 // Import Font Awesome icons at the top
 import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaBalanceScale, FaMedal, FaObjectGroup, FaCog } from 'react-icons/fa';
 import { RealTrainingAI } from '../services/RealTrainingAI';
-import { PlanEngine } from '../services/PlanEngine';
+
 
 // Triathlon-specific assessment options
 const TRIATHLON_DISTANCES = [
