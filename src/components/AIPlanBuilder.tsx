@@ -1701,10 +1701,14 @@ Return a valid JSON plan structure.`;
                           
                           {/* Daily Workouts */}
                           <div className="space-y-6">
-                            {console.log('Current week workouts:', weeks[currentWeek].workouts)}
-                            {weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => (
-                              console.log('Workout structure:', workout),
-                              <div key={dayIndex} className="border-b border-gray-100 pb-6">
+                            {(() => {
+                              console.log('Current week workouts:', weeks[currentWeek].workouts);
+                              return null;
+                            })()}
+                            {weeks[currentWeek].workouts?.map((workout: any, dayIndex: number) => {
+                              console.log('Workout structure:', workout);
+                              return (
+                                <div key={dayIndex} className="border-b border-gray-100 pb-6">
                                 <div className="flex justify-between items-start mb-4">
                                   <div className="font-medium text-gray-900 text-lg">
                                     {workout.day}: {workout.type}
@@ -1741,7 +1745,8 @@ Return a valid JSON plan structure.`;
                                   )}
                                 </div>
                               </div>
-                            ))}
+                            );
+                            })}
                           </div>
                         </div>
                       )}
