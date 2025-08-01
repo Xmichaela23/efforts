@@ -601,9 +601,9 @@ export default function AIPlanBuilder() {
     const insights = getBaselineInsights();
     let prompt = `Create a comprehensive training plan for a triathlete with the following specifications:
 
-**CRITICAL REQUIREMENT: Generate a 4-WEEK PREVIEW of the training plan. This is a preview showing the first month of training. The full plan will be available in the app.**
+**CRITICAL REQUIREMENT: Generate a COMPLETE, PERSONALIZED training plan based on ALL user assessment data. This is NOT a preview - generate the full plan.**
 
-**RESPONSE LENGTH: Generate exactly 4 weeks with detailed workouts. This is a preview, not the complete plan.**
+**RESPONSE LENGTH: Generate exactly 4 weeks with detailed workouts. This is the complete plan based on user assessment.**
 
 **MANDATORY: Each week MUST have EXACTLY 7 DAYS of workouts (Monday through Sunday). DO NOT skip any days. Include all 7 days in every week. NO REST DAYS unless specifically requested.**
 
