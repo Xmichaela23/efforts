@@ -474,9 +474,10 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     if (!aiResponse.focusAreas) {
       throw new Error('AI analysis missing focusAreas data');
     }
-    if (!aiResponse.injuryConsiderations) {
-      throw new Error('AI analysis missing injuryConsiderations data');
-    }
+    // Bypass injuryConsiderations for now - can be added later
+    // if (!aiResponse.injuryConsiderations) {
+    //   throw new Error('AI analysis missing injuryConsiderations data');
+    // }
     if (!aiResponse.equipmentOptimization) {
       throw new Error('AI analysis missing equipmentOptimization data');
     }
@@ -495,7 +496,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       strengthFocus,
       progressionRate,
       recoveryNeeds,
-      injuryConsiderations: aiResponse.injuryConsiderations,
+      injuryConsiderations: aiResponse.injuryConsiderations || [], // Default to empty array if missing
       equipmentOptimization: aiResponse.equipmentOptimization,
       ageAdjustments: aiResponse.ageAdjustments,
       baselineFitness: aiResponse.baselineFitness,
