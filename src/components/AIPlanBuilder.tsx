@@ -646,9 +646,93 @@ Return a valid JSON plan structure.`;
     return { prompt, userData };
   };
 
+  // Comprehensive validation - NO FALLBACKS
+  const validateAssessment = () => {
+    console.log('🔍 VALIDATING ASSESSMENT DATA...');
+    console.log('📊 Baselines:', baselines);
+    console.log('📝 Responses:', responses);
+    
+    // 1. ASSESSMENT RESPONSES VALIDATION
+    const requiredAssessmentFields = [
+      'distance',
+      'timeline', 
+      'trainingPhilosophy',
+      'trainingFrequency',
+      'strengthTraining'
+    ];
+    
+    const missingAssessmentFields = requiredAssessmentFields.filter(field => !responses[field]);
+    
+    if (missingAssessmentFields.length > 0) {
+      throw new Error(`❌ ASSESSMENT INCOMPLETE: Please complete these questions: ${missingAssessmentFields.join(', ')}`);
+    }
+    
+    // 2. BASELINE DATA VALIDATION
+    if (!baselines) {
+      throw new Error('❌ NO BASELINE DATA: Please complete your training baselines first.');
+    }
+    
+    if (!baselines.performanceNumbers) {
+      throw new Error('❌ NO PERFORMANCE DATA: Please add your performance numbers in training baselines.');
+    }
+    
+    // 3. DISCIPLINE-SPECIFIC VALIDATION
+    const missingBaselineFields: string[] = [];
+    const disciplines = baselines.disciplines || [];
+    const performanceNumbers = baselines.performanceNumbers;
+    
+    // Cycling validation
+    if (disciplines.includes('cycling') && !performanceNumbers.ftp) {
+      missingBaselineFields.push('FTP (Functional Threshold Power)');
+    }
+    
+    // Running validation
+    if (disciplines.includes('running')) {
+      if (!performanceNumbers.fiveK) missingBaselineFields.push('5K pace');
+      if (!performanceNumbers.easyPace) missingBaselineFields.push('Easy pace');
+    }
+    
+    // Swimming validation
+    if (disciplines.includes('swimming') && !performanceNumbers.swimPace100) {
+      missingBaselineFields.push('Swim pace (100m)');
+    }
+    
+    // Strength validation
+    if (disciplines.includes('strength') || responses.strengthTraining !== 'no-strength') {
+      if (!performanceNumbers.squat) missingBaselineFields.push('Squat 1RM');
+      if (!performanceNumbers.bench) missingBaselineFields.push('Bench 1RM');
+      if (!performanceNumbers.deadlift) missingBaselineFields.push('Deadlift 1RM');
+    }
+    
+    // Age validation
+    if (!baselines.age && !baselines.birthday) {
+      missingBaselineFields.push('Age or birthday');
+    }
+    
+    // Equipment validation
+    if (disciplines.includes('strength') && (!baselines.equipment?.strength || baselines.equipment.strength.length === 0)) {
+      missingBaselineFields.push('Strength equipment');
+    }
+    
+    // Injury history validation
+    if (!baselines.injuryHistory) {
+      missingBaselineFields.push('Injury history');
+    }
+    
+    if (missingBaselineFields.length > 0) {
+      throw new Error(`❌ MISSING BASELINE DATA: Please add these in training baselines: ${missingBaselineFields.join(', ')}`);
+    }
+    
+    console.log('✅ ALL VALIDATION PASSED - Ready for AI plan generation');
+    return true;
+  };
+
   // Generate plan using AI analysis + PlanEngine
   const generatePlan = async () => {
     try {
+      // Validate assessment completion first
+      validateAssessment();
+      
       setGeneratingPlan(true);
       
       console.log('🧠 Starting AI analysis of user profile...');
@@ -699,19 +783,34 @@ Return a valid JSON plan structure.`;
       console.error('❌ Error generating plan:', error);
       console.error('❌ Error details:', error.message);
       console.error('❌ Error stack:', error.stack);
-      // Show error to user
-      setGeneratedPlan(null);
+      
+      // NO FALLBACKS - Show the actual error to user with detailed information
+      const errorDetails = {
+        id: 'error',
+        name: 'Plan Generation Failed',
+        description: `❌ ${error.message}`,
+        focus: 'Error',
+        plan: null,
+        fullPlan: null,
+        aiAnalysis: null,
+        workouts: [],
+        error: error.message,
+        debugInfo: {
+          baselines: baselines ? 'Present' : 'Missing',
+          responses: responses,
+          missingFields: error.message.includes('Missing') ? error.message : null
+        }
+      };
+      
+      console.log('❌ PLAN GENERATION FAILED:', errorDetails);
+      setGeneratedPlan(errorDetails);
     } finally {
       setGeneratingPlan(false);
     }
   };
 
-  // Auto-generate plan when reaching step 6
-  useEffect(() => {
-    if (step === 6 && !generatedPlan && !generatingPlan) {
-      generatePlan();
-    }
-  }, [step]);
+  // NO AUTO-GENERATION - User must explicitly click "Generate Plan"
+  // Removed auto-generation to prevent empty assessment data from reaching AI
 
   const getCurrentStepContent = () => {
     const insights = getBaselineInsights();
@@ -1458,15 +1557,35 @@ Return a valid JSON plan structure.`;
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingPhilosophy}
-                onClick={() => setStep(8)}
+                onClick={generatePlan}
               >
                 Generate Plan
               </button>
+              
+              {/* Validation Status */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="text-sm font-medium text-blue-800 mb-2">Data Requirements:</div>
+                <div className="text-xs text-blue-700 space-y-1">
+                  <div>✅ Training Philosophy: {responses.trainingPhilosophy || '❌ Missing'}</div>
+                  <div>✅ Distance: {responses.distance || '❌ Missing'}</div>
+                  <div>✅ Timeline: {responses.timeline || '❌ Missing'}</div>
+                  <div>✅ Training Frequency: {responses.trainingFrequency || '❌ Missing'}</div>
+                  <div>✅ Strength Training: {responses.strengthTraining || '❌ Missing'}</div>
+                  <div>✅ Baseline Data: {baselines ? '✅ Complete' : '❌ Missing'}</div>
+                </div>
+              </div>
             </div>
           </div>
         );
 
       case 8:
+        // Auto-trigger plan generation when reaching step 8
+        useEffect(() => {
+          if (!generatedPlan && !generatingPlan) {
+            generatePlan();
+          }
+        }, []);
+        
         if (generatingPlan) {
           return (
             <div className="flex flex-col items-center justify-center min-h-[60vh]">
@@ -1512,6 +1631,7 @@ Return a valid JSON plan structure.`;
 
               {/* Parse and display the actual plan */}
               {(() => {
+                console.log('Starting plan rendering...');
                 try {
                   // The system now returns the plan directly in the correct format
                   const planData = generatedPlan.plan;

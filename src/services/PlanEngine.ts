@@ -29,7 +29,7 @@ export interface TrainingPlan {
   description: string;
   phase: string;
   phaseDescription: string;
-  trainingPhilosophy: 'pyramid' | 'polarized' | 'balanced';
+  trainingPhilosophy: 'pyramid' | 'polarized' | 'threshold';
   weeks: Week[];
 }
 
@@ -101,10 +101,11 @@ export class PlanEngine {
     
     const weeks = this.generateWeeks(1, 4);
     
-    // Use AI analysis for training philosophy, fallback to responses
-    const trainingPhilosophy = this.aiAnalysis?.trainingPhilosophy || 
-                              this.responses.trainingPhilosophy || 
-                              'balanced';
+    // NO FALLBACKS - Require AI analysis for training philosophy
+    if (!this.aiAnalysis?.trainingPhilosophy) {
+      throw new Error('AI analysis missing trainingPhilosophy data. Cannot generate plan without AI analysis.');
+    }
+    const trainingPhilosophy = this.aiAnalysis.trainingPhilosophy;
     
     console.log('🔧 Using training philosophy:', trainingPhilosophy);
     
@@ -186,15 +187,9 @@ export class PlanEngine {
 
   // Get workout distribution based on AI analysis
   private getWorkoutDistribution(): { [key: string]: number } {
+    // NO FALLBACKS - Require AI analysis for workout distribution
     if (!this.aiAnalysis) {
-      // Fallback distribution
-      return {
-        swim: 1,
-        bike: 2,
-        run: 2,
-        strength: 1,
-        rest: 1
-      };
+      throw new Error('AI analysis required for workout distribution. Cannot generate plan without AI analysis.');
     }
 
     const { focusAreas, trainingPhilosophy, weeklyVolume } = this.aiAnalysis;
@@ -537,8 +532,13 @@ export class PlanEngine {
     }
   }
 
-  // Get run intensity with proper pace ranges and goal consideration (fallback method)
+  // Get run intensity with proper pace ranges and goal consideration (NO FALLBACKS)
   private getRunIntensity(weekNumber: number, paces: any): string {
+    // NO FALLBACKS - Require real pace data
+    if (!paces?.easyRange || !paces?.tenKRange || !paces?.fiveKRange) {
+      throw new Error('Running pace data required. Cannot generate run workouts without complete pace data.');
+    }
+    
     const { easyRange, tenKRange, fiveKRange, halfMarathonRange } = paces;
     const primaryGoal = this.responses.primaryGoal || 'base';
     
@@ -567,13 +567,14 @@ export class PlanEngine {
     return `${easyRange} (easy pace, Zone 2)`;
   }
 
-  // Get bike intensity with goal consideration (fallback method)
+  // Get bike intensity with goal consideration (NO FALLBACKS)
   private getBikeIntensity(weekNumber: number): string {
     const ftp = this.userBaselines.performanceNumbers.ftp;
     const primaryGoal = this.responses.primaryGoal || 'base';
     
+    // NO FALLBACKS - Require FTP data
     if (!ftp) {
-      return 'Zone 2-3 (moderate effort)';
+      throw new Error('FTP data required. Cannot generate bike workouts without FTP.');
     }
     
     // Base building - lower intensity, higher volume
@@ -599,20 +600,26 @@ export class PlanEngine {
     return `${percentage}% FTP (${watts} watts)`;
   }
 
-  // Get swim intensity (fallback method)
+  // Get swim intensity (NO FALLBACKS)
   private getSwimIntensity(weekNumber: number): string {
     const swimPace = this.userBaselines.performanceNumbers.swimPace100;
+    
+    // NO FALLBACKS - Require swim pace data
+    if (!swimPace) {
+      throw new Error('Swim pace data required. Cannot generate swim workouts without swim pace.');
+    }
     
     return `${swimPace} (moderate pace)`;
   }
 
-  // Get strength intensity with goal consideration (fallback method)
+  // Get strength intensity with goal consideration (NO FALLBACKS)
   private getStrengthIntensity(weekNumber: number): string {
     const squat = this.userBaselines.performanceNumbers.squat;
     const primaryGoal = this.responses.primaryGoal || 'base';
     
+    // NO FALLBACKS - Require strength data
     if (!squat) {
-      return 'Bodyweight exercises';
+      throw new Error('Strength data required. Cannot generate strength workouts without squat 1RM.');
     }
     
     // Base building - focus on form and endurance
@@ -865,20 +872,9 @@ export class PlanEngine {
 
   // Generate main set with AI-driven exercise selection
   private generateMainSet(type: string, intensity: string, weekNumber: number): string {
+    // NO FALLBACKS - Require AI analysis for workout generation
     if (!this.aiAnalysis) {
-      // Fallback to generic workouts
-      switch (type) {
-        case 'swim':
-          return `8x50m @ 1:15/100m, 30s rest`;
-        case 'bike':
-          return `3x10min @ ${intensity}, 5min rest`;
-        case 'run':
-          return `20min @ ${intensity}`;
-        case 'strength':
-          return this.generateStrengthWorkout(intensity, weekNumber);
-        default:
-          return '';
-      }
+      throw new Error('AI analysis required for workout generation. Cannot generate workouts without AI analysis.');
     }
 
     // Use AI analysis to generate personalized workouts
@@ -1021,10 +1017,15 @@ export class PlanEngine {
       'sport-specific': 'sport_specific',
       'build-muscle': 'muscle_building',
       'general-fitness': 'general_fitness',
-      'no-strength': 'general_fitness' // Fallback for no strength
+      'no-strength': 'general_fitness' // NO FALLBACKS - Require valid strength type
     };
     
-    return mapping[uiKey] || 'general_fitness';
+    // NO FALLBACKS - Require valid strength training type
+    if (!mapping[uiKey]) {
+      throw new Error(`Invalid strength training type: ${uiKey}. Must be one of: ${Object.keys(mapping).join(', ')}`);
+    }
+    
+    return mapping[uiKey];
   }
 
   // Select appropriate strength exercises
@@ -1052,13 +1053,9 @@ export class PlanEngine {
       return true;
     });
     
-    // If no exercises found for category, fall back to general fitness
+    // NO FALLBACKS - Require exercises for the specified category
     if (availableExercises.length === 0) {
-      availableExercises = ExerciseLibraryService.getStrengthExercisesByCategory('general_fitness').filter(exercise => 
-        exercise.equipment.every(equip => 
-          userEquipment.includes(equip) || equip === ''
-        )
-      );
+      throw new Error(`No strength exercises available for category '${strengthType}' with available equipment. Please check equipment settings or choose different strength training type.`);
     }
     
     // Select 3-4 exercises for a complete workout

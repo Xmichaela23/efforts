@@ -590,25 +590,16 @@ export default function AICoachAssessment() {
       }));
       
     } catch (error) {
-      console.error('Error generating plan:', error);
-      // Fallback to simple plan
-      const plan = {
-        name: "Your Training Plan",
-        description: "Here's your personalized plan based on your assessment.",
-        weeklySchedule: [
-          "Monday: Swim technique + Strength",
-          "Tuesday: Bike intervals", 
-          "Wednesday: Easy run + Core",
-          "Thursday: Swim endurance",
-          "Friday: Bike long ride",
-          "Saturday: Long run",
-          "Sunday: Rest or active recovery"
-        ]
-      };
-      
+      console.error('❌ AI failed to generate plan:', error);
+      // NO FALLBACKS - Show the actual error to user
       setAssessmentState(prev => ({
         ...prev,
-        generatedPlan: plan
+        generatedPlan: {
+          name: "AI Generation Failed",
+          description: `The AI could not generate a plan. Error: ${error.message}`,
+          weeklySchedule: [],
+          error: error.message
+        }
       }));
     }
     

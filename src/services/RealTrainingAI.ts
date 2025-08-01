@@ -400,9 +400,14 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
   private transformAIResponse(aiResponse: any): AIAnalysisResult {
     console.log('🔄 Transforming AI response to expected format');
     
+    // NO DEFAULTS - Require AI to provide real data
+    if (!aiResponse.weeklyVolume) {
+      throw new Error('AI analysis missing weeklyVolume data');
+    }
+    
     // Transform weeklyVolume from object to number
-    let weeklyVolume = 8; // Default
-    if (aiResponse.weeklyVolume && typeof aiResponse.weeklyVolume === 'object') {
+    let weeklyVolume: number;
+    if (typeof aiResponse.weeklyVolume === 'object') {
       // Sum up all sport volumes
       const volumes = Object.values(aiResponse.weeklyVolume);
       weeklyVolume = volumes.reduce((sum: number, volume: unknown) => {
@@ -411,21 +416,33 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       }, 0);
     } else if (typeof aiResponse.weeklyVolume === 'number') {
       weeklyVolume = aiResponse.weeklyVolume;
+    } else {
+      throw new Error('AI analysis provided invalid weeklyVolume format');
     }
     
-    // Transform intensityDistribution
-    let intensityDistribution = { easy: 60, moderate: 25, hard: 15 }; // Default
-    if (aiResponse.intensityDistribution) {
-      const ai = aiResponse.intensityDistribution;
-      intensityDistribution = {
-        easy: ai.easy || ai.threshold || 60,
-        moderate: ai.moderate || ai.threshold || 25,
-        hard: ai.hard || ai.vo2max || 15
-      };
+    // Transform intensityDistribution - NO DEFAULTS
+    if (!aiResponse.intensityDistribution) {
+      throw new Error('AI analysis missing intensityDistribution data');
     }
     
-    // Transform strength approach
-    let strengthFocus = 'general_fitness'; // Default
+    const ai = aiResponse.intensityDistribution;
+    const intensityDistribution = {
+      easy: ai.easy || ai.threshold,
+      moderate: ai.moderate || ai.threshold,
+      hard: ai.hard || ai.vo2max
+    };
+    
+    // Validate intensity distribution
+    if (!intensityDistribution.easy || !intensityDistribution.moderate || !intensityDistribution.hard) {
+      throw new Error('AI analysis provided incomplete intensityDistribution data');
+    }
+    
+    // Transform strength approach - NO DEFAULTS
+    if (!aiResponse.strengthApproach) {
+      throw new Error('AI analysis missing strengthApproach data');
+    }
+    
+    let strengthFocus = aiResponse.strengthApproach;
     if (aiResponse.strengthApproach) {
       const mapping: { [key: string]: string } = {
         'power-lifting': 'powerlifting',
@@ -438,40 +455,50 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       strengthFocus = mapping[aiResponse.strengthApproach] || 'general_fitness';
     }
     
-    // Transform progression type
-    let progressionRate: 'conservative' | 'moderate' | 'aggressive' = 'moderate'; // Default
-    if (aiResponse.progressionType) {
-      progressionRate = aiResponse.progressionType as 'conservative' | 'moderate' | 'aggressive';
+    // Transform progression type - NO DEFAULTS
+    if (!aiResponse.progressionType) {
+      throw new Error('AI analysis missing progressionType data');
     }
+    const progressionRate: 'conservative' | 'moderate' | 'aggressive' = aiResponse.progressionType as 'conservative' | 'moderate' | 'aggressive';
     
-    // Transform recovery emphasis
-    let recoveryNeeds: 'high' | 'moderate' | 'low' = 'moderate'; // Default
-    if (aiResponse.recoveryEmphasis) {
-      recoveryNeeds = aiResponse.recoveryEmphasis as 'high' | 'moderate' | 'low';
+    // Transform recovery emphasis - NO DEFAULTS
+    if (!aiResponse.recoveryEmphasis) {
+      throw new Error('AI analysis missing recoveryEmphasis data');
+    }
+    const recoveryNeeds: 'high' | 'moderate' | 'low' = aiResponse.recoveryEmphasis as 'high' | 'moderate' | 'low';
+    
+    // NO DEFAULTS - Require AI to provide all data
+    if (!aiResponse.trainingPhilosophy) {
+      throw new Error('AI analysis missing trainingPhilosophy data');
+    }
+    if (!aiResponse.focusAreas) {
+      throw new Error('AI analysis missing focusAreas data');
+    }
+    if (!aiResponse.injuryConsiderations) {
+      throw new Error('AI analysis missing injuryConsiderations data');
+    }
+    if (!aiResponse.equipmentOptimization) {
+      throw new Error('AI analysis missing equipmentOptimization data');
+    }
+    if (!aiResponse.ageAdjustments) {
+      throw new Error('AI analysis missing ageAdjustments data');
+    }
+    if (!aiResponse.baselineFitness) {
+      throw new Error('AI analysis missing baselineFitness data');
     }
     
     const transformed: AIAnalysisResult = {
-      trainingPhilosophy: aiResponse.trainingPhilosophy || 'threshold',
-      focusAreas: aiResponse.focusAreas || ['swim', 'bike', 'run'],
+      trainingPhilosophy: aiResponse.trainingPhilosophy,
+      focusAreas: aiResponse.focusAreas,
       weeklyVolume,
       intensityDistribution,
       strengthFocus,
       progressionRate,
       recoveryNeeds,
-      injuryConsiderations: aiResponse.injuryConsiderations || [],
-      equipmentOptimization: aiResponse.equipmentOptimization || [],
-      ageAdjustments: aiResponse.ageAdjustments || {
-        recoveryTime: 24,
-        intensityModifier: 1.0,
-        volumeModifier: 1.0
-      },
-      baselineFitness: aiResponse.baselineFitness || {
-        overallLevel: 'intermediate',
-        swimLevel: 'intermediate',
-        bikeLevel: 'intermediate',
-        runLevel: 'intermediate',
-        strengthLevel: 'intermediate'
-      },
+      injuryConsiderations: aiResponse.injuryConsiderations,
+      equipmentOptimization: aiResponse.equipmentOptimization,
+      ageAdjustments: aiResponse.ageAdjustments,
+      baselineFitness: aiResponse.baselineFitness,
       customParameters: aiResponse.customParameters || {}
     };
     
