@@ -1515,11 +1515,9 @@ Return a valid JSON plan structure.`;
                 try {
                   // The system now returns the plan directly in the correct format
                   const planData = generatedPlan.plan;
-                  if (!planData) return <div>No plan data available</div>;
-                  
-                  // Check if weeks exist in the plan structure
-                  const weeks = planData.weeks || [];
+                  const weeks = generatedPlan.weeks || planData?.weeks || [];
                   console.log('Plan data:', planData);
+                  console.log('Generated plan structure:', generatedPlan);
                   console.log('Weeks found:', weeks.length);
                   
                   if (weeks.length === 0) return <div>No weeks found in plan</div>;
@@ -1528,9 +1526,9 @@ Return a valid JSON plan structure.`;
                     <div className="space-y-6">
                       {/* Plan Overview */}
                       <div className="p-4 bg-blue-50 text-blue-800 rounded-lg">
-                        <div className="font-medium mb-2">{planData.phase}</div>
-                        <div className="text-sm">{planData.phaseDescription}</div>
-                        <div className="text-sm mt-1">Training Philosophy: {planData.trainingPhilosophy}</div>
+                        <div className="font-medium mb-2">{planData?.phase || 'Training Plan'}</div>
+                        <div className="text-sm">{planData?.phaseDescription || 'Personalized training plan'}</div>
+                        <div className="text-sm mt-1">Training Philosophy: {planData?.trainingPhilosophy || 'Not specified'}</div>
                       </div>
                       
                       {/* Week Navigation */}
