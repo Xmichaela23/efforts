@@ -61,11 +61,23 @@ export interface AIAnalysisResult {
 export class RealTrainingAI {
   private analysisURL: string;
   private planURL: string;
+  private supabase: any;
 
   constructor() {
     // Use Supabase Edge Functions for AI analysis and plan generation
     this.analysisURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/analyze-user-profile';
     this.planURL = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/generate-plan';
+    
+    // Initialize Supabase client once
+    this.initSupabase();
+  }
+
+  private async initSupabase() {
+    const { createClient } = await import('@supabase/supabase-js');
+    this.supabase = createClient(
+      'https://yyriamwvtvzlkumqrvpm.supabase.co',
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+    );
   }
 
   async analyzeUserProfile(userBaselines: any, userResponses: any): Promise<AIAnalysisResult> {
@@ -388,8 +400,8 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       // Sum up all sport volumes
       const volumes = Object.values(aiResponse.weeklyVolume);
       weeklyVolume = volumes.reduce((sum: number, volume: unknown) => {
-        const numVolume = typeof volume === 'number' ? volume : Number(volume) || 0;
-        return sum + Number(numVolume);
+        const numVolume = typeof volume === 'number' ? volume : (Number(volume) || 0);
+        return sum + (numVolume as number);
       }, 0);
     } else if (typeof aiResponse.weeklyVolume === 'number') {
       weeklyVolume = aiResponse.weeklyVolume;
@@ -463,13 +475,12 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
 
   private async getAuthToken(): Promise<string> {
     try {
-      // Get Supabase session for authentication
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://yyriamwvtvzlkumqrvpm.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
-      );
-      const { data: { session } } = await supabase.auth.getSession();
+      // Ensure Supabase client is initialized
+      if (!this.supabase) {
+        await this.initSupabase();
+      }
+      
+      const { data: { session } } = await this.supabase.auth.getSession();
       
       if (!session) {
         throw new Error('User must be logged in to generate training plans');
@@ -508,13 +519,11 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
         controller.abort();
       }, 120000); // 2 minute timeout - AI needs more time for complex plans
 
-      // Get Supabase session for authentication
-      const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
-        'https://yyriamwvtvzlkumqrvpm.supabase.co',
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
-      );
-      const { data: { session } } = await supabase.auth.getSession();
+      // Ensure Supabase client is initialized
+      if (!this.supabase) {
+        await this.initSupabase();
+      }
+      const { data: { session } } = await this.supabase.auth.getSession();
       
       if (!session) {
         throw new Error('User must be logged in to generate training plans');
