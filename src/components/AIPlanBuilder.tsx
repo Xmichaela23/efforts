@@ -1623,6 +1623,7 @@ Return a valid JSON plan structure.`;
         if (generatedPlan) {
           console.log('🎯 RENDERING PLAN - Step 8, generatedPlan exists:', generatedPlan);
           console.log('🎯 Plan structure:', JSON.stringify(generatedPlan, null, 2));
+          console.log('🎯 About to render the plan UI...');
           return (
             <div>
               <div className="mb-6">
