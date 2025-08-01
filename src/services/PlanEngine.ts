@@ -36,6 +36,7 @@ export interface TrainingPlan {
 export interface UserBaselines {
   age?: number;
   birthday?: string;
+  disciplines?: string[];  // Add missing disciplines field
   performanceNumbers: {
     fiveK?: string;
     easyPace?: string;
@@ -83,14 +84,10 @@ export class PlanEngine {
     
     const performanceNumbers = this.userBaselines.performanceNumbers;
     
-    // Validate required performance data
-    if (!performanceNumbers.ftp) throw new Error('❌ MISSING: FTP');
-    if (!performanceNumbers.squat) throw new Error('❌ MISSING: Squat 1RM');
-    if (!performanceNumbers.bench) throw new Error('❌ MISSING: Bench 1RM');
-    if (!performanceNumbers.deadlift) throw new Error('❌ MISSING: Deadlift 1RM');
-    if (!performanceNumbers.fiveK) throw new Error('❌ MISSING: 5K pace (fiveK)');
-    if (!performanceNumbers.tenK) throw new Error('❌ MISSING: 10K pace');
-    if (!performanceNumbers.swimPace100) throw new Error('❌ MISSING: Swim pace');
+    // Validate that we have performance data to work with
+    if (!performanceNumbers || Object.keys(performanceNumbers).length === 0) {
+      throw new Error('❌ MISSING: No performance data available');
+    }
     
     // Calculate age from birthday if needed
     if (!this.userBaselines.age && this.userBaselines.birthday) {
@@ -100,7 +97,7 @@ export class PlanEngine {
       console.log('✅ Calculated age from birthday:', this.userBaselines.age);
     }
     
-    console.log('✅ All required performance data present');
+    console.log('✅ Performance data available for plan generation');
     
     const weeks = this.generateWeeks(1, 4);
     
