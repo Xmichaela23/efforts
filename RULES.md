@@ -4,6 +4,13 @@
 
 **The AI must act as a knowledgeable coach who applies training science to create personalized plans based on the athlete's actual data and preferences.**
 
+**Key Principles:**
+- **No fallbacks** - never use default values or assumptions
+- **No hardcoding** - every parameter must come from user data
+- **Science-based** - all training techniques must be grounded in training science
+- **User-driven** - volume and intensity based on user baselines and preferences
+- **Flexible** - adapt to any amount of user data provided
+
 ## 🚫 NEVER Hardcode or Use Fallbacks
 
 ### Forbidden Practices:
@@ -21,16 +28,16 @@
 ## ✅ ALWAYS Use User Data
 
 ### Required Data Sources:
-1. **`userContext.responses.trainingFrequency`** - Exact training days (4-days, 5-days, 6-days, 7-days)
-2. **`userContext.responses.weekdayDuration`** - Exact weekday session duration preferences
-3. **`userContext.responses.weekendDuration`** - Exact weekend session duration preferences
-4. **`userContext.baseline.performanceNumbers`** - Exact FTP, 5K pace, swim pace, 1RMs
-5. **`userContext.baseline.equipment.strength`** - Exact equipment available
-6. **`userContext.aiAnalysis.trainingPhilosophy`** - Exact training approach (polarized, pyramid, threshold)
-7. **`userContext.aiAnalysis.strengthFocus`** - Exact strength training focus
-8. **`userContext.responses.weekendAvailability`** - Exact weekend availability
-9. **`userContext.responses.longSessionPreference`** - Exact long session preferences
-10. **`userContext.responses.goals`** - Exact athlete goals
+**ALL available user data must be used, including but not limited to:**
+- **Training preferences**: Frequency, duration, availability, session preferences
+- **Performance baselines**: FTP, paces, 1RMs, current fitness metrics
+- **Equipment access**: Available strength equipment, training facilities
+- **Training philosophy**: AI-analyzed training approach (polarized, pyramid, threshold)
+- **Strength focus**: AI-determined strength training priorities
+- **Goals and constraints**: Race goals, timeline, experience level
+- **Any additional user-provided data**: The system should adapt to new data points as they're added
+
+**Principle**: Use every piece of user data available - don't ignore any information the user has provided.
 
 ## 🧠 Apply Training Science Intelligently
 
@@ -70,12 +77,12 @@
 ## 📊 Data Validation Rules
 
 ### Required Validation:
-- ✅ Training frequency must be valid (4-days, 5-days, 6-days, 7-days)
-- ✅ Duration preferences must be provided
-- ✅ Performance numbers must be available
-- ✅ Equipment list must be provided
-- ✅ Training philosophy must be determined
-- ✅ Strength focus must be determined
+- ✅ **All user data must be validated** before processing
+- ✅ **Training preferences** must be complete and valid
+- ✅ **Performance baselines** must be available for selected disciplines
+- ✅ **Equipment information** must be provided for strength training
+- ✅ **Training philosophy** must be determined by AI analysis
+- ✅ **Any missing critical data** should trigger descriptive errors, not fallbacks
 
 ### Error Responses:
 - ❌ **Don't use fallbacks** for missing data
