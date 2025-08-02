@@ -8,7 +8,7 @@
 - **No fallbacks** - never use default values or assumptions
 - **No hardcoding** - every parameter must come from user data
 - **Science-based** - all training techniques must be grounded in training science
-- **User-driven** - volume and intensity based on user baselines and preferences
+- **User-driven** - volume and intensity based on user baselines, preferences, and timelines
 - **Flexible** - adapt to any amount of user data provided
 
 ## 🚫 NEVER Hardcode or Use Fallbacks
@@ -35,6 +35,8 @@
 - **Training philosophy**: AI-analyzed training approach (polarized, pyramid, threshold)
 - **Strength focus**: AI-determined strength training priorities
 - **Goals and constraints**: Race goals, timeline, experience level
+- **Timeline factors**: Event date, training timeline, progression needs
+- **Volume determinants**: User preferences, timeline constraints, current fitness, event demands
 - **Any additional user-provided data**: The system should adapt to new data points as they're added
 
 **Principle**: Use every piece of user data available - don't ignore any information the user has provided.
@@ -45,13 +47,13 @@
 - **80% Easy (Zone 2)**: Use athlete's exact easy paces/power
 - **20% Hard (Zone 4+)**: Use athlete's exact threshold paces/power
 - **No Zone 3**: Avoid the "gray zone" that polarized training excludes
-- **Volume Calculation**: Calculate from user's duration preferences, then apply 80/20 split
+- **Volume Calculation**: Calculate from user's duration preferences, timeline constraints, and event demands, then apply 80/20 split
 
 ### Progression Principles:
 - **Week 1**: Use athlete's current fitness level and training philosophy
-- **Week 2**: Increase volume based on athlete's volume increase capacity
-- **Week 3**: Progress intensity based on athlete's current fitness
-- **Week 4**: Peak week respecting athlete's current capabilities
+- **Week 2**: Increase volume based on athlete's volume increase capacity and timeline
+- **Week 3**: Progress intensity based on athlete's current fitness and timeline demands
+- **Week 4**: Peak week respecting athlete's current capabilities and timeline constraints
 
 ### Strength Integration:
 - **Equipment-based**: Only prescribe exercises for available equipment
