@@ -633,12 +633,24 @@ export default function AIPlanBuilder() {
         injuryHistory: insights.injuryHistory,
         performanceNumbers: insights.performanceNumbers,
         equipment: insights.equipment,
-        disciplineFitness: insights.disciplineFitness
+        disciplineFitness: insights.disciplineFitness,
+        trainingBackground: insights.trainingBackground
       } : null
     };
     
-    // Detailed prompt that tells AI to use specific baseline numbers
-    const prompt = `Create a personalized training plan using the provided user data.
+    // Detailed prompt that tells AI to use specific baseline numbers AND AI analysis results
+    const prompt = `Create a personalized training plan using the provided user data and AI analysis results.
+
+CRITICAL: You MUST use the AI analysis data provided in userContext.aiAnalysis to create this plan.
+
+AI ANALYSIS RESULTS (MANDATORY TO USE):
+- Training Philosophy: userContext.aiAnalysis.trainingPhilosophy (DO NOT CHANGE THIS)
+- Weekly Volume: userContext.aiAnalysis.weeklyVolume
+- Intensity Distribution: userContext.aiAnalysis.intensityDistribution
+- Progression Type: userContext.aiAnalysis.progressionType
+- Strength Approach: userContext.aiAnalysis.strengthFocus
+- Recovery Emphasis: userContext.aiAnalysis.recoveryNeeds
+- Focus Areas: userContext.aiAnalysis.focusAreas
 
 User has selected: ${userData.distance} distance, ${userData.trainingPhilosophy} training philosophy.
 
@@ -679,7 +691,14 @@ CREATE WORKOUTS SPECIFIC TO THIS ATHLETE'S:
 
 USE THESE EXACT NUMBERS AND THEIR SPECIFIC CONTEXT in your workout descriptions.` : 'No performance numbers available.'}
 
-Generate a 4-week plan with 7 days per week, using their specific baseline data and preferences.
+MANDATORY REQUIREMENTS:
+1. Use userContext.aiAnalysis.trainingPhilosophy as the training philosophy - DO NOT CHANGE THIS
+2. Apply the intensity distribution from userContext.aiAnalysis.intensityDistribution
+3. Use the strength approach from userContext.aiAnalysis.strengthFocus
+4. Follow the progression type from userContext.aiAnalysis.progressionType
+5. Respect the recovery emphasis from userContext.aiAnalysis.recoveryNeeds
+
+Generate a 4-week plan with 7 days per week, using their specific baseline data, preferences, AND the AI analysis results.
 
 Return a valid JSON plan structure.`;
     

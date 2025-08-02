@@ -77,6 +77,19 @@ serve(async (req) => {
     const isAnalysis = userContext?.analysis === true;
     console.log(`🔍 IS ANALYSIS REQUEST: ${isAnalysis}`);
 
+    // Log the AI analysis data for debugging
+    if (userContext?.aiAnalysis) {
+      console.log(`🧠 AI ANALYSIS DATA RECEIVED:`);
+      console.log(`   - Training Philosophy: ${userContext.aiAnalysis.trainingPhilosophy}`);
+      console.log(`   - Weekly Volume: ${JSON.stringify(userContext.aiAnalysis.weeklyVolume)}`);
+      console.log(`   - Intensity Distribution: ${JSON.stringify(userContext.aiAnalysis.intensityDistribution)}`);
+      console.log(`   - Strength Focus: ${userContext.aiAnalysis.strengthFocus}`);
+      console.log(`   - Progression Type: ${userContext.aiAnalysis.progressionType}`);
+      console.log(`   - Recovery Needs: ${userContext.aiAnalysis.recoveryNeeds}`);
+    } else {
+      console.log(`❌ NO AI ANALYSIS DATA FOUND IN USER CONTEXT`);
+    }
+
     // Build OpenAI request
     const openaiRequest = {
       model: 'gpt-3.5-turbo',
@@ -90,6 +103,15 @@ serve(async (req) => {
 CRITICAL: You MUST use the AI analysis data provided in the userContext.aiAnalysis object to create the plan.
 
 MANDATORY: Use userContext.aiAnalysis.trainingPhilosophy as the training philosophy for this plan. Do not change or override this value.
+
+AI ANALYSIS DATA TO USE (MANDATORY):
+- Training Philosophy: userContext.aiAnalysis.trainingPhilosophy (DO NOT CHANGE)
+- Weekly Volume: userContext.aiAnalysis.weeklyVolume
+- Intensity Distribution: userContext.aiAnalysis.intensityDistribution
+- Progression Type: userContext.aiAnalysis.progressionType
+- Strength Focus: userContext.aiAnalysis.strengthFocus
+- Recovery Needs: userContext.aiAnalysis.recoveryNeeds
+- Focus Areas: userContext.aiAnalysis.focusAreas
 
 TRAINING SCIENCE APPLICATION:
 
