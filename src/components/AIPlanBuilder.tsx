@@ -637,7 +637,13 @@ export default function AIPlanBuilder() {
   };
 
   const validateTimeline = (distance: string, timeline: string) => {
-    const insights = getBaselineInsights();
+    let insights = null;
+    try {
+      insights = getBaselineInsights();
+    } catch (error) {
+      console.log('Baseline insights not available for timeline validation:', error.message);
+      return { isValid: true, warning: null };
+    }
     if (!insights) return { isValid: true, warning: null };
 
     const { totalHours, trainingBackground, age } = insights;
@@ -690,7 +696,13 @@ export default function AIPlanBuilder() {
   };
 
   const getRecommendedTimeline = (distance: string) => {
-    const insights = getBaselineInsights();
+    let insights = null;
+    try {
+      insights = getBaselineInsights();
+    } catch (error) {
+      console.log('Baseline insights not available for timeline recommendations:', error.message);
+      return null;
+    }
     if (!insights) return null;
 
     const { totalHours, trainingBackground, age } = insights;
@@ -712,7 +724,13 @@ export default function AIPlanBuilder() {
   };
 
   const getRecommendedFrequency = () => {
-    const insights = getBaselineInsights();
+    let insights = null;
+    try {
+      insights = getBaselineInsights();
+    } catch (error) {
+      console.log('Baseline insights not available for frequency recommendations:', error.message);
+      return null;
+    }
     if (!insights) return null;
 
     const { totalHours, trainingFrequency, volumeIncreaseCapacity } = insights;
@@ -756,7 +774,13 @@ export default function AIPlanBuilder() {
   };
 
   const getRecommendedStrength = () => {
-    const insights = getBaselineInsights();
+    let insights = null;
+    try {
+      insights = getBaselineInsights();
+    } catch (error) {
+      console.log('Baseline insights not available for strength recommendations:', error.message);
+      return null;
+    }
     if (!insights) return null;
 
     const { injuryHistory, age, performanceNumbers } = insights;
@@ -769,7 +793,13 @@ export default function AIPlanBuilder() {
   };
 
   const prePopulateFromBaselines = () => {
-    const insights = getBaselineInsights();
+    let insights = null;
+    try {
+      insights = getBaselineInsights();
+    } catch (error) {
+      console.log('Baseline insights not available for pre-population:', error.message);
+      return;
+    }
     if (!insights) return;
 
     const { performanceNumbers, equipment, trainingFrequency } = insights;
@@ -808,7 +838,7 @@ export default function AIPlanBuilder() {
 
   // Build comprehensive prompt from responses
   const buildPlanPrompt = (aiAnalysis: any) => {
-    const insights = getBaselineInsights();
+    const insights = getBaselineInsights(); // This one should throw - it's for plan generation
     
     // Build structured user data instead of massive prompt
     const userData = {
