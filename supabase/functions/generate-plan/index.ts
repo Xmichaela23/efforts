@@ -84,7 +84,7 @@ serve(async (req) => {
       console.log(`   - Weekly Volume: ${JSON.stringify(userContext.aiAnalysis.weeklyVolume)}`);
       console.log(`   - Intensity Distribution: ${JSON.stringify(userContext.aiAnalysis.intensityDistribution)}`);
       console.log(`   - Strength Focus: ${userContext.aiAnalysis.strengthFocus}`);
-      console.log(`   - Progression Type: ${userContext.aiAnalysis.progressionType}`);
+      console.log(`   - Progression Rate: ${userContext.aiAnalysis.progressionRate}`);
       console.log(`   - Recovery Needs: ${userContext.aiAnalysis.recoveryNeeds}`);
     } else {
       console.log(`❌ NO AI ANALYSIS DATA FOUND IN USER CONTEXT`);
@@ -97,7 +97,11 @@ serve(async (req) => {
     console.log(`   - Is it "5-days"? ${userContext?.responses?.trainingFrequency === '5-days'}`);
     console.log(`   - Full userContext object: ${JSON.stringify(userContext, null, 2)}`);
     
-    const trainingFrequency = userContext?.responses?.trainingFrequency || 'NOT PROVIDED';
+    const trainingFrequency = userContext?.responses?.trainingFrequency;
+    
+    if (!trainingFrequency) {
+      throw new Error('Training frequency is required. User must select training frequency in assessment.');
+    }
     console.log(`🎯 USING TRAINING FREQUENCY: ${trainingFrequency}`);
     
     // Determine exact workout count based on frequency
@@ -156,11 +160,42 @@ CRITICAL SUCCESS FACTORS (Your reputation depends on these):
 
 2. TRAINING PHILOSOPHY: Use userContext.aiAnalysis.trainingPhilosophy - DO NOT CHANGE THIS VALUE
 
-3. USER PERFORMANCE NUMBERS: Use userContext.baseline.performanceNumbers for exact paces/power
-   - Running: Use their exact easyPace for Zone 2, convert their fiveK time to pace per mile for Zone 4
-   - Cycling: Use their exact FTP for power targets
-   - Swimming: Use their exact swimPace100 for threshold work
-   - Strength: Use their exact 1RMs for weight prescriptions
+3. TRAINING ZONES & PERFORMANCE NUMBERS: As a coach, calculate proper training zones from the athlete's performance numbers
+   
+   CYCLING ZONES (from FTP):
+   - Zone 1 (Recovery): 50-60% of FTP - very easy, active recovery
+   - Zone 2 (Endurance): 60-75% of FTP - conversational pace, aerobic base building
+   - Zone 3 (Tempo): 75-85% of FTP - moderate intensity, limited use in polarized training
+   - Zone 4 (Threshold): 85-95% of FTP - lactate threshold, sustainable for 20-30 minutes
+   - Zone 5 (VO2 Max): 105-120% of FTP - very hard, 3-8 minute intervals
+   - Zone 6 (Anaerobic): 120%+ of FTP - sprint efforts, 30 seconds to 2 minutes
+   
+   RUNNING ZONES (from 5K pace):
+   - Zone 1 (Recovery): 30-45 seconds slower than 5K pace per mile
+   - Zone 2 (Endurance): 45-90 seconds slower than 5K pace per mile
+   - Zone 3 (Tempo): 15-30 seconds slower than 5K pace per mile
+   - Zone 4 (Threshold): 5-15 seconds slower than 5K pace per mile
+   - Zone 5 (VO2 Max): 5K pace to 10 seconds faster per mile
+   - Zone 6 (Anaerobic): 10+ seconds faster than 5K pace per mile
+   
+   SWIMMING ZONES (from 100m pace):
+   - Zone 1 (Recovery): 20-30 seconds slower than 100m pace
+   - Zone 2 (Endurance): 10-20 seconds slower than 100m pace
+   - Zone 3 (Tempo): 5-10 seconds slower than 100m pace
+   - Zone 4 (Threshold): 100m pace to 5 seconds slower
+   - Zone 5 (VO2 Max): 5-10 seconds faster than 100m pace
+   
+   STRENGTH ZONES (from 1RMs):
+   - Power/Explosive: 30-50% of 1RM for speed and power
+   - Strength: 70-85% of 1RM for strength building
+   - Endurance: 50-70% of 1RM for muscular endurance
+   - Hypertrophy: 65-80% of 1RM for muscle building
+   
+   COACHING APPLICATION:
+   - Use these calculated zones for appropriate workout prescriptions
+   - Never prescribe workouts at 100% of FTP/5K pace for sustained intervals
+   - Apply polarized training: 80% of training time in Zones 1-2, 20% in Zones 4-5
+   - Vary workout types and intensities based on training phase and athlete needs
 
 4. WEEKLY VOLUME CALCULATION: CRITICAL - Calculate total weekly hours from user's duration preferences
    - Weekday sessions: Use userContext.responses.weekdayDuration (30-45, 45-60, 60-90, 90-plus minutes)
@@ -266,49 +301,97 @@ Your coaching reputation depends on creating a plan that the athlete can actuall
 
 🚨 FINAL REMINDER: YOU MUST CREATE EXACTLY 4 WEEKS WITH ${expectedWorkoutsPerWeek} WORKOUTS PER WEEK 🚨
 
-PROGRESSION GUIDELINES:
-- Week 1: Foundation - use athlete's current fitness level and training philosophy to set appropriate intensity
-- Week 2: Volume - increase duration based on athlete's volume increase capacity and training philosophy
-- Week 3: Intensity - progress intensity based on athlete's current fitness and training philosophy
-- Week 4: Peak - highest intensity week, but respect athlete's current capabilities and training philosophy
+PROGRESSION COACHING: Apply intelligent progression based on athlete's current fitness and training philosophy
 
-COACHING LANGUAGE: Use coaching explanations in your plan
+PROGRESSION PRINCIPLES:
+- Start where the athlete is, not where you want them to be
+- Consider their current volume, fitness level, and training background
+- Progress volume OR intensity, not both simultaneously
+- Allow adequate recovery between hard sessions
+- Adapt to the athlete's response and timeline constraints
+
+WEEK-BY-WEEK COACHING:
+- Week 1: Foundation - establish baseline fitness and technique
+  * Use athlete's current fitness level to set appropriate starting intensity
+  * Focus on form, consistency, and building routine
+  * Include technique work and skill development
+  
+- Week 2: Volume - increase duration while maintaining intensity
+  * Build endurance and aerobic capacity
+  * Increase session length based on athlete's volume increase capacity
+  * Maintain same intensity zones as Week 1
+  
+- Week 3: Intensity - increase workout difficulty while managing volume
+  * Progress to higher intensity zones (Zone 4-5)
+  * May reduce volume slightly to accommodate increased intensity
+  * Focus on quality over quantity
+  
+- Week 4: Peak - highest intensity week with race-specific preparation
+  * Highest intensity sessions of the cycle
+  * Include race-pace work and mental preparation
+  * Ensure adequate recovery for race day
+
+COACHING DECISIONS:
+- If athlete is new to structured training: Start conservative, progress slowly
+- If athlete has good base: Can progress more aggressively
+- If athlete has limited time: Focus on quality over quantity
+- If athlete has injury history: Emphasize technique and recovery
+
+COACHING CREATIVITY & WORKOUT VARIETY: As a coach, create diverse and engaging workout structures
+
+WORKOUT VARIETY PRINCIPLES:
+- Vary the sequence of disciplines across weeks (don't always start with swim)
+- Mix different interval types (not just threshold intervals)
+- Include technique work, endurance building, and race-specific sessions
+- Vary the workout structure (not always the same interval pattern)
+- Include recovery-focused sessions and active recovery options
+
+WORKOUT TYPE EXAMPLES:
+- Cycling: Sweet spot intervals, VO2 max intervals, endurance rides, recovery spins
+- Running: Fartlek, tempo runs, long slow distance, hill repeats, track intervals
+- Swimming: Technique drills, endurance sets, speed work, open water simulation
+- Strength: Power development, stability work, sport-specific movements, recovery sessions
+
+COACHING LANGUAGE: Provide coaching explanations that show understanding
 - "Based on your 5-day schedule, we'll focus on quality over quantity"
 - "Looking at your baselines, you've been riding less - we'll increase bike volume"
 - "You're only swimming 1x/week - Olympic distance needs 2-3 swims"
 - "Your run volume is good, but we need to add more bike endurance"
 - "You have strength equipment but aren't using it - let's integrate it properly"
-- POLARIZED TRAINING APPLICATION (Current Focus):
-  * 80% of training time should be EASY (Zone 2) - use athlete's exact easy paces/power
-  * 20% of training time should be HARD (Zone 4+) - use athlete's exact threshold paces/power
-  * Easy sessions: Focus on technique, endurance, and recovery
-  * Hard sessions: High-quality intervals with full recovery
-  * No moderate intensity (Zone 3) - avoid the "gray zone"
-  * Calculate weekly volume from athlete's duration preferences, then apply 80/20 split
+- "This workout targets your lactate threshold without overtraining"
+- "Today's easy session builds aerobic base while allowing recovery"
+
+POLARIZED TRAINING APPLICATION (Current Focus):
+- 80% of training time in Zones 1-2 (easy, conversational pace)
+- 20% of training time in Zones 4-5 (hard, quality intervals)
+- Easy sessions: Focus on technique, endurance, and recovery
+- Hard sessions: High-quality intervals with full recovery
+- No moderate intensity (Zone 3) - avoid the "gray zone"
+- Calculate weekly volume from athlete's duration preferences, then apply 80/20 split
 - Use athlete's exact performance numbers: FTP, 5K pace, swim pace for precise workout prescriptions
 - Consider athlete's current volume and fitness level from baselines
 - Recovery: Always include adequate recovery between hard sessions
 - Progression should match athlete's training background and current fitness
 
-Return valid JSON plan structure with this exact format:
+Return valid JSON plan structure with this EXACT format - NO VARIATIONS:
 
 {
   "plan": {
-    "name": "Your Training Plan",
-    "description": "Personalized training plan based on your assessment",
+    "name": "Use userContext.responses.distance + ' Distance Training Plan'",
+    "description": "Personalized training plan based on your assessment and AI analysis",
     "type": "endurance",
     "duration": 4,
-    "level": "intermediate",
-    "goal": "olympic",
+    "level": "Use userContext.baseline.disciplineFitness to determine level",
+    "goal": "Use userContext.responses.distance (sprint, olympic, 70.3, ironman)",
     "status": "active",
     "currentWeek": 0,
-    "createdDate": "2025-01-27",
-    "totalWorkouts": 28,
-    "disciplines": ["swimming", "cycling", "running"],
+    "createdDate": "Use current date",
+    "totalWorkouts": "Calculate from weeks array",
+    "disciplines": ["swimming", "cycling", "running", "strength"],
     "isIntegrated": true,
-    "phase": "Build Phase",
-    "phaseDescription": "Building endurance and technique",
-    "trainingPhilosophy": "use userContext.aiAnalysis.trainingPhilosophy value"
+    "phase": "Use training phase based on progression",
+    "phaseDescription": "Use phase-appropriate description",
+    "trainingPhilosophy": "Use userContext.aiAnalysis.trainingPhilosophy"
   },
   "weeks": [
     {
@@ -317,13 +400,46 @@ Return valid JSON plan structure with this exact format:
       "phase": "Build",
       "workouts": [
         {
-          "day": "Monday",
-          "type": "Swim",
-          "duration": "45 minutes",
-          "warmup": "200m easy freestyle",
-          "main": "8x100m at threshold pace (use user's swimPace100) with 30s rest",
-          "cooldown": "200m easy freestyle",
-          "notes": "Focus on technique and maintaining threshold pace"
+          "day": "Use actual day from workoutDays",
+          "type": "Use discipline (Swim, Cycling, Running, Strength)",
+          "duration": "Use user's duration preferences",
+          "warmup": "Use appropriate warmup for discipline and intensity",
+          "main": "Use calculated training zones and user's performance numbers",
+          "cooldown": "Use appropriate cooldown for discipline",
+          "notes": "Include coaching explanations and reasoning"
+        }
+      ]
+    }
+  ]
+}
+
+CRITICAL: You MUST return this EXACT structure. The plan object MUST contain all fields listed above. The weeks array MUST contain 4 weeks with ${expectedWorkoutsPerWeek} workouts each. NO FALLBACKS - if you cannot generate this structure, the plan will be rejected.
+    "level": "Use userContext.baseline.disciplineFitness to determine level",
+    "goal": "Use userContext.responses.distance (sprint, olympic, 70.3, ironman)",
+    "status": "active",
+    "currentWeek": 0,
+    "createdDate": "Use current date",
+    "totalWorkouts": "Calculate from weeks array",
+    "disciplines": ["swimming", "cycling", "running", "strength"],
+    "isIntegrated": true,
+    "phase": "Use training phase based on progression",
+    "phaseDescription": "Use phase-appropriate description",
+    "trainingPhilosophy": "Use userContext.aiAnalysis.trainingPhilosophy"
+  },
+  "weeks": [
+    {
+      "weekNumber": 1,
+      "focus": "Foundation",
+      "phase": "Build",
+      "workouts": [
+        {
+          "day": "Use actual day from workoutDays",
+          "type": "Use discipline (Swim, Cycling, Running, Strength)",
+          "duration": "Use user's duration preferences",
+          "warmup": "Use appropriate warmup for discipline and intensity",
+          "main": "Use calculated training zones and user's performance numbers",
+          "cooldown": "Use appropriate cooldown for discipline",
+          "notes": "Include coaching explanations and reasoning"
         }
       ]
     }
@@ -510,79 +626,32 @@ function parseAIResponse(aiResponse: string, startDate: string) {
     console.log('Root keys:', Object.keys(parsed));
     console.log('🔍 FULL PARSED OBJECT:', JSON.stringify(parsed, null, 2));
     
-    // Ensure it has the expected structure - be more flexible
-    if (parsed.plan && parsed.weeks) {
-      // Remove AI language from the plan
-      if (parsed.plan.name) {
-        parsed.plan.name = parsed.plan.name.replace('AI Generated Training Plan', 'Your Training Plan');
-        parsed.plan.name = parsed.plan.name.replace('Generated by OpenAI', 'Personalized training plan');
+    // VALIDATE REQUIRED STRUCTURE - NO FALLBACKS
+    if (!parsed.plan) {
+      throw new Error('AI failed to generate plan object. Must include complete plan structure with name, description, type, duration, level, goal, status, currentWeek, createdDate, totalWorkouts, disciplines, isIntegrated, phase, phaseDescription, and trainingPhilosophy.');
+    }
+    
+    if (!parsed.weeks || !Array.isArray(parsed.weeks)) {
+      throw new Error('AI failed to generate weeks array. Must include weeks array with workout data.');
+    }
+    
+    // Validate plan object has all required fields
+    const requiredPlanFields = ['name', 'description', 'type', 'duration', 'level', 'goal', 'status', 'currentWeek', 'createdDate', 'totalWorkouts', 'disciplines', 'isIntegrated', 'phase', 'phaseDescription', 'trainingPhilosophy'];
+    const missingFields = requiredPlanFields.filter(field => !parsed.plan[field]);
+    
+    if (missingFields.length > 0) {
+      throw new Error(`AI failed to include required plan fields: ${missingFields.join(', ')}. Plan object must be complete.`);
+    }
+    
+    // Validate weeks structure
+    parsed.weeks.forEach((week, index) => {
+      if (!week.workouts || !Array.isArray(week.workouts)) {
+        throw new Error(`Week ${index + 1} missing workouts array. Each week must have workouts.`);
       }
-      if (parsed.plan.description) {
-        parsed.plan.description = parsed.plan.description.replace('Generated by OpenAI', 'Personalized training plan based on your assessment');
-      }
-      return parsed;
-    }
+    });
     
-    // If the AI returned a different structure, try to adapt it
-    console.log('⚠️ AI returned different structure, attempting to adapt...');
-    
-    // If it has weeks but no plan object, create a plan object
-    if (parsed.weeks && !parsed.plan) {
-      const adaptedPlan = {
-        plan: {
-          name: 'Your Training Plan',
-          description: 'Personalized training plan based on your assessment',
-          type: 'endurance',
-          duration: 4,
-          level: 'intermediate',
-          goal: 'olympic',
-          status: 'active',
-          currentWeek: 0,
-          createdDate: new Date().toISOString().split('T')[0],
-          totalWorkouts: parsed.weeks.reduce((total: number, week: any) => total + (week.workouts?.length || 0), 0),
-          disciplines: ['swimming', 'cycling', 'running'],
-          isIntegrated: true,
-          phase: 'Build Phase',
-          phaseDescription: 'Building endurance and technique',
-          trainingPhilosophy: 'polarized'
-        },
-        weeks: parsed.weeks
-      };
-      return adaptedPlan;
-    }
-    
-    // If the AI put weeks inside the plan object, extract it
-    if (parsed.plan && parsed.plan.weeks && !parsed.weeks) {
-      console.log('⚠️ AI put weeks inside plan object, extracting...');
-      const extractedWeeks = parsed.plan.weeks;
-      delete parsed.plan.weeks;
-      
-      const adaptedPlan = {
-        plan: {
-          ...parsed.plan,
-          name: parsed.plan.name || 'Your Training Plan',
-          description: parsed.plan.description || 'Personalized training plan based on your assessment',
-          type: parsed.plan.type || 'endurance',
-          duration: parsed.plan.duration || 4,
-          level: parsed.plan.level || 'intermediate',
-          goal: parsed.plan.goal || 'olympic',
-          status: parsed.plan.status || 'active',
-          currentWeek: parsed.plan.currentWeek || 0,
-          createdDate: parsed.plan.createdDate || new Date().toISOString().split('T')[0],
-          totalWorkouts: parsed.plan.totalWorkouts || extractedWeeks.reduce((total: number, week: any) => total + (week.workouts?.length || 0), 0),
-          disciplines: parsed.plan.disciplines || ['swimming', 'cycling', 'running'],
-          isIntegrated: parsed.plan.isIntegrated !== undefined ? parsed.plan.isIntegrated : true,
-          phase: parsed.plan.phase || 'Build Phase',
-          phaseDescription: parsed.plan.phaseDescription || 'Building endurance and technique',
-          trainingPhilosophy: parsed.plan.trainingPhilosophy || 'polarized'
-        },
-        weeks: extractedWeeks
-      };
-      return adaptedPlan;
-    }
-    
-    // If it doesn't have the right structure, throw error
-    throw new Error('Invalid plan structure - missing weeks array');
+    console.log('✅ PLAN STRUCTURE VALIDATION PASSED');
+    return parsed;
     
   } catch (error) {
     console.log(`❌ PARSE ERROR: ${error.message}`);

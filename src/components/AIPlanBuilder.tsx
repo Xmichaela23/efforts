@@ -256,7 +256,7 @@ const CLIMATE_OPTIONS = [
 // Calculate weekly volume from user's duration preferences
 const calculateVolumeFromResponses = (responses: any) => {
   if (!responses.trainingFrequency || !responses.weekdayDuration || !responses.weekendDuration) {
-    return { weekly: 'unknown', weekday: 0, weekend: 0, total: 0 };
+    throw new Error('Training frequency, weekday duration, and weekend duration are required to calculate volume.');
   }
 
   // Parse weekday duration
@@ -547,7 +547,7 @@ export default function AIPlanBuilder() {
       case 'sprint':
         return 'Sprint';
       default:
-        return 'Unknown';
+        throw new Error(`Invalid distance: ${distance}. Must be one of: ironman, 70.3, olympic, sprint`);
     }
   };
 
@@ -563,33 +563,53 @@ export default function AIPlanBuilder() {
     if (!baselines) return null;
 
     try {
-      const currentVolume = baselines.current_volume || {};
+      const currentVolume = baselines.current_volume;
+      if (!currentVolume) {
+        throw new Error('Current volume data is required from baselines.');
+      }
+      
       const totalHours = Object.values(currentVolume).reduce((sum: number, vol: any) => {
         // Parse volume strings like "2-4 hours" to get the average
         const volumeStr = vol as string;
-        if (!volumeStr) return sum;
+        if (!volumeStr) {
+          throw new Error('Volume data is incomplete. All disciplines must have volume information.');
+        }
         
         // Handle different volume formats
         if (volumeStr.includes('-')) {
           // "2-4 hours" format - take the average
           const parts = volumeStr.split('-');
-          const low = parseInt(parts[0]) || 0;
-          const high = parseInt(parts[1]) || 0;
+          const low = parseInt(parts[0]);
+          const high = parseInt(parts[1]);
+          if (isNaN(low) || isNaN(high)) {
+            throw new Error(`Invalid volume format: ${volumeStr}. Expected format like "2-4 hours".`);
+          }
           return sum + ((low + high) / 2);
         } else if (volumeStr.includes('+')) {
           // "8+ hours" format - take the minimum
-          const num = parseInt(volumeStr) || 0;
+          const num = parseInt(volumeStr);
+          if (isNaN(num)) {
+            throw new Error(`Invalid volume format: ${volumeStr}. Expected format like "8+ hours".`);
+          }
           return sum + num;
         } else {
           // Single number format
-          return sum + (parseInt(volumeStr) || 0);
+          const num = parseInt(volumeStr);
+          if (isNaN(num)) {
+            throw new Error(`Invalid volume format: ${volumeStr}. Expected a number.`);
+          }
+          return sum + num;
         }
       }, 0);
 
-      const trainingFrequency = baselines.training_frequency || {};
-      const volumeIncreaseCapacity = baselines.volume_increase_capacity || {};
-      const disciplineFitness = baselines.disciplineFitness || {};
-      const performanceNumbers = baselines.performanceNumbers || {};
+      const trainingFrequency = baselines.training_frequency;
+      const volumeIncreaseCapacity = baselines.volume_increase_capacity;
+      const disciplineFitness = baselines.disciplineFitness;
+      const performanceNumbers = baselines.performanceNumbers;
+      
+      if (!trainingFrequency || !volumeIncreaseCapacity || !disciplineFitness || !performanceNumbers) {
+        throw new Error('Complete baseline data is required: training_frequency, volume_increase_capacity, disciplineFitness, performanceNumbers.');
+      }
 
       return {
         totalHours: totalHours as number,
@@ -601,7 +621,7 @@ export default function AIPlanBuilder() {
         trainingBackground: baselines.trainingBackground,
         age: baselines.age as number,
         injuryHistory: baselines.injuryHistory,
-        equipment: baselines.equipment || {}
+        equipment: baselines.equipment
       };
     } catch (error) {
       console.error('Error in getBaselineInsights:', error);
@@ -834,15 +854,15 @@ AI ANALYSIS RESULTS (MANDATORY TO USE):
 - Focus Areas: userContext.aiAnalysis.focusAreas
 
 EXPLICIT ANALYSIS VALUES (USE THESE EXACT VALUES):
-- Training Philosophy: ${aiAnalysis?.trainingPhilosophy || 'NOT PROVIDED'}
-- Weekly Volume: ${JSON.stringify(aiAnalysis?.weeklyVolume || 'NOT PROVIDED')}
-- Intensity Distribution: ${JSON.stringify(aiAnalysis?.intensityDistribution || 'NOT PROVIDED')}
-- Progression Type: ${aiAnalysis?.progressionType || 'NOT PROVIDED'}
-- Strength Focus: ${aiAnalysis?.strengthFocus || 'NOT PROVIDED'}
-- Recovery Needs: ${aiAnalysis?.recoveryNeeds || 'NOT PROVIDED'}
-- Focus Areas: ${JSON.stringify(aiAnalysis?.focusAreas || 'NOT PROVIDED')}
+- Training Philosophy: ${aiAnalysis?.trainingPhilosophy}
+- Weekly Volume: ${JSON.stringify(aiAnalysis?.weeklyVolume)}
+- Intensity Distribution: ${JSON.stringify(aiAnalysis?.intensityDistribution)}
+- Progression Type: ${aiAnalysis?.progressionType}
+- Strength Focus: ${aiAnalysis?.strengthFocus}
+- Recovery Needs: ${aiAnalysis?.recoveryNeeds}
+- Focus Areas: ${JSON.stringify(aiAnalysis?.focusAreas)}
 
-MANDATORY: Use the training philosophy "${aiAnalysis?.trainingPhilosophy || 'NOT PROVIDED'}" for this plan. Do not change this value.
+MANDATORY: Use the training philosophy "${aiAnalysis?.trainingPhilosophy}" for this plan. Do not change this value.
 
 User has selected: ${userData.distance} distance, ${userData.trainingPhilosophy} training philosophy.
 
@@ -859,10 +879,10 @@ PERFORMANCE NUMBERS AND TRAINING ZONES:
 - Deadlift 1RM: ${userData.baseline.performanceNumbers.deadlift}lbs
 
 PERSONALIZED TRAINING CONTEXT:
-- Current Training Volume: ${userData.baseline?.totalHours || 'Unknown'} hours/week
-- Training Background: ${userData.baseline?.trainingBackground || 'Unknown'}
-- Age: ${userData.baseline?.age || 'Unknown'} years old
-- Injury History: ${userData.baseline?.injuryHistory || 'None'}
+- Current Training Volume: ${userData.baseline?.totalHours} hours/week
+- Training Background: ${userData.baseline?.trainingBackground}
+- Age: ${userData.baseline?.age} years old
+- Injury History: ${userData.baseline?.injuryHistory}
 
 CRITICAL - USE THESE EXACT PACES FROM USER INPUT:
 - Zone 2 (Easy): Use their exact easy pace: ${userData.baseline?.performanceNumbers?.easyPace} - conversational, can talk easily
@@ -877,9 +897,9 @@ PACE CONVERSION EXAMPLE:
 DO NOT MAKE UP PACES - USE ONLY THE NUMBERS THE USER PROVIDED.
 
 CREATE WORKOUTS SPECIFIC TO THIS ATHLETE'S:
-- Current fitness level (${userData.baseline?.disciplineFitness?.running || 'Unknown'} running, ${userData.baseline?.disciplineFitness?.cycling || 'Unknown'} cycling)
-- Available equipment (${userData.baseline?.equipment?.strength?.join(', ') || 'None'} for strength)
-- Injury considerations (${userData.baseline?.injuryHistory || 'None'})
+- Current fitness level (${userData.baseline?.disciplineFitness?.running} running, ${userData.baseline?.disciplineFitness?.cycling} cycling)
+- Available equipment (${userData.baseline?.equipment?.strength?.join(', ')} for strength)
+- Injury considerations (${userData.baseline?.injuryHistory})
 
 USE THESE EXACT NUMBERS AND THEIR SPECIFIC CONTEXT in your workout descriptions.` : 'No performance numbers available.'}
 

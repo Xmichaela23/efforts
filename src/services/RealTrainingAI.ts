@@ -417,7 +417,10 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       // Sum up all sport volumes
       const volumes = Object.values(aiResponse.weeklyVolume);
       weeklyVolume = volumes.reduce((sum: number, volume: unknown) => {
-        const numVolume = typeof volume === 'number' ? volume : (Number(volume) || 0);
+        const numVolume = typeof volume === 'number' ? volume : Number(volume);
+        if (isNaN(numVolume)) {
+          throw new Error(`Invalid volume value: ${volume}. Expected a number.`);
+        }
         return sum + (numVolume as number);
       }, 0);
     } else if (typeof aiResponse.weeklyVolume === 'number') {
@@ -434,11 +437,19 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     const ai = aiResponse.intensityDistribution;
     console.log('🔍 Raw intensityDistribution from AI:', ai);
     
-    // More flexible parsing for intensity distribution - NO FALLBACKS
+    // Parse intensity distribution - NO FALLBACKS
+    const easy = Number(ai.easy) || Number(ai.threshold) || Number(ai.zone1) || Number(ai.zone2);
+    const moderate = Number(ai.moderate) || Number(ai.tempo) || Number(ai.zone3);
+    const hard = Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5);
+    
+    if (isNaN(easy) || isNaN(hard)) {
+      throw new Error(`Invalid intensity distribution values. Easy: ${ai.easy}, Hard: ${ai.hard}. Expected numbers.`);
+    }
+    
     const intensityDistribution = {
-      easy: Number(ai.easy) || Number(ai.threshold) || Number(ai.zone1) || Number(ai.zone2) || 0,
-      moderate: Number(ai.moderate) || Number(ai.tempo) || Number(ai.zone3) || 0,
-      hard: Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5) || 0
+      easy,
+      moderate: isNaN(moderate) ? 0 : moderate, // Moderate can be 0 for polarized training
+      hard
     } as { easy: number; moderate: number; hard: number };
     
     // Validate intensity distribution - handle polarized training (moderate can be 0)
