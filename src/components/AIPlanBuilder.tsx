@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 // Import Font Awesome icons at the top
-import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaBalanceScale, FaMedal, FaObjectGroup, FaCog } from 'react-icons/fa';
+import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaTachometerAlt, FaMedal, FaObjectGroup, FaCog } from 'react-icons/fa';
 import { RealTrainingAI } from '../services/RealTrainingAI';
 
 
@@ -143,7 +143,7 @@ const LONG_SESSION_PREFERENCES = [
 const TRAINING_PHILOSOPHY_OPTIONS = [
   { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
   { key: 'pyramid', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (weekly intensity progression)</> },
-  { key: 'threshold', label: <><FaBalanceScale className="inline mr-2" />THRESHOLD (40% moderate, 40% easy, 20% hard)</> },
+  { key: 'threshold', label: <><FaTachometerAlt className="inline mr-2" />THRESHOLD (40% moderate, 40% easy, 20% hard)</> },
 ];
 
 // Separate course detail options for different disciplines
@@ -1597,7 +1597,7 @@ Return a valid JSON plan structure.`;
                 }`}
               >
                 <div className="font-medium mb-2 flex items-center">
-                  <FaBalanceScale className="inline mr-2" />
+                  <FaTachometerAlt className="inline mr-2" />
                   THRESHOLD (Sustained moderate effort training)
                 </div>
                 <div className="text-sm text-gray-600 mb-2">

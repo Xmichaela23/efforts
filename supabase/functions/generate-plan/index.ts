@@ -85,57 +85,48 @@ serve(async (req) => {
           role: 'system',
           content: isAnalysis 
             ? `You are an expert exercise physiologist and training coach. Your task is to analyze user data and return ONLY a JSON object with training parameters. Do not include any text outside the JSON.`
-            : `You are a training plan generator. Your task is to create personalized training plans by applying training science to user data.
+            : `You are an exercise physiologist and training scientist. Your task is to create personalized training plans by applying evidence-based training science to user data.
 
 CRITICAL: You MUST use the AI analysis data provided in the userContext.aiAnalysis object to create the plan.
 
-HOW TO CREATE PERSONALIZED PLANS:
+TRAINING SCIENCE APPLICATION:
 
-1. USE THE AI ANALYSIS DATA (MANDATORY):
-   - Use aiAnalysis.trainingPhilosophy to structure the plan
-   - Use aiAnalysis.focusAreas to determine workout distribution
-   - Use aiAnalysis.strengthFocus to include strength training when specified
-   - Use aiAnalysis.weeklyVolume to determine training volume
-   - Use aiAnalysis.intensityDistribution to structure workout intensities
+1. TRAINING PHILOSOPHY IMPLEMENTATION (Evidence-Based):
+   - PYRAMIDAL: Apply Bompa's periodization theory with weekly intensity progression. Structure: Monday (easy) → Tuesday (moderate) → Wednesday (hard) → Thursday (moderate) → Friday (easy) → Weekend (moderate). Use user's specific paces/FTP for each zone.
+   - POLARIZED: Apply Seiler & Tønnessen's 80/20 model. 80% of sessions at <2mmol/L lactate (Zone 1-2), 20% at >4mmol/L lactate (Zone 4-5). No Zone 3 work. Use user's specific paces/FTP for zone targets.
+   - THRESHOLD: Apply Coggan & Allen's lactate threshold methodology. 40% Zone 3 (threshold), 40% Zone 2 (aerobic), 20% Zone 4-5 (high intensity). Focus on sustained effort at lactate threshold using user's specific paces/FTP.
 
-2. RESPECT USER PREFERENCES (MANDATORY):
+2. INTENSITY ZONE APPLICATION (Based on Coggan's Power Training Zones):
+   - Zone 1 (Recovery): <55% FTP, <68% HRmax - Use user's easyPace for running, 50% FTP for cycling
+   - Zone 2 (Aerobic): 55-75% FTP, 68-83% HRmax - Use user's easyPace for running, 60-70% FTP for cycling
+   - Zone 3 (Tempo): 75-90% FTP, 83-94% HRmax - Use user's fiveK pace for running, 80-85% FTP for cycling
+   - Zone 4 (Threshold): 90-105% FTP, 94-105% HRmax - Use user's fiveK pace for running, 90-95% FTP for cycling
+   - Zone 5 (VO2max): 105-120% FTP, >105% HRmax - Use faster than fiveK pace for running, 105-110% FTP for cycling
+
+3. WORKOUT STRUCTURE REQUIREMENTS:
+   - Always use user's specific baseline data (FTP, fiveK pace, easyPace, 1RMs)
+   - Never use generic descriptions - create specific, measurable workouts
+   - For strength: Include exercises, sets, reps, and weights based on user's 1RMs
+   - For intervals: Use exact paces/FTP percentages with specific rest periods
+   - For endurance: Use specific pace targets and durations
+
+4. RESPECT USER PREFERENCES (MANDATORY):
    - If user chose "7 days per week" - create 7 workouts per week (NO REST DAYS)
    - If aiAnalysis.strengthFocus exists - you MUST include strength training workouts
-   - If aiAnalysis.strengthFocus is "powerlifting" - include powerlifting exercises
-   - If aiAnalysis.strengthFocus is "power_development" - include explosive movements
+   - If aiAnalysis.strengthFocus is "powerlifting" - include compound lifts (squat, bench, deadlift)
+   - If aiAnalysis.strengthFocus is "power_development" - include Olympic lifts and plyometrics
    - If aiAnalysis.strengthFocus is "injury_prevention" - include mobility/stability work
-   - If aiAnalysis.strengthFocus is "sport_specific" - include sport-specific strength
-   - If aiAnalysis.strengthFocus is "muscle_building" - include hypertrophy work
-   - If aiAnalysis.strengthFocus is "general_fitness" - include general strength work
-   - If user chose specific disciplines - prioritize those in aiAnalysis.focusAreas
+   - If aiAnalysis.strengthFocus is "sport_specific" - include sport-specific movements
+   - If aiAnalysis.strengthFocus is "muscle_building" - include hypertrophy work (8-12 reps)
+   - If aiAnalysis.strengthFocus is "general_fitness" - include balanced strength work
 
-3. APPLY THE CHOSEN TRAINING PHILOSOPHY:
-   - PYRAMID: Structure each workout with intensity progression (easy → moderate → hard → moderate → easy) using their specific paces/FTP
-   - POLARIZED: Structure the week with 80% easy sessions and 20% hard sessions using their specific paces/FTP
-   - THRESHOLD: Focus on threshold-specific workouts using their specific paces/FTP
-
-4. TRANSLATE ASSESSMENT ANSWERS INTO TRAINING DECISIONS:
-   - Use their event distance to determine training volume and progression
-   - Use their timeline to structure the plan length and phases
-   - Use their availability preferences to schedule sessions
-   - Use their strength training choice to include appropriate strength work
-   - Use their course details to include specific training adaptations
-
-5. USE ACTUAL NUMBERS AND STRUCTURE WORKOUTS PROPERLY:
-   - Always use their specific baseline data for pace targets, FTP percentages, and strength weights
-   - Never use generic descriptions like "focus on form" or "moderate intensity"
-   - For strength workouts: Include specific exercises, sets, reps, and weights (e.g., "3x5 squats at 70% of 225lbs 1RM")
-   - For running: Use their actual paces and create structured intervals (e.g., "6x400m at 8:30/mile pace with 90s rest")
-   - For cycling: Use their actual FTP and create structured intervals (e.g., "3x8 minutes at 90% of 220W FTP with 4 minutes easy spin")
-   - For swimming: Use their actual swim pace and create structured sets (e.g., "8x100m at 1:45 pace with 30s rest")
-
-6. WORKOUT DISTRIBUTION RULES:
+5. WORKOUT DISTRIBUTION RULES:
    - If aiAnalysis.strengthFocus exists: Include 1-2 strength workouts per week
    - If user chose 7 days: Create exactly 7 workouts per week (no rest days)
    - Distribute remaining workouts across swim/bike/run based on aiAnalysis.focusAreas
    - Example: 7 days with strength = 1 strength + 2 swim + 2 bike + 2 run
 
-7. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with this exact structure:
+6. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with this exact structure:
 
 {
   "plan": {
@@ -175,7 +166,9 @@ HOW TO CREATE PERSONALIZED PLANS:
   ]
 }
 
-Your job is to take the user's unique data and apply training science to create a plan that's personalized to them.`
+CRITICAL: You MUST generate exactly 4 weeks of workouts. Each week should show progression in volume, intensity, or complexity based on the training philosophy. Do not generate fewer than 4 weeks.
+
+Your job is to apply evidence-based training science to the user's unique data to create a scientifically-sound, personalized training plan.`
         },
         {
           role: 'user',
