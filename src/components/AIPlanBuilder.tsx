@@ -554,15 +554,11 @@ export default function AIPlanBuilder() {
 
     const { injuryHistory, age, performanceNumbers } = insights;
 
-
-
     // Recommend injury prevention if they have injury history
     if (injuryHistory?.includes('injury')) return 'injury-prevention';
 
-    // If they have strength numbers, they can do more advanced strength
-    if (performanceNumbers.squat && performanceNumbers.deadlift) return 'power-development';
-
-    return 'injury-prevention'; // Default to safest option
+    // Default to injury prevention for safety
+    return 'injury-prevention';
   };
 
   const prePopulateFromBaselines = () => {
