@@ -253,6 +253,60 @@ const CLIMATE_OPTIONS = [
 ];
 
 // Event-based training recommendations with smart gating
+// Calculate weekly volume from user's duration preferences
+const calculateVolumeFromResponses = (responses: any) => {
+  if (!responses.trainingFrequency || !responses.weekdayDuration || !responses.weekendDuration) {
+    return { weekly: 'unknown', weekday: 0, weekend: 0, total: 0 };
+  }
+
+  // Parse weekday duration
+  let weekdayHours = 0;
+  switch (responses.weekdayDuration) {
+    case '30-45': weekdayHours = 0.625; break; // 37.5 minutes average
+    case '45-60': weekdayHours = 0.875; break; // 52.5 minutes average
+    case '60-90': weekdayHours = 1.25; break;  // 75 minutes average
+    case '90-plus': weekdayHours = 1.5; break; // 90 minutes average
+  }
+
+  // Parse weekend duration
+  let weekendHours = 0;
+  switch (responses.weekendDuration) {
+    case '1-2-hours': weekendHours = 1.5; break;  // 1.5 hours average
+    case '2-3-hours': weekendHours = 2.5; break;  // 2.5 hours average
+    case '3-4-hours': weekendHours = 3.5; break;  // 3.5 hours average
+    case '4-plus-hours': weekendHours = 4.5; break; // 4.5 hours average
+  }
+
+  // Calculate weekday sessions based on training frequency
+  let weekdaySessions = 0;
+  switch (responses.trainingFrequency) {
+    case '4-days': weekdaySessions = 3; break; // 3 weekdays + 1 weekend
+    case '5-days': weekdaySessions = 3; break; // 3 weekdays + 2 weekends
+    case '6-days': weekdaySessions = 4; break; // 4 weekdays + 2 weekends
+    case '7-days': weekdaySessions = 5; break; // 5 weekdays + 2 weekends
+  }
+
+  // Calculate weekend sessions
+  let weekendSessions = 0;
+  switch (responses.trainingFrequency) {
+    case '4-days': weekendSessions = 1; break;
+    case '5-days': weekendSessions = 2; break;
+    case '6-days': weekendSessions = 2; break;
+    case '7-days': weekendSessions = 2; break;
+  }
+
+  const totalWeekday = weekdayHours * weekdaySessions;
+  const totalWeekend = weekendHours * weekendSessions;
+  const totalWeekly = totalWeekday + totalWeekend;
+
+  return {
+    weekly: `${totalWeekly.toFixed(1)} hours/week`,
+    weekday: totalWeekday,
+    weekend: totalWeekend,
+    total: totalWeekly
+  };
+};
+
 const getEventBasedRecommendations = (distance: string) => {
   switch (distance) {
     case 'sprint':
@@ -979,9 +1033,9 @@ Return a valid JSON plan structure.`;
       console.log('🎯 setGeneratedPlan called - plan should now be set');
       setCurrentWeek(0); // Reset to first week
       
-      // Advance to step 7 to show the plan
-      console.log('🎯 Advancing to step 7 to show the plan...');
-      setStep(7);
+      // Advance to step 8 to show the plan
+      console.log('🎯 Advancing to step 8 to show the plan...');
+      setStep(8);
       
     } catch (error) {
       console.error('❌ Error generating plan:', error);
@@ -1508,16 +1562,24 @@ Return a valid JSON plan structure.`;
               </div>
             </div>
             
-            {insights && (
-              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                <div>
-                  <strong>Based on your baseline:</strong> You currently train {insights.trainingFrequency.triathlon || 'unknown frequency'}.
-                  {recommendedFrequency && (
-                    <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
-                  )}
+            {(() => {
+              const calculatedVolume = calculateVolumeFromResponses(responses);
+              return (
+                <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                  <div>
+                    <strong>Based on your selections:</strong> 
+                    {calculatedVolume.total > 0 ? (
+                      <>You'll train {calculatedVolume.weekly}.</>
+                    ) : (
+                      <>Select training frequency and duration to see your volume.</>
+                    )}
+                    {recommendedFrequency && (
+                      <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             
             <div className="space-y-3 mb-6">
               {TRAINING_FREQUENCY_OPTIONS.map((option) => {
@@ -1598,15 +1660,18 @@ Return a valid JSON plan structure.`;
               </div>
             </div>
             
-            {insights && insights.totalHours !== undefined && (
-              <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                <div>
-                  <strong>Based on your baseline:</strong> You currently train {insights.totalHours} hours/week.
-                  {insights.totalHours < 6 && ' Consider longer sessions to build endurance.'}
-                  {insights.totalHours >= 8 && ' Elite level volume - use Zone 3-4 for long sessions, Zone 4-5 for intervals.'}
+            {(() => {
+              const calculatedVolume = calculateVolumeFromResponses(responses);
+              return (
+                <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                  <div>
+                    <strong>Based on your selections:</strong> You'll train {calculatedVolume.weekly}.
+                    {calculatedVolume.total < 6 && ' Consider longer sessions to build endurance.'}
+                    {calculatedVolume.total >= 8 && ' Elite level volume - use Zone 3-4 for long sessions, Zone 4-5 for intervals.'}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Focused training sessions (weekdays):</div>
