@@ -560,7 +560,9 @@ export default function AIPlanBuilder() {
 
   // Baseline-based validation and recommendations
   const getBaselineInsights = () => {
-    if (!baselines) return null;
+    if (!baselines) {
+      throw new Error('Baseline data is required to generate a plan. User must complete baseline assessment first.');
+    }
 
     try {
       const currentVolume = baselines.current_volume;
@@ -625,7 +627,7 @@ export default function AIPlanBuilder() {
       };
     } catch (error) {
       console.error('Error in getBaselineInsights:', error);
-      return null;
+      throw new Error(`Baseline data error: ${error.message}. User must have complete baseline data to generate a plan.`);
     }
   };
 
@@ -836,7 +838,7 @@ export default function AIPlanBuilder() {
         equipment: insights.equipment,
         disciplineFitness: insights.disciplineFitness,
         trainingBackground: insights.trainingBackground
-      } : null
+      } : (() => { throw new Error('Baseline insights are required to generate a plan. User must complete baseline assessment.'); })()
     };
     
     // Detailed prompt that tells AI to use specific baseline numbers AND AI analysis results
@@ -901,7 +903,7 @@ CREATE WORKOUTS SPECIFIC TO THIS ATHLETE'S:
 - Available equipment (${userData.baseline?.equipment?.strength?.join(', ')} for strength)
 - Injury considerations (${userData.baseline?.injuryHistory})
 
-USE THESE EXACT NUMBERS AND THEIR SPECIFIC CONTEXT in your workout descriptions.` : 'No performance numbers available.'}
+USE THESE EXACT NUMBERS AND THEIR SPECIFIC CONTEXT in your workout descriptions.` : (() => { throw new Error('Performance numbers are required to generate a plan. User must provide FTP, 5K pace, and other performance metrics.'); })()}
 
 MANDATORY REQUIREMENTS:
 1. Use userContext.aiAnalysis.trainingPhilosophy as the training philosophy - DO NOT CHANGE THIS
@@ -1583,22 +1585,46 @@ Return a valid JSON plan structure.`;
             </div>
             
             {(() => {
-              const calculatedVolume = calculateVolumeFromResponses(responses);
-              return (
-                <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                  <div>
-                    <strong>Based on your selections:</strong> 
-                    {calculatedVolume.total > 0 ? (
-                      <>You'll train {calculatedVolume.weekly}.</>
-                    ) : (
-                      <>Select training frequency and duration to see your volume.</>
-                    )}
-                    {recommendedFrequency && (
-                      <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
-                    )}
+              // Only calculate volume if user has selected required fields
+              if (responses.trainingFrequency && responses.weekdayDuration && responses.weekendDuration) {
+                try {
+                  const calculatedVolume = calculateVolumeFromResponses(responses);
+                  return (
+                    <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                      <div>
+                        <strong>Based on your selections:</strong> 
+                        {calculatedVolume.total > 0 ? (
+                          <>You'll train {calculatedVolume.weekly}.</>
+                        ) : (
+                          <>Select training frequency and duration to see your volume.</>
+                        )}
+                        {recommendedFrequency && (
+                          <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                } catch (error) {
+                  return (
+                    <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 text-sm">
+                      <div>
+                        <strong>Complete your selections:</strong> Please select training frequency and duration to see your volume.
+                      </div>
+                    </div>
+                  );
+                }
+              } else {
+                return (
+                  <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                    <div>
+                      <strong>Based on your selections:</strong> Select training frequency and duration to see your volume.
+                      {recommendedFrequency && (
+                        <div className="mt-1">Recommended: {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === recommendedFrequency)?.label}</div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
+                );
+              }
             })()}
             
             <div className="space-y-3 mb-6">
@@ -1681,16 +1707,37 @@ Return a valid JSON plan structure.`;
             </div>
             
             {(() => {
-              const calculatedVolume = calculateVolumeFromResponses(responses);
-              return (
-                <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
-                  <div>
-                    <strong>Based on your selections:</strong> You'll train {calculatedVolume.weekly}.
-                    {calculatedVolume.total < 6 && ' Consider longer sessions to build endurance.'}
-                    {calculatedVolume.total >= 8 && ' Elite level volume - use Zone 3-4 for long sessions, Zone 4-5 for intervals.'}
+              // Only calculate volume if user has selected required fields
+              if (responses.trainingFrequency && responses.weekdayDuration && responses.weekendDuration) {
+                try {
+                  const calculatedVolume = calculateVolumeFromResponses(responses);
+                  return (
+                    <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                      <div>
+                        <strong>Based on your selections:</strong> You'll train {calculatedVolume.weekly}.
+                        {calculatedVolume.total < 6 && ' Consider longer sessions to build endurance.'}
+                        {calculatedVolume.total >= 8 && ' Elite level volume - use Zone 3-4 for long sessions, Zone 4-5 for intervals.'}
+                      </div>
+                    </div>
+                  );
+                } catch (error) {
+                  return (
+                    <div className="mb-4 p-3 bg-yellow-100 text-yellow-800 text-sm">
+                      <div>
+                        <strong>Complete your selections:</strong> Please select all training options to see your volume.
+                      </div>
+                    </div>
+                  );
+                }
+              } else {
+                return (
+                  <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
+                    <div>
+                      <strong>Based on your selections:</strong> Select training frequency and duration to see your volume.
+                    </div>
                   </div>
-                </div>
-              );
+                );
+              }
             })()}
             
             <div className="mb-6">

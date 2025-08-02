@@ -637,7 +637,7 @@ function parseAIResponse(aiResponse: string, startDate: string) {
     
     // Validate plan object has all required fields
     const requiredPlanFields = ['name', 'description', 'type', 'duration', 'level', 'goal', 'status', 'currentWeek', 'createdDate', 'totalWorkouts', 'disciplines', 'isIntegrated', 'phase', 'phaseDescription', 'trainingPhilosophy'];
-    const missingFields = requiredPlanFields.filter(field => !parsed.plan[field]);
+    const missingFields = requiredPlanFields.filter(field => parsed.plan[field] === undefined || parsed.plan[field] === null);
     
     if (missingFields.length > 0) {
       throw new Error(`AI failed to include required plan fields: ${missingFields.join(', ')}. Plan object must be complete.`);
