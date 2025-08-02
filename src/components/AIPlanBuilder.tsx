@@ -52,9 +52,7 @@ const STRENGTH_OPTIONS = [
   { key: 'general-fitness', label: 'Endurance conditioning (basic strength for racing)' },
 ];
 
-const GOAL_OPTIONS = [
-  { key: 'general', label: 'General Training', description: 'Standard training approach' },
-];
+
 
 const STRENGTH_FITNESS_LEVELS = [
   { key: 'new', label: 'New to strength training' },
@@ -1224,7 +1222,7 @@ Return a valid JSON plan structure.`;
               {/* ... */}
               <button
                 className="w-full bg-gray-800 text-white py-2 font-medium mt-4"
-                onClick={() => setStep(5)}
+                onClick={() => setStep(4)}
               >
                 Next
               </button>
@@ -1235,57 +1233,6 @@ Return a valid JSON plan structure.`;
         return null;
 
       case 2:
-        return (
-          <div>
-            <div className="mb-4 text-gray-800 font-medium">What are your primary goals for this training plan?</div>
-            <div className="text-sm text-gray-600 mb-4">Select up to 3 goals that matter most to you</div>
-            
-            <div className="space-y-3 mb-6">
-              {GOAL_OPTIONS.map((option) => {
-                const isSelected = responses.goals.includes(option.key);
-                return (
-                  <button
-                    key={option.key}
-                    onClick={() => {
-                      const newGoals = isSelected 
-                        ? responses.goals.filter(g => g !== option.key)
-                        : responses.goals.length < 3 
-                          ? [...responses.goals, option.key]
-                          : responses.goals;
-                      updateResponse('goals', newGoals);
-                    }}
-                    className={`w-full p-3 text-left transition-colors ${
-                      isSelected
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-transparent text-black hover:bg-gray-100'
-                    }`}
-                  >
-                    <div className="font-medium">{option.label}</div>
-                    <div className="text-sm text-gray-600">{option.description}</div>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(1)}
-              >
-                Back
-              </button>
-              <button
-                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
-                disabled={responses.goals.length === 0}
-                onClick={() => setStep(3)}
-              >
-                Next
-              </button>
-            </div>
-          </div>
-        );
-
-      case 3:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">Do you want to add strength training to your triathlon plan?</div>
@@ -1331,7 +1278,7 @@ Return a valid JSON plan structure.`;
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.strengthTraining}
-                onClick={() => setStep(4)}
+                onClick={() => setStep(3)}
               >
                 Next
               </button>
@@ -1339,7 +1286,7 @@ Return a valid JSON plan structure.`;
           </div>
         );
 
-      case 4:
+      case 3:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">What's your weekend availability?</div>
@@ -1387,14 +1334,14 @@ Return a valid JSON plan structure.`;
             <div className="flex gap-3">
               <button
                 className="flex-1 text-gray-800 py-2 font-medium"
-                onClick={() => setStep(3)}
+                onClick={() => setStep(2)}
               >
                 Back
               </button>
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekendAvailability || (responses.weekendAvailability !== 'optimize' && !responses.longSessionPreference)}
-                onClick={() => setStep(5)}
+                onClick={() => setStep(4)}
               >
                 Next
               </button>
@@ -1402,7 +1349,7 @@ Return a valid JSON plan structure.`;
           </div>
         );
 
-      case 5:
+      case 4:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
@@ -1454,7 +1401,7 @@ Return a valid JSON plan structure.`;
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingFrequency}
-                onClick={() => setStep(6)}
+                onClick={() => setStep(5)}
               >
                 Next
               </button>
@@ -1462,7 +1409,7 @@ Return a valid JSON plan structure.`;
           </div>
         );
 
-      case 6:
+      case 5:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
@@ -1526,7 +1473,7 @@ Return a valid JSON plan structure.`;
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.weekdayDuration || !responses.weekendDuration}
-                onClick={() => setStep(7)}
+                onClick={() => setStep(6)}
               >
                 Next
               </button>
@@ -1534,7 +1481,7 @@ Return a valid JSON plan structure.`;
           </div>
         );
 
-      case 7:
+      case 6:
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">Choose your training approach:</div>
@@ -1652,7 +1599,7 @@ Return a valid JSON plan structure.`;
           </div>
         );
 
-      case 8:
+      case 7:
         console.log('🎯 STEP 8 - Current step:', step);
         console.log('🎯 generatedPlan state:', generatedPlan);
         console.log('🎯 generatingPlan state:', generatingPlan);
