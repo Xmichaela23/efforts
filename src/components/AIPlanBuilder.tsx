@@ -671,11 +671,13 @@ PERSONALIZED TRAINING CONTEXT:
 - Age: ${userData.baseline?.age || 'Unknown'} years old
 - Injury History: ${userData.baseline?.injuryHistory || 'None'}
 
-TRAINING ZONE UNDERSTANDING FOR THIS ATHLETE:
-- Zone 2 (Easy): Use their easy pace (${userData.baseline?.performanceNumbers?.easyPace}) - conversational, can talk easily
-- Zone 4 (Threshold): Use their 5K pace (${userData.baseline?.performanceNumbers?.fiveK}) - hard but sustainable for 20-30 minutes
+CRITICAL - USE THESE EXACT PACES FROM USER INPUT:
+- Zone 2 (Easy): Use their exact easy pace: ${userData.baseline?.performanceNumbers?.easyPace} - conversational, can talk easily
+- Zone 4 (Threshold): Use their exact 5K pace: ${userData.baseline?.performanceNumbers?.fiveK} - hard but sustainable for 20-30 minutes
 - Zone 5 (VO2 Max): Faster than their 5K pace - very hard, 3-8 minute intervals
-- FTP (Cycling): Use their actual FTP (${userData.baseline?.performanceNumbers?.ftp}W) for threshold work
+- FTP (Cycling): Use their exact FTP: ${userData.baseline?.performanceNumbers?.ftp}W for threshold work
+
+DO NOT MAKE UP PACES - USE ONLY THE NUMBERS THE USER PROVIDED.
 
 CREATE WORKOUTS SPECIFIC TO THIS ATHLETE'S:
 - Current fitness level (${userData.baseline?.disciplineFitness?.running || 'Unknown'} running, ${userData.baseline?.disciplineFitness?.cycling || 'Unknown'} cycling)
