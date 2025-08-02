@@ -53,21 +53,7 @@ const STRENGTH_OPTIONS = [
 ];
 
 const GOAL_OPTIONS = [
-  { key: 'speed-improvement', label: 'Speed Improvement', description: 'Improve pace/speed in one or more disciplines' },
-  { key: 'endurance-building', label: 'Endurance Building', description: 'Build stamina for longer distances' },
-  { key: 'strength-development', label: 'Strength Development', description: 'Get stronger for better performance' },
-  { key: 'technique-refinement', label: 'Technique Refinement', description: 'Improve form and efficiency' },
-  { key: 'complete-finish', label: 'Complete & Finish', description: 'Just complete the race successfully' },
-  { key: 'personal-best', label: 'Personal Best', description: 'Beat my previous race times' },
-  { key: 'qualify', label: 'Qualify', description: 'Qualify for championships or other events' },
-  { key: 'podium', label: 'Podium', description: 'Compete for age group placement' },
-  { key: 'swim-focus', label: 'Swim Focus', description: 'Improve swimming (my weakest discipline)' },
-  { key: 'bike-focus', label: 'Bike Focus', description: 'Improve cycling (my strongest discipline)' },
-  { key: 'run-focus', label: 'Run Focus', description: 'Improve running (my strongest discipline)' },
-  { key: 'balanced-improvement', label: 'Balanced Improvement', description: 'Improve all disciplines equally' },
-  { key: 'first-timer', label: 'First Timer', description: 'Complete my first triathlon' },
-  { key: 'building-experience', label: 'Building Experience', description: 'Gain more race experience' },
-  { key: 'advanced-training', label: 'Advanced Training', description: 'Take my training to the next level' },
+  { key: 'general', label: 'General Training', description: 'Standard training approach' },
 ];
 
 const STRENGTH_FITNESS_LEVELS = [
