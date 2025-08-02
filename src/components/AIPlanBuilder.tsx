@@ -666,9 +666,13 @@ PERSONALIZED TRAINING CONTEXT:
 
 CRITICAL - USE THESE EXACT PACES FROM USER INPUT:
 - Zone 2 (Easy): Use their exact easy pace: ${userData.baseline?.performanceNumbers?.easyPace} - conversational, can talk easily
-- Zone 4 (Threshold): Use their exact 5K pace: ${userData.baseline?.performanceNumbers?.fiveK} - hard but sustainable for 20-30 minutes
-- Zone 5 (VO2 Max): Faster than their 5K pace - very hard, 3-8 minute intervals
+- Zone 4 (Threshold): Convert their 5K time (${userData.baseline?.performanceNumbers?.fiveK}) to pace per mile - 5K is 3.1 miles, so ${userData.baseline?.performanceNumbers?.fiveK} = ${userData.baseline?.performanceNumbers?.fiveK} ÷ 3.1 = pace per mile - hard but sustainable for 20-30 minutes
+- Zone 5 (VO2 Max): Faster than their 5K pace per mile - very hard, 3-8 minute intervals
 - FTP (Cycling): Use their exact FTP: ${userData.baseline?.performanceNumbers?.ftp}W for threshold work
+
+PACE CONVERSION EXAMPLE:
+- If 5K time is 24:00, then pace per mile = 24:00 ÷ 3.1 = 7:45 per mile
+- Use this converted pace per mile in all running workouts
 
 DO NOT MAKE UP PACES - USE ONLY THE NUMBERS THE USER PROVIDED.
 

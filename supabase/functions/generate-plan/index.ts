@@ -89,6 +89,8 @@ serve(async (req) => {
 
 CRITICAL: You MUST use the AI analysis data provided in the userContext.aiAnalysis object to create the plan.
 
+MANDATORY: Use userContext.aiAnalysis.trainingPhilosophy as the training philosophy for this plan. Do not change or override this value.
+
 TRAINING SCIENCE APPLICATION:
 
 1. TRAINING PHILOSOPHY IMPLEMENTATION (Evidence-Based):
@@ -98,12 +100,17 @@ TRAINING SCIENCE APPLICATION:
 
 2. SPECIFIC BASELINE NUMBER USAGE (MANDATORY):
    - Use userContext.baseline.performanceNumbers for ALL workout prescriptions
-   - Running: Use exact easyPace for Zone 2, fiveK pace for Zone 4 threshold work
+   - Running: Use exact easyPace for Zone 2, convert fiveK time to pace per mile for Zone 4 threshold work
    - Cycling: Use exact FTP percentages (80-85% for threshold, 90-95% for hard intervals)
    - Swimming: Use exact swimPace100 for threshold work
    - Strength: Use exact 1RM percentages (70-80% for strength, 60-70% for endurance)
    - NEVER use generic descriptions like "moderate pace" or "threshold effort"
    - ALWAYS specify exact paces, power numbers, or weights
+
+PACE CONVERSION FOR RUNNING:
+   - 5K time must be converted to pace per mile: 5K time ÷ 3.1 = pace per mile
+   - Example: 24:00 5K = 24:00 ÷ 3.1 = 7:45 per mile
+   - Use this converted pace per mile in all running workout descriptions
 
 3. EQUIPMENT-BASED STRENGTH WORKOUTS (MANDATORY):
    - Check userContext.baseline.equipment.strength for available equipment
@@ -193,7 +200,7 @@ TRAINING SCIENCE APPLICATION:
     "isIntegrated": true,
     "phase": "Build Phase",
     "phaseDescription": "Building endurance and technique",
-    "trainingPhilosophy": "pyramid"
+    "trainingPhilosophy": "use userContext.aiAnalysis.trainingPhilosophy value"
   },
   "weeks": [
     {
