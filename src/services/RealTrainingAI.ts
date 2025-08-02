@@ -441,10 +441,16 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       hard: Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5) || 0
     } as { easy: number; moderate: number; hard: number };
     
-    // Validate intensity distribution - NO FALLBACKS
-    if (!intensityDistribution.easy || !intensityDistribution.moderate || !intensityDistribution.hard) {
+    // Validate intensity distribution - handle polarized training (moderate can be 0)
+    if (!intensityDistribution.easy || !intensityDistribution.hard) {
       console.log('❌ Invalid intensity distribution:', intensityDistribution);
       throw new Error('AI analysis provided incomplete intensityDistribution data');
+    }
+    
+    // For polarized training, moderate can be 0
+    if (intensityDistribution.moderate === undefined) {
+      console.log('❌ Missing moderate value in intensity distribution:', intensityDistribution);
+      throw new Error('AI analysis missing moderate value in intensityDistribution');
     }
     
     // Transform strength approach - NO DEFAULTS
