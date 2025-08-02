@@ -1552,16 +1552,16 @@ Return a valid JSON plan structure.`;
               >
                 <div className="font-medium mb-2 flex items-center">
                   <FaRoad className="inline mr-2" />
-                  POLARIZED (80% easy, 20% hard)
+                  POLARIZED (Mostly easy with some very hard)
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Based on Seiler & Tønnessen research. 80% of training at low intensity (Zone 1-2), 20% at high intensity (Zone 4-5), minimal moderate intensity.
+                  80% of your training is easy, 20% is very hard - no middle ground
                 </div>
                 <div className="text-sm text-gray-500">
-                  <strong>Best for:</strong> Endurance performance improvement, avoiding "junk miles"
+                  <strong>Best for:</strong> Anyone training for endurance events
                 </div>
                 <div className="text-sm text-gray-500">
-                  <strong>Why choose this:</strong> Proven effective for endurance athletes, especially those with limited time
+                  <strong>Why choose this:</strong> The most common approach used by coaches. Simple - either easy or hard, nothing in between
                 </div>
               </div>
 
@@ -1575,16 +1575,16 @@ Return a valid JSON plan structure.`;
               >
                 <div className="font-medium mb-2 flex items-center">
                   <FaChartArea className="inline mr-2" />
-                  PYRAMIDAL (weekly intensity progression)
+                  PYRAMIDAL (Build up intensity through the week)
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Weekly intensity progression: easy → moderate → hard → moderate → easy. Builds intensity tolerance throughout the week.
+                  Start easy, build up to hard workouts mid-week, then ease back down
                 </div>
                 <div className="text-sm text-gray-500">
-                  <strong>Best for:</strong> Building intensity tolerance, structured progression
+                  <strong>Best for:</strong> Anyone newer to endurance training who should maximize recovery
                 </div>
                 <div className="text-sm text-gray-500">
-                  <strong>Why choose this:</strong> Prevents overtraining with structured progression, good for beginners
+                  <strong>Why choose this:</strong> Designed to peak your weekly training mid-week, allowing more time for recovery. You may see a pyramid-style week leading up to a race in other training philosophies
                 </div>
               </div>
 
@@ -1598,16 +1598,16 @@ Return a valid JSON plan structure.`;
               >
                 <div className="font-medium mb-2 flex items-center">
                   <FaBalanceScale className="inline mr-2" />
-                  THRESHOLD (40% moderate, 40% easy, 20% hard)
+                  THRESHOLD (Sustained moderate effort training)
                 </div>
                 <div className="text-sm text-gray-600 mb-2">
-                  Based on Coggan & Allen research. 40% moderate intensity (Zone 3), 40% easy (Zone 2), 20% hard (Zone 4-5).
+                  Mix of easy, moderate, and hard workouts throughout the week
                 </div>
                 <div className="text-sm text-gray-500">
-                  <strong>Best for:</strong> Time trial performance, sustained power improvement
+                  <strong>Best for:</strong> Anyone training for 70.3, half marathon, or longer events
                 </div>
                 <div className="text-sm text-gray-500">
-                  <strong>Why choose this:</strong> Focuses on lactate threshold improvement, great for cyclists and time trialists
+                  <strong>Why choose this:</strong> Builds your ability to hold steady effort for extended periods
                 </div>
               </div>
             </div>
