@@ -440,19 +440,6 @@ export default function AIPlanBuilder() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
   
-  // Debug effect to track generatedPlan changes
-  useEffect(() => {
-    console.log('🎯 generatedPlan state changed:', generatedPlan);
-  }, [generatedPlan]);
-  
-  // Auto-trigger plan generation when reaching step 8
-  useEffect(() => {
-    if (step === 8 && !generatedPlan && !generatingPlan) {
-      console.log('🎯 Auto-triggering plan generation...');
-      generatePlan();
-    }
-  }, [step, generatedPlan, generatingPlan]);
-  
   const [currentWeek, setCurrentWeek] = useState(0); // Track current week being viewed
   
   // Assessment responses
@@ -508,6 +495,24 @@ export default function AIPlanBuilder() {
     // Question 8: Goals
     goals: [] as string[],
   });
+
+  // Debug effect to track generatedPlan changes
+  useEffect(() => {
+    console.log('🎯 generatedPlan state changed:', generatedPlan);
+  }, [generatedPlan]);
+  
+  // Auto-trigger plan generation when reaching step 8
+  useEffect(() => {
+    if (step === 8 && !generatedPlan && !generatingPlan) {
+      // Validate that user has completed all required fields before auto-generating
+      if (responses.trainingFrequency && responses.weekdayDuration && responses.weekendDuration && responses.trainingPhilosophy) {
+        console.log('🎯 Auto-triggering plan generation...');
+        generatePlan();
+      } else {
+        console.log('🎯 Auto-trigger skipped - user has not completed all required fields');
+      }
+    }
+  }, [step, generatedPlan, generatingPlan, responses.trainingFrequency, responses.weekdayDuration, responses.weekendDuration, responses.trainingPhilosophy]);
 
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
 
