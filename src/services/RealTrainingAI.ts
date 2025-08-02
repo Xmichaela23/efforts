@@ -441,10 +441,12 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       hard: Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5) || 15
     } as { easy: number; moderate: number; hard: number };
     
-    // Validate intensity distribution
+    // Validate intensity distribution - use defaults if missing
     if (!intensityDistribution.easy || !intensityDistribution.moderate || !intensityDistribution.hard) {
-      console.log('❌ Invalid intensity distribution:', intensityDistribution);
-      throw new Error('AI analysis provided incomplete intensityDistribution data');
+      console.log('⚠️ Using default intensity distribution values');
+      intensityDistribution.easy = intensityDistribution.easy || 60;
+      intensityDistribution.moderate = intensityDistribution.moderate || 25;
+      intensityDistribution.hard = intensityDistribution.hard || 15;
     }
     
     // Transform strength approach - NO DEFAULTS
