@@ -58,6 +58,34 @@ This app has reached a significant level of complexity requiring careful conside
 
 **Rule**: Request documentation FIRST, implement SECOND. This saves hours of debugging and prevents incorrect assumptions.
 
+### Deployment Strategy
+
+#### Frontend Deployment (React App)
+- **Method**: Git-based deployment
+- **Process**: 
+  1. Make changes to React components
+  2. Commit with descriptive messages: `git commit -m "Add event-based training recommendations with smart gating"`
+  3. Push to main branch: `git push`
+  4. Automatic deployment via git workflow
+- **Files**: All React/TypeScript files in `src/` directory
+
+#### Backend Deployment (Supabase Edge Functions)
+- **Method**: Manual copy/paste deployment
+- **Process**:
+  1. Develop Edge Functions locally in `supabase/functions/`
+  2. Test locally with `supabase start`
+  3. Copy the TypeScript code from `index.ts` files
+  4. Paste into Supabase Dashboard → Edge Functions → [Function Name] → Edit
+  5. Save and deploy
+- **Files**: `supabase/functions/*/index.ts`
+- **Why this approach**: Gives full control over when Edge Function updates go live
+
+#### Deployment Workflow
+1. **Frontend changes**: Commit and push to git (automatic deployment)
+2. **Backend changes**: Copy/paste to Supabase dashboard (manual deployment)
+3. **Testing**: Test frontend changes first, then deploy backend
+4. **Rollback**: Can quickly revert Edge Functions in dashboard if needed
+
 ### Session Continuity Notes
 - **Context Maintenance**: This AI maintains conversation context and code understanding across sessions
 - **Documentation**: Key architectural decisions and integration details are documented in this README
