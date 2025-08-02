@@ -448,15 +448,17 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     
     let strengthFocus = aiResponse.strengthApproach;
     if (aiResponse.strengthApproach) {
+      // Map AI response back to the original strength training options
       const mapping: { [key: string]: string } = {
-        'power-lifting': 'powerlifting',
-        'power-development': 'power_development',
-        'injury-prevention': 'injury_prevention',
-        'sport-specific': 'sport_specific',
-        'build-muscle': 'muscle_building',
-        'general-fitness': 'general_fitness'
+        'power-lifting': 'power-lifting',
+        'power-development': 'power-development',
+        'injury-prevention': 'injury-prevention',
+        'sport-specific': 'sport-specific',
+        'build-muscle': 'build-muscle',
+        'general-fitness': 'general-fitness',
+        'no-strength': 'no-strength'
       };
-      strengthFocus = mapping[aiResponse.strengthApproach] || 'general_fitness';
+      strengthFocus = mapping[aiResponse.strengthApproach] || aiResponse.strengthApproach;
     }
     
     // Transform progression type - NO DEFAULTS

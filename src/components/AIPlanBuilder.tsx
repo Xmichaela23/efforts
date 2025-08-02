@@ -44,12 +44,12 @@ const TRAINING_FREQUENCY_OPTIONS = [
 
 const STRENGTH_OPTIONS = [
   { key: 'no-strength', label: 'No strength training' },
-  { key: 'power-development', label: 'Power development (plyometrics, explosive movements)' },
-  { key: 'power-lifting', label: 'Power lifting (compound lifts, heavy weight, low reps)' },
-  { key: 'injury-prevention', label: 'Injury prevention (mobility, stability, corrective work)' },
-  { key: 'sport-specific', label: 'Sport-specific (triathlon movements)' },
-  { key: 'build-muscle', label: 'Build muscle (hypertrophy, 8-12 reps)' },
-  { key: 'general-fitness', label: 'General fitness (basic conditioning)' },
+  { key: 'power-development', label: 'Power development (explosive movements for endurance)' },
+  { key: 'power-lifting', label: 'Endurance power (compound lifts for race performance)' },
+  { key: 'injury-prevention', label: 'Injury prevention (mobility, stability for endurance)' },
+  { key: 'sport-specific', label: 'Triathlon-specific (swim, bike, run movements)' },
+  { key: 'build-muscle', label: 'Functional strength (endurance-focused, not bodybuilding)' },
+  { key: 'general-fitness', label: 'Endurance conditioning (basic strength for racing)' },
 ];
 
 const GOAL_OPTIONS = [
