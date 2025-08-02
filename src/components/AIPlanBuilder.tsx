@@ -2124,7 +2124,9 @@ Return a valid JSON plan structure.`;
                       <span className="font-medium">Duration:</span> {generatedPlan.plan?.duration} weeks
                     </div>
                     <div className="text-gray-700">
-                      <span className="font-medium">Level:</span> {generatedPlan.plan?.level}
+                      <span className="font-medium">Level:</span> {typeof generatedPlan.plan?.level === 'object' ? 
+                        `${generatedPlan.plan.level.age} years old, ${generatedPlan.plan.level.trainingBackground}` : 
+                        generatedPlan.plan?.level}
                     </div>
                   </div>
                 </div>

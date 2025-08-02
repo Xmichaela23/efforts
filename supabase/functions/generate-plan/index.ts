@@ -264,13 +264,19 @@ CRITICAL SUCCESS FACTORS (Your reputation depends on these):
    - Example: "Your run volume is good, but we need to add more bike endurance"
    - Example: "You have strength equipment but aren't using it - let's integrate it properly"
 
-ADVANCED COACHING CHALLENGE:
-- User selected "${trainingFrequency}" → Create EXACTLY ${expectedWorkoutsPerWeek} workouts per week (${workoutDays})
+🚨 ABSOLUTE TRAINING FREQUENCY REQUIREMENT 🚨
+- User selected "${trainingFrequency}" → Create EXACTLY ${expectedWorkoutsPerWeek} workouts per week
+- Training days: ${workoutDays}
 - ALL DAYS LISTED (${workoutDays}) ARE TRAINING DAYS - DO NOT MARK ANY AS "REST"
 - DO NOT CREATE MORE WORKOUTS THAN THE USER REQUESTED
+- DO NOT CREATE FEWER WORKOUTS THAN THE USER REQUESTED
 - DO NOT IGNORE THIS - IT'S THE MOST IMPORTANT CONSTRAINT
 - COUNT YOUR WORKOUTS - MAKE SURE YOU HAVE THE EXACT NUMBER
 - IF A DAY IS LISTED, IT MUST HAVE A WORKOUT (swim, bike, run, strength, or brick)
+- BEFORE SUBMITTING: Count your workouts in each week - you must have exactly ${expectedWorkoutsPerWeek}
+- IF YOU GENERATE ${expectedWorkoutsPerWeek + 1} OR MORE WORKOUTS, THE PLAN WILL BE REJECTED
+- IF YOU GENERATE ${expectedWorkoutsPerWeek - 1} OR FEWER WORKOUTS, THE PLAN WILL BE REJECTED
+- THIS IS A HARD CONSTRAINT - NO EXCEPTIONS
 
 This is your chance to demonstrate that you're a superior coach who can achieve better results with fewer days than a generic 7-day plan. The athlete's success depends on your ability to work within their schedule.
 
@@ -373,25 +379,34 @@ POLARIZED TRAINING APPLICATION (Current Focus):
 - Recovery: Always include adequate recovery between hard sessions
 - Progression should match athlete's training background and current fitness
 
-Return valid JSON plan structure with this EXACT format - NO VARIATIONS:
+CRITICAL: You MUST use the user's EXACT performance numbers and preferences. NO GENERIC VALUES.
+
+🚨 FINAL COUNTING REMINDER 🚨
+- You MUST create EXACTLY ${expectedWorkoutsPerWeek} workouts per week
+- You MUST create EXACTLY 4 weeks
+- Total workouts: ${expectedWorkoutsPerWeek} × 4 = ${expectedWorkoutsPerWeek * 4}
+- Training days: ${workoutDays}
+- COUNT YOUR WORKOUTS BEFORE SUBMITTING
+
+Return valid JSON plan structure with this EXACT format:
 
 {
   "plan": {
-    "name": "Use userContext.responses.distance + ' Distance Training Plan'",
+    "name": "${userContext.responses.distance} Distance Training Plan",
     "description": "Personalized training plan based on your assessment and AI analysis",
     "type": "endurance",
     "duration": 4,
-    "level": "Use userContext.baseline.disciplineFitness to determine level",
-    "goal": "Use userContext.responses.distance (sprint, olympic, 70.3, ironman)",
+    "level": "Use userContext.baseline.disciplineFitness to determine level as a string (e.g., 'Regular runner and cyclist', 'Intermediate triathlete', etc.)",
+    "goal": "${userContext.responses.distance}",
     "status": "active",
     "currentWeek": 0,
-    "createdDate": "Use current date",
-    "totalWorkouts": "Calculate from weeks array",
+    "createdDate": "${new Date().toISOString().split('T')[0]}",
+    "totalWorkouts": ${expectedWorkoutsPerWeek * 4},
     "disciplines": ["swimming", "cycling", "running", "strength"],
     "isIntegrated": true,
-    "phase": "Use training phase based on progression",
-    "phaseDescription": "Use phase-appropriate description",
-    "trainingPhilosophy": "Use userContext.aiAnalysis.trainingPhilosophy"
+    "phase": "Build",
+    "phaseDescription": "Building endurance and technique",
+    "trainingPhilosophy": "${userContext.aiAnalysis.trainingPhilosophy}"
   },
   "weeks": [
     {
@@ -400,51 +415,37 @@ Return valid JSON plan structure with this EXACT format - NO VARIATIONS:
       "phase": "Build",
       "workouts": [
         {
-          "day": "Use actual day from workoutDays",
-          "type": "Use discipline (Swim, Cycling, Running, Strength)",
-          "duration": "Use user's duration preferences",
-          "warmup": "Use appropriate warmup for discipline and intensity",
-          "main": "Use calculated training zones and user's performance numbers",
-          "cooldown": "Use appropriate cooldown for discipline",
-          "notes": "Include coaching explanations and reasoning"
+          "day": "Monday",
+          "type": "Swimming",
+          "duration": "${userContext.responses.weekdayDuration}",
+          "warmup": "200m easy freestyle",
+          "main": "Use user's exact swim pace: ${userContext.baseline.performanceNumbers.swimPace100} per 100m for intervals",
+          "cooldown": "200m easy freestyle",
+          "notes": "Focus on technique at your specific pace"
         }
+        // ... ADD EXACTLY ${expectedWorkoutsPerWeek} WORKOUTS FOR THIS WEEK
+        // ... USE DAYS: ${workoutDays}
+        // ... EACH DAY MUST HAVE A WORKOUT (swim, bike, run, strength, or brick)
       ]
     }
+    // ... ADD EXACTLY 3 MORE WEEKS WITH ${expectedWorkoutsPerWeek} WORKOUTS EACH
   ]
 }
 
-CRITICAL: You MUST return this EXACT structure. The plan object MUST contain all fields listed above. The weeks array MUST contain 4 weeks with ${expectedWorkoutsPerWeek} workouts each. NO FALLBACKS - if you cannot generate this structure, the plan will be rejected.
-    "level": "Use userContext.baseline.disciplineFitness to determine level",
-    "goal": "Use userContext.responses.distance (sprint, olympic, 70.3, ironman)",
-    "status": "active",
-    "currentWeek": 0,
-    "createdDate": "Use current date",
-    "totalWorkouts": "Calculate from weeks array",
-    "disciplines": ["swimming", "cycling", "running", "strength"],
-    "isIntegrated": true,
-    "phase": "Use training phase based on progression",
-    "phaseDescription": "Use phase-appropriate description",
-    "trainingPhilosophy": "Use userContext.aiAnalysis.trainingPhilosophy"
-  },
-  "weeks": [
-    {
-      "weekNumber": 1,
-      "focus": "Foundation",
-      "phase": "Build",
-      "workouts": [
-        {
-          "day": "Use actual day from workoutDays",
-          "type": "Use discipline (Swim, Cycling, Running, Strength)",
-          "duration": "Use user's duration preferences",
-          "warmup": "Use appropriate warmup for discipline and intensity",
-          "main": "Use calculated training zones and user's performance numbers",
-          "cooldown": "Use appropriate cooldown for discipline",
-          "notes": "Include coaching explanations and reasoning"
-        }
-      ]
-    }
-  ]
-}`
+MANDATORY REQUIREMENTS:
+1. Use user's EXACT FTP: ${userContext.baseline.performanceNumbers.ftp}W for cycling workouts
+2. Use user's EXACT 5K pace: ${userContext.baseline.performanceNumbers.fiveK} for running workouts
+3. Use user's EXACT swim pace: ${userContext.baseline.performanceNumbers.swimPace100} per 100m for swimming workouts
+4. Use user's EXACT duration preferences: ${userContext.responses.weekdayDuration} weekdays, ${userContext.responses.weekendDuration} weekends
+5. Use user's EXACT training frequency: ${expectedWorkoutsPerWeek} workouts per week
+6. Use user's EXACT training philosophy: ${userContext.aiAnalysis.trainingPhilosophy}
+
+NO GENERIC DESCRIPTIONS - USE EXACT NUMBERS:
+- Never say "Zone 4 threshold pace" - use their exact pace
+- Never say "moderate intensity" - use their exact power/pace
+- Never say "easy pace" - use their exact easy pace
+
+If you cannot use the user's exact data, the plan will be rejected.`
         },
         {
           role: 'user',
