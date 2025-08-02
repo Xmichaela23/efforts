@@ -239,6 +239,87 @@ const CLIMATE_OPTIONS = [
   'High altitude'
 ];
 
+// Event-based training recommendations
+const getEventBasedRecommendations = (distance: string) => {
+  switch (distance) {
+    case 'sprint':
+      return {
+        frequency: {
+          recommended: ['3-days', '4-days'],
+          possible: ['3-days', '4-days', '5-days'],
+          description: 'Sprint distance (750m swim, 20km bike, 5km run) - shorter, higher intensity'
+        },
+        volume: {
+          weekly: '4-6 hours',
+          weekday: '30-45 minutes',
+          weekend: '1-2 hours',
+          description: 'Focus on speed and technique over endurance'
+        },
+        explanation: 'Sprint triathlons are high-intensity events lasting 1-1.5 hours. Training focuses on speed, technique, and race-specific fitness rather than pure endurance.'
+      };
+    case 'olympic':
+      return {
+        frequency: {
+          recommended: ['4-days', '5-days'],
+          possible: ['4-days', '5-days', '6-days'],
+          description: 'Olympic distance (1.5km swim, 40km bike, 10km run) - balanced endurance and speed'
+        },
+        volume: {
+          weekly: '6-10 hours',
+          weekday: '45-60 minutes',
+          weekend: '2-3 hours',
+          description: 'Balance endurance building with speed work'
+        },
+        explanation: 'Olympic distance (2-3 hours) requires both endurance and speed. Training balances longer aerobic sessions with high-intensity intervals.'
+      };
+    case '70.3':
+      return {
+        frequency: {
+          recommended: ['5-days', '6-days'],
+          possible: ['5-days', '6-days', '7-days'],
+          description: '70.3 distance (1.9km swim, 90km bike, 21.1km run) - endurance focused'
+        },
+        volume: {
+          weekly: '8-12 hours',
+          weekday: '60-90 minutes',
+          weekend: '3-4 hours',
+          description: 'Emphasis on building endurance and bike/run volume'
+        },
+        explanation: '70.3 distance (4-6 hours) is primarily an endurance event. Training emphasizes long aerobic sessions with strategic intensity work.'
+      };
+    case 'ironman':
+      return {
+        frequency: {
+          recommended: ['6-days', '7-days'],
+          possible: ['6-days', '7-days'],
+          description: 'Ironman distance (3.8km swim, 180km bike, 42.2km run) - maximum endurance'
+        },
+        volume: {
+          weekly: '12-18 hours',
+          weekday: '90-plus minutes',
+          weekend: '4-plus hours',
+          description: 'Maximum endurance focus with long sessions'
+        },
+        explanation: 'Ironman distance (8-17 hours) is the ultimate endurance challenge. Training requires high volume with careful recovery management.'
+      };
+    default:
+      return {
+        frequency: {
+          recommended: ['4-days', '5-days'],
+          possible: ['3-days', '4-days', '5-days', '6-days', '7-days'],
+          description: 'General triathlon training'
+        },
+        volume: {
+          weekly: '6-10 hours',
+          weekday: '45-60 minutes',
+          weekend: '2-3 hours',
+          description: 'Balanced approach'
+        },
+        explanation: 'Choose based on your experience and available time.'
+      };
+  }
+};
+
 export default function AIPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
@@ -1350,15 +1431,18 @@ Return a valid JSON plan structure.`;
         );
 
       case 4:
+        const eventRecs = getEventBasedRecommendations(responses.distance);
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How many days per week can you train?</div>
             <div className="text-sm text-gray-600 mb-4">
-              {responses.distance === 'ironman' && 'Most Ironman athletes train 6 days per week'}
-              {responses.distance === '70.3' && 'Most 70.3 athletes train 5-6 days per week'}
-              {responses.distance === 'olympic' && 'Most Olympic athletes train 4-5 days per week'}
-              {responses.distance === 'sprint' && 'Most Sprint athletes train 3-4 days per week'}
-              {!responses.distance && 'Training frequency varies by race distance and current fitness'}
+              {eventRecs.frequency.description}
+            </div>
+            
+            <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400">
+              <div className="text-sm text-blue-800">
+                <strong>Event-Specific Guidance:</strong> {eventRecs.explanation}
+              </div>
             </div>
             
             {insights && (
@@ -1373,22 +1457,45 @@ Return a valid JSON plan structure.`;
             )}
             
             <div className="space-y-3 mb-6">
-              {TRAINING_FREQUENCY_OPTIONS.map((option) => (
-                <button
-                  key={option.key}
-                  onClick={() => updateResponse('trainingFrequency', option.key)}
-                  className={`w-full p-3 text-left transition-colors ${
-                    responses.trainingFrequency === option.key
-                      ? 'bg-gray-200 text-black'
-                      : 'bg-transparent text-black hover:bg-gray-100'
-                  }`}
-                >
-                  {option.label}
-                  {option.key === recommendedFrequency && (
-                    <span className="ml-2 text-xs bg-green-100 text-green-800 px-2 py-1">Recommended</span>
-                  )}
-                </button>
-              ))}
+              {TRAINING_FREQUENCY_OPTIONS.map((option) => {
+                const isRecommended = eventRecs.frequency.recommended.includes(option.key);
+                const isPossible = eventRecs.frequency.possible.includes(option.key);
+                const isDisabled = !isPossible;
+                
+                return (
+                  <button
+                    key={option.key}
+                    onClick={() => !isDisabled && updateResponse('trainingFrequency', option.key)}
+                    disabled={isDisabled}
+                    className={`w-full p-3 text-left transition-colors ${
+                      responses.trainingFrequency === option.key
+                        ? 'bg-gray-200 text-black'
+                        : isDisabled
+                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="flex justify-between items-center">
+                      <span>{option.label}</span>
+                      <div className="flex gap-2">
+                        {isRecommended && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                        )}
+                        {!isPossible && (
+                          <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Not suitable</span>
+                        )}
+                      </div>
+                    </div>
+                    {isDisabled && (
+                      <div className="text-xs text-gray-500 mt-1">
+                        {option.key === '3-days' && 'Too few days for this distance'}
+                        {option.key === '7-days' && responses.distance === 'sprint' && 'Too many days for sprint distance'}
+                        {option.key === '7-days' && responses.distance === 'olympic' && 'Consider 6 days for better recovery'}
+                      </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex gap-3">
@@ -1410,10 +1517,19 @@ Return a valid JSON plan structure.`;
         );
 
       case 5:
+        const durationRecs = getEventBasedRecommendations(responses.distance);
         return (
           <div>
             <div className="mb-4 text-gray-800 font-medium">How much time do you have for training sessions?</div>
             <div className="text-sm text-gray-600 mb-4">Long sessions (longer rides and runs) important for endurance</div>
+            
+            <div className="mb-4 p-3 bg-blue-50 border-l-4 border-blue-400">
+              <div className="text-sm text-blue-800">
+                <strong>Event-Specific Volume:</strong> {durationRecs.volume.description}
+                <br />
+                <strong>Weekly Target:</strong> {durationRecs.volume.weekly}
+              </div>
+            </div>
             
             {insights && insights.totalHours !== undefined && (
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
@@ -1428,38 +1544,58 @@ Return a valid JSON plan structure.`;
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Focused training sessions (weekdays):</div>
               <div className="space-y-2 mb-4">
-                {WEEKDAY_DURATION_OPTIONS && WEEKDAY_DURATION_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('weekdayDuration', option.key)}
-                    className={`w-full p-3 text-left transition-colors ${
-                      responses.weekdayDuration === option.key
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-transparent text-black hover:bg-gray-100'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                {WEEKDAY_DURATION_OPTIONS && WEEKDAY_DURATION_OPTIONS.map((option) => {
+                  const isRecommended = durationRecs.volume.weekday.includes(option.key);
+                  const isPossible = true; // All weekday options are possible
+                  
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => updateResponse('weekdayDuration', option.key)}
+                      className={`w-full p-3 text-left transition-colors ${
+                        responses.weekdayDuration === option.key
+                          ? 'bg-gray-200 text-black'
+                          : 'bg-transparent text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span>{option.label}</span>
+                        {isRecommended && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
             <div className="mb-6">
               <div className="text-sm text-gray-600 mb-3">Long sessions (longer rides and runs):</div>
               <div className="space-y-2">
-                {WEEKEND_DURATION_OPTIONS && WEEKEND_DURATION_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('weekendDuration', option.key)}
-                    className={`w-full p-3 text-left transition-colors ${
-                      responses.weekendDuration === option.key
-                        ? 'bg-gray-200 text-black'
-                        : 'bg-transparent text-black hover:bg-gray-100'
-                    }`}
-                  >
-                    {option.label}
-                  </button>
-                ))}
+                {WEEKEND_DURATION_OPTIONS && WEEKEND_DURATION_OPTIONS.map((option) => {
+                  const isRecommended = durationRecs.volume.weekend.includes(option.key);
+                  const isPossible = true; // All weekend options are possible
+                  
+                  return (
+                    <button
+                      key={option.key}
+                      onClick={() => updateResponse('weekendDuration', option.key)}
+                      className={`w-full p-3 text-left transition-colors ${
+                        responses.weekendDuration === option.key
+                          ? 'bg-gray-200 text-black'
+                          : 'bg-transparent text-black hover:bg-gray-100'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center">
+                        <span>{option.label}</span>
+                        {isRecommended && (
+                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
