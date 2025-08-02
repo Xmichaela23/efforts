@@ -1098,7 +1098,14 @@ Return a valid JSON plan structure.`;
   // Removed auto-generation to prevent empty assessment data from reaching AI
 
   const getCurrentStepContent = () => {
-    const insights = getBaselineInsights();
+    // Safely get insights - don't crash the UI if baselines aren't loaded yet
+    let insights = null;
+    try {
+      insights = getBaselineInsights();
+    } catch (error) {
+      console.log('Baseline insights not available yet:', error.message);
+    }
+    
     const timelineValidation = responses.distance && responses.timeline ? 
       validateTimeline(responses.distance, responses.timeline) : null;
     const recommendedTimeline = responses.distance ? 
