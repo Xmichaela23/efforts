@@ -434,19 +434,17 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     const ai = aiResponse.intensityDistribution;
     console.log('🔍 Raw intensityDistribution from AI:', ai);
     
-    // More flexible parsing for intensity distribution
+    // More flexible parsing for intensity distribution - NO FALLBACKS
     const intensityDistribution = {
-      easy: Number(ai.easy) || Number(ai.threshold) || Number(ai.zone1) || Number(ai.zone2) || 60,
-      moderate: Number(ai.moderate) || Number(ai.tempo) || Number(ai.zone3) || 25,
-      hard: Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5) || 15
+      easy: Number(ai.easy) || Number(ai.threshold) || Number(ai.zone1) || Number(ai.zone2) || 0,
+      moderate: Number(ai.moderate) || Number(ai.tempo) || Number(ai.zone3) || 0,
+      hard: Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5) || 0
     } as { easy: number; moderate: number; hard: number };
     
-    // Validate intensity distribution - use defaults if missing
+    // Validate intensity distribution - NO FALLBACKS
     if (!intensityDistribution.easy || !intensityDistribution.moderate || !intensityDistribution.hard) {
-      console.log('⚠️ Using default intensity distribution values');
-      intensityDistribution.easy = intensityDistribution.easy || 60;
-      intensityDistribution.moderate = intensityDistribution.moderate || 25;
-      intensityDistribution.hard = intensityDistribution.hard || 15;
+      console.log('❌ Invalid intensity distribution:', intensityDistribution);
+      throw new Error('AI analysis provided incomplete intensityDistribution data');
     }
     
     // Transform strength approach - NO DEFAULTS
