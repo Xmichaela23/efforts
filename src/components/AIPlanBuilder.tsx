@@ -1807,6 +1807,26 @@ Return a valid JSON plan structure.`;
                                     {workout.notes}
                                   </div>
                                 )}
+                                
+                                {/* Strength Exercises */}
+                                {workout.type === 'Strength' && workout.exercises && workout.exercises.length > 0 && (
+                                  <div className="mt-3">
+                                    <div className="font-medium text-gray-700 mb-2">Exercises:</div>
+                                    <div className="space-y-2">
+                                      {workout.exercises.map((exercise: any, index: number) => (
+                                        <div key={index} className="bg-gray-50 p-2 rounded">
+                                          <div className="font-medium text-gray-800">{exercise.name}</div>
+                                          <div className="text-sm text-gray-600">
+                                            {exercise.sets} sets × {exercise.reps} reps
+                                          </div>
+                                          <div className="text-sm text-gray-700 font-medium">
+                                            {exercise.weight}
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           ))}
