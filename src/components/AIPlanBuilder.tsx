@@ -141,8 +141,8 @@ const LONG_SESSION_PREFERENCES = [
 
 // Update training philosophy options to use only text
 const TRAINING_PHILOSOPHY_OPTIONS = [
-  { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
   { key: 'pyramid', label: <><FaChartArea className="inline mr-2" />PYRAMIDAL (weekly intensity progression)</> },
+  { key: 'polarized', label: <><FaRoad className="inline mr-2" />POLARIZED (80% easy, 20% hard)</> },
   { key: 'threshold', label: <><FaTachometerAlt className="inline mr-2" />THRESHOLD (40% moderate, 40% easy, 20% hard)</> },
 ];
 
@@ -1543,29 +1543,6 @@ Return a valid JSON plan structure.`;
             
             <div className="space-y-4 mb-6">
               <div
-                onClick={() => updateResponse('trainingPhilosophy', 'polarized')}
-                className={`w-full p-4 cursor-pointer transition-colors border rounded-lg ${
-                  responses.trainingPhilosophy === 'polarized'
-                    ? 'bg-gray-200 border-gray-400'
-                    : 'bg-transparent hover:bg-gray-50 border-gray-200'
-                }`}
-              >
-                <div className="font-medium mb-2 flex items-center">
-                  <FaRoad className="inline mr-2" />
-                  POLARIZED (Mostly easy with some very hard)
-                </div>
-                <div className="text-sm text-gray-600 mb-2">
-                  80% of your training is easy, 20% is very hard - no middle ground
-                </div>
-                <div className="text-sm text-gray-500">
-                  <strong>Best for:</strong> Anyone training for endurance events
-                </div>
-                <div className="text-sm text-gray-500">
-                  <strong>Why choose this:</strong> The most common approach used by coaches. Simple - either easy or hard, nothing in between
-                </div>
-              </div>
-
-              <div
                 onClick={() => updateResponse('trainingPhilosophy', 'pyramid')}
                 className={`w-full p-4 cursor-pointer transition-colors border rounded-lg ${
                   responses.trainingPhilosophy === 'pyramid'
@@ -1585,6 +1562,29 @@ Return a valid JSON plan structure.`;
                 </div>
                 <div className="text-sm text-gray-500">
                   <strong>Why choose this:</strong> Designed to peak your weekly training mid-week, allowing more time for recovery. You may see a pyramid-style week leading up to a race in other training philosophies
+                </div>
+              </div>
+
+              <div
+                onClick={() => updateResponse('trainingPhilosophy', 'polarized')}
+                className={`w-full p-4 cursor-pointer transition-colors border rounded-lg ${
+                  responses.trainingPhilosophy === 'polarized'
+                    ? 'bg-gray-200 border-gray-400'
+                    : 'bg-transparent hover:bg-gray-50 border-gray-200'
+                }`}
+              >
+                <div className="font-medium mb-2 flex items-center">
+                  <FaRoad className="inline mr-2" />
+                  POLARIZED (Mostly easy with some very hard)
+                </div>
+                <div className="text-sm text-gray-600 mb-2">
+                  80% of your training is easy, 20% is very hard - no middle ground
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Best for:</strong> Anyone training for endurance events
+                </div>
+                <div className="text-sm text-gray-500">
+                  <strong>Why choose this:</strong> The most common approach used by coaches. Simple - either easy or hard, nothing in between
                 </div>
               </div>
 
