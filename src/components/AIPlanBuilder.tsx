@@ -653,19 +653,36 @@ export default function AIPlanBuilder() {
 
 User has selected: ${userData.distance} distance, ${userData.trainingPhilosophy} training philosophy.
 
-CRITICAL: Use their specific baseline performance numbers for all workouts:
+CRITICAL: Use their specific baseline performance numbers and understand training zones:
 
 ${userData.baseline?.performanceNumbers ? `
-PERFORMANCE NUMBERS TO USE:
-- FTP: ${userData.baseline.performanceNumbers.ftp}W
-- 5K Pace: ${userData.baseline.performanceNumbers.fiveK}
-- Easy Pace: ${userData.baseline.performanceNumbers.easyPace}
-- Swim 100m: ${userData.baseline.performanceNumbers.swimPace100}
+PERFORMANCE NUMBERS AND TRAINING ZONES:
+- FTP: ${userData.baseline.performanceNumbers.ftp}W (Zone 4 threshold)
+- 5K Pace: ${userData.baseline.performanceNumbers.fiveK} (Zone 4 threshold - HARD pace)
+- Easy Pace: ${userData.baseline.performanceNumbers.easyPace} (Zone 2 - CONVERSATIONAL pace)
+- Swim 100m: ${userData.baseline.performanceNumbers.swimPace100} (Zone 4 threshold)
 - Squat 1RM: ${userData.baseline.performanceNumbers.squat}lbs
 - Bench 1RM: ${userData.baseline.performanceNumbers.bench}lbs
 - Deadlift 1RM: ${userData.baseline.performanceNumbers.deadlift}lbs
 
-USE THESE EXACT NUMBERS in your workout descriptions.` : 'No performance numbers available.'}
+PERSONALIZED TRAINING CONTEXT:
+- Current Training Volume: ${userData.baseline?.totalHours || 'Unknown'} hours/week
+- Training Background: ${userData.baseline?.trainingBackground || 'Unknown'}
+- Age: ${userData.baseline?.age || 'Unknown'} years old
+- Injury History: ${userData.baseline?.injuryHistory || 'None'}
+
+TRAINING ZONE UNDERSTANDING FOR THIS ATHLETE:
+- Zone 2 (Easy): Use their easy pace (${userData.baseline?.performanceNumbers?.easyPace}) - conversational, can talk easily
+- Zone 4 (Threshold): Use their 5K pace (${userData.baseline?.performanceNumbers?.fiveK}) - hard but sustainable for 20-30 minutes
+- Zone 5 (VO2 Max): Faster than their 5K pace - very hard, 3-8 minute intervals
+- FTP (Cycling): Use their actual FTP (${userData.baseline?.performanceNumbers?.ftp}W) for threshold work
+
+CREATE WORKOUTS SPECIFIC TO THIS ATHLETE'S:
+- Current fitness level (${userData.baseline?.disciplineFitness?.running || 'Unknown'} running, ${userData.baseline?.disciplineFitness?.cycling || 'Unknown'} cycling)
+- Available equipment (${userData.baseline?.equipment?.strength?.join(', ') || 'None'} for strength)
+- Injury considerations (${userData.baseline?.injuryHistory || 'None'})
+
+USE THESE EXACT NUMBERS AND THEIR SPECIFIC CONTEXT in your workout descriptions.` : 'No performance numbers available.'}
 
 Generate a 4-week plan with 7 days per week, using their specific baseline data and preferences.
 

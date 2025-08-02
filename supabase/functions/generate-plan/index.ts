@@ -121,7 +121,13 @@ HOW TO CREATE PERSONALIZED PLANS:
    - Use their strength training choice to include appropriate strength work
    - Use their course details to include specific training adaptations
 
-5. USE ACTUAL NUMBERS: Always use their specific baseline data for pace targets, FTP percentages, and strength weights. Never use generic descriptions.
+5. USE ACTUAL NUMBERS AND STRUCTURE WORKOUTS PROPERLY:
+   - Always use their specific baseline data for pace targets, FTP percentages, and strength weights
+   - Never use generic descriptions like "focus on form" or "moderate intensity"
+   - For strength workouts: Include specific exercises, sets, reps, and weights (e.g., "3x5 squats at 70% of 225lbs 1RM")
+   - For running: Use their actual paces and create structured intervals (e.g., "6x400m at 8:30/mile pace with 90s rest")
+   - For cycling: Use their actual FTP and create structured intervals (e.g., "3x8 minutes at 90% of 220W FTP with 4 minutes easy spin")
+   - For swimming: Use their actual swim pace and create structured sets (e.g., "8x100m at 1:45 pace with 30s rest")
 
 6. WORKOUT DISTRIBUTION RULES:
    - If aiAnalysis.strengthFocus exists: Include 1-2 strength workouts per week
