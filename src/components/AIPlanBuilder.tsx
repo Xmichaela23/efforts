@@ -600,7 +600,7 @@ export default function AIPlanBuilder() {
   }, [baselines]);
 
   // Build comprehensive prompt from responses
-  const buildPlanPrompt = () => {
+  const buildPlanPrompt = (aiAnalysis: any) => {
     const insights = getBaselineInsights();
     
     // Build structured user data instead of massive prompt
@@ -651,6 +651,17 @@ AI ANALYSIS RESULTS (MANDATORY TO USE):
 - Strength Approach: userContext.aiAnalysis.strengthFocus
 - Recovery Emphasis: userContext.aiAnalysis.recoveryNeeds
 - Focus Areas: userContext.aiAnalysis.focusAreas
+
+EXPLICIT ANALYSIS VALUES (USE THESE EXACT VALUES):
+- Training Philosophy: ${aiAnalysis?.trainingPhilosophy || 'NOT PROVIDED'}
+- Weekly Volume: ${JSON.stringify(aiAnalysis?.weeklyVolume || 'NOT PROVIDED')}
+- Intensity Distribution: ${JSON.stringify(aiAnalysis?.intensityDistribution || 'NOT PROVIDED')}
+- Progression Type: ${aiAnalysis?.progressionType || 'NOT PROVIDED'}
+- Strength Focus: ${aiAnalysis?.strengthFocus || 'NOT PROVIDED'}
+- Recovery Needs: ${aiAnalysis?.recoveryNeeds || 'NOT PROVIDED'}
+- Focus Areas: ${JSON.stringify(aiAnalysis?.focusAreas || 'NOT PROVIDED')}
+
+MANDATORY: Use the training philosophy "${aiAnalysis?.trainingPhilosophy || 'NOT PROVIDED'}" for this plan. Do not change this value.
 
 User has selected: ${userData.distance} distance, ${userData.trainingPhilosophy} training philosophy.
 
@@ -808,7 +819,7 @@ Return a valid JSON plan structure.`;
       }
       
       // Step 2: AI Plan Generation - use Edge Function to generate unique plan
-      const { prompt, userData } = buildPlanPrompt();
+      const { prompt, userData } = buildPlanPrompt(aiAnalysis);
       const startDate = new Date().toISOString().split('T')[0];
       const userContext = {
         ...userData,

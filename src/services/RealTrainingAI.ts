@@ -222,6 +222,7 @@ export class RealTrainingAI {
     }
     
     const trainingFrequency = userResponses.trainingFrequency;
+    const trainingPhilosophy = userResponses.trainingPhilosophy;
     const goals = userResponses.goals || [];
     
     // Safely access baseline data (validation already done above)
@@ -258,6 +259,7 @@ COMPLETE USER PROFILE MAPPING:
 - Running Course Profile: ${userResponses.runningCourseProfile || 'Not specified'}
 - Climate: ${userResponses.climate || 'Not specified'}
 - Strength Training Choice: ${strengthChoice || 'Not specified'}
+- Training Philosophy Choice: ${trainingPhilosophy || 'Not specified'}
 - Timeline: ${timeline} weeks
 - Event Type: ${eventType}
 - Training Frequency: ${trainingFrequency || 'Not specified'}
