@@ -835,9 +835,9 @@ Return a valid JSON plan structure.`;
       console.log('🎯 setGeneratedPlan called - plan should now be set');
       setCurrentWeek(0); // Reset to first week
       
-      // Advance to step 8 to show the plan
-      console.log('🎯 Advancing to step 8 to show the plan...');
-      setStep(8);
+      // Advance to step 7 to show the plan
+      console.log('🎯 Advancing to step 7 to show the plan...');
+      setStep(7);
       
     } catch (error) {
       console.error('❌ Error generating plan:', error);
