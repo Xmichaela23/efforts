@@ -130,6 +130,19 @@ const TRAINING_PHILOSOPHY_OPTIONS = [
   { key: 'threshold', label: <><FaTachometerAlt className="inline mr-2" />THRESHOLD (40% moderate, 40% easy, 20% hard)</> },
 ];
 
+const STRENGTH_FREQUENCY_OPTIONS = [
+  { 
+    key: '2x-week', 
+    label: '2x/week minimum (standard triathlon integration)',
+    explanation: 'One strength session every 3-4 days. Supports endurance without competing for time. Focus on injury prevention, core stability, and basic strength. 45-60 minutes per session.'
+  },
+  { 
+    key: '3x-week', 
+    label: '3x/week with double sessions (strength-focused approach)',
+    explanation: 'Strength 3x/week, some days will have 2 workouts. More strength development and faster progress. Focus on power development, muscle building, and advanced movements. 45-60 minutes per session + double session days.'
+  },
+];
+
 // Separate course detail options for different disciplines
 const RUNNING_COURSE_OPTIONS = {
   elevationGain: [
@@ -239,7 +252,7 @@ const CLIMATE_OPTIONS = [
   'High altitude'
 ];
 
-// Event-based training recommendations
+// Event-based training recommendations with smart gating
 const getEventBasedRecommendations = (distance: string) => {
   switch (distance) {
     case 'sprint':
@@ -247,73 +260,118 @@ const getEventBasedRecommendations = (distance: string) => {
         frequency: {
           recommended: ['3-days', '4-days'],
           possible: ['3-days', '4-days', '5-days'],
-          description: 'Sprint distance (750m swim, 20km bike, 5km run) - shorter, higher intensity'
+          description: 'Sprint distance (750m swim, 20km bike, 5km run) - shorter, higher intensity',
+          explanation: 'Sprint events are high-intensity and short duration (1-1.5 hours). Training focuses on speed, technique, and race-specific fitness rather than pure endurance. 3-4 days per week is optimal for quality over quantity.'
         },
         volume: {
           weekly: '4-6 hours',
-          weekday: '30-45 minutes',
-          weekend: '1-2 hours',
-          description: 'Focus on speed and technique over endurance'
+          weekday: ['30-45', '45-60'],
+          weekend: ['1-2-hours', '2-3-hours'],
+          description: 'Focus on speed and technique over endurance',
+          explanation: 'Sprint training emphasizes quality over quantity. Weekday sessions (30-60 minutes) focus on speed work and technique. Weekend sessions (1-3 hours) build race-specific endurance without overtraining.'
         },
-        explanation: 'Sprint triathlons are high-intensity events lasting 1-1.5 hours. Training focuses on speed, technique, and race-specific fitness rather than pure endurance.'
+        gating: {
+          minDays: 3,
+          maxDays: 5,
+          minHours: 4,
+          maxHours: 6,
+          reason: 'Sprint events require focused, high-intensity training rather than high volume.'
+        },
+        explanation: 'Sprint triathlons are high-intensity events lasting 1-1.5 hours. Training focuses on speed, technique, and race-specific fitness rather than pure endurance. This approach maximizes performance while preventing overtraining.'
       };
     case 'olympic':
       return {
         frequency: {
           recommended: ['4-days', '5-days'],
           possible: ['4-days', '5-days', '6-days'],
-          description: 'Olympic distance (1.5km swim, 40km bike, 10km run) - balanced endurance and speed'
+          description: 'Olympic distance (1.5km swim, 40km bike, 10km run) - balanced endurance and speed',
+          explanation: 'Olympic distance requires both endurance and speed over 2-3 hours. 4-5 days per week provides enough volume for endurance development while allowing adequate recovery for quality sessions.'
         },
         volume: {
           weekly: '6-10 hours',
-          weekday: '45-60 minutes',
-          weekend: '2-3 hours',
-          description: 'Balance endurance building with speed work'
+          weekday: ['45-60', '60-90'],
+          weekend: ['2-3-hours', '3-4-hours'],
+          description: 'Balance endurance building with speed work',
+          explanation: 'Olympic training balances endurance and speed. Weekday sessions (45-90 minutes) include both endurance and intensity work. Weekend sessions (2-4 hours) build aerobic capacity and race-specific endurance.'
         },
-        explanation: 'Olympic distance (2-3 hours) requires both endurance and speed. Training balances longer aerobic sessions with high-intensity intervals.'
+        gating: {
+          minDays: 4,
+          maxDays: 6,
+          minHours: 6,
+          maxHours: 10,
+          reason: 'Olympic distance requires balanced endurance and speed development.'
+        },
+        explanation: 'Olympic distance (2-3 hours) requires both endurance and speed. Training balances longer aerobic sessions with high-intensity intervals. This approach develops the aerobic base needed for the duration while maintaining the speed required for performance.'
       };
     case '70.3':
       return {
         frequency: {
           recommended: ['5-days', '6-days'],
           possible: ['5-days', '6-days', '7-days'],
-          description: '70.3 distance (1.9km swim, 90km bike, 21.1km run) - endurance focused'
+          description: '70.3 distance (1.9km swim, 90km bike, 21.1km run) - endurance focused',
+          explanation: '70.3 events are primarily endurance challenges lasting 4-6 hours. 5-6 days per week provides the volume needed for endurance development while maintaining training quality.'
         },
         volume: {
           weekly: '8-12 hours',
-          weekday: '60-90 minutes',
-          weekend: '3-4 hours',
-          description: 'Emphasis on building endurance and bike/run volume'
+          weekday: ['60-90', '90-plus'],
+          weekend: ['3-4-hours', '4-plus-hours'],
+          description: 'Emphasis on building endurance and bike/run volume',
+          explanation: '70.3 training emphasizes endurance development. Weekday sessions (60+ minutes) build aerobic capacity and technique. Weekend sessions (3+ hours) develop the endurance needed for the long bike and run legs.'
         },
-        explanation: '70.3 distance (4-6 hours) is primarily an endurance event. Training emphasizes long aerobic sessions with strategic intensity work.'
+        gating: {
+          minDays: 5,
+          maxDays: 7,
+          minHours: 8,
+          maxHours: 12,
+          reason: '70.3 distance requires significant endurance volume and consistent training.'
+        },
+        explanation: '70.3 distance (4-6 hours) is primarily an endurance event. Training emphasizes long aerobic sessions with strategic intensity work. This approach builds the aerobic capacity and muscular endurance needed to complete the distance efficiently.'
       };
     case 'ironman':
       return {
         frequency: {
           recommended: ['6-days', '7-days'],
           possible: ['6-days', '7-days'],
-          description: 'Ironman distance (3.8km swim, 180km bike, 42.2km run) - maximum endurance'
+          description: 'Ironman distance (3.8km swim, 180km bike, 42.2km run) - maximum endurance',
+          explanation: 'Ironman events are the ultimate endurance challenge lasting 8-17 hours. 6-7 days per week is required to build the volume and consistency needed for success.'
         },
         volume: {
           weekly: '12-18 hours',
-          weekday: '90-plus minutes',
-          weekend: '4-plus hours',
-          description: 'Maximum endurance focus with long sessions'
+          weekday: ['90-plus'],
+          weekend: ['4-plus-hours'],
+          description: 'Maximum endurance focus with long sessions',
+          explanation: 'Ironman training requires maximum volume and endurance focus. Weekday sessions (90+ minutes) build aerobic capacity and technique. Weekend sessions (4+ hours) develop the extreme endurance needed for the long bike and marathon run.'
         },
-        explanation: 'Ironman distance (8-17 hours) is the ultimate endurance challenge. Training requires high volume with careful recovery management.'
+        gating: {
+          minDays: 6,
+          maxDays: 7,
+          minHours: 12,
+          maxHours: 18,
+          reason: 'Ironman distance requires maximum training volume and daily consistency.'
+        },
+        explanation: 'Ironman distance (8-17 hours) is the ultimate endurance challenge. Training requires high volume with careful recovery management. This approach builds the extreme aerobic capacity and muscular endurance needed to complete the full distance.'
       };
     default:
       return {
         frequency: {
           recommended: ['4-days', '5-days'],
           possible: ['3-days', '4-days', '5-days', '6-days', '7-days'],
-          description: 'General triathlon training'
+          description: 'General triathlon training',
+          explanation: 'Choose based on your experience and available time.'
         },
         volume: {
           weekly: '6-10 hours',
-          weekday: '45-60 minutes',
-          weekend: '2-3 hours',
-          description: 'Balanced approach'
+          weekday: ['45-60', '60-90'],
+          weekend: ['2-3-hours', '3-4-hours'],
+          description: 'Balanced approach',
+          explanation: 'General triathlon training balances endurance and speed development.'
+        },
+        gating: {
+          minDays: 3,
+          maxDays: 7,
+          minHours: 4,
+          maxHours: 18,
+          reason: 'General training allows flexibility based on experience and goals.'
         },
         explanation: 'Choose based on your experience and available time.'
       };
@@ -390,7 +448,10 @@ export default function AIPlanBuilder() {
     // Question 6: Training Philosophy
     trainingPhilosophy: '',
 
-    // Question 7: Goals
+    // Question 7: Strength Frequency
+    strengthFrequency: '',
+
+    // Question 8: Goals
     goals: [] as string[],
   });
 
@@ -675,6 +736,7 @@ export default function AIPlanBuilder() {
       trainingPhilosophy: responses.trainingPhilosophy,
       goals: responses.goals,
       strengthTraining: responses.strengthTraining,
+      strengthFrequency: responses.strengthFrequency,
       trainingFrequency: responses.trainingFrequency,
       weekendAvailability: responses.weekendAvailability,
       longSessionPreference: responses.longSessionPreference,
@@ -793,7 +855,8 @@ Return a valid JSON plan structure.`;
       'timeline', 
       'trainingPhilosophy',
       'trainingFrequency',
-      'strengthTraining'
+      'strengthTraining',
+      'strengthFrequency'
     ];
     
     const missingAssessmentFields = requiredAssessmentFields.filter(field => !responses[field]);
@@ -1488,9 +1551,13 @@ Return a valid JSON plan structure.`;
                     </div>
                     {isDisabled && (
                       <div className="text-xs text-gray-500 mt-1">
-                        {option.key === '3-days' && 'Too few days for this distance'}
+                        {option.key === '3-days' && responses.distance === 'olympic' && 'Too few days for Olympic distance'}
+                        {option.key === '3-days' && responses.distance === '70.3' && 'Too few days for 70.3 distance'}
+                        {option.key === '3-days' && responses.distance === 'ironman' && 'Too few days for Ironman distance'}
+                        {option.key === '4-days' && responses.distance === '70.3' && 'Too few days for 70.3 distance'}
+                        {option.key === '4-days' && responses.distance === 'ironman' && 'Too few days for Ironman distance'}
+                        {option.key === '5-days' && responses.distance === 'ironman' && 'Too few days for Ironman distance'}
                         {option.key === '7-days' && responses.distance === 'sprint' && 'Too many days for sprint distance'}
-                        {option.key === '7-days' && responses.distance === 'olympic' && 'Consider 6 days for better recovery'}
                       </div>
                     )}
                   </button>
@@ -1546,24 +1613,43 @@ Return a valid JSON plan structure.`;
               <div className="space-y-2 mb-4">
                 {WEEKDAY_DURATION_OPTIONS && WEEKDAY_DURATION_OPTIONS.map((option) => {
                   const isRecommended = durationRecs.volume.weekday.includes(option.key);
-                  const isPossible = true; // All weekday options are possible
+                  const isPossible = durationRecs.volume.weekday.includes(option.key);
+                  const isDisabled = !isPossible;
                   
                   return (
                     <button
                       key={option.key}
-                      onClick={() => updateResponse('weekdayDuration', option.key)}
+                      onClick={() => !isDisabled && updateResponse('weekdayDuration', option.key)}
+                      disabled={isDisabled}
                       className={`w-full p-3 text-left transition-colors ${
                         responses.weekdayDuration === option.key
                           ? 'bg-gray-200 text-black'
+                          : isDisabled
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-transparent text-black hover:bg-gray-100'
                       }`}
                     >
                       <div className="flex justify-between items-center">
                         <span>{option.label}</span>
-                        {isRecommended && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
-                        )}
+                        <div className="flex gap-2">
+                          {isRecommended && (
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                          )}
+                          {!isPossible && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Not suitable</span>
+                          )}
+                        </div>
                       </div>
+                      {isDisabled && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {option.key === '30-45' && responses.distance === 'olympic' && 'Too short for Olympic distance training'}
+                          {option.key === '30-45' && responses.distance === '70.3' && 'Too short for 70.3 distance training'}
+                          {option.key === '30-45' && responses.distance === 'ironman' && 'Too short for Ironman distance training'}
+                          {option.key === '45-60' && responses.distance === '70.3' && 'Too short for 70.3 distance training'}
+                          {option.key === '45-60' && responses.distance === 'ironman' && 'Too short for Ironman distance training'}
+                          {option.key === '60-90' && responses.distance === 'ironman' && 'Too short for Ironman distance training'}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1575,24 +1661,43 @@ Return a valid JSON plan structure.`;
               <div className="space-y-2">
                 {WEEKEND_DURATION_OPTIONS && WEEKEND_DURATION_OPTIONS.map((option) => {
                   const isRecommended = durationRecs.volume.weekend.includes(option.key);
-                  const isPossible = true; // All weekend options are possible
+                  const isPossible = durationRecs.volume.weekend.includes(option.key);
+                  const isDisabled = !isPossible;
                   
                   return (
                     <button
                       key={option.key}
-                      onClick={() => updateResponse('weekendDuration', option.key)}
+                      onClick={() => !isDisabled && updateResponse('weekendDuration', option.key)}
+                      disabled={isDisabled}
                       className={`w-full p-3 text-left transition-colors ${
                         responses.weekendDuration === option.key
                           ? 'bg-gray-200 text-black'
+                          : isDisabled
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
                           : 'bg-transparent text-black hover:bg-gray-100'
                       }`}
                     >
                       <div className="flex justify-between items-center">
                         <span>{option.label}</span>
-                        {isRecommended && (
-                          <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
-                        )}
+                        <div className="flex gap-2">
+                          {isRecommended && (
+                            <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">Recommended</span>
+                          )}
+                          {!isPossible && (
+                            <span className="text-xs bg-red-100 text-red-800 px-2 py-1 rounded">Not suitable</span>
+                          )}
+                        </div>
                       </div>
+                      {isDisabled && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {option.key === '1-2-hours' && responses.distance === 'olympic' && 'Too short for Olympic distance training'}
+                          {option.key === '1-2-hours' && responses.distance === '70.3' && 'Too short for 70.3 distance training'}
+                          {option.key === '1-2-hours' && responses.distance === 'ironman' && 'Too short for Ironman distance training'}
+                          {option.key === '2-3-hours' && responses.distance === '70.3' && 'Too short for 70.3 distance training'}
+                          {option.key === '2-3-hours' && responses.distance === 'ironman' && 'Too short for Ironman distance training'}
+                          {option.key === '3-4-hours' && responses.distance === 'ironman' && 'Too short for Ironman distance training'}
+                        </div>
+                      )}
                     </button>
                   );
                 })}
@@ -1714,9 +1819,9 @@ Return a valid JSON plan structure.`;
               <button
                 className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
                 disabled={!responses.trainingPhilosophy}
-                onClick={generatePlan}
+                onClick={() => setStep(7)}
               >
-                Generate Plan
+                Next
               </button>
               
               {/* Validation Status */}
@@ -1728,6 +1833,7 @@ Return a valid JSON plan structure.`;
                   <div>✅ Timeline: {responses.timeline || '❌ Missing'}</div>
                   <div>✅ Training Frequency: {responses.trainingFrequency || '❌ Missing'}</div>
                   <div>✅ Strength Training: {responses.strengthTraining || '❌ Missing'}</div>
+                  <div>✅ Strength Frequency: {responses.strengthFrequency || '❌ Missing'}</div>
                   <div>✅ Baseline Data: {baselines ? '✅ Complete' : '❌ Missing'}</div>
                 </div>
               </div>
@@ -1736,6 +1842,47 @@ Return a valid JSON plan structure.`;
         );
 
       case 7:
+        return (
+          <div>
+            <div className="mb-4 text-gray-800 font-medium">Strength Training Frequency:</div>
+            <div className="text-sm text-gray-600 mb-4">How often would you like to include strength training in your plan?</div>
+            
+            <div className="space-y-3 mb-6">
+              {STRENGTH_FREQUENCY_OPTIONS.map((option) => (
+                <button
+                  key={option.key}
+                  onClick={() => updateResponse('strengthFrequency', option.key)}
+                  className={`w-full p-4 text-left transition-colors border rounded-lg ${
+                    responses.strengthFrequency === option.key
+                      ? 'bg-gray-200 border-gray-400'
+                      : 'bg-transparent hover:bg-gray-50 border-gray-200'
+                  }`}
+                >
+                  <div className="font-medium mb-2">{option.label}</div>
+                  <div className="text-sm text-gray-600">{option.explanation}</div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                className="flex-1 text-gray-800 py-2 font-medium"
+                onClick={() => setStep(6)}
+              >
+                Back
+              </button>
+              <button
+                className="flex-1 bg-gray-800 text-white py-2 font-medium disabled:bg-gray-300"
+                disabled={!responses.strengthFrequency}
+                onClick={() => setStep(8)}
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        );
+
+      case 8:
         console.log('🎯 STEP 8 - Current step:', step);
         console.log('🎯 generatedPlan state:', generatedPlan);
         console.log('🎯 generatingPlan state:', generatingPlan);
