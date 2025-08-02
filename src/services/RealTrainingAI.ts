@@ -432,14 +432,18 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     }
     
     const ai = aiResponse.intensityDistribution;
+    console.log('🔍 Raw intensityDistribution from AI:', ai);
+    
+    // More flexible parsing for intensity distribution
     const intensityDistribution = {
-      easy: ai.easy || ai.threshold,
-      moderate: ai.moderate || ai.threshold,
-      hard: ai.hard || ai.vo2max
-    };
+      easy: Number(ai.easy) || Number(ai.threshold) || Number(ai.zone1) || Number(ai.zone2) || 60,
+      moderate: Number(ai.moderate) || Number(ai.tempo) || Number(ai.zone3) || 25,
+      hard: Number(ai.hard) || Number(ai.vo2max) || Number(ai.zone4) || Number(ai.zone5) || 15
+    } as { easy: number; moderate: number; hard: number };
     
     // Validate intensity distribution
     if (!intensityDistribution.easy || !intensityDistribution.moderate || !intensityDistribution.hard) {
+      console.log('❌ Invalid intensity distribution:', intensityDistribution);
       throw new Error('AI analysis provided incomplete intensityDistribution data');
     }
     
