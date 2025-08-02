@@ -648,10 +648,24 @@ export default function AIPlanBuilder() {
       } : null
     };
     
-    // Simple, clear prompt that references the structured data
+    // Detailed prompt that tells AI to use specific baseline numbers
     const prompt = `Create a personalized training plan using the provided user data.
 
 User has selected: ${userData.distance} distance, ${userData.trainingPhilosophy} training philosophy.
+
+CRITICAL: Use their specific baseline performance numbers for all workouts:
+
+${userData.baseline?.performanceNumbers ? `
+PERFORMANCE NUMBERS TO USE:
+- FTP: ${userData.baseline.performanceNumbers.ftp}W
+- 5K Pace: ${userData.baseline.performanceNumbers.fiveK}
+- Easy Pace: ${userData.baseline.performanceNumbers.easyPace}
+- Swim 100m: ${userData.baseline.performanceNumbers.swimPace100}
+- Squat 1RM: ${userData.baseline.performanceNumbers.squat}lbs
+- Bench 1RM: ${userData.baseline.performanceNumbers.bench}lbs
+- Deadlift 1RM: ${userData.baseline.performanceNumbers.deadlift}lbs
+
+USE THESE EXACT NUMBERS in your workout descriptions.` : 'No performance numbers available.'}
 
 Generate a 4-week plan with 7 days per week, using their specific baseline data and preferences.
 

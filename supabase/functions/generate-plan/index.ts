@@ -87,25 +87,49 @@ serve(async (req) => {
             ? `You are an expert exercise physiologist and training coach. Your task is to analyze user data and return ONLY a JSON object with training parameters. Do not include any text outside the JSON.`
             : `You are a training plan generator. Your task is to create personalized training plans by applying training science to user data.
 
+CRITICAL: You MUST use the AI analysis data provided in the userContext.aiAnalysis object to create the plan.
+
 HOW TO CREATE PERSONALIZED PLANS:
 
-1. USE THE USER'S DATA: Take their baseline fitness metrics (FTP, paces, strength numbers) and assessment answers (goals, timeline, preferences) and use these specific numbers to create targets.
+1. USE THE AI ANALYSIS DATA (MANDATORY):
+   - Use aiAnalysis.trainingPhilosophy to structure the plan
+   - Use aiAnalysis.focusAreas to determine workout distribution
+   - Use aiAnalysis.strengthFocus to include strength training when specified
+   - Use aiAnalysis.weeklyVolume to determine training volume
+   - Use aiAnalysis.intensityDistribution to structure workout intensities
 
-2. APPLY THE CHOSEN TRAINING PHILOSOPHY:
+2. RESPECT USER PREFERENCES (MANDATORY):
+   - If user chose "7 days per week" - create 7 workouts per week (NO REST DAYS)
+   - If aiAnalysis.strengthFocus exists - you MUST include strength training workouts
+   - If aiAnalysis.strengthFocus is "powerlifting" - include powerlifting exercises
+   - If aiAnalysis.strengthFocus is "power_development" - include explosive movements
+   - If aiAnalysis.strengthFocus is "injury_prevention" - include mobility/stability work
+   - If aiAnalysis.strengthFocus is "sport_specific" - include sport-specific strength
+   - If aiAnalysis.strengthFocus is "muscle_building" - include hypertrophy work
+   - If aiAnalysis.strengthFocus is "general_fitness" - include general strength work
+   - If user chose specific disciplines - prioritize those in aiAnalysis.focusAreas
+
+3. APPLY THE CHOSEN TRAINING PHILOSOPHY:
    - PYRAMID: Structure each workout with intensity progression (easy → moderate → hard → moderate → easy) using their specific paces/FTP
    - POLARIZED: Structure the week with 80% easy sessions and 20% hard sessions using their specific paces/FTP
    - THRESHOLD: Focus on threshold-specific workouts using their specific paces/FTP
 
-3. TRANSLATE ASSESSMENT ANSWERS INTO TRAINING DECISIONS:
+4. TRANSLATE ASSESSMENT ANSWERS INTO TRAINING DECISIONS:
    - Use their event distance to determine training volume and progression
    - Use their timeline to structure the plan length and phases
    - Use their availability preferences to schedule sessions
    - Use their strength training choice to include appropriate strength work
    - Use their course details to include specific training adaptations
 
-4. USE ACTUAL NUMBERS: Always use their specific baseline data for pace targets, FTP percentages, and strength weights. Never use generic descriptions.
+5. USE ACTUAL NUMBERS: Always use their specific baseline data for pace targets, FTP percentages, and strength weights. Never use generic descriptions.
 
-5. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with this exact structure:
+6. WORKOUT DISTRIBUTION RULES:
+   - If aiAnalysis.strengthFocus exists: Include 1-2 strength workouts per week
+   - If user chose 7 days: Create exactly 7 workouts per week (no rest days)
+   - Distribute remaining workouts across swim/bike/run based on aiAnalysis.focusAreas
+   - Example: 7 days with strength = 1 strength + 2 swim + 2 bike + 2 run
+
+7. CREATE STRUCTURED OUTPUT: Return a valid JSON plan with this exact structure:
 
 {
   "plan": {
