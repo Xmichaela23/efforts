@@ -41,11 +41,7 @@ export interface AIAnalysisResult {
   recoveryNeeds: 'high' | 'moderate' | 'low';
   injuryConsiderations: string[];
   equipmentOptimization: string[];
-  ageAdjustments: {
-    recoveryTime: number;
-    intensityModifier: number;
-    volumeModifier: number;
-  };
+
   baselineFitness: {
     overallLevel: 'beginner' | 'intermediate' | 'advanced' | 'elite';
     swimLevel: string;
@@ -327,7 +323,7 @@ You MUST return a JSON object with these EXACT fields:
   "eventType": "string",
   "injuryConsiderations": ["array", "of", "injury", "considerations"],
   "equipmentOptimization": ["array", "of", "equipment", "optimizations"],
-  "ageAdjustments": { "recoveryTime": number, "intensityModifier": number, "volumeModifier": number },
+
   "baselineFitness": { "overallLevel": "beginner" or "intermediate" or "advanced" or "elite", "swimLevel": "string", "bikeLevel": "string", "runLevel": "string", "strengthLevel": "string" }
 }
 
@@ -354,7 +350,7 @@ EXAMPLE RESPONSE:
   "eventType": "70.3",
   "injuryConsiderations": ["focus on form", "gradual progression", "listen to body"],
   "equipmentOptimization": ["use available weights", "bodyweight alternatives", "progressive overload"],
-  "ageAdjustments": { "recoveryTime": 48, "intensityModifier": 0.9, "volumeModifier": 0.8 },
+
   "baselineFitness": { "overallLevel": "intermediate", "swimLevel": "intermediate", "bikeLevel": "intermediate", "runLevel": "intermediate", "strengthLevel": "beginner" }
 }
 
@@ -489,9 +485,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     if (!aiResponse.equipmentOptimization) {
       throw new Error('AI analysis missing equipmentOptimization data');
     }
-    if (!aiResponse.ageAdjustments) {
-      throw new Error('AI analysis missing ageAdjustments data');
-    }
+
     if (!aiResponse.baselineFitness) {
       throw new Error('AI analysis missing baselineFitness data');
     }
@@ -506,7 +500,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       recoveryNeeds,
       injuryConsiderations: aiResponse.injuryConsiderations || [], // Default to empty array if missing
       equipmentOptimization: aiResponse.equipmentOptimization,
-      ageAdjustments: aiResponse.ageAdjustments,
+
       baselineFitness: aiResponse.baselineFitness,
       customParameters: aiResponse.customParameters || {}
     };

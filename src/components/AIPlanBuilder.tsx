@@ -477,13 +477,7 @@ export default function AIPlanBuilder() {
       }
     }
 
-    // Age considerations
-    if (age && age >= 40 && timeline === '8-12-weeks') {
-      return {
-        isValid: true,
-        warning: `At ${age} years old, consider a longer timeline for better recovery and injury prevention.`
-      };
-    }
+
 
     return { isValid: true, warning: null };
   };
@@ -560,8 +554,7 @@ export default function AIPlanBuilder() {
 
     const { injuryHistory, age, performanceNumbers } = insights;
 
-    // Always recommend injury prevention for 40+
-    if (age >= 40) return 'injury-prevention';
+
 
     // Recommend injury prevention if they have injury history
     if (injuryHistory?.includes('injury')) return 'injury-prevention';
@@ -1285,7 +1278,7 @@ Return a valid JSON plan structure.`;
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
                 <div>
                   <strong>Based on your baseline:</strong> 
-                  {insights.age >= 40 && ' At your age, injury prevention is recommended.'}
+                  
                   {insights.injuryHistory?.includes('injury') && ' Given your injury history, injury prevention is recommended.'}
                   {insights.performanceNumbers.squat && ' You have strength numbers, so power development is an option.'}
                   <div className="mt-1">Recommended: {STRENGTH_OPTIONS.find(s => s.key === recommendedStrength)?.label}</div>
@@ -1534,7 +1527,7 @@ Return a valid JSON plan structure.`;
               <div className="mb-4 p-3 bg-blue-100 text-blue-800 text-sm">
                 <div>
                   <strong>Based on your baseline:</strong> 
-                  {insights.age >= 40 && ' At your age, sustainable training is recommended for injury prevention.'}
+  
                   {insights.trainingBackground?.includes('new') && ' As a newer athlete, sustainable training will help build consistency.'}
                   {insights.trainingBackground?.includes('consistent') && ' With your consistent training history, you can handle more intensity.'}
                 </div>

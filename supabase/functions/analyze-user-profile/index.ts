@@ -58,14 +58,14 @@ TRAINING SCIENCE FRAMEWORK:
    - Zone 5 (VO2max): 105-120% FTP, >105% HRmax
 
 3. PROGRESSION PRINCIPLES (Based on Bompa's Periodization):
-   - CONSERVATIVE: 5-10% volume increases, 2-3 week adaptation cycles
-   - MODERATE: 10-15% volume increases, 1-2 week adaptation cycles
-   - AGGRESSIVE: 15-25% volume increases, 1 week adaptation cycles
+   - CONSERVATIVE: 5-10% volume increases, 2-3 week adaptation cycles. Best for: Injury history, limited training time, gradual progression needs.
+   - MODERATE: 10-15% volume increases, 1-2 week adaptation cycles. Best for: Most athletes, balanced progression.
+   - AGGRESSIVE: 15-25% volume increases, 1 week adaptation cycles. Best for: High training capacity, experienced athletes.
 
 4. RECOVERY SCIENCE (Based on Fry's Supercompensation Theory):
-   - HIGH: 48-72 hour recovery between hard sessions
-   - MODERATE: 24-48 hour recovery between hard sessions
-   - LOW: 12-24 hour recovery between hard sessions
+   - HIGH: 48-72 hour recovery between hard sessions. Best for: Injury history, high stress, limited recovery capacity.
+   - MODERATE: 24-48 hour recovery between hard sessions. Best for: Most athletes, balanced training load.
+   - LOW: 12-24 hour recovery between hard sessions. Best for: High training capacity, experienced athletes.
 
 ANALYSIS REQUIREMENTS:
 Analyze user data and return a JSON object with these exact fields:
@@ -81,7 +81,7 @@ Analyze user data and return a JSON object with these exact fields:
   "eventType": "string",
   "injuryConsiderations": ["array", "of", "injury", "considerations"],
   "equipmentOptimization": ["array", "of", "equipment", "optimizations"],
-  "ageAdjustments": { "recoveryTime": number, "intensityModifier": number, "volumeModifier": number },
+
   "baselineFitness": { "overallLevel": "beginner" or "intermediate" or "advanced" or "elite", "swimLevel": "string", "bikeLevel": "string", "runLevel": "string", "strengthLevel": "string" }
 }
 
