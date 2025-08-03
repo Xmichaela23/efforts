@@ -815,11 +815,38 @@ export default function AlgorithmPlanBuilder() {
             {generatedPlan ? (
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 rounded-lg">
-                  <h3 className="font-semibold">{generatedPlan.plan.name}</h3>
-                  <p className="text-sm text-gray-600">{generatedPlan.plan.description}</p>
-                  <p className="text-sm text-gray-600">Total workouts: {generatedPlan.plan.totalWorkouts}</p>
+                  <h3 className="font-semibold">{generatedPlan.name}</h3>
+                  <p className="text-sm text-gray-600">{generatedPlan.description}</p>
+                  <p className="text-sm text-gray-600">Total workouts: {generatedPlan.workouts?.length || 0}</p>
                 </div>
-                {/* Add workout display here */}
+                
+                {/* Display first few weeks of workouts */}
+                {generatedPlan.workouts && generatedPlan.workouts.length > 0 && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Your Training Plan</h3>
+                    {generatedPlan.workouts.slice(0, 20).map((workout: any, index: number) => (
+                      <div key={index} className="p-4 border border-gray-200 rounded-lg">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h4 className="font-medium">{workout.name || `Workout ${index + 1}`}</h4>
+                            <p className="text-sm text-gray-600">{workout.description}</p>
+                            {workout.duration && (
+                              <p className="text-sm text-gray-500">Duration: {workout.duration}</p>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {workout.type && <span className="inline-block px-2 py-1 bg-gray-100 rounded">{workout.type}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {generatedPlan.workouts.length > 20 && (
+                      <div className="text-center text-gray-500">
+                        <p>... and {generatedPlan.workouts.length - 20} more workouts</p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-4 bg-red-50 rounded-lg">
