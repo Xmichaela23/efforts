@@ -303,15 +303,45 @@ export const DISCIPLINE_FOCUS_OPTIONS: DisciplineFocus[] = [
 
 // Base templates for each distance (polarized training approach)
 export function getBaseTemplate(distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman' | 'running' | 'cycling' | 'swimming' | 'strength' | 'hybrid'): TrainingTemplate {
+  // This function is now deprecated - use the new polarized architecture
+  // Keeping for backward compatibility but it should not be used
   switch (distance) {
     case 'sprint':
-      return getSprintTemplate();
+      return {
+        distance: 'sprint',
+        baseHours: 6,
+        minDays: 4,
+        weeks: generateFullProgression(16, 'sprint', 6),
+        strengthOptions: STRENGTH_OPTIONS,
+        disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+      };
     case 'olympic':
-      return getOlympicTemplate();
+      return {
+        distance: 'olympic',
+        baseHours: 8,
+        minDays: 5,
+        weeks: generateFullProgression(16, 'olympic', 8),
+        strengthOptions: STRENGTH_OPTIONS,
+        disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+      };
     case 'seventy3':
-      return getSeventy3Template();
+      return {
+        distance: 'seventy3',
+        baseHours: 12,
+        minDays: 6,
+        weeks: generateFullProgression(12, 'seventy3', 12),
+        strengthOptions: STRENGTH_OPTIONS,
+        disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+      };
     case 'ironman':
-      return getIronmanTemplate();
+      return {
+        distance: 'ironman',
+        baseHours: 15,
+        minDays: 6,
+        weeks: generateFullProgression(12, 'ironman', 15),
+        strengthOptions: STRENGTH_OPTIONS,
+        disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+      };
     case 'running':
       return getRunningTemplate();
     case 'cycling':
@@ -327,49 +357,7 @@ export function getBaseTemplate(distance: 'sprint' | 'olympic' | 'seventy3' | 'i
   }
 }
 
-function getSprintTemplate(): TrainingTemplate {
-  return {
-    distance: 'sprint',
-    baseHours: 6,
-    minDays: 4,
-    weeks: generateFullProgression(16, 'sprint', 6),
-    strengthOptions: STRENGTH_OPTIONS,
-    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
-  };
-}
 
-function getOlympicTemplate(): TrainingTemplate {
-  return {
-    distance: 'olympic',
-    baseHours: 8,
-    minDays: 5,
-    weeks: generateFullProgression(16, 'olympic', 8),
-    strengthOptions: STRENGTH_OPTIONS,
-    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
-  };
-}
-
-function getSeventy3Template(): TrainingTemplate {
-  return {
-    distance: 'seventy3',
-    baseHours: 12,
-    minDays: 6,
-    weeks: generateFullProgressionWithScience('seventy3', 12, 6, 'none', 'balanced'), // Use new science-based function
-    strengthOptions: STRENGTH_OPTIONS,
-    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
-  };
-}
-
-function getIronmanTemplate(): TrainingTemplate {
-  return {
-    distance: 'ironman',
-    baseHours: 15,
-    minDays: 6,
-    weeks: generateFullProgression(12, 'ironman', 15), // Reduced from 20 to 12 weeks for preview
-    strengthOptions: STRENGTH_OPTIONS,
-    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
-  };
-}
 
 function getRunningTemplate(): TrainingTemplate {
   return {
@@ -517,8 +505,8 @@ function getBaseSessionsForDistance(distance: string): SessionTemplate[] {
         { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
         { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 90, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
         { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
-        { day: 'Thursday', discipline: 'swim', type: 'threshold', duration: 45, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
-        { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy bike, recovery', zones: [2] },
+        { day: 'Thursday', discipline: 'bike', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy bike, recovery', zones: [2] },
+        { day: 'Friday', discipline: 'swim', type: 'threshold', duration: 45, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
         { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 120, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
       ];
     case 'ironman':
@@ -610,7 +598,6 @@ export function generateTrainingPlan(
   longSessionOrder?: string
 ): TrainingTemplate {
 
-  
   // Validate inputs - NO FALLBACKS
   if (!distance) throw new Error('Distance is required');
   if (!strengthOption) throw new Error('Strength option is required');
@@ -626,7 +613,6 @@ export function generateTrainingPlan(
       throw new Error('1RM data required for strength training: squat, deadlift, and bench press values must be provided in user baselines');
     }
   }
-  // Swim pace is optional - only required if user has swimming in disciplines
 
   // Calculate intensity zones
   const zones = calculateIntensityZones(
@@ -636,19 +622,41 @@ export function generateTrainingPlan(
     userPerformance.swimPace || undefined
   );
 
-  // NEW: Use polarized template approach
-  const timing = longSessionDays?.includes('weekend') ? 'weekend' : 'weekday';
-  const polarizedTemplate = createPolarizedTemplate(distance, timing, targetHours, userPerformance);
-  
-  // Convert polarized template to TrainingTemplate format
+  // UNIFIED POLARIZED ARCHITECTURE
   const weeks: WeekTemplate[] = [];
   const totalWeeks = getTotalWeeks(distance);
   
   for (let weekNum = 1; weekNum <= totalWeeks; weekNum++) {
     const phase = getPhaseForWeek(weekNum, totalWeeks);
+    const phaseStartWeek = getPhaseStartWeek(phase, totalWeeks);
+    const totalWeeksInPhase = getTotalWeeksInPhase(phase, totalWeeks);
+    const weekInPhase = weekNum - phaseStartWeek + 1;
     
-    // Generate detailed workouts for each session
-    const detailedSessions = polarizedTemplate.sessions.map(session => {
+    // Step 1: Get base template for distance and training frequency
+    const baseSessions = getBaseTemplateForDistance(distance, trainingFrequency);
+    
+    // Step 2: Apply polarized distribution (80% easy, 20% hard)
+    const polarizedSessions = applyPolarizedDistribution(baseSessions, targetHours);
+    
+    // Step 3: Add strength sessions if selected
+    const sessionsWithStrength = addStrengthSessionsToTemplate(polarizedSessions, strengthOption, phase, weekInPhase, totalWeeksInPhase);
+    
+    // Step 4: Apply discipline focus
+    const sessionsWithFocus = applyDisciplineFocusToTemplate(sessionsWithStrength, disciplineFocus);
+    
+    // Step 5: Apply long session preferences
+    const sessionsWithLongPreferences = applyLongSessionPreferences(sessionsWithFocus, longSessionDays, longSessionOrder);
+    
+    // Step 6: Scale to target hours
+    const baseHoursPerWeek = getBaseHoursPerWeek(distance);
+    const scalingFactor = targetHours / baseHoursPerWeek;
+    const scaledSessions = sessionsWithLongPreferences.map(session => ({
+      ...session,
+      duration: Math.round(session.duration * scalingFactor)
+    }));
+    
+    // Step 7: Generate detailed workouts
+    const detailedSessions = scaledSessions.map(session => {
       const detailedWorkout = generateDetailedWorkout(session, userPerformance, phase, strengthOption, disciplineFocus, userEquipment);
       const garminWorkout = generateGarminWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
       
@@ -659,15 +667,18 @@ export function generateTrainingPlan(
       };
     });
     
+    // Calculate total hours for this week
+    const totalHours = Math.round(detailedSessions.reduce((sum, session) => sum + session.duration, 0) / 60);
+    
     weeks.push({
       weekNumber: weekNum,
       phase,
       sessions: detailedSessions,
-      totalHours: targetHours
+      totalHours
     });
   }
   
-  const baseTemplate: TrainingTemplate = {
+  return {
     distance,
     baseHours: targetHours,
     minDays: trainingFrequency,
@@ -675,39 +686,174 @@ export function generateTrainingPlan(
     strengthOptions: STRENGTH_OPTIONS,
     disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
   };
+}
+
+// Step 1: Get base template for distance and training frequency
+function getBaseTemplateForDistance(distance: string, trainingFrequency: number): SessionTemplate[] {
+  switch (distance) {
+    case 'sprint':
+      return getSprintTemplate(trainingFrequency);
+    case 'olympic':
+      return getOlympicTemplate(trainingFrequency);
+    case 'seventy3':
+      return getSeventy3Template(trainingFrequency);
+    case 'ironman':
+      return getIronmanTemplate(trainingFrequency);
+    default:
+      throw new Error(`Invalid distance: ${distance}`);
+  }
+}
+
+// Step 2: Apply polarized distribution (80% easy, 20% hard)
+function applyPolarizedDistribution(sessions: SessionTemplate[], targetHours: number): SessionTemplate[] {
+  const totalMinutes = targetHours * 60;
+  const easyMinutes = Math.floor(totalMinutes * 0.8); // 80% easy
+  const hardMinutes = totalMinutes - easyMinutes; // 20% hard
   
-  const scaledTemplate = baseTemplate;
+  // Distribute easy and hard sessions
+  const easySessions = sessions.filter(s => s.type === 'endurance' || s.type === 'recovery');
+  const hardSessions = sessions.filter(s => s.type === 'tempo' || s.type === 'threshold' || s.discipline === 'brick');
+  
+  // Scale session durations to match polarized distribution
+  const easySessionMinutes = easySessions.reduce((sum, s) => sum + s.duration, 0);
+  const hardSessionMinutes = hardSessions.reduce((sum, s) => sum + s.duration, 0);
+  
+  const easyScalingFactor = easyMinutes / easySessionMinutes;
+  const hardScalingFactor = hardMinutes / hardSessionMinutes;
+  
+  return sessions.map(session => {
+    if (session.type === 'endurance' || session.type === 'recovery') {
+      return { ...session, duration: Math.round(session.duration * easyScalingFactor) };
+    } else {
+      return { ...session, duration: Math.round(session.duration * hardScalingFactor) };
+    }
+  });
+}
 
-  // Generate detailed workouts for each session
-  const detailedTemplate = {
-    ...scaledTemplate,
-    weeks: scaledTemplate.weeks.map(week => ({
-      ...week,
-      sessions: week.sessions.map(session => {
-        // Pass 1RM data to the detailed workout generation
-        const userPerformanceWith1RM = {
-          ...userPerformance,
-          squat: userPerformance.squat,
-          deadlift: userPerformance.deadlift,
-          bench: userPerformance.bench
-        };
-        
-        // Debug FTP value
-      
-        
-        const detailedWorkout = generateDetailedWorkout(session, userPerformanceWith1RM, week.phase, strengthOption, disciplineFocus, userEquipment);
-        const garminWorkout = generateGarminWorkout(session, userPerformanceWith1RM, week.phase, disciplineFocus, userEquipment);
-      
-        return {
-          ...session,
-          detailedWorkout,
-          garminWorkout
-        };
-      })
-    }))
-  };
+// Step 3: Add strength sessions to template
+function addStrengthSessionsToTemplate(sessions: SessionTemplate[], strengthOption: string, phase: string, weekInPhase?: number, totalWeeksInPhase?: number): SessionTemplate[] {
+  if (strengthOption === 'none') return sessions;
+  
+  const strengthDetails = STRENGTH_OPTIONS.find(opt => opt.id === strengthOption);
+  if (!strengthDetails) return sessions;
+  
+  const strengthSessions = [];
+  const strengthDays = determineStrengthDays(sessions, strengthDetails.sessionsPerWeek);
+  
+  for (let i = 0; i < strengthDetails.sessionsPerWeek; i++) {
+    const day = strengthDays[i];
+    const strengthSession = createStrengthSession(day, strengthDetails, i + 1);
+    strengthSessions.push(strengthSession);
+  }
+  
+  return [...sessions, ...strengthSessions];
+}
 
-  return detailedTemplate;
+// Step 4: Apply discipline focus to template
+function applyDisciplineFocusToTemplate(sessions: SessionTemplate[], disciplineFocus: string): SessionTemplate[] {
+  const disciplineDetails = DISCIPLINE_FOCUS_OPTIONS.find(opt => opt.id === disciplineFocus);
+  if (!disciplineDetails) return sessions;
+  
+  // Adjust session durations based on discipline focus
+  return sessions.map(session => {
+    if (disciplineFocus === 'bike' && session.discipline === 'bike') {
+      return { ...session, duration: Math.round(session.duration * 1.2) };
+    } else if (disciplineFocus === 'run' && session.discipline === 'run') {
+      return { ...session, duration: Math.round(session.duration * 1.2) };
+    } else if (disciplineFocus === 'swim' && session.discipline === 'swim') {
+      return { ...session, duration: Math.round(session.duration * 1.2) };
+    }
+    return session;
+  });
+}
+
+// Base templates for each distance
+function getSprintTemplate(trainingFrequency: number): SessionTemplate[] {
+  const baseSessions: SessionTemplate[] = [
+    { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 30, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
+    { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 45, intensity: 'Zone 3', description: 'Tempo bike, build endurance', zones: [3] },
+    { day: 'Thursday', discipline: 'run', type: 'endurance', duration: 30, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
+    { day: 'Saturday', discipline: 'brick', type: 'tempo', duration: 60, intensity: 'Zone 3', description: 'Bike-run brick, moderate intensity', zones: [3] }
+  ];
+  
+  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'sprint');
+}
+
+function getOlympicTemplate(trainingFrequency: number): SessionTemplate[] {
+  const baseSessions: SessionTemplate[] = [
+    { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
+    { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 60, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
+    { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
+    { day: 'Friday', discipline: 'swim', type: 'threshold', duration: 30, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
+    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 90, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
+  ];
+  
+  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'olympic');
+}
+
+function getSeventy3Template(trainingFrequency: number): SessionTemplate[] {
+  const baseSessions: SessionTemplate[] = [
+    { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
+    { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 90, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
+    { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
+    { day: 'Thursday', discipline: 'bike', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy bike, recovery', zones: [2] },
+    { day: 'Friday', discipline: 'swim', type: 'threshold', duration: 45, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
+    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 120, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
+  ];
+  
+  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'seventy3');
+}
+
+function getIronmanTemplate(trainingFrequency: number): SessionTemplate[] {
+  const baseSessions: SessionTemplate[] = [
+    { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
+    { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 120, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
+    { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
+    { day: 'Thursday', discipline: 'bike', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Easy bike, recovery', zones: [2] },
+    { day: 'Friday', discipline: 'swim', type: 'threshold', duration: 60, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
+    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 180, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
+  ];
+  
+  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'ironman');
+}
+
+// Adjust template based on training frequency
+function adjustTemplateForFrequency(sessions: SessionTemplate[], frequency: number, distance: string): SessionTemplate[] {
+  if (frequency === sessions.length) return sessions;
+  
+  // For lower frequency, remove some sessions
+  if (frequency < sessions.length) {
+    // Keep the most important sessions (brick, long sessions)
+    const importantSessions = sessions.filter(s => s.discipline === 'brick' || s.type === 'tempo');
+    const otherSessions = sessions.filter(s => s.discipline !== 'brick' && s.type !== 'tempo');
+    
+    // Take the first N sessions to match frequency
+    const sessionsToKeep = [...importantSessions, ...otherSessions].slice(0, frequency);
+    return sessionsToKeep;
+  }
+  
+  // For higher frequency, add recovery sessions
+  const additionalSessions = [];
+  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const usedDays = sessions.map(s => s.day);
+  const availableDays = days.filter(day => !usedDays.includes(day));
+  
+  for (let i = 0; i < frequency - sessions.length; i++) {
+    const day = availableDays[i];
+    if (day) {
+      additionalSessions.push({
+        day,
+        discipline: 'run',
+        type: 'endurance',
+        duration: getSessionDuration('run', 'endurance', distance, 'base'),
+        intensity: 'Zone 2',
+        description: 'Easy recovery run',
+        zones: [2]
+      });
+    }
+  }
+  
+  return [...sessions, ...additionalSessions];
 }
 
 function scaleTemplate(template: TrainingTemplate, targetHours: number): TrainingTemplate {
@@ -2022,7 +2168,7 @@ function generate4DayTemplate(distance: string, strengthOption: string, discipli
     {
       day: 'Saturday',
       discipline: 'brick',
-      type: 'endurance',
+      type: 'tempo',
       duration: getSessionDuration('brick', 'endurance', distance, phase),
       intensity: 'Zone 2-3',
       description: 'Bike-run brick, moderate intensity',

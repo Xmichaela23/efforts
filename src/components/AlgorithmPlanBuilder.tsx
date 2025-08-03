@@ -1199,14 +1199,46 @@ export default function AlgorithmPlanBuilder() {
                           </div>
                           <div className="space-y-4">
                             {(() => {
-                              // Group workouts by day
+                              // Group workouts by day and split brick workouts
                               const workoutsByDay: { [key: string]: any[] } = {};
                               weekWorkouts.forEach((workout: any) => {
                                 const day = workout.day || workout.date || 'Unknown';
                                 if (!workoutsByDay[day]) {
                                   workoutsByDay[day] = [];
                                 }
-                                workoutsByDay[day].push(workout);
+                                
+                                // Split brick workouts into separate bike and run components
+                                if (workout.discipline === 'brick') {
+                                  const totalDuration = workout.duration || 0;
+                                  const bikeDuration = Math.floor(totalDuration * 0.7);
+                                  const runDuration = totalDuration - bikeDuration;
+                                  
+                                  // Add bike component
+                                  workoutsByDay[day].push({
+                                    ...workout,
+                                    discipline: 'bike',
+                                    duration: bikeDuration,
+                                    type: 'brick-bike',
+                                    description: 'Bike portion of brick workout',
+                                    detailedWorkout: workout.detailedWorkout ? 
+                                      workout.detailedWorkout.split('\n').filter(line => line.includes('Bike:')).join('\n') : 
+                                      'Bike portion of brick workout'
+                                  });
+                                  
+                                  // Add run component
+                                  workoutsByDay[day].push({
+                                    ...workout,
+                                    discipline: 'run',
+                                    duration: runDuration,
+                                    type: 'brick-run',
+                                    description: 'Run portion of brick workout',
+                                    detailedWorkout: workout.detailedWorkout ? 
+                                      workout.detailedWorkout.split('\n').filter(line => line.includes('Run:')).join('\n') : 
+                                      'Run portion of brick workout'
+                                  });
+                                } else {
+                                  workoutsByDay[day].push(workout);
+                                }
                               });
 
                               return Object.entries(workoutsByDay).map(([day, workouts], dayIndex) => {
