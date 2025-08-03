@@ -558,6 +558,12 @@ export function generateTrainingPlan(
     squat?: number; // Optional - 1RM squat in lbs
     deadlift?: number; // Optional - 1RM deadlift in lbs
     bench?: number; // Optional - 1RM bench press in lbs
+  },
+  userEquipment?: {
+    running?: string[];
+    cycling?: string[];
+    swimming?: string[];
+    strength?: string[];
   }
 ): TrainingTemplate {
   // Validate inputs - NO FALLBACKS
@@ -614,7 +620,7 @@ export function generateTrainingPlan(
           deadlift: userPerformance.deadlift,
           bench: userPerformance.bench
         };
-        const detailedWorkout = generateDetailedWorkout(session, userPerformanceWith1RM, week.phase, strengthOption, disciplineFocus);
+        const detailedWorkout = generateDetailedWorkout(session, userPerformanceWith1RM, week.phase, strengthOption, disciplineFocus, userEquipment);
         console.log('🔍 DEBUG - Session:', session.discipline, session.type, 'strengthType:', session.strengthType, 'detailedWorkout:', detailedWorkout);
         return {
           ...session,
@@ -896,7 +902,7 @@ export function getStrengthSuggestion(disciplineFocus: string) {
 } 
 
 // Generate detailed workout structure for each session
-function generateDetailedWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthOption?: string, disciplineFocus?: string): string {
+function generateDetailedWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthOption?: string, disciplineFocus?: string, userEquipment?: any): string {
   const { discipline, type, duration, intensity, zones, strengthType } = session;
   
   // Use the session's strengthType if available, otherwise use the user's selected strength option
@@ -904,20 +910,20 @@ function generateDetailedWorkout(session: SessionTemplate, userPerformance: any,
   
   // If this session has strength integrated, generate combined workout
   if (strengthType && discipline !== 'strength') {
-    const enduranceWorkout = generateEnduranceWorkout(session, userPerformance, phase, disciplineFocus);
-    const strengthWorkout = generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType);
+    const enduranceWorkout = generateEnduranceWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
+    const strengthWorkout = generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType, userEquipment);
     return `${enduranceWorkout}\n\nSTRENGTH INTEGRATION:\n${strengthWorkout}`;
   }
   
   switch (discipline) {
     case 'swim':
-      return generateSwimWorkout(session, userPerformance, phase, disciplineFocus);
+      return generateSwimWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
     case 'bike':
-      return generateBikeWorkout(session, userPerformance, phase, disciplineFocus);
+      return generateBikeWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
     case 'run':
-      return generateRunWorkout(session, userPerformance, phase, disciplineFocus);
+      return generateRunWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
     case 'strength':
-      return generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType);
+      return generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType, userEquipment);
     case 'brick':
       return generateBrickWorkout(session, userPerformance, phase, disciplineFocus);
     default:
@@ -926,24 +932,31 @@ function generateDetailedWorkout(session: SessionTemplate, userPerformance: any,
 }
 
 // Helper function to generate endurance workout based on discipline
-function generateEnduranceWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
+function generateEnduranceWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string, userEquipment?: any): string {
   const { discipline } = session;
   
   switch (discipline) {
     case 'swim':
-      return generateSwimWorkout(session, userPerformance, phase, disciplineFocus);
+      return generateSwimWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
     case 'bike':
-      return generateBikeWorkout(session, userPerformance, phase, disciplineFocus);
+      return generateBikeWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
     case 'run':
-      return generateRunWorkout(session, userPerformance, phase, disciplineFocus);
+      return generateRunWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
     default:
       return session.description;
   }
 }
 
-function generateSwimWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
+function generateSwimWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string, userEquipment?: any): string {
   const { type, duration, zones } = session;
   const swimPace = userPerformance.swimPace || "2:00/100m";
+  
+  // Check available swim equipment
+  const hasPool = userEquipment?.swimming?.includes('pool') || userEquipment?.swimming?.includes('access');
+  const hasOpenWater = userEquipment?.swimming?.includes('open_water') || userEquipment?.swimming?.includes('lake') || userEquipment?.swimming?.includes('ocean');
+  const hasPullBuoy = userEquipment?.swimming?.includes('pull_buoy');
+  const hasPaddles = userEquipment?.swimming?.includes('paddles');
+  const hasFins = userEquipment?.swimming?.includes('fins');
   
   // Adjust intensity based on training phase
   const phaseMultiplier = getPhaseIntensityMultiplier(phase);
@@ -971,9 +984,16 @@ function generateSwimWorkout(session: SessionTemplate, userPerformance: any, pha
   }
 }
 
-function generateBikeWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
+function generateBikeWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string, userEquipment?: any): string {
   const { type, duration, zones } = session;
   const ftp = userPerformance.ftp || 200;
+  
+  // Check available bike equipment
+  const hasIndoorTrainer = userEquipment?.cycling?.includes('indoor_trainer') || userEquipment?.cycling?.includes('turbo');
+  const hasPowerMeter = userEquipment?.cycling?.includes('power_meter') || userEquipment?.cycling?.includes('power');
+  const hasHeartRate = userEquipment?.cycling?.includes('heart_rate') || userEquipment?.cycling?.includes('hr');
+  const hasRoadBike = userEquipment?.cycling?.includes('road_bike') || userEquipment?.cycling?.includes('road');
+  const hasMountainBike = userEquipment?.cycling?.includes('mountain_bike') || userEquipment?.cycling?.includes('mtb');
   
   // Adjust intensity based on training phase
   const phaseMultiplier = getPhaseIntensityMultiplier(phase);
@@ -1002,10 +1022,16 @@ function generateBikeWorkout(session: SessionTemplate, userPerformance: any, pha
   }
 }
 
-function generateRunWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
+function generateRunWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string, userEquipment?: any): string {
   const { type, duration, zones } = session;
   const fiveKPace = userPerformance.fiveKPace || "24:00";
   const easyPace = userPerformance.easyPace || "9:00/mile";
+  
+  // Check available run equipment
+  const hasTreadmill = userEquipment?.running?.includes('treadmill');
+  const hasHeartRate = userEquipment?.running?.includes('heart_rate') || userEquipment?.running?.includes('hr');
+  const hasGPS = userEquipment?.running?.includes('gps') || userEquipment?.running?.includes('watch');
+  const hasTrack = userEquipment?.running?.includes('track') || userEquipment?.running?.includes('access');
   
   // Adjust intensity based on training phase
   const phaseMultiplier = getPhaseIntensityMultiplier(phase);
@@ -1033,8 +1059,16 @@ function generateRunWorkout(session: SessionTemplate, userPerformance: any, phas
   }
 }
 
-function generateStrengthWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthType?: string): string {
+function generateStrengthWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthType?: string, userEquipment?: any): string {
   const { type } = session;
+  
+  // Check available strength equipment
+  const hasGym = userEquipment?.strength?.includes('gym') || userEquipment?.strength?.includes('access');
+  const hasHomeGym = userEquipment?.strength?.includes('home_gym') || userEquipment?.strength?.includes('home');
+  const hasBarbell = userEquipment?.strength?.includes('barbell') || userEquipment?.strength?.includes('rack');
+  const hasDumbbells = userEquipment?.strength?.includes('dumbbells') || userEquipment?.strength?.includes('db');
+  const hasKettlebells = userEquipment?.strength?.includes('kettlebells') || userEquipment?.strength?.includes('kb');
+  const hasResistanceBands = userEquipment?.strength?.includes('resistance_bands') || userEquipment?.strength?.includes('bands');
   
   // Adjust intensity based on training phase
   const phaseMultiplier = getPhaseIntensityMultiplier(phase);

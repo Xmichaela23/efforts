@@ -55,12 +55,20 @@ export interface UserPerformance {
   bench?: number; // 1RM bench press in lbs
 }
 
+export interface UserEquipment {
+  running?: string[];
+  cycling?: string[];
+  swimming?: string[];
+  strength?: string[];
+}
+
 export interface PlanParameters {
   distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman';
   strengthOption: string;
   disciplineFocus: string;
   targetHours: number;
   userPerformance: UserPerformance;
+  userEquipment?: UserEquipment;
   weeksUntilRace?: number;
   baselineFitness?: 'beginner' | 'intermediate' | 'advanced';
 }
@@ -85,7 +93,8 @@ export class AlgorithmTrainingService {
         planParameters.strengthOption,
         planParameters.disciplineFocus,
         planParameters.targetHours,
-        planParameters.userPerformance
+        planParameters.userPerformance,
+        planParameters.userEquipment
       );
 
       // Apply timeline adjustments if race date provided

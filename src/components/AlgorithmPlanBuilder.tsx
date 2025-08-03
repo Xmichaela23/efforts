@@ -284,7 +284,8 @@ export default function AlgorithmPlanBuilder() {
           squat: baselines.performanceNumbers.squat,
           deadlift: baselines.performanceNumbers.deadlift,
           bench: baselines.performanceNumbers.bench
-        }
+        },
+        userEquipment: baselines.equipment
       };
 
       // Add optional parameters if available
