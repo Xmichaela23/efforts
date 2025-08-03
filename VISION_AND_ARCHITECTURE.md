@@ -53,6 +53,7 @@
 - **Sample Data Integration**: Now receiving power, heart rate, GPS, temperature data
 - **User Lookup**: Fixed database queries for proper user association
 - **Payload Structure**: Corrected activity detail processing
+- **Algorithm Architecture**: Implemented unified polarized architecture with distance-appropriate templates
 
 ### 📊 Data Flow
 1. **Garmin Device** → Records activity with sensor data
@@ -61,13 +62,36 @@
 4. **Database** → Stores rich sensor data (10k+ points per workout)
 5. **Frontend** → Displays comprehensive analytics and insights
 
+## Algorithm Training Plan Architecture
+
+### Unified Polarized Architecture
+- **Step 1**: Template Selection (`getBaseTemplateForDistance`) - Distance-appropriate base templates
+- **Step 2**: Polarized Distribution (`applyPolarizedDistribution`) - 80% easy, 20% hard intensity
+- **Step 3**: Strength Integration (`addStrengthSessionsToTemplate`) - Non-consecutive placement
+- **Step 4**: Discipline Focus (`applyDisciplineFocusToTemplate`) - Volume adjustments
+- **Step 5**: Long Session Preferences (`applyLongSessionPreferences`) - User timing
+- **Step 6**: Final Scaling & Detailed Workouts - User-specific paces and FTP
+
+### Distance-Based Templates
+- **Sprint**: 4-6 days, 6-8 hours/week
+- **Olympic**: 5-6 days, 8-12 hours/week
+- **70.3**: 5-7 days, 10-15 hours/week
+- **Ironman**: 6-7 days, 12-20 hours/week
+
+### Strength Integration Options
+- **Power Development**: Plyometrics, explosive movements (2x/week)
+- **Stability Focus**: Single-leg stability, core work (2x/week)
+- **Compound Strength**: Heavy compound lifts (2x/week)
+- **Cowboy Endurance**: Endurance strength + aesthetics (3x/week)
+- **Cowboy Compound**: Heavy compounds + aesthetics (3x/week)
+
 ## UI/UX Vision
 
 ### Navigation Flow
 - **Calendar View** → Primary interface for date selection
 - **Swipe Navigation** → Smooth transitions between planned activities
 - **Completed Activities** → Accessible from calendar with detailed analytics
-- **Strength Logger** → Manual entry with AI plan integration
+- **Strength Logger** → Manual entry with algorithm plan integration
 
 ### Key Screens
 - **Overview Dashboard**: 7-day training load, 6-week progression, recovery status
@@ -92,10 +116,10 @@
 ### Phase 2: Analytics Implementation
 - [ ] **Power Curve Analysis** - FTP calculations, training stress
 - [ ] **Zone Analysis** - Time in zones, training load distribution
-- [ ] **User Profile** - Training baselines, AI plan customization
+- [ ] **User Profile** - Training baselines, algorithm plan customization
 - [ ] **Comparative Analytics** - Progress tracking, trend analysis
 
-### Phase 3: AI Enhancement
+### Phase 3: Algorithm Enhancement
 - [ ] **Advanced Insights** - Cross-training correlations, recovery optimization
 - [ ] **Predictive Analytics** - Performance forecasting, injury prevention
 - [ ] **Personalized Coaching** - Dynamic plan adjustments based on data
@@ -113,10 +137,10 @@
 - **Solution**: JSONB columns for sensor data, structured columns for analytics
 - **Result**: Efficient storage and querying of time-series data
 
-### AI Integration
+### Algorithm Integration
 - **Problem**: Training plans need user baseline data
 - **Solution**: Training baselines component with manual and data-driven options
-- **Result**: Personalized AI-generated training plans
+- **Result**: Personalized algorithm-generated training plans
 
 ## Success Metrics
 
@@ -136,7 +160,7 @@
 
 **Efforts** aims to be the definitive training platform for serious athletes who want:
 - **Professional-level analytics** without the complexity
-- **AI-powered coaching** that adapts to their data
+- **Algorithm-powered coaching** that adapts to their data
 - **Multi-sport integration** that sees the bigger picture
 - **Beautiful, intuitive interface** that gets out of the way
 

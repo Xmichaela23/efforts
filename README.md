@@ -1,6 +1,6 @@
 # Efforts - Fitness Training App
 
-A comprehensive fitness training application built with React, TypeScript, and Supabase, featuring AI-powered training plan generation and integration with fitness platforms like Garmin and Strava.
+A comprehensive fitness training application built with React, TypeScript, and Supabase, featuring algorithm-powered training plan generation and integration with fitness platforms like Garmin and Strava.
 
 ## Development Status & Integration Guide
 
@@ -9,14 +9,14 @@ This app has reached a significant level of complexity requiring careful conside
 
 - **Frontend**: React + TypeScript + Vite with shadcn/ui components
 - **Backend**: Supabase (database, auth, Edge Functions)
-- **Algorithm Integration**: AlgorithmTrainingService for plan generation
+- **Algorithm Integration**: AlgorithmTrainingService for deterministic plan generation
 - **Third-party APIs**: Garmin Connect, Strava integration
 - **Real-time Data**: Webhooks for live fitness data synchronization
 
 ### Integration Status
 - ✅ **Garmin Connect**: Full integration with webhook processing and detailed sensor data
 - ✅ **Strava**: Basic integration implemented
-- ✅ **AlgorithmTrainingService**: Algorithm-based training plan generation
+- ✅ **AlgorithmTrainingService**: Algorithm-based training plan generation with unified polarized architecture
 - 🔄 **Ongoing**: Continuous refinement of data processing and UI components
 
 ### Critical Dependencies
