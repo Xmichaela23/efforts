@@ -743,10 +743,11 @@ export default function AlgorithmPlanBuilder() {
 
       case 5:
         // Plan display
+        console.log('🔍 Step 5 - generatedPlan:', generatedPlan);
         return (
           <div>
             <h2 className="text-2xl font-medium mb-6">Your Training Plan</h2>
-            {generatedPlan && (
+            {generatedPlan ? (
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h3 className="font-semibold">{generatedPlan.plan.name}</h3>
@@ -754,6 +755,10 @@ export default function AlgorithmPlanBuilder() {
                   <p className="text-sm text-gray-600">Total workouts: {generatedPlan.plan.totalWorkouts}</p>
                 </div>
                 {/* Add workout display here */}
+              </div>
+            ) : (
+              <div className="p-4 bg-red-50 rounded-lg">
+                <p className="text-red-700">No plan generated. generatedPlan is: {JSON.stringify(generatedPlan)}</p>
               </div>
             )}
           </div>
