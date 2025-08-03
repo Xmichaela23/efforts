@@ -3,6 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaTachometerAlt, FaMedal, FaObjectGroup, FaCog } from 'react-icons/fa';
 import { AlgorithmTrainingService, type PlanParameters, type UserPerformance } from '../services/AlgorithmTrainingService';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 // Preserve all our flow questions and options
 const TRAINING_CATEGORIES = [
@@ -48,6 +49,21 @@ const TRAINING_FREQUENCY_OPTIONS = [
   { key: '5-days', label: '5 days per week' },
   { key: '6-days', label: '6 days per week' },
   { key: '7-days', label: '7 days per week' },
+];
+
+const LONG_SESSION_DAY_OPTIONS = [
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
+];
+
+const LONG_SESSION_ORDER_OPTIONS = [
+  { key: 'bike-first', label: 'Bike First, then Run' },
+  { key: 'run-first', label: 'Run First, then Bike' },
 ];
 
 const STRENGTH_OPTIONS = [
@@ -179,6 +195,7 @@ export default function AlgorithmPlanBuilder() {
   const [generatingPlan, setGeneratingPlan] = useState(false);
   const [generatedPlan, setGeneratedPlan] = useState<any>(null);
   const [currentWeek, setCurrentWeek] = useState(0);
+  const [currentTab, setCurrentTab] = useState('run');
   
   // Assessment responses - preserve all our flow questions
   const [responses, setResponses] = useState({
@@ -238,6 +255,10 @@ export default function AlgorithmPlanBuilder() {
     disciplineFocus: 'standard',
     weeklyHours: 8,
     trainingBackground: '',
+    
+    // Long Session Preferences
+    longSessionDays: [] as string[],
+    longSessionOrder: 'bike-first', // 'bike-first' or 'run-first'
   });
 
   const [selectedFocus, setSelectedFocus] = useState<string[]>([]);
@@ -914,6 +935,84 @@ export default function AlgorithmPlanBuilder() {
         );
 
               case 5:
+          // Long Session Preferences
+        return (
+          <div>
+            <h2 className="text-2xl font-medium mb-6">Long Session Preferences</h2>
+            
+            {/* Long Session Days */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">Choose Your Long Session Days:</h3>
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm">
+                  Select which days of the week you prefer for your long training sessions. 
+                  Most athletes choose weekends, but if you work weekends, you can select weekdays.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {LONG_SESSION_DAY_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => {
+                      const currentDays = responses.longSessionDays || [];
+                      const newDays = currentDays.includes(option.key)
+                        ? currentDays.filter(day => day !== option.key)
+                        : [...currentDays, option.key];
+                      updateResponse('longSessionDays', newDays);
+                    }}
+                    className={`p-3 border rounded-lg text-center transition-colors ${
+                      (responses.longSessionDays || []).includes(option.key)
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Long Session Order */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold mb-4">Long Session Order:</h3>
+              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm">
+                  Choose whether you prefer to bike first or run first on your long session days. 
+                  This affects the order of your brick workouts.
+                </p>
+              </div>
+              <div className="space-y-3">
+                {LONG_SESSION_ORDER_OPTIONS.map((option) => (
+                  <button
+                    key={option.key}
+                    onClick={() => updateResponse('longSessionOrder', option.key)}
+                    className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                      responses.longSessionOrder === option.key
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                    }`}
+                  >
+                    <div className="font-semibold">{option.label}</div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Continue Button */}
+            {responses.longSessionDays && responses.longSessionDays.length > 0 && responses.longSessionOrder && (
+              <div className="mt-6">
+                <button
+                  onClick={() => setStep(6)}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+          </div>
+        );
+
+              case 6:
           // Review and generate
         return (
           <div>
@@ -926,6 +1025,9 @@ export default function AlgorithmPlanBuilder() {
               <div><strong>Strength:</strong> {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
               <div><strong>Training Days:</strong> {TRAINING_FREQUENCY_OPTIONS.find(t => t.key === responses.trainingFrequency)?.label}</div>
               <div><strong>Weekly Hours:</strong> {responses.weeklyHours} hours</div>
+              <div><strong>Long Session Days:</strong> {(responses.longSessionDays || []).map(day => 
+                LONG_SESSION_DAY_OPTIONS.find(d => d.key === day)?.label).join(', ')}</div>
+              <div><strong>Long Session Order:</strong> {LONG_SESSION_ORDER_OPTIONS.find(o => o.key === responses.longSessionOrder)?.label}</div>
             </div>
             <div className="mt-6">
               <button
@@ -944,7 +1046,7 @@ export default function AlgorithmPlanBuilder() {
           </div>
         );
 
-              case 6:
+              case 7:
           // Plan display
         console.log('🔍 Step 6 - generatedPlan:', generatedPlan);
         return (
@@ -991,34 +1093,61 @@ export default function AlgorithmPlanBuilder() {
                   </div>
                 )}
                 
-                {/* Display workouts grouped by weeks and phases */}
+                {/* Display workouts with week tabs */}
                 {generatedPlan.workouts && generatedPlan.workouts.length > 0 && (
                   <div className="space-y-6">
                     <h3 className="text-lg font-medium">Your Training Plan (12-Week Progression)</h3>
                     
-                    {/* Group workouts by week */}
+                    {/* Week tabs */}
+                    <div className="border-b border-gray-200">
+                      <div className="flex space-x-8 overflow-x-auto">
+                        {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 6)) }, (_, weekIndex) => {
+                          const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
+                          return (
+                            <button
+                              key={weekIndex}
+                              onClick={() => setCurrentWeek(weekIndex)}
+                              className={`py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                                currentWeek === weekIndex
+                                  ? 'border-gray-900 text-gray-900'
+                                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                              }`}
+                            >
+                              Week {weekIndex + 1}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                    
+                    {/* Week content */}
                     {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 6)) }, (_, weekIndex) => {
                       const weekWorkouts = generatedPlan.workouts.slice(weekIndex * 6, (weekIndex + 1) * 6);
                       const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
-                      const phaseColor = phase === 'Base' ? 'bg-blue-100' : phase === 'Build' ? 'bg-green-100' : phase === 'Peak' ? 'bg-yellow-100' : 'bg-purple-100';
+                      const phaseColor = weekIndex < 5 ? 'bg-blue-100' : weekIndex < 9 ? 'bg-green-100' : weekIndex < 10 ? 'bg-yellow-100' : 'bg-purple-100';
                       
                       return (
-                        <div key={weekIndex} className="border border-gray-200 rounded-lg overflow-hidden">
-                          <div className={`p-3 ${phaseColor} border-b border-gray-200`}>
+                        <div key={weekIndex} className={currentWeek === weekIndex ? 'block' : 'hidden'}>
+                          <div className={`p-3 ${phaseColor} rounded-lg mb-4`}>
                             <h4 className="font-semibold">Week {weekIndex + 1} - {phase} Phase</h4>
                             <p className="text-sm text-gray-600">
                               {weekWorkouts.length} sessions • {Math.round(weekWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0) / 60)} hours
                             </p>
                           </div>
-                          <div className="space-y-2 p-3">
+                          <div className="space-y-2">
                             {weekWorkouts.map((workout: any, sessionIndex: number) => (
                               <div key={sessionIndex} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-b-0">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm font-medium">{workout.day || workout.date || `Day ${sessionIndex + 1}`}</span>
-                                    <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.discipline}</span>
-                                    {workout.type && (
-                                      <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.type}</span>
+                                    {/* Only show discipline if it's different from type, or if type doesn't exist */}
+                                    {workout.type && workout.type !== workout.discipline ? (
+                                      <>
+                                        <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+                                        <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+                                      </>
+                                    ) : (
+                                      <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
                                     )}
                                   </div>
                                   {workout.detailedWorkout ? (
