@@ -550,6 +550,7 @@ export function generateTrainingPlan(
   strengthOption: string,
   disciplineFocus: string,
   targetHours: number,
+  trainingFrequency: number, // User's explicit training days selection
   userPerformance: {
     ftp: number;
     fiveKPace: string;
@@ -591,15 +592,14 @@ export function generateTrainingPlan(
     userPerformance.swimPace || undefined
   );
 
-  // Generate science-based weekly templates
-  const trainingDays = getTrainingDaysFromHours(targetHours);
-  const weeks = generateFullProgressionWithScience(distance, targetHours, trainingDays, strengthOption, disciplineFocus);
+  // Generate science-based weekly templates using user's explicit training frequency
+  const weeks = generateFullProgressionWithScience(distance, targetHours, trainingFrequency, strengthOption, disciplineFocus);
   
   // Create template with science-based weeks
   const baseTemplate: TrainingTemplate = {
     distance,
     baseHours: targetHours,
-    minDays: trainingDays,
+    minDays: trainingFrequency,
     weeks,
     strengthOptions: STRENGTH_OPTIONS,
     disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
@@ -620,6 +620,10 @@ export function generateTrainingPlan(
           deadlift: userPerformance.deadlift,
           bench: userPerformance.bench
         };
+        
+        // Debug FTP value
+        console.log('🔍 DEBUG - userPerformance FTP:', userPerformance.ftp, 'userPerformanceWith1RM FTP:', userPerformanceWith1RM.ftp);
+        
         const detailedWorkout = generateDetailedWorkout(session, userPerformanceWith1RM, week.phase, strengthOption, disciplineFocus, userEquipment);
         console.log('🔍 DEBUG - Session:', session.discipline, session.type, 'strengthType:', session.strengthType, 'detailedWorkout:', detailedWorkout);
         return {
@@ -905,6 +909,9 @@ export function getStrengthSuggestion(disciplineFocus: string) {
 function generateDetailedWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthOption?: string, disciplineFocus?: string, userEquipment?: any): string {
   const { discipline, type, duration, intensity, zones, strengthType } = session;
   
+  // Debug userPerformance
+  console.log('🔍 DEBUG - generateDetailedWorkout userPerformance:', userPerformance);
+  
   // Use the session's strengthType if available, otherwise use the user's selected strength option
   const effectiveStrengthType = strengthType || strengthOption;
   
@@ -969,16 +976,48 @@ function generateSwimWorkout(session: SessionTemplate, userPerformance: any, pha
   switch (type) {
     case 'endurance':
       const enduranceSets = Math.floor((adjustedDuration * 0.6 / 2) * focusMultiplier);
-      return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${enduranceSets}x200m @ ${swimPace}, 30s rest\nCool-down: 200m easy`;
+      
+      if (hasPool) {
+        return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${enduranceSets}x200m @ ${swimPace}, 30s rest\nCool-down: 200m easy`;
+      } else if (hasOpenWater) {
+        return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${enduranceSets}x200m @ ${swimPace} in open water, 30s rest\nCool-down: 200m easy`;
+      } else {
+        return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${enduranceSets}x200m @ ${swimPace}, 30s rest\nCool-down: 200m easy`;
+      }
+      
     case 'threshold':
       const thresholdSets = isSwimFocused ? 10 : 8;
-      return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${thresholdSets}x100m @ threshold pace, 30s rest\nCool-down: 200m easy`;
+      
+      if (hasPool) {
+        return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${thresholdSets}x100m @ threshold pace, 30s rest\nCool-down: 200m easy`;
+      } else if (hasOpenWater) {
+        return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${thresholdSets}x100m @ threshold pace in open water, 30s rest\nCool-down: 200m easy`;
+      } else {
+        return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${thresholdSets}x100m @ threshold pace, 30s rest\nCool-down: 200m easy`;
+      }
+      
     case 'tempo':
       const tempoSets = isSwimFocused ? 5 : 4;
-      return `Warm-up: 200m easy, 4x50m drills\nMain Set: ${tempoSets}x150m @ tempo pace, 45s rest\nCool-down: 200m easy`;
+      
+      if (hasPool) {
+        return `Warm-up: 200m easy, 4x50m drills\nMain Set: ${tempoSets}x150m @ tempo pace, 45s rest\nCool-down: 200m easy`;
+      } else if (hasOpenWater) {
+        return `Warm-up: 200m easy, 4x50m drills\nMain Set: ${tempoSets}x150m @ tempo pace in open water, 45s rest\nCool-down: 200m easy`;
+      } else {
+        return `Warm-up: 200m easy, 4x50m drills\nMain Set: ${tempoSets}x150m @ tempo pace, 45s rest\nCool-down: 200m easy`;
+      }
+      
     case 'vo2max':
       const vo2maxSets = isSwimFocused ? 12 : 10;
-      return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${vo2maxSets}x50m @ max effort, 60s rest\nCool-down: 200m easy`;
+      
+      if (hasPool) {
+        return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${vo2maxSets}x50m @ max effort, 60s rest\nCool-down: 200m easy`;
+      } else if (hasOpenWater) {
+        return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${vo2maxSets}x50m @ max effort in open water, 60s rest\nCool-down: 200m easy`;
+      } else {
+        return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${vo2maxSets}x50m @ max effort, 60s rest\nCool-down: 200m easy`;
+      }
+      
     default:
       return session.description;
   }
@@ -987,6 +1026,9 @@ function generateSwimWorkout(session: SessionTemplate, userPerformance: any, pha
 function generateBikeWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string, userEquipment?: any): string {
   const { type, duration, zones } = session;
   const ftp = userPerformance.ftp || 200;
+  
+  // Debug FTP value
+  console.log('🔍 DEBUG - Bike workout FTP:', ftp, 'userPerformance:', userPerformance);
   
   // Check available bike equipment
   const hasIndoorTrainer = userEquipment?.cycling?.includes('indoor_trainer') || userEquipment?.cycling?.includes('turbo');
@@ -1006,17 +1048,51 @@ function generateBikeWorkout(session: SessionTemplate, userPerformance: any, pha
   switch (type) {
     case 'endurance':
       const enduranceTime = Math.floor((adjustedDuration * 0.7) * focusMultiplier);
-      return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${enduranceTime}min steady @ Zone 2\nCool-down: 10min easy spinning`;
+      
+      if (hasIndoorTrainer) {
+        return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${enduranceTime}min steady @ Zone 2 on trainer\nCool-down: 10min easy spinning`;
+      } else if (hasPowerMeter) {
+        return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${enduranceTime}min steady @ Zone 2 (${Math.round(ftp * 0.7)}W)\nCool-down: 10min easy spinning`;
+      } else if (hasHeartRate) {
+        return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${enduranceTime}min steady @ Zone 2 (65-75% max HR)\nCool-down: 10min easy spinning`;
+      } else {
+        return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${enduranceTime}min steady @ conversational pace\nCool-down: 10min easy spinning`;
+      }
+      
     case 'tempo':
       const tempoIntervals = isBikeFocused ? 4 : 3;
       const tempoTime = Math.floor((adjustedDuration * 0.6 / tempoIntervals));
-      return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ 85-90% FTP, 5min easy between\nCool-down: 10min easy`;
+      
+      if (hasPowerMeter) {
+        return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ ${Math.round(ftp * 0.85)}-${Math.round(ftp * 0.9)}W, 5min easy between\nCool-down: 10min easy`;
+      } else if (hasHeartRate) {
+        return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ 80-85% max HR, 5min easy between\nCool-down: 10min easy`;
+      } else {
+        return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ tempo effort (sustainable but challenging), 5min easy between\nCool-down: 10min easy`;
+      }
+      
     case 'threshold':
       const thresholdIntervals = isBikeFocused ? 5 : 4;
-      return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x8min @ FTP, 4min easy between\nCool-down: 10min easy`;
+      
+      if (hasPowerMeter) {
+        return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x8min @ ${ftp}W, 4min easy between\nCool-down: 10min easy`;
+      } else if (hasHeartRate) {
+        return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x8min @ 88-92% max HR, 4min easy between\nCool-down: 10min easy`;
+      } else {
+        return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x8min @ threshold effort (max sustainable for 1 hour), 4min easy between\nCool-down: 10min easy`;
+      }
+      
     case 'vo2max':
       const vo2maxIntervals = isBikeFocused ? 8 : 6;
-      return `Warm-up: 15min easy spinning\nMain Set: ${vo2maxIntervals}x3min @ 110% FTP, 3min easy between\nCool-down: 10min easy`;
+      
+      if (hasPowerMeter) {
+        return `Warm-up: 15min easy spinning\nMain Set: ${vo2maxIntervals}x3min @ ${Math.round(ftp * 1.1)}W, 3min easy between\nCool-down: 10min easy`;
+      } else if (hasHeartRate) {
+        return `Warm-up: 15min easy spinning\nMain Set: ${vo2maxIntervals}x3min @ 95-100% max HR, 3min easy between\nCool-down: 10min easy`;
+      } else {
+        return `Warm-up: 15min easy spinning\nMain Set: ${vo2maxIntervals}x3min @ max effort, 3min easy between\nCool-down: 10min easy`;
+      }
+      
     default:
       return session.description;
   }
@@ -1044,16 +1120,52 @@ function generateRunWorkout(session: SessionTemplate, userPerformance: any, phas
   switch (type) {
     case 'endurance':
       const enduranceTime = Math.floor((adjustedDuration * 0.8) * focusMultiplier);
-      return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPace}\nCool-down: 10min easy jog`;
+      
+      if (hasTreadmill) {
+        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPace} on treadmill\nCool-down: 10min easy jog`;
+      } else if (hasHeartRate) {
+        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPace} (65-75% max HR)\nCool-down: 10min easy jog`;
+      } else if (hasGPS) {
+        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPace} (use GPS for pace)\nCool-down: 10min easy jog`;
+      } else {
+        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPace} (conversational pace)\nCool-down: 10min easy jog`;
+      }
+      
     case 'tempo':
       const tempoTime = isRunFocused ? 25 : 20;
-      return `Warm-up: 10min easy jog\nMain Set: ${tempoTime}min @ tempo pace (between 10K and half marathon pace)\nCool-down: 10min easy jog`;
+      
+      if (hasTreadmill) {
+        return `Warm-up: 10min easy jog\nMain Set: ${tempoTime}min @ tempo pace on treadmill (between 10K and half marathon pace)\nCool-down: 10min easy jog`;
+      } else if (hasHeartRate) {
+        return `Warm-up: 10min easy jog\nMain Set: ${tempoTime}min @ tempo pace (80-85% max HR)\nCool-down: 10min easy jog`;
+      } else if (hasGPS) {
+        return `Warm-up: 10min easy jog\nMain Set: ${tempoTime}min @ tempo pace (use GPS for pace control)\nCool-down: 10min easy jog`;
+      } else {
+        return `Warm-up: 10min easy jog\nMain Set: ${tempoTime}min @ tempo pace (sustainable but challenging)\nCool-down: 10min easy jog`;
+      }
+      
     case 'threshold':
       const thresholdIntervals = isRunFocused ? 8 : 6;
-      return `Warm-up: 10min easy jog\nMain Set: ${thresholdIntervals}x800m @ 5K pace, 2min rest\nCool-down: 10min easy jog`;
+      
+      if (hasTrack) {
+        return `Warm-up: 10min easy jog\nMain Set: ${thresholdIntervals}x800m @ 5K pace on track, 2min rest\nCool-down: 10min easy jog`;
+      } else if (hasGPS) {
+        return `Warm-up: 10min easy jog\nMain Set: ${thresholdIntervals}x800m @ 5K pace (use GPS for distance), 2min rest\nCool-down: 10min easy jog`;
+      } else {
+        return `Warm-up: 10min easy jog\nMain Set: ${thresholdIntervals}x800m @ 5K pace (estimate distance), 2min rest\nCool-down: 10min easy jog`;
+      }
+      
     case 'vo2max':
       const vo2maxIntervals = isRunFocused ? 10 : 8;
-      return `Warm-up: 10min easy jog\nMain Set: ${vo2maxIntervals}x400m @ 3K pace, 90s rest\nCool-down: 10min easy jog`;
+      
+      if (hasTrack) {
+        return `Warm-up: 10min easy jog\nMain Set: ${vo2maxIntervals}x400m @ 3K pace on track, 90s rest\nCool-down: 10min easy jog`;
+      } else if (hasGPS) {
+        return `Warm-up: 10min easy jog\nMain Set: ${vo2maxIntervals}x400m @ 3K pace (use GPS for distance), 90s rest\nCool-down: 10min easy jog`;
+      } else {
+        return `Warm-up: 10min easy jog\nMain Set: ${vo2maxIntervals}x400m @ 3K pace (estimate distance), 90s rest\nCool-down: 10min easy jog`;
+      }
+      
     default:
       return session.description;
   }
@@ -1096,23 +1208,67 @@ function generateStrengthWorkout(session: SessionTemplate, userPerformance: any,
     case 'power':
       const powerSets = isPeakPhase ? 4 : 3;
       const powerReps = isTaperPhase ? 3 : 5;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Power Cleans ${powerSets}x${powerReps} @ ${powerCleanWeight}lbs, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
+      
+      if (hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Power Cleans ${powerSets}x${powerReps} @ ${powerCleanWeight}lbs, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Dumbbell Snatches ${powerSets}x${powerReps} each arm, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Kettlebell Swings ${powerSets}x${powerReps}, Kettlebell Snatches ${powerSets}x8 each arm\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Burpees ${powerSets}x${powerReps}, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
+      }
+      
     case 'compound':
       const compoundSets = isPeakPhase ? 4 : 3;
       const compoundReps = isTaperPhase ? 3 : 5;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${compoundSets}x${compoundReps} @ ${squatWeight}lbs, Deadlift ${compoundSets}x3 @ ${deadliftWeight}lbs, Bench Press ${compoundSets}x${compoundReps} @ ${benchWeight}lbs\nCool-down: 5min static stretching`;
+      
+      if (hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${compoundSets}x${compoundReps} @ ${squatWeight}lbs, Deadlift ${compoundSets}x3 @ ${deadliftWeight}lbs, Bench Press ${compoundSets}x${compoundReps} @ ${benchWeight}lbs\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Goblet Squats ${compoundSets}x${compoundReps}, Dumbbell Deadlifts ${compoundSets}x3, Dumbbell Bench Press ${compoundSets}x${compoundReps}\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Goblet Squats ${compoundSets}x${compoundReps}, Kettlebell Deadlifts ${compoundSets}x3, Kettlebell Press ${compoundSets}x${compoundReps}\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Bodyweight Squats ${compoundSets}x${compoundReps * 2}, Single-leg Deadlifts ${compoundSets}x8 each, Push-ups ${compoundSets}x${compoundReps * 2}\nCool-down: 5min static stretching`;
+      }
+      
     case 'stability':
       const stabilitySets = isPeakPhase ? 4 : 3;
       const stabilityTime = isTaperPhase ? 45 : 60;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg squats ${stabilitySets}x8 each, Planks ${stabilitySets}x${stabilityTime}s, Bird dogs ${stabilitySets}x10 each\nCool-down: 5min static stretching`;
+      
+      if (hasDumbbells || hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg squats ${stabilitySets}x8 each, Planks ${stabilitySets}x${stabilityTime}s, Bird dogs ${stabilitySets}x10 each, Single-arm rows ${stabilitySets}x8 each\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg squats ${stabilitySets}x8 each, Planks ${stabilitySets}x${stabilityTime}s, Bird dogs ${stabilitySets}x10 each, Superman holds ${stabilitySets}x${stabilityTime}s\nCool-down: 5min static stretching`;
+      }
+      
     case 'cowboy_endurance':
       const cowboySets = isPeakPhase ? 4 : 3;
       const cowboyDistance = isTaperPhase ? 75 : 100;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks ${cowboySets}x${cowboyDistance}m, Sandbag carries ${cowboySets}x50m, Rope climbs ${cowboySets}x3\nCool-down: 5min static stretching`;
+      
+      if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks with dumbbells ${cowboySets}x${cowboyDistance}m, Dumbbell carries ${cowboySets}x50m, Pull-ups ${cowboySets}x3\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks with kettlebells ${cowboySets}x${cowboyDistance}m, Kettlebell carries ${cowboySets}x50m, Pull-ups ${cowboySets}x3\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Walking lunges ${cowboySets}x${cowboyDistance}m, Bear crawls ${cowboySets}x50m, Pull-ups ${cowboySets}x3\nCool-down: 5min static stretching`;
+      }
+      
     case 'cowboy_compound':
       const cowboyCompoundSets = isPeakPhase ? 4 : 3;
       const cowboyCompoundReps = isTaperPhase ? 3 : 5;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${deadliftWeight}lbs, Overhead press ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${overheadWeight}lbs, Rows ${cowboyCompoundSets}x8 @ ${rowWeight}lbs\nCool-down: 5min static stretching`;
+      
+      if (hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${deadliftWeight}lbs, Overhead press ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${overheadWeight}lbs, Rows ${cowboyCompoundSets}x8 @ ${rowWeight}lbs\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Deadlifts ${cowboyCompoundSets}x${cowboyCompoundReps}, Dumbbell Overhead Press ${cowboyCompoundSets}x${cowboyCompoundReps}, Dumbbell Rows ${cowboyCompoundSets}x8 each\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Deadlifts ${cowboyCompoundSets}x${cowboyCompoundReps}, Kettlebell Press ${cowboyCompoundSets}x${cowboyCompoundReps}, Kettlebell Rows ${cowboyCompoundSets}x8 each\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg Deadlifts ${cowboyCompoundSets}x${cowboyCompoundReps} each, Pike Push-ups ${cowboyCompoundSets}x${cowboyCompoundReps}, Inverted Rows ${cowboyCompoundSets}x8\nCool-down: 5min static stretching`;
+      }
+      
     default:
       return session.description;
   }
@@ -1219,7 +1375,7 @@ function getTrainingDaysFromHours(targetHours: number): number {
 function generateFullProgressionWithScience(
   distance: string,
   targetHours: number,
-  trainingDays: number,
+  trainingFrequency: number,
   strengthOption: string,
   disciplineFocus: string
 ): WeekTemplate[] {
@@ -1228,7 +1384,7 @@ function generateFullProgressionWithScience(
   
   for (let weekNum = 1; weekNum <= totalWeeks; weekNum++) {
     const phase = getPhaseForWeek(weekNum, totalWeeks);
-    const weeklyTemplate = generateWeeklyTemplate(distance, trainingDays, strengthOption, disciplineFocus, phase);
+    const weeklyTemplate = generateWeeklyTemplate(distance, trainingFrequency, strengthOption, disciplineFocus, phase);
     
     // Calculate total hours for this week
     const totalHours = Math.round(weeklyTemplate.reduce((sum, session) => sum + session.duration, 0) / 60);
@@ -1270,7 +1426,7 @@ function getPhaseForWeek(weekNum: number, totalWeeks: number): 'base' | 'build' 
 // Weekly template generator based on training science
 function generateWeeklyTemplate(
   distance: string,
-  trainingDays: number,
+  trainingFrequency: number,
   strengthOption: string,
   disciplineFocus: string,
   phase: string
@@ -1283,7 +1439,7 @@ function generateWeeklyTemplate(
     '7-days': generate7DayTemplate(distance, strengthOption, disciplineFocus, phase)
   };
   
-  return templates[`${trainingDays}-days`] || templates['5-days'];
+  return templates[`${trainingFrequency}-days`] || templates['5-days'];
 }
 
 // 4-day template (Sprint distance)

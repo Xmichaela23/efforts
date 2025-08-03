@@ -273,6 +273,7 @@ export default function AlgorithmPlanBuilder() {
         strengthOption: responses.strengthTraining || 'none',
         disciplineFocus: responses.disciplineFocus,
         targetHours: responses.weeklyHours,
+        trainingFrequency: parseInt(responses.trainingFrequency.split('-')[0]),
         userPerformance: {
           ftp: baselines.performanceNumbers.ftp,
           fiveKPace: baselines.performanceNumbers.fiveK,

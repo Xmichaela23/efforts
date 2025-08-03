@@ -67,6 +67,7 @@ export interface PlanParameters {
   strengthOption: string;
   disciplineFocus: string;
   targetHours: number;
+  trainingFrequency: number; // User's selected training days per week
   userPerformance: UserPerformance;
   userEquipment?: UserEquipment;
   weeksUntilRace?: number;
@@ -93,6 +94,7 @@ export class AlgorithmTrainingService {
         planParameters.strengthOption,
         planParameters.disciplineFocus,
         planParameters.targetHours,
+        planParameters.trainingFrequency,
         planParameters.userPerformance,
         planParameters.userEquipment
       );
