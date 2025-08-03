@@ -1769,7 +1769,13 @@ function generateFullProgressionWithScience(
   
   for (let weekNum = 1; weekNum <= totalWeeks; weekNum++) {
     const phase = getPhaseForWeek(weekNum, totalWeeks);
-    const weeklyTemplate = generateWeeklyTemplate(distance, trainingFrequency, strengthOption, disciplineFocus, phase);
+    
+    // Calculate week progression within the current phase
+    const phaseStartWeek = getPhaseStartWeek(phase, totalWeeks);
+    const totalWeeksInPhase = getTotalWeeksInPhase(phase, totalWeeks);
+    const weekInPhase = weekNum - phaseStartWeek + 1;
+    
+    const weeklyTemplate = generateWeeklyTemplate(distance, trainingFrequency, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
     
     // Calculate total hours for this week
     const totalHours = Math.round(weeklyTemplate.reduce((sum, session) => sum + session.duration, 0) / 60);
@@ -1808,13 +1814,45 @@ function getPhaseForWeek(weekNum: number, totalWeeks: number): 'base' | 'build' 
   return 'taper';
 }
 
+// Helper function to get the starting week of a phase
+function getPhaseStartWeek(phase: string, totalWeeks: number): number {
+  const baseWeeks = Math.floor(totalWeeks * 0.4);
+  const buildWeeks = Math.floor(totalWeeks * 0.4);
+  const peakWeeks = totalWeeks - baseWeeks - buildWeeks - 2;
+  
+  switch (phase) {
+    case 'base': return 1;
+    case 'build': return baseWeeks + 1;
+    case 'peak': return baseWeeks + buildWeeks + 1;
+    case 'taper': return baseWeeks + buildWeeks + peakWeeks + 1;
+    default: return 1;
+  }
+}
+
+// Helper function to get total weeks in a phase
+function getTotalWeeksInPhase(phase: string, totalWeeks: number): number {
+  const baseWeeks = Math.floor(totalWeeks * 0.4);
+  const buildWeeks = Math.floor(totalWeeks * 0.4);
+  const peakWeeks = totalWeeks - baseWeeks - buildWeeks - 2;
+  
+  switch (phase) {
+    case 'base': return baseWeeks;
+    case 'build': return buildWeeks;
+    case 'peak': return peakWeeks;
+    case 'taper': return 2;
+    default: return 1;
+  }
+}
+
 // Weekly template generator based on training science
 function generateWeeklyTemplate(
   distance: string,
   trainingFrequency: number,
   strengthOption: string,
   disciplineFocus: string,
-  phase: string
+  phase: string,
+  weekInPhase?: number,
+  totalWeeksInPhase?: number
 ): SessionTemplate[] {
   
   const templateKey = `${trainingFrequency}-days`;
@@ -1823,27 +1861,27 @@ function generateWeeklyTemplate(
   
   switch (templateKey) {
     case '4-days':
-      result = generate4DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      result = generate4DayTemplate(distance, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
       break;
     case '5-days':
-      result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
       break;
     case '6-days':
-      result = generate6DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      result = generate6DayTemplate(distance, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
       break;
     case '7-days':
-      result = generate7DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      result = generate7DayTemplate(distance, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
       break;
     default:
       console.warn(`⚠️ Unknown template key: ${templateKey}, falling back to 5-days`);
-      result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
   }
   
   return result;
 }
 
 // 4-day template (Sprint distance)
-function generate4DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+function generate4DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string, weekInPhase?: number, totalWeeksInPhase?: number): SessionTemplate[] {
   return [
     // Monday: Swim + Strength (integrated)
     {
@@ -1890,7 +1928,7 @@ function generate4DayTemplate(distance: string, strengthOption: string, discipli
 }
 
 // 5-day template (Olympic distance)
-function generate5DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+function generate5DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string, weekInPhase?: number, totalWeeksInPhase?: number): SessionTemplate[] {
   const sessions: SessionTemplate[] = [];
   
   // Get strength option details for gating logic
@@ -1911,7 +1949,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     day: 'Monday',
     discipline: 'swim',
     type: 'endurance',
-    duration: getSessionDuration('swim', 'endurance', distance, phase),
+    duration: getSessionDuration('swim', 'endurance', distance, phase, 'Monday', weekInPhase, totalWeeksInPhase),
     intensity: 'Zone 2',
     description: 'Easy swim, focus on technique',
     zones: [2]
@@ -1922,7 +1960,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     day: 'Tuesday',
     discipline: 'bike',
     type: 'tempo',
-    duration: getSessionDuration('bike', 'tempo', distance, phase),
+    duration: getSessionDuration('bike', 'tempo', distance, phase, 'Tuesday', weekInPhase, totalWeeksInPhase),
     intensity: 'Zone 3',
     description: 'Tempo bike, build endurance',
     zones: [3]
@@ -1933,7 +1971,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     day: 'Wednesday',
     discipline: 'run',
     type: 'endurance',
-    duration: getSessionDuration('run', 'endurance', distance, phase),
+    duration: getSessionDuration('run', 'endurance', distance, phase, 'Wednesday', weekInPhase, totalWeeksInPhase),
     intensity: 'Zone 2',
     description: 'Easy run, build aerobic base',
     zones: [2]
@@ -1958,7 +1996,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     day: 'Friday',
     discipline: 'swim',
     type: 'threshold',
-    duration: getSessionDuration('swim', 'threshold', distance, phase),
+    duration: getSessionDuration('swim', 'threshold', distance, phase, 'Friday', weekInPhase, totalWeeksInPhase),
     intensity: 'Zone 4',
     description: 'Swim intervals, build speed',
     zones: [4]
@@ -1984,7 +2022,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     day: 'Saturday',
     discipline: 'brick',
     type: 'endurance',
-    duration: getSessionDuration('brick', 'endurance', distance, phase),
+    duration: getSessionDuration('brick', 'endurance', distance, phase, 'Saturday', weekInPhase, totalWeeksInPhase),
     intensity: 'Zone 2-3',
     description: 'Long bike-run brick',
     zones: [2, 3]
@@ -1994,7 +2032,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
 }
 
 // 6-day template (70.3/Ironman distance)
-function generate6DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+function generate6DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string, weekInPhase?: number, totalWeeksInPhase?: number): SessionTemplate[] {
   const sessions: SessionTemplate[] = [];
   
   // Get strength option details for gating logic
@@ -2105,7 +2143,7 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
 }
 
 // 7-day template (High volume training)
-function generate7DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+function generate7DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string, weekInPhase?: number, totalWeeksInPhase?: number): SessionTemplate[] {
   const sessions: SessionTemplate[] = [];
   
   // Get strength option details for gating logic
@@ -2227,46 +2265,123 @@ function generate7DayTemplate(distance: string, strengthOption: string, discipli
 }
 
 // Helper functions for science-based session generation
-function getSessionDuration(discipline: string, type: string, distance: string, phase: string): number {
+function getSessionDuration(discipline: string, type: string, distance: string, phase: string, day?: string, weekInPhase?: number, totalWeeksInPhase?: number): number {
+  // Science-based duration calculation with weekday/weekend variation and progressive overload
+  const isWeekend = day && (day.includes('Saturday') || day.includes('Sunday'));
+  const isWeekday = day && !isWeekend;
+  
   const baseDurations = {
     sprint: {
-      swim: { endurance: 30, threshold: 20, tempo: 25 },
-      bike: { endurance: 45, tempo: 60, threshold: 30 },
-      run: { endurance: 30, tempo: 45, threshold: 20 },
-      brick: { endurance: 60, tempo: 75 }
+      swim: { 
+        endurance: { weekday: 30, weekend: 45 },
+        threshold: { weekday: 20, weekend: 30 },
+        tempo: { weekday: 25, weekend: 35 }
+      },
+      bike: { 
+        endurance: { weekday: 45, weekend: 60 },
+        tempo: { weekday: 60, weekend: 75 },
+        threshold: { weekday: 30, weekend: 45 }
+      },
+      run: { 
+        endurance: { weekday: 30, weekend: 45 },
+        tempo: { weekday: 45, weekend: 60 },
+        threshold: { weekday: 20, weekend: 30 }
+      },
+      brick: { 
+        endurance: { weekday: 60, weekend: 90 },
+        tempo: { weekday: 75, weekend: 105 }
+      }
     },
     olympic: {
-      swim: { endurance: 45, threshold: 30, tempo: 35 },
-      bike: { endurance: 60, tempo: 75, threshold: 45 },
-      run: { endurance: 45, tempo: 60, threshold: 30 },
-      brick: { endurance: 90, tempo: 105 }
+      swim: { 
+        endurance: { weekday: 45, weekend: 60 },
+        threshold: { weekday: 30, weekend: 45 },
+        tempo: { weekday: 35, weekend: 50 }
+      },
+      bike: { 
+        endurance: { weekday: 60, weekend: 90 },
+        tempo: { weekday: 75, weekend: 105 },
+        threshold: { weekday: 45, weekend: 60 }
+      },
+      run: { 
+        endurance: { weekday: 45, weekend: 60 },
+        tempo: { weekday: 60, weekend: 75 },
+        threshold: { weekday: 30, weekend: 45 }
+      },
+      brick: { 
+        endurance: { weekday: 90, weekend: 120 },
+        tempo: { weekday: 105, weekend: 135 }
+      }
     },
     seventy3: {
-      swim: { endurance: 90, threshold: 60, tempo: 75 },
-      bike: { endurance: 180, tempo: 150, threshold: 90 },
-      run: { endurance: 90, tempo: 105, threshold: 60 },
-      brick: { endurance: 240, tempo: 180 }
+      swim: { 
+        endurance: { weekday: 60, weekend: 90 },
+        threshold: { weekday: 45, weekend: 60 },
+        tempo: { weekday: 50, weekend: 75 }
+      },
+      bike: { 
+        endurance: { weekday: 90, weekend: 180 },
+        tempo: { weekday: 75, weekend: 150 },
+        threshold: { weekday: 60, weekend: 90 }
+      },
+      run: { 
+        endurance: { weekday: 60, weekend: 90 },
+        tempo: { weekday: 75, weekend: 105 },
+        threshold: { weekday: 45, weekend: 60 }
+      },
+      brick: { 
+        endurance: { weekday: 120, weekend: 240 },
+        tempo: { weekday: 150, weekend: 180 }
+      }
     },
     ironman: {
-      swim: { endurance: 120, threshold: 90, tempo: 105 },
-      bike: { endurance: 240, tempo: 210, threshold: 120 },
-      run: { endurance: 120, tempo: 135, threshold: 90 },
-      brick: { endurance: 300, tempo: 240 }
+      swim: { 
+        endurance: { weekday: 75, weekend: 120 },
+        threshold: { weekday: 60, weekend: 90 },
+        tempo: { weekday: 65, weekend: 105 }
+      },
+      bike: { 
+        endurance: { weekday: 120, weekend: 240 },
+        tempo: { weekday: 150, weekend: 210 },
+        threshold: { weekday: 90, weekend: 120 }
+      },
+      run: { 
+        endurance: { weekday: 75, weekend: 120 },
+        tempo: { weekday: 90, weekend: 135 },
+        threshold: { weekday: 60, weekend: 90 }
+      },
+      brick: { 
+        endurance: { weekday: 180, weekend: 300 },
+        tempo: { weekday: 210, weekend: 240 }
+      }
     }
   };
   
-  const phaseMultiplier = getPhaseMultiplier(phase);
-  const baseDuration = baseDurations[distance as keyof typeof baseDurations]?.[discipline as keyof typeof baseDurations.sprint]?.[type as keyof typeof baseDurations.sprint.swim] || 45;
+  const phaseMultiplier = getPhaseMultiplier(phase, weekInPhase, totalWeeksInPhase);
+  const durationType = isWeekend ? 'weekend' : 'weekday';
+  
+  const baseDuration = baseDurations[distance as keyof typeof baseDurations]?.[discipline as keyof typeof baseDurations.sprint]?.[type as keyof typeof baseDurations.sprint.swim]?.[durationType as keyof typeof baseDurations.sprint.swim.endurance] || 45;
   
   return Math.round(baseDuration * phaseMultiplier);
 }
 
-function getPhaseMultiplier(phase: string): number {
+function getPhaseMultiplier(phase: string, weekInPhase?: number, totalWeeksInPhase?: number): number {
+  // Progressive overload: gradual increase within each phase
+  const weekProgress = weekInPhase && totalWeeksInPhase ? weekInPhase / totalWeeksInPhase : 0.5;
+  
   switch (phase) {
-    case 'base': return 0.8; // Lower intensity, focus on volume
-    case 'build': return 1.0; // Standard intensity
-    case 'peak': return 1.2; // Higher intensity, focus on quality
-    case 'taper': return 0.9; // Slightly reduced intensity
+    case 'base': 
+      // Base: Start at 0.7, gradually increase to 0.9 (focus on building volume)
+      return 0.7 + (weekProgress * 0.2);
+    case 'build': 
+      // Build: Start at 0.9, increase to 1.1 (increasing intensity and volume)
+      return 0.9 + (weekProgress * 0.2);
+    case 'peak': 
+      // Peak: Start at 1.1, increase to 1.3 (high intensity, quality focus)
+      return 1.1 + (weekProgress * 0.2);
+    case 'taper': 
+      // Taper: Start at 1.0, reduce to 0.7 (maintain intensity, reduce volume)
+      return 1.0 - (weekProgress * 0.3);
     default: return 1.0;
   }
 }
