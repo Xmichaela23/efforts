@@ -364,7 +364,9 @@ export default function AlgorithmPlanBuilder() {
           deadlift: baselines.performanceNumbers.deadlift,
           bench: baselines.performanceNumbers.bench
         },
-        userEquipment: baselines.equipment
+        userEquipment: baselines.equipment,
+        longSessionDays: responses.longSessionDays,
+        longSessionOrder: responses.longSessionOrder
       };
 
       // Add optional parameters if available

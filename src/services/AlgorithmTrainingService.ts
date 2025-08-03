@@ -73,6 +73,8 @@ export interface PlanParameters {
   userEquipment?: UserEquipment;
   weeksUntilRace?: number;
   baselineFitness?: 'beginner' | 'intermediate' | 'advanced';
+  longSessionDays?: string[]; // User's preferred days for long sessions
+  longSessionOrder?: string; // User's preference for bike-first or run-first
 }
 
 export class AlgorithmTrainingService {
@@ -97,7 +99,9 @@ export class AlgorithmTrainingService {
         planParameters.targetHours,
         planParameters.trainingFrequency,
         planParameters.userPerformance,
-        planParameters.userEquipment
+        planParameters.userEquipment,
+        planParameters.longSessionDays,
+        planParameters.longSessionOrder
       );
 
       // Apply timeline adjustments if race date provided

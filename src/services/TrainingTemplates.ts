@@ -605,7 +605,9 @@ export function generateTrainingPlan(
     cycling?: string[];
     swimming?: string[];
     strength?: string[];
-  }
+  },
+  longSessionDays?: string[],
+  longSessionOrder?: string
 ): TrainingTemplate {
 
   
@@ -634,8 +636,8 @@ export function generateTrainingPlan(
     userPerformance.swimPace || undefined
   );
 
-  // Generate science-based weekly templates using user's explicit training frequency
-  const weeks = generateFullProgressionWithScience(distance, targetHours, trainingFrequency, strengthOption, disciplineFocus);
+  // Generate science-based weekly templates using user's explicit training frequency and preferences
+  const weeks = generateFullProgressionWithScience(distance, targetHours, trainingFrequency, strengthOption, disciplineFocus, longSessionDays, longSessionOrder);
   
   // Create template with science-based weeks
   const baseTemplate: TrainingTemplate = {
@@ -1762,7 +1764,9 @@ function generateFullProgressionWithScience(
   targetHours: number,
   trainingFrequency: number,
   strengthOption: string,
-  disciplineFocus: string
+  disciplineFocus: string,
+  longSessionDays?: string[],
+  longSessionOrder?: string
 ): WeekTemplate[] {
   const totalWeeks = getTotalWeeks(distance);
   const weeks: WeekTemplate[] = [];
@@ -1781,7 +1785,7 @@ function generateFullProgressionWithScience(
     const totalWeeksInPhase = getTotalWeeksInPhase(phase, totalWeeks);
     const weekInPhase = weekNum - phaseStartWeek + 1;
     
-    const weeklyTemplate = generateWeeklyTemplate(distance, trainingFrequency, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
+    const weeklyTemplate = generateWeeklyTemplate(distance, trainingFrequency, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase, longSessionDays, longSessionOrder);
     
     // Scale all session durations to match user's target hours
     const scaledTemplate = weeklyTemplate.map(session => ({
@@ -1880,7 +1884,9 @@ function generateWeeklyTemplate(
   disciplineFocus: string,
   phase: string,
   weekInPhase?: number,
-  totalWeeksInPhase?: number
+  totalWeeksInPhase?: number,
+  longSessionDays?: string[],
+  longSessionOrder?: string
 ): SessionTemplate[] {
   
   const templateKey = `${trainingFrequency}-days`;
@@ -1903,6 +1909,11 @@ function generateWeeklyTemplate(
     default:
       console.warn(`⚠️ Unknown template key: ${templateKey}, falling back to 5-days`);
       result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
+  }
+  
+  // Apply user's long session preferences if provided
+  if (longSessionDays && longSessionOrder) {
+    result = applyLongSessionPreferences(result, longSessionDays, longSessionOrder);
   }
   
   return result;
@@ -2470,4 +2481,57 @@ function getStrengthIntensity(phase: string): string {
     default:
       return 'Moderate';
   }
+}
+
+// Apply user's long session preferences to the weekly template
+function applyLongSessionPreferences(sessions: SessionTemplate[], longSessionDays: string[], longSessionOrder: string): SessionTemplate[] {
+  // Find brick sessions (long sessions)
+  const brickSessions = sessions.filter(s => s.discipline === 'brick');
+  const otherSessions = sessions.filter(s => s.discipline !== 'brick');
+  
+  if (brickSessions.length === 0) {
+    return sessions; // No brick sessions to adjust
+  }
+  
+  // Map user preferences to actual days
+  const dayMapping: { [key: string]: string } = {
+    'weekend': 'Saturday', // Default to Saturday for weekend
+    'weekday': 'Wednesday', // Default to Wednesday for weekday
+    'monday': 'Monday',
+    'tuesday': 'Tuesday', 
+    'wednesday': 'Wednesday',
+    'thursday': 'Thursday',
+    'friday': 'Friday',
+    'saturday': 'Saturday',
+    'sunday': 'Sunday'
+  };
+  
+  // Get the preferred days for long sessions
+  const preferredDays = longSessionDays.map(day => dayMapping[day.toLowerCase()] || day);
+  
+  // Reassign brick sessions to preferred days
+  const adjustedSessions = [...otherSessions];
+  
+  brickSessions.forEach((brickSession, index) => {
+    const preferredDay = preferredDays[index % preferredDays.length];
+    
+    // Update the brick session day
+    const adjustedBrickSession = {
+      ...brickSession,
+      day: preferredDay,
+      description: `${brickSession.description} (${longSessionOrder === 'bike-first' ? 'Bike-Run' : 'Run-Bike'} order)`
+    };
+    
+    adjustedSessions.push(adjustedBrickSession);
+  });
+  
+  // Sort sessions by day order (Monday to Sunday)
+  const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  adjustedSessions.sort((a, b) => {
+    const aIndex = dayOrder.indexOf(a.day);
+    const bIndex = dayOrder.indexOf(b.day);
+    return aIndex - bIndex;
+  });
+  
+  return adjustedSessions;
 } 
