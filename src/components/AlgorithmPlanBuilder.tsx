@@ -129,14 +129,46 @@ const WEEKDAY_DURATION_OPTIONS = [
 ];
 
 const DISCIPLINE_FOCUS_OPTIONS = [
-  { key: 'standard', label: 'Standard (Balanced) - 2-3 sessions per discipline' },
-  { key: 'swim_speed', label: 'Swim Focus + Speed - 3 swims, technique/intervals' },
-  { key: 'swim_endurance', label: 'Swim Focus + Endurance - 3 swims, longer sessions' },
-  { key: 'bike_speed', label: 'Bike Focus + Speed - 3 bikes, power intervals' },
-  { key: 'bike_endurance', label: 'Bike Focus + Endurance - 3 bikes, longer rides' },
-  { key: 'run_speed', label: 'Run Focus + Speed - 3 runs, tempo/speed work' },
-  { key: 'run_endurance', label: 'Run Focus + Endurance - 3 runs, longer runs' },
-  { key: 'bike_run_speed', label: 'Bike + Run Speed - 3 bikes, 2 runs, both high intensity' },
+  { 
+    key: 'standard', 
+    label: 'Standard (Balanced) - 2 sessions per discipline',
+    description: 'Balanced training across all disciplines. Works well for all distances and experience levels.'
+  },
+  { 
+    key: 'swim_speed', 
+    label: 'Swim Focus + Speed - 3 swims, technique/intervals',
+    description: 'Extra swim sessions focused on technique and speed work. Great for improving swim efficiency.'
+  },
+  { 
+    key: 'swim_endurance', 
+    label: 'Swim Focus + Endurance - 3 swims, longer sessions',
+    description: 'Extra swim sessions focused on building endurance. Ideal for longer swim distances.'
+  },
+  { 
+    key: 'bike_speed', 
+    label: 'Bike Focus + Speed - 3 bikes, power intervals',
+    description: 'Extra bike sessions focused on power and speed. Great for improving bike performance.'
+  },
+  { 
+    key: 'bike_endurance', 
+    label: 'Bike Focus + Endurance - 3 bikes, longer rides',
+    description: 'Extra bike sessions focused on building endurance. Ideal for longer bike distances.'
+  },
+  { 
+    key: 'run_speed', 
+    label: 'Run Focus + Speed - 3 runs, tempo/speed work',
+    description: 'Extra run sessions focused on speed and tempo work. Great for improving run performance.'
+  },
+  { 
+    key: 'run_endurance', 
+    label: 'Run Focus + Endurance - 3 runs, longer runs',
+    description: 'Extra run sessions focused on building endurance. Ideal for longer run distances.'
+  },
+  { 
+    key: 'bike_run_speed', 
+    label: 'Bike + Run Speed - 3 bikes, 2 runs, both high intensity',
+    description: 'High-intensity focus on bike and run. Demanding but effective for performance gains.'
+  },
 ];
 
 export default function AlgorithmPlanBuilder() {
@@ -484,6 +516,13 @@ export default function AlgorithmPlanBuilder() {
                   Choose your training focus based on your goals and available time. Higher training volumes (6-7 days/week) allow for more specialized focus, 
                   while lower volumes (4-5 days/week) work better with balanced training across all disciplines.
                 </p>
+                <div className="mt-3 pt-3 border-t border-blue-200">
+                  <p className="text-sm">
+                    <strong>📊 Session Counts:</strong> The session counts shown (2-3 per discipline) are consistent across all distances. 
+                    For shorter distances (Sprint/Olympic), sessions are shorter but more intense. 
+                    For longer distances (70.3/Ironman), sessions are longer with more volume.
+                  </p>
+                </div>
                 {responses.trainingFrequency && ['6-days', '7-days'].includes(responses.trainingFrequency) && (
                   <div className="mt-3 pt-3 border-t border-blue-200">
                     <p className="text-sm">
@@ -493,21 +532,29 @@ export default function AlgorithmPlanBuilder() {
                   </div>
                 )}
               </div>
-              <div className="space-y-4">
-                {DISCIPLINE_FOCUS_OPTIONS.map((option) => (
-                  <button
-                    key={option.key}
-                    onClick={() => updateResponse('disciplineFocus', option.key)}
-                    className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                      responses.disciplineFocus === option.key
-                        ? 'border-gray-400 bg-gray-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                    }`}
-                  >
-                    <div className="font-semibold">{option.label}</div>
-                  </button>
-                ))}
-              </div>
+              <TooltipProvider>
+                <div className="space-y-4">
+                  {DISCIPLINE_FOCUS_OPTIONS.map((option) => (
+                    <Tooltip key={option.key}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => updateResponse('disciplineFocus', option.key)}
+                          className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                            responses.disciplineFocus === option.key
+                              ? 'border-gray-400 bg-gray-50'
+                              : 'border-gray-300 hover:border-gray-400'
+                          }`}
+                        >
+                          <div className="font-semibold">{option.label}</div>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right" className="max-w-xs">
+                        <p className="text-sm">{option.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  ))}
+                </div>
+              </TooltipProvider>
             </div>
 
             {/* Strength Training Section - Only show after discipline focus is selected */}
