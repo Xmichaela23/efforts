@@ -768,82 +768,119 @@ function applyDisciplineFocusToTemplate(sessions: SessionTemplate[], disciplineF
   });
 }
 
-// Base templates for each distance
+// Base templates for each distance - create the CORRECT number of sessions
 function getSprintTemplate(trainingFrequency: number): SessionTemplate[] {
+  // Sprint: 4-6 days, base template should be 4 days, add sessions for 5-6
   const baseSessions: SessionTemplate[] = [
     { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 30, intensity: 'Zone 2', description: 'Easy swim, recovery from weekend', zones: [2] },
     { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 45, intensity: 'Zone 3', description: 'Tempo bike, build endurance', zones: [3] },
     { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 30, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
-    { day: 'Thursday', discipline: 'swim', type: 'endurance', duration: 25, intensity: 'Zone 2', description: 'Swim technique and recovery', zones: [2] },
-    { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 40, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] },
-    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 60, intensity: 'Zone 2-3', description: 'Bike-run brick, moderate intensity', zones: [2, 3] },
-    { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 35, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
+    { day: 'Thursday', discipline: 'bike', type: 'endurance', duration: 40, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] }
   ];
   
-  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'sprint');
+  return addSessionsForFrequency(baseSessions, trainingFrequency, 'sprint');
 }
 
 function getOlympicTemplate(trainingFrequency: number): SessionTemplate[] {
+  // Olympic: 5-6 days, base template should be 5 days, add session for 6
   const baseSessions: SessionTemplate[] = [
     { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy swim, recovery from weekend', zones: [2] },
     { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 60, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
     { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
     { day: 'Thursday', discipline: 'swim', type: 'endurance', duration: 35, intensity: 'Zone 2', description: 'Swim technique and recovery', zones: [2] },
-    { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 55, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] },
-    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 90, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] },
-    { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 50, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
+    { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 55, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] }
   ];
   
-  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'olympic');
+  return addSessionsForFrequency(baseSessions, trainingFrequency, 'olympic');
 }
 
 function getSeventy3Template(trainingFrequency: number): SessionTemplate[] {
+  // 70.3: 5-7 days, base template should be 5 days, add sessions for 6-7
   const baseSessions: SessionTemplate[] = [
     { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy swim, recovery from weekend', zones: [2] },
     { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 90, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
     { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
     { day: 'Thursday', discipline: 'swim', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Swim technique and recovery', zones: [2] },
-    { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] },
-    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 120, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] },
-    { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 70, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
+    { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] }
   ];
   
-  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'seventy3');
+  return addSessionsForFrequency(baseSessions, trainingFrequency, 'seventy3');
 }
 
 function getIronmanTemplate(trainingFrequency: number): SessionTemplate[] {
+  // Ironman: 6-7 days, base template should be 6 days, add session for 7
   const baseSessions: SessionTemplate[] = [
     { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy swim, recovery from weekend', zones: [2] },
     { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 120, intensity: 'Zone 3', description: 'Moderate bike, build endurance', zones: [3] },
     { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
     { day: 'Thursday', discipline: 'swim', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Swim technique and recovery', zones: [2] },
     { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Easy bike, build endurance', zones: [2] },
-    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 180, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] },
-    { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
+    { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 180, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
   ];
   
-  return adjustTemplateForFrequency(baseSessions, trainingFrequency, 'ironman');
+  return addSessionsForFrequency(baseSessions, trainingFrequency, 'ironman');
 }
 
-// Adjust template based on training frequency
-function adjustTemplateForFrequency(sessions: SessionTemplate[], frequency: number, distance: string): SessionTemplate[] {
+// Add sessions for higher frequency instead of cutting down
+function addSessionsForFrequency(sessions: SessionTemplate[], frequency: number, distance: string): SessionTemplate[] {
   if (frequency === sessions.length) return sessions;
   
-  // For lower frequency, remove some sessions intelligently
+  // For higher frequency, add appropriate sessions
+  if (frequency > sessions.length) {
+    const additionalSessions = [];
+    const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    const usedDays = sessions.map(s => s.day);
+    const availableDays = daysOfWeek.filter(day => !usedDays.includes(day));
+    
+    // Priority for additional sessions based on distance
+    const additionalSessionTypes = {
+      'sprint': [
+        { discipline: 'run', type: 'endurance', description: 'Long run, build endurance' },
+        { discipline: 'brick', type: 'endurance', description: 'Bike-run brick, moderate intensity' }
+      ],
+      'olympic': [
+        { discipline: 'run', type: 'endurance', description: 'Long run, build endurance' },
+        { discipline: 'brick', type: 'endurance', description: 'Bike-run brick, moderate intensity' }
+      ],
+      'seventy3': [
+        { discipline: 'brick', type: 'endurance', description: 'Long bike-run brick' },
+        { discipline: 'run', type: 'endurance', description: 'Long run, build endurance' }
+      ],
+      'ironman': [
+        { discipline: 'run', type: 'endurance', description: 'Long run, build endurance' }
+      ]
+    };
+    
+    const sessionTypes = additionalSessionTypes[distance as keyof typeof additionalSessionTypes] || [];
+    
+    for (let i = 0; i < frequency - sessions.length && i < availableDays.length; i++) {
+      const day = availableDays[i];
+      const sessionType = sessionTypes[i] || { discipline: 'run', type: 'endurance', description: 'Additional training session' };
+      
+      additionalSessions.push({
+        day,
+        discipline: sessionType.discipline as 'swim' | 'bike' | 'run' | 'strength' | 'brick',
+        type: sessionType.type as 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max' | 'anaerobic',
+        duration: getSessionDuration(sessionType.discipline, sessionType.type, distance, 'base'),
+        intensity: sessionType.discipline === 'brick' ? 'Zone 2-3' : 'Zone 2',
+        description: sessionType.description,
+        zones: sessionType.discipline === 'brick' ? [2, 3] : [2]
+      });
+    }
+    
+    return [...sessions, ...additionalSessions];
+  }
+  
+  // For lower frequency (shouldn't happen with proper base templates), remove sessions intelligently
   if (frequency < sessions.length) {
-    // Priority order: brick > tempo > long sessions > core sessions > technique sessions
+    // Priority order: brick > tempo > long sessions > core sessions > other sessions
     const brickSessions = sessions.filter(s => s.discipline === 'brick');
     const tempoSessions = sessions.filter(s => s.type === 'tempo');
     const longSessions = sessions.filter(s => s.day === 'Saturday' || s.day === 'Sunday');
     const coreSessions = sessions.filter(s => 
-      s.day === 'Thursday' || // Thursday is core, not technique
-      (s.day === 'Monday' && s.discipline === 'swim') || // Monday swim is core
-      (s.day === 'Wednesday' && s.discipline === 'run') // Wednesday run is core
-    );
-    const techniqueSessions = sessions.filter(s => 
-      s.discipline === 'swim' && 
-      s.day !== 'Monday' && 
-      s.day !== 'Thursday' // Thursday is not technique
+      s.day === 'Thursday' || 
+      (s.day === 'Monday' && s.discipline === 'swim') || 
+      (s.day === 'Wednesday' && s.discipline === 'run')
     );
     const otherSessions = sessions.filter(s => 
       s.discipline !== 'brick' && 
@@ -855,33 +892,11 @@ function adjustTemplateForFrequency(sessions: SessionTemplate[], frequency: numb
       s.day !== 'Wednesday'
     );
     
-    // Build priority list
-    const prioritySessions = [...brickSessions, ...tempoSessions, ...longSessions, ...coreSessions, ...otherSessions, ...techniqueSessions];
+    const prioritySessions = [...brickSessions, ...tempoSessions, ...longSessions, ...coreSessions, ...otherSessions];
     return prioritySessions.slice(0, frequency);
   }
   
-  // For higher frequency (shouldn't happen with 7-session base), add recovery sessions
-  const additionalSessions = [];
-  const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const usedDays = sessions.map(s => s.day);
-  const availableDays = days.filter(day => !usedDays.includes(day));
-  
-  for (let i = 0; i < frequency - sessions.length; i++) {
-    const day = availableDays[i];
-    if (day) {
-      additionalSessions.push({
-        day,
-        discipline: 'run',
-        type: 'endurance',
-        duration: getSessionDuration('run', 'endurance', distance, 'base'),
-        intensity: 'Zone 2',
-        description: 'Easy recovery run',
-        zones: [2]
-      });
-    }
-  }
-  
-  return [...sessions, ...additionalSessions];
+  return sessions;
 }
 
 function scaleTemplate(template: TrainingTemplate, targetHours: number): TrainingTemplate {
