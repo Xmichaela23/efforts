@@ -636,19 +636,22 @@ export function generateTrainingPlan(
     // Step 1: Get base template for distance and training frequency
     const baseSessions = getBaseTemplateForDistance(distance, trainingFrequency);
     
-    // Step 2: Apply polarized distribution (80% easy, 20% hard)
-    const polarizedSessions = applyPolarizedDistribution(baseSessions, targetHours);
+    // Step 2: Add sessions for higher frequency (this was missing!)
+    const sessionsWithFrequency = addSessionsForFrequency(baseSessions, trainingFrequency, distance);
     
-    // Step 3: Add strength sessions if selected
+    // Step 3: Apply polarized distribution (80% easy, 20% hard)
+    const polarizedSessions = applyPolarizedDistribution(sessionsWithFrequency, targetHours);
+    
+    // Step 4: Add strength sessions if selected
     const sessionsWithStrength = addStrengthSessionsToTemplate(polarizedSessions, strengthOption, phase, weekInPhase, totalWeeksInPhase);
     
-    // Step 4: Apply discipline focus
+    // Step 5: Apply discipline focus
     const sessionsWithFocus = applyDisciplineFocusToTemplate(sessionsWithStrength, disciplineFocus);
     
-    // Step 5: Apply long session preferences
+    // Step 6: Apply long session preferences
     const sessionsWithLongPreferences = applyLongSessionPreferences(sessionsWithFocus, longSessionDays, longSessionOrder);
     
-    // Step 6: Scale to target hours
+    // Step 7: Scale to target hours
     const baseHoursPerWeek = getBaseHoursPerWeek(distance);
     const scalingFactor = targetHours / baseHoursPerWeek;
     const scaledSessions = sessionsWithLongPreferences.map(session => ({
@@ -656,7 +659,7 @@ export function generateTrainingPlan(
       duration: Math.round(session.duration * scalingFactor)
     }));
     
-    // Step 7: Generate detailed workouts
+    // Step 8: Generate detailed workouts
     const detailedSessions = scaledSessions.map(session => {
       const detailedWorkout = generateDetailedWorkout(session, userPerformance, phase, strengthOption, disciplineFocus, userEquipment);
       const garminWorkout = generateGarminWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
