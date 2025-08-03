@@ -4,11 +4,16 @@ import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaTach
 import { AlgorithmTrainingService, type PlanParameters, type UserPerformance } from '../services/AlgorithmTrainingService';
 
 // Preserve all our flow questions and options
-const TRIATHLON_DISTANCES = [
-  { key: 'sprint', label: 'Sprint (750m swim, 20km bike, 5km run)' },
-  { key: 'olympic', label: 'Olympic (1.5km swim, 40km bike, 10km run)' },
+const TRAINING_FOCUS_OPTIONS = [
+  { key: 'sprint', label: 'Sprint Triathlon (750m swim, 20km bike, 5km run)' },
+  { key: 'olympic', label: 'Olympic Triathlon (1.5km swim, 40km bike, 10km run)' },
   { key: 'seventy3', label: '70.3 Half Ironman (1.9km swim, 90km bike, 21km run)' },
   { key: 'ironman', label: 'Full Ironman (3.8km swim, 180km bike, 42km run)' },
+  { key: 'running', label: 'Running Focus (5K to Marathon)' },
+  { key: 'cycling', label: 'Cycling Focus (Road, Gravel, MTB)' },
+  { key: 'swimming', label: 'Swimming Focus (Pool & Open Water)' },
+  { key: 'strength', label: 'Strength Training Focus' },
+  { key: 'hybrid', label: 'Hybrid Training (Multiple Disciplines)' },
 ];
 
 const TIMELINE_OPTIONS = [
@@ -332,19 +337,19 @@ export default function AlgorithmPlanBuilder() {
         // Distance selection
         return (
           <div>
-            <h2 className="text-2xl font-medium mb-6">What are you training for?</h2>
+            <h2 className="text-2xl font-medium mb-6">What would you like to focus on?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {TRIATHLON_DISTANCES.map((distance) => (
+              {TRAINING_FOCUS_OPTIONS.map((focus) => (
                 <button
-                  key={distance.key}
-                  onClick={() => updateResponse('distance', distance.key)}
+                  key={focus.key}
+                  onClick={() => updateResponse('distance', focus.key)}
                   className={`p-4 border rounded-lg text-left transition-colors ${
-                    responses.distance === distance.key
+                    responses.distance === focus.key
                       ? 'border-gray-400 bg-gray-50'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
-                  <div className="font-semibold">{distance.label}</div>
+                  <div className="font-semibold">{focus.label}</div>
                 </button>
               ))}
             </div>
@@ -469,7 +474,7 @@ export default function AlgorithmPlanBuilder() {
                 {(() => {
                   const focus = DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus);
                   const strength = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining);
-                  const distance = TRIATHLON_DISTANCES.find(d => d.key === responses.distance);
+                  const distance = TRAINING_FOCUS_OPTIONS.find(d => d.key === responses.distance);
                   
                   let assessment = "";
                   if (responses.disciplineFocus === 'bike_run_speed' && responses.strengthTraining !== 'none') {
@@ -577,7 +582,7 @@ export default function AlgorithmPlanBuilder() {
                 <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
                   <h3 className="font-semibold text-orange-800 mb-2">Honest Assessment:</h3>
                 {(() => {
-                  const distance = TRIATHLON_DISTANCES.find(d => d.key === responses.distance);
+                  const distance = TRAINING_FOCUS_OPTIONS.find(d => d.key === responses.distance);
                   const focus = DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus);
                   const strength = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining);
                   const days = TRAINING_FREQUENCY_OPTIONS.find(t => t.key === responses.trainingFrequency);
@@ -723,7 +728,7 @@ export default function AlgorithmPlanBuilder() {
           <div>
             <h2 className="text-2xl font-medium mb-6">Review Your Plan</h2>
             <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-              <div><strong>Distance:</strong> {TRIATHLON_DISTANCES.find(d => d.key === responses.distance)?.label}</div>
+              <div><strong>Focus:</strong> {TRAINING_FOCUS_OPTIONS.find(d => d.key === responses.distance)?.label}</div>
               <div><strong>Discipline Focus:</strong> {DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus)?.label}</div>
               <div><strong>Strength:</strong> {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
               <div><strong>Training Days:</strong> {TRAINING_FREQUENCY_OPTIONS.find(t => t.key === responses.trainingFrequency)?.label}</div>
