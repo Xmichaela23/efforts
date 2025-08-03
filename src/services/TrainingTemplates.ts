@@ -2132,7 +2132,7 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
     day: 'Friday',
     discipline: 'bike',
     type: 'endurance',
-    duration: getSessionDuration('bike', 'endurance', distance, phase),
+    duration: getSessionDuration('bike', 'endurance', distance, phase, 'Friday', weekInPhase, totalWeeksInPhase),
     intensity: 'Zone 2',
     description: 'Easy bike, recovery',
     zones: [2]
@@ -2144,8 +2144,8 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
       day: 'Friday',
       discipline: 'strength',
       type: 'endurance',
-      duration: 45, // Shorter strength session
-      intensity: 'Moderate',
+      duration: getStrengthDuration(phase, 2, weekInPhase, totalWeeksInPhase),
+      intensity: getStrengthIntensity(phase),
       description: 'Strength training session 2',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
