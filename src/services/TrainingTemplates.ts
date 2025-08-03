@@ -301,7 +301,7 @@ function getSeventy3Template(): TrainingTemplate {
     distance: 'seventy3',
     baseHours: 12,
     minDays: 6,
-    weeks: generateFullProgression(20, 'seventy3', 12),
+    weeks: generateFullProgression(12, 'seventy3', 12), // Reduced from 20 to 12 weeks for preview
     strengthOptions: STRENGTH_OPTIONS,
     disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
   };
@@ -312,7 +312,7 @@ function getIronmanTemplate(): TrainingTemplate {
     distance: 'ironman',
     baseHours: 15,
     minDays: 6,
-    weeks: generateFullProgression(20, 'ironman', 15),
+    weeks: generateFullProgression(12, 'ironman', 15), // Reduced from 20 to 12 weeks for preview
     strengthOptions: STRENGTH_OPTIONS,
     disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
   };

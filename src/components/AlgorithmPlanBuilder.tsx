@@ -817,34 +817,59 @@ export default function AlgorithmPlanBuilder() {
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <h3 className="font-semibold">{generatedPlan.name}</h3>
                   <p className="text-sm text-gray-600">{generatedPlan.description}</p>
-                  <p className="text-sm text-gray-600">Total workouts: {generatedPlan.workouts?.length || 0}</p>
+                  <p className="text-sm text-gray-600">Total workouts: {generatedPlan.workouts?.length || 0} (12-week preview)</p>
+                  <p className="text-xs text-gray-500 mt-1">Showing first 12 weeks of progression. Full plans typically run 16-20 weeks.</p>
                 </div>
                 
-                {/* Display first few weeks of workouts */}
+                {/* Display workouts grouped by weeks and phases */}
                 {generatedPlan.workouts && generatedPlan.workouts.length > 0 && (
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Your Training Plan</h3>
-                    {generatedPlan.workouts.slice(0, 20).map((workout: any, index: number) => (
-                      <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h4 className="font-medium">{workout.name || `Workout ${index + 1}`}</h4>
-                            <p className="text-sm text-gray-600">{workout.description}</p>
-                            {workout.duration && (
-                              <p className="text-sm text-gray-500">Duration: {workout.duration}</p>
-                            )}
+                  <div className="space-y-6">
+                    <h3 className="text-lg font-medium">Your Training Plan (12-Week Progression)</h3>
+                    
+                    {/* Group workouts by week */}
+                    {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 6)) }, (_, weekIndex) => {
+                      const weekWorkouts = generatedPlan.workouts.slice(weekIndex * 6, (weekIndex + 1) * 6);
+                      const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
+                      const phaseColor = phase === 'Base' ? 'bg-blue-100' : phase === 'Build' ? 'bg-green-100' : phase === 'Peak' ? 'bg-yellow-100' : 'bg-purple-100';
+                      
+                      return (
+                        <div key={weekIndex} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <div className={`p-3 ${phaseColor} border-b border-gray-200`}>
+                            <h4 className="font-semibold">Week {weekIndex + 1} - {phase} Phase</h4>
+                            <p className="text-sm text-gray-600">
+                              {weekWorkouts.length} sessions • {Math.round(weekWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0) / 60)} hours
+                            </p>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            {workout.type && <span className="inline-block px-2 py-1 bg-gray-100 rounded">{workout.type}</span>}
+                          <div className="space-y-2 p-3">
+                            {weekWorkouts.map((workout: any, sessionIndex: number) => (
+                              <div key={sessionIndex} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-b-0">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">{workout.day || `Day ${sessionIndex + 1}`}</span>
+                                    <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+                                    {workout.type && (
+                                      <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+                                    )}
+                                  </div>
+                                  <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                  {workout.intensity && (
+                                    <p className="text-xs text-gray-500">Intensity: {workout.intensity}</p>
+                                  )}
+                                </div>
+                                <div className="text-sm text-gray-500 ml-4">
+                                  {workout.duration && `${workout.duration}min`}
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                    {generatedPlan.workouts.length > 20 && (
-                      <div className="text-center text-gray-500">
-                        <p>... and {generatedPlan.workouts.length - 20} more workouts</p>
-                      </div>
-                    )}
+                      );
+                    })}
+                    
+                    <div className="text-center text-gray-500 p-4 bg-gray-50 rounded-lg">
+                      <p className="font-medium">Progression Overview</p>
+                      <p className="text-sm">Base (Weeks 1-5): Build aerobic foundation • Build (Weeks 6-9): Increase volume & intensity • Peak (Week 10): High intensity • Taper (Weeks 11-12): Reduce volume, maintain intensity</p>
+                    </div>
                   </div>
                 )}
               </div>
