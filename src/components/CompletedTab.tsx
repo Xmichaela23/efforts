@@ -111,6 +111,26 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    return `${f}°F`;
  };
 
+ // Format pace (seconds) to MM:SS format
+ const formatPace = (seconds: any): string => {
+   const num = Number(seconds);
+   if (!num || isNaN(num)) return 'N/A';
+   
+   const minutes = Math.floor(num / 60);
+   const secs = Math.floor(num % 60);
+   return `${minutes}:${secs.toString().padStart(2, '0')}`;
+ };
+
+ // Format swim pace (seconds per 100m) to MM:SS format
+ const formatSwimPace = (seconds: any): string => {
+   const num = Number(seconds);
+   if (!num || isNaN(num)) return 'N/A';
+   
+   const minutes = Math.floor(num / 60);
+   const secs = Math.floor(num % 60);
+   return `${minutes}:${secs.toString().padStart(2, '0')}`;
+ };
+
  const formatTime = (timestamp: any): string => {
    console.log('🔍 formatTime called with:', timestamp, typeof timestamp);
    
@@ -184,80 +204,179 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    return title;
  };
 
- // 🏠 PRIMARY METRICS - Exactly 8 as shown in screenshot
- const primaryMetrics = [
-   {
-     label: 'Distance',
-     value: formatDistance(workoutData.distance),
-     unit: useImperial ? 'mi' : 'mi'
-   },
-   {
-     label: 'Duration', 
-     value: formatDuration(workoutData.duration)
-   },
-   {
-     label: 'Heart Rate',
-     value: workoutData.metrics?.avg_heart_rate ? safeNumber(workoutData.metrics.avg_heart_rate) : 'N/A',
-     unit: 'bpm'
-   },
-   {
-     label: 'Power',
-     value: workoutData.metrics?.avg_power ? safeNumber(workoutData.metrics.avg_power) : 'N/A',
-     unit: 'W'
-   },
-   {
-     label: 'Speed',
-     value: formatSpeed(workoutData.metrics?.avg_speed),
-     unit: useImperial ? 'mph' : 'mph'
-   },
-   {
-     label: 'Cadence',
-     value: workoutData.metrics?.avg_cadence ? safeNumber(workoutData.metrics.avg_cadence) : 'N/A',
-     unit: 'rpm'
-   },
-   {
-     label: 'Elevation',
-     value: formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain),
-     unit: useImperial ? 'ft' : 'ft'
-   },
-   {
-     label: 'Calories',
-     value: workoutData.metrics?.calories ? safeNumber(workoutData.metrics.calories) : 'N/A',
-     unit: 'cal'
-   }
- ];
+   // 🏠 PRIMARY METRICS - Dynamic based on workout type
+  const getPrimaryMetrics = () => {
+    const isRun = workoutType === 'run';
+    const isBike = workoutType === 'ride';
+    const isSwim = workoutType === 'swim';
+    
+    const baseMetrics = [
+      {
+        label: 'Distance',
+        value: formatDistance(workoutData.distance),
+        unit: useImperial ? 'mi' : 'mi'
+      },
+      {
+        label: 'Duration', 
+        value: formatDuration(workoutData.duration)
+      },
+      {
+        label: 'Heart Rate',
+        value: workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate ? safeNumber(workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate) : 'N/A',
+        unit: 'bpm'
+      },
+      {
+        label: 'Elevation',
+        value: formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain),
+        unit: useImperial ? 'ft' : 'ft'
+      },
+      {
+        label: 'Calories',
+        value: workoutData.metrics?.calories || workoutData.calories ? safeNumber(workoutData.metrics?.calories || workoutData.calories) : 'N/A',
+        unit: 'cal'
+      }
+    ];
 
- // 🏠 ADVANCED METRICS - 6 metrics as shown in screenshot
- const advancedMetrics = [
-   {
-     label: 'Max HR',
-     value: workoutData.metrics?.max_heart_rate ? safeNumber(workoutData.metrics.max_heart_rate) : 'N/A',
-     unit: 'bpm'
-   },
-   {
-     label: 'Max Power',
-     value: workoutData.metrics?.max_power ? safeNumber(workoutData.metrics.max_power) : 'N/A',
-     unit: 'W'
-   },
-   {
-     label: 'Max Speed',
-     value: workoutData.metrics?.max_speed ? formatSpeed(workoutData.metrics.max_speed) : 'N/A',
-     unit: useImperial ? 'mph' : 'mph'
-   },
-   {
-     label: 'Max Cadence',
-     value: workoutData.metrics?.max_cadence ? safeNumber(workoutData.metrics.max_cadence) : 'N/A',
-     unit: 'rpm'
-   },
-   {
-     label: 'TSS',
-     value: workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'
-   },
-   {
-     label: 'Intensity Factor',
-     value: workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'
+    // Add discipline-specific metrics
+    if (isRun) {
+      return [
+        ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
+        {
+          label: 'Pace',
+          value: formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace),
+          unit: useImperial ? '/mi' : '/km'
+        },
+        {
+          label: 'Cadence',
+          value: workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A',
+          unit: 'spm'
+        },
+        ...baseMetrics.slice(3) // Elevation, Calories
+      ];
+    } else if (isBike) {
+      return [
+        ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
+        {
+          label: 'Power',
+          value: workoutData.metrics?.avg_power || workoutData.avg_power ? safeNumber(workoutData.metrics?.avg_power || workoutData.avg_power) : 'N/A',
+          unit: 'W'
+        },
+        {
+          label: 'Speed',
+          value: formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed),
+          unit: useImperial ? 'mph' : 'mph'
+        },
+        {
+          label: 'Cadence',
+          value: workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A',
+          unit: 'rpm'
+        },
+        ...baseMetrics.slice(3) // Elevation, Calories
+      ];
+    } else if (isSwim) {
+      return [
+        ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
+        {
+          label: 'Pace',
+          value: formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace),
+          unit: '/100m'
+        },
+        {
+          label: 'Cadence',
+          value: workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A',
+          unit: 'spm'
+        },
+        ...baseMetrics.slice(3) // Elevation, Calories
+      ];
+    }
+
+    return baseMetrics;
+  };
+
+  const primaryMetrics = getPrimaryMetrics();
+
+ // 🏠 ADVANCED METRICS - Dynamic based on workout type
+ const getAdvancedMetrics = () => {
+   const isRun = workoutType === 'run';
+   const isBike = workoutType === 'ride';
+   const isSwim = workoutType === 'swim';
+   
+   const baseMetrics = [
+     {
+       label: 'Max HR',
+       value: workoutData.metrics?.max_heart_rate || workoutData.max_heart_rate ? safeNumber(workoutData.metrics?.max_heart_rate || workoutData.max_heart_rate) : 'N/A',
+       unit: 'bpm'
+     },
+     {
+       label: 'Max Speed',
+       value: workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A',
+       unit: useImperial ? 'mph' : 'mph'
+     },
+     {
+       label: 'Max Cadence',
+       value: workoutData.metrics?.max_cadence || workoutData.max_cadence ? safeNumber(workoutData.metrics?.max_cadence || workoutData.max_cadence) : 'N/A',
+       unit: isRun ? 'spm' : 'rpm'
+     }
+   ];
+
+   // Add discipline-specific metrics
+   if (isRun) {
+     return [
+       ...baseMetrics,
+       {
+         label: 'Max Pace',
+         value: formatPace(workoutData.metrics?.max_pace || workoutData.max_pace),
+         unit: useImperial ? '/mi' : '/km'
+       },
+       {
+         label: 'Steps',
+         value: workoutData.metrics?.steps || workoutData.steps ? safeNumber(workoutData.metrics?.steps || workoutData.steps) : 'N/A'
+       },
+       {
+         label: 'TSS',
+         value: workoutData.metrics?.training_stress_score || workoutData.tss ? safeNumber(Math.round((workoutData.metrics?.training_stress_score || workoutData.tss) * 10) / 10) : 'N/A'
+       }
+     ];
+   } else if (isBike) {
+     return [
+       ...baseMetrics,
+       {
+         label: 'Max Power',
+         value: workoutData.metrics?.max_power || workoutData.max_power ? safeNumber(workoutData.metrics?.max_power || workoutData.max_power) : 'N/A',
+         unit: 'W'
+       },
+       {
+         label: 'TSS',
+         value: workoutData.metrics?.training_stress_score || workoutData.tss ? safeNumber(Math.round((workoutData.metrics?.training_stress_score || workoutData.tss) * 10) / 10) : 'N/A'
+       },
+       {
+         label: 'Intensity Factor',
+         value: workoutData.metrics?.intensity_factor || workoutData.intensity_factor ? `${safeNumber(workoutData.metrics?.intensity_factor || workoutData.intensity_factor)}%` : 'N/A'
+       }
+     ];
+   } else if (isSwim) {
+     return [
+       ...baseMetrics,
+       {
+         label: 'Max Pace',
+         value: formatSwimPace(workoutData.metrics?.max_pace || workoutData.max_pace),
+         unit: '/100m'
+       },
+       {
+         label: 'TSS',
+         value: workoutData.metrics?.training_stress_score || workoutData.tss ? safeNumber(Math.round((workoutData.metrics?.training_stress_score || workoutData.tss) * 10) / 10) : 'N/A'
+       },
+       {
+         label: 'Intensity Factor',
+         value: workoutData.metrics?.intensity_factor || workoutData.intensity_factor ? `${safeNumber(workoutData.metrics?.intensity_factor || workoutData.intensity_factor)}%` : 'N/A'
+       }
+     ];
    }
- ];
+
+   return baseMetrics;
+ };
+
+ const advancedMetrics = getAdvancedMetrics();
 
  // 🏠 TRAINING METRICS - Pull real data from FIT file, remove Weighted Avg Power
  const calculateTotalWork = () => {
@@ -438,25 +557,56 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
          </div>
        </div>
        
-       {/* Speed */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {formatSpeed(workoutData.metrics?.avg_speed)}
+       {/* Dynamic Speed/Pace based on workout type */}
+       {workoutType === 'run' ? (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Pace</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Avg Speed</div>
+       ) : workoutType === 'swim' ? (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Pace</div>
+           </div>
          </div>
-       </div>
+       ) : (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed)}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Speed</div>
+           </div>
+         </div>
+       )}
        
-       {/* Cadence */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.avg_cadence ? safeNumber(workoutData.metrics.avg_cadence) : 'N/A'}
+       {/* Dynamic Power/Cadence based on workout type */}
+       {workoutType === 'ride' ? (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.avg_power || workoutData.avg_power ? safeNumber(workoutData.metrics?.avg_power || workoutData.avg_power) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Power</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Avg Cadence</div>
+       ) : (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Cadence</div>
+           </div>
          </div>
-       </div>
+       )}
        
        {/* Elevation */}
        <div className="px-2 py-1">

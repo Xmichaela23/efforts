@@ -127,6 +127,10 @@ export interface Workout {
   total_cycles?: number;
   deviceInfo?: any;
   metrics?: any;
+  // Run-specific fields
+  avg_pace?: number;
+  max_pace?: number;
+  steps?: number;
 }
 
 export const useWorkouts = () => {
@@ -563,14 +567,20 @@ export const useWorkouts = () => {
           };
 
           // Transform garmin_activities data to workout format
-          const workoutData: Omit<Workout, "id"> = {
+          const workoutData = {
             name: activity.activity_name || `Garmin ${activity.activity_type || 'Activity'}`,
             type: getWorkoutType(activity.activity_type),
             date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
             duration: Math.round((activity.duration_seconds || 0) / 60), // Convert seconds to minutes
             distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined, // Convert meters to km
             description: `Imported from Garmin Connect - ${activity.activity_type}`,
+            userComments: "",
+            completedManually: false,
             workout_status: "completed",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            intervals: [],
+            strength_exercises: [],
             
             // GPS and location data
             timestamp: activity.start_time,
@@ -591,9 +601,16 @@ export const useWorkouts = () => {
             avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
             max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
             
-            // Cadence data
-            avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
-            max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
+            // Run-specific pace data (convert min/km to seconds for display)
+            avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
+            max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
+            
+            // Cadence data (use run-specific cadence for runs, bike for rides)
+            avg_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.avg_run_cadence : activity.avg_bike_cadence,
+            max_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.max_run_cadence : activity.max_bike_cadence,
+            
+            // Run-specific data
+            steps: activity.steps,
             
             // Time data
             moving_time: Math.round(activity.duration_seconds || 0),
@@ -602,7 +619,7 @@ export const useWorkouts = () => {
             // Additional metrics that might be available
             avg_temperature: activity.avg_temperature,
             
-            // Create metrics object for CompletedTab compatibility
+            // Create metrics object for CompletedTab compatibility - FLAT STRUCTURE
             metrics: {
               avg_heart_rate: activity.avg_heart_rate,
               max_heart_rate: activity.max_heart_rate,
@@ -613,14 +630,18 @@ export const useWorkouts = () => {
               elevation_loss: activity.elevation_loss_meters,
               avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
               max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
-              avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
-              max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
+              avg_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.avg_run_cadence : activity.avg_bike_cadence,
+              max_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.max_run_cadence : activity.max_bike_cadence,
               avg_temperature: activity.avg_temperature,
+              // Run-specific metrics
+              avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
+              max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
+              steps: activity.steps,
             }
           };
 
           // Use existing addWorkout function to save the data
-          await addWorkout(workoutData);
+          await addWorkout(workoutData as Omit<Workout, "id">);
           
           console.log(`✅ Imported Garmin activity: ${activity.garmin_activity_id} - ${workoutData.name}`);
           imported++;
