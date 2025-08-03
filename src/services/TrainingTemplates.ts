@@ -104,28 +104,28 @@ export function calculateIntensityZones(
   
   return {
     bike: {
-      zone1: Math.round(ftp * 0.55), // Recovery
-      zone2: Math.round(ftp * 0.75), // Endurance
-      zone3: Math.round(ftp * 0.90), // Tempo
-      zone4: Math.round(ftp * 1.05), // Threshold
-      zone5: Math.round(ftp * 1.20), // VO2max
-      zone6: Math.round(ftp * 1.50)  // Anaerobic
+      zone1: Math.round(ftp * 0.55), // Recovery (50-60% FTP)
+      zone2: Math.round(ftp * 0.68), // Endurance (60-75% FTP)
+      zone3: Math.round(ftp * 0.83), // Tempo (75-90% FTP)
+      zone4: Math.round(ftp * 0.98), // Threshold (90-105% FTP)
+      zone5: Math.round(ftp * 1.13), // VO2max (105-120% FTP)
+      zone6: Math.round(ftp * 1.35)  // Anaerobic (120-150% FTP)
     },
     run: {
-      zone1: easySeconds ? addSecondsToPace(easySeconds, 30) : addSecondsToPace(fiveKSeconds, 90),   // Recovery
-      zone2: easySeconds ? easyPace : addSecondsToPace(fiveKSeconds, 60),   // Endurance (use actual easy pace!)
-      zone3: easySeconds ? subtractSecondsFromPace(easySeconds, 30) : addSecondsToPace(fiveKSeconds, 30),   // Tempo
+      zone1: easySeconds ? addSecondsToPace(easySeconds, 45) : addSecondsToPace(fiveKSeconds, 90),   // Recovery (30-60s slower than easy)
+      zone2: easySeconds ? easyPace : addSecondsToPace(fiveKSeconds, 60),   // Endurance (easy pace)
+      zone3: easySeconds ? subtractSecondsFromPace(easySeconds, 22) : addSecondsToPace(fiveKSeconds, 30),   // Tempo (15-30s faster than easy)
       zone4: addSecondsToPace(fiveKSeconds, 0),    // Threshold (5K pace)
-      zone5: subtractSecondsFromPace(fiveKSeconds, 15), // VO2max
-      zone6: subtractSecondsFromPace(fiveKSeconds, 30)  // Anaerobic
+      zone5: subtractSecondsFromPace(fiveKSeconds, 15), // VO2max (10K pace)
+      zone6: subtractSecondsFromPace(fiveKSeconds, 30)  // Anaerobic (3K pace)
     },
     swim: swimSeconds ? {
-      zone1: addSecondsToSwimPace(swimSeconds, 30),   // Recovery
-      zone2: addSecondsToSwimPace(swimSeconds, 20),   // Endurance
-      zone3: addSecondsToSwimPace(swimSeconds, 10),   // Tempo
-      zone4: addSecondsToSwimPace(swimSeconds, 0),    // Threshold
-      zone5: subtractSecondsFromSwimPace(swimSeconds, 10), // VO2max
-      zone6: subtractSecondsFromSwimPace(swimSeconds, 20)  // Anaerobic
+      zone1: addSecondsToSwimPace(swimSeconds, 25),   // Recovery (20-30s slower than threshold)
+      zone2: addSecondsToSwimPace(swimSeconds, 15),   // Endurance (10-20s slower than threshold)
+      zone3: addSecondsToSwimPace(swimSeconds, 7),    // Tempo (5-10s slower than threshold)
+      zone4: addSecondsToSwimPace(swimSeconds, 0),    // Threshold (current 100m pace)
+      zone5: subtractSecondsFromSwimPace(swimSeconds, 7), // VO2max (5-10s faster than threshold)
+      zone6: subtractSecondsFromSwimPace(swimSeconds, 15) // Anaerobic (10-20s faster than threshold)
     } : null
   };
 }
@@ -711,25 +711,32 @@ function getBaseTemplateForDistance(distance: string, trainingFrequency: number)
 // Step 2: Apply polarized distribution (80% easy, 20% hard)
 function applyPolarizedDistribution(sessions: SessionTemplate[], targetHours: number): SessionTemplate[] {
   const totalMinutes = targetHours * 60;
-  const easyMinutes = Math.floor(totalMinutes * 0.8); // 80% easy
-  const hardMinutes = totalMinutes - easyMinutes; // 20% hard
+  const easyMinutes = Math.floor(totalMinutes * 0.8); // 80% easy (Zone 1-2)
+  const hardMinutes = totalMinutes - easyMinutes; // 20% hard (Zone 3-4)
   
-  // Distribute easy and hard sessions
+  // Categorize sessions by intensity
   const easySessions = sessions.filter(s => s.type === 'endurance' || s.type === 'recovery');
   const hardSessions = sessions.filter(s => s.type === 'tempo' || s.type === 'threshold' || s.discipline === 'brick');
   
-  // Scale session durations to match polarized distribution
-  const easySessionMinutes = easySessions.reduce((sum, s) => sum + s.duration, 0);
-  const hardSessionMinutes = hardSessions.reduce((sum, s) => sum + s.duration, 0);
+  // Calculate current distribution
+  const currentEasyMinutes = easySessions.reduce((sum, s) => sum + s.duration, 0);
+  const currentHardMinutes = hardSessions.reduce((sum, s) => sum + s.duration, 0);
+  const currentTotalMinutes = currentEasyMinutes + currentHardMinutes;
   
-  const easyScalingFactor = easyMinutes / easySessionMinutes;
-  const hardScalingFactor = hardMinutes / hardSessionMinutes;
+  // Calculate scaling factors to achieve 80/20 split
+  const easyScalingFactor = easyMinutes / currentEasyMinutes;
+  const hardScalingFactor = hardMinutes / currentHardMinutes;
   
+  // Apply polarized distribution
   return sessions.map(session => {
     if (session.type === 'endurance' || session.type === 'recovery') {
       return { ...session, duration: Math.round(session.duration * easyScalingFactor) };
-    } else {
+    } else if (session.type === 'tempo' || session.type === 'threshold' || session.discipline === 'brick') {
       return { ...session, duration: Math.round(session.duration * hardScalingFactor) };
+    } else {
+      // For other session types, maintain proportional scaling
+      const totalScalingFactor = totalMinutes / currentTotalMinutes;
+      return { ...session, duration: Math.round(session.duration * totalScalingFactor) };
     }
   });
 }
