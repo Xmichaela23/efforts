@@ -555,6 +555,9 @@ export function generateTrainingPlan(
     fiveKPace: string;
     easyPace?: string; // Optional - Zone 2 conversational pace
     swimPace?: string; // Optional - only required if user has swimming in disciplines
+    squat?: number; // Optional - 1RM squat in lbs
+    deadlift?: number; // Optional - 1RM deadlift in lbs
+    bench?: number; // Optional - 1RM bench press in lbs
   }
 ): TrainingTemplate {
   // Validate inputs - NO FALLBACKS
@@ -597,7 +600,14 @@ export function generateTrainingPlan(
     weeks: scaledTemplate.weeks.map(week => ({
       ...week,
       sessions: week.sessions.map(session => {
-        const detailedWorkout = generateDetailedWorkout(session, userPerformance, week.phase, strengthOption, disciplineFocus);
+        // Pass 1RM data to the detailed workout generation
+        const userPerformanceWith1RM = {
+          ...userPerformance,
+          squat: userPerformance.squat,
+          deadlift: userPerformance.deadlift,
+          bench: userPerformance.bench
+        };
+        const detailedWorkout = generateDetailedWorkout(session, userPerformanceWith1RM, week.phase, strengthOption, disciplineFocus);
         console.log('🔍 DEBUG - Session:', session.discipline, session.type, 'strengthType:', session.strengthType, 'detailedWorkout:', detailedWorkout);
         return {
           ...session,
@@ -1024,15 +1034,28 @@ function generateStrengthWorkout(session: SessionTemplate, userPerformance: any,
   const isPeakPhase = phase === 'peak';
   const isTaperPhase = phase === 'taper';
   
+  // Get user's 1RM values (with fallbacks if not available)
+  const squat1RM = userPerformance.squat || 135; // Default 135 lbs
+  const deadlift1RM = userPerformance.deadlift || 185; // Default 185 lbs
+  const bench1RM = userPerformance.bench || 115; // Default 115 lbs
+  
+  // Calculate actual weights based on percentages
+  const squatWeight = Math.round(squat1RM * 0.8); // 80% of 1RM
+  const deadliftWeight = Math.round(deadlift1RM * 0.85); // 85% of 1RM
+  const benchWeight = Math.round(bench1RM * 0.75); // 75% of 1RM
+  const overheadWeight = Math.round(bench1RM * 0.75); // 75% of 1RM for overhead press
+  const rowWeight = Math.round(bench1RM * 0.7); // 70% of 1RM for rows
+  const powerCleanWeight = Math.round(deadlift1RM * 0.8); // 80% of 1RM for power cleans
+  
   switch (strengthType) {
     case 'power':
       const powerSets = isPeakPhase ? 4 : 3;
       const powerReps = isTaperPhase ? 3 : 5;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Power Cleans ${powerSets}x${powerReps} @ 80% 1RM, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Power Cleans ${powerSets}x${powerReps} @ ${powerCleanWeight}lbs, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
     case 'compound':
       const compoundSets = isPeakPhase ? 4 : 3;
       const compoundReps = isTaperPhase ? 3 : 5;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${compoundSets}x${compoundReps} @ 80% 1RM, Deadlift ${compoundSets}x3 @ 85% 1RM, Bench Press ${compoundSets}x${compoundReps} @ 75% 1RM\nCool-down: 5min static stretching`;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${compoundSets}x${compoundReps} @ ${squatWeight}lbs, Deadlift ${compoundSets}x3 @ ${deadliftWeight}lbs, Bench Press ${compoundSets}x${compoundReps} @ ${benchWeight}lbs\nCool-down: 5min static stretching`;
     case 'stability':
       const stabilitySets = isPeakPhase ? 4 : 3;
       const stabilityTime = isTaperPhase ? 45 : 60;
@@ -1044,7 +1067,7 @@ function generateStrengthWorkout(session: SessionTemplate, userPerformance: any,
     case 'cowboy_compound':
       const cowboyCompoundSets = isPeakPhase ? 4 : 3;
       const cowboyCompoundReps = isTaperPhase ? 3 : 5;
-      return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift ${cowboyCompoundSets}x${cowboyCompoundReps} @ 80% 1RM, Overhead press ${cowboyCompoundSets}x${cowboyCompoundReps} @ 75% 1RM, Rows ${cowboyCompoundSets}x8 @ 70% 1RM\nCool-down: 5min static stretching`;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${deadliftWeight}lbs, Overhead press ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${overheadWeight}lbs, Rows ${cowboyCompoundSets}x8 @ ${rowWeight}lbs\nCool-down: 5min static stretching`;
     default:
       return session.description;
   }

@@ -280,7 +280,10 @@ export default function AlgorithmPlanBuilder() {
           swimPace: baselines.performanceNumbers.swimPace100 || 
                    baselines.performanceNumbers.swimPace || 
                    baselines.performanceNumbers.swim || 
-                   undefined
+                   undefined,
+          squat: baselines.performanceNumbers.squat,
+          deadlift: baselines.performanceNumbers.deadlift,
+          bench: baselines.performanceNumbers.bench
         }
       };
 

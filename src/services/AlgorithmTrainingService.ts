@@ -50,6 +50,9 @@ export interface UserPerformance {
   fiveKPace: string; // format: "MM:SS"
   easyPace?: string; // format: "MM:SS" - Zone 2 conversational pace
   swimPace?: string;   // format: "MM:SS/100m" - optional
+  squat?: number; // 1RM squat in lbs
+  deadlift?: number; // 1RM deadlift in lbs
+  bench?: number; // 1RM bench press in lbs
 }
 
 export interface PlanParameters {
