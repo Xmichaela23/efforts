@@ -303,6 +303,13 @@ export default function AlgorithmPlanBuilder() {
       
       console.log('✅ Rithm plan generated:', algorithmPlan);
       
+      // Debug: Check what the algorithm actually returned
+      if (algorithmPlan.workouts && algorithmPlan.workouts.length > 0) {
+        const firstWorkout = algorithmPlan.workouts[0];
+        console.log('🔍 DEBUG - First workout structure:', firstWorkout);
+        console.log('🔍 DEBUG - First workout keys:', Object.keys(firstWorkout));
+      }
+      
       // Create plan object
       const plan = {
         id: `plan-${Date.now()}`,
@@ -914,7 +921,9 @@ export default function AlgorithmPlanBuilder() {
                                       <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
                                     </div>
                                   ) : (
-                                    <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                    <div>
+                                      <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                    </div>
                                   )}
                                   {workout.intensity && (
                                     <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>

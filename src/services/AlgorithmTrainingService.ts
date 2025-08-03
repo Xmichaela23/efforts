@@ -37,6 +37,11 @@ export interface AlgorithmTrainingPlan {
     description: string;
     intervals?: any[];
     strength_exercises?: any[];
+    detailedWorkout?: string;
+    discipline?: string;
+    intensity?: string;
+    zones?: number[];
+    strengthType?: string;
   }>;
 }
 
@@ -204,9 +209,14 @@ export class AlgorithmTrainingService {
           type: session.discipline,
           date: sessionDate.toISOString().split('T')[0],
           duration: session.duration,
-          description: `${session.description} (${session.intensity})`,
+          description: session.detailedWorkout || `${session.description} (${session.intensity})`,
           intervals: session.zones.length > 0 ? [{ zones: session.zones }] : undefined,
-          strength_exercises: session.strengthType ? [{ type: session.strengthType }] : undefined
+          strength_exercises: session.strengthType ? [{ type: session.strengthType }] : undefined,
+          detailedWorkout: session.detailedWorkout,
+          discipline: session.discipline,
+          intensity: session.intensity,
+          zones: session.zones,
+          strengthType: session.strengthType
         };
       });
     });
