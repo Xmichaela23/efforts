@@ -2016,10 +2016,10 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     zones: [2]
   });
   
-  // Monday: Strength Session 1 (if needed) - after easy swim, good recovery from weekend
+  // Thursday: Strength Session 1 (if needed) - after easy run, good recovery spacing
   if (actualStrengthSessions >= 1) {
     sessions.push({
-      day: 'Monday',
+      day: 'Thursday',
       discipline: 'strength',
       type: 'endurance',
       duration: getStrengthDuration(phase, 1, weekInPhase, totalWeeksInPhase),
@@ -2041,7 +2041,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     zones: [4]
   });
   
-  // Saturday: Brick (no strength before brick - better recovery)
+  // Saturday: Brick (long session day)
   sessions.push({
     day: 'Saturday',
     discipline: 'brick',
@@ -2127,20 +2127,6 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
     });
   }
   
-  // Friday: Bike (recovery) + Strength Session 2 (if needed)
-  if (actualStrengthSessions >= 2) {
-    sessions.push({
-      day: 'Friday',
-      discipline: 'strength',
-      type: 'endurance',
-      duration: 45, // Shorter strength session
-      intensity: 'Moderate',
-      description: 'Strength training session 2',
-      zones: [2],
-      strengthType: getStrengthType(strengthOption)
-    });
-  }
-  
   // Friday: Bike (recovery) - easy day before brick
   sessions.push({
     day: 'Friday',
@@ -2152,15 +2138,15 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
     zones: [2]
   });
   
-  // Saturday: Brick + Strength Session 3 (if needed)
-  if (actualStrengthSessions >= 3) {
+  // Friday: Strength Session 2 (if needed) - after bike
+  if (actualStrengthSessions >= 2) {
     sessions.push({
-      day: 'Saturday',
+      day: 'Friday',
       discipline: 'strength',
       type: 'endurance',
-      duration: 30, // Short strength session before brick
+      duration: 45, // Shorter strength session
       intensity: 'Moderate',
-      description: 'Strength training session 3 (pre-brick)',
+      description: 'Strength training session 2',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
     });
@@ -2176,6 +2162,20 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
     description: 'Long bike-run brick',
     zones: [2, 3]
   });
+  
+  // Sunday: Strength Session 3 (if needed) - after brick, full recovery before next week
+  if (actualStrengthSessions >= 3) {
+    sessions.push({
+      day: 'Sunday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 30, // Short strength session
+      intensity: 'Moderate',
+      description: 'Strength training session 3 (post-brick recovery)',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
   
   return sessions;
 }
@@ -2238,20 +2238,6 @@ function generate7DayTemplate(distance: string, strengthOption: string, discipli
     });
   }
   
-  // Friday: Swim + Strength Session 2 (if needed)
-  if (actualStrengthSessions >= 2) {
-    sessions.push({
-      day: 'Friday',
-      discipline: 'strength',
-      type: 'endurance',
-      duration: 45, // Shorter strength session
-      intensity: 'Moderate',
-      description: 'Strength training session 2',
-      zones: [2],
-      strengthType: getStrengthType(strengthOption)
-    });
-  }
-  
   // Friday: Swim
   sessions.push({
     day: 'Friday',
@@ -2263,15 +2249,15 @@ function generate7DayTemplate(distance: string, strengthOption: string, discipli
     zones: [4]
   });
   
-  // Saturday: Brick + Strength Session 3 (if needed)
-  if (actualStrengthSessions >= 3) {
+  // Friday: Strength Session 2 (if needed) - after swim
+  if (actualStrengthSessions >= 2) {
     sessions.push({
-      day: 'Saturday',
+      day: 'Friday',
       discipline: 'strength',
       type: 'endurance',
-      duration: 30, // Short strength session before brick
+      duration: 45, // Shorter strength session
       intensity: 'Moderate',
-      description: 'Strength training session 3 (pre-brick)',
+      description: 'Strength training session 2',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
     });
@@ -2287,6 +2273,20 @@ function generate7DayTemplate(distance: string, strengthOption: string, discipli
     description: 'Long bike-run brick',
     zones: [2, 3]
   });
+  
+  // Saturday: Strength Session 3 (if needed) - after brick
+  if (actualStrengthSessions >= 3) {
+    sessions.push({
+      day: 'Saturday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 30, // Short strength session after brick
+      intensity: 'Moderate',
+      description: 'Strength training session 3 (post-brick)',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
   
   // Sunday: Active recovery
   sessions.push({

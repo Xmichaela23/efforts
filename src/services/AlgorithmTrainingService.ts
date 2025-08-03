@@ -32,6 +32,7 @@ export interface AlgorithmTrainingPlan {
   workouts: Array<{
     name: string;
     type: string;
+    day?: string; // Day of the week (Monday, Tuesday, etc.)
     date: string;
     duration: number;
     description: string;
@@ -226,17 +227,18 @@ export class AlgorithmTrainingService {
         return {
           name: `${session.discipline.charAt(0).toUpperCase() + session.discipline.slice(1)} - ${session.type}`,
           type: session.discipline,
+          day: session.day, // Preserve the day name
           date: sessionDate.toISOString().split('T')[0],
           duration: session.duration,
           description: session.detailedWorkout || `${session.description} (${session.intensity})`,
           intervals: session.zones.length > 0 ? [{ zones: session.zones }] : undefined,
           strength_exercises: session.strengthType ? [{ type: session.strengthType }] : undefined,
-                  detailedWorkout: session.detailedWorkout,
-        discipline: session.discipline,
-        intensity: session.intensity,
-        zones: session.zones,
-        strengthType: session.strengthType,
-        garminWorkout: session.garminWorkout
+          detailedWorkout: session.detailedWorkout,
+          discipline: session.discipline,
+          intensity: session.intensity,
+          zones: session.zones,
+          strengthType: session.strengthType,
+          garminWorkout: session.garminWorkout
         };
       });
     });
