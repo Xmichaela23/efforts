@@ -516,7 +516,8 @@ function getBaseSessionsForDistance(distance: string): SessionTemplate[] {
         { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
         { day: 'Thursday', discipline: 'swim', type: 'threshold', duration: 60, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
         { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Easy bike, recovery', zones: [2] },
-        { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 180, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
+        { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 180, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] },
+        { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
       ];
     case 'running':
       return [
@@ -933,84 +934,78 @@ function determineStrengthDays(existingSessions: SessionTemplate[], strengthSess
   
   const availableDays = daysOfWeek.filter(day => !usedDays.includes(day));
   
+  // Predefined optimal strength day combinations
+  const optimalCombinations = {
+    2: [['Tuesday', 'Friday'], ['Tuesday', 'Thursday'], ['Wednesday', 'Saturday']],
+    3: [['Tuesday', 'Thursday', 'Sunday'], ['Monday', 'Wednesday', 'Friday']]
+  };
+  
+  // Try optimal combinations first
+  const combinations = optimalCombinations[strengthSessionsPerWeek] || [];
+  for (const combination of combinations) {
+    const isValid = combination.every(day => 
+      !highIntensityDays.includes(day) && 
+      !combination.some(otherDay => 
+        otherDay !== day && 
+        Math.abs(daysOfWeek.indexOf(day) - daysOfWeek.indexOf(otherDay)) <= 1
+      )
+    );
+    
+    if (isValid) {
+      return combination;
+    }
+  }
+  
+  // Fallback: build combination manually
   const selectedDays: string[] = [];
   
-  if (strengthSessionsPerWeek === 2) {
-    // 2x/week: Tuesday + Friday (or best available)
-    const preferredDays = ['Tuesday', 'Friday'];
-    for (const day of preferredDays) {
-      if (!highIntensityDays.includes(day) && !selectedDays.includes(day)) {
-        selectedDays.push(day);
-      }
-    }
-    
-    // If we don't have 2 days yet, use available days
-    for (const day of availableDays) {
-      if (selectedDays.length < 2 && !highIntensityDays.includes(day) && !selectedDays.includes(day)) {
-        selectedDays.push(day);
-      }
-    }
-    
-    // If still need more, use low-intensity days
-    for (const day of lowIntensityDays) {
-      if (selectedDays.length < 2 && !selectedDays.includes(day)) {
-        selectedDays.push(day);
-      }
-    }
-  } else if (strengthSessionsPerWeek === 3) {
-    // 3x/week: Tuesday + Thursday + Sunday (or Monday)
-    const preferredDays = ['Tuesday', 'Thursday', 'Sunday'];
-    for (const day of preferredDays) {
-      if (!highIntensityDays.includes(day) && !selectedDays.includes(day)) {
-        selectedDays.push(day);
-      }
-    }
-    
-    // If we don't have 3 days yet, use available days
-    for (const day of availableDays) {
-      if (selectedDays.length < 3 && !highIntensityDays.includes(day) && !selectedDays.includes(day)) {
-        selectedDays.push(day);
-      }
-    }
-    
-    // If still need more, use low-intensity days
-    for (const day of lowIntensityDays) {
-      if (selectedDays.length < 3 && !selectedDays.includes(day)) {
-        selectedDays.push(day);
-      }
-    }
-  }
-  
-  // Ensure no consecutive days
-  const finalDays: string[] = [];
-  for (const day of selectedDays) {
-    const dayIndex = daysOfWeek.indexOf(day);
-    const hasAdjacentDay = finalDays.some(selectedDay => {
-      const selectedIndex = daysOfWeek.indexOf(selectedDay);
-      return Math.abs(dayIndex - selectedIndex) <= 1;
-    });
-    
-    if (!hasAdjacentDay) {
-      finalDays.push(day);
-    }
-  }
-  
-  // If we still don't have enough days, add any remaining non-consecutive days
-  for (const day of daysOfWeek) {
-    if (finalDays.length < strengthSessionsPerWeek && !finalDays.includes(day)) {
-      const dayIndex = daysOfWeek.indexOf(day);
-      const hasAdjacentDay = finalDays.some(selectedDay => {
+  // Start with available days that aren't high intensity
+  for (const day of availableDays) {
+    if (selectedDays.length < strengthSessionsPerWeek && !highIntensityDays.includes(day)) {
+      // Check if this day is adjacent to any already selected day
+      const isAdjacent = selectedDays.some(selectedDay => {
+        const dayIndex = daysOfWeek.indexOf(day);
         const selectedIndex = daysOfWeek.indexOf(selectedDay);
         return Math.abs(dayIndex - selectedIndex) <= 1;
       });
       
-      if (!hasAdjacentDay) {
-        finalDays.push(day);
+      if (!isAdjacent) {
+        selectedDays.push(day);
       }
     }
   }
   
-  return finalDays.slice(0, strengthSessionsPerWeek);
+  // If we still need more days, use low-intensity days
+  for (const day of lowIntensityDays) {
+    if (selectedDays.length < strengthSessionsPerWeek && !selectedDays.includes(day)) {
+      const isAdjacent = selectedDays.some(selectedDay => {
+        const dayIndex = daysOfWeek.indexOf(day);
+        const selectedIndex = daysOfWeek.indexOf(selectedDay);
+        return Math.abs(dayIndex - selectedIndex) <= 1;
+      });
+      
+      if (!isAdjacent) {
+        selectedDays.push(day);
+      }
+    }
+  }
+  
+  // If still need more, use any remaining non-consecutive days
+  for (const day of daysOfWeek) {
+    if (selectedDays.length < strengthSessionsPerWeek && !selectedDays.includes(day)) {
+      const isAdjacent = selectedDays.some(selectedDay => {
+        const dayIndex = daysOfWeek.indexOf(day);
+        const selectedIndex = daysOfWeek.indexOf(selectedDay);
+        return Math.abs(dayIndex - selectedIndex) <= 1;
+      });
+      
+      if (!isAdjacent) {
+        selectedDays.push(day);
+      }
+    }
+  }
+  
+  return selectedDays.slice(0, strengthSessionsPerWeek);
 }
 
 function createStrengthSession(day: string, strengthOption: StrengthOption, sessionNumber: number): SessionTemplate {

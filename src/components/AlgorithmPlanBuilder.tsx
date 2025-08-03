@@ -1437,7 +1437,10 @@ export default function AlgorithmPlanBuilder() {
         'swim': 'Swim Focus',
         'bike_run_speed': 'Bike+Run Speed Focus'
       };
-      title += ` (${focusNames[responses.disciplineFocus] || ''})`;
+      const focusName = focusNames[responses.disciplineFocus];
+      if (focusName) {
+        title += ` (${focusName})`;
+      }
     }
     
     return `${title} Plan (12-Week Progression)`;
