@@ -509,19 +509,41 @@ export default function AlgorithmPlanBuilder() {
 
                 {/* Strength Options */}
                 <div className="space-y-4">
-                  {STRENGTH_OPTIONS.map((option) => (
-                    <button
-                      key={option.key}
-                      onClick={() => updateResponse('strengthTraining', option.key)}
-                      className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                        responses.strengthTraining === option.key
-                          ? 'border-gray-400 bg-gray-50'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
-                    >
-                      <div className="font-semibold">{option.label}</div>
-                    </button>
-                  ))}
+                  {STRENGTH_OPTIONS.map((option) => {
+                    // Gating logic for strength options based on training days
+                    let isDisabled = false;
+                    let disabledReason = "";
+                    
+                    // Check if this strength option requires more sessions than available training days
+                    if (option.key === 'cowboy_endurance' || option.key === 'cowboy_compound') {
+                      // These require 3 sessions/week
+                      const trainingDays = parseInt(responses.trainingFrequency?.split('-')[0] || '0');
+                      if (trainingDays > 0 && trainingDays < 6) {
+                        isDisabled = true;
+                        disabledReason = "Cowboy options require 6-7 training days/week";
+                      }
+                    }
+                    
+                    return (
+                      <button
+                        key={option.key}
+                        onClick={() => !isDisabled && updateResponse('strengthTraining', option.key)}
+                        disabled={isDisabled}
+                        className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                          responses.strengthTraining === option.key
+                            ? 'border-gray-400 bg-gray-50'
+                            : isDisabled
+                            ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                            : 'border-gray-300 hover:border-gray-400'
+                        }`}
+                      >
+                        <div className="font-semibold">{option.label}</div>
+                        {isDisabled && (
+                          <div className="text-sm text-red-600 mt-1">{disabledReason}</div>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}

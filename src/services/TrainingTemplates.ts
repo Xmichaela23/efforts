@@ -1876,6 +1876,19 @@ function generate4DayTemplate(distance: string, strengthOption: string, discipli
 function generate5DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
   const sessions: SessionTemplate[] = [];
   
+  // Get strength option details for gating logic
+  const strengthDetails = STRENGTH_OPTIONS.find(opt => opt.id === strengthOption);
+  const strengthSessionsNeeded = strengthDetails?.sessionsPerWeek || 0;
+  
+  // GATING LOGIC: Check if strength option is compatible with 5-day training
+  if (strengthSessionsNeeded > 2) {
+    // Cowboy options (3 sessions) are not compatible with 5-day training
+    // Only allow 2 strength sessions max for 5-day plans
+    console.warn(`⚠️ ${strengthDetails?.name} requires ${strengthSessionsNeeded} sessions/week but 5-day plan only supports 2 max. Reducing to 2 sessions.`);
+  }
+  
+  const actualStrengthSessions = Math.min(strengthSessionsNeeded, 2);
+  
   // Monday: Swim
   sessions.push({
     day: 'Monday',
@@ -1909,15 +1922,15 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     zones: [2]
   });
   
-  // Thursday: Strength (if selected)
-  if (strengthOption !== 'none') {
+  // Thursday: Strength Session 1 (if needed)
+  if (actualStrengthSessions >= 1) {
     sessions.push({
       day: 'Thursday',
       discipline: 'strength',
       type: 'endurance',
       duration: 60, // 1 hour strength session
       intensity: 'Moderate',
-      description: 'Strength training session',
+      description: 'Strength training session 1',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
     });
@@ -1933,6 +1946,21 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     description: 'Swim intervals, build speed',
     zones: [4]
   });
+  
+  // Saturday: Brick + Strength Session 2 (if needed)
+  if (actualStrengthSessions >= 2) {
+    // Add strength session before brick
+    sessions.push({
+      day: 'Saturday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 45, // Shorter strength session before brick
+      intensity: 'Moderate',
+      description: 'Strength training session 2 (pre-brick)',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
   
   // Saturday: Brick
   sessions.push({
@@ -1952,6 +1980,13 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
 function generate6DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
   const sessions: SessionTemplate[] = [];
   
+  // Get strength option details for gating logic
+  const strengthDetails = STRENGTH_OPTIONS.find(opt => opt.id === strengthOption);
+  const strengthSessionsNeeded = strengthDetails?.sessionsPerWeek || 0;
+  
+  // 6-day template can handle up to 3 strength sessions
+  const actualStrengthSessions = Math.min(strengthSessionsNeeded, 3);
+  
   // Monday: Swim
   sessions.push({
     day: 'Monday',
@@ -1985,15 +2020,29 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
     zones: [2]
   });
   
-  // Thursday: Strength (if selected)
-  if (strengthOption !== 'none') {
+  // Thursday: Strength Session 1
+  if (actualStrengthSessions >= 1) {
     sessions.push({
       day: 'Thursday',
       discipline: 'strength',
       type: 'endurance',
       duration: 60, // 1 hour strength session
       intensity: 'Moderate',
-      description: 'Strength training session',
+      description: 'Strength training session 1',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
+  
+  // Friday: Bike (recovery) + Strength Session 2 (if needed)
+  if (actualStrengthSessions >= 2) {
+    sessions.push({
+      day: 'Friday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 45, // Shorter strength session
+      intensity: 'Moderate',
+      description: 'Strength training session 2',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
     });
@@ -2009,6 +2058,20 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
     description: 'Easy bike, recovery',
     zones: [2]
   });
+  
+  // Saturday: Brick + Strength Session 3 (if needed)
+  if (actualStrengthSessions >= 3) {
+    sessions.push({
+      day: 'Saturday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 30, // Short strength session before brick
+      intensity: 'Moderate',
+      description: 'Strength training session 3 (pre-brick)',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
   
   // Saturday: Brick (endurance)
   sessions.push({
@@ -2028,6 +2091,13 @@ function generate6DayTemplate(distance: string, strengthOption: string, discipli
 function generate7DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
   const sessions: SessionTemplate[] = [];
   
+  // Get strength option details for gating logic
+  const strengthDetails = STRENGTH_OPTIONS.find(opt => opt.id === strengthOption);
+  const strengthSessionsNeeded = strengthDetails?.sessionsPerWeek || 0;
+  
+  // 7-day template can handle up to 3 strength sessions
+  const actualStrengthSessions = Math.min(strengthSessionsNeeded, 3);
+  
   // Monday: Swim
   sessions.push({
     day: 'Monday',
@@ -2061,15 +2131,29 @@ function generate7DayTemplate(distance: string, strengthOption: string, discipli
     zones: [2]
   });
   
-  // Thursday: Strength (if selected)
-  if (strengthOption !== 'none') {
+  // Thursday: Strength Session 1
+  if (actualStrengthSessions >= 1) {
     sessions.push({
       day: 'Thursday',
       discipline: 'strength',
       type: 'endurance',
       duration: 60, // 1 hour strength session
       intensity: 'Moderate',
-      description: 'Strength training session',
+      description: 'Strength training session 1',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
+  
+  // Friday: Swim + Strength Session 2 (if needed)
+  if (actualStrengthSessions >= 2) {
+    sessions.push({
+      day: 'Friday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 45, // Shorter strength session
+      intensity: 'Moderate',
+      description: 'Strength training session 2',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
     });
@@ -2085,6 +2169,20 @@ function generate7DayTemplate(distance: string, strengthOption: string, discipli
     description: 'Swim intervals, build speed',
     zones: [4]
   });
+  
+  // Saturday: Brick + Strength Session 3 (if needed)
+  if (actualStrengthSessions >= 3) {
+    sessions.push({
+      day: 'Saturday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: 30, // Short strength session before brick
+      intensity: 'Moderate',
+      description: 'Strength training session 3 (pre-brick)',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
   
   // Saturday: Brick
   sessions.push({
