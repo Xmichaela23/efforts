@@ -602,7 +602,7 @@ export function generateTrainingPlan(
       ...week,
       sessions: week.sessions.map(session => ({
         ...session,
-        detailedWorkout: generateDetailedWorkout(session, userPerformance, week.phase)
+        detailedWorkout: generateDetailedWorkout(session, userPerformance, week.phase, strengthOption, disciplineFocus)
       }))
     }))
   };
@@ -879,103 +879,191 @@ export function getStrengthSuggestion(disciplineFocus: string) {
 } 
 
 // Generate detailed workout structure for each session
-function generateDetailedWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
-  const { discipline, type, duration, intensity, zones } = session;
+function generateDetailedWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthOption?: string, disciplineFocus?: string): string {
+  const { discipline, type, duration, intensity, zones, strengthType } = session;
+  
+  // Use the session's strengthType if available, otherwise use the user's selected strength option
+  const effectiveStrengthType = strengthType || strengthOption;
   
   switch (discipline) {
     case 'swim':
-      return generateSwimWorkout(session, userPerformance, phase);
+      return generateSwimWorkout(session, userPerformance, phase, disciplineFocus);
     case 'bike':
-      return generateBikeWorkout(session, userPerformance, phase);
+      return generateBikeWorkout(session, userPerformance, phase, disciplineFocus);
     case 'run':
-      return generateRunWorkout(session, userPerformance, phase);
+      return generateRunWorkout(session, userPerformance, phase, disciplineFocus);
     case 'strength':
-      return generateStrengthWorkout(session, userPerformance, phase);
+      return generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType);
     case 'brick':
-      return generateBrickWorkout(session, userPerformance, phase);
+      return generateBrickWorkout(session, userPerformance, phase, disciplineFocus);
     default:
       return session.description;
   }
 }
 
-function generateSwimWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+function generateSwimWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
   const { type, duration, zones } = session;
   const swimPace = userPerformance.swimPace || "2:00/100m";
   
-  switch (type) {
-    case 'endurance':
-      return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${Math.floor(duration * 0.6 / 2)}x200m @ ${swimPace}, 30s rest\nCool-down: 200m easy`;
-    case 'threshold':
-      return `Warm-up: 300m easy, 6x50m drills\nMain Set: 8x100m @ threshold pace, 30s rest\nCool-down: 200m easy`;
-    case 'tempo':
-      return `Warm-up: 200m easy, 4x50m drills\nMain Set: 4x150m @ tempo pace, 45s rest\nCool-down: 200m easy`;
-    case 'vo2max':
-      return `Warm-up: 300m easy, 6x50m drills\nMain Set: 10x50m @ max effort, 60s rest\nCool-down: 200m easy`;
-    default:
-      return session.description;
-  }
-}
-
-function generateBikeWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
-  const { type, duration, zones } = session;
-  const ftp = userPerformance.ftp || 200;
+  // Adjust intensity based on training phase
+  const phaseMultiplier = getPhaseIntensityMultiplier(phase);
+  const adjustedDuration = Math.floor(duration * phaseMultiplier);
+  
+  // Adjust based on discipline focus
+  const isSwimFocused = disciplineFocus?.includes('swim');
+  const focusMultiplier = isSwimFocused ? 1.2 : 1.0;
   
   switch (type) {
     case 'endurance':
-      return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${Math.floor(duration * 0.7)}min steady @ Zone 2\nCool-down: 10min easy spinning`;
-    case 'tempo':
-      return `Warm-up: 15min easy spinning\nMain Set: 3x${Math.floor(duration * 0.6 / 3)}min @ 85-90% FTP, 5min easy between\nCool-down: 10min easy`;
+      const enduranceSets = Math.floor((adjustedDuration * 0.6 / 2) * focusMultiplier);
+      return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${enduranceSets}x200m @ ${swimPace}, 30s rest\nCool-down: 200m easy`;
     case 'threshold':
-      return `Warm-up: 15min easy spinning\nMain Set: 4x8min @ FTP, 4min easy between\nCool-down: 10min easy`;
+      const thresholdSets = isSwimFocused ? 10 : 8;
+      return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${thresholdSets}x100m @ threshold pace, 30s rest\nCool-down: 200m easy`;
+    case 'tempo':
+      const tempoSets = isSwimFocused ? 5 : 4;
+      return `Warm-up: 200m easy, 4x50m drills\nMain Set: ${tempoSets}x150m @ tempo pace, 45s rest\nCool-down: 200m easy`;
     case 'vo2max':
-      return `Warm-up: 15min easy spinning\nMain Set: 6x3min @ 110% FTP, 3min easy between\nCool-down: 10min easy`;
+      const vo2maxSets = isSwimFocused ? 12 : 10;
+      return `Warm-up: 300m easy, 6x50m drills\nMain Set: ${vo2maxSets}x50m @ max effort, 60s rest\nCool-down: 200m easy`;
     default:
       return session.description;
   }
 }
 
-function generateRunWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+function generateBikeWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
+  const { type, duration, zones } = session;
+  const ftp = userPerformance.ftp || 200;
+  
+  // Adjust intensity based on training phase
+  const phaseMultiplier = getPhaseIntensityMultiplier(phase);
+  const adjustedDuration = Math.floor(duration * phaseMultiplier);
+  
+  // Adjust based on discipline focus
+  const isBikeFocused = disciplineFocus?.includes('bike');
+  const focusMultiplier = isBikeFocused ? 1.2 : 1.0;
+  
+  switch (type) {
+    case 'endurance':
+      const enduranceTime = Math.floor((adjustedDuration * 0.7) * focusMultiplier);
+      return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${enduranceTime}min steady @ Zone 2\nCool-down: 10min easy spinning`;
+    case 'tempo':
+      const tempoIntervals = isBikeFocused ? 4 : 3;
+      const tempoTime = Math.floor((adjustedDuration * 0.6 / tempoIntervals));
+      return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ 85-90% FTP, 5min easy between\nCool-down: 10min easy`;
+    case 'threshold':
+      const thresholdIntervals = isBikeFocused ? 5 : 4;
+      return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x8min @ FTP, 4min easy between\nCool-down: 10min easy`;
+    case 'vo2max':
+      const vo2maxIntervals = isBikeFocused ? 8 : 6;
+      return `Warm-up: 15min easy spinning\nMain Set: ${vo2maxIntervals}x3min @ 110% FTP, 3min easy between\nCool-down: 10min easy`;
+    default:
+      return session.description;
+  }
+}
+
+function generateRunWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
   const { type, duration, zones } = session;
   const fiveKPace = userPerformance.fiveKPace || "24:00";
   const easyPace = userPerformance.easyPace || "9:00/mile";
   
+  // Adjust intensity based on training phase
+  const phaseMultiplier = getPhaseIntensityMultiplier(phase);
+  const adjustedDuration = Math.floor(duration * phaseMultiplier);
+  
+  // Adjust based on discipline focus
+  const isRunFocused = disciplineFocus?.includes('run');
+  const focusMultiplier = isRunFocused ? 1.2 : 1.0;
+  
   switch (type) {
     case 'endurance':
-      return `Warm-up: 10min easy jog\nMain Set: ${Math.floor(duration * 0.8)}min steady @ ${easyPace}\nCool-down: 10min easy jog`;
+      const enduranceTime = Math.floor((adjustedDuration * 0.8) * focusMultiplier);
+      return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPace}\nCool-down: 10min easy jog`;
     case 'tempo':
-      return `Warm-up: 10min easy jog\nMain Set: 20min @ tempo pace (between 10K and half marathon pace)\nCool-down: 10min easy jog`;
+      const tempoTime = isRunFocused ? 25 : 20;
+      return `Warm-up: 10min easy jog\nMain Set: ${tempoTime}min @ tempo pace (between 10K and half marathon pace)\nCool-down: 10min easy jog`;
     case 'threshold':
-      return `Warm-up: 10min easy jog\nMain Set: 6x800m @ 5K pace, 2min rest\nCool-down: 10min easy jog`;
+      const thresholdIntervals = isRunFocused ? 8 : 6;
+      return `Warm-up: 10min easy jog\nMain Set: ${thresholdIntervals}x800m @ 5K pace, 2min rest\nCool-down: 10min easy jog`;
     case 'vo2max':
-      return `Warm-up: 10min easy jog\nMain Set: 8x400m @ 3K pace, 90s rest\nCool-down: 10min easy jog`;
+      const vo2maxIntervals = isRunFocused ? 10 : 8;
+      return `Warm-up: 10min easy jog\nMain Set: ${vo2maxIntervals}x400m @ 3K pace, 90s rest\nCool-down: 10min easy jog`;
     default:
       return session.description;
   }
 }
 
-function generateStrengthWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
-  const { type, strengthType } = session;
+function generateStrengthWorkout(session: SessionTemplate, userPerformance: any, phase: string, strengthType?: string): string {
+  const { type } = session;
+  
+  // Adjust intensity based on training phase
+  const phaseMultiplier = getPhaseIntensityMultiplier(phase);
+  const isPeakPhase = phase === 'peak';
+  const isTaperPhase = phase === 'taper';
   
   switch (strengthType) {
     case 'power':
-      return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps 3x5, Power Cleans 3x3 @ 80% 1RM, Plyometric Push-ups 3x8\nCool-down: 5min static stretching`;
+      const powerSets = isPeakPhase ? 4 : 3;
+      const powerReps = isTaperPhase ? 3 : 5;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps ${powerSets}x${powerReps}, Power Cleans ${powerSets}x${powerReps} @ 80% 1RM, Plyometric Push-ups ${powerSets}x8\nCool-down: 5min static stretching`;
     case 'compound':
-      return `Warm-up: 5min dynamic stretching\nMain Set: Squat 3x5 @ 80% 1RM, Deadlift 3x3 @ 85% 1RM, Bench Press 3x5 @ 75% 1RM\nCool-down: 5min static stretching`;
+      const compoundSets = isPeakPhase ? 4 : 3;
+      const compoundReps = isTaperPhase ? 3 : 5;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${compoundSets}x${compoundReps} @ 80% 1RM, Deadlift ${compoundSets}x3 @ 85% 1RM, Bench Press ${compoundSets}x${compoundReps} @ 75% 1RM\nCool-down: 5min static stretching`;
     case 'stability':
-      return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg squats 3x8 each, Planks 3x60s, Bird dogs 3x10 each\nCool-down: 5min static stretching`;
+      const stabilitySets = isPeakPhase ? 4 : 3;
+      const stabilityTime = isTaperPhase ? 45 : 60;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg squats ${stabilitySets}x8 each, Planks ${stabilitySets}x${stabilityTime}s, Bird dogs ${stabilitySets}x10 each\nCool-down: 5min static stretching`;
     case 'cowboy_endurance':
-      return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks 3x100m, Sandbag carries 3x50m, Rope climbs 3x3\nCool-down: 5min static stretching`;
+      const cowboySets = isPeakPhase ? 4 : 3;
+      const cowboyDistance = isTaperPhase ? 75 : 100;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks ${cowboySets}x${cowboyDistance}m, Sandbag carries ${cowboySets}x50m, Rope climbs ${cowboySets}x3\nCool-down: 5min static stretching`;
     case 'cowboy_compound':
-      return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift 3x5 @ 80% 1RM, Overhead press 3x5 @ 75% 1RM, Rows 3x8 @ 70% 1RM\nCool-down: 5min static stretching`;
+      const cowboyCompoundSets = isPeakPhase ? 4 : 3;
+      const cowboyCompoundReps = isTaperPhase ? 3 : 5;
+      return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift ${cowboyCompoundSets}x${cowboyCompoundReps} @ 80% 1RM, Overhead press ${cowboyCompoundSets}x${cowboyCompoundReps} @ 75% 1RM, Rows ${cowboyCompoundSets}x8 @ 70% 1RM\nCool-down: 5min static stretching`;
     default:
       return session.description;
   }
 }
 
-function generateBrickWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+function generateBrickWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
   const { type, duration } = session;
-  const bikeTime = Math.floor(duration * 0.7);
-  const runTime = duration - bikeTime;
+  
+  // Adjust based on training phase
+  const phaseMultiplier = getPhaseIntensityMultiplier(phase);
+  const adjustedDuration = Math.floor(duration * phaseMultiplier);
+  
+  // Adjust based on discipline focus
+  const isBikeFocused = disciplineFocus?.includes('bike');
+  const isRunFocused = disciplineFocus?.includes('run');
+  
+  let bikeTime = Math.floor(adjustedDuration * 0.7);
+  let runTime = adjustedDuration - bikeTime;
+  
+  if (isBikeFocused) {
+    bikeTime = Math.floor(adjustedDuration * 0.75);
+    runTime = adjustedDuration - bikeTime;
+  } else if (isRunFocused) {
+    bikeTime = Math.floor(adjustedDuration * 0.65);
+    runTime = adjustedDuration - bikeTime;
+  }
   
   return `Warm-up: 10min easy bike\nBike: ${bikeTime}min @ Zone 2-3\nTransition: 2min (practice quick transition)\nRun: ${runTime}min @ Zone 2-3\nCool-down: 5min easy walk`;
+}
+
+// Helper function to get intensity multiplier based on training phase
+function getPhaseIntensityMultiplier(phase: string): number {
+  switch (phase) {
+    case 'base':
+      return 0.8; // Lower intensity, focus on volume
+    case 'build':
+      return 1.0; // Standard intensity
+    case 'peak':
+      return 1.2; // Higher intensity, focus on quality
+    case 'taper':
+      return 0.9; // Slightly reduced intensity
+    default:
+      return 1.0;
+  }
 } 
