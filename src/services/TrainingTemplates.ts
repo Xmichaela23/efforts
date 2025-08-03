@@ -568,6 +568,13 @@ export function generateTrainingPlan(
   if (!userPerformance.ftp || !userPerformance.fiveKPace) {
     throw new Error('FTP and 5K pace are required');
   }
+  
+  // Validate 1RM data if strength training is selected
+  if (strengthOption !== 'none') {
+    if (!userPerformance.squat || !userPerformance.deadlift || !userPerformance.bench) {
+      throw new Error('1RM data required for strength training: squat, deadlift, and bench press values must be provided in user baselines');
+    }
+  }
   // Swim pace is optional - only required if user has swimming in disciplines
 
   // Calculate intensity zones
@@ -1034,10 +1041,14 @@ function generateStrengthWorkout(session: SessionTemplate, userPerformance: any,
   const isPeakPhase = phase === 'peak';
   const isTaperPhase = phase === 'taper';
   
-  // Get user's 1RM values (with fallbacks if not available)
-  const squat1RM = userPerformance.squat || 135; // Default 135 lbs
-  const deadlift1RM = userPerformance.deadlift || 185; // Default 185 lbs
-  const bench1RM = userPerformance.bench || 115; // Default 115 lbs
+  // Get user's 1RM values - NO FALLBACKS
+  if (!userPerformance.squat || !userPerformance.deadlift || !userPerformance.bench) {
+    throw new Error('1RM data required for strength training: squat, deadlift, and bench press values must be provided');
+  }
+  
+  const squat1RM = userPerformance.squat;
+  const deadlift1RM = userPerformance.deadlift;
+  const bench1RM = userPerformance.bench;
   
   // Calculate actual weights based on percentages
   const squatWeight = Math.round(squat1RM * 0.8); // 80% of 1RM
