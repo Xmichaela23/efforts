@@ -607,7 +607,7 @@ export function generateTrainingPlan(
     strength?: string[];
   }
 ): TrainingTemplate {
-  console.log(`🔍 generateTrainingPlan called with trainingFrequency: ${trainingFrequency}`);
+
   
   // Validate inputs - NO FALLBACKS
   if (!distance) throw new Error('Distance is required');
@@ -1817,18 +1817,28 @@ function generateWeeklyTemplate(
   phase: string
 ): SessionTemplate[] {
   
-  const templates = {
-    '4-days': generate4DayTemplate(distance, strengthOption, disciplineFocus, phase),
-    '5-days': generate5DayTemplate(distance, strengthOption, disciplineFocus, phase),
-    '6-days': generate6DayTemplate(distance, strengthOption, disciplineFocus, phase),
-    '7-days': generate7DayTemplate(distance, strengthOption, disciplineFocus, phase)
-  };
-  
   const templateKey = `${trainingFrequency}-days`;
-  console.log(`🔍 Looking for template: ${templateKey}, available: ${Object.keys(templates).join(', ')}`);
-  console.log(`🔍 trainingFrequency: ${trainingFrequency}, templateKey: ${templateKey}`);
-  const result = templates[templateKey] || templates['5-days'];
-  console.log(`🔍 Selected template sessions: ${result.length}`);
+  
+  let result: SessionTemplate[];
+  
+  switch (templateKey) {
+    case '4-days':
+      result = generate4DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      break;
+    case '5-days':
+      result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      break;
+    case '6-days':
+      result = generate6DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      break;
+    case '7-days':
+      result = generate7DayTemplate(distance, strengthOption, disciplineFocus, phase);
+      break;
+    default:
+      console.warn(`⚠️ Unknown template key: ${templateKey}, falling back to 5-days`);
+      result = generate5DayTemplate(distance, strengthOption, disciplineFocus, phase);
+  }
+  
   return result;
 }
 
