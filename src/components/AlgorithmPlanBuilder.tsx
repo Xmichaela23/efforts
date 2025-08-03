@@ -236,7 +236,7 @@ export default function AlgorithmPlanBuilder() {
       
       setGeneratingPlan(true);
       
-      console.log('🧮 Starting algorithm-based plan generation...');
+      console.log('🧮 Starting rithm-based plan generation...');
       console.log('📊 Baselines:', baselines);
       console.log('📝 Responses:', responses);
       
@@ -267,10 +267,10 @@ export default function AlgorithmPlanBuilder() {
       
       const startDate = new Date().toISOString().split('T')[0];
       
-      console.log('🧮 Calling algorithm-based plan generation...');
+      console.log('🧮 Calling rithm-based plan generation...');
       const algorithmPlan = await algorithmService.generateTrainingPlan(planParameters, startDate);
       
-      console.log('✅ Algorithm plan generated:', algorithmPlan);
+      console.log('✅ Rithm plan generated:', algorithmPlan);
       
       // Create plan object
       const plan = {
@@ -280,7 +280,7 @@ export default function AlgorithmPlanBuilder() {
         focus: selectedFocus.join(', '),
         plan: algorithmPlan.plan,
         fullPlan: algorithmPlan,
-        aiAnalysis: null, // No AI analysis in algorithm approach
+        aiAnalysis: null, // No AI analysis in rithm approach
         workouts: algorithmPlan.workouts
       };
       
@@ -290,7 +290,7 @@ export default function AlgorithmPlanBuilder() {
       setStep(5);
       
     } catch (error) {
-      console.error('❌ Error generating plan:', error);
+      console.error('❌ Error generating rithm plan:', error);
       throw error;
     } finally {
       setGeneratingPlan(false);
@@ -332,7 +332,7 @@ export default function AlgorithmPlanBuilder() {
         // Distance selection
         return (
           <div>
-            <h2 className="text-2xl font-bold mb-6">What are you training for?</h2>
+            <h2 className="text-2xl font-medium mb-6">What are you training for?</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {TRIATHLON_DISTANCES.map((distance) => (
                 <button
@@ -365,16 +365,24 @@ export default function AlgorithmPlanBuilder() {
         // Discipline Focus & Strength Training (COMBINED)
         return (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Discipline Focus & Strength Training</h2>
+            <h2 className="text-2xl font-medium mb-6">Discipline Focus & Strength Training</h2>
             
             {/* Discipline Focus Section */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold mb-4">Choose Your Focus:</h3>
               <div className="mb-4 p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm">
-                  You may be inclined to add a discipline you enjoy, and while we totally support your training being fulfilling, 
-                  you may want to consider focusing on an area you feel needs more development.
+                  Choose your training focus based on your goals and available time. Higher training volumes (6-7 days/week) allow for more specialized focus, 
+                  while lower volumes (4-5 days/week) work better with balanced training across all disciplines.
                 </p>
+                {responses.trainingFrequency && ['6-days', '7-days'].includes(responses.trainingFrequency) && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <p className="text-sm">
+                      You may be inclined to focus on a discipline you enjoy, and while we totally support your training being fulfilling, 
+                      you may want to consider focusing on an area you feel needs more development.
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="space-y-4">
                 {DISCIPLINE_FOCUS_OPTIONS.map((option) => (
@@ -452,12 +460,12 @@ export default function AlgorithmPlanBuilder() {
         // Training days - with honest assessment
         return (
           <div>
-            <h2 className="text-2xl font-bold mb-6">How many training days per week?</h2>
+            <h2 className="text-2xl font-medium mb-6">How many training days per week?</h2>
             
-            {/* Honest Assessment Based on Focus and Strength */}
-            {responses.disciplineFocus && responses.strengthTraining && (
-              <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                <h3 className="font-semibold text-yellow-800 mb-2">Honest Assessment:</h3>
+                          {/* Honest Assessment Based on Focus and Strength */}
+              {responses.disciplineFocus && responses.strengthTraining && (
+                <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <h3 className="font-semibold text-yellow-800 mb-2">Honest Assessment:</h3>
                 {(() => {
                   const focus = DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus);
                   const strength = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining);
@@ -562,12 +570,12 @@ export default function AlgorithmPlanBuilder() {
         // Weekly hours - with honest assessment
         return (
           <div>
-            <h2 className="text-2xl font-bold mb-6">How many hours per week?</h2>
+            <h2 className="text-2xl font-medium mb-6">How many hours per week?</h2>
             
-            {/* Honest Assessment Based on All Selections */}
-            {responses.distance && responses.disciplineFocus && responses.strengthTraining && responses.trainingFrequency && (
-              <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                <h3 className="font-semibold text-orange-800 mb-2">Honest Assessment:</h3>
+                          {/* Honest Assessment Based on All Selections */}
+              {responses.distance && responses.disciplineFocus && responses.strengthTraining && responses.trainingFrequency && (
+                <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
+                  <h3 className="font-semibold text-orange-800 mb-2">Honest Assessment:</h3>
                 {(() => {
                   const distance = TRIATHLON_DISTANCES.find(d => d.key === responses.distance);
                   const focus = DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus);
@@ -713,7 +721,7 @@ export default function AlgorithmPlanBuilder() {
         // Review and generate
         return (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Review Your Plan</h2>
+            <h2 className="text-2xl font-medium mb-6">Review Your Plan</h2>
             <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
               <div><strong>Distance:</strong> {TRIATHLON_DISTANCES.find(d => d.key === responses.distance)?.label}</div>
               <div><strong>Discipline Focus:</strong> {DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus)?.label}</div>
@@ -737,7 +745,7 @@ export default function AlgorithmPlanBuilder() {
         // Plan display
         return (
           <div>
-            <h2 className="text-2xl font-bold mb-6">Your Training Plan</h2>
+            <h2 className="text-2xl font-medium mb-6">Your Training Plan</h2>
             {generatedPlan && (
               <div className="space-y-4">
                 <div className="p-4 bg-blue-50 rounded-lg">
@@ -778,23 +786,23 @@ export default function AlgorithmPlanBuilder() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="w-full">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Algorithm Training Plan Builder</h1>
-        <p className="text-gray-600">Create your personalized training plan using evidence-based algorithms</p>
+        <h1 className="text-2xl font-medium mb-2">Rithm Training Plan Builder</h1>
+        <p className="text-gray-600">Evidence-based rithm for personalized training</p>
       </div>
 
-      <div className="bg-white rounded-lg shadow-lg p-6">
+      <div>
         {getCurrentStepContent()}
       </div>
 
       {step > 0 && step < 5 && (
-        <div className="mt-6 flex justify-between">
+        <div className="mt-6">
           <button
             onClick={() => setStep(step - 1)}
-            className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600"
+            className="text-sm text-blue-600 hover:text-blue-700"
           >
-            Back
+            ← Back
           </button>
         </div>
       )}
