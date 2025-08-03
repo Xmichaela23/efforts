@@ -1224,7 +1224,7 @@ export default function AlgorithmPlanBuilder() {
                     {/* Week tabs */}
                     <div className="border-b border-gray-200">
                       <div className="flex space-x-8 overflow-x-auto">
-                        {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 6)) }, (_, weekIndex) => {
+                        {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 7)) }, (_, weekIndex) => {
                           const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
                           return (
                             <button
@@ -1244,8 +1244,8 @@ export default function AlgorithmPlanBuilder() {
                     </div>
                     
                     {/* Week content */}
-                    {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 6)) }, (_, weekIndex) => {
-                      const weekWorkouts = generatedPlan.workouts.slice(weekIndex * 6, (weekIndex + 1) * 6);
+                    {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 7)) }, (_, weekIndex) => {
+                      const weekWorkouts = generatedPlan.workouts.slice(weekIndex * 7, (weekIndex + 1) * 7);
                       const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
                       const phaseColor = weekIndex < 5 ? 'bg-blue-100' : weekIndex < 9 ? 'bg-green-100' : weekIndex < 10 ? 'bg-yellow-100' : 'bg-purple-100';
                       
