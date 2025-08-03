@@ -567,9 +567,6 @@ export function generateTrainingPlan(
   }
   // Swim pace is optional - only required if user has swimming in disciplines
 
-  // Get base template
-  const baseTemplate = getBaseTemplate(distance);
-  
   // Calculate intensity zones
   const zones = calculateIntensityZones(
     userPerformance.ftp,
@@ -578,22 +575,21 @@ export function generateTrainingPlan(
     userPerformance.swimPace || undefined
   );
 
-  // Scale template to target hours
-  const scaledTemplate = scaleTemplate(baseTemplate, targetHours);
+  // Generate science-based weekly templates
+  const trainingDays = getTrainingDaysFromHours(targetHours);
+  const weeks = generateFullProgressionWithScience(distance, targetHours, trainingDays, strengthOption, disciplineFocus);
   
-  // Add strength sessions if selected
-  if (strengthOption !== 'none') {
-    const strengthOptionData = STRENGTH_OPTIONS.find(opt => opt.id === strengthOption);
-    if (!strengthOptionData) throw new Error(`Invalid strength option: ${strengthOption}`);
-    
-    scaledTemplate.weeks = addStrengthSessions(scaledTemplate.weeks, strengthOptionData);
-  }
-
-  // Apply discipline focus
-  const disciplineFocusData = DISCIPLINE_FOCUS_OPTIONS.find(opt => opt.id === disciplineFocus);
-  if (!disciplineFocusData) throw new Error(`Invalid discipline focus: ${disciplineFocus}`);
+  // Create template with science-based weeks
+  const baseTemplate: TrainingTemplate = {
+    distance,
+    baseHours: targetHours,
+    minDays: trainingDays,
+    weeks,
+    strengthOptions: STRENGTH_OPTIONS,
+    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+  };
   
-  scaledTemplate.weeks = applyDisciplineFocus(scaledTemplate.weeks, disciplineFocusData);
+  const scaledTemplate = baseTemplate;
 
   // Generate detailed workouts for each session
   const detailedTemplate = {
@@ -1070,4 +1066,438 @@ function getPhaseIntensityMultiplier(phase: string): number {
     default:
       return 1.0;
   }
+} 
+
+// Training Science Principles
+const TRAINING_SCIENCE = {
+  // Recovery windows
+  RECOVERY_WINDOWS: {
+    HIGH_INTENSITY: 24, // hours between high-intensity sessions
+    STRENGTH: 48, // hours between strength sessions
+    BRICK: 72, // hours after brick session
+    RACE_SIMULATION: 96 // hours after race simulation
+  },
+  
+  // Training load principles
+  LOAD_PRINCIPLES: {
+    ACUTE_CHRONIC_RATIO: 0.8, // Acute:Chronic Workload Ratio target
+    WEEKLY_VOLUME_DISTRIBUTION: {
+      MONDAY: 0.15, // 15% of weekly volume
+      TUESDAY: 0.20, // 20% of weekly volume
+      WEDNESDAY: 0.15, // 15% of weekly volume
+      THURSDAY: 0.20, // 20% of weekly volume
+      FRIDAY: 0.10, // 10% of weekly volume
+      SATURDAY: 0.20, // 20% of weekly volume
+      SUNDAY: 0.00  // Rest day
+    },
+    INTENSITY_DISTRIBUTION: {
+      ZONE_1: 0.05, // 5% recovery
+      ZONE_2: 0.75, // 75% endurance (80/20 rule)
+      ZONE_3: 0.10, // 10% tempo
+      ZONE_4: 0.08, // 8% threshold
+      ZONE_5: 0.02  // 2% VO2max
+    }
+  },
+  
+  // Session sequencing rules
+  SEQUENCING_RULES: {
+    HARD_DAY_FOLLOWED_BY: 'easy', // Hard day → Easy day
+    STRENGTH_FOLLOWED_BY: 'endurance', // Strength → Endurance
+    BRICK_FOLLOWED_BY: 'rest', // Brick → Rest
+    HIGH_INTENSITY_SPACING: 48 // hours between high-intensity sessions
+  },
+  
+  // Integration principles
+  INTEGRATION: {
+    STRENGTH_ENDURANCE: 'same_day', // Strength + Endurance same day
+    STRENGTH_INTENSITY: 'low', // Strength on low-intensity days
+    BRICK_PLACEMENT: 'saturday', // Brick sessions on Saturday
+    RECOVERY_PLACEMENT: 'sunday' // Rest day on Sunday
+  }
+};
+
+// Helper function to determine training days from target hours
+function getTrainingDaysFromHours(targetHours: number): number {
+  if (targetHours <= 6) return 4; // Sprint: 4 days
+  if (targetHours <= 10) return 5; // Olympic: 5 days
+  if (targetHours <= 15) return 6; // 70.3: 6 days
+  return 7; // Ironman: 7 days
+}
+
+// Generate full progression with science-based templates
+function generateFullProgressionWithScience(
+  distance: string,
+  targetHours: number,
+  trainingDays: number,
+  strengthOption: string,
+  disciplineFocus: string
+): WeekTemplate[] {
+  const totalWeeks = getTotalWeeks(distance);
+  const weeks: WeekTemplate[] = [];
+  
+  for (let weekNum = 1; weekNum <= totalWeeks; weekNum++) {
+    const phase = getPhaseForWeek(weekNum, totalWeeks);
+    const weeklyTemplate = generateWeeklyTemplate(distance, trainingDays, strengthOption, disciplineFocus, phase);
+    
+    // Calculate total hours for this week
+    const totalHours = Math.round(weeklyTemplate.reduce((sum, session) => sum + session.duration, 0) / 60);
+    
+    weeks.push({
+      weekNumber: weekNum,
+      phase,
+      sessions: weeklyTemplate,
+      totalHours
+    });
+  }
+  
+  return weeks;
+}
+
+// Helper function to get total weeks based on distance
+function getTotalWeeks(distance: string): number {
+  switch (distance) {
+    case 'sprint': return 16;
+    case 'olympic': return 18;
+    case 'seventy3': return 12; // Preview length
+    case 'ironman': return 12; // Preview length
+    default: return 16;
+  }
+}
+
+// Helper function to determine phase for each week
+function getPhaseForWeek(weekNum: number, totalWeeks: number): 'base' | 'build' | 'peak' | 'taper' {
+  const baseWeeks = Math.floor(totalWeeks * 0.4);
+  const buildWeeks = Math.floor(totalWeeks * 0.4);
+  const peakWeeks = totalWeeks - baseWeeks - buildWeeks - 2; // Last 2 weeks are taper
+  
+  if (weekNum <= baseWeeks) return 'base';
+  if (weekNum <= baseWeeks + buildWeeks) return 'build';
+  if (weekNum <= baseWeeks + buildWeeks + peakWeeks) return 'peak';
+  return 'taper';
+}
+
+// Weekly template generator based on training science
+function generateWeeklyTemplate(
+  distance: string,
+  trainingDays: number,
+  strengthOption: string,
+  disciplineFocus: string,
+  phase: string
+): SessionTemplate[] {
+  
+  const templates = {
+    '4-days': generate4DayTemplate(distance, strengthOption, disciplineFocus, phase),
+    '5-days': generate5DayTemplate(distance, strengthOption, disciplineFocus, phase),
+    '6-days': generate6DayTemplate(distance, strengthOption, disciplineFocus, phase),
+    '7-days': generate7DayTemplate(distance, strengthOption, disciplineFocus, phase)
+  };
+  
+  return templates[`${trainingDays}-days`] || templates['5-days'];
+}
+
+// 4-day template (Sprint distance)
+function generate4DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+  return [
+    // Monday: Swim + Strength (integrated)
+    {
+      day: 'Monday',
+      discipline: 'swim',
+      type: 'endurance',
+      duration: getSessionDuration('swim', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy swim, focus on technique',
+      zones: [2],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Tuesday: Bike (tempo)
+    {
+      day: 'Tuesday', 
+      discipline: 'bike',
+      type: 'tempo',
+      duration: getSessionDuration('bike', 'tempo', distance, phase),
+      intensity: 'Zone 3',
+      description: 'Tempo bike, build endurance',
+      zones: [3]
+    },
+    // Thursday: Run (endurance) - recovery from Tuesday
+    {
+      day: 'Thursday',
+      discipline: 'run', 
+      type: 'endurance',
+      duration: getSessionDuration('run', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy run, build aerobic base',
+      zones: [2]
+    },
+    // Saturday: Brick (moderate)
+    {
+      day: 'Saturday',
+      discipline: 'brick',
+      type: 'endurance',
+      duration: getSessionDuration('brick', 'endurance', distance, phase),
+      intensity: 'Zone 2-3',
+      description: 'Bike-run brick, moderate intensity',
+      zones: [2, 3]
+    }
+  ];
+}
+
+// 5-day template (Olympic distance)
+function generate5DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+  return [
+    // Monday: Swim + Strength (integrated)
+    {
+      day: 'Monday',
+      discipline: 'swim',
+      type: 'endurance',
+      duration: getSessionDuration('swim', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy swim, focus on technique',
+      zones: [2],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Tuesday: Bike (tempo)
+    {
+      day: 'Tuesday',
+      discipline: 'bike',
+      type: 'tempo',
+      duration: getSessionDuration('bike', 'tempo', distance, phase),
+      intensity: 'Zone 3',
+      description: 'Tempo bike, build endurance',
+      zones: [3]
+    },
+    // Wednesday: Run (endurance) - recovery from Tuesday
+    {
+      day: 'Wednesday',
+      discipline: 'run',
+      type: 'endurance',
+      duration: getSessionDuration('run', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy run, build aerobic base',
+      zones: [2]
+    },
+    // Friday: Swim (threshold) + Strength (integrated)
+    {
+      day: 'Friday',
+      discipline: 'swim',
+      type: 'threshold',
+      duration: getSessionDuration('swim', 'threshold', distance, phase),
+      intensity: 'Zone 4',
+      description: 'Swim intervals, build speed',
+      zones: [4],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Saturday: Brick (endurance)
+    {
+      day: 'Saturday',
+      discipline: 'brick',
+      type: 'endurance',
+      duration: getSessionDuration('brick', 'endurance', distance, phase),
+      intensity: 'Zone 2-3',
+      description: 'Long bike-run brick',
+      zones: [2, 3]
+    }
+  ];
+}
+
+// 6-day template (70.3/Ironman distance)
+function generate6DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+  return [
+    // Monday: Swim + Strength (integrated)
+    {
+      day: 'Monday',
+      discipline: 'swim',
+      type: 'endurance',
+      duration: getSessionDuration('swim', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy swim, focus on technique',
+      zones: [2],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Tuesday: Bike (tempo)
+    {
+      day: 'Tuesday',
+      discipline: 'bike',
+      type: 'tempo',
+      duration: getSessionDuration('bike', 'tempo', distance, phase),
+      intensity: 'Zone 3',
+      description: 'Tempo bike, build endurance',
+      zones: [3]
+    },
+    // Wednesday: Run (endurance) - recovery from Tuesday
+    {
+      day: 'Wednesday',
+      discipline: 'run',
+      type: 'endurance',
+      duration: getSessionDuration('run', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy run, build aerobic base',
+      zones: [2]
+    },
+    // Thursday: Swim (threshold) + Strength (integrated)
+    {
+      day: 'Thursday',
+      discipline: 'swim',
+      type: 'threshold',
+      duration: getSessionDuration('swim', 'threshold', distance, phase),
+      intensity: 'Zone 4',
+      description: 'Swim intervals, build speed',
+      zones: [4],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Friday: Bike (recovery) - easy day before brick
+    {
+      day: 'Friday',
+      discipline: 'bike',
+      type: 'endurance',
+      duration: getSessionDuration('bike', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy bike, recovery',
+      zones: [2]
+    },
+    // Saturday: Brick (endurance)
+    {
+      day: 'Saturday',
+      discipline: 'brick',
+      type: 'endurance',
+      duration: getSessionDuration('brick', 'endurance', distance, phase),
+      intensity: 'Zone 2-3',
+      description: 'Long bike-run brick',
+      zones: [2, 3]
+    }
+  ];
+}
+
+// 7-day template (High volume training)
+function generate7DayTemplate(distance: string, strengthOption: string, disciplineFocus: string, phase: string): SessionTemplate[] {
+  return [
+    // Monday: Swim + Strength (integrated)
+    {
+      day: 'Monday',
+      discipline: 'swim',
+      type: 'endurance',
+      duration: getSessionDuration('swim', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy swim, focus on technique',
+      zones: [2],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Tuesday: Bike (tempo)
+    {
+      day: 'Tuesday',
+      discipline: 'bike',
+      type: 'tempo',
+      duration: getSessionDuration('bike', 'tempo', distance, phase),
+      intensity: 'Zone 3',
+      description: 'Tempo bike, build endurance',
+      zones: [3]
+    },
+    // Wednesday: Run (endurance) - recovery from Tuesday
+    {
+      day: 'Wednesday',
+      discipline: 'run',
+      type: 'endurance',
+      duration: getSessionDuration('run', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy run, build aerobic base',
+      zones: [2]
+    },
+    // Thursday: Swim (threshold) + Strength (integrated)
+    {
+      day: 'Thursday',
+      discipline: 'swim',
+      type: 'threshold',
+      duration: getSessionDuration('swim', 'threshold', distance, phase),
+      intensity: 'Zone 4',
+      description: 'Swim intervals, build speed',
+      zones: [4],
+      strengthType: strengthOption !== 'none' ? getStrengthType(strengthOption) : undefined
+    },
+    // Friday: Bike (recovery) - easy day before brick
+    {
+      day: 'Friday',
+      discipline: 'bike',
+      type: 'endurance',
+      duration: getSessionDuration('bike', 'endurance', distance, phase),
+      intensity: 'Zone 2',
+      description: 'Easy bike, recovery',
+      zones: [2]
+    },
+    // Saturday: Brick (endurance)
+    {
+      day: 'Saturday',
+      discipline: 'brick',
+      type: 'endurance',
+      duration: getSessionDuration('brick', 'endurance', distance, phase),
+      intensity: 'Zone 2-3',
+      description: 'Long bike-run brick',
+      zones: [2, 3]
+    },
+    // Sunday: Active recovery (optional)
+    {
+      day: 'Sunday',
+      discipline: 'run',
+      type: 'recovery',
+      duration: 30,
+      intensity: 'Zone 1',
+      description: 'Easy recovery run or rest',
+      zones: [1]
+    }
+  ];
+}
+
+// Helper functions for science-based session generation
+function getSessionDuration(discipline: string, type: string, distance: string, phase: string): number {
+  const baseDurations = {
+    sprint: {
+      swim: { endurance: 30, threshold: 20, tempo: 25 },
+      bike: { endurance: 45, tempo: 60, threshold: 30 },
+      run: { endurance: 30, tempo: 45, threshold: 20 },
+      brick: { endurance: 60, tempo: 75 }
+    },
+    olympic: {
+      swim: { endurance: 45, threshold: 30, tempo: 35 },
+      bike: { endurance: 60, tempo: 75, threshold: 45 },
+      run: { endurance: 45, tempo: 60, threshold: 30 },
+      brick: { endurance: 90, tempo: 105 }
+    },
+    seventy3: {
+      swim: { endurance: 60, threshold: 45, tempo: 50 },
+      bike: { endurance: 90, tempo: 105, threshold: 60 },
+      run: { endurance: 60, tempo: 75, threshold: 45 },
+      brick: { endurance: 120, tempo: 135 }
+    },
+    ironman: {
+      swim: { endurance: 75, threshold: 60, tempo: 65 },
+      bike: { endurance: 120, tempo: 135, threshold: 90 },
+      run: { endurance: 75, tempo: 90, threshold: 60 },
+      brick: { endurance: 180, tempo: 195 }
+    }
+  };
+  
+  const phaseMultiplier = getPhaseMultiplier(phase);
+  const baseDuration = baseDurations[distance as keyof typeof baseDurations]?.[discipline as keyof typeof baseDurations.sprint]?.[type as keyof typeof baseDurations.sprint.swim] || 45;
+  
+  return Math.round(baseDuration * phaseMultiplier);
+}
+
+function getPhaseMultiplier(phase: string): number {
+  switch (phase) {
+    case 'base': return 0.8; // Lower intensity, focus on volume
+    case 'build': return 1.0; // Standard intensity
+    case 'peak': return 1.2; // Higher intensity, focus on quality
+    case 'taper': return 0.9; // Slightly reduced intensity
+    default: return 1.0;
+  }
+}
+
+function getStrengthType(strengthOption: string): 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' {
+  const strengthMap: { [key: string]: any } = {
+    'power_development': 'power',
+    'stability_focus': 'stability',
+    'compound_strength': 'compound',
+    'cowboy_endurance': 'cowboy_endurance',
+    'cowboy_compound': 'cowboy_compound'
+  };
+  return strengthMap[strengthOption] || 'power';
 } 
