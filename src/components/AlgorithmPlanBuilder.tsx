@@ -229,8 +229,11 @@ export default function AlgorithmPlanBuilder() {
     if (!baselines?.performanceNumbers?.fiveK) {
       throw new Error('5K pace is required for run training zones');
     }
-    // Only require swim pace if user has swimming in their disciplines
-    if (baselines?.disciplines?.includes('swimming') && !baselines?.performanceNumbers?.swimPace100) {
+    // Only require swim pace if user selected swimming or triathlon
+    const hasSwimming = responses.category === 'swimming' || 
+                       (responses.category === 'triathlon' && responses.distance) ||
+                       responses.category === 'hybrid';
+    if (hasSwimming && !baselines?.performanceNumbers?.swimPace100) {
       throw new Error('Swim pace is required for swim training zones');
     }
 
@@ -297,7 +300,7 @@ export default function AlgorithmPlanBuilder() {
       console.log('🎯 About to set generatedPlan with:', plan);
       setGeneratedPlan(plan);
       setCurrentWeek(0);
-      setStep(5);
+      setStep(6);
       
     } catch (error) {
       console.error('❌ Error generating rithm plan:', error);
@@ -788,7 +791,12 @@ export default function AlgorithmPlanBuilder() {
             </div>
             <div className="mt-6">
               <button
-                onClick={generatePlan}
+                onClick={() => {
+                  console.log('🚀 Generate button clicked!');
+                  console.log('📊 Current responses:', responses);
+                  console.log('📊 Current baselines:', baselines);
+                  generatePlan();
+                }}
                 disabled={generatingPlan}
                 className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
               >
@@ -800,7 +808,7 @@ export default function AlgorithmPlanBuilder() {
 
               case 6:
           // Plan display
-        console.log('🔍 Step 5 - generatedPlan:', generatedPlan);
+        console.log('🔍 Step 6 - generatedPlan:', generatedPlan);
         return (
           <div>
             <h2 className="text-2xl font-medium mb-6">Your Training Plan</h2>
