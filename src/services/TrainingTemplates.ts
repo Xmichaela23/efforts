@@ -600,10 +600,14 @@ export function generateTrainingPlan(
     ...scaledTemplate,
     weeks: scaledTemplate.weeks.map(week => ({
       ...week,
-      sessions: week.sessions.map(session => ({
-        ...session,
-        detailedWorkout: generateDetailedWorkout(session, userPerformance, week.phase, strengthOption, disciplineFocus)
-      }))
+      sessions: week.sessions.map(session => {
+        const detailedWorkout = generateDetailedWorkout(session, userPerformance, week.phase, strengthOption, disciplineFocus);
+        console.log('🔍 DEBUG - Session:', session.discipline, session.type, 'strengthType:', session.strengthType, 'detailedWorkout:', detailedWorkout);
+        return {
+          ...session,
+          detailedWorkout
+        };
+      })
     }))
   };
 
