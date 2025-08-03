@@ -636,10 +636,37 @@ export function generateTrainingPlan(
     userPerformance.swimPace || undefined
   );
 
-  // Generate science-based weekly templates using user's explicit training frequency and preferences
-  const weeks = generateFullProgressionWithScience(distance, targetHours, trainingFrequency, strengthOption, disciplineFocus, longSessionDays, longSessionOrder);
+  // NEW: Use polarized template approach
+  const timing = longSessionDays?.includes('weekend') ? 'weekend' : 'weekday';
+  const polarizedTemplate = createPolarizedTemplate(distance, timing, targetHours, userPerformance);
   
-  // Create template with science-based weeks
+  // Convert polarized template to TrainingTemplate format
+  const weeks: WeekTemplate[] = [];
+  const totalWeeks = getTotalWeeks(distance);
+  
+  for (let weekNum = 1; weekNum <= totalWeeks; weekNum++) {
+    const phase = getPhaseForWeek(weekNum, totalWeeks);
+    
+    // Generate detailed workouts for each session
+    const detailedSessions = polarizedTemplate.sessions.map(session => {
+      const detailedWorkout = generateDetailedWorkout(session, userPerformance, phase, strengthOption, disciplineFocus, userEquipment);
+      const garminWorkout = generateGarminWorkout(session, userPerformance, phase, disciplineFocus, userEquipment);
+      
+      return {
+        ...session,
+        detailedWorkout,
+        garminWorkout
+      };
+    });
+    
+    weeks.push({
+      weekNumber: weekNum,
+      phase,
+      sessions: detailedSessions,
+      totalHours: targetHours
+    });
+  }
+  
   const baseTemplate: TrainingTemplate = {
     distance,
     baseHours: targetHours,
@@ -2535,3 +2562,147 @@ function applyLongSessionPreferences(sessions: SessionTemplate[], longSessionDay
   
   return adjustedSessions;
 } 
+
+// NEW: Polarized Training Template System
+// One template structure that scales to all distances and timing preferences
+
+export interface PolarizedTemplate {
+  distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman';
+  timing: 'weekend' | 'weekday' | 'monday' | 'custom';
+  sessions: SessionTemplate[];
+  totalHours: number;
+}
+
+// Base polarized template structure
+function createPolarizedTemplate(
+  distance: string,
+  timing: string,
+  targetHours: number,
+  userPerformance: any
+): PolarizedTemplate {
+  
+  // Calculate session durations based on polarized training principles
+  const longSessionHours = targetHours * 0.25; // 25% for long session
+  const brickSessionHours = targetHours * 0.20; // 20% for brick
+  const recoveryHours = targetHours * 0.15; // 15% for recovery
+  const tempoHours = targetHours * 0.20; // 20% for tempo/threshold
+  const strengthHours = targetHours * 0.20; // 20% for strength (if selected)
+  
+  // Convert to minutes
+  const longSessionMinutes = Math.round(longSessionHours * 60);
+  const brickSessionMinutes = Math.round(brickSessionHours * 60);
+  const recoveryMinutes = Math.round(recoveryHours * 60);
+  const tempoMinutes = Math.round(tempoHours * 60);
+  const strengthMinutes = Math.round(strengthHours * 60);
+  
+  // Determine day placement based on timing preference
+  const dayPlacement = getDayPlacement(timing);
+  
+  const sessions: SessionTemplate[] = [
+    // Recovery swim (Zone 1-2)
+    {
+      day: dayPlacement.recovery,
+      discipline: 'swim',
+      type: 'recovery',
+      duration: recoveryMinutes,
+      intensity: 'Zone 1-2',
+      description: 'Easy recovery swim, focus on technique',
+      zones: [1, 2]
+    },
+    
+    // Tempo bike (Zone 3-4)
+    {
+      day: dayPlacement.tempo,
+      discipline: 'bike',
+      type: 'tempo',
+      duration: tempoMinutes,
+      intensity: 'Zone 3-4',
+      description: 'Tempo bike, build endurance',
+      zones: [3, 4]
+    },
+    
+    // Easy run (Zone 2)
+    {
+      day: dayPlacement.easy,
+      discipline: 'run',
+      type: 'endurance',
+      duration: recoveryMinutes,
+      intensity: 'Zone 2',
+      description: 'Easy run, conversational pace',
+      zones: [2]
+    },
+    
+    // Long bike (Zone 2-3) - 25% of weekly volume
+    {
+      day: dayPlacement.long,
+      discipline: 'bike',
+      type: 'endurance',
+      duration: longSessionMinutes,
+      intensity: 'Zone 2-3',
+      description: 'Long endurance bike',
+      zones: [2, 3]
+    },
+    
+    // Brick session (Zone 2-3) - 20% of weekly volume
+    {
+      day: dayPlacement.brick,
+      discipline: 'brick',
+      type: 'endurance',
+      duration: brickSessionMinutes,
+      intensity: 'Zone 2-3',
+      description: 'Bike-run brick session',
+      zones: [2, 3]
+    }
+  ];
+  
+  return {
+    distance: distance as any,
+    timing: timing as any,
+    sessions,
+    totalHours: targetHours
+  };
+}
+
+// Helper function to determine day placement based on timing preference
+function getDayPlacement(timing: string): {
+  recovery: string;
+  tempo: string;
+  easy: string;
+  long: string;
+  brick: string;
+} {
+  switch (timing) {
+    case 'weekend':
+      return {
+        recovery: 'Monday',
+        tempo: 'Tuesday',
+        easy: 'Wednesday',
+        long: 'Saturday',
+        brick: 'Sunday'
+      };
+    case 'weekday':
+      return {
+        recovery: 'Monday',
+        tempo: 'Tuesday',
+        easy: 'Wednesday',
+        long: 'Wednesday',
+        brick: 'Thursday'
+      };
+    case 'monday':
+      return {
+        recovery: 'Tuesday',
+        tempo: 'Wednesday',
+        easy: 'Thursday',
+        long: 'Monday',
+        brick: 'Monday'
+      };
+    default:
+      return {
+        recovery: 'Monday',
+        tempo: 'Tuesday',
+        easy: 'Wednesday',
+        long: 'Saturday',
+        brick: 'Sunday'
+      };
+  }
+}
