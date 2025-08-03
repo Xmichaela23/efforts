@@ -995,6 +995,43 @@ export default function AlgorithmPlanBuilder() {
                   // No strength training has no additional hour requirements
                 }
                 
+                // Additional gating for high-intensity combinations
+                if (!isDisabled) {
+                  // 70.3 + Bike + Run Speed + Strength = requires 12+ hours
+                  if (responses.distance === 'seventy3' && 
+                      responses.disciplineFocus === 'bike_run_speed' && 
+                      responses.strengthTraining !== 'none' && 
+                      hours < 12) {
+                    isDisabled = true;
+                    disabledReason = "70.3 with high-intensity bike+run focus and strength requires minimum 12 hours/week";
+                  }
+                  
+                  // 70.3 + Cowboy Compound = requires 15+ hours
+                  if (responses.distance === 'seventy3' && 
+                      responses.strengthTraining === 'cowboy_compound' && 
+                      hours < 15) {
+                    isDisabled = true;
+                    disabledReason = "70.3 with Cowboy Compound requires minimum 15 hours/week";
+                  }
+                  
+                  // Ironman + any strength = requires 15+ hours
+                  if (responses.distance === 'ironman' && 
+                      responses.strengthTraining !== 'none' && 
+                      hours < 15) {
+                    isDisabled = true;
+                    disabledReason = "Ironman with strength training requires minimum 15 hours/week";
+                  }
+                  
+                  // Olympic + Bike + Run Speed + Strength = requires 10+ hours
+                  if (responses.distance === 'olympic' && 
+                      responses.disciplineFocus === 'bike_run_speed' && 
+                      responses.strengthTraining !== 'none' && 
+                      hours < 10) {
+                    isDisabled = true;
+                    disabledReason = "Olympic with high-intensity bike+run focus and strength requires minimum 10 hours/week";
+                  }
+                }
+                
                 return (
                   <button
                     key={hours}
