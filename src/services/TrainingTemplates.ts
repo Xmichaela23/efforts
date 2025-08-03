@@ -1767,6 +1767,12 @@ function generateFullProgressionWithScience(
   const totalWeeks = getTotalWeeks(distance);
   const weeks: WeekTemplate[] = [];
   
+  // Calculate the base hours per week for this distance
+  const baseHoursPerWeek = getBaseHoursPerWeek(distance);
+  
+  // Calculate scaling factor to match user's target hours
+  const scalingFactor = targetHours / baseHoursPerWeek;
+  
   for (let weekNum = 1; weekNum <= totalWeeks; weekNum++) {
     const phase = getPhaseForWeek(weekNum, totalWeeks);
     
@@ -1777,13 +1783,19 @@ function generateFullProgressionWithScience(
     
     const weeklyTemplate = generateWeeklyTemplate(distance, trainingFrequency, strengthOption, disciplineFocus, phase, weekInPhase, totalWeeksInPhase);
     
+    // Scale all session durations to match user's target hours
+    const scaledTemplate = weeklyTemplate.map(session => ({
+      ...session,
+      duration: Math.round(session.duration * scalingFactor)
+    }));
+    
     // Calculate total hours for this week
-    const totalHours = Math.round(weeklyTemplate.reduce((sum, session) => sum + session.duration, 0) / 60);
+    const totalHours = Math.round(scaledTemplate.reduce((sum, session) => sum + session.duration, 0) / 60);
     
     weeks.push({
       weekNumber: weekNum,
       phase,
-      sessions: weeklyTemplate,
+      sessions: scaledTemplate,
       totalHours
     });
   }
@@ -1799,6 +1811,22 @@ function getTotalWeeks(distance: string): number {
     case 'seventy3': return 12; // Preview length
     case 'ironman': return 12; // Preview length
     default: return 16;
+  }
+}
+
+// Helper function to get base hours per week for each distance
+function getBaseHoursPerWeek(distance: string): number {
+  switch (distance) {
+    case 'sprint': return 6; // 6 hours per week for sprint
+    case 'olympic': return 8; // 8 hours per week for olympic
+    case 'seventy3': return 12; // 12 hours per week for 70.3
+    case 'ironman': return 15; // 15 hours per week for ironman
+    case 'running': return 8; // 8 hours per week for running
+    case 'cycling': return 10; // 10 hours per week for cycling
+    case 'swimming': return 6; // 6 hours per week for swimming
+    case 'strength': return 6; // 6 hours per week for strength
+    case 'hybrid': return 10; // 10 hours per week for hybrid
+    default: return 8;
   }
 }
 
