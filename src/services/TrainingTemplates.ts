@@ -831,21 +831,32 @@ function adjustTemplateForFrequency(sessions: SessionTemplate[], frequency: numb
   
   // For lower frequency, remove some sessions intelligently
   if (frequency < sessions.length) {
-    // Priority order: brick > tempo > long sessions > technique sessions
+    // Priority order: brick > tempo > long sessions > core sessions > technique sessions
     const brickSessions = sessions.filter(s => s.discipline === 'brick');
     const tempoSessions = sessions.filter(s => s.type === 'tempo');
     const longSessions = sessions.filter(s => s.day === 'Saturday' || s.day === 'Sunday');
-    const techniqueSessions = sessions.filter(s => s.discipline === 'swim' && s.day === 'Thursday');
+    const coreSessions = sessions.filter(s => 
+      s.day === 'Thursday' || // Thursday is core, not technique
+      (s.day === 'Monday' && s.discipline === 'swim') || // Monday swim is core
+      (s.day === 'Wednesday' && s.discipline === 'run') // Wednesday run is core
+    );
+    const techniqueSessions = sessions.filter(s => 
+      s.discipline === 'swim' && 
+      s.day !== 'Monday' && 
+      s.day !== 'Thursday' // Thursday is not technique
+    );
     const otherSessions = sessions.filter(s => 
       s.discipline !== 'brick' && 
       s.type !== 'tempo' && 
       s.day !== 'Saturday' && 
       s.day !== 'Sunday' &&
-      !(s.discipline === 'swim' && s.day === 'Thursday')
+      s.day !== 'Thursday' &&
+      s.day !== 'Monday' &&
+      s.day !== 'Wednesday'
     );
     
     // Build priority list
-    const prioritySessions = [...brickSessions, ...tempoSessions, ...longSessions, ...otherSessions, ...techniqueSessions];
+    const prioritySessions = [...brickSessions, ...tempoSessions, ...longSessions, ...coreSessions, ...otherSessions, ...techniqueSessions];
     return prioritySessions.slice(0, frequency);
   }
   
