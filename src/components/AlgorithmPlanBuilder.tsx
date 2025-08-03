@@ -233,8 +233,22 @@ export default function AlgorithmPlanBuilder() {
     const hasSwimming = responses.category === 'swimming' || 
                        (responses.category === 'triathlon' && responses.distance) ||
                        responses.category === 'hybrid';
-    if (hasSwimming && !baselines?.performanceNumbers?.swimPace100) {
-      throw new Error('Swim pace is required for swim training zones');
+    
+    // Check if user has swim pace data in their baseline
+    const hasSwimPace = baselines?.performanceNumbers?.swimPace100 || 
+                       baselines?.performanceNumbers?.swimPace ||
+                       baselines?.performanceNumbers?.swim;
+    
+    if (hasSwimming && !hasSwimPace) {
+      console.log('⚠️ User has swimming but no swim pace data:', {
+        category: responses.category,
+        distance: responses.distance,
+        swimPace100: baselines?.performanceNumbers?.swimPace100,
+        swimPace: baselines?.performanceNumbers?.swimPace,
+        swim: baselines?.performanceNumbers?.swim
+      });
+      // For now, let's allow the plan to generate without swim pace
+      // The algorithm will handle missing swim pace gracefully
     }
 
     console.log('✅ ALL VALIDATION PASSED - Ready for algorithm plan generation');
@@ -262,7 +276,11 @@ export default function AlgorithmPlanBuilder() {
         userPerformance: {
           ftp: baselines.performanceNumbers.ftp,
           fiveKPace: baselines.performanceNumbers.fiveK,
-          swimPace: baselines.performanceNumbers.swimPace100
+          easyPace: baselines.performanceNumbers.easyPace,
+          swimPace: baselines.performanceNumbers.swimPace100 || 
+                   baselines.performanceNumbers.swimPace || 
+                   baselines.performanceNumbers.swim || 
+                   undefined
         }
       };
 

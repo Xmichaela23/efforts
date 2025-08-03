@@ -52,11 +52,13 @@ export interface DisciplineFocus {
 // Mathematical intensity calculations based on user performance data
 export function calculateIntensityZones(
   ftp: number,
-  fiveKPace: string, // format: "MM:SS"
+  fiveKPace: string, // format: "MM:SS" - their fastest 5K pace
+  easyPace?: string, // format: "MM:SS" - their Zone 2 conversational pace
   swimPace?: string   // format: "MM:SS/100m" - optional
 ) {
   // Parse paces
   const fiveKSeconds = parsePaceToSeconds(fiveKPace);
+  const easySeconds = easyPace ? parsePaceToSeconds(easyPace) : null;
   const swimSeconds = swimPace ? parseSwimPaceToSeconds(swimPace) : null;
   
   return {
@@ -69,10 +71,10 @@ export function calculateIntensityZones(
       zone6: Math.round(ftp * 1.50)  // Anaerobic
     },
     run: {
-      zone1: addSecondsToPace(fiveKSeconds, 90),   // Recovery
-      zone2: addSecondsToPace(fiveKSeconds, 60),   // Endurance
-      zone3: addSecondsToPace(fiveKSeconds, 30),   // Tempo
-      zone4: addSecondsToPace(fiveKSeconds, 0),    // Threshold
+      zone1: easySeconds ? addSecondsToPace(easySeconds, 30) : addSecondsToPace(fiveKSeconds, 90),   // Recovery
+      zone2: easySeconds ? easyPace : addSecondsToPace(fiveKSeconds, 60),   // Endurance (use actual easy pace!)
+      zone3: easySeconds ? subtractSecondsFromPace(easySeconds, 30) : addSecondsToPace(fiveKSeconds, 30),   // Tempo
+      zone4: addSecondsToPace(fiveKSeconds, 0),    // Threshold (5K pace)
       zone5: subtractSecondsFromPace(fiveKSeconds, 15), // VO2max
       zone6: subtractSecondsFromPace(fiveKSeconds, 30)  // Anaerobic
     },
@@ -550,6 +552,7 @@ export function generateTrainingPlan(
   userPerformance: {
     ftp: number;
     fiveKPace: string;
+    easyPace?: string; // Optional - Zone 2 conversational pace
     swimPace?: string; // Optional - only required if user has swimming in disciplines
   }
 ): TrainingTemplate {
@@ -570,6 +573,7 @@ export function generateTrainingPlan(
   const zones = calculateIntensityZones(
     userPerformance.ftp,
     userPerformance.fiveKPace,
+    userPerformance.easyPace || undefined,
     userPerformance.swimPace || undefined
   );
 

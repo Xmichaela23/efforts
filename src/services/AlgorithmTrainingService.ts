@@ -43,6 +43,7 @@ export interface AlgorithmTrainingPlan {
 export interface UserPerformance {
   ftp: number;
   fiveKPace: string; // format: "MM:SS"
+  easyPace?: string; // format: "MM:SS" - Zone 2 conversational pace
   swimPace?: string;   // format: "MM:SS/100m" - optional
 }
 
