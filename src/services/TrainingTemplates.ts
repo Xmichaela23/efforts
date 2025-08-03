@@ -885,6 +885,13 @@ function generateDetailedWorkout(session: SessionTemplate, userPerformance: any,
   // Use the session's strengthType if available, otherwise use the user's selected strength option
   const effectiveStrengthType = strengthType || strengthOption;
   
+  // If this session has strength integrated, generate combined workout
+  if (strengthType && discipline !== 'strength') {
+    const enduranceWorkout = generateEnduranceWorkout(session, userPerformance, phase, disciplineFocus);
+    const strengthWorkout = generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType);
+    return `${enduranceWorkout}\n\nSTRENGTH INTEGRATION:\n${strengthWorkout}`;
+  }
+  
   switch (discipline) {
     case 'swim':
       return generateSwimWorkout(session, userPerformance, phase, disciplineFocus);
@@ -896,6 +903,22 @@ function generateDetailedWorkout(session: SessionTemplate, userPerformance: any,
       return generateStrengthWorkout(session, userPerformance, phase, effectiveStrengthType);
     case 'brick':
       return generateBrickWorkout(session, userPerformance, phase, disciplineFocus);
+    default:
+      return session.description;
+  }
+}
+
+// Helper function to generate endurance workout based on discipline
+function generateEnduranceWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string): string {
+  const { discipline } = session;
+  
+  switch (discipline) {
+    case 'swim':
+      return generateSwimWorkout(session, userPerformance, phase, disciplineFocus);
+    case 'bike':
+      return generateBikeWorkout(session, userPerformance, phase, disciplineFocus);
+    case 'run':
+      return generateRunWorkout(session, userPerformance, phase, disciplineFocus);
     default:
       return session.description;
   }
