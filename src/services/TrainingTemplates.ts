@@ -3,7 +3,7 @@
 // Based on kitchen science: Polarized training, Coggan zones, evidence-based approaches
 
 export interface TrainingTemplate {
-  distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman';
+  distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman' | 'running' | 'cycling' | 'swimming' | 'strength' | 'hybrid';
   baseHours: number;
   minDays: number;
   weeks: WeekTemplate[];
@@ -259,7 +259,7 @@ export const DISCIPLINE_FOCUS_OPTIONS: DisciplineFocus[] = [
 ];
 
 // Base templates for each distance (polarized training approach)
-export function getBaseTemplate(distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman'): TrainingTemplate {
+export function getBaseTemplate(distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman' | 'running' | 'cycling' | 'swimming' | 'strength' | 'hybrid'): TrainingTemplate {
   switch (distance) {
     case 'sprint':
       return getSprintTemplate();
@@ -269,6 +269,16 @@ export function getBaseTemplate(distance: 'sprint' | 'olympic' | 'seventy3' | 'i
       return getSeventy3Template();
     case 'ironman':
       return getIronmanTemplate();
+    case 'running':
+      return getRunningTemplate();
+    case 'cycling':
+      return getCyclingTemplate();
+    case 'swimming':
+      return getSwimmingTemplate();
+    case 'strength':
+      return getStrengthTemplate();
+    case 'hybrid':
+      return getHybridTemplate();
     default:
       throw new Error(`Invalid distance: ${distance}`);
   }
@@ -313,6 +323,61 @@ function getIronmanTemplate(): TrainingTemplate {
     baseHours: 15,
     minDays: 6,
     weeks: generateFullProgression(12, 'ironman', 15), // Reduced from 20 to 12 weeks for preview
+    strengthOptions: STRENGTH_OPTIONS,
+    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+  };
+}
+
+function getRunningTemplate(): TrainingTemplate {
+  return {
+    distance: 'running',
+    baseHours: 8,
+    minDays: 4,
+    weeks: generateFullProgression(12, 'running', 8),
+    strengthOptions: STRENGTH_OPTIONS,
+    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+  };
+}
+
+function getCyclingTemplate(): TrainingTemplate {
+  return {
+    distance: 'cycling',
+    baseHours: 10,
+    minDays: 4,
+    weeks: generateFullProgression(12, 'cycling', 10),
+    strengthOptions: STRENGTH_OPTIONS,
+    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+  };
+}
+
+function getSwimmingTemplate(): TrainingTemplate {
+  return {
+    distance: 'swimming',
+    baseHours: 6,
+    minDays: 3,
+    weeks: generateFullProgression(12, 'swimming', 6),
+    strengthOptions: STRENGTH_OPTIONS,
+    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+  };
+}
+
+function getStrengthTemplate(): TrainingTemplate {
+  return {
+    distance: 'strength',
+    baseHours: 6,
+    minDays: 3,
+    weeks: generateFullProgression(12, 'strength', 6),
+    strengthOptions: STRENGTH_OPTIONS,
+    disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
+  };
+}
+
+function getHybridTemplate(): TrainingTemplate {
+  return {
+    distance: 'hybrid',
+    baseHours: 10,
+    minDays: 5,
+    weeks: generateFullProgression(12, 'hybrid', 10),
     strengthOptions: STRENGTH_OPTIONS,
     disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
   };
@@ -422,6 +487,39 @@ function getBaseSessionsForDistance(distance: string): SessionTemplate[] {
         { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Easy bike, recovery', zones: [2] },
         { day: 'Saturday', discipline: 'brick', type: 'endurance', duration: 180, intensity: 'Zone 2-3', description: 'Long bike-run brick', zones: [2, 3] }
       ];
+    case 'running':
+      return [
+        { day: 'Monday', discipline: 'run', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
+        { day: 'Wednesday', discipline: 'run', type: 'tempo', duration: 60, intensity: 'Zone 3', description: 'Tempo run, build endurance', zones: [3] },
+        { day: 'Friday', discipline: 'run', type: 'threshold', duration: 30, intensity: 'Zone 4', description: 'Speed intervals, build pace', zones: [4] },
+        { day: 'Saturday', discipline: 'run', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
+      ];
+    case 'cycling':
+      return [
+        { day: 'Monday', discipline: 'bike', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy ride, build aerobic base', zones: [2] },
+        { day: 'Wednesday', discipline: 'bike', type: 'tempo', duration: 90, intensity: 'Zone 3', description: 'Tempo ride, build endurance', zones: [3] },
+        { day: 'Friday', discipline: 'bike', type: 'threshold', duration: 45, intensity: 'Zone 4', description: 'Power intervals, build strength', zones: [4] },
+        { day: 'Saturday', discipline: 'bike', type: 'endurance', duration: 120, intensity: 'Zone 2', description: 'Long ride, build endurance', zones: [2] }
+      ];
+    case 'swimming':
+      return [
+        { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
+        { day: 'Wednesday', discipline: 'swim', type: 'threshold', duration: 30, intensity: 'Zone 4', description: 'Swim intervals, build speed', zones: [4] },
+        { day: 'Friday', discipline: 'swim', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Long swim, build endurance', zones: [2] }
+      ];
+    case 'strength':
+      return [
+        { day: 'Monday', discipline: 'strength', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Compound lifts, build strength', zones: [2] },
+        { day: 'Wednesday', discipline: 'strength', type: 'tempo', duration: 45, intensity: 'Zone 3', description: 'Power development, build explosiveness', zones: [3] },
+        { day: 'Friday', discipline: 'strength', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Stability work, build balance', zones: [2] }
+      ];
+    case 'hybrid':
+      return [
+        { day: 'Monday', discipline: 'run', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Easy run, build aerobic base', zones: [2] },
+        { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 60, intensity: 'Zone 3', description: 'Tempo ride, build endurance', zones: [3] },
+        { day: 'Thursday', discipline: 'swim', type: 'endurance', duration: 30, intensity: 'Zone 2', description: 'Easy swim, focus on technique', zones: [2] },
+        { day: 'Saturday', discipline: 'run', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Long run, build endurance', zones: [2] }
+      ];
     default:
       throw new Error(`Invalid distance: ${distance}`);
   }
@@ -445,7 +543,7 @@ function adjustIntensityForPhase(intensity: string, phase: string): string {
 
 // Main function to generate training plan using algorithms
 export function generateTrainingPlan(
-  distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman',
+  distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman' | 'running' | 'cycling' | 'swimming' | 'strength' | 'hybrid',
   strengthOption: string,
   disciplineFocus: string,
   targetHours: number,
