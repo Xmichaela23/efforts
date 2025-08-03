@@ -701,6 +701,7 @@ export default function AlgorithmPlanBuilder() {
                               }`}
                             >
                               <div className="font-semibold">{option.label}</div>
+                              <div className="text-sm text-gray-600 mt-2">{option.description}</div>
                               {isDisabled && (
                                 <div className="text-sm text-red-600 mt-1">{disabledReason}</div>
                               )}
