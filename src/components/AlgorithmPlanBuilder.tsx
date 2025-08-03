@@ -408,7 +408,8 @@ export default function AlgorithmPlanBuilder() {
       console.log('🎯 About to set generatedPlan with:', plan);
       setGeneratedPlan(plan);
       setCurrentWeek(0);
-      setStep(6);
+      setStep(7);
+      console.log('✅ Plan set, moving to step 7');
       
     } catch (error) {
       console.error('❌ Error generating rithm plan:', error);
@@ -1048,7 +1049,7 @@ export default function AlgorithmPlanBuilder() {
 
               case 7:
           // Plan display
-        console.log('🔍 Step 6 - generatedPlan:', generatedPlan);
+        console.log('🔍 Step 7 - generatedPlan:', generatedPlan);
         return (
           <div>
             {generatedPlan ? (
