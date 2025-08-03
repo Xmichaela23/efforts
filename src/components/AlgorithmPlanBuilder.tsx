@@ -1219,7 +1219,7 @@ export default function AlgorithmPlanBuilder() {
                 {/* Display workouts with week tabs */}
                 {generatedPlan.workouts && generatedPlan.workouts.length > 0 && (
                   <div className="space-y-6">
-                    <h3 className="text-lg font-medium">Your Training Plan (12-Week Progression)</h3>
+                    <h3 className="text-lg font-medium">{getPlanTitle()}</h3>
                     
                     {/* Week tabs */}
                     <div className="border-b border-gray-200">
@@ -1397,6 +1397,50 @@ export default function AlgorithmPlanBuilder() {
   const getRecommendedStrength = () => {
     // Implementation preserved from original
     return 'power_development';
+  };
+
+  const getPlanTitle = () => {
+    if (!responses.distance) return "Your Training Plan (12-Week Progression)";
+    
+    // Distance mapping
+    const distanceNames = {
+      'sprint': 'Sprint Triathlon',
+      'olympic': 'Olympic Triathlon', 
+      'seventy3': '70.3 Triathlon',
+      'ironman': 'Ironman Triathlon',
+      'running': 'Running',
+      'cycling': 'Cycling',
+      'swimming': 'Swimming',
+      'strength': 'Strength Training',
+      'hybrid': 'Hybrid Training'
+    };
+    
+    let title = distanceNames[responses.distance] || 'Training';
+    
+    // Add strength info
+    if (responses.strengthTraining && responses.strengthTraining !== 'none') {
+      const strengthNames = {
+        'power_development': 'with Power Development',
+        'stability_focus': 'with Stability Focus',
+        'compound_strength': 'with Compound Strength',
+        'cowboy_endurance': 'with Cowboy Endurance',
+        'cowboy_compound': 'with Cowboy Compound'
+      };
+      title += ` ${strengthNames[responses.strengthTraining] || ''}`;
+    }
+    
+    // Add discipline focus
+    if (responses.disciplineFocus && responses.disciplineFocus !== 'none') {
+      const focusNames = {
+        'bike': 'Bike Focus',
+        'run': 'Run Focus', 
+        'swim': 'Swim Focus',
+        'bike_run_speed': 'Bike+Run Speed Focus'
+      };
+      title += ` (${focusNames[responses.disciplineFocus] || ''})`;
+    }
+    
+    return `${title} Plan (12-Week Progression)`;
   };
 
   return (
