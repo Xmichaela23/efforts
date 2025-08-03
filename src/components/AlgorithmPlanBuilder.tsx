@@ -220,7 +220,7 @@ export default function AlgorithmPlanBuilder() {
       throw new Error('5K pace is required for run training zones');
     }
     // Only require swim pace if user has swimming in their disciplines
-    if (baselines?.disciplines?.includes('swimming') && !baselines?.performanceNumbers?.swim) {
+    if (baselines?.disciplines?.includes('swimming') && !baselines?.performanceNumbers?.swimPace100) {
       throw new Error('Swim pace is required for swim training zones');
     }
 
@@ -249,7 +249,7 @@ export default function AlgorithmPlanBuilder() {
         userPerformance: {
           ftp: baselines.performanceNumbers.ftp,
           fiveKPace: baselines.performanceNumbers.fiveK,
-          swimPace: baselines.performanceNumbers.swim
+          swimPace: baselines.performanceNumbers.swimPace100
         }
       };
 
@@ -340,7 +340,7 @@ export default function AlgorithmPlanBuilder() {
                   onClick={() => updateResponse('distance', distance.key)}
                   className={`p-4 border rounded-lg text-left transition-colors ${
                     responses.distance === distance.key
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-gray-400 bg-gray-50'
                       : 'border-gray-300 hover:border-gray-400'
                   }`}
                 >
@@ -391,7 +391,7 @@ export default function AlgorithmPlanBuilder() {
                     onClick={() => updateResponse('disciplineFocus', option.key)}
                     className={`w-full p-4 border rounded-lg text-left transition-colors ${
                       responses.disciplineFocus === option.key
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-gray-400 bg-gray-50'
                         : 'border-gray-300 hover:border-gray-400'
                     }`}
                   >
@@ -407,17 +407,17 @@ export default function AlgorithmPlanBuilder() {
                 <h3 className="text-lg font-semibold mb-4">Strength Training:</h3>
                 
                 {/* Smart Strength Suggestion */}
-                <div className="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
-                  <h4 className="font-semibold text-green-800 mb-2">Based on your {DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus)?.label}, we suggest:</h4>
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                  <h4 className="font-semibold text-gray-900 mb-2">Based on your {DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus)?.label}, we suggest:</h4>
                   {(() => {
                     const suggestion = algorithmService.getStrengthSuggestion(responses.disciplineFocus);
                     const strengthOption = STRENGTH_OPTIONS.find(s => s.key === suggestion.recommended);
                     return (
                       <div className="space-y-2">
-                        <div className="font-semibold text-green-700">{strengthOption?.label}</div>
-                        <div className="text-sm text-green-600">{suggestion.reason}</div>
-                        <div className="text-xs text-green-500">Evidence: {suggestion.evidence}</div>
-                        <div className="text-xs text-green-500">Recovery: {suggestion.recovery}</div>
+                        <div className="font-semibold text-gray-900">{strengthOption?.label}</div>
+                        <div className="text-sm text-gray-700">{suggestion.reason}</div>
+                        <div className="text-xs text-gray-600">Evidence: {suggestion.evidence}</div>
+                        <div className="text-xs text-gray-600">Recovery: {suggestion.recovery}</div>
                       </div>
                     );
                   })()}
@@ -431,7 +431,7 @@ export default function AlgorithmPlanBuilder() {
                       onClick={() => updateResponse('strengthTraining', option.key)}
                       className={`w-full p-4 border rounded-lg text-left transition-colors ${
                         responses.strengthTraining === option.key
-                          ? 'border-blue-500 bg-blue-50'
+                          ? 'border-gray-400 bg-gray-50'
                           : 'border-gray-300 hover:border-gray-400'
                       }`}
                     >
@@ -539,7 +539,7 @@ export default function AlgorithmPlanBuilder() {
                     disabled={isDisabled}
                     className={`w-full p-4 border rounded-lg text-left transition-colors ${
                       responses.trainingFrequency === option.key
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-gray-400 bg-gray-50'
                         : isDisabled
                         ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
                         : 'border-gray-300 hover:border-gray-400'
@@ -690,10 +690,10 @@ export default function AlgorithmPlanBuilder() {
                     disabled={isDisabled}
                     className={`w-full p-4 border rounded-lg text-left transition-colors ${
                       responses.weeklyHours === hours
-                        ? 'border-blue-500 bg-blue-50'
+                        ? 'border-gray-400 bg-gray-50'
                         : isDisabled
                         ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                        : 'border-gray-300 hover:border-gray-400'
+                        : 'border-gray-400 hover:border-gray-400'
                     }`}
                   >
                     <div className="font-semibold">{hours} hours per week</div>
