@@ -607,6 +607,8 @@ export function generateTrainingPlan(
     strength?: string[];
   }
 ): TrainingTemplate {
+  console.log(`🔍 generateTrainingPlan called with trainingFrequency: ${trainingFrequency}`);
+  
   // Validate inputs - NO FALLBACKS
   if (!distance) throw new Error('Distance is required');
   if (!strengthOption) throw new Error('Strength option is required');
@@ -1824,7 +1826,10 @@ function generateWeeklyTemplate(
   
   const templateKey = `${trainingFrequency}-days`;
   console.log(`🔍 Looking for template: ${templateKey}, available: ${Object.keys(templates).join(', ')}`);
-  return templates[templateKey] || templates['5-days'];
+  console.log(`🔍 trainingFrequency: ${trainingFrequency}, templateKey: ${templateKey}`);
+  const result = templates[templateKey] || templates['5-days'];
+  console.log(`🔍 Selected template sessions: ${result.length}`);
+  return result;
 }
 
 // 4-day template (Sprint distance)

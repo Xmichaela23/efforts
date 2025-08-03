@@ -268,12 +268,16 @@ export default function AlgorithmPlanBuilder() {
       console.log('📝 Responses:', responses);
       
       // Extract plan parameters
+      console.log('🔍 DEBUG - responses.trainingFrequency:', responses.trainingFrequency);
+      const trainingFreq = parseInt(responses.trainingFrequency.split('-')[0]);
+      console.log('🔍 DEBUG - parsed trainingFrequency:', trainingFreq);
+      
       const planParameters: PlanParameters = {
         distance: responses.distance as any,
         strengthOption: responses.strengthTraining || 'none',
         disciplineFocus: responses.disciplineFocus,
         targetHours: responses.weeklyHours,
-        trainingFrequency: parseInt(responses.trainingFrequency.split('-')[0]), // Convert "5-days" to 5 for template lookup
+        trainingFrequency: trainingFreq, // Convert "5-days" to 5 for template lookup
         userPerformance: {
           ftp: baselines.performanceNumbers.ftp,
           fiveKPace: baselines.performanceNumbers.fiveK,
