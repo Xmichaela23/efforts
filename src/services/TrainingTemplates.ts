@@ -1822,7 +1822,9 @@ function generateWeeklyTemplate(
     '7-days': generate7DayTemplate(distance, strengthOption, disciplineFocus, phase)
   };
   
-  return templates[`${trainingFrequency}-days`] || templates['5-days'];
+  const templateKey = `${trainingFrequency}-days`;
+  console.log(`🔍 Looking for template: ${templateKey}, available: ${Object.keys(templates).join(', ')}`);
+  return templates[templateKey] || templates['5-days'];
 }
 
 // 4-day template (Sprint distance)

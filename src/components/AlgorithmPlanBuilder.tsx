@@ -273,7 +273,7 @@ export default function AlgorithmPlanBuilder() {
         strengthOption: responses.strengthTraining || 'none',
         disciplineFocus: responses.disciplineFocus,
         targetHours: responses.weeklyHours,
-        trainingFrequency: parseInt(responses.trainingFrequency.split('-')[0]),
+        trainingFrequency: parseInt(responses.trainingFrequency.split('-')[0]), // Convert "5-days" to 5 for template lookup
         userPerformance: {
           ftp: baselines.performanceNumbers.ftp,
           fiveKPace: baselines.performanceNumbers.fiveK,
@@ -863,15 +863,8 @@ export default function AlgorithmPlanBuilder() {
         console.log('🔍 Step 6 - generatedPlan:', generatedPlan);
         return (
           <div>
-            <h2 className="text-2xl font-medium mb-6">Your Training Plan</h2>
             {generatedPlan ? (
               <div className="space-y-4">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <h3 className="font-semibold">{generatedPlan.name}</h3>
-                  <p className="text-sm text-gray-600">{generatedPlan.description}</p>
-                  <p className="text-sm text-gray-600">Total workouts: {generatedPlan.workouts?.length || 0} (12-week preview)</p>
-                  <p className="text-xs text-gray-500 mt-1">Showing first 12 weeks of progression. Full plans typically run 16-20 weeks.</p>
-                </div>
                 
                 {/* Training Zones Summary */}
                 {generatedPlan.fullPlan?.zones && (
@@ -936,7 +929,7 @@ export default function AlgorithmPlanBuilder() {
                               <div key={sessionIndex} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-b-0">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">{workout.day || `Day ${sessionIndex + 1}`}</span>
+                                    <span className="text-sm font-medium">{workout.day || workout.date || `Day ${sessionIndex + 1}`}</span>
                                     <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.discipline}</span>
                                     {workout.type && (
                                       <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.type}</span>

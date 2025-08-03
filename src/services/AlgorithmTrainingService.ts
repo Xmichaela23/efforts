@@ -240,7 +240,7 @@ export class AlgorithmTrainingService {
     return {
       plan: {
         name: planName,
-        description: `Algorithm-generated ${template.distance} distance training plan`,
+        description: `Rithm-generated ${template.distance} distance training plan`,
         type: 'triathlon',
         duration: template.weeks.length,
         level: 'intermediate',
