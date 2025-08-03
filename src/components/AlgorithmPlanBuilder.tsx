@@ -751,7 +751,11 @@ export default function AlgorithmPlanBuilder() {
                   
                   let assessment = "";
                   if (responses.disciplineFocus === 'bike_run_speed' && responses.strengthTraining !== 'none') {
-                    assessment = `Your ${focus?.label} with ${strength?.label} requires significant recovery. Consider 5-6 days to allow proper rest between high-intensity sessions.`;
+                    if (responses.distance === 'seventy3' || responses.distance === 'ironman') {
+                      assessment = `Your ${focus?.label} with ${strength?.label} requires significant recovery. For ${distance?.label}, you'll need 6-7 days to allow proper rest between high-intensity sessions.`;
+                    } else {
+                      assessment = `Your ${focus?.label} with ${strength?.label} requires significant recovery. Consider 5-6 days to allow proper rest between high-intensity sessions.`;
+                    }
                   } else if (responses.strengthTraining === 'cowboy_compound') {
                     assessment = `Cowboy Compound (3x/week strength) is very demanding. You'll need 6-7 days to properly integrate this with your ${focus?.label}.`;
                   } else if (responses.strengthTraining === 'none') {
@@ -807,6 +811,34 @@ export default function AlgorithmPlanBuilder() {
                   } else if (responses.strengthTraining === 'power_development' && option.key === '4-days') {
                     isDisabled = true;
                     disabledReason = "Power Development (2x/week) requires minimum 5 days/week";
+                  }
+                }
+                
+                // Additional gating for high-intensity combinations
+                if (!isDisabled) {
+                  // 70.3 + Bike + Run Speed + Strength = requires 6-7 days
+                  if (responses.distance === 'seventy3' && 
+                      responses.disciplineFocus === 'bike_run_speed' && 
+                      responses.strengthTraining !== 'none' && 
+                      (option.key === '4-days' || option.key === '5-days')) {
+                    isDisabled = true;
+                    disabledReason = "70.3 with high-intensity bike+run focus and strength requires 6-7 days/week for proper recovery";
+                  }
+                  
+                  // 70.3 + Cowboy Compound = requires 6-7 days
+                  if (responses.distance === 'seventy3' && 
+                      responses.strengthTraining === 'cowboy_compound' && 
+                      option.key === '5-days') {
+                    isDisabled = true;
+                    disabledReason = "70.3 with Cowboy Compound (3x/week strength) requires 6-7 days/week";
+                  }
+                  
+                  // Ironman + any strength = requires 6-7 days
+                  if (responses.distance === 'ironman' && 
+                      responses.strengthTraining !== 'none' && 
+                      option.key === '5-days') {
+                    isDisabled = true;
+                    disabledReason = "Ironman with strength training requires 6-7 days/week";
                   }
                 }
                 
