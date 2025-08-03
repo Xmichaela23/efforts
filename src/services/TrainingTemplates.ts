@@ -2005,21 +2005,21 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     zones: [2]
   });
   
-  // Thursday: Strength Session 1 (if needed)
+  // Monday: Strength Session 1 (if needed) - after easy swim, good recovery from weekend
   if (actualStrengthSessions >= 1) {
     sessions.push({
-      day: 'Thursday',
+      day: 'Monday',
       discipline: 'strength',
       type: 'endurance',
-      duration: 60, // 1 hour strength session
-      intensity: 'Moderate',
+      duration: getStrengthDuration(phase, 1, weekInPhase, totalWeeksInPhase),
+      intensity: getStrengthIntensity(phase),
       description: 'Strength training session 1',
       zones: [2],
       strengthType: getStrengthType(strengthOption)
     });
   }
   
-  // Friday: Swim
+  // Friday: Swim (threshold) - moved to Friday for better recovery spacing
   sessions.push({
     day: 'Friday',
     discipline: 'swim',
@@ -2030,22 +2030,7 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     zones: [4]
   });
   
-  // Saturday: Brick + Strength Session 2 (if needed)
-  if (actualStrengthSessions >= 2) {
-    // Add strength session before brick
-    sessions.push({
-      day: 'Saturday',
-      discipline: 'strength',
-      type: 'endurance',
-      duration: 45, // Shorter strength session before brick
-      intensity: 'Moderate',
-      description: 'Strength training session 2 (pre-brick)',
-      zones: [2],
-      strengthType: getStrengthType(strengthOption)
-    });
-  }
-  
-  // Saturday: Brick
+  // Saturday: Brick (no strength before brick - better recovery)
   sessions.push({
     day: 'Saturday',
     discipline: 'brick',
@@ -2055,6 +2040,20 @@ function generate5DayTemplate(distance: string, strengthOption: string, discipli
     description: 'Long bike-run brick',
     zones: [2, 3]
   });
+  
+  // Sunday: Strength Session 2 (if needed) - after brick, full recovery before next week
+  if (actualStrengthSessions >= 2) {
+    sessions.push({
+      day: 'Sunday',
+      discipline: 'strength',
+      type: 'endurance',
+      duration: getStrengthDuration(phase, 2, weekInPhase, totalWeeksInPhase),
+      intensity: getStrengthIntensity(phase),
+      description: 'Strength training session 2 (post-brick recovery)',
+      zones: [2],
+      strengthType: getStrengthType(strengthOption)
+    });
+  }
   
   return sessions;
 }
@@ -2423,4 +2422,52 @@ function getStrengthType(strengthOption: string): 'power' | 'stability' | 'compo
     'cowboy_compound': 'cowboy_compound'
   };
   return strengthMap[strengthOption] || 'power';
+}
+
+// Science-based strength duration calculation
+function getStrengthDuration(phase: string, sessionNumber: number, weekInPhase?: number, totalWeeksInPhase?: number): number {
+  const weekProgress = weekInPhase && totalWeeksInPhase ? weekInPhase / totalWeeksInPhase : 0.5;
+  
+  // Base durations by phase
+  let baseDuration: number;
+  switch (phase) {
+    case 'base':
+      baseDuration = 75; // Higher volume, more exercises
+      break;
+    case 'build':
+      baseDuration = 60; // Moderate volume
+      break;
+    case 'peak':
+      baseDuration = 45; // Lower volume, heavier weights
+      break;
+    case 'taper':
+      baseDuration = 30; // Minimal strength, maintenance
+      break;
+    default:
+      baseDuration = 60;
+  }
+  
+  // Progressive overload within phase
+  const phaseMultiplier = 0.8 + (weekProgress * 0.4); // 0.8 to 1.2 range
+  
+  // Session number adjustment (first session longer, subsequent shorter)
+  const sessionMultiplier = sessionNumber === 1 ? 1.0 : 0.8;
+  
+  return Math.round(baseDuration * phaseMultiplier * sessionMultiplier);
+}
+
+// Science-based strength intensity calculation
+function getStrengthIntensity(phase: string): string {
+  switch (phase) {
+    case 'base':
+      return 'Moderate'; // Focus on form and volume
+    case 'build':
+      return 'Moderate-High'; // Increasing intensity
+    case 'peak':
+      return 'High'; // Heavy weights, low reps
+    case 'taper':
+      return 'Light'; // Maintenance, no fatigue
+    default:
+      return 'Moderate';
+  }
 } 
