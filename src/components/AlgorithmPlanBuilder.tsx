@@ -89,13 +89,13 @@ const STRENGTH_OPTIONS = [
   },
   { 
     key: 'cowboy_endurance', 
-    label: 'Cowboy Endurance (3x/week, +2-2.5 hours) - Carries, walks, bodyweight movements',
-    description: 'Endurance-based strength: farmer\'s walks, carries, bodyweight movements. Moderate intensity, good recovery. Requires 6+ training days.'
+    label: 'Cowboy Endurance (3x/week + 1 upper body day, +2.5-3 hours) - Carries, walks, bodyweight',
+    description: 'Cowboy Endurance follows traditional endurance strength protocols with an additional day of upper body work for race course aesthetics and physical balance. Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.'
   },
   { 
     key: 'cowboy_compound', 
-    label: 'Cowboy Compound (3x/week, +2.5-3 hours) - Heavy deadlifts, presses, 1RM-based',
-    description: 'Heavy compound lifts using your 1RM values. Very demanding, requires 48-72hr recovery. Requires 6+ training days.'
+    label: 'Cowboy Compound (3x/week + 1 upper body day, +3-3.5 hours) - Heavy deadlifts, presses, 1RM-based',
+    description: 'Cowboy Compound focuses on compound lifts for endurance training and adds an additional day of upper body work for race course aesthetics and physical balance. Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.'
   },
 ];
 

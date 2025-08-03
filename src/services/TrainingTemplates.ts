@@ -26,7 +26,7 @@ export interface SessionTemplate {
   intensity: string;
   description: string;
   zones: number[];
-  strengthType?: 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
+  strengthType?: 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' | 'cowboy_endurance_upper' | 'cowboy_compound_upper';
   detailedWorkout?: string; // Detailed workout prescription
   garminWorkout?: GarminWorkoutStructure; // Garmin-compatible workout structure
 }
@@ -206,20 +206,20 @@ export const STRENGTH_OPTIONS: StrengthOption[] = [
     name: 'Cowboy Endurance',
     sessionsPerWeek: 3,
     totalHours: 2.5,
-    description: '2x endurance strength + 1x upper body focus',
+    description: 'Cowboy Endurance follows traditional endurance strength protocols with an additional day of upper body work for race course aesthetics and physical balance',
     evidence: 'Mixed approach with some research support',
     recovery: '24-48 hours between sessions',
-    phasing: 'Taper 2-3 weeks before race, reduce to 1x/week'
+    phasing: 'Taper 2-3 weeks before race, reduce to 1x/week. Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.'
   },
   {
     id: 'cowboy_compound',
     name: 'Cowboy Compound',
     sessionsPerWeek: 3,
     totalHours: 3.0,
-    description: '2x compound strength + 1x upper body focus',
+    description: 'Cowboy Compound focuses on compound lifts for endurance training and adds an additional day of upper body work for race course aesthetics and physical balance',
     evidence: 'Experimental approach, not well-studied for triathlon',
     recovery: '48-72 hours between sessions (most demanding)',
-    phasing: 'Taper 3-4 weeks before race, reduce to 1x/week'
+    phasing: 'Taper 3-4 weeks before race, reduce to 1x/week. Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.'
   },
   {
     id: 'none',
@@ -791,7 +791,7 @@ function createStrengthSession(day: string, strengthOption: StrengthOption, sess
   const sessionDuration = Math.round((strengthOption.totalHours / strengthOption.sessionsPerWeek) * 60);
   
   let description = '';
-  let strengthType: 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
+  let strengthType: 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' | 'cowboy_endurance_upper' | 'cowboy_compound_upper';
   
   switch (strengthOption.id) {
     case 'power_development':
@@ -807,12 +807,22 @@ function createStrengthSession(day: string, strengthOption: StrengthOption, sess
       strengthType = 'compound';
       break;
     case 'cowboy_endurance':
-      description = sessionNumber <= 2 ? 'Endurance strength, high reps' : 'Upper body focus';
-      strengthType = 'cowboy_endurance';
+      if (sessionNumber <= 2) {
+        description = 'Endurance strength, high reps';
+        strengthType = 'cowboy_endurance';
+      } else {
+        description = 'Upper body aesthetics - look better on the course, minimal performance impact';
+        strengthType = 'cowboy_endurance_upper';
+      }
       break;
     case 'cowboy_compound':
-      description = sessionNumber <= 2 ? 'Heavy compounds, low reps' : 'Upper body focus';
-      strengthType = 'cowboy_compound';
+      if (sessionNumber <= 2) {
+        description = 'Heavy compounds, low reps';
+        strengthType = 'cowboy_compound';
+      } else {
+        description = 'Upper body aesthetics - look better on the course, minimal performance impact';
+        strengthType = 'cowboy_compound_upper';
+      }
       break;
     default:
       description = 'General strength training';
@@ -1347,6 +1357,34 @@ function generateStrengthWorkout(session: SessionTemplate, userPerformance: any,
         return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Deadlifts ${cowboyCompoundSets}x${cowboyCompoundReps}, Kettlebell Press ${cowboyCompoundSets}x${cowboyCompoundReps}, Kettlebell Rows ${cowboyCompoundSets}x8 each\nCool-down: 5min static stretching`;
       } else {
         return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg Deadlifts ${cowboyCompoundSets}x${cowboyCompoundReps} each, Pike Push-ups ${cowboyCompoundSets}x${cowboyCompoundReps}, Inverted Rows ${cowboyCompoundSets}x8\nCool-down: 5min static stretching`;
+      }
+      
+    case 'cowboy_endurance_upper':
+      const upperSets = isPeakPhase ? 4 : 3;
+      const upperReps = isTaperPhase ? 8 : 12;
+      
+      if (hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Bench Press ${upperSets}x${upperReps} @ ${benchWeight}lbs, Overhead Press ${upperSets}x${upperReps} @ ${overheadWeight}lbs, Barbell Rows ${upperSets}x${upperReps} @ ${rowWeight}lbs, Bicep Curls ${upperSets}x12 @ ${Math.round(benchWeight * 0.4)}lbs\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Bench Press ${upperSets}x${upperReps}, Dumbbell Overhead Press ${upperSets}x${upperReps}, Dumbbell Rows ${upperSets}x${upperReps} each, Dumbbell Curls ${upperSets}x12 each\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Floor Press ${upperSets}x${upperReps}, Kettlebell Press ${upperSets}x${upperReps}, Kettlebell Rows ${upperSets}x${upperReps} each, Kettlebell Curls ${upperSets}x12 each\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Push-ups ${upperSets}x${upperReps * 2}, Pike Push-ups ${upperSets}x${upperReps}, Inverted Rows ${upperSets}x${upperReps}, Diamond Push-ups ${upperSets}x12\nCool-down: 5min static stretching`;
+      }
+      
+    case 'cowboy_compound_upper':
+      const compoundUpperSets = isPeakPhase ? 4 : 3;
+      const compoundUpperReps = isTaperPhase ? 6 : 8;
+      
+      if (hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Bench Press ${compoundUpperSets}x${compoundUpperReps} @ ${benchWeight}lbs, Overhead Press ${compoundUpperSets}x${compoundUpperReps} @ ${overheadWeight}lbs, Barbell Rows ${compoundUpperSets}x${compoundUpperReps} @ ${rowWeight}lbs, Close-Grip Bench Press ${compoundUpperSets}x8 @ ${Math.round(benchWeight * 0.8)}lbs\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Bench Press ${compoundUpperSets}x${compoundUpperReps}, Dumbbell Overhead Press ${compoundUpperSets}x${compoundUpperReps}, Dumbbell Rows ${compoundUpperSets}x${compoundUpperReps} each, Dumbbell Floor Press ${compoundUpperSets}x8 each\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Floor Press ${compoundUpperSets}x${compoundUpperReps}, Kettlebell Press ${compoundUpperSets}x${compoundUpperReps}, Kettlebell Rows ${compoundUpperSets}x${compoundUpperReps} each, Kettlebell Floor Press ${compoundUpperSets}x8 each\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Push-ups ${compoundUpperSets}x${compoundUpperReps * 2}, Pike Push-ups ${compoundUpperSets}x${compoundUpperReps}, Inverted Rows ${compoundUpperSets}x${compoundUpperReps}, Diamond Push-ups ${compoundUpperSets}x8\nCool-down: 5min static stretching`;
       }
       
     default:
