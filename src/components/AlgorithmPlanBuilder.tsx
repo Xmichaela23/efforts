@@ -5,6 +5,65 @@ import { AlgorithmTrainingService, type PlanParameters, type UserPerformance } f
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+// WorkoutTabs component for handling multiple workouts on the same day
+const WorkoutTabs = ({ workouts }: { workouts: any[] }) => {
+  const [currentDay, setCurrentDay] = useState(0);
+
+  return (
+    <div>
+      {/* Tab navigation */}
+      <div className="flex border-b border-gray-200">
+        {workouts.map((workout, index) => (
+          <button
+            key={index}
+            onClick={() => setCurrentDay(index)}
+            className={`px-4 py-2 text-xs font-medium border-b-2 ${
+              currentDay === index
+                ? 'border-gray-900 text-gray-900'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {workout.discipline} ({workout.duration}min)
+          </button>
+        ))}
+      </div>
+      
+      {/* Tab content */}
+      <div className="p-3">
+        {workouts.map((workout, index) => (
+          <div key={index} className={currentDay === index ? 'block' : 'hidden'}>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+              {workout.type && workout.type !== workout.discipline && (
+                <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+              )}
+            </div>
+            {workout.detailedWorkout ? (
+              <div>
+                <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
+              </div>
+            ) : (
+              <div>
+                <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+              </div>
+            )}
+            {workout.intensity && (
+              <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>
+            )}
+            {workout.zones && workout.zones.length > 0 && (
+              <p className="text-xs text-gray-500">Zones: {workout.zones.join(', ')}</p>
+            )}
+            {workout.strengthType && (
+              <p className="text-xs text-gray-500">Strength Type: {workout.strengthType}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Preserve all our flow questions and options
 const TRAINING_CATEGORIES = [
   { key: 'triathlon', label: 'Triathlon' },
@@ -1149,9 +1208,8 @@ export default function AlgorithmPlanBuilder() {
                                 workoutsByDay[day].push(workout);
                               });
 
-                              return Object.entries(workoutsByDay).map(([day, workouts]) => {
+                              return Object.entries(workoutsByDay).map(([day, workouts], dayIndex) => {
                                 const totalDuration = workouts.reduce((sum, w) => sum + (w.duration || 0), 0);
-                                const [currentDay, setCurrentDay] = useState(0);
 
                                 return (
                                   <div key={day} className="border border-gray-200 rounded-lg">
@@ -1163,57 +1221,7 @@ export default function AlgorithmPlanBuilder() {
                                     
                                     {/* Multiple workouts for this day */}
                                     {workouts.length > 1 ? (
-                                      <div>
-                                        {/* Tab navigation */}
-                                        <div className="flex border-b border-gray-200">
-                                          {workouts.map((workout, index) => (
-                                            <button
-                                              key={index}
-                                              onClick={() => setCurrentDay(index)}
-                                              className={`px-4 py-2 text-xs font-medium border-b-2 ${
-                                                currentDay === index
-                                                  ? 'border-gray-900 text-gray-900'
-                                                  : 'border-transparent text-gray-500 hover:text-gray-700'
-                                              }`}
-                                            >
-                                              {workout.discipline} ({workout.duration}min)
-                                            </button>
-                                          ))}
-                                        </div>
-                                        
-                                        {/* Tab content */}
-                                        <div className="p-3">
-                                          {workouts.map((workout, index) => (
-                                            <div key={index} className={currentDay === index ? 'block' : 'hidden'}>
-                                              <div className="flex items-center gap-2 mb-2">
-                                                <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
-                                                {workout.type && workout.type !== workout.discipline && (
-                                                  <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
-                                                )}
-                                              </div>
-                                              {workout.detailedWorkout ? (
-                                                <div>
-                                                  <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
-                                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
-                                                </div>
-                                              ) : (
-                                                <div>
-                                                  <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
-                                                </div>
-                                              )}
-                                              {workout.intensity && (
-                                                <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>
-                                              )}
-                                              {workout.zones && workout.zones.length > 0 && (
-                                                <p className="text-xs text-gray-500">Zones: {workout.zones.join(', ')}</p>
-                                              )}
-                                              {workout.strengthType && (
-                                                <p className="text-xs text-gray-500">Strength Type: {workout.strengthType}</p>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
+                                      <WorkoutTabs workouts={workouts} />
                                     ) : (
                                       /* Single workout for this day */
                                       <div className="p-3">
