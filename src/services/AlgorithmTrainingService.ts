@@ -42,6 +42,7 @@ export interface AlgorithmTrainingPlan {
     intensity?: string;
     zones?: number[];
     strengthType?: string;
+    garminWorkout?: any; // Garmin-compatible workout structure
   }>;
 }
 
@@ -226,11 +227,12 @@ export class AlgorithmTrainingService {
           description: session.detailedWorkout || `${session.description} (${session.intensity})`,
           intervals: session.zones.length > 0 ? [{ zones: session.zones }] : undefined,
           strength_exercises: session.strengthType ? [{ type: session.strengthType }] : undefined,
-          detailedWorkout: session.detailedWorkout,
-          discipline: session.discipline,
-          intensity: session.intensity,
-          zones: session.zones,
-          strengthType: session.strengthType
+                  detailedWorkout: session.detailedWorkout,
+        discipline: session.discipline,
+        intensity: session.intensity,
+        zones: session.zones,
+        strengthType: session.strengthType,
+        garminWorkout: session.garminWorkout
         };
       });
     });

@@ -28,6 +28,46 @@ export interface SessionTemplate {
   zones: number[];
   strengthType?: 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
   detailedWorkout?: string; // Detailed workout prescription
+  garminWorkout?: GarminWorkoutStructure; // Garmin-compatible workout structure
+}
+
+// Garmin-compatible workout structure
+export interface GarminWorkoutStructure {
+  workoutName: string;
+  description: string;
+  sport: string;
+  estimatedDurationInSecs: number;
+  estimatedDistanceInMeters?: number;
+  segments: GarminSegment[];
+}
+
+export interface GarminSegment {
+  segmentOrder: number;
+  sport: string;
+  estimatedDurationInSecs: number;
+  estimatedDistanceInMeters?: number;
+  steps: GarminStep[];
+}
+
+export interface GarminStep {
+  stepOrder: number;
+  type: 'WorkoutStep' | 'WorkoutRepeatStep';
+  intensity: string;
+  description: string;
+  durationType: string;
+  durationValue: number;
+  targetType?: string;
+  targetValue?: number;
+  targetValueLow?: number;
+  targetValueHigh?: number;
+  targetValueType?: string;
+  strokeType?: string; // For swimming
+  drillType?: string; // For swimming
+  equipmentType?: string; // For swimming
+  exerciseCategory?: string; // For strength
+  exerciseName?: string; // For strength
+  weightValue?: number; // For strength
+  weightDisplayUnit?: string; // For strength
 }
 
 export interface StrengthOption {
@@ -625,10 +665,12 @@ export function generateTrainingPlan(
         console.log('🔍 DEBUG - userPerformance FTP:', userPerformance.ftp, 'userPerformanceWith1RM FTP:', userPerformanceWith1RM.ftp);
         
         const detailedWorkout = generateDetailedWorkout(session, userPerformanceWith1RM, week.phase, strengthOption, disciplineFocus, userEquipment);
+        const garminWorkout = generateGarminWorkout(session, userPerformanceWith1RM, week.phase, disciplineFocus, userEquipment);
         console.log('🔍 DEBUG - Session:', session.discipline, session.type, 'strengthType:', session.strengthType, 'detailedWorkout:', detailedWorkout);
         return {
           ...session,
-          detailedWorkout
+          detailedWorkout,
+          garminWorkout
         };
       })
     }))
@@ -1313,6 +1355,340 @@ function getPhaseIntensityMultiplier(phase: string): number {
     default:
       return 1.0;
   }
+}
+
+// Generate Garmin-compatible workout structure
+function generateGarminWorkout(session: SessionTemplate, userPerformance: any, phase: string, disciplineFocus?: string, userEquipment?: any): GarminWorkoutStructure {
+  const { discipline, type, duration, intensity, zones, strengthType } = session;
+  
+  // Map discipline to Garmin sport
+  const getGarminSport = (discipline: string): string => {
+    switch (discipline) {
+      case 'swim': return 'LAP_SWIMMING';
+      case 'bike': return 'CYCLING';
+      case 'run': return 'RUNNING';
+      case 'strength': return 'STRENGTH_TRAINING';
+      case 'brick': return 'MULTI_SPORT';
+      default: return 'GENERIC';
+    }
+  };
+  
+  // Map intensity to Garmin intensity
+  const getGarminIntensity = (type: string): string => {
+    switch (type) {
+      case 'recovery': return 'RECOVERY';
+      case 'endurance': return 'ACTIVE';
+      case 'tempo': return 'INTERVAL';
+      case 'threshold': return 'INTERVAL';
+      case 'vo2max': return 'INTERVAL';
+      case 'anaerobic': return 'INTERVAL';
+      default: return 'ACTIVE';
+    }
+  };
+  
+  // Map duration type
+  const getGarminDurationType = (discipline: string): string => {
+    switch (discipline) {
+      case 'swim': return 'DISTANCE'; // Swimming typically uses distance
+      case 'bike': return 'TIME';
+      case 'run': return 'TIME';
+      case 'strength': return 'TIME';
+      case 'brick': return 'TIME';
+      default: return 'TIME';
+    }
+  };
+  
+  // Generate steps based on discipline
+  const generateSteps = (): GarminStep[] => {
+    const steps: GarminStep[] = [];
+    let stepOrder = 1;
+    
+    // Warm-up step
+    steps.push({
+      stepOrder: stepOrder++,
+      type: 'WorkoutStep',
+      intensity: 'WARMUP',
+      description: 'Warm-up',
+      durationType: 'TIME',
+      durationValue: 300, // 5 minutes
+      targetType: 'OPEN'
+    });
+    
+         // Main set steps
+     switch (discipline) {
+       case 'swim':
+         steps.push(...generateSwimSteps(userPerformance, phase, stepOrder, disciplineFocus, userEquipment));
+         break;
+       case 'bike':
+         steps.push(...generateBikeSteps(userPerformance, phase, stepOrder, disciplineFocus, userEquipment));
+         break;
+       case 'run':
+         steps.push(...generateRunSteps(userPerformance, phase, stepOrder, disciplineFocus, userEquipment));
+         break;
+       case 'strength':
+         steps.push(...generateStrengthSteps(userPerformance, phase, stepOrder, strengthType, userEquipment));
+         break;
+       case 'brick':
+         steps.push(...generateBrickSteps(userPerformance, phase, stepOrder, disciplineFocus));
+         break;
+     }
+    
+    // Cool-down step
+    steps.push({
+      stepOrder: stepOrder++,
+      type: 'WorkoutStep',
+      intensity: 'COOLDOWN',
+      description: 'Cool-down',
+      durationType: 'TIME',
+      durationValue: 300, // 5 minutes
+      targetType: 'OPEN'
+    });
+    
+    return steps;
+  };
+  
+  return {
+    workoutName: `${discipline.charAt(0).toUpperCase() + discipline.slice(1)} ${type.charAt(0).toUpperCase() + type.slice(1)}`,
+    description: session.description,
+    sport: getGarminSport(discipline),
+    estimatedDurationInSecs: duration * 60,
+    segments: [{
+      segmentOrder: 1,
+      sport: getGarminSport(discipline),
+      estimatedDurationInSecs: duration * 60,
+      steps: generateSteps()
+    }]
+  };
+}
+
+// Generate swim-specific steps
+function generateSwimSteps(userPerformance: any, phase: string, startStepOrder: number, disciplineFocus?: string, userEquipment?: any): GarminStep[] {
+  const steps: GarminStep[] = [];
+  const swimPace = userPerformance.swimPace || "2:00/100m";
+  const hasPool = userEquipment?.swimming?.includes('pool');
+  
+  // Convert pace to m/s for Garmin
+  const paceToMs = (pace: string): number => {
+    const [minutes, seconds] = pace.split(':').map(Number);
+    const totalSeconds = minutes * 60 + seconds;
+    return 100 / totalSeconds; // m/s
+  };
+  
+  const targetPace = paceToMs(swimPace);
+  
+  steps.push({
+    stepOrder: startStepOrder,
+    type: 'WorkoutStep',
+    intensity: 'ACTIVE',
+    description: 'Main swim set',
+    durationType: 'DISTANCE',
+    durationValue: 1000, // 1km
+    targetType: 'PACE',
+    targetValue: targetPace,
+    targetValueType: 'SPEED',
+    strokeType: 'FREESTYLE',
+    equipmentType: hasPool ? 'NONE' : 'NONE'
+  });
+  
+  return steps;
+}
+
+// Generate bike-specific steps
+function generateBikeSteps(userPerformance: any, phase: string, startStepOrder: number, disciplineFocus?: string, userEquipment?: any): GarminStep[] {
+  const steps: GarminStep[] = [];
+  const ftp = userPerformance.ftp || 200;
+  const hasPowerMeter = userEquipment?.cycling?.includes('power_meter');
+  const hasHeartRate = userEquipment?.cycling?.includes('heart_rate');
+  
+  // Determine target type based on available equipment
+  let targetType = 'OPEN';
+  let targetValue = 0;
+  let targetValueLow = 0;
+  let targetValueHigh = 0;
+  
+  if (hasPowerMeter) {
+    targetType = 'POWER';
+    targetValue = Math.round(ftp * 0.7); // Zone 2
+    targetValueLow = Math.round(ftp * 0.65);
+    targetValueHigh = Math.round(ftp * 0.75);
+  } else if (hasHeartRate) {
+    targetType = 'HEART_RATE';
+    targetValue = 140; // Approximate Zone 2
+    targetValueLow = 130;
+    targetValueHigh = 150;
+  }
+  
+  steps.push({
+    stepOrder: startStepOrder,
+    type: 'WorkoutStep',
+    intensity: 'ACTIVE',
+    description: 'Main bike set',
+    durationType: 'TIME',
+    durationValue: 1800, // 30 minutes
+    targetType,
+    targetValue,
+    targetValueLow,
+    targetValueHigh,
+    targetValueType: targetType === 'POWER' ? 'POWER' : 'HEART_RATE'
+  });
+  
+  return steps;
+}
+
+// Generate run-specific steps
+function generateRunSteps(userPerformance: any, phase: string, startStepOrder: number, disciplineFocus?: string, userEquipment?: any): GarminStep[] {
+  const steps: GarminStep[] = [];
+  const easyPace = userPerformance.easyPace || "9:00/mile";
+  const hasHeartRate = userEquipment?.running?.includes('heart_rate');
+  
+  // Convert pace to m/s for Garmin
+  const paceToMs = (pace: string): number => {
+    const [minutes, seconds] = pace.split(':').map(Number);
+    const totalSeconds = minutes * 60 + seconds;
+    return 1609.34 / totalSeconds; // m/s (1 mile = 1609.34m)
+  };
+  
+  const targetPace = paceToMs(easyPace);
+  
+  let targetType = 'OPEN';
+  let targetValue = 0;
+  let targetValueLow = 0;
+  let targetValueHigh = 0;
+  
+  if (hasHeartRate) {
+    targetType = 'HEART_RATE';
+    targetValue = 140; // Approximate Zone 2
+    targetValueLow = 130;
+    targetValueHigh = 150;
+  } else {
+    targetType = 'PACE';
+    targetValue = targetPace;
+    targetValueLow = targetPace * 0.95;
+    targetValueHigh = targetPace * 1.05;
+  }
+  
+  steps.push({
+    stepOrder: startStepOrder,
+    type: 'WorkoutStep',
+    intensity: 'ACTIVE',
+    description: 'Main run set',
+    durationType: 'TIME',
+    durationValue: 1800, // 30 minutes
+    targetType,
+    targetValue,
+    targetValueLow,
+    targetValueHigh,
+    targetValueType: targetType === 'PACE' ? 'SPEED' : 'HEART_RATE'
+  });
+  
+  return steps;
+}
+
+// Generate strength-specific steps
+function generateStrengthSteps(userPerformance: any, phase: string, startStepOrder: number, strengthType?: string, userEquipment?: any): GarminStep[] {
+  const steps: GarminStep[] = [];
+  
+  // Get 1RM values
+  const squat1RM = userPerformance.squat || 135;
+  const deadlift1RM = userPerformance.deadlift || 185;
+  const bench1RM = userPerformance.bench || 135;
+  
+  // Generate exercises based on strength type
+  const exercises = getStrengthExercises(strengthType, userEquipment);
+  
+  exercises.forEach((exercise, index) => {
+    steps.push({
+      stepOrder: startStepOrder + index,
+      type: 'WorkoutStep',
+      intensity: 'ACTIVE',
+      description: exercise.name,
+      durationType: 'REPS',
+      durationValue: exercise.reps,
+      targetType: 'OPEN',
+      exerciseCategory: exercise.category,
+      exerciseName: exercise.name,
+      weightValue: exercise.weight,
+      weightDisplayUnit: 'LB'
+    });
+  });
+  
+  return steps;
+}
+
+// Helper function to get strength exercises
+function getStrengthExercises(strengthType?: string, userEquipment?: any): Array<{name: string, category: string, reps: number, weight: number}> {
+  const hasBarbell = userEquipment?.strength?.includes('barbell');
+  const hasDumbbells = userEquipment?.strength?.includes('dumbbells');
+  const hasKettlebells = userEquipment?.strength?.includes('kettlebells');
+  
+  switch (strengthType) {
+    case 'compound':
+      if (hasBarbell) {
+        return [
+          { name: 'Barbell Squat', category: 'COMPOUND', reps: 5, weight: 0 },
+          { name: 'Barbell Deadlift', category: 'COMPOUND', reps: 3, weight: 0 },
+          { name: 'Barbell Bench Press', category: 'COMPOUND', reps: 5, weight: 0 }
+        ];
+      } else if (hasDumbbells) {
+        return [
+          { name: 'Goblet Squat', category: 'COMPOUND', reps: 5, weight: 0 },
+          { name: 'Dumbbell Deadlift', category: 'COMPOUND', reps: 3, weight: 0 },
+          { name: 'Dumbbell Bench Press', category: 'COMPOUND', reps: 5, weight: 0 }
+        ];
+      } else {
+        return [
+          { name: 'Bodyweight Squat', category: 'COMPOUND', reps: 10, weight: 0 },
+          { name: 'Single-leg Deadlift', category: 'COMPOUND', reps: 8, weight: 0 },
+          { name: 'Push-up', category: 'COMPOUND', reps: 10, weight: 0 }
+        ];
+      }
+    default:
+      return [
+        { name: 'Bodyweight Squat', category: 'COMPOUND', reps: 10, weight: 0 },
+        { name: 'Push-up', category: 'COMPOUND', reps: 10, weight: 0 },
+        { name: 'Plank', category: 'CORE', reps: 1, weight: 0 }
+      ];
+  }
+}
+
+// Generate brick-specific steps
+function generateBrickSteps(userPerformance: any, phase: string, startStepOrder: number, disciplineFocus?: string): GarminStep[] {
+  const steps: GarminStep[] = [];
+  
+  // Bike segment
+  steps.push({
+    stepOrder: startStepOrder,
+    type: 'WorkoutStep',
+    intensity: 'ACTIVE',
+    description: 'Bike segment',
+    durationType: 'TIME',
+    durationValue: 1800, // 30 minutes
+    targetType: 'OPEN'
+  });
+  
+  // Transition
+  steps.push({
+    stepOrder: startStepOrder + 1,
+    type: 'WorkoutStep',
+    intensity: 'REST',
+    description: 'Transition',
+    durationType: 'TIME',
+    durationValue: 120, // 2 minutes
+    targetType: 'OPEN'
+  });
+  
+  // Run segment
+  steps.push({
+    stepOrder: startStepOrder + 2,
+    type: 'WorkoutStep',
+    intensity: 'ACTIVE',
+    description: 'Run segment',
+    durationType: 'TIME',
+    durationValue: 900, // 15 minutes
+    targetType: 'OPEN'
+  });
+  
+  return steps;
 } 
 
 // Training Science Principles
