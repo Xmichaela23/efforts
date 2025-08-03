@@ -1117,7 +1117,7 @@ function generateBikeWorkout(session: SessionTemplate, userPerformance: any, pha
       } else if (hasHeartRate) {
         return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ 80-85% max HR, 5min easy between\nCool-down: 10min easy`;
       } else {
-        return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ tempo effort (sustainable but challenging), 5min easy between\nCool-down: 10min easy`;
+        return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ tempo effort (${Math.round(ftp * 0.85)}-${Math.round(ftp * 0.9)}W target), 5min easy between\nCool-down: 10min easy`;
       }
       
     case 'threshold':
