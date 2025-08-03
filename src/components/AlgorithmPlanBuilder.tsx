@@ -997,29 +997,13 @@ export default function AlgorithmPlanBuilder() {
                 
                 // Additional gating for high-intensity combinations
                 if (!isDisabled) {
-                  // 70.3 + Bike + Run Speed + Strength = requires 12+ hours
-                  if (responses.distance === 'seventy3' && 
+                  // Sprint + Bike + Run Speed + Strength = requires 8+ hours
+                  if (responses.distance === 'sprint' && 
                       responses.disciplineFocus === 'bike_run_speed' && 
                       responses.strengthTraining !== 'none' && 
-                      hours < 12) {
+                      hours < 8) {
                     isDisabled = true;
-                    disabledReason = "70.3 with high-intensity bike+run focus and strength requires minimum 12 hours/week";
-                  }
-                  
-                  // 70.3 + Cowboy Compound = requires 15+ hours
-                  if (responses.distance === 'seventy3' && 
-                      responses.strengthTraining === 'cowboy_compound' && 
-                      hours < 15) {
-                    isDisabled = true;
-                    disabledReason = "70.3 with Cowboy Compound requires minimum 15 hours/week";
-                  }
-                  
-                  // Ironman + any strength = requires 15+ hours
-                  if (responses.distance === 'ironman' && 
-                      responses.strengthTraining !== 'none' && 
-                      hours < 15) {
-                    isDisabled = true;
-                    disabledReason = "Ironman with strength training requires minimum 15 hours/week";
+                    disabledReason = "Sprint with high-intensity bike+run focus and strength requires minimum 8 hours/week";
                   }
                   
                   // Olympic + Bike + Run Speed + Strength = requires 10+ hours
@@ -1029,6 +1013,41 @@ export default function AlgorithmPlanBuilder() {
                       hours < 10) {
                     isDisabled = true;
                     disabledReason = "Olympic with high-intensity bike+run focus and strength requires minimum 10 hours/week";
+                  }
+                  
+                  // 70.3 + Bike + Run Speed + Strength = requires 12+ hours
+                  if (responses.distance === 'seventy3' && 
+                      responses.disciplineFocus === 'bike_run_speed' && 
+                      responses.strengthTraining !== 'none' && 
+                      hours < 12) {
+                    isDisabled = true;
+                    disabledReason = "70.3 with high-intensity bike+run focus and strength requires minimum 12 hours/week";
+                  }
+                  
+                  // Ironman + Bike + Run Speed + Strength = requires 15+ hours
+                  if (responses.distance === 'ironman' && 
+                      responses.disciplineFocus === 'bike_run_speed' && 
+                      responses.strengthTraining !== 'none' && 
+                      hours < 15) {
+                    isDisabled = true;
+                    disabledReason = "Ironman with high-intensity bike+run focus and strength requires minimum 15 hours/week";
+                  }
+                  
+                  // Cowboy Compound requires additional hours for all distances
+                  if (responses.strengthTraining === 'cowboy_compound') {
+                    if (responses.distance === 'sprint' && hours < 10) {
+                      isDisabled = true;
+                      disabledReason = "Sprint with Cowboy Compound requires minimum 10 hours/week";
+                    } else if (responses.distance === 'olympic' && hours < 12) {
+                      isDisabled = true;
+                      disabledReason = "Olympic with Cowboy Compound requires minimum 12 hours/week";
+                    } else if (responses.distance === 'seventy3' && hours < 15) {
+                      isDisabled = true;
+                      disabledReason = "70.3 with Cowboy Compound requires minimum 15 hours/week";
+                    } else if (responses.distance === 'ironman' && hours < 18) {
+                      isDisabled = true;
+                      disabledReason = "Ironman with Cowboy Compound requires minimum 18 hours/week";
+                    }
                   }
                 }
                 
