@@ -200,11 +200,10 @@ export default function AlgorithmPlanBuilder() {
   const validateAssessment = () => {
     const requiredFields = [
       'distance',
-      'trainingFrequency',
+      'disciplineFocus',
       'strengthTraining',
-      'weekdayDuration',
-      'weekendDuration',
-      'trainingPhilosophy'
+      'trainingFrequency',
+      'weeklyHours'
     ];
 
     const missingFields = requiredFields.filter(field => !responses[field]);
