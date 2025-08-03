@@ -53,11 +53,11 @@ export interface DisciplineFocus {
 export function calculateIntensityZones(
   ftp: number,
   fiveKPace: string, // format: "MM:SS"
-  swimPace: string   // format: "MM:SS/100m"
+  swimPace?: string   // format: "MM:SS/100m" - optional
 ) {
   // Parse paces
   const fiveKSeconds = parsePaceToSeconds(fiveKPace);
-  const swimSeconds = parseSwimPaceToSeconds(swimPace);
+  const swimSeconds = swimPace ? parseSwimPaceToSeconds(swimPace) : null;
   
   return {
     bike: {
@@ -76,14 +76,14 @@ export function calculateIntensityZones(
       zone5: subtractSecondsFromPace(fiveKSeconds, 15), // VO2max
       zone6: subtractSecondsFromPace(fiveKSeconds, 30)  // Anaerobic
     },
-    swim: {
+    swim: swimSeconds ? {
       zone1: addSecondsToSwimPace(swimSeconds, 30),   // Recovery
       zone2: addSecondsToSwimPace(swimSeconds, 20),   // Endurance
       zone3: addSecondsToSwimPace(swimSeconds, 10),   // Tempo
       zone4: addSecondsToSwimPace(swimSeconds, 0),    // Threshold
       zone5: subtractSecondsFromSwimPace(swimSeconds, 10), // VO2max
       zone6: subtractSecondsFromSwimPace(swimSeconds, 20)  // Anaerobic
-    }
+    } : null
   };
 }
 
@@ -452,7 +452,7 @@ export function generateTrainingPlan(
   userPerformance: {
     ftp: number;
     fiveKPace: string;
-    swimPace: string;
+    swimPace?: string; // Optional - only required if user has swimming in disciplines
   }
 ): TrainingTemplate {
   // Validate inputs - NO FALLBACKS
@@ -460,9 +460,10 @@ export function generateTrainingPlan(
   if (!strengthOption) throw new Error('Strength option is required');
   if (!disciplineFocus) throw new Error('Discipline focus is required');
   if (!targetHours || targetHours < 4) throw new Error('Target hours must be at least 4');
-  if (!userPerformance.ftp || !userPerformance.fiveKPace || !userPerformance.swimPace) {
-    throw new Error('All performance metrics are required');
+  if (!userPerformance.ftp || !userPerformance.fiveKPace) {
+    throw new Error('FTP and 5K pace are required');
   }
+  // Swim pace is optional - only required if user has swimming in disciplines
 
   // Get base template
   const baseTemplate = getBaseTemplate(distance);
@@ -471,7 +472,7 @@ export function generateTrainingPlan(
   const zones = calculateIntensityZones(
     userPerformance.ftp,
     userPerformance.fiveKPace,
-    userPerformance.swimPace
+    userPerformance.swimPace || undefined
   );
 
   // Scale template to target hours

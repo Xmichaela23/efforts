@@ -212,14 +212,15 @@ export default function AlgorithmPlanBuilder() {
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
     }
 
-    // Validate performance data
+    // Validate performance data based on user's disciplines
     if (!baselines?.performanceNumbers?.ftp) {
       throw new Error('FTP is required for bike training zones');
     }
     if (!baselines?.performanceNumbers?.fiveK) {
       throw new Error('5K pace is required for run training zones');
     }
-    if (!baselines?.performanceNumbers?.swim) {
+    // Only require swim pace if user has swimming in their disciplines
+    if (baselines?.disciplines?.includes('swimming') && !baselines?.performanceNumbers?.swim) {
       throw new Error('Swim pace is required for swim training zones');
     }
 

@@ -43,7 +43,7 @@ export interface AlgorithmTrainingPlan {
 export interface UserPerformance {
   ftp: number;
   fiveKPace: string; // format: "MM:SS"
-  swimPace: string;   // format: "MM:SS/100m"
+  swimPace?: string;   // format: "MM:SS/100m" - optional
 }
 
 export interface PlanParameters {
@@ -109,9 +109,10 @@ export class AlgorithmTrainingService {
     if (!params.targetHours || params.targetHours < 4) throw new Error('Target hours must be at least 4');
     
     const { ftp, fiveKPace, swimPace } = params.userPerformance;
-    if (!ftp || !fiveKPace || !swimPace) {
-      throw new Error('All performance metrics (FTP, 5K pace, swim pace) are required');
+    if (!ftp || !fiveKPace) {
+      throw new Error('FTP and 5K pace are required');
     }
+    // Swim pace is optional - only required if user has swimming in disciplines
 
     // Validate strength option exists
     const validStrengthOption = STRENGTH_OPTIONS.find(opt => opt.id === params.strengthOption);
