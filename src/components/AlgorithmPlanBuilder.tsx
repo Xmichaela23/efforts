@@ -1401,11 +1401,6 @@ export default function AlgorithmPlanBuilder() {
 
   return (
     <div className="w-full">
-      <div className="mb-8">
-        <h1 className="text-2xl font-medium mb-2">Rithm Training Plan Builder</h1>
-        <p className="text-gray-600">Evidence-based rithm for personalized training</p>
-      </div>
-
       <div>
         {getCurrentStepContent()}
       </div>
