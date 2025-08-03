@@ -582,8 +582,8 @@ export function generateTrainingPlan(
   userPerformance: {
     ftp: number;
     fiveKPace: string;
-    easyPace?: string; // Optional - Zone 2 conversational pace
-    swimPace?: string; // Optional - only required if user has swimming in disciplines
+    easyPace?: string, // Optional - Zone 2 conversational pace
+    swimPace?: string, // Optional - only required if user has swimming in disciplines
     squat?: number; // Optional - 1RM squat in lbs
     deadlift?: number; // Optional - 1RM deadlift in lbs
     bench?: number; // Optional - 1RM bench press in lbs
@@ -915,38 +915,102 @@ function addStrengthSessions(weeks: WeekTemplate[], strengthOption: StrengthOpti
 function determineStrengthDays(existingSessions: SessionTemplate[], strengthSessionsPerWeek: number): string[] {
   const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const usedDays = existingSessions.map(s => s.day);
-  const availableDays = daysOfWeek.filter(day => !usedDays.includes(day));
   
-  // If we have enough available days, use them
-  if (availableDays.length >= strengthSessionsPerWeek) {
-    return availableDays.slice(0, strengthSessionsPerWeek);
-  }
+  // Science-based strength placement rules:
+  // 1. Avoid consecutive strength days (48-72h recovery needed)
+  // 2. Prefer days with low-intensity endurance sessions
+  // 3. Avoid days with high-intensity sessions (tempo, threshold, brick)
+  // 4. For 2x/week: Tuesday + Friday (or Thursday)
+  // 5. For 3x/week: Tuesday + Thursday + Sunday (or Monday)
   
-  // Otherwise, add to existing days (avoiding high-intensity days)
-  const lowIntensityDays = existingSessions
-    .filter(s => s.intensity.includes('Zone 2') || s.intensity.includes('Zone 1'))
+  const highIntensityDays = existingSessions
+    .filter(s => s.intensity.includes('Zone 3') || s.intensity.includes('Zone 4') || s.discipline === 'brick')
     .map(s => s.day);
+  
+  const lowIntensityDays = existingSessions
+    .filter(s => s.intensity.includes('Zone 2') && !highIntensityDays.includes(s.day))
+    .map(s => s.day);
+  
+  const availableDays = daysOfWeek.filter(day => !usedDays.includes(day));
   
   const selectedDays: string[] = [];
   
-  // First, use available days
-  selectedDays.push(...availableDays);
-  
-  // Then, add to low-intensity days if needed
-  for (const day of lowIntensityDays) {
-    if (selectedDays.length < strengthSessionsPerWeek && !selectedDays.includes(day)) {
-      selectedDays.push(day);
+  if (strengthSessionsPerWeek === 2) {
+    // 2x/week: Tuesday + Friday (or best available)
+    const preferredDays = ['Tuesday', 'Friday'];
+    for (const day of preferredDays) {
+      if (!highIntensityDays.includes(day) && !selectedDays.includes(day)) {
+        selectedDays.push(day);
+      }
+    }
+    
+    // If we don't have 2 days yet, use available days
+    for (const day of availableDays) {
+      if (selectedDays.length < 2 && !highIntensityDays.includes(day) && !selectedDays.includes(day)) {
+        selectedDays.push(day);
+      }
+    }
+    
+    // If still need more, use low-intensity days
+    for (const day of lowIntensityDays) {
+      if (selectedDays.length < 2 && !selectedDays.includes(day)) {
+        selectedDays.push(day);
+      }
+    }
+  } else if (strengthSessionsPerWeek === 3) {
+    // 3x/week: Tuesday + Thursday + Sunday (or Monday)
+    const preferredDays = ['Tuesday', 'Thursday', 'Sunday'];
+    for (const day of preferredDays) {
+      if (!highIntensityDays.includes(day) && !selectedDays.includes(day)) {
+        selectedDays.push(day);
+      }
+    }
+    
+    // If we don't have 3 days yet, use available days
+    for (const day of availableDays) {
+      if (selectedDays.length < 3 && !highIntensityDays.includes(day) && !selectedDays.includes(day)) {
+        selectedDays.push(day);
+      }
+    }
+    
+    // If still need more, use low-intensity days
+    for (const day of lowIntensityDays) {
+      if (selectedDays.length < 3 && !selectedDays.includes(day)) {
+        selectedDays.push(day);
+      }
     }
   }
   
-  // If still need more, use any remaining days
+  // Ensure no consecutive days
+  const finalDays: string[] = [];
+  for (const day of selectedDays) {
+    const dayIndex = daysOfWeek.indexOf(day);
+    const hasAdjacentDay = finalDays.some(selectedDay => {
+      const selectedIndex = daysOfWeek.indexOf(selectedDay);
+      return Math.abs(dayIndex - selectedIndex) <= 1;
+    });
+    
+    if (!hasAdjacentDay) {
+      finalDays.push(day);
+    }
+  }
+  
+  // If we still don't have enough days, add any remaining non-consecutive days
   for (const day of daysOfWeek) {
-    if (selectedDays.length < strengthSessionsPerWeek && !selectedDays.includes(day)) {
-      selectedDays.push(day);
+    if (finalDays.length < strengthSessionsPerWeek && !finalDays.includes(day)) {
+      const dayIndex = daysOfWeek.indexOf(day);
+      const hasAdjacentDay = finalDays.some(selectedDay => {
+        const selectedIndex = daysOfWeek.indexOf(selectedDay);
+        return Math.abs(dayIndex - selectedIndex) <= 1;
+      });
+      
+      if (!hasAdjacentDay) {
+        finalDays.push(day);
+      }
     }
   }
   
-  return selectedDays.slice(0, strengthSessionsPerWeek);
+  return finalDays.slice(0, strengthSessionsPerWeek);
 }
 
 function createStrengthSession(day: string, strengthOption: StrengthOption, sessionNumber: number): SessionTemplate {
@@ -957,32 +1021,57 @@ function createStrengthSession(day: string, strengthOption: StrengthOption, sess
   
   switch (strengthOption.id) {
     case 'power_development':
-      description = 'Plyometrics, explosive movements, power cleans';
-      strengthType = 'power';
+      if (sessionNumber === 1) {
+        description = 'Plyometrics and explosive movements - Box jumps, power cleans, medicine ball throws';
+        strengthType = 'power';
+      } else {
+        description = 'Power development - Jump squats, burpees, plyometric push-ups';
+        strengthType = 'power';
+      }
       break;
     case 'stability_focus':
-      description = 'Single-leg work, core stability, mobility';
-      strengthType = 'stability';
+      if (sessionNumber === 1) {
+        description = 'Single-leg stability and core work - Pistol squats, single-leg deadlifts, planks';
+        strengthType = 'stability';
+      } else {
+        description = 'Mobility and balance - Lunges, side planks, stability ball work';
+        strengthType = 'stability';
+      }
       break;
     case 'compound_strength':
-      description = 'Squats, deadlifts, bench press, heavy compounds';
-      strengthType = 'compound';
+      if (sessionNumber === 1) {
+        description = 'Heavy compound lifts - Squats, deadlifts, bench press';
+        strengthType = 'compound';
+      } else {
+        description = 'Compound strength - Romanian deadlifts, overhead press, rows';
+        strengthType = 'compound';
+      }
       break;
     case 'cowboy_endurance':
       if (sessionNumber <= 2) {
-        description = 'Endurance strength, high reps';
-        strengthType = 'cowboy_endurance';
+        if (sessionNumber === 1) {
+          description = 'Endurance strength - High reps, bodyweight focus, carries';
+          strengthType = 'cowboy_endurance';
+        } else {
+          description = 'Endurance strength - Walking lunges, step-ups, farmer carries';
+          strengthType = 'cowboy_endurance';
+        }
       } else {
-        description = 'Upper body aesthetics - look better on the course, minimal performance impact';
+        description = 'Upper body aesthetics - Look better on the course, minimal performance impact';
         strengthType = 'cowboy_endurance_upper';
       }
       break;
     case 'cowboy_compound':
       if (sessionNumber <= 2) {
-        description = 'Heavy compounds, low reps';
-        strengthType = 'cowboy_compound';
+        if (sessionNumber === 1) {
+          description = 'Heavy compounds for endurance - Deadlifts, squats, low reps';
+          strengthType = 'cowboy_compound';
+        } else {
+          description = 'Compound strength - Bench press, rows, overhead press';
+          strengthType = 'cowboy_compound';
+        }
       } else {
-        description = 'Upper body aesthetics - look better on the course, minimal performance impact';
+        description = 'Upper body aesthetics - Look better on the course, minimal performance impact';
         strengthType = 'cowboy_compound_upper';
       }
       break;
