@@ -354,7 +354,7 @@ function getSeventy3Template(): TrainingTemplate {
     distance: 'seventy3',
     baseHours: 12,
     minDays: 6,
-    weeks: generateFullProgression(12, 'seventy3', 12), // Reduced from 20 to 12 weeks for preview
+    weeks: generateFullProgressionWithScience('seventy3', 12, 6, 'none', 'balanced'), // Use new science-based function
     strengthOptions: STRENGTH_OPTIONS,
     disciplineFocus: DISCIPLINE_FOCUS_OPTIONS
   };
@@ -2242,16 +2242,16 @@ function getSessionDuration(discipline: string, type: string, distance: string, 
       brick: { endurance: 90, tempo: 105 }
     },
     seventy3: {
-      swim: { endurance: 60, threshold: 45, tempo: 50 },
-      bike: { endurance: 90, tempo: 105, threshold: 60 },
-      run: { endurance: 60, tempo: 75, threshold: 45 },
-      brick: { endurance: 120, tempo: 135 }
+      swim: { endurance: 90, threshold: 60, tempo: 75 },
+      bike: { endurance: 180, tempo: 150, threshold: 90 },
+      run: { endurance: 90, tempo: 105, threshold: 60 },
+      brick: { endurance: 240, tempo: 180 }
     },
     ironman: {
-      swim: { endurance: 75, threshold: 60, tempo: 65 },
-      bike: { endurance: 120, tempo: 135, threshold: 90 },
-      run: { endurance: 75, tempo: 90, threshold: 60 },
-      brick: { endurance: 180, tempo: 195 }
+      swim: { endurance: 120, threshold: 90, tempo: 105 },
+      bike: { endurance: 240, tempo: 210, threshold: 120 },
+      run: { endurance: 120, tempo: 135, threshold: 90 },
+      brick: { endurance: 300, tempo: 240 }
     }
   };
   
