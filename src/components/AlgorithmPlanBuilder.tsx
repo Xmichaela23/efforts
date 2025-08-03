@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { FaRunning, FaSwimmer, FaBiking, FaDumbbell, FaRoad, FaChartArea, FaTachometerAlt, FaMedal, FaObjectGroup, FaCog } from 'react-icons/fa';
 import { AlgorithmTrainingService, type PlanParameters, type UserPerformance } from '../services/AlgorithmTrainingService';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 // Preserve all our flow questions and options
 const TRAINING_CATEGORIES = [
@@ -50,12 +51,36 @@ const TRAINING_FREQUENCY_OPTIONS = [
 ];
 
 const STRENGTH_OPTIONS = [
-  { key: 'none', label: 'No Strength (0 hours, pure endurance)' },
-  { key: 'power_development', label: 'Power Development (2x/week, +1-1.5 hours, triathlon performance)' },
-  { key: 'stability_focus', label: 'Stability Focus (2x/week, +1-1.2 hours, injury prevention)' },
-  { key: 'compound_strength', label: 'Compound Strength (2x/week, +1.5-2 hours, experimental approach)' },
-  { key: 'cowboy_endurance', label: 'Cowboy Endurance (3x/week, +2-2.5 hours, performance + aesthetics)' },
-  { key: 'cowboy_compound', label: 'Cowboy Compound (3x/week, +2.5-3 hours, experimental + aesthetics)' },
+  { 
+    key: 'none', 
+    label: 'No Strength (0 hours, pure endurance)',
+    description: 'Pure endurance training only. Many successful triathletes train this way.'
+  },
+  { 
+    key: 'power_development', 
+    label: 'Power Development (2x/week, +1-1.5 hours, triathlon performance)',
+    description: 'Explosive movements, plyometrics, and Olympic lifts. Focus on power output for triathlon performance.'
+  },
+  { 
+    key: 'stability_focus', 
+    label: 'Stability Focus (2x/week, +1-1.2 hours, injury prevention)',
+    description: 'Single-leg exercises, core stability, balance work. Great for injury prevention and movement quality.'
+  },
+  { 
+    key: 'compound_strength', 
+    label: 'Compound Strength (2x/week, +1.5-2 hours, experimental approach)',
+    description: 'Heavy compound lifts (squats, deadlifts, presses). Experimental approach for triathletes.'
+  },
+  { 
+    key: 'cowboy_endurance', 
+    label: 'Cowboy Endurance (3x/week, +2-2.5 hours) - Carries, walks, bodyweight movements',
+    description: 'Endurance-based strength: farmer\'s walks, carries, bodyweight movements. Moderate intensity, good recovery. Requires 6+ training days.'
+  },
+  { 
+    key: 'cowboy_compound', 
+    label: 'Cowboy Compound (3x/week, +2.5-3 hours) - Heavy deadlifts, presses, 1RM-based',
+    description: 'Heavy compound lifts using your 1RM values. Very demanding, requires 48-72hr recovery. Requires 6+ training days.'
+  },
 ];
 
 const STRENGTH_FITNESS_LEVELS = [
@@ -508,43 +533,57 @@ export default function AlgorithmPlanBuilder() {
                 </div>
 
                 {/* Strength Options */}
-                <div className="space-y-4">
-                  {STRENGTH_OPTIONS.map((option) => {
-                    // Gating logic for strength options based on training days
-                    let isDisabled = false;
-                    let disabledReason = "";
-                    
-                    // Check if this strength option requires more sessions than available training days
-                    if (option.key === 'cowboy_endurance' || option.key === 'cowboy_compound') {
-                      // These require 3 sessions/week
-                      const trainingDays = parseInt(responses.trainingFrequency?.split('-')[0] || '0');
-                      if (trainingDays > 0 && trainingDays < 6) {
-                        isDisabled = true;
-                        disabledReason = "Cowboy options require 6-7 training days/week";
-                      }
-                    }
-                    
-                    return (
-                      <button
-                        key={option.key}
-                        onClick={() => !isDisabled && updateResponse('strengthTraining', option.key)}
-                        disabled={isDisabled}
-                        className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                          responses.strengthTraining === option.key
-                            ? 'border-gray-400 bg-gray-50'
-                            : isDisabled
-                            ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                            : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                      >
-                        <div className="font-semibold">{option.label}</div>
-                        {isDisabled && (
-                          <div className="text-sm text-red-600 mt-1">{disabledReason}</div>
-                        )}
-                      </button>
-                    );
-                  })}
+                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    <strong>💡 Tip:</strong> Hover over each option for detailed descriptions. 
+                    <strong>Cowboy options require 6+ training days</strong> due to their 3x/week strength sessions.
+                  </p>
                 </div>
+                <TooltipProvider>
+                  <div className="space-y-4">
+                    {STRENGTH_OPTIONS.map((option) => {
+                      // Gating logic for strength options based on training days
+                      let isDisabled = false;
+                      let disabledReason = "";
+                      
+                      // Check if this strength option requires more sessions than available training days
+                      if (option.key === 'cowboy_endurance' || option.key === 'cowboy_compound') {
+                        // These require 3 sessions/week
+                        const trainingDays = parseInt(responses.trainingFrequency?.split('-')[0] || '0');
+                        if (trainingDays > 0 && trainingDays < 6) {
+                          isDisabled = true;
+                          disabledReason = "Cowboy options require 6-7 training days/week";
+                        }
+                      }
+                      
+                      return (
+                        <Tooltip key={option.key}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => !isDisabled && updateResponse('strengthTraining', option.key)}
+                              disabled={isDisabled}
+                              className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                                responses.strengthTraining === option.key
+                                  ? 'border-gray-400 bg-gray-50'
+                                  : isDisabled
+                                  ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                                  : 'border-gray-300 hover:border-gray-400'
+                              }`}
+                            >
+                              <div className="font-semibold">{option.label}</div>
+                              {isDisabled && (
+                                <div className="text-sm text-red-600 mt-1">{disabledReason}</div>
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="right" className="max-w-xs">
+                            <p className="text-sm">{option.description}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })}
+                  </div>
+                </TooltipProvider>
               </div>
             )}
 
