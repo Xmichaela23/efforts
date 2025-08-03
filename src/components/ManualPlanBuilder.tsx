@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Calendar } from 'lucide-react';
 
-// Import the existing RealTrainingAI service
-import { RealTrainingAI } from '../services/RealTrainingAI';
+// Manual plan builder - no AI dependencies
 
 // Quick plan suggestions for manual tab
 const quickPlans = [
@@ -33,7 +32,34 @@ export default function ManualPlanBuilder({
   generatingPlan,
   onSetGeneratingPlan 
 }: ManualPlanBuilderProps) {
-  const [realAI] = useState(() => new RealTrainingAI());
+  // Simple mock for manual plan generation (no AI)
+  const generateMockPlan = async (prompt: string, startDate: string) => {
+    return {
+      plan: {
+        id: `manual-${Date.now()}`,
+        name: 'Manual Training Plan',
+        description: `Custom plan: ${prompt}`,
+        type: 'manual',
+        goal: 'custom',
+        status: 'active',
+        currentWeek: 1,
+        createdDate: new Date().toISOString(),
+        totalWorkouts: 7,
+        disciplines: ['custom'],
+        isIntegrated: true,
+        duration: 7 // Add missing duration property
+      },
+      workouts: [
+        { name: 'Custom Workout 1', type: 'custom', date: startDate, duration: 60, description: 'Day 1: ' + prompt },
+        { name: 'Custom Workout 2', type: 'custom', date: startDate, duration: 60, description: 'Day 2: ' + prompt },
+        { name: 'Custom Workout 3', type: 'custom', date: startDate, duration: 60, description: 'Day 3: ' + prompt },
+        { name: 'Custom Workout 4', type: 'custom', date: startDate, duration: 60, description: 'Day 4: ' + prompt },
+        { name: 'Custom Workout 5', type: 'custom', date: startDate, duration: 60, description: 'Day 5: ' + prompt },
+        { name: 'Custom Workout 6', type: 'custom', date: startDate, duration: 60, description: 'Day 6: ' + prompt },
+        { name: 'Custom Workout 7', type: 'custom', date: startDate, duration: 60, description: 'Day 7: ' + prompt }
+      ]
+    };
+  };
   const [planPrompt, setPlanPrompt] = useState('');
 
   const generateDisplaySchedule = (workouts: any[]): string[] => {
@@ -86,11 +112,7 @@ export default function ManualPlanBuilder({
     try {
       console.log('Generating plan from manual prompt...');
       
-      const result = await realAI.generateTrainingPlan(
-        planPrompt,
-        startDate,
-        {}
-      );
+      const result = await generateMockPlan(planPrompt, startDate);
       
       const manualPlan = {
         id: result.plan.id || `manual-plan-${Date.now()}`,
