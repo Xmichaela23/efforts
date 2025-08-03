@@ -15,7 +15,7 @@
 **Efforts** is a comprehensive fitness training platform that combines:
 - 🏃‍♂️ **Multi-sport activity tracking** (Garmin, Strava integration)
 - 🏋️‍♂️ **Advanced strength logging** (plate math, RIR tracking)
-- 🧠 **AI-powered training plans** (RealTrainingAI)
+- 🧮 **Algorithm-powered training plans** (AlgorithmTrainingService)
 - 📊 **Professional-level analytics** (power curves, training zones)
 - 🎯 **Personalized coaching insights** (cross-training correlations)
 
@@ -36,14 +36,14 @@
 ### Integrations
 - **Garmin Connect API** - Activity data, webhooks, real-time sync
 - **Strava API** - Additional fitness data sources
-- **RealTrainingAI** - AI-powered training plan generation
+- **AlgorithmTrainingService** - Algorithm-powered training plan generation
 
 ## Current State (July 2025)
 
 ### ✅ Working Features
 - **Garmin Integration**: Complete webhook processing with 10k+ samples per workout
 - **Database Schema**: Comprehensive `garmin_activities` table with rich sensor data
-- **AI Training Plans**: RealTrainingAI integration for personalized workouts
+- **Algorithm Training Plans**: AlgorithmTrainingService integration for personalized workouts
 - **Strength Logger**: Advanced features (plate math, RIR tracking, exercise autocomplete)
 - **Calendar Interface**: Date-based workout planning and viewing
 - **Completed Tab**: Detailed workout analysis with sensor data visualization

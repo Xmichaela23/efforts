@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Calendar } from 'lucide-react';
-import AIPlanBuilder from './AIPlanBuilder';
+import AlgorithmPlanBuilder from './AlgorithmPlanBuilder';
 import ManualPlanBuilder from './ManualPlanBuilder';
 
 export default function PlanBuilder() {
@@ -24,7 +24,7 @@ export default function PlanBuilder() {
           }`}
           onClick={() => setActiveTab('ai')}
         >
-          AI Assistant
+          Smart Assistant
         </button>
         <button
           className={`ml-2 px-4 py-2 -mb-px font-medium border-b-2 transition-colors ${
@@ -38,7 +38,7 @@ export default function PlanBuilder() {
         </button>
       </div>
       {activeTab === 'ai' ? (
-        <AIPlanBuilder />
+        <AlgorithmPlanBuilder />
       ) : (
         <ManualPlanBuilder
           startDate={startDate}

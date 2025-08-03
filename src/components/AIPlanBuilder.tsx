@@ -43,13 +43,12 @@ const TRAINING_FREQUENCY_OPTIONS = [
 ];
 
 const STRENGTH_OPTIONS = [
-  { key: 'no-strength', label: 'No strength training' },
-  { key: 'power-development', label: 'Power development (explosive movements for endurance)' },
-  { key: 'power-lifting', label: 'Endurance power (compound lifts for race performance)' },
-  { key: 'injury-prevention', label: 'Injury prevention (mobility, stability for endurance)' },
-  { key: 'sport-specific', label: 'Triathlon-specific (swim, bike, run movements)' },
-  { key: 'build-muscle', label: 'Functional strength (endurance-focused, not bodybuilding)' },
-  { key: 'general-fitness', label: 'Endurance conditioning (basic strength for racing)' },
+  { key: 'none', label: 'No Strength (0 hours, pure endurance)' },
+  { key: 'power_development', label: 'Power Development (2x/week, +1-1.5 hours, triathlon performance)' },
+  { key: 'stability_focus', label: 'Stability Focus (2x/week, +1-1.2 hours, injury prevention)' },
+  { key: 'compound_strength', label: 'Compound Strength (2x/week, +1.5-2 hours, experimental approach)' },
+  { key: 'cowboy_endurance', label: 'Cowboy Endurance (3x/week, +2-2.5 hours, performance + aesthetics)' },
+  { key: 'cowboy_compound', label: 'Cowboy Compound (3x/week, +2.5-3 hours, experimental + aesthetics)' },
 ];
 
 
@@ -68,6 +67,13 @@ const STRENGTH_PERFORMANCE_LEVELS = [
   { key: '1.25x-bodyweight', label: 'Can squat/deadlift 1.25x bodyweight' },
   { key: '1.5x-plus-bodyweight', label: 'Can squat/deadlift 1.5x+ bodyweight' },
   { key: 'know-1rms', label: 'I know my compound 1RMs' },
+];
+
+const DISCIPLINE_FOCUS_OPTIONS = [
+  { key: 'standard', label: 'Standard (Recommended) - 2-3 sessions per discipline' },
+  { key: 'swim_focus', label: 'Swim Focus - 3 swims, 2 bikes, 2 runs' },
+  { key: 'bike_focus', label: 'Bike Focus - 2 swims, 3 bikes, 2 runs' },
+  { key: 'run_focus', label: 'Run Focus - 2 swims, 2 bikes, 3 runs' },
 ];
 
 const EQUIPMENT_OPTIONS = [
@@ -494,6 +500,10 @@ export default function AIPlanBuilder() {
 
     // Question 8: Goals
     goals: [] as string[],
+    
+    // Algorithm-based plan parameters
+    disciplineFocus: 'standard',
+    weeklyHours: 8,
   });
 
   // Debug effect to track generatedPlan changes
@@ -641,10 +651,10 @@ export default function AIPlanBuilder() {
     try {
       insights = getBaselineInsights();
     } catch (error) {
-      console.log('Baseline insights not available for timeline validation:', error.message);
-      return { isValid: true, warning: null };
+      console.error('Baseline insights error for timeline validation:', error.message);
+      throw error;
     }
-    if (!insights) return { isValid: true, warning: null };
+    if (!insights) throw new Error('Baseline insights required for timeline validation');
 
     const { totalHours, trainingBackground, age } = insights;
 
@@ -692,7 +702,7 @@ export default function AIPlanBuilder() {
 
 
 
-    return { isValid: true, warning: null };
+    throw new Error('Timeline validation requires distance and timeline data');
   };
 
   const getRecommendedTimeline = (distance: string) => {
@@ -700,10 +710,10 @@ export default function AIPlanBuilder() {
     try {
       insights = getBaselineInsights();
     } catch (error) {
-      console.log('Baseline insights not available for timeline recommendations:', error.message);
-      return null;
+      console.error('Baseline insights error for timeline recommendations:', error.message);
+      throw error;
     }
-    if (!insights) return null;
+    if (!insights) throw new Error('Baseline insights required for timeline recommendations');
 
     const { totalHours, trainingBackground, age } = insights;
 
@@ -720,7 +730,7 @@ export default function AIPlanBuilder() {
       return '24-plus-weeks'; // Need to build base
     }
 
-    return null;
+    throw new Error('Unable to determine recommended timeline from user data');
   };
 
   const getRecommendedFrequency = () => {
@@ -728,10 +738,10 @@ export default function AIPlanBuilder() {
     try {
       insights = getBaselineInsights();
     } catch (error) {
-      console.log('Baseline insights not available for frequency recommendations:', error.message);
-      return null;
+      console.error('Baseline insights error for frequency recommendations:', error.message);
+      throw error;
     }
-    if (!insights) return null;
+    if (!insights) throw new Error('Baseline insights required for frequency recommendations');
 
     const { totalHours, trainingFrequency, volumeIncreaseCapacity } = insights;
     const distance = responses.distance;
@@ -766,11 +776,8 @@ export default function AIPlanBuilder() {
       return '3-days';
     }
 
-    // Default fallback
-    if (totalHours >= 8) return '6-days';
-    if (totalHours >= 6 && canIncrease) return '6-days';
-    if (totalHours >= 4) return '5-days';
-    return '4-days';
+    // No fallbacks - throw error if no recommendation can be made
+    throw new Error('Unable to determine recommended training frequency from user data');
   };
 
   const getRecommendedStrength = () => {
@@ -778,18 +785,18 @@ export default function AIPlanBuilder() {
     try {
       insights = getBaselineInsights();
     } catch (error) {
-      console.log('Baseline insights not available for strength recommendations:', error.message);
-      return null;
+      console.error('Baseline insights error for strength recommendations:', error.message);
+      throw error;
     }
-    if (!insights) return null;
+    if (!insights) throw new Error('Baseline insights required for strength recommendations');
 
     const { injuryHistory, age, performanceNumbers } = insights;
 
     // Recommend injury prevention if they have injury history
     if (injuryHistory?.includes('injury')) return 'injury-prevention';
 
-    // Default to injury prevention for safety
-    return 'injury-prevention';
+    // No fallbacks - throw error if no recommendation can be made
+    throw new Error('Unable to determine recommended strength approach from user data');
   };
 
   const prePopulateFromBaselines = () => {
@@ -797,10 +804,10 @@ export default function AIPlanBuilder() {
     try {
       insights = getBaselineInsights();
     } catch (error) {
-      console.log('Baseline insights not available for pre-population:', error.message);
-      return;
+      console.error('Baseline insights error for pre-population:', error.message);
+      throw error;
     }
-    if (!insights) return;
+    if (!insights) throw new Error('Baseline insights required for pre-population');
 
     const { performanceNumbers, equipment, trainingFrequency } = insights;
 
@@ -1036,7 +1043,7 @@ Return a valid JSON plan structure.`;
     return true;
   };
 
-  // Generate plan using AI analysis + PlanEngine
+  // Generate plan using algorithm-based templates
   const generatePlan = async () => {
     try {
       // Validate assessment completion first
@@ -1044,36 +1051,47 @@ Return a valid JSON plan structure.`;
       
       setGeneratingPlan(true);
       
-      console.log('🧠 Starting AI analysis of user profile...');
+      console.log('🧮 Starting algorithm-based plan generation...');
       console.log('📊 Baselines:', baselines);
       console.log('📝 Responses:', responses);
       
-      // Step 1: AI Analysis - analyze user profile to get training parameters
-      const aiAnalysis = await realAI.analyzeUserProfile(baselines, responses);
-      console.log('✅ AI analysis completed:', aiAnalysis);
+      // Extract plan parameters from user responses
+      const distance = responses.distance;
+      const strengthOption = responses.strengthTraining || 'none';
+      const disciplineFocus = responses.disciplineFocus || 'standard';
+      const targetHours = responses.weeklyHours || 8;
       
-      if (!aiAnalysis) {
-        console.error('❌ AI analysis returned null/undefined!');
-        throw new Error('AI analysis failed - returned null');
-      }
+      // Extract performance data from baselines
+      const userPerformance = {
+        ftp: baselines?.performanceNumbers?.ftp,
+        fiveKPace: baselines?.performanceNumbers?.fiveK,
+        swimPace: baselines?.performanceNumbers?.swim
+      };
       
-      // Step 2: AI Plan Generation - use Edge Function to generate unique plan
-      const { prompt, userData } = buildPlanPrompt(aiAnalysis);
+      // Validate required data - NO FALLBACKS
+      if (!distance) throw new Error('Distance selection is required');
+      if (!userPerformance.ftp) throw new Error('FTP is required for bike training zones');
+      if (!userPerformance.fiveKPace) throw new Error('5K pace is required for run training zones');
+      if (!userPerformance.swimPace) throw new Error('Swim pace is required for swim training zones');
+      
       const startDate = new Date().toISOString().split('T')[0];
       const userContext = {
-        ...userData,
+        distance,
+        strengthOption,
+        disciplineFocus,
+        targetHours,
+        userPerformance,
         baselines,
         responses,
-        aiAnalysis,
         selectedFocus
       };
       
-      console.log('🤖 Calling AI Edge Function for plan generation...');
-      const aiPlan = await realAI.generateTrainingPlan(prompt, startDate, userContext);
+      console.log('🧮 Calling algorithm-based plan generation...');
+      const aiPlan = await realAI.generateTrainingPlan('', startDate, userContext);
       
-      console.log('✅ AI plan generated via Edge Function:', aiPlan);
+      console.log('✅ Algorithm plan generated:', aiPlan);
       
-      // Create plan object with AI-generated structure
+      // Create plan object with algorithm-generated structure
       const plan = {
         id: `plan-${Date.now()}`,
         name: aiPlan.plan.name,
@@ -1081,7 +1099,7 @@ Return a valid JSON plan structure.`;
         focus: selectedFocus.join(', '),
         plan: aiPlan.plan,
         fullPlan: aiPlan,
-        aiAnalysis: aiAnalysis,
+        aiAnalysis: null, // No AI analysis in algorithm approach
         workouts: aiPlan.workouts
       };
       
@@ -1099,26 +1117,8 @@ Return a valid JSON plan structure.`;
       console.error('❌ Error details:', error.message);
       console.error('❌ Error stack:', error.stack);
       
-      // NO FALLBACKS - Show the actual error to user with detailed information
-      const errorDetails = {
-        id: 'error',
-        name: 'Plan Generation Failed',
-        description: `❌ ${error.message}`,
-        focus: 'Error',
-        plan: null,
-        fullPlan: null,
-        aiAnalysis: null,
-        workouts: [],
-        error: error.message,
-        debugInfo: {
-          baselines: baselines ? 'Present' : 'Missing',
-          responses: responses,
-          missingFields: error.message.includes('Missing') ? error.message : null
-        }
-      };
-      
-      console.log('❌ PLAN GENERATION FAILED:', errorDetails);
-      setGeneratedPlan(errorDetails);
+      // NO FALLBACKS - THROW THE ERROR
+      throw error;
     } finally {
       setGeneratingPlan(false);
     }
@@ -1128,12 +1128,13 @@ Return a valid JSON plan structure.`;
   // Removed auto-generation to prevent empty assessment data from reaching AI
 
   const getCurrentStepContent = () => {
-    // Safely get insights - don't crash the UI if baselines aren't loaded yet
+    // Get insights - throw error if baselines aren't loaded
     let insights = null;
     try {
       insights = getBaselineInsights();
     } catch (error) {
-      console.log('Baseline insights not available yet:', error.message);
+      console.error('Baseline insights error:', error.message);
+      throw error;
     }
     
     const timelineValidation = responses.distance && responses.timeline ? 
@@ -1492,7 +1493,7 @@ Return a valid JSON plan structure.`;
           );
         }
         // ... handle other disciplines ...
-        return null;
+        throw new Error('Unable to determine discipline-specific recommendations');
 
       case 2:
         return (

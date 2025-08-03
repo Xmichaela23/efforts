@@ -9,14 +9,14 @@ This app has reached a significant level of complexity requiring careful conside
 
 - **Frontend**: React + TypeScript + Vite with shadcn/ui components
 - **Backend**: Supabase (database, auth, Edge Functions)
-- **AI Integration**: RealTrainingAI service for plan generation
+- **Algorithm Integration**: AlgorithmTrainingService for plan generation
 - **Third-party APIs**: Garmin Connect, Strava integration
 - **Real-time Data**: Webhooks for live fitness data synchronization
 
 ### Integration Status
 - ✅ **Garmin Connect**: Full integration with webhook processing and detailed sensor data
 - ✅ **Strava**: Basic integration implemented
-- ✅ **RealTrainingAI**: AI-powered training plan generation
+- ✅ **AlgorithmTrainingService**: Algorithm-based training plan generation
 - 🔄 **Ongoing**: Continuous refinement of data processing and UI components
 
 ### Critical Dependencies

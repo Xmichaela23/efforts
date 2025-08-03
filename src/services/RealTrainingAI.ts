@@ -1,3 +1,11 @@
+import { 
+  generateTrainingPlan, 
+  calculateIntensityZones,
+  STRENGTH_OPTIONS,
+  DISCIPLINE_FOCUS_OPTIONS,
+  type TrainingTemplate 
+} from './TrainingTemplates';
+
 export interface AITrainingPlan {
   plan: {
     name: string;
@@ -421,7 +429,7 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
         if (isNaN(numVolume)) {
           throw new Error(`Invalid volume value: ${volume}. Expected a number.`);
         }
-        return sum + (numVolume as number);
+        return sum + numVolume;
       }, 0);
     } else if (typeof aiResponse.weeklyVolume === 'number') {
       weeklyVolume = aiResponse.weeklyVolume;
@@ -523,11 +531,11 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
       strengthFocus,
       progressionRate,
       recoveryNeeds,
-      injuryConsiderations: aiResponse.injuryConsiderations || [], // Default to empty array if missing
+      injuryConsiderations: aiResponse.injuryConsiderations,
       equipmentOptimization: aiResponse.equipmentOptimization,
 
       baselineFitness: aiResponse.baselineFitness,
-      customParameters: aiResponse.customParameters || {}
+      customParameters: aiResponse.customParameters
     };
     
     console.log('✅ Transformation complete:', transformed);
@@ -554,83 +562,119 @@ YOU MUST INCLUDE BOTH timeline AND eventType IN YOUR JSON RESPONSE.`;
     }
   }
 
-  // Real AI plan generation with training science
+  // Algorithm-based plan generation (replacing AI)
   async generateTrainingPlan(
     prompt: string, 
     startDate: string,
     userContext: any = {}
   ): Promise<AITrainingPlan> {
     
-    console.log('🤖 Starting AI plan generation via Edge Function...');
+    console.log('🧮 Starting algorithm-based plan generation...');
     
-    // Send structured data instead of massive prompt
-    const requestData = {
-      prompt: prompt,
-      startDate: startDate,
-      userContext: userContext
-    };
-
-    console.log('📤 Sending structured data to Supabase Edge Function...');
+    // Parse user context to extract plan parameters
+    const { distance, strengthOption, disciplineFocus, targetHours, userPerformance } = userContext;
+    
+    // Validate required parameters - NO FALLBACKS
+    if (!distance) throw new Error('Distance is required');
+    if (!strengthOption) throw new Error('Strength option is required');
+    if (!disciplineFocus) throw new Error('Discipline focus is required');
+    if (!targetHours) throw new Error('Target hours is required');
+    if (!userPerformance) throw new Error('User performance data is required');
+    
+    const { ftp, fiveKPace, swimPace } = userPerformance;
+    if (!ftp || !fiveKPace || !swimPace) {
+      throw new Error('All performance metrics (FTP, 5K pace, swim pace) are required');
+    }
 
     try {
-      // Add timeout to prevent hanging
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => {
-        console.log('⏰ Request timeout, aborting...');
-        controller.abort();
-      }, 120000); // 2 minute timeout - AI needs more time for complex plans
+      // Generate plan using algorithm templates
+      const trainingTemplate = generateTrainingPlan(
+        distance,
+        strengthOption,
+        disciplineFocus,
+        targetHours,
+        { ftp, fiveKPace, swimPace }
+      );
 
-      // Ensure Supabase client is initialized
-      if (!this.supabase) {
-        await this.initSupabase();
-      }
-      const { data: { session } } = await this.supabase.auth.getSession();
+      // Convert template to AITrainingPlan format
+      const plan = convertTemplateToPlan(trainingTemplate, startDate);
       
-      if (!session) {
-        throw new Error('User must be logged in to generate training plans');
-      }
-
-      const response = await fetch(this.planURL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`
-        },
-        signal: controller.signal,
-        body: JSON.stringify(requestData),
-      });
-
-      clearTimeout(timeoutId);
-      console.log('📥 Received response from Edge Function...');
-      console.log('📥 Response status:', response.status);
-      console.log('📥 Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('📥 Error response:', errorText);
-        throw new Error(`Edge Function error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      
-      // The edge function returns the parsed plan directly
-      if (data.error) {
-        console.error('❌ Edge Function returned error:', data.error);
-        throw new Error(`Edge Function error: ${data.error}`);
-      }
-
-      console.log('🤖 Plan generated successfully via Edge Function');
-      return data;
+      console.log('🧮 Plan generated successfully using algorithms');
+      return plan;
 
     } catch (error) {
-      console.error('❌ Plan generation failed:', error);
-      
-      // NO FALLBACKS - THROW THE ERROR
+      console.error('❌ Algorithm plan generation failed:', error);
       throw error;
     }
   }
 
-  // Build comprehensive training science prompt
+  // Convert TrainingTemplate to AITrainingPlan format
+  private convertTemplateToPlan(template: TrainingTemplate, startDate: string): AITrainingPlan {
+    const planName = `${template.distance.charAt(0).toUpperCase() + template.distance.slice(1)} Distance Training Plan`;
+    
+    // Calculate total workouts
+    const totalWorkouts = template.weeks.reduce((total, week) => {
+      return total + week.sessions.length;
+    }, 0);
+
+    // Convert sessions to workouts
+    const workouts = template.weeks.flatMap((week, weekIndex) => {
+      return week.sessions.map((session, sessionIndex) => {
+        // Calculate date for this session
+        const sessionDate = new Date(startDate);
+        sessionDate.setDate(sessionDate.getDate() + (weekIndex * 7) + this.getDayOffset(session.day));
+        
+        return {
+          name: `${session.discipline.charAt(0).toUpperCase() + session.discipline.slice(1)} - ${session.type}`,
+          type: session.discipline,
+          date: sessionDate.toISOString().split('T')[0],
+          duration: session.duration,
+          description: `${session.description} (${session.intensity})`,
+          intervals: session.zones.length > 0 ? [{ zones: session.zones }] : undefined,
+          strength_exercises: session.strengthType ? [{ type: session.strengthType }] : undefined
+        };
+      });
+    });
+
+    return {
+      plan: {
+        name: planName,
+        description: `Algorithm-generated ${template.distance} distance training plan`,
+        type: 'triathlon',
+        duration: template.weeks.length,
+        level: 'intermediate',
+        goal: template.distance,
+        status: 'active',
+        currentWeek: 1,
+        createdDate: new Date().toISOString(),
+        totalWorkouts,
+        disciplines: ['swim', 'bike', 'run'],
+        isIntegrated: true,
+        weeks: template.weeks.map(week => ({
+          weekNumber: week.weekNumber,
+          phase: week.phase,
+          totalHours: week.totalHours,
+          sessions: week.sessions
+        }))
+      },
+      workouts
+    };
+  }
+
+  // Helper function to convert day names to date offsets
+  private getDayOffset(day: string): number {
+    const dayMap: { [key: string]: number } = {
+      'Monday': 0,
+      'Tuesday': 1,
+      'Wednesday': 2,
+      'Thursday': 3,
+      'Friday': 4,
+      'Saturday': 5,
+      'Sunday': 6
+    };
+    return dayMap[day] || 0;
+  }
+}
   private buildTrainingSciencePrompt(): string {
     return `You are an expert exercise physiologist and training coach specializing in endurance sports and strength training. Your task is to create scientifically-based, personalized training plans.
 
@@ -792,11 +836,19 @@ Return ONLY the JSON plan object, no additional text.`;
       
       // Calculate total workouts
       plan.totalWorkouts = plan.weeks.reduce((total: number, week: any) => {
-        return total + (week.workouts ? week.workouts.length : 0);
+        if (!week.workouts) {
+          throw new Error('Week missing workouts array');
+        }
+        return total + week.workouts.length;
       }, 0);
       
       console.log('✅ Plan parsed successfully');
-      return { plan, workouts: [] };
+      return { plan, workouts: plan.weeks.flatMap(week => {
+        if (!week.workouts) {
+          throw new Error('Week missing workouts array');
+        }
+        return week.workouts;
+      }) };
       
     } catch (error) {
       console.error('❌ Failed to parse AI plan response:', error);
@@ -812,7 +864,11 @@ Return ONLY the JSON plan object, no additional text.`;
     const intervalMatches = intervalStr.match(/(\d+)x(\d+)(\w+)/g);
     if (intervalMatches) {
       intervalMatches.forEach(match => {
-        const [reps, duration, unit] = match.match(/(\d+)x(\d+)(\w+)/)?.slice(1) || [];
+        const matchResult = match.match(/(\d+)x(\d+)(\w+)/);
+        if (!matchResult) {
+          throw new Error(`Invalid interval format: ${match}`);
+        }
+        const [reps, duration, unit] = matchResult.slice(1);
         intervals.push({
           reps: parseInt(reps),
           duration: parseInt(duration),
@@ -833,7 +889,11 @@ Return ONLY the JSON plan object, no additional text.`;
     const exerciseMatches = description.match(/(\d+)x(\d+)\s+([^,]+)/g);
     if (exerciseMatches) {
       exerciseMatches.forEach(match => {
-        const [sets, reps, exercise] = match.match(/(\d+)x(\d+)\s+(.+)/)?.slice(1) || [];
+        const matchResult = match.match(/(\d+)x(\d+)\s+(.+)/);
+        if (!matchResult) {
+          throw new Error(`Invalid exercise format: ${match}`);
+        }
+        const [sets, reps, exercise] = matchResult.slice(1);
         exercises.push({
           name: exercise.trim(),
           sets: parseInt(sets),
@@ -856,6 +916,9 @@ Return ONLY the JSON plan object, no additional text.`;
       5: 'Very Hard (RPE 9-10)',
       6: 'Maximum (RPE 10)'
     };
-    return rpeMap[zone] || 'Moderate (RPE 5-6)';
+    if (!rpeMap[zone]) {
+      throw new Error(`Invalid training zone: ${zone}. Must be 1-6.`);
+    }
+    return rpeMap[zone];
   }
 } 
