@@ -1137,47 +1137,121 @@ export default function AlgorithmPlanBuilder() {
                               {weekWorkouts.length} sessions • {Math.round(weekWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0) / 60)} hours
                             </p>
                           </div>
-                          <div className="space-y-2">
-                            {weekWorkouts.map((workout: any, sessionIndex: number) => (
-                              <div key={sessionIndex} className="flex justify-between items-start py-2 border-b border-gray-100 last:border-b-0">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-sm font-medium">{workout.day || workout.date || `Day ${sessionIndex + 1}`}</span>
-                                    {/* Only show discipline if it's different from type, or if type doesn't exist */}
-                                    {workout.type && workout.type !== workout.discipline ? (
-                                      <>
-                                        <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
-                                        <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
-                                      </>
+                          <div className="space-y-4">
+                            {(() => {
+                              // Group workouts by day
+                              const workoutsByDay: { [key: string]: any[] } = {};
+                              weekWorkouts.forEach((workout: any) => {
+                                const day = workout.day || workout.date || 'Unknown';
+                                if (!workoutsByDay[day]) {
+                                  workoutsByDay[day] = [];
+                                }
+                                workoutsByDay[day].push(workout);
+                              });
+
+                              return Object.entries(workoutsByDay).map(([day, workouts]) => {
+                                const totalDuration = workouts.reduce((sum, w) => sum + (w.duration || 0), 0);
+                                const [currentDay, setCurrentDay] = useState(0);
+
+                                return (
+                                  <div key={day} className="border border-gray-200 rounded-lg">
+                                    {/* Day header with total duration */}
+                                    <div className="flex justify-between items-center p-3 bg-gray-50 border-b border-gray-200">
+                                      <span className="text-sm font-medium">{day}</span>
+                                      <span className="text-sm text-gray-500">{totalDuration}min total</span>
+                                    </div>
+                                    
+                                    {/* Multiple workouts for this day */}
+                                    {workouts.length > 1 ? (
+                                      <div>
+                                        {/* Tab navigation */}
+                                        <div className="flex border-b border-gray-200">
+                                          {workouts.map((workout, index) => (
+                                            <button
+                                              key={index}
+                                              onClick={() => setCurrentDay(index)}
+                                              className={`px-4 py-2 text-xs font-medium border-b-2 ${
+                                                currentDay === index
+                                                  ? 'border-gray-900 text-gray-900'
+                                                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                                              }`}
+                                            >
+                                              {workout.discipline} ({workout.duration}min)
+                                            </button>
+                                          ))}
+                                        </div>
+                                        
+                                        {/* Tab content */}
+                                        <div className="p-3">
+                                          {workouts.map((workout, index) => (
+                                            <div key={index} className={currentDay === index ? 'block' : 'hidden'}>
+                                              <div className="flex items-center gap-2 mb-2">
+                                                <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+                                                {workout.type && workout.type !== workout.discipline && (
+                                                  <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+                                                )}
+                                              </div>
+                                              {workout.detailedWorkout ? (
+                                                <div>
+                                                  <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
+                                                  <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
+                                                </div>
+                                              ) : (
+                                                <div>
+                                                  <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                                </div>
+                                              )}
+                                              {workout.intensity && (
+                                                <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>
+                                              )}
+                                              {workout.zones && workout.zones.length > 0 && (
+                                                <p className="text-xs text-gray-500">Zones: {workout.zones.join(', ')}</p>
+                                              )}
+                                              {workout.strengthType && (
+                                                <p className="text-xs text-gray-500">Strength Type: {workout.strengthType}</p>
+                                              )}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
                                     ) : (
-                                      <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+                                      /* Single workout for this day */
+                                      <div className="p-3">
+                                        {workouts.map((workout, index) => (
+                                          <div key={index}>
+                                            <div className="flex items-center gap-2 mb-2">
+                                              <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+                                              {workout.type && workout.type !== workout.discipline && (
+                                                <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+                                              )}
+                                            </div>
+                                            {workout.detailedWorkout ? (
+                                              <div>
+                                                <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
+                                                <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
+                                              </div>
+                                            ) : (
+                                              <div>
+                                                <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                              </div>
+                                            )}
+                                            {workout.intensity && (
+                                              <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>
+                                            )}
+                                            {workout.zones && workout.zones.length > 0 && (
+                                              <p className="text-xs text-gray-500">Zones: {workout.zones.join(', ')}</p>
+                                            )}
+                                            {workout.strengthType && (
+                                              <p className="text-xs text-gray-500">Strength Type: {workout.strengthType}</p>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
                                     )}
                                   </div>
-                                  {workout.detailedWorkout ? (
-                                    <div className="mt-2">
-                                      <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
-                                      <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
-                                    </div>
-                                  )}
-                                  {workout.intensity && (
-                                    <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>
-                                  )}
-                                  {workout.zones && workout.zones.length > 0 && (
-                                    <p className="text-xs text-gray-500">Zones: {workout.zones.join(', ')}</p>
-                                  )}
-                                  {workout.strengthType && (
-                                    <p className="text-xs text-gray-500">Strength Type: {workout.strengthType}</p>
-                                  )}
-                                </div>
-                                <div className="text-sm text-gray-500 ml-4">
-                                  {workout.duration && `${workout.duration}min`}
-                                </div>
-                              </div>
-                            ))}
+                                );
+                              });
+                            })()}
                           </div>
                         </div>
                       );
