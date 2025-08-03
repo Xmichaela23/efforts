@@ -27,6 +27,7 @@ export interface SessionTemplate {
   description: string;
   zones: number[];
   strengthType?: 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
+  detailedWorkout?: string; // Detailed workout prescription
 }
 
 export interface StrengthOption {
@@ -594,7 +595,19 @@ export function generateTrainingPlan(
   
   scaledTemplate.weeks = applyDisciplineFocus(scaledTemplate.weeks, disciplineFocusData);
 
-  return scaledTemplate;
+  // Generate detailed workouts for each session
+  const detailedTemplate = {
+    ...scaledTemplate,
+    weeks: scaledTemplate.weeks.map(week => ({
+      ...week,
+      sessions: week.sessions.map(session => ({
+        ...session,
+        detailedWorkout: generateDetailedWorkout(session, userPerformance, week.phase)
+      }))
+    }))
+  };
+
+  return detailedTemplate;
 }
 
 function scaleTemplate(template: TrainingTemplate, targetHours: number): TrainingTemplate {
@@ -863,4 +876,106 @@ export function getStrengthSuggestion(disciplineFocus: string) {
   };
   
   return suggestions[disciplineFocus as keyof typeof suggestions] || suggestions.standard;
+} 
+
+// Generate detailed workout structure for each session
+function generateDetailedWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+  const { discipline, type, duration, intensity, zones } = session;
+  
+  switch (discipline) {
+    case 'swim':
+      return generateSwimWorkout(session, userPerformance, phase);
+    case 'bike':
+      return generateBikeWorkout(session, userPerformance, phase);
+    case 'run':
+      return generateRunWorkout(session, userPerformance, phase);
+    case 'strength':
+      return generateStrengthWorkout(session, userPerformance, phase);
+    case 'brick':
+      return generateBrickWorkout(session, userPerformance, phase);
+    default:
+      return session.description;
+  }
+}
+
+function generateSwimWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+  const { type, duration, zones } = session;
+  const swimPace = userPerformance.swimPace || "2:00/100m";
+  
+  switch (type) {
+    case 'endurance':
+      return `Warm-up: 200m easy, 4x50m drills (catch-up, fist, single-arm)\nMain Set: ${Math.floor(duration * 0.6 / 2)}x200m @ ${swimPace}, 30s rest\nCool-down: 200m easy`;
+    case 'threshold':
+      return `Warm-up: 300m easy, 6x50m drills\nMain Set: 8x100m @ threshold pace, 30s rest\nCool-down: 200m easy`;
+    case 'tempo':
+      return `Warm-up: 200m easy, 4x50m drills\nMain Set: 4x150m @ tempo pace, 45s rest\nCool-down: 200m easy`;
+    case 'vo2max':
+      return `Warm-up: 300m easy, 6x50m drills\nMain Set: 10x50m @ max effort, 60s rest\nCool-down: 200m easy`;
+    default:
+      return session.description;
+  }
+}
+
+function generateBikeWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+  const { type, duration, zones } = session;
+  const ftp = userPerformance.ftp || 200;
+  
+  switch (type) {
+    case 'endurance':
+      return `Warm-up: 15min easy spinning (Zone 1-2)\nMain Set: ${Math.floor(duration * 0.7)}min steady @ Zone 2\nCool-down: 10min easy spinning`;
+    case 'tempo':
+      return `Warm-up: 15min easy spinning\nMain Set: 3x${Math.floor(duration * 0.6 / 3)}min @ 85-90% FTP, 5min easy between\nCool-down: 10min easy`;
+    case 'threshold':
+      return `Warm-up: 15min easy spinning\nMain Set: 4x8min @ FTP, 4min easy between\nCool-down: 10min easy`;
+    case 'vo2max':
+      return `Warm-up: 15min easy spinning\nMain Set: 6x3min @ 110% FTP, 3min easy between\nCool-down: 10min easy`;
+    default:
+      return session.description;
+  }
+}
+
+function generateRunWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+  const { type, duration, zones } = session;
+  const fiveKPace = userPerformance.fiveKPace || "24:00";
+  const easyPace = userPerformance.easyPace || "9:00/mile";
+  
+  switch (type) {
+    case 'endurance':
+      return `Warm-up: 10min easy jog\nMain Set: ${Math.floor(duration * 0.8)}min steady @ ${easyPace}\nCool-down: 10min easy jog`;
+    case 'tempo':
+      return `Warm-up: 10min easy jog\nMain Set: 20min @ tempo pace (between 10K and half marathon pace)\nCool-down: 10min easy jog`;
+    case 'threshold':
+      return `Warm-up: 10min easy jog\nMain Set: 6x800m @ 5K pace, 2min rest\nCool-down: 10min easy jog`;
+    case 'vo2max':
+      return `Warm-up: 10min easy jog\nMain Set: 8x400m @ 3K pace, 90s rest\nCool-down: 10min easy jog`;
+    default:
+      return session.description;
+  }
+}
+
+function generateStrengthWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+  const { type, strengthType } = session;
+  
+  switch (strengthType) {
+    case 'power':
+      return `Warm-up: 5min dynamic stretching\nMain Set: Box Jumps 3x5, Power Cleans 3x3 @ 80% 1RM, Plyometric Push-ups 3x8\nCool-down: 5min static stretching`;
+    case 'compound':
+      return `Warm-up: 5min dynamic stretching\nMain Set: Squat 3x5 @ 80% 1RM, Deadlift 3x3 @ 85% 1RM, Bench Press 3x5 @ 75% 1RM\nCool-down: 5min static stretching`;
+    case 'stability':
+      return `Warm-up: 5min dynamic stretching\nMain Set: Single-leg squats 3x8 each, Planks 3x60s, Bird dogs 3x10 each\nCool-down: 5min static stretching`;
+    case 'cowboy_endurance':
+      return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks 3x100m, Sandbag carries 3x50m, Rope climbs 3x3\nCool-down: 5min static stretching`;
+    case 'cowboy_compound':
+      return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift 3x5 @ 80% 1RM, Overhead press 3x5 @ 75% 1RM, Rows 3x8 @ 70% 1RM\nCool-down: 5min static stretching`;
+    default:
+      return session.description;
+  }
+}
+
+function generateBrickWorkout(session: SessionTemplate, userPerformance: any, phase: string): string {
+  const { type, duration } = session;
+  const bikeTime = Math.floor(duration * 0.7);
+  const runTime = duration - bikeTime;
+  
+  return `Warm-up: 10min easy bike\nBike: ${bikeTime}min @ Zone 2-3\nTransition: 2min (practice quick transition)\nRun: ${runTime}min @ Zone 2-3\nCool-down: 5min easy walk`;
 } 

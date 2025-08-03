@@ -839,6 +839,45 @@ export default function AlgorithmPlanBuilder() {
                   <p className="text-xs text-gray-500 mt-1">Showing first 12 weeks of progression. Full plans typically run 16-20 weeks.</p>
                 </div>
                 
+                {/* Training Zones Summary */}
+                {generatedPlan.fullPlan?.zones && (
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <h3 className="font-semibold text-green-800 mb-2">Your Personalized Training Zones</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                      {generatedPlan.fullPlan.zones.bike && (
+                        <div>
+                          <h4 className="font-medium text-green-700">Bike Zones (FTP: {generatedPlan.fullPlan.zones.bike.zone4}w)</h4>
+                          <p>Zone 1: {generatedPlan.fullPlan.zones.bike.zone1}w (Recovery)</p>
+                          <p>Zone 2: {generatedPlan.fullPlan.zones.bike.zone2}w (Endurance)</p>
+                          <p>Zone 3: {generatedPlan.fullPlan.zones.bike.zone3}w (Tempo)</p>
+                          <p>Zone 4: {generatedPlan.fullPlan.zones.bike.zone4}w (Threshold)</p>
+                          <p>Zone 5: {generatedPlan.fullPlan.zones.bike.zone5}w (VO2max)</p>
+                        </div>
+                      )}
+                      {generatedPlan.fullPlan.zones.run && (
+                        <div>
+                          <h4 className="font-medium text-green-700">Run Zones</h4>
+                          <p>Zone 1: {generatedPlan.fullPlan.zones.run.zone1}/mile (Recovery)</p>
+                          <p>Zone 2: {generatedPlan.fullPlan.zones.run.zone2}/mile (Endurance)</p>
+                          <p>Zone 3: {generatedPlan.fullPlan.zones.run.zone3}/mile (Tempo)</p>
+                          <p>Zone 4: {generatedPlan.fullPlan.zones.run.zone4}/mile (Threshold)</p>
+                          <p>Zone 5: {generatedPlan.fullPlan.zones.run.zone5}/mile (VO2max)</p>
+                        </div>
+                      )}
+                      {generatedPlan.fullPlan.zones.swim && (
+                        <div>
+                          <h4 className="font-medium text-green-700">Swim Zones</h4>
+                          <p>Zone 1: {generatedPlan.fullPlan.zones.swim.zone1} (Recovery)</p>
+                          <p>Zone 2: {generatedPlan.fullPlan.zones.swim.zone2} (Endurance)</p>
+                          <p>Zone 3: {generatedPlan.fullPlan.zones.swim.zone3} (Tempo)</p>
+                          <p>Zone 4: {generatedPlan.fullPlan.zones.swim.zone4} (Threshold)</p>
+                          <p>Zone 5: {generatedPlan.fullPlan.zones.swim.zone5} (VO2max)</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 {/* Display workouts grouped by weeks and phases */}
                 {generatedPlan.workouts && generatedPlan.workouts.length > 0 && (
                   <div className="space-y-6">
@@ -869,9 +908,22 @@ export default function AlgorithmPlanBuilder() {
                                       <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
                                     )}
                                   </div>
-                                  <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                  {workout.detailedWorkout ? (
+                                    <div className="mt-2">
+                                      <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
+                                      <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                  )}
                                   {workout.intensity && (
-                                    <p className="text-xs text-gray-500">Intensity: {workout.intensity}</p>
+                                    <p className="text-xs text-gray-500 mt-1">Intensity: {workout.intensity}</p>
+                                  )}
+                                  {workout.zones && workout.zones.length > 0 && (
+                                    <p className="text-xs text-gray-500">Zones: {workout.zones.join(', ')}</p>
+                                  )}
+                                  {workout.strengthType && (
+                                    <p className="text-xs text-gray-500">Strength Type: {workout.strengthType}</p>
                                   )}
                                 </div>
                                 <div className="text-sm text-gray-500 ml-4">
