@@ -965,17 +965,6 @@ export class SimpleTrainingService {
       },
       {
         day: 'TBD', // Will be set by reverse engineering logic
-        discipline: 'strength',
-        type: 'endurance',
-        duration: 45,
-        intensity: 'Traditional strength',
-        description: 'Traditional strength session',
-        zones: [2],
-        strengthType: 'traditional',
-        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines)
-      },
-      {
-        day: 'TBD', // Will be set by reverse engineering logic
         discipline: 'bike',
         type: 'endurance',
         duration: 45,
@@ -1013,17 +1002,6 @@ export class SimpleTrainingService {
         description: 'Swim endurance session',
         zones: [2],
         detailedWorkout: this.getSwimEnduranceWorkout(enduranceSwimPace)
-      },
-      {
-        day: 'TBD', // Will be set by reverse engineering logic
-        discipline: 'strength',
-        type: 'endurance',
-        duration: 45,
-        intensity: 'Traditional strength',
-        description: 'Traditional strength session',
-        zones: [2],
-        strengthType: 'traditional',
-        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines)
       },
       {
         day: 'TBD', // Will be set by reverse engineering logic
