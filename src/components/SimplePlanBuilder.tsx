@@ -13,6 +13,7 @@ export default function SimplePlanBuilder() {
   const [userBaselines, setUserBaselines] = useState<any>(null);
   const [isLoadingBaselines, setIsLoadingBaselines] = useState(true);
   const [answers, setAnswers] = useState({
+    distance: '',
     timeLevel: '',
     strengthOption: '',
     longSessionDays: ''
@@ -107,7 +108,7 @@ export default function SimplePlanBuilder() {
       return;
     }
     
-    if (answers.timeLevel && answers.strengthOption && answers.longSessionDays && userBaselines) {
+    if (answers.distance && answers.timeLevel && answers.strengthOption && answers.longSessionDays && userBaselines) {
       // Check if required baselines are present for scientifically sound training
       const missingBaselines = [];
       
@@ -157,12 +158,24 @@ export default function SimplePlanBuilder() {
       
       console.log('🎯 Passing baseline data to training service:', baselineData);
       
-      const generatedPlan = trainingService.generateSprintPlan(
-        answers.timeLevel as any,
-        answers.strengthOption as any,
-        answers.longSessionDays,
-        baselineData
-      );
+      let generatedPlan;
+      if (answers.distance === 'sprint') {
+        generatedPlan = trainingService.generateSprintPlan(
+          answers.timeLevel as any,
+          answers.strengthOption as any,
+          answers.longSessionDays,
+          baselineData
+        );
+      } else if (answers.distance === 'seventy3') {
+        generatedPlan = trainingService.generateSeventy3Plan(
+          answers.timeLevel as any,
+          answers.strengthOption as any,
+          answers.longSessionDays,
+          baselineData
+        );
+      } else {
+        throw new Error(`Unsupported distance: ${answers.distance}`);
+      }
       setPlan(generatedPlan);
           setCurrentWeek(0);
     }
@@ -175,14 +188,29 @@ export default function SimplePlanBuilder() {
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold">What are you training for?</h2>
             <div className="space-y-4">
-              <div>
+              <div 
+                className={`cursor-pointer hover:bg-gray-50 p-4 rounded ${
+                  answers.distance === 'sprint' ? 'bg-blue-50 border-blue-200' : ''
+                }`}
+                onClick={() => updateAnswer('distance', 'sprint')}
+              >
                 <h3 className="font-medium">Sprint Triathlon</h3>
                 <p className="text-sm text-gray-600">Complete in 1-1.5 hours • 8-12 weeks training</p>
+              </div>
+              <div 
+                className={`cursor-pointer hover:bg-gray-50 p-4 rounded ${
+                  answers.distance === 'seventy3' ? 'bg-blue-50 border-blue-200' : ''
+                }`}
+                onClick={() => updateAnswer('distance', 'seventy3')}
+              >
+                <h3 className="font-medium">70.3 Triathlon</h3>
+                <p className="text-sm text-gray-600">Complete in 4-6 hours • 12-16 weeks training</p>
               </div>
             </div>
             <button 
               onClick={() => setCurrentStep(2)}
-              className="w-full px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+              disabled={!answers.distance}
+              className="w-full px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
             >
               Continue →
             </button>
@@ -355,6 +383,7 @@ export default function SimplePlanBuilder() {
                 setPlan(null);
                 setCurrentStep(1);
                 setAnswers({ 
+                  distance: '',
                   timeLevel: '', 
                   strengthOption: '', 
                   longSessionDays: ''
