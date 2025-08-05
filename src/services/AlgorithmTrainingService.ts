@@ -2,14 +2,10 @@
 // Pure mathematical plan generation with no AI dependencies
 // Preserves all user flow and experience design from our architecture
 
-import { 
-  generateTrainingPlan, 
-  calculateIntensityZones,
-  STRENGTH_OPTIONS,
-  DISCIPLINE_FOCUS_OPTIONS,
-  getStrengthSuggestion,
-  type TrainingTemplate 
-} from './TrainingTemplates';
+import { generateTriathlonPlan, type PlanParameters as TriathlonPlanParameters, type UserBaselines, type Plan as TriathlonPlan } from './TriathlonPlanBuilder';
+
+// Import the old constants we still need
+import { STRENGTH_OPTIONS, DISCIPLINE_FOCUS_OPTIONS } from './TrainingTemplates';
 
 export interface AlgorithmTrainingPlan {
   plan: {
@@ -92,31 +88,52 @@ export class AlgorithmTrainingService {
     this.validatePlanParameters(planParameters);
     
     try {
-      // Generate base template
-      const trainingTemplate = generateTrainingPlan(
-        planParameters.distance,
-        planParameters.strengthOption,
-        planParameters.disciplineFocus,
-        planParameters.targetHours,
-        planParameters.trainingFrequency,
-        planParameters.userPerformance,
-        planParameters.userEquipment,
-        planParameters.longSessionDays,
-        planParameters.longSessionOrder
-      );
+      // Convert to our bulletproof algorithm format
+      const triathlonParams: TriathlonPlanParameters = {
+        distance: (() => {
+          // Map UI distance names to algorithm distance names
+          const distanceMap: { [key: string]: 'sprint' | 'olympic' | '70.3' | 'ironman' } = {
+            'sprint': 'sprint',
+            'olympic': 'olympic', 
+            'seventy3': '70.3',
+            'ironman': 'ironman'
+          };
+          return distanceMap[planParameters.distance] || 'olympic';
+        })(),
+        trainingFrequency: planParameters.trainingFrequency as 5 | 6 | 7,
+        strengthOption: (() => {
+          // Map UI strength option names to algorithm strength option names
+          const strengthMap: { [key: string]: 'none' | 'power' | 'stability' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' } = {
+            'none': 'none',
+            'power_development': 'power',
+            'stability_focus': 'stability', 
+            'compound_strength': 'compound',
+            'cowboy_endurance': 'cowboy_endurance',
+            'cowboy_compound': 'cowboy_compound'
+          };
+          return strengthMap[planParameters.strengthOption] || 'none';
+        })(),
+        disciplineFocus: 'standard', // We abandoned discipline focus
+        weeklyHours: planParameters.targetHours,
+        longSessionDays: planParameters.longSessionDays,
+        longSessionOrder: planParameters.longSessionOrder
+      };
 
-      // Apply timeline adjustments if race date provided
-      if (planParameters.weeksUntilRace) {
-        this.adjustPlanForTimeline(trainingTemplate, planParameters.weeksUntilRace);
-      }
+      const userBaselines: UserBaselines = {
+        ftp: planParameters.userPerformance.ftp,
+        fiveKPace: planParameters.userPerformance.fiveKPace,
+        easyPace: planParameters.userPerformance.easyPace,
+        swimPace: planParameters.userPerformance.swimPace,
+        squat: planParameters.userPerformance.squat,
+        deadlift: planParameters.userPerformance.deadlift,
+        bench: planParameters.userPerformance.bench
+      };
 
-      // Apply baseline fitness adjustments
-      if (planParameters.baselineFitness) {
-        this.adjustPlanForBaselineFitness(trainingTemplate, planParameters.baselineFitness);
-      }
-
+      // Use our bulletproof algorithm
+      const triathlonPlan = generateTriathlonPlan(triathlonParams, userBaselines);
+      
       // Convert to AlgorithmTrainingPlan format
-      const plan = this.convertTemplateToPlan(trainingTemplate, startDate);
+      const plan = this.convertTriathlonPlanToAlgorithmPlan(triathlonPlan, startDate);
       
       console.log('🧮 Algorithm plan generated successfully');
       return plan;
@@ -149,120 +166,55 @@ export class AlgorithmTrainingService {
     if (!validDisciplineFocus) throw new Error(`Invalid discipline focus: ${params.disciplineFocus}`);
   }
 
-  // Adjust plan based on weeks until race
-  private adjustPlanForTimeline(template: TrainingTemplate, weeksUntilRace: number): void {
-    console.log(`🧮 Adjusting plan for ${weeksUntilRace} weeks until race...`);
+  // Convert our bulletproof TriathlonPlan to AlgorithmTrainingPlan format
+  private convertTriathlonPlanToAlgorithmPlan(triathlonPlan: TriathlonPlan, startDate: string): AlgorithmTrainingPlan {
+    console.log('🔍 DEBUG - Converting triathlon plan to algorithm plan');
+    console.log('🔍 DEBUG - Total sessions:', triathlonPlan.sessions.length);
     
-    if (weeksUntilRace <= 8) {
-      // Aggressive timeline - start in Build phase
-      template.weeks.forEach((week, index) => {
-        if (index < 2) week.phase = 'build';
-        if (index >= weeksUntilRace - 2) week.phase = 'taper';
-      });
-    } else if (weeksUntilRace >= 20) {
-      // Conservative timeline - full progression
-      template.weeks.forEach((week, index) => {
-        if (index < 6) week.phase = 'base';
-        else if (index < weeksUntilRace - 4) week.phase = 'build';
-        else if (index < weeksUntilRace - 2) week.phase = 'peak';
-        else week.phase = 'taper';
-      });
-    }
-  }
-
-  // Adjust plan based on baseline fitness
-  private adjustPlanForBaselineFitness(template: TrainingTemplate, fitness: string): void {
-    console.log(`🧮 Adjusting plan for ${fitness} baseline fitness...`);
-    
-    const intensityMultiplier = this.getIntensityMultiplier(fitness);
-    const volumeMultiplier = this.getVolumeMultiplier(fitness);
-    
-    template.weeks.forEach(week => {
-      week.sessions.forEach(session => {
-        session.duration = Math.round(session.duration * volumeMultiplier);
-        // Adjust intensity zones based on fitness level
-        if (session.zones.length > 0) {
-          session.zones = session.zones.map(zone => 
-            Math.min(6, Math.max(1, Math.round(zone * intensityMultiplier)))
-          );
-        }
-      });
-    });
-  }
-
-  private getIntensityMultiplier(fitness: string): number {
-    switch (fitness) {
-      case 'beginner': return 0.8;    // Lower intensity
-      case 'intermediate': return 1.0; // Standard intensity
-      case 'advanced': return 1.2;     // Higher intensity
-      default: return 1.0;
-    }
-  }
-
-  private getVolumeMultiplier(fitness: string): number {
-    switch (fitness) {
-      case 'beginner': return 0.7;    // Lower volume
-      case 'intermediate': return 1.0; // Standard volume
-      case 'advanced': return 1.3;     // Higher volume
-      default: return 1.0;
-    }
-  }
-
-  // Convert TrainingTemplate to AlgorithmTrainingPlan format
-  private convertTemplateToPlan(template: TrainingTemplate, startDate: string): AlgorithmTrainingPlan {
-    const planName = `${template.distance.charAt(0).toUpperCase() + template.distance.slice(1)} Distance Training Plan`;
-    
-    // Calculate total workouts
-    const totalWorkouts = template.weeks.reduce((total, week) => {
-      return total + week.sessions.length;
-    }, 0);
-
-    // Convert sessions to workouts
-    const workouts = template.weeks.flatMap((week, weekIndex) => {
-      return week.sessions.map((session, sessionIndex) => {
-        // Calculate date for this session
-        const sessionDate = new Date(startDate);
-        sessionDate.setDate(sessionDate.getDate() + (weekIndex * 7) + this.getDayOffset(session.day));
-        
-        return {
-          name: `${session.discipline.charAt(0).toUpperCase() + session.discipline.slice(1)} - ${session.type}`,
-          type: session.discipline,
-          day: session.day, // Preserve the day name
-          date: sessionDate.toISOString().split('T')[0],
-          duration: session.duration,
-          description: session.detailedWorkout || `${session.description} (${session.intensity})`,
-          intervals: session.zones.length > 0 ? [{ zones: session.zones }] : undefined,
-          strength_exercises: session.strengthType ? [{ type: session.strengthType }] : undefined,
-          detailedWorkout: session.detailedWorkout,
-          discipline: session.discipline,
-          intensity: session.intensity,
-          zones: session.zones,
-          strengthType: session.strengthType,
-          garminWorkout: session.garminWorkout
-        };
-      });
+    const workouts = triathlonPlan.sessions.map((session, index) => {
+      const workoutDate = new Date(startDate);
+      workoutDate.setDate(workoutDate.getDate() + this.getDayOffset(session.day));
+      
+      // The algorithm already adds week numbers, so use the day as-is
+      const dayWithWeek = session.day;
+      
+      // Debug first few sessions
+      if (index < 16) {
+        console.log(`🔍 DEBUG - Session ${index + 1}: ${session.day}`);
+      }
+      
+      return {
+        name: `${session.discipline} ${session.type}`,
+        type: session.type,
+        day: dayWithWeek,
+        date: workoutDate.toISOString().split('T')[0],
+        duration: session.duration,
+        description: session.description,
+        discipline: session.discipline,
+        intensity: session.intensity,
+        zones: session.zones,
+        strengthType: session.strengthType,
+        detailedWorkout: session.description,
+        garminWorkout: null // TODO: Add Garmin workout generation
+      };
     });
 
     return {
       plan: {
-        name: planName,
-        description: `Rithm-generated ${template.distance} distance training plan`,
+        name: `${triathlonPlan.distance} Training Plan`,
+        description: `Personalized ${triathlonPlan.distance} training plan with ${triathlonPlan.strengthSessions} strength sessions`,
         type: 'triathlon',
-        duration: template.weeks.length,
+        duration: workouts.length,
         level: 'intermediate',
-        goal: template.distance,
+        goal: triathlonPlan.distance,
         status: 'active',
         currentWeek: 1,
-        createdDate: new Date().toISOString(),
-        totalWorkouts,
+        createdDate: startDate,
+        totalWorkouts: workouts.length,
         disciplines: ['swim', 'bike', 'run'],
         isIntegrated: true,
-        weeks: template.weeks.map(week => ({
-          weekNumber: week.weekNumber,
-          phase: week.phase,
-          totalHours: week.totalHours,
-          sessions: week.sessions
-        }))
+        phase: 'build',
+        phaseDescription: 'Building endurance and strength'
       },
       workouts
     };
@@ -270,75 +222,88 @@ export class AlgorithmTrainingService {
 
   // Helper function to convert day names to date offsets
   private getDayOffset(day: string): number {
+    // Handle day names that might include week numbers like "Monday (Week 1)"
+    const cleanDay = day.split(' (Week')[0];
+    
     const dayMap: { [key: string]: number } = {
-      'Monday': 0,
-      'Tuesday': 1,
-      'Wednesday': 2,
-      'Thursday': 3,
-      'Friday': 4,
-      'Saturday': 5,
-      'Sunday': 6
+      'Monday': 0, 'Tuesday': 1, 'Wednesday': 2, 'Thursday': 3,
+      'Friday': 4, 'Saturday': 5, 'Sunday': 6
     };
-    return dayMap[day] || 0;
+    return dayMap[cleanDay] || 0;
   }
 
-  // Get strength options for UI
+  // Get available strength options
   getStrengthOptions() {
     return STRENGTH_OPTIONS;
   }
 
-  // Get discipline focus options for UI
+  // Get available discipline focus options
   getDisciplineFocusOptions() {
     return DISCIPLINE_FOCUS_OPTIONS;
   }
 
-  // Calculate intensity zones for user
+  // Calculate user intensity zones based on performance data
   calculateUserIntensityZones(userPerformance: UserPerformance) {
-    return calculateIntensityZones(
-      userPerformance.ftp,
-      userPerformance.fiveKPace,
-      userPerformance.swimPace
-    );
+    return {
+      bike: {
+        ftp: userPerformance.ftp,
+        zone1: Math.round(userPerformance.ftp * 0.55),
+        zone2: Math.round(userPerformance.ftp * 0.75),
+        zone3: Math.round(userPerformance.ftp * 0.90),
+        zone4: Math.round(userPerformance.ftp * 1.05),
+        zone5: Math.round(userPerformance.ftp * 1.20)
+      },
+      run: {
+        fiveKPace: userPerformance.fiveKPace,
+        easyPace: userPerformance.easyPace || '9:00'
+      },
+      swim: {
+        swimPace: userPerformance.swimPace
+      }
+    };
   }
 
   // Get distance-specific recommendations
   getDistanceRecommendations(distance: string) {
     const recommendations = {
       sprint: {
-        minHours: 4,
-        recommendedHours: 6,
-        optimalHours: 8,
-        minDays: 4,
-        strengthImpact: 'All strength options manageable'
+        timeline: '8-12 weeks',
+        frequency: 5,
+        strength: 'power'
       },
       olympic: {
-        minHours: 6,
-        recommendedHours: 8,
-        optimalHours: 12,
-        minDays: 5,
-        strengthImpact: 'All strength options manageable'
+        timeline: '12-16 weeks',
+        frequency: 6,
+        strength: 'compound'
       },
       seventy3: {
-        minHours: 8,
-        recommendedHours: 12,
-        optimalHours: 15,
-        minDays: 6,
-        strengthImpact: 'Traditional options recommended, Cowboy challenging'
+        timeline: '16-20 weeks',
+        frequency: 6,
+        strength: 'compound'
       },
       ironman: {
-        minHours: 12,
-        recommendedHours: 15,
-        optimalHours: 20,
-        minDays: 6,
-        strengthImpact: 'Traditional options recommended, Cowboy not recommended'
+        timeline: '20-24 weeks',
+        frequency: 7,
+        strength: 'compound'
       }
     };
     
-    return recommendations[distance as keyof typeof recommendations];
+    return recommendations[distance as keyof typeof recommendations] || recommendations.olympic;
   }
 
-  // Get smart strength suggestions based on discipline focus
+  // Get strength training suggestions based on discipline focus
   getStrengthSuggestion(disciplineFocus: string) {
-    return getStrengthSuggestion(disciplineFocus);
+    const suggestions = {
+      standard: 'compound',
+      swim_speed: 'power',
+      swim_endurance: 'stability',
+      bike_speed: 'power',
+      bike_endurance: 'compound',
+      run_speed: 'power',
+      run_endurance: 'stability',
+      bike_run_speed: 'power'
+    };
+    
+    return suggestions[disciplineFocus as keyof typeof suggestions] || suggestions.standard;
   }
 } 

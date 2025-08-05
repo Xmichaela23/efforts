@@ -12,7 +12,7 @@ const WorkoutTabs = ({ workouts }: { workouts: any[] }) => {
   return (
     <div>
       {/* Tab navigation */}
-      <div className="flex border-b border-gray-200">
+      <div className="flex border-b border-gray-200 mb-3">
         {workouts.map((workout, index) => (
           <button
             key={index}
@@ -29,23 +29,23 @@ const WorkoutTabs = ({ workouts }: { workouts: any[] }) => {
       </div>
       
       {/* Tab content */}
-      <div className="p-3">
+      <div>
         {workouts.map((workout, index) => (
           <div key={index} className={currentDay === index ? 'block' : 'hidden'}>
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+              <span className="text-xs">{workout.discipline}</span>
               {workout.type && workout.type !== workout.discipline && (
-                <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+                <span className="text-xs text-gray-500">{workout.type}</span>
               )}
             </div>
             {workout.detailedWorkout ? (
               <div>
-                <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
-                <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
+                <p className="text-sm font-medium mb-1">Workout:</p>
+                <pre className="text-xs text-gray-700 whitespace-pre-wrap">{workout.detailedWorkout}</pre>
               </div>
             ) : (
               <div>
-                <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                <p className="text-sm text-gray-600">{workout.description}</p>
               </div>
             )}
             {workout.intensity && (
@@ -203,49 +203,6 @@ const WEEKDAY_DURATION_OPTIONS = [
   { key: '90-plus', label: '90+ minutes' },
 ];
 
-const DISCIPLINE_FOCUS_OPTIONS = [
-  { 
-    key: 'standard', 
-    label: 'Standard (Balanced) - 2 sessions per discipline',
-    description: 'Balanced training across all disciplines. Works well for all distances and experience levels.'
-  },
-  { 
-    key: 'swim_speed', 
-    label: 'Swim Focus + Speed - 3 swims, technique/intervals',
-    description: 'Extra swim sessions focused on technique and speed work. Great for improving swim efficiency.'
-  },
-  { 
-    key: 'swim_endurance', 
-    label: 'Swim Focus + Endurance - 3 swims, longer sessions',
-    description: 'Extra swim sessions focused on building endurance. Ideal for longer swim distances.'
-  },
-  { 
-    key: 'bike_speed', 
-    label: 'Bike Focus + Speed - 3 bikes, power intervals',
-    description: 'Extra bike sessions focused on power and speed. Great for improving bike performance.'
-  },
-  { 
-    key: 'bike_endurance', 
-    label: 'Bike Focus + Endurance - 3 bikes, longer rides',
-    description: 'Extra bike sessions focused on building endurance. Ideal for longer bike distances.'
-  },
-  { 
-    key: 'run_speed', 
-    label: 'Run Focus + Speed - 3 runs, tempo/speed work',
-    description: 'Extra run sessions focused on speed and tempo work. Great for improving run performance.'
-  },
-  { 
-    key: 'run_endurance', 
-    label: 'Run Focus + Endurance - 3 runs, longer runs',
-    description: 'Extra run sessions focused on building endurance. Ideal for longer run distances.'
-  },
-  { 
-    key: 'bike_run_speed', 
-    label: 'Bike + Run Speed - 3 bikes, 2 runs, both high intensity',
-    description: 'High-intensity focus on bike and run. Demanding but effective for performance gains.'
-  },
-];
-
 export default function AlgorithmPlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
@@ -311,7 +268,6 @@ export default function AlgorithmPlanBuilder() {
     goals: [] as string[],
     
     // Algorithm-based plan parameters
-    disciplineFocus: 'standard',
     weeklyHours: 8,
     trainingBackground: '',
     
@@ -336,18 +292,10 @@ export default function AlgorithmPlanBuilder() {
     setResponses(prev => ({ ...prev, [key]: value }));
   };
 
-  // Toggle focus helper
-  const toggleFocus = (focus: string) => {
-    setSelectedFocus((prev) =>
-      prev.includes(focus) ? prev.filter((f) => f !== focus) : [...prev, focus]
-    );
-  };
-
   // Validation helper
   const validateAssessment = () => {
     const requiredFields = [
       'distance',
-      'disciplineFocus',
       'strengthTraining',
       'trainingFrequency',
       'weeklyHours'
@@ -393,6 +341,45 @@ export default function AlgorithmPlanBuilder() {
   };
 
   // Generate plan using algorithm
+  // Helper to convert duration option to weekly hours
+  const convertDurationToWeeklyHours = (durationOption: string): number => {
+    switch (durationOption) {
+      case '30-45':
+        return 4; // 30-45 min sessions = ~4 hours/week
+      case '45-60':
+        return 6; // 45-60 min sessions = ~6 hours/week
+      case '60-90':
+        return 8; // 60-90 min sessions = ~8 hours/week
+      case '90-plus':
+        return 12; // 90+ min sessions = ~12 hours/week
+      default:
+        return 8; // Default to 8 hours
+    }
+  };
+
+  // Get scientifically sound minimum hours for the selected distance and strength
+  const getMinimumHours = (distance: string, strengthOption: string): number => {
+    // Map UI distance names to algorithm distance names
+    const distanceMap: { [key: string]: string } = {
+      'sprint': 'sprint',
+      'olympic': 'olympic',
+      'seventy3': '70.3',
+      'ironman': 'ironman'
+    };
+    const mappedDistance = distanceMap[distance] || distance;
+    
+    if (mappedDistance === '70.3' && (strengthOption === 'cowboy_compound' || strengthOption === 'cowboy_endurance')) {
+      return 10; // Minimum 10 hours for 70.3 with heavy strength
+    }
+    if (mappedDistance === 'ironman') {
+      return 12; // Minimum 12 hours for Ironman
+    }
+    if (mappedDistance === '70.3') {
+      return 8; // Minimum 8 hours for 70.3 without heavy strength
+    }
+    return 6; // Default minimum
+  };
+
   const generatePlan = async () => {
     try {
       // Validate assessment completion first
@@ -400,16 +387,26 @@ export default function AlgorithmPlanBuilder() {
       
       setGeneratingPlan(true);
       
-      console.log('🧮 Starting rithm-based plan generation...');
+      console.log('🧮 Starting algorithm-based plan generation...');
       console.log('📊 Baselines:', baselines);
       console.log('📝 Responses:', responses);
+      console.log('💪 User 1RM values:', {
+        squat: baselines.performanceNumbers.squat,
+        deadlift: baselines.performanceNumbers.deadlift,
+        bench: baselines.performanceNumbers.bench
+      });
+      console.log('💪 User baselines object:', baselines.performanceNumbers);
+      
+      // Use the weekly hours directly
+      const weeklyHours = responses.weeklyHours;
+      console.log(`🕐 Using weekly hours: ${weeklyHours} hours/week`);
       
       // Extract plan parameters
       const planParameters: PlanParameters = {
         distance: responses.distance as any,
         strengthOption: responses.strengthTraining || 'none',
-        disciplineFocus: responses.disciplineFocus,
-        targetHours: responses.weeklyHours,
+        disciplineFocus: 'standard', // Always standard now
+        targetHours: weeklyHours,
         trainingFrequency: parseInt(responses.trainingFrequency.split('-')[0]), // Convert "5-days" to 5 for template lookup
         userPerformance: {
           ftp: baselines.performanceNumbers.ftp,
@@ -442,16 +439,18 @@ export default function AlgorithmPlanBuilder() {
       
       const startDate = new Date().toISOString().split('T')[0];
       
-      console.log('🧮 Calling rithm-based plan generation...');
+      console.log('🧮 Calling algorithm-based plan generation...');
       const algorithmPlan = await algorithmService.generateTrainingPlan(planParameters, startDate);
       
-      console.log('✅ Rithm plan generated:', algorithmPlan);
+      console.log('✅ Algorithm plan generated:', algorithmPlan);
       
       // Debug: Check what the algorithm actually returned
       if (algorithmPlan.workouts && algorithmPlan.workouts.length > 0) {
-        const firstWorkout = algorithmPlan.workouts[0];
-        console.log('🔍 DEBUG - First workout structure:', firstWorkout);
-        console.log('🔍 DEBUG - First workout keys:', Object.keys(firstWorkout));
+        console.log('🔍 DEBUG - Total workouts generated:', algorithmPlan.workouts.length);
+        console.log('🔍 DEBUG - First 10 workouts:');
+        algorithmPlan.workouts.slice(0, 10).forEach((w, i) => {
+          console.log(`  ${i + 1}. ${w.day} - ${w.discipline} ${w.type} (${w.duration}min)`);
+        });
       }
       
       // Create plan object
@@ -473,7 +472,7 @@ export default function AlgorithmPlanBuilder() {
       console.log('✅ Plan set, moving to step 7');
       
     } catch (error) {
-      console.error('❌ Error generating rithm plan:', error);
+      console.error('❌ Error generating algorithm plan:', error);
       throw error;
     } finally {
       setGeneratingPlan(false);
@@ -545,7 +544,7 @@ export default function AlgorithmPlanBuilder() {
         );
 
       case 1:
-        // Triathlon distance selection (if triathlon selected) or go to discipline focus
+        // Triathlon distance selection (if triathlon selected) or go to strength training
         if (responses.category === 'triathlon') {
           return (
             <div>
@@ -578,148 +577,96 @@ export default function AlgorithmPlanBuilder() {
             </div>
           );
         } else {
-          // For non-triathlon categories, set distance to category and go to discipline focus
+          // For non-triathlon categories, set distance to category and go to strength training
           if (!responses.distance) {
             updateResponse('distance', responses.category);
           }
           return getCurrentStepContent();
         }
 
-              case 2:
-          // Discipline Focus & Strength Training (COMBINED)
+      case 2:
+        // Strength Training (REMOVED DISCIPLINE FOCUS)
         return (
           <div>
-            <h2 className="text-2xl font-medium mb-6">Discipline Focus & Strength Training</h2>
+            <h2 className="text-2xl font-medium mb-6">Strength Training</h2>
             
-            {/* Discipline Focus Section */}
+            {/* Strength Training Section */}
             <div className="mb-8">
-              <h3 className="text-lg font-semibold mb-4">Choose Your Focus:</h3>
-              <div className="mb-4 p-4 bg-blue-50 rounded-lg">
-                <p className="text-sm">
-                  Choose your training focus based on your goals and available time. Higher training volumes (6-7 days/week) allow for more specialized focus, 
-                  while lower volumes (4-5 days/week) work better with balanced training across all disciplines.
+              <h3 className="text-lg font-semibold mb-4">Choose Your Strength Training:</h3>
+              
+              {/* Smart Strength Suggestion */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <h4 className="font-semibold text-gray-900 mb-2">Based on your Standard (Balanced) training, we suggest:</h4>
+                {(() => {
+                  const suggestion = algorithmService.getStrengthSuggestion('standard');
+                  const strengthOption = STRENGTH_OPTIONS.find(s => s.key === suggestion);
+                  return (
+                    <div className="space-y-2">
+                      <div className="font-semibold text-gray-900">{strengthOption?.label}</div>
+                      <div className="text-sm text-gray-700">Balanced strength training for triathlon performance</div>
+                      <div className="text-xs text-gray-600">Evidence: Compound movements improve power output</div>
+                      <div className="text-xs text-gray-600">Recovery: 2x/week allows proper adaptation</div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Strength Options */}
+              <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                <p className="text-sm text-blue-800">
+                  <strong>💡 Tip:</strong> Hover over each option for detailed descriptions. 
+                  <strong>Cowboy options require 6+ training days</strong> due to their 3x/week strength sessions.
                 </p>
-                <div className="mt-3 pt-3 border-t border-blue-200">
-                  <p className="text-sm">
-                    <strong>📊 Session Counts:</strong> The session counts shown (2-3 per discipline) are consistent across all distances. 
-                    For shorter distances (Sprint/Olympic), sessions are shorter but more intense. 
-                    For longer distances (70.3/Ironman), sessions are longer with more volume.
-                  </p>
-                </div>
-                {responses.trainingFrequency && ['6-days', '7-days'].includes(responses.trainingFrequency) && (
-                  <div className="mt-3 pt-3 border-t border-blue-200">
-                    <p className="text-sm">
-                      You may be inclined to focus on a discipline you enjoy, and while we totally support your training being fulfilling, 
-                      you may want to consider focusing on an area you feel needs more development.
-                    </p>
-                  </div>
-                )}
               </div>
               <TooltipProvider>
                 <div className="space-y-4">
-                  {DISCIPLINE_FOCUS_OPTIONS.map((option) => (
-                    <Tooltip key={option.key}>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => updateResponse('disciplineFocus', option.key)}
-                          className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                            responses.disciplineFocus === option.key
-                              ? 'border-gray-400 bg-gray-50'
-                              : 'border-gray-300 hover:border-gray-400'
-                          }`}
-                        >
-                          <div className="font-semibold">{option.label}</div>
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="right" className="max-w-xs">
-                        <p className="text-sm">{option.description}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  ))}
+                  {STRENGTH_OPTIONS.map((option) => {
+                    // Gating logic for strength options based on training days
+                    let isDisabled = false;
+                    let disabledReason = "";
+                    
+                    // Check if this strength option requires more sessions than available training days
+                    if (option.key === 'cowboy_endurance' || option.key === 'cowboy_compound') {
+                      // These require 3 sessions/week
+                      const trainingDays = parseInt(responses.trainingFrequency?.split('-')[0] || '0');
+                      if (trainingDays > 0 && trainingDays < 6) {
+                        isDisabled = true;
+                        disabledReason = "Cowboy options require 6-7 training days/week";
+                      }
+                    }
+                    
+                    return (
+                      <Tooltip key={option.key}>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => !isDisabled && updateResponse('strengthTraining', option.key)}
+                            disabled={isDisabled}
+                            className={`w-full p-4 border rounded-lg text-left transition-colors ${
+                              responses.strengthTraining === option.key
+                                ? 'border-gray-400 bg-gray-50'
+                                : isDisabled
+                                ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
+                                : 'border-gray-300 hover:border-gray-400'
+                            }`}
+                          >
+                            <div className="font-semibold">{option.label}</div>
+                            <div className="text-sm text-gray-600 mt-1">{option.description}</div>
+                            {isDisabled && (
+                              <div className="text-xs text-red-600 mt-1">{disabledReason}</div>
+                            )}
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="right" className="max-w-xs">
+                          <p className="text-sm">{option.description}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
                 </div>
               </TooltipProvider>
             </div>
 
-            {/* Strength Training Section - Only show after discipline focus is selected */}
-            {responses.disciplineFocus && (
-              <div className="mb-8">
-                <h3 className="text-lg font-semibold mb-4">Strength Training:</h3>
-                
-                {/* Smart Strength Suggestion */}
-                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                  <h4 className="font-semibold text-gray-900 mb-2">Based on your {DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus)?.label}, we suggest:</h4>
-                  {(() => {
-                    const suggestion = algorithmService.getStrengthSuggestion(responses.disciplineFocus);
-                    const strengthOption = STRENGTH_OPTIONS.find(s => s.key === suggestion.recommended);
-                    return (
-                      <div className="space-y-2">
-                        <div className="font-semibold text-gray-900">{strengthOption?.label}</div>
-                        <div className="text-sm text-gray-700">{suggestion.reason}</div>
-                        <div className="text-xs text-gray-600">Evidence: {suggestion.evidence}</div>
-                        <div className="text-xs text-gray-600">Recovery: {suggestion.recovery}</div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Strength Options */}
-                <div className="mb-4 p-3 bg-blue-50 rounded-lg border border-blue-200">
-                  <p className="text-sm text-blue-800">
-                    <strong>💡 Tip:</strong> Hover over each option for detailed descriptions. 
-                    <strong>Cowboy options require 6+ training days</strong> due to their 3x/week strength sessions.
-                  </p>
-                </div>
-                <TooltipProvider>
-                  <div className="space-y-4">
-                    {STRENGTH_OPTIONS.map((option) => {
-                      // Gating logic for strength options based on training days
-                      let isDisabled = false;
-                      let disabledReason = "";
-                      
-                      // Check if this strength option requires more sessions than available training days
-                      if (option.key === 'cowboy_endurance' || option.key === 'cowboy_compound') {
-                        // These require 3 sessions/week
-                        const trainingDays = parseInt(responses.trainingFrequency?.split('-')[0] || '0');
-                        if (trainingDays > 0 && trainingDays < 6) {
-                          isDisabled = true;
-                          disabledReason = "Cowboy options require 6-7 training days/week";
-                        }
-                      }
-                      
-                      return (
-                        <Tooltip key={option.key}>
-                          <TooltipTrigger asChild>
-                            <button
-                              onClick={() => !isDisabled && updateResponse('strengthTraining', option.key)}
-                              disabled={isDisabled}
-                              className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                                responses.strengthTraining === option.key
-                                  ? 'border-gray-400 bg-gray-50'
-                                  : isDisabled
-                                  ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                                  : 'border-gray-300 hover:border-gray-400'
-                              }`}
-                            >
-                              <div className="font-semibold">{option.label}</div>
-                              <div className="text-sm text-gray-600 mt-2">{option.description}</div>
-                              {isDisabled && (
-                                <div className="text-sm text-red-600 mt-1">{disabledReason}</div>
-                              )}
-                            </button>
-                          </TooltipTrigger>
-                          <TooltipContent side="right" className="max-w-xs">
-                            <p className="text-sm">{option.description}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    })}
-                  </div>
-                </TooltipProvider>
-              </div>
-            )}
-
-            {/* Continue Button - Only show when both are selected */}
-            {responses.disciplineFocus && responses.strengthTraining && (
+            {responses.strengthTraining && (
               <div className="mt-6">
                 <button
                   onClick={() => setStep(3)}
@@ -732,137 +679,77 @@ export default function AlgorithmPlanBuilder() {
           </div>
         );
 
-              case 3:
-          // Training days - with honest assessment
+      case 3:
+        // Training frequency
         return (
           <div>
             <h2 className="text-2xl font-medium mb-6">How many training days per week?</h2>
             
-                          {/* Honest Assessment Based on Focus and Strength */}
-              {responses.disciplineFocus && responses.strengthTraining && (
-                <div className="mb-6 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <h3 className="font-semibold text-yellow-800 mb-2">Honest Assessment:</h3>
-                {(() => {
-                  const focus = DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus);
-                  const strength = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining);
-                  const distance = responses.category === 'triathlon' 
-                  ? TRIATHLON_DISTANCES.find(d => d.key === responses.distance)
-                  : TRAINING_CATEGORIES.find(d => d.key === responses.distance);
-                  
-                  let assessment = "";
-                  if (responses.disciplineFocus === 'bike_run_speed' && responses.strengthTraining !== 'none') {
-                    if (responses.distance === 'seventy3' || responses.distance === 'ironman') {
-                      assessment = `Your ${focus?.label} with ${strength?.label} requires significant recovery. For ${distance?.label}, you'll need 6-7 days to allow proper rest between high-intensity sessions.`;
-                    } else {
-                      assessment = `Your ${focus?.label} with ${strength?.label} requires significant recovery. Consider 5-6 days to allow proper rest between high-intensity sessions.`;
-                    }
-                  } else if (responses.strengthTraining === 'cowboy_compound') {
-                    assessment = `Cowboy Compound (3x/week strength) is very demanding. You'll need 6-7 days to properly integrate this with your ${focus?.label}.`;
-                  } else if (responses.strengthTraining === 'none') {
-                    assessment = `No strength training gives you more flexibility. You can train 4-7 days depending on your endurance goals.`;
-                  } else {
-                    assessment = `Your ${focus?.label} with ${strength?.label} works well with 5-6 training days per week.`;
-                  }
-                  
-                  return <div className="text-sm text-yellow-700">{assessment}</div>;
-                })()}
+            {/* Honest Assessment Warning */}
+            {responses.strengthTraining && (responses.strengthTraining === 'cowboy_endurance' || responses.strengthTraining === 'cowboy_compound') && (
+              <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <div className="font-semibold text-yellow-800">Honest Assessment:</div>
+                <div className="text-sm text-yellow-700">
+                  {responses.strengthTraining === 'cowboy_compound' ? 'Cowboy Compound' : 'Cowboy Endurance'} ({responses.strengthTraining === 'cowboy_compound' ? '3x/week strength' : '3x/week strength'}) is very demanding. 
+                  You'll need 6-7 days to properly integrate this with your Standard (Balanced) - 2 sessions per discipline.
+                </div>
               </div>
             )}
             
             <div className="space-y-4">
-              {TRAINING_FREQUENCY_OPTIONS.map((option) => {
-                // Gate training days based on distance
+              {TRAINING_FREQUENCY_OPTIONS.map((frequency) => {
                 let isDisabled = false;
                 let disabledReason = "";
                 
-                if (responses.distance === 'sprint') {
-                  if (option.key === '7-days') {
+                // Check if this frequency is compatible with selected strength training
+                if (responses.strengthTraining === 'cowboy_endurance' || responses.strengthTraining === 'cowboy_compound') {
+                  const days = parseInt(frequency.key.split('-')[0]);
+                  if (days < 6) {
                     isDisabled = true;
-                    disabledReason = "Sprint distance doesn't require 7 days/week";
+                    disabledReason = `${responses.strengthTraining === 'cowboy_compound' ? 'Cowboy Compound' : 'Cowboy Endurance'} requires 6-7 days/week`;
                   }
-                } else if (responses.distance === 'olympic') {
-                  if (option.key === '4-days') {
-                    isDisabled = true;
-                    disabledReason = "Olympic distance requires minimum 5 days/week";
-                  }
-                } else if (responses.distance === 'seventy3') {
-                  if (option.key === '4-days') {
+                }
+                
+                // Check if this frequency is compatible with selected distance
+                if (responses.distance === 'seventy3') {
+                  const days = parseInt(frequency.key.split('-')[0]);
+                  if (days < 5) {
                     isDisabled = true;
                     disabledReason = "70.3 distance requires minimum 5 days/week";
                   }
-                } else if (responses.distance === 'ironman') {
-                  if (option.key === '4-days') {
-                    isDisabled = true;
-                    disabledReason = "Ironman distance requires minimum 5 days/week";
-                  }
                 }
                 
-                // Factor in strength training requirements
-                if (responses.strengthTraining && !isDisabled) {
-                  if (responses.strengthTraining === 'cowboy_compound' && option.key === '4-days') {
+                // Check if this frequency is compatible with both distance and strength
+                if (responses.distance === 'seventy3' && (responses.strengthTraining === 'cowboy_endurance' || responses.strengthTraining === 'cowboy_compound')) {
+                  const days = parseInt(frequency.key.split('-')[0]);
+                  if (days < 6) {
                     isDisabled = true;
-                    disabledReason = "Cowboy Compound (3x/week strength) requires minimum 5 days/week";
-                  } else if (responses.strengthTraining === 'cowboy_endurance' && option.key === '4-days') {
-                    isDisabled = true;
-                    disabledReason = "Cowboy Endurance (3x/week strength) requires minimum 5 days/week";
-                  } else if (responses.strengthTraining === 'compound_strength' && option.key === '4-days') {
-                    isDisabled = true;
-                    disabledReason = "Compound Strength (2x/week) requires minimum 5 days/week";
-                  } else if (responses.strengthTraining === 'power_development' && option.key === '4-days') {
-                    isDisabled = true;
-                    disabledReason = "Power Development (2x/week) requires minimum 5 days/week";
-                  }
-                }
-                
-                // Additional gating for high-intensity combinations
-                if (!isDisabled) {
-                  // 70.3 + Bike + Run Speed + Strength = requires 6-7 days
-                  if (responses.distance === 'seventy3' && 
-                      responses.disciplineFocus === 'bike_run_speed' && 
-                      responses.strengthTraining !== 'none' && 
-                      (option.key === '4-days' || option.key === '5-days')) {
-                    isDisabled = true;
-                    disabledReason = "70.3 with high-intensity bike+run focus and strength requires 6-7 days/week for proper recovery";
-                  }
-                  
-                  // 70.3 + Cowboy Compound = requires 6-7 days
-                  if (responses.distance === 'seventy3' && 
-                      responses.strengthTraining === 'cowboy_compound' && 
-                      option.key === '5-days') {
-                    isDisabled = true;
-                    disabledReason = "70.3 with Cowboy Compound (3x/week strength) requires 6-7 days/week";
-                  }
-                  
-                  // Ironman + any strength = requires 6-7 days
-                  if (responses.distance === 'ironman' && 
-                      responses.strengthTraining !== 'none' && 
-                      option.key === '5-days') {
-                    isDisabled = true;
-                    disabledReason = "Ironman with strength training requires 6-7 days/week";
+                    disabledReason = "70.3 with Cowboy options requires 6-7 days/week";
                   }
                 }
                 
                 return (
                   <button
-                    key={option.key}
-                    onClick={() => !isDisabled && updateResponse('trainingFrequency', option.key)}
+                    key={frequency.key}
+                    onClick={() => !isDisabled && updateResponse('trainingFrequency', frequency.key)}
                     disabled={isDisabled}
                     className={`w-full p-4 border rounded-lg text-left transition-colors ${
-                      responses.trainingFrequency === option.key
+                      responses.trainingFrequency === frequency.key
                         ? 'border-gray-400 bg-gray-50'
                         : isDisabled
                         ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
                         : 'border-gray-300 hover:border-gray-400'
                     }`}
                   >
-                    <div className="font-semibold">{option.label}</div>
+                    <div className="font-semibold">{frequency.label}</div>
                     {isDisabled && (
-                      <div className="text-xs text-gray-500 mt-1">{disabledReason}</div>
+                      <div className="text-xs text-red-600 mt-1">{disabledReason}</div>
                     )}
                   </button>
                 );
               })}
             </div>
+            
             {responses.trainingFrequency && (
               <div className="mt-6">
                 <button
@@ -876,151 +763,34 @@ export default function AlgorithmPlanBuilder() {
           </div>
         );
 
-              case 4:
-          // Weekly hours - with honest assessment
+      case 4:
+        // Weekly hours
         return (
           <div>
             <h2 className="text-2xl font-medium mb-6">How many hours per week?</h2>
             
-                          {/* Honest Assessment Based on All Selections */}
-              {responses.distance && responses.disciplineFocus && responses.strengthTraining && responses.trainingFrequency && (
-                <div className="mb-6 p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <h3 className="font-semibold text-orange-800 mb-2">Honest Assessment:</h3>
-                {(() => {
-                                      const distance = responses.category === 'triathlon' 
-                      ? TRIATHLON_DISTANCES.find(d => d.key === responses.distance)
-                      : TRAINING_CATEGORIES.find(d => d.key === responses.distance);
-                    const focus = DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus);
-                    const strength = STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining);
-                  const days = TRAINING_FREQUENCY_OPTIONS.find(t => t.key === responses.trainingFrequency);
-                  
-                  let assessment = "";
-                  let recommendedHours = "";
-                  
-                  // Calculate recommended hours based on selections
-                  if (responses.distance === 'sprint') {
-                    recommendedHours = "6-8 hours";
-                    if (responses.strengthTraining !== 'none') {
-                      assessment = `For ${distance?.label} with ${strength?.label}, aim for ${recommendedHours} per week. This allows proper recovery between high-intensity sessions.`;
-                    } else {
-                      assessment = `For ${distance?.label} without strength, ${recommendedHours} gives you good balance of intensity and recovery.`;
-                    }
-                  } else if (responses.distance === 'olympic') {
-                    recommendedHours = "8-12 hours";
-                    if (responses.disciplineFocus === 'bike_run_speed') {
-                      assessment = `Your ${focus?.label} for ${distance?.label} requires ${recommendedHours} to properly develop both bike power and run speed.`;
-                    } else {
-                      assessment = `For ${distance?.label} with ${focus?.label}, ${recommendedHours} provides adequate volume for improvement.`;
-                    }
-                  } else if (responses.distance === 'seventy3') {
-                    recommendedHours = "12-15 hours";
-                    if (responses.strengthTraining === 'cowboy_compound') {
-                      assessment = `Cowboy Compound with ${distance?.label} is very demanding. Consider 15+ hours if you can handle the volume.`;
-                    } else {
-                      assessment = `For ${distance?.label} with ${focus?.label}, ${recommendedHours} is the sweet spot for performance improvement.`;
-                    }
-                  } else if (responses.distance === 'ironman') {
-                    recommendedHours = "15-20 hours";
-                    if (responses.strengthTraining !== 'none') {
-                      assessment = `Ironman with strength training requires ${recommendedHours}. Traditional strength options recommended over Cowboy approaches.`;
-                    } else {
-                      assessment = `For Ironman without strength, ${recommendedHours} allows focus on pure endurance development.`;
-                    }
-                  }
-                  
-                  return <div className="text-sm text-orange-700">{assessment}</div>;
-                })()}
+            {/* Honest Assessment Warning */}
+            {responses.strengthTraining && responses.distance && (
+              <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                <div className="font-semibold text-orange-800">Honest Assessment:</div>
+                <div className="text-sm text-orange-700">
+                  {responses.strengthTraining === 'cowboy_compound' ? 'Cowboy Compound' : responses.strengthTraining} with {responses.distance === 'seventy3' ? '70.3 Half Ironman' : responses.distance} is demanding. 
+                  Minimum recommended: {getMinimumHours(responses.distance, responses.strengthTraining)} hours/week for proper training balance.
+                </div>
               </div>
             )}
             
             <div className="space-y-4">
               {[6, 8, 10, 12, 15, 18].map((hours) => {
-                // Gate weekly hours based on distance
+                // Check if this volume is compatible with selected strength training and distance
                 let isDisabled = false;
                 let disabledReason = "";
                 
-                // Check for high-intensity combinations FIRST (most specific rules)
-                if (responses.disciplineFocus === 'bike_run_speed' && responses.strengthTraining !== 'none') {
-                  if (responses.distance === 'sprint' && hours < 8) {
-                    isDisabled = true;
-                    disabledReason = "Sprint with high-intensity bike+run focus and strength requires minimum 8 hours/week";
-                  } else if (responses.distance === 'olympic' && hours < 10) {
-                    isDisabled = true;
-                    disabledReason = "Olympic with high-intensity bike+run focus and strength requires minimum 10 hours/week";
-                  } else if (responses.distance === 'seventy3' && hours < 12) {
-                    isDisabled = true;
-                    disabledReason = "70.3 with high-intensity bike+run focus and strength requires minimum 12 hours/week";
-                  } else if (responses.distance === 'ironman' && hours < 15) {
-                    isDisabled = true;
-                    disabledReason = "Ironman with high-intensity bike+run focus and strength requires minimum 15 hours/week";
-                  }
-                }
-                // Check for Cowboy Compound (most demanding strength)
-                else if (responses.strengthTraining === 'cowboy_compound') {
-                  if (responses.distance === 'sprint' && hours < 10) {
-                    isDisabled = true;
-                    disabledReason = "Sprint with Cowboy Compound requires minimum 10 hours/week";
-                  } else if (responses.distance === 'olympic' && hours < 12) {
-                    isDisabled = true;
-                    disabledReason = "Olympic with Cowboy Compound requires minimum 12 hours/week";
-                  } else if (responses.distance === 'seventy3' && hours < 15) {
-                    isDisabled = true;
-                    disabledReason = "70.3 with Cowboy Compound requires minimum 15 hours/week";
-                  } else if (responses.distance === 'ironman' && hours < 18) {
-                    isDisabled = true;
-                    disabledReason = "Ironman with Cowboy Compound requires minimum 18 hours/week";
-                  }
-                }
-                // Basic distance gating (fallback for simpler combinations)
-                else if (responses.distance === 'sprint') {
-                  if (hours > 12) {
-                    isDisabled = true;
-                    disabledReason = "Sprint distance doesn't require more than 12 hours/week";
-                  }
-                } else if (responses.distance === 'olympic') {
-                  if (hours < 8) {
-                    isDisabled = true;
-                    disabledReason = "Olympic distance requires minimum 8 hours/week";
-                  } else if (hours > 15) {
-                    isDisabled = true;
-                    disabledReason = "Olympic distance doesn't require more than 15 hours/week";
-                  }
-                } else if (responses.distance === 'seventy3') {
-                  if (hours < 10) {
-                    isDisabled = true;
-                    disabledReason = "70.3 distance requires minimum 10 hours/week";
-                  }
-                } else if (responses.distance === 'ironman') {
-                  if (hours < 12) {
-                    isDisabled = true;
-                    disabledReason = "Ironman distance requires minimum 12 hours/week";
-                  }
-                }
-                
-                // Factor in other strength training requirements (for non-Cowboy options)
-                if (responses.strengthTraining && !isDisabled && responses.strengthTraining !== 'cowboy_compound') {
-                  if (responses.strengthTraining === 'cowboy_endurance') {
-                    if (hours < 10) {
-                      isDisabled = true;
-                      disabledReason = "Cowboy Endurance (3x/week strength) requires minimum 10 hours/week";
-                    }
-                  } else if (responses.strengthTraining === 'compound_strength') {
-                    if (hours < 8) {
-                      isDisabled = true;
-                      disabledReason = "Compound Strength (2x/week) requires minimum 8 hours/week";
-                    }
-                  } else if (responses.strengthTraining === 'power_development') {
-                    if (hours < 8) {
-                      isDisabled = true;
-                      disabledReason = "Power Development (2x/week) requires minimum 8 hours/week";
-                    }
-                  } else if (responses.strengthTraining === 'stability_focus') {
-                    if (hours < 6) {
-                      isDisabled = true;
-                      disabledReason = "Stability Focus (2x/week) requires minimum 6 hours/week";
-                    }
-                  }
-                  // No strength training has no additional hour requirements
+                // Check if this volume is compatible with selected strength training and distance
+                const minimumHours = getMinimumHours(responses.distance, responses.strengthTraining);
+                if (hours < minimumHours) {
+                  isDisabled = true;
+                  disabledReason = `${responses.distance === 'seventy3' ? '70.3' : responses.distance} with ${responses.strengthTraining} requires minimum ${minimumHours} hours/week`;
                 }
                 
                 return (
@@ -1033,17 +803,18 @@ export default function AlgorithmPlanBuilder() {
                         ? 'border-gray-400 bg-gray-50'
                         : isDisabled
                         ? 'border-gray-200 bg-gray-100 cursor-not-allowed'
-                        : 'border-gray-400 hover:border-gray-400'
+                        : 'border-gray-300 hover:border-gray-400'
                     }`}
                   >
                     <div className="font-semibold">{hours} hours per week</div>
                     {isDisabled && (
-                      <div className="text-xs text-gray-500 mt-1">{disabledReason}</div>
+                      <div className="text-xs text-red-600 mt-1">{disabledReason}</div>
                     )}
                   </button>
                 );
               })}
             </div>
+            
             {responses.weeklyHours && (
               <div className="mt-6">
                 <button
@@ -1057,8 +828,8 @@ export default function AlgorithmPlanBuilder() {
           </div>
         );
 
-              case 5:
-          // Long Session Preferences
+      case 5:
+        // Long session preferences
         return (
           <div>
             <h2 className="text-2xl font-medium mb-6">Long Session Preferences</h2>
@@ -1094,7 +865,7 @@ export default function AlgorithmPlanBuilder() {
                 ))}
               </div>
             </div>
-
+            
             {/* Long Session Order */}
             <div className="mb-8">
               <h3 className="text-lg font-semibold mb-4">Long Session Order:</h3>
@@ -1120,9 +891,8 @@ export default function AlgorithmPlanBuilder() {
                 ))}
               </div>
             </div>
-
-            {/* Continue Button */}
-            {responses.longSessionDays && responses.longSessionDays.length > 0 && responses.longSessionOrder && (
+            
+            {responses.longSessionDays && responses.longSessionOrder && (
               <div className="mt-6">
                 <button
                   onClick={() => setStep(6)}
@@ -1135,42 +905,36 @@ export default function AlgorithmPlanBuilder() {
           </div>
         );
 
-              case 6:
-          // Review and generate
+      case 6:
+        // Review and generate
         return (
           <div>
             <h2 className="text-2xl font-medium mb-6">Review Your Plan</h2>
-            <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
-              <div><strong>Focus:</strong> {responses.category === 'triathlon' 
-                ? TRIATHLON_DISTANCES.find(d => d.key === responses.distance)?.label
-                : TRAINING_CATEGORIES.find(d => d.key === responses.distance)?.label}</div>
-              <div><strong>Discipline Focus:</strong> {DISCIPLINE_FOCUS_OPTIONS.find(d => d.key === responses.disciplineFocus)?.label}</div>
-              <div><strong>Strength:</strong> {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
-              <div><strong>Training Days:</strong> {TRAINING_FREQUENCY_OPTIONS.find(t => t.key === responses.trainingFrequency)?.label}</div>
-              <div><strong>Weekly Hours:</strong> {responses.weeklyHours} hours</div>
-              <div><strong>Long Session Days:</strong> {(responses.longSessionDays || []).map(day => 
-                LONG_SESSION_DAY_OPTIONS.find(d => d.key === day)?.label).join(', ')}</div>
-              <div><strong>Long Session Order:</strong> {LONG_SESSION_ORDER_OPTIONS.find(o => o.key === responses.longSessionOrder)?.label}</div>
+            
+            <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+              <div className="space-y-2">
+                <div><strong>Focus:</strong> {TRIATHLON_DISTANCES.find(d => d.key === responses.distance)?.label || responses.distance}</div>
+                <div><strong>Discipline Focus:</strong> Standard (Balanced) - 2 sessions per discipline</div>
+                <div><strong>Strength:</strong> {STRENGTH_OPTIONS.find(s => s.key === responses.strengthTraining)?.label}</div>
+                <div><strong>Training Days:</strong> {TRAINING_FREQUENCY_OPTIONS.find(f => f.key === responses.trainingFrequency)?.label}</div>
+                <div><strong>Weekly Hours:</strong> {responses.weeklyHours} hours per week</div>
+                <div><strong>Long Session Days:</strong> {(responses.longSessionDays || []).join(', ')}</div>
+                <div><strong>Long Session Order:</strong> {LONG_SESSION_ORDER_OPTIONS.find(o => o.key === responses.longSessionOrder)?.label}</div>
+              </div>
             </div>
-            <div className="mt-6">
-              <button
-                onClick={() => {
-                  console.log('🚀 Generate button clicked!');
-                  console.log('📊 Current responses:', responses);
-                  console.log('📊 Current baselines:', baselines);
-                  generatePlan();
-                }}
-                disabled={generatingPlan}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
-              >
-                {generatingPlan ? 'Generating Plan...' : 'Generate Training Plan'}
-              </button>
-            </div>
+            
+            <button
+              onClick={generatePlan}
+              disabled={generatingPlan}
+              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 disabled:opacity-50"
+            >
+              {generatingPlan ? 'Generating Plan...' : 'Generate Training Plan'}
+            </button>
           </div>
         );
 
-              case 7:
-          // Plan display
+      case 7:
+        // Plan display
         console.log('🔍 Step 7 - generatedPlan:', generatedPlan);
         return (
           <div>
@@ -1221,10 +985,16 @@ export default function AlgorithmPlanBuilder() {
                   <div className="space-y-6">
                     <h3 className="text-lg font-medium">{getPlanTitle()}</h3>
                     
+                    {/* Plan overview */}
+                    <div className="mb-6">
+                      <h4 className="text-base font-medium">12-Week Training Plan • {generatedPlan.workouts.length} sessions</h4>
+                      <p className="text-sm text-gray-600">Progressive phases: Base → Build → Peak → Taper</p>
+                    </div>
+                    
                     {/* Week tabs */}
                     <div className="border-b border-gray-200">
                       <div className="flex space-x-8 overflow-x-auto">
-                        {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 7)) }, (_, weekIndex) => {
+                        {Array.from({ length: 12 }, (_, weekIndex) => {
                           const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
                           return (
                             <button
@@ -1244,15 +1014,44 @@ export default function AlgorithmPlanBuilder() {
                     </div>
                     
                     {/* Week content */}
-                    {Array.from({ length: Math.min(12, Math.ceil(generatedPlan.workouts.length / 7)) }, (_, weekIndex) => {
-                      const weekWorkouts = generatedPlan.workouts.slice(weekIndex * 7, (weekIndex + 1) * 7);
+                    {Array.from({ length: 12 }, (_, weekIndex) => {
+                      // FIXED: Properly slice workouts for each week
+                      // The algorithm generates 12 weeks with varying sessions per week
+                      // We need to find workouts that belong to this specific week
+                      const weekWorkouts = generatedPlan.workouts.filter((workout: any) => {
+                        const dayWithWeek = workout.day || '';
+                        // Extract week number from day string like "Monday (Week 1)"
+                        const weekMatch = dayWithWeek.match(/Week (\d+)/);
+                        if (weekMatch) {
+                          return parseInt(weekMatch[1]) === weekIndex + 1;
+                        }
+                        // Fallback: if no week info, use old slicing (shouldn't happen with new algorithm)
+                        return false;
+                      });
+                      
+                            // Debug logging for all weeks
+      console.log(`🔍 DEBUG - Week ${weekIndex + 1} filtering:`);
+      console.log(`  Looking for workouts with "Week ${weekIndex + 1}"`);
+      console.log(`  Found ${weekWorkouts.length} workouts for Week ${weekIndex + 1}`);
+      
+      if (weekIndex < 3) { // Show first 3 weeks for debugging
+        weekWorkouts.forEach((w, i) => {
+          console.log(`    ${i + 1}. ${w.day} - ${w.discipline} ${w.type} (${w.duration}min)`);
+          if (w.discipline === 'strength') {
+            console.log(`       💪 Strength details: ${w.detailedWorkout ? 'EXISTS' : 'MISSING'}`);
+            if (w.detailedWorkout) {
+              console.log(`       💪 Content: ${w.detailedWorkout.substring(0, 100)}...`);
+            }
+          }
+        });
+      }
+                      
                       const phase = weekIndex < 5 ? 'Base' : weekIndex < 9 ? 'Build' : weekIndex < 10 ? 'Peak' : 'Taper';
-                      const phaseColor = weekIndex < 5 ? 'bg-blue-100' : weekIndex < 9 ? 'bg-green-100' : weekIndex < 10 ? 'bg-yellow-100' : 'bg-purple-100';
                       
                       return (
                         <div key={weekIndex} className={currentWeek === weekIndex ? 'block' : 'hidden'}>
-                          <div className={`p-3 ${phaseColor} rounded-lg mb-4`}>
-                            <h4 className="font-semibold">Week {weekIndex + 1} - {phase} Phase</h4>
+                          <div className="mb-6">
+                            <h4 className="text-base font-medium">Week {weekIndex + 1} - {phase} Phase</h4>
                             <p className="text-sm text-gray-600">
                               {weekWorkouts.length} sessions • {Math.round(weekWorkouts.reduce((sum, w) => sum + (w.duration || 0), 0) / 60)} hours
                             </p>
@@ -1262,9 +1061,10 @@ export default function AlgorithmPlanBuilder() {
                               // Group workouts by day and split brick workouts
                               const workoutsByDay: { [key: string]: any[] } = {};
                               weekWorkouts.forEach((workout: any) => {
-                                const day = workout.day || workout.date || 'Unknown';
-                                if (!workoutsByDay[day]) {
-                                  workoutsByDay[day] = [];
+                                // Extract just the day name (without week number) for grouping
+                                const dayName = workout.day ? workout.day.split(' (Week')[0] : 'Unknown';
+                                if (!workoutsByDay[dayName]) {
+                                  workoutsByDay[dayName] = [];
                                 }
                                 
                                 // Split brick workouts into separate bike and run components
@@ -1274,7 +1074,7 @@ export default function AlgorithmPlanBuilder() {
                                   const runDuration = totalDuration - bikeDuration;
                                   
                                   // Add bike component
-                                  workoutsByDay[day].push({
+                                  workoutsByDay[dayName].push({
                                     ...workout,
                                     discipline: 'bike',
                                     duration: bikeDuration,
@@ -1286,7 +1086,7 @@ export default function AlgorithmPlanBuilder() {
                                   });
                                   
                                   // Add run component
-                                  workoutsByDay[day].push({
+                                  workoutsByDay[dayName].push({
                                     ...workout,
                                     discipline: 'run',
                                     duration: runDuration,
@@ -1297,19 +1097,21 @@ export default function AlgorithmPlanBuilder() {
                                       'Run portion of brick workout'
                                   });
                                 } else {
-                                  workoutsByDay[day].push(workout);
+                                  workoutsByDay[dayName].push(workout);
                                 }
                               });
 
                               return Object.entries(workoutsByDay).map(([day, workouts], dayIndex) => {
                                 const totalDuration = workouts.reduce((sum, w) => sum + (w.duration || 0), 0);
 
+
+
                                 return (
-                                  <div key={day} className="border border-gray-200 rounded-lg">
-                                    {/* Day header with total duration */}
-                                    <div className="flex justify-between items-center p-3 bg-gray-50 border-b border-gray-200">
-                                      <span className="text-sm font-medium">{day}</span>
-                                      <span className="text-sm text-gray-500">{totalDuration}min total</span>
+                                  <div key={day} className="mb-6">
+                                    {/* Day header */}
+                                    <div className="mb-3">
+                                      <h5 className="text-sm font-medium">{day}</h5>
+                                      <p className="text-xs text-gray-500">{totalDuration}min total</p>
                                     </div>
                                     
                                     {/* Multiple workouts for this day */}
@@ -1317,23 +1119,23 @@ export default function AlgorithmPlanBuilder() {
                                       <WorkoutTabs workouts={workouts} />
                                     ) : (
                                       /* Single workout for this day */
-                                      <div className="p-3">
+                                      <div className="mb-4">
                                         {workouts.map((workout, index) => (
-                                          <div key={index}>
+                                          <div key={index} className="mb-3">
                                             <div className="flex items-center gap-2 mb-2">
-                                              <span className="text-xs px-2 py-1 bg-gray-100 rounded">{workout.discipline}</span>
+                                              <span className="text-xs">{workout.discipline}</span>
                                               {workout.type && workout.type !== workout.discipline && (
-                                                <span className="text-xs px-2 py-1 bg-blue-100 rounded">{workout.type}</span>
+                                                <span className="text-xs text-gray-500">{workout.type}</span>
                                               )}
                                             </div>
                                             {workout.detailedWorkout ? (
                                               <div>
-                                                <p className="text-sm font-medium text-gray-800 mb-1">Workout:</p>
-                                                <pre className="text-xs text-gray-700 whitespace-pre-wrap bg-gray-50 p-2 rounded border">{workout.detailedWorkout}</pre>
+                                                <p className="text-sm font-medium mb-1">Workout:</p>
+                                                <pre className="text-xs text-gray-700 whitespace-pre-wrap">{workout.detailedWorkout}</pre>
                                               </div>
                                             ) : (
                                               <div>
-                                                <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
+                                                <p className="text-sm text-gray-600">{workout.description}</p>
                                               </div>
                                             )}
                                             {workout.intensity && (
@@ -1358,9 +1160,9 @@ export default function AlgorithmPlanBuilder() {
                       );
                     })}
                     
-                    <div className="text-center text-gray-500 p-4 bg-gray-50 rounded-lg">
-                      <p className="font-medium">Progression Overview</p>
-                      <p className="text-sm">Base (Weeks 1-5): Build aerobic foundation • Build (Weeks 6-9): Increase volume & intensity • Peak (Week 10): High intensity • Taper (Weeks 11-12): Reduce volume, maintain intensity</p>
+                    <div className="mt-8">
+                      <h4 className="text-base font-medium mb-2">Progression Overview</h4>
+                      <p className="text-sm text-gray-600">Base (Weeks 1-5): Build aerobic foundation • Build (Weeks 6-9): Increase volume & intensity • Peak (Week 10): High intensity • Taper (Weeks 11-12): Reduce volume, maintain intensity</p>
                     </div>
                   </div>
                 )}
@@ -1374,7 +1176,7 @@ export default function AlgorithmPlanBuilder() {
         );
 
       default:
-        return <div>Step not implemented</div>;
+        return <div>Invalid step</div>;
     }
   };
 
@@ -1427,20 +1229,6 @@ export default function AlgorithmPlanBuilder() {
         'cowboy_compound': 'with Cowboy Compound'
       };
       title += ` ${strengthNames[responses.strengthTraining] || ''}`;
-    }
-    
-    // Add discipline focus
-    if (responses.disciplineFocus && responses.disciplineFocus !== 'none') {
-      const focusNames = {
-        'bike': 'Bike Focus',
-        'run': 'Run Focus', 
-        'swim': 'Swim Focus',
-        'bike_run_speed': 'Bike+Run Speed Focus'
-      };
-      const focusName = focusNames[responses.disciplineFocus];
-      if (focusName) {
-        title += ` (${focusName})`;
-      }
     }
     
     return `${title} Plan (12-Week Progression)`;

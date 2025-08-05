@@ -50,10 +50,11 @@ performanceNumbers: {
   tenK?: string;
   halfMarathon?: string;
   marathon?: string;
-  // Strength
-  squat?: number;
-  deadlift?: number;
-  bench?: number;
+      // Strength
+    squat?: number;
+    deadlift?: number;
+    bench?: number;
+    overheadPress1RM?: number;
 };
 injuryHistory: string;
 injuryRegions: string[];
@@ -108,6 +109,11 @@ const [garminAccessToken, setGarminAccessToken] = useState<string | null>(null);
 useEffect(() => {
   loadBaselines();
 }, []);
+
+// Debug disciplines
+useEffect(() => {
+  console.log('🔍 Current disciplines:', data.disciplines);
+}, [data.disciplines]);
 
 // NEW: Check for existing Strava token
 useEffect(() => {
@@ -592,12 +598,17 @@ const bodyRegionOptions = [
 ];
 
 const toggleDiscipline = (disciplineId: string) => {
-  setData(prev => ({
-    ...prev,
-    disciplines: prev.disciplines.includes(disciplineId)
+  console.log('🔍 Toggling discipline:', disciplineId);
+  setData(prev => {
+    const newDisciplines = prev.disciplines.includes(disciplineId)
       ? prev.disciplines.filter(d => d !== disciplineId)
-      : [...prev.disciplines, disciplineId]
-  }));
+      : [...prev.disciplines, disciplineId];
+    console.log('🔍 New disciplines array:', newDisciplines);
+    return {
+      ...prev,
+      disciplines: newDisciplines
+    };
+  });
 };
 
 const toggleEquipment = (disciplineId: string, option: string) => {
@@ -656,6 +667,7 @@ const getPerformanceNumbers = (disciplineId: string) => {
       if (data.performanceNumbers?.squat) numbers.push(`Squat: ${data.performanceNumbers.squat}lbs`);
       if (data.performanceNumbers?.deadlift) numbers.push(`Deadlift: ${data.performanceNumbers.deadlift}lbs`);
       if (data.performanceNumbers?.bench) numbers.push(`Bench: ${data.performanceNumbers.bench}lbs`);
+      if (data.performanceNumbers?.overheadPress1RM) numbers.push(`Overhead Press: ${data.performanceNumbers.overheadPress1RM}lbs`);
       break;
   }
   
@@ -1295,6 +1307,22 @@ return (
                                           performanceNumbers: {
                                             ...prev.performanceNumbers,
                                             bench: parseInt(e.target.value) || undefined
+                                          }
+                                        }))}
+                                        placeholder="Enter your 1RM"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Overhead Press 1RM (lbs)</label>
+                                      <input
+                                        type="number"
+                                        value={data.performanceNumbers?.overheadPress1RM || ''}
+                                        onChange={(e) => setData(prev => ({
+                                          ...prev,
+                                          performanceNumbers: {
+                                            ...prev.performanceNumbers,
+                                            overheadPress1RM: parseInt(e.target.value) || undefined
                                           }
                                         }))}
                                         placeholder="Enter your 1RM"

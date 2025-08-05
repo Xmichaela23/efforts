@@ -90,6 +90,7 @@ interface BaselineData {
     squat?: number;
     deadlift?: number;
     bench?: number;
+    overheadPress1RM?: number;
   };
   injuryHistory: string;
   injuryRegions: string[];
@@ -264,8 +265,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadUserBaselines = async (): Promise<BaselineData | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      console.log('🔍 User auth check:', user ? `User ID: ${user.id}` : 'No user found');
       if (!user) return null;
       const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+      console.log('🔍 Database query result:', { data: !!data, error: error?.message });
       if (error && error.code !== 'PGRST116') throw error;
       if (!data) return null;
       
@@ -287,7 +290,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       console.log('🔍 Database data loaded:', data);
       console.log('🔍 current_fitness from database:', data.current_fitness);
+      console.log('🔍 performance_numbers from database:', data.performance_numbers);
+      console.log('🔍 age from database:', data.age);
+      console.log('🔍 birthday from database:', data.birthday);
       
+      // Calculate age from birthday if age is 0 or missing
+      let calculatedAge = data.age || 0;
+      console.log('🔍 Original age from DB:', data.age);
+      console.log('🔍 Formatted birthday:', formattedBirthday);
+      
+      if ((!data.age || data.age === 0) && formattedBirthday) {
+        const birthDate = new Date(formattedBirthday);
+        const today = new Date();
+        calculatedAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+          calculatedAge--;
+        }
+        console.log('🔍 Calculated age from birthday:', calculatedAge);
+      }
+      
+      console.log('🔍 Final age being returned:', calculatedAge);
+
       return {
         // Enhanced user details
         birthday: formattedBirthday,
@@ -301,7 +325,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         training_status: data.training_status,
         benchmark_recency: data.benchmark_recency,
         // Existing fields
-        age: data.age || 0,
+        age: calculatedAge,
         disciplines: data.disciplines || [],
         currentFitness: data.current_fitness,
         disciplineFitness: data.discipline_fitness || {},

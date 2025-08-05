@@ -1,12 +1,12 @@
 import React from 'react';
-import AlgorithmPlanBuilder from './AlgorithmPlanBuilder';
+import SimplePlanBuilder from './SimplePlanBuilder';
 
 export default function PlanBuilder() {
   console.log('🎯 PlanBuilder component rendering');
 
   return (
     <div className="w-full">
-      <AlgorithmPlanBuilder />
+      <SimplePlanBuilder />
     </div>
   );
 }
