@@ -405,21 +405,29 @@ export default function SimplePlanBuilder() {
         </div>
 
         <div>
-          {/* Week Navigation */}
-          <div className="flex mb-6">
-            {plan.weeks.map((week, weekIndex) => (
-              <button
-                key={weekIndex}
-                onClick={() => setCurrentWeek(weekIndex)}
-                className={`px-6 py-3 text-sm font-medium transition-colors ${
-                  currentWeek === weekIndex
-                    ? 'text-gray-900'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Week {week.weekNumber}
-              </button>
-            ))}
+          {/* Week Navigation with Swipe Cues */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex">
+              {plan.weeks.map((week, weekIndex) => (
+                <button
+                  key={weekIndex}
+                  onClick={() => setCurrentWeek(weekIndex)}
+                  className={`px-6 py-3 text-sm font-medium transition-colors ${
+                    currentWeek === weekIndex
+                      ? 'text-gray-900'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Week {week.weekNumber}
+                </button>
+              ))}
+            </div>
+            <div className="flex items-center space-x-2 text-xs text-gray-400">
+              <span>Swipe to navigate</span>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </div>
           </div>
 
           {/* Current Week Content */}
