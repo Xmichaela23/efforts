@@ -256,9 +256,14 @@ export default function SimplePlanBuilder() {
       case 3:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold">How much time can you train?</h2>
+            <div className="mb-4">
+              <h2 className="text-2xl font-semibold">How much time can you train?</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Training for: <span className="font-medium">{answers.distance === 'sprint' ? 'Sprint Triathlon' : '70.3 Triathlon'}</span>
+              </p>
+            </div>
             <div className="space-y-4">
-              {trainingService.getSprintTimeOptions().map(option => (
+              {trainingService.getTimeOptions(answers.distance).map(option => (
                 <div 
                   key={option.key}
                   className={`cursor-pointer hover:bg-gray-50 ${

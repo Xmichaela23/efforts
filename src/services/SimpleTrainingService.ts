@@ -2190,6 +2190,22 @@ Run (25min):
       { key: 'serious', label: '5-7 hours/week (serious)', description: 'Competitive • Total 6.5-10.5 hours with strength • Cowboy options require high commitment' }
     ];
   }
+
+  getSeventy3TimeOptions() {
+    return [
+      { key: 'minimum', label: '8-10 hours/week (minimum)', description: 'Basic completion training • Total 9-12 hours with strength • Consider Traditional or None for strength' },
+      { key: 'moderate', label: '10-12 hours/week (moderate)', description: 'Balanced training and improvement • Total 11-14 hours with strength • All strength options manageable' },
+      { key: 'serious', label: '12-15 hours/week (serious)', description: 'Competitive • Total 13-17 hours with strength • Cowboy options require high commitment' },
+      { key: 'hardcore', label: '15+ hours/week (hardcore)', description: 'Elite performance • Total 16+ hours with strength • Maximum training load' }
+    ];
+  }
+
+  getTimeOptions(distance: string) {
+    if (distance === 'seventy3') {
+      return this.getSeventy3TimeOptions();
+    }
+    return this.getSprintTimeOptions();
+  }
   
   getSprintStrengthOptions() {
     return [

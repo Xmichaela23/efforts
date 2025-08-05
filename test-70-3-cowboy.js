@@ -1,5 +1,5 @@
 // Test 70.3 Cowboy Plan Generation
-const { SimpleTrainingService } = require('./src/services/SimpleTrainingService.ts');
+import { SimpleTrainingService } from './src/services/SimpleTrainingService.ts';
 
 async function test70_3CowboyPlan() {
   console.log('🧪 Testing 70.3 Cowboy Plan Generation...');
