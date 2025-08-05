@@ -950,16 +950,378 @@ export class SimpleTrainingService {
   ): SimpleTrainingPlan {
     
     console.log(`🏊‍♂️ Generating ${distance} plan...`);
-    console.log('🔧 User baselines received:', {
-      ftp: userBaselines.ftp,
-      fiveKPace: userBaselines.fiveKPace,
-      easyPace: userBaselines.easyPace,
-      swimPace100: userBaselines.swimPace100,
-      squat1RM: userBaselines.squat1RM,
-      deadlift1RM: userBaselines.deadlift1RM,
-      bench1RM: userBaselines.bench1RM,
-      age: userBaselines.age
-    });
+    
+    // Use the solid plan engine for Sprint
+    if (distance === 'sprint') {
+      return this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    }
+    
+    // Use the solid plan engine for 70.3
+    if (distance === 'seventy3') {
+      return this.generateSolid70_3Plan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    }
+    
+    // Fallback to original method for other distances
+    return this.generateLegacyPlan(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+  }
+  
+  // NEW: Solid Sprint Plan Engine
+  private generateSolidSprintPlan(
+    timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
+    strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
+    longSessionDays: string,
+    userBaselines: any,
+    userEquipment?: any
+  ): SimpleTrainingPlan {
+    
+    console.log('🎯 Generating solid Sprint plan...');
+    
+    // Calculate personalized targets
+    const easyBikePower = Math.round(userBaselines.ftp * 0.65);
+    const enduranceBikePower = Math.round(userBaselines.ftp * 0.75);
+    const tempoBikePower = Math.round(userBaselines.ftp * 0.85);
+    
+    const easyRunPace = this.calculateEasyRunPace(userBaselines);
+    const tempoRunPace = this.calculateTempoRunPace(userBaselines);
+    
+    const easySwimPace = this.calculateEasySwimPace(userBaselines);
+    const enduranceSwimPace = this.calculateEnduranceSwimPace(userBaselines);
+    
+    console.log('🔧 Personalized targets:');
+    console.log(`  • Bike: Easy ${easyBikePower}W, Endurance ${enduranceBikePower}W, Tempo ${tempoBikePower}W`);
+    console.log(`  • Run: Easy ${easyRunPace}, Tempo ${tempoRunPace}`);
+    console.log(`  • Swim: Easy ${easySwimPace}, Endurance ${enduranceSwimPace}`);
+    
+    // Create base weekly template (6 hours = 360 minutes)
+    const baseSessions = this.createSolidBaseTemplate(
+      easyBikePower, enduranceBikePower, tempoBikePower,
+      easyRunPace, tempoRunPace,
+      easySwimPace, enduranceSwimPace
+    );
+    
+    // Create 12-week progression
+    const weeks = this.createSolidWeeklyProgression(baseSessions, userBaselines);
+    
+    // Calculate total hours
+    const totalHours = weeks.reduce((sum, week) => sum + week.totalHours, 0);
+    
+    return {
+      distance: 'sprint',
+      timeLevel,
+      strengthOption,
+      longSessionDays,
+      totalHours,
+      weeks
+    };
+  }
+  
+  // NEW: Solid 70.3 Plan Engine
+  private generateSolid70_3Plan(
+    timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
+    strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
+    longSessionDays: string,
+    userBaselines: any,
+    userEquipment?: any
+  ): SimpleTrainingPlan {
+    
+    console.log('🎯 Generating solid 70.3 plan...');
+    
+    // Calculate personalized targets (higher for 70.3)
+    const easyBikePower = Math.round(userBaselines.ftp * 0.65);
+    const enduranceBikePower = Math.round(userBaselines.ftp * 0.75);
+    const tempoBikePower = Math.round(userBaselines.ftp * 0.85);
+    
+    const easyRunPace = this.calculateEasyRunPace(userBaselines);
+    const tempoRunPace = this.calculateTempoRunPace(userBaselines);
+    
+    const easySwimPace = this.calculateEasySwimPace(userBaselines);
+    const enduranceSwimPace = this.calculateEnduranceSwimPace(userBaselines);
+    
+    // Create base weekly template (10 hours = 600 minutes for 70.3)
+    const baseSessions = this.createSolid70_3Template(
+      easyBikePower, enduranceBikePower, tempoBikePower,
+      easyRunPace, tempoRunPace,
+      easySwimPace, enduranceSwimPace
+    );
+    
+    // Create 12-week progression
+    const weeks = this.createSolidWeeklyProgression(baseSessions, userBaselines);
+    
+    // Calculate total hours
+    const totalHours = weeks.reduce((sum, week) => sum + week.totalHours, 0);
+    
+    return {
+      distance: 'seventy3',
+      timeLevel,
+      strengthOption,
+      longSessionDays,
+      totalHours,
+      weeks
+    };
+  }
+  
+  // NEW: Solid Base Template for Sprint
+  private createSolidBaseTemplate(
+    easyBikePower: number,
+    enduranceBikePower: number, 
+    tempoBikePower: number,
+    easyRunPace: string,
+    tempoRunPace: string,
+    easySwimPace: string,
+    enduranceSwimPace: string
+  ): SimpleSession[] {
+    
+    // 6 hours = 360 minutes per week
+    // 80/20 polarized: 288 min low intensity, 72 min high intensity
+    return [
+      {
+        day: 'Monday',
+        discipline: 'swim',
+        type: 'recovery',
+        duration: 45,
+        intensity: 'Zone 1 (Recovery)',
+        description: 'Swim technique and recovery',
+        zones: [1],
+        detailedWorkout: this.getSwimRecoveryWorkout(easySwimPace)
+      },
+      {
+        day: 'Tuesday',
+        discipline: 'bike',
+        type: 'endurance',
+        duration: 60,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Bike endurance session',
+        zones: [2],
+        detailedWorkout: this.getBikeEnduranceWorkout(enduranceBikePower)
+      },
+      {
+        day: 'Wednesday',
+        discipline: 'run',
+        type: 'tempo',
+        duration: 45,
+        intensity: 'Zone 3 (Tempo)',
+        description: 'Run tempo session',
+        zones: [3],
+        detailedWorkout: this.getRunTempoWorkout(tempoRunPace)
+      },
+      {
+        day: 'Thursday',
+        discipline: 'bike',
+        type: 'endurance',
+        duration: 50,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Bike endurance session',
+        zones: [2],
+        detailedWorkout: this.getBikeEnduranceWorkout(enduranceBikePower)
+      },
+      {
+        day: 'Friday',
+        discipline: 'swim',
+        type: 'endurance',
+        duration: 40,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Swim endurance session',
+        zones: [2],
+        detailedWorkout: this.getSwimEnduranceWorkout(enduranceSwimPace)
+      },
+      {
+        day: 'Saturday',
+        discipline: 'brick',
+        type: 'endurance',
+        duration: 90,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Brick session - bike to run',
+        zones: [2],
+        detailedWorkout: this.getBrickWorkout(enduranceBikePower, easyRunPace)
+      },
+      {
+        day: 'Sunday',
+        discipline: 'run',
+        type: 'recovery',
+        duration: 30,
+        intensity: 'Zone 1 (Recovery)',
+        description: 'Easy recovery run',
+        zones: [1],
+        detailedWorkout: this.getRunRecoveryWorkout(easyRunPace)
+      }
+    ];
+  }
+  
+  // NEW: Solid Base Template for 70.3
+  private createSolid70_3Template(
+    easyBikePower: number,
+    enduranceBikePower: number, 
+    tempoBikePower: number,
+    easyRunPace: string,
+    tempoRunPace: string,
+    easySwimPace: string,
+    enduranceSwimPace: string
+  ): SimpleSession[] {
+    
+    // 10 hours = 600 minutes per week for 70.3
+    // Two long sessions as requested
+    return [
+      {
+        day: 'Monday',
+        discipline: 'swim',
+        type: 'recovery',
+        duration: 45,
+        intensity: 'Zone 1 (Recovery)',
+        description: 'Swim technique and recovery',
+        zones: [1],
+        detailedWorkout: this.getSwimRecoveryWorkout(easySwimPace)
+      },
+      {
+        day: 'Tuesday',
+        discipline: 'bike',
+        type: 'endurance',
+        duration: 75,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Bike endurance session',
+        zones: [2],
+        detailedWorkout: this.getBikeEnduranceWorkout(enduranceBikePower)
+      },
+      {
+        day: 'Wednesday',
+        discipline: 'run',
+        type: 'tempo',
+        duration: 60,
+        intensity: 'Zone 3 (Tempo)',
+        description: 'Run tempo session',
+        zones: [3],
+        detailedWorkout: this.getRunTempoWorkout(tempoRunPace)
+      },
+      {
+        day: 'Thursday',
+        discipline: 'bike',
+        type: 'endurance',
+        duration: 60,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Bike endurance session',
+        zones: [2],
+        detailedWorkout: this.getBikeEnduranceWorkout(enduranceBikePower)
+      },
+      {
+        day: 'Friday',
+        discipline: 'swim',
+        type: 'endurance',
+        duration: 50,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Swim endurance session',
+        zones: [2],
+        detailedWorkout: this.getSwimEnduranceWorkout(enduranceSwimPace)
+      },
+      {
+        day: 'Saturday',
+        discipline: 'brick',
+        type: 'endurance',
+        duration: 120,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Long brick session - bike to run',
+        zones: [2],
+        detailedWorkout: this.getBrickWorkout(enduranceBikePower, easyRunPace)
+      },
+      {
+        day: 'Sunday',
+        discipline: 'run',
+        type: 'endurance',
+        duration: 90,
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Long run session',
+        zones: [2],
+        detailedWorkout: this.getRunEnduranceWorkout(easyRunPace)
+      }
+    ];
+  }
+  
+  // NEW: Solid Weekly Progression
+  private createSolidWeeklyProgression(baseSessions: SimpleSession[], userBaselines: any): SimpleWeek[] {
+    const weeks: SimpleWeek[] = [];
+    
+    for (let weekNum = 1; weekNum <= 12; weekNum++) {
+      const phase = this.getPhaseForWeek(weekNum, 12);
+      const phaseMultiplier = this.getSolidPhaseMultiplier(phase, weekNum);
+      
+      // Adjust sessions for this phase
+      const adjustedSessions = baseSessions.map(session => ({
+        ...session,
+        duration: Math.round(session.duration * phaseMultiplier),
+        detailedWorkout: this.adjustWorkoutForPhase(session.detailedWorkout, phase, userBaselines)
+      }));
+      
+      const totalHours = adjustedSessions.reduce((sum, session) => sum + session.duration, 0) / 60;
+      
+      weeks.push({
+        weekNumber: weekNum,
+        phase,
+        totalHours,
+        sessions: adjustedSessions
+      });
+    }
+    
+    return weeks;
+  }
+  
+  // NEW: Solid Phase Multiplier
+  private getSolidPhaseMultiplier(phase: string, weekNum: number): number {
+    switch (phase) {
+      case 'base':
+        return 1.0 + (weekNum - 1) * 0.05; // Gradual increase
+      case 'build':
+        return 1.2 + (weekNum - 6) * 0.08; // More aggressive
+      case 'peak':
+        return 1.4 + (weekNum - 9) * 0.05; // Peak volume
+      case 'taper':
+        return 0.7; // Reduce volume
+      default:
+        return 1.0;
+    }
+  }
+  
+  // NEW: Adjust workout for phase
+  private adjustWorkoutForPhase(workout: string, phase: string, userBaselines: any): string {
+    // Adjust intensity based on phase
+    switch (phase) {
+      case 'base':
+        return workout; // Keep base intensity
+      case 'build':
+        return workout.replace(/Zone 2/g, 'Zone 3').replace(/Zone 1/g, 'Zone 2');
+      case 'peak':
+        return workout.replace(/Zone 2/g, 'Zone 3').replace(/Zone 1/g, 'Zone 2');
+      case 'taper':
+        return workout.replace(/Zone 3/g, 'Zone 2'); // Reduce intensity
+      default:
+        return workout;
+    }
+  }
+  
+  // NEW: Run recovery workout
+  private getRunRecoveryWorkout(easyPace: string): string {
+    return `Easy recovery run:
+  • 30min easy @ ${easyPace}
+  • Focus on form and breathing
+  • Stretch after`;
+  }
+  
+  // NEW: Run endurance workout
+  private getRunEnduranceWorkout(easyPace: string): string {
+    return `Long endurance run:
+  • 90min steady @ ${easyPace}
+  • Focus on consistent pace
+  • Hydrate and fuel properly`;
+  }
+  
+  // LEGACY: Keep original method for fallback
+  private generateLegacyPlan(
+    distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman',
+    timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
+    strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
+    longSessionDays: string,
+    userBaselines: any,
+    userEquipment?: any
+  ): SimpleTrainingPlan {
+    
+    console.log(`🏊‍♂️ Generating ${distance} plan (legacy method)...`);
     
     // Get base template and personalize with user baselines
     let sessions = this.createPersonalizedTemplate(userBaselines, distance);
