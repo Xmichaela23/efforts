@@ -396,17 +396,17 @@ export default function SimplePlanBuilder() {
           </div>
         </div>
 
-        <div>
+        <div className="bg-white rounded-xl shadow-lg p-8">
           {/* Week Navigation */}
-          <div className="flex border-b border-gray-200 mb-6">
+          <div className="flex mb-6 bg-white rounded-lg shadow-sm overflow-hidden">
             {plan.weeks.map((week, weekIndex) => (
               <button
                 key={weekIndex}
                 onClick={() => setCurrentWeek(weekIndex)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 ${
+                className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
                   currentWeek === weekIndex
-                    ? 'border-gray-900 text-gray-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 Week {week.weekNumber}
@@ -417,14 +417,16 @@ export default function SimplePlanBuilder() {
           {/* Current Week Content */}
           {plan.weeks[currentWeek] && (
             <div>
-              <h2 className="text-xl font-semibold mb-2">
-                Week {plan.weeks[currentWeek].weekNumber} - {plan.weeks[currentWeek].phase.charAt(0).toUpperCase() + plan.weeks[currentWeek].phase.slice(1)} Phase
-              </h2>
-              <p className="text-sm text-gray-600 mb-4">
-                {plan.weeks[currentWeek].sessions.length} sessions • {plan.weeks[currentWeek].totalHours.toFixed(1)} hours
-              </p>
+              <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+                <h2 className="text-2xl font-bold mb-2">
+                  Week {plan.weeks[currentWeek].weekNumber} - {plan.weeks[currentWeek].phase.charAt(0).toUpperCase() + plan.weeks[currentWeek].phase.slice(1)} Phase
+                </h2>
+                <p className="text-lg text-gray-600">
+                  {plan.weeks[currentWeek].sessions.length} sessions • {plan.weeks[currentWeek].totalHours.toFixed(1)} hours
+                </p>
+              </div>
 
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {(() => {
                   // Group sessions by day
                   const sessionsByDay = plan.weeks[currentWeek].sessions.reduce((acc, session) => {
@@ -436,69 +438,75 @@ export default function SimplePlanBuilder() {
                   }, {} as Record<string, any[]>);
 
                   return Object.entries(sessionsByDay).map(([day, sessions], dayIndex) => (
-                    <div key={`${day}-${dayIndex}`} className="border-l-4 border-gray-500 pl-4 py-2">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-lg">{day}</span>
-                          {sessions.length > 1 && (
-                            <span className="px-2 py-1 bg-gray-200 text-xs font-medium rounded">
-                              {sessions.length} SESSIONS
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          {sessions.reduce((total, session) => total + session.duration, 0)}min total
-                        </div>
-                      </div>
-                      
-                      {sessions.length === 1 ? (
-                        // Single session
-                        <div>
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="px-2 py-1 bg-gray-100 text-xs font-medium rounded">
-                              {sessions[0].discipline.toUpperCase()}
-                            </span>
-                            {sessions[0].type && (
-                              <span className="px-2 py-1 bg-gray-200 text-gray-800 text-xs font-medium rounded">
-                                {sessions[0].type}
+                    <div key={`${day}-${dayIndex}`} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                      {/* Day Header */}
+                      <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <span className="font-bold text-xl text-white">{day}</span>
+                            {sessions.length > 1 && (
+                              <span className="px-3 py-1 bg-white/20 text-white text-sm font-medium rounded-full">
+                                {sessions.length} SESSIONS
                               </span>
                             )}
                           </div>
-                          {sessions[0].detailedWorkout && (
-                            <div className="bg-white p-3 rounded border">
-                              <p className="text-sm font-medium mb-2 text-gray-800">Workout Details:</p>
-                              <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
-                            </div>
-                          )}
+                          <div className="text-white/90 font-medium">
+                            {sessions.reduce((total, session) => total + session.duration, 0)}min total
+                          </div>
                         </div>
-                      ) : (
-                        // Multiple sessions - stacked vertically
-                        <div className="space-y-4">
-                          {sessions.map((session, sessionIndex) => (
-                            <div key={sessionIndex} className="border-l-2 border-gray-300 pl-3">
-                              <div className="flex items-center gap-3 mb-2">
-                                <span className="px-2 py-1 bg-gray-100 text-xs font-medium rounded">
-                                  {session.discipline.toUpperCase()}
+                      </div>
+                      
+                      {/* Sessions */}
+                      <div className="p-6">
+                        {sessions.length === 1 ? (
+                          // Single session
+                          <div>
+                            <div className="flex items-center gap-3 mb-4">
+                              <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                                {sessions[0].discipline.toUpperCase()}
+                              </span>
+                              {sessions[0].type && (
+                                <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
+                                  {sessions[0].type}
                                 </span>
-                                {session.type && (
-                                  <span className="px-2 py-1 bg-gray-200 text-gray-800 text-xs font-medium rounded">
-                                    {session.type}
-                                  </span>
-                                )}
-                                <span className="text-sm text-gray-600">
-                                  ({session.duration}min)
-                                </span>
-                              </div>
-                              {session.detailedWorkout && (
-                                <div className="bg-white p-3 rounded border">
-                                  <p className="text-sm font-medium mb-2 text-gray-800">Workout Details:</p>
-                                  <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
-                                </div>
                               )}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                            {sessions[0].detailedWorkout && (
+                              <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
+                                <p className="text-sm font-semibold mb-3 text-gray-800">Workout Details:</p>
+                                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          // Multiple sessions - stacked vertically
+                          <div className="space-y-6">
+                            {sessions.map((session, sessionIndex) => (
+                              <div key={sessionIndex} className="border-b border-gray-200 pb-6 last:border-b-0 last:pb-0">
+                                <div className="flex items-center gap-3 mb-4">
+                                  <span className="px-3 py-1 bg-blue-100 text-blue-800 text-sm font-semibold rounded-full">
+                                    {session.discipline.toUpperCase()}
+                                  </span>
+                                  {session.type && (
+                                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
+                                      {session.type}
+                                    </span>
+                                  )}
+                                  <span className="text-sm text-gray-600 font-medium">
+                                    ({session.duration}min)
+                                  </span>
+                                </div>
+                                {session.detailedWorkout && (
+                                  <div className="bg-gray-50 rounded-lg p-4 border-l-4 border-blue-500">
+                                    <p className="text-sm font-semibold mb-3 text-gray-800">Workout Details:</p>
+                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ));
                 })()}
@@ -511,8 +519,10 @@ export default function SimplePlanBuilder() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto p-6">
-      {renderStep()}
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto p-4">
+        {renderStep()}
+      </div>
     </div>
   );
 } 
