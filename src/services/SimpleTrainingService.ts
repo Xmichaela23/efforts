@@ -1285,40 +1285,40 @@ Run (25min):
     return `Warm-up: 5min dynamic stretching\n\nMain Set:\n• Squats: 3x8 @ ${squat}-${squatRange}lbs (${Math.round(squatMultiplier * 100)}% 1RM) (2min rest)\n• Deadlifts: 3x6 @ ${deadlift}-${deadliftRange}lbs (${Math.round(deadliftMultiplier * 100)}% 1RM) (2min rest)${overheadPressSection}\n• Walking Lunges: 3x10 each leg (1min rest)\n• Box Jumps: 3x5 (1min rest)\n• Planks: 3x30sec\n\nCool-down: 5min stretching`;
   }
 
-  private getCompoundWorkout(userBaselines: any): string {
+  private getCompoundWorkout(userBaselines: any, strengthProgression: number = 0.80): string {
     if (!userBaselines.squat1RM || !userBaselines.deadlift1RM || !userBaselines.bench1RM) {
       throw new Error('Strength baselines required: squat1RM, deadlift1RM, bench1RM');
     }
     
-    // Use our actual coaching data percentages (80% 1RM for Session 1)
-    const squat = Math.round(userBaselines.squat1RM * 0.8 / 5) * 5; // 80% 1RM
-    const squatRange = Math.round(userBaselines.squat1RM * 0.85 / 5) * 5;
-    const deadlift = Math.round(userBaselines.deadlift1RM * 0.8 / 5) * 5; // 80% 1RM
-    const deadliftRange = Math.round(userBaselines.deadlift1RM * 0.85 / 5) * 5;
-    const bench = Math.round(userBaselines.bench1RM * 0.75 / 5) * 5; // 75% 1RM
-    const benchRange = Math.round(userBaselines.bench1RM * 0.8 / 5) * 5;
-    const ohp = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * 0.75 / 5) * 5 : 0; // 75% 1RM
-    const ohpRange = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * 0.8 / 5) * 5 : 0;
+    // Use progressive overload based on phase
+    const squat = Math.round(userBaselines.squat1RM * strengthProgression / 5) * 5;
+    const squatRange = Math.round(userBaselines.squat1RM * (strengthProgression + 0.05) / 5) * 5;
+    const deadlift = Math.round(userBaselines.deadlift1RM * strengthProgression / 5) * 5;
+    const deadliftRange = Math.round(userBaselines.deadlift1RM * (strengthProgression + 0.05) / 5) * 5;
+    const bench = Math.round(userBaselines.bench1RM * (strengthProgression - 0.05) / 5) * 5; // Bench slightly lighter
+    const benchRange = Math.round(userBaselines.bench1RM * strengthProgression / 5) * 5;
+    const ohp = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * (strengthProgression - 0.05) / 5) * 5 : 0;
+    const ohpRange = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * strengthProgression / 5) * 5 : 0;
     
     const overheadPressSection = userBaselines.overheadPress1RM ? `\n• Overhead Press: 3x6 @ ${ohp}-${ohpRange}lbs (3-4min rest)` : '';
     
     return `Warm-up: 5min dynamic stretching\n\nMain Set:\n• Squats: 4x5 @ ${squat}-${squatRange}lbs (3-4min rest)\n• Deadlifts: 3x5 @ ${deadlift}-${deadliftRange}lbs (3-4min rest)\n• Bench Press: 3x6 @ ${bench}-${benchRange}lbs (3-4min rest)${overheadPressSection}\n• Pull-ups: 3x6-8 (1min rest)\n\nCool-down: 5min stretching`;
   }
 
-  private getCowboyCompoundWorkout(userBaselines: any, userEquipment?: any): string {
+  private getCowboyCompoundWorkout(userBaselines: any, userEquipment?: any, strengthProgression: number = 0.80): string {
     if (!userBaselines.squat1RM || !userBaselines.deadlift1RM || !userBaselines.bench1RM) {
       throw new Error('Strength baselines required: squat1RM, deadlift1RM, bench1RM');
     }
     
-    // Use our actual coaching data percentages (80% 1RM for Session 1)
-    const squat = Math.round(userBaselines.squat1RM * 0.8 / 5) * 5; // 80% 1RM
-    const squatRange = Math.round(userBaselines.squat1RM * 0.85 / 5) * 5;
-    const deadlift = Math.round(userBaselines.deadlift1RM * 0.8 / 5) * 5; // 80% 1RM
-    const deadliftRange = Math.round(userBaselines.deadlift1RM * 0.85 / 5) * 5;
-    const bench = Math.round(userBaselines.bench1RM * 0.75 / 5) * 5; // 75% 1RM
-    const benchRange = Math.round(userBaselines.bench1RM * 0.8 / 5) * 5;
-    const ohp = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * 0.75 / 5) * 5 : 0; // 75% 1RM
-    const ohpRange = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * 0.8 / 5) * 5 : 0;
+    // Use progressive overload based on phase
+    const squat = Math.round(userBaselines.squat1RM * strengthProgression / 5) * 5;
+    const squatRange = Math.round(userBaselines.squat1RM * (strengthProgression + 0.05) / 5) * 5;
+    const deadlift = Math.round(userBaselines.deadlift1RM * strengthProgression / 5) * 5;
+    const deadliftRange = Math.round(userBaselines.deadlift1RM * (strengthProgression + 0.05) / 5) * 5;
+    const bench = Math.round(userBaselines.bench1RM * (strengthProgression - 0.05) / 5) * 5; // Bench slightly lighter
+    const benchRange = Math.round(userBaselines.bench1RM * strengthProgression / 5) * 5;
+    const ohp = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * (strengthProgression - 0.05) / 5) * 5 : 0;
+    const ohpRange = userBaselines.overheadPress1RM ? Math.round(userBaselines.overheadPress1RM * strengthProgression / 5) * 5 : 0;
     
     const overheadPressSection = userBaselines.overheadPress1RM ? `\n• Overhead Press: 3x6 @ ${ohp}-${ohpRange}lbs (3-4min rest)` : '';
     
@@ -1362,7 +1362,7 @@ Run (25min):
         description: 'Lower body strength session',
         zones: [2],
         strengthType: 'traditional',
-        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base')
+        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base', 0.70) // Base phase 70% 1RM
       });
       strengthSessions.push({
         day: 'TBD', // Will be set by reverse engineering logic
@@ -1373,7 +1373,7 @@ Run (25min):
         description: 'Upper body strength session',
         zones: [2],
         strengthType: 'traditional',
-        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base')
+        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base', 0.70) // Base phase 70% 1RM
       });
     } else if (strengthType === 'compound') {
       // 2 compound strength sessions with variety
@@ -1411,7 +1411,7 @@ Run (25min):
           description: 'Traditional strength session',
           zones: [2],
           strengthType: 'traditional',
-          detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base')
+          detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base', 0.70) // Base phase 70% 1RM
         });
       }
       // Add 3rd upper body session
@@ -1676,6 +1676,28 @@ Run (25min):
     
     console.log(`📈 Week ${weekNum} (${phase}): Multiplier = ${phaseMultiplier.toFixed(2)}`);
     
+    // For taper phase, reduce session count by eliminating certain sessions
+    if (phase === 'taper') {
+      // Keep only key sessions for taper: brick, tempo run, 1 strength, 1-2 recovery
+      const keySessions = sessions.filter(session => {
+        // Always keep brick (key session)
+        if (session.discipline === 'brick') return true;
+        // Always keep tempo run (maintain intensity)
+        if (session.discipline === 'run' && session.type === 'tempo') return true;
+        // Keep only 1 strength session (first one)
+        if (session.discipline === 'strength') {
+          return sessions.indexOf(session) === sessions.findIndex(s => s.discipline === 'strength');
+        }
+        // Keep 1-2 recovery sessions (swim recovery)
+        if (session.discipline === 'swim' && session.type === 'recovery') return true;
+        // Eliminate other sessions
+        return false;
+      });
+      
+      console.log(`🏃 Taper: Reduced from ${sessions.length} to ${keySessions.length} sessions`);
+      sessions = keySessions;
+    }
+    
     return sessions.map(session => {
       // Scale duration based on phase
       const newDuration = Math.round(session.duration * phaseMultiplier);
@@ -1717,15 +1739,18 @@ Run (25min):
       
       // Apply progressive overload to ALL sessions based on discipline and week
       if (session.discipline === 'strength') {
-        // For strength, apply progressive overload based on week number
+        // For strength, apply proper phase-based progressive overload
+        const weekWithinPhase = this.getWeekWithinPhase(weekNum);
+        const strengthProgression = this.getStrengthProgressionForWeek(phase, weekWithinPhase);
+        
         if (session.strengthType === 'traditional') {
-          // Calculate progressive overload: 70% + (weekNum * 0.5%) = 70%, 70.5%, 71%, 71.5%...
-          const strengthPercentage = 0.70 + (weekNum * 0.005);
-          newWorkout = this.getStrengthWorkout('traditional', userBaselines, undefined, phase, strengthPercentage);
+          newWorkout = this.getStrengthWorkout('traditional', userBaselines, undefined, phase, strengthProgression);
         } else if (session.strengthType === 'compound') {
-          newWorkout = this.getCompoundWorkout(userBaselines);
+          // Apply progression to compound workouts
+          newWorkout = this.getCompoundWorkout(userBaselines, strengthProgression);
         } else if (session.strengthType === 'cowboy_compound') {
-          newWorkout = this.getCowboyCompoundWorkout(userBaselines);
+          // Apply progression to cowboy compound workouts
+          newWorkout = this.getCowboyCompoundWorkout(userBaselines, undefined, strengthProgression);
         } else if (session.strengthType === 'cowboy_endurance') {
           newWorkout = this.getUpperBodyWorkout(userBaselines);
         }
