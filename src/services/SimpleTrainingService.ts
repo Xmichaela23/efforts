@@ -1558,16 +1558,10 @@ Run (25min):
           break;
         }
       }
-      // If no empty day found, place it on the least busy day
+      // If no empty day found, skip this session to avoid conflicts
       if (!availableDay) {
-        const dayCounts = dayOrder.map(day => ({
-          day,
-          count: newSessions.filter(s => s.day === day).length
-        }));
-        const leastBusyDay = dayCounts.reduce((min, current) => 
-          current.count < min.count ? current : min
-        );
-        availableDay = leastBusyDay.day;
+        console.log(`⚠️ Skipping strength session ${i} - no available days`);
+        continue;
       }
       newSessions.push({ ...strengthSessions[i], day: availableDay });
       usedDays.add(availableDay);
