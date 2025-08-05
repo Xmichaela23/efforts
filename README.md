@@ -32,6 +32,8 @@ A comprehensive fitness training application built with React, TypeScript, and S
 5. **Proper Recovery**: Sessions distributed around long day with recovery spacing
 6. **Smart Strength Distribution**: 3-tier placement strategy for Cowboy options
 7. **Complete Workout Generation**: All strength options with evidence-based percentages
+8. **Progressive Overload**: Strength weights properly progress through phases (70%→75%→80%→65% 1RM)
+9. **Proper Taper Phase**: Reduces session count from 8 to 4-6 sessions, eliminates extra strength sessions
 
 ## 🧠 Current Architecture
 
@@ -43,6 +45,8 @@ A comprehensive fitness training application built with React, TypeScript, and S
 - **Personalization**: User baselines drive all targets and weights
 - **Progressive Overload**: 12-week plans with Base → Build → Peak → Taper phases
 - **Smart Distribution**: 3-tier placement strategy for additional strength sessions
+- **Phase-Based Strength**: Weights progress from 70% (base) → 75% (build) → 80% (peak) → 65% (taper) 1RM
+- **Taper Optimization**: Reduces session count and eliminates extra strength sessions for proper recovery
 
 **UI Integration**: `src/components/SimplePlanBuilder.tsx`
 - **4-Step Assessment**: Distance → Strength → Time → Long Session Day
@@ -57,6 +61,7 @@ A comprehensive fitness training application built with React, TypeScript, and S
 - **Strength Percentages**: 80-85% 1RM for compound strength (evidence-based)
 - **Recovery Spacing**: Proper session distribution to prevent overtraining
 - **Progressive Overload**: Systematic volume and intensity increases
+- **Phase-Based Strength Progression**: Weights increase through phases, decrease in taper
 - **Workout Science**: Complete exercise prescriptions with proper sets, reps, and rest
 
 ## 🎨 User Experience

@@ -14,6 +14,8 @@
 - **12-week progressive plans** with proper phase progression
 - **Smart strength session distribution** with 3-tier placement strategy
 - **Complete workout generation** with evidence-based percentages
+- **Progressive overload**: Strength weights progress through phases (70%→75%→80%→65% 1RM)
+- **Proper taper phase**: Reduces session count from 8 to 4-6 sessions, eliminates extra strength sessions
 
 ### ✅ **UI: SimplePlanBuilder**
 - **Clean, minimal interface** (no cards, boxes, frames)
@@ -42,6 +44,8 @@
 - **Evidence-based percentages**: 80-85% 1RM for compound strength
 - **Dumbbell rows** scientifically justified for upper body focus day
 - **Complete exercise prescriptions** with proper sets, reps, rest periods
+- **Progressive overload**: Strength weights now properly progress through phases
+- **Taper optimization**: Session count reduction and strength session elimination for proper recovery
 
 ### ✅ **Smart Distribution Logic**
 - **Priority 1**: Find completely empty day (minimal impact)
