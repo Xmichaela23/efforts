@@ -316,7 +316,7 @@ export default function SimplePlanBuilder() {
 
     
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="w-full">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-3xl font-bold">
@@ -342,7 +342,7 @@ export default function SimplePlanBuilder() {
           </p>
           
           {/* Plan Choices Summary */}
-          <div className="bg-blue-50 p-4 rounded-lg mb-6">
+          <div className="bg-gray-50 p-4 mb-6">
             <h3 className="font-medium mb-2">Your Plan Choices</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
@@ -354,28 +354,20 @@ export default function SimplePlanBuilder() {
               <div>
                 <p className="text-gray-700">
                   <strong>Strength:</strong> {
-                    answers.strengthOption === 'none' ? 'None (no additional time)' :
-                    answers.strengthOption === 'traditional' ? 'Traditional (+1.5 hours)' :
-                    answers.strengthOption === 'compound' ? 'Compound (+2.0 hours)' :
-                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance (+3.0 hours) - Carries, walks, bodyweight' :
-                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound (+3.5 hours) - Heavy deadlifts, presses, 1RM-based' :
+                    answers.strengthOption === 'none' ? 'None' :
+                    answers.strengthOption === 'traditional' ? 'Traditional (+1.5h)' :
+                    answers.strengthOption === 'compound' ? 'Compound (+2.0h)' :
+                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance (+3.0h)' :
+                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound (+3.5h)' :
                     answers.strengthOption
                   }
                 </p>
-                {(answers.strengthOption === 'cowboy_endurance' || answers.strengthOption === 'cowboy_compound') && (
-                  <p className="text-sm text-gray-600 mt-1">
-                    {answers.strengthOption === 'cowboy_endurance' 
-                      ? 'Cowboy Endurance follows traditional endurance strength protocols with an additional upper body focus day for muscular balance and aesthetics.' 
-                      : 'Cowboy Compound focuses on compound lifts for endurance training with an additional upper body focus day for muscular balance and aesthetics.'
-                    } Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.
-                  </p>
-                )}
               </div>
             </div>
           </div>
           
           {/* Training Plan Summary */}
-          <div className="bg-gray-50 p-6 rounded-lg mb-6">
+          <div className="bg-gray-50 p-6 mb-6">
             <h2 className="text-xl font-semibold mb-3">Training Methodology</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
