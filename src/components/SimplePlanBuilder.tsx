@@ -357,11 +357,19 @@ export default function SimplePlanBuilder() {
                     answers.strengthOption === 'none' ? 'None (no additional time)' :
                     answers.strengthOption === 'traditional' ? 'Traditional (+1.5 hours)' :
                     answers.strengthOption === 'compound' ? 'Compound (+2.0 hours)' :
-                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance (+3.0 hours)' :
-                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound (+3.5 hours)' :
+                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance (+3.0 hours) - Carries, walks, bodyweight' :
+                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound (+3.5 hours) - Heavy deadlifts, presses, 1RM-based' :
                     answers.strengthOption
                   }
                 </p>
+                {(answers.strengthOption === 'cowboy_endurance' || answers.strengthOption === 'cowboy_compound') && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    {answers.strengthOption === 'cowboy_endurance' 
+                      ? 'Cowboy Endurance follows traditional endurance strength protocols with an additional day of upper body work for race course aesthetics and physical balance.' 
+                      : 'Cowboy Compound focuses on compound lifts for endurance training and adds an additional day of upper body work for race course aesthetics and physical balance.'
+                    } Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.
+                  </p>
+                )}
               </div>
             </div>
           </div>
