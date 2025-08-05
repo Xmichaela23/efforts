@@ -1475,63 +1475,85 @@ Run (25min):
     const strengthSessions = sessions.filter(s => s.discipline === 'strength');
     
     const newSessions: SimpleSession[] = [];
+    const usedDays = new Set<string>();
     
     // 1. Place brick session on user's chosen day (this is the LONG session)
     if (brickSession) {
       newSessions.push({ ...brickSession, day: longSessionDays });
+      usedDays.add(longSessionDays);
     }
     
     // 2. Place sessions around the long day with proper recovery spacing
     // 3 days before: Recovery swim (easy day)
     if (swimSessions.length > 0) {
       const swimDay = dayOrder[(longDayIndex - 3 + 7) % 7];
-      newSessions.push({ ...swimSessions[0], day: swimDay });
+      if (!usedDays.has(swimDay)) {
+        newSessions.push({ ...swimSessions[0], day: swimDay });
+        usedDays.add(swimDay);
+      }
     }
     
     // 2 days before: Strength session
     if (strengthSessions.length > 0) {
       const strengthDay = dayOrder[(longDayIndex - 2 + 7) % 7];
-      newSessions.push({ ...strengthSessions[0], day: strengthDay });
+      if (!usedDays.has(strengthDay)) {
+        newSessions.push({ ...strengthSessions[0], day: strengthDay });
+        usedDays.add(strengthDay);
+      }
     }
     
     // 1 day before: Easy bike (prep for long day)
     if (bikeSessions.length > 0) {
       const bikeDay = dayOrder[(longDayIndex - 1 + 7) % 7];
-      newSessions.push({ ...bikeSessions[0], day: bikeDay });
+      if (!usedDays.has(bikeDay)) {
+        newSessions.push({ ...bikeSessions[0], day: bikeDay });
+        usedDays.add(bikeDay);
+      }
     }
     
     // 1 day after: Recovery swim (easy day)
     if (swimSessions.length > 1) {
       const swimDay = dayOrder[(longDayIndex + 1) % 7];
-      newSessions.push({ ...swimSessions[1], day: swimDay });
+      if (!usedDays.has(swimDay)) {
+        newSessions.push({ ...swimSessions[1], day: swimDay });
+        usedDays.add(swimDay);
+      }
     }
     
     // 2 days after: Strength session
     if (strengthSessions.length > 1) {
       const strengthDay = dayOrder[(longDayIndex + 2) % 7];
-      newSessions.push({ ...strengthSessions[1], day: strengthDay });
+      if (!usedDays.has(strengthDay)) {
+        newSessions.push({ ...strengthSessions[1], day: strengthDay });
+        usedDays.add(strengthDay);
+      }
     }
     
     // 3 days after: Tempo run
     if (runSessions.length > 0) {
       const runDay = dayOrder[(longDayIndex + 3) % 7];
-      newSessions.push({ ...runSessions[0], day: runDay });
+      if (!usedDays.has(runDay)) {
+        newSessions.push({ ...runSessions[0], day: runDay });
+        usedDays.add(runDay);
+      }
     }
     
     // 4 days after: Endurance bike
     if (bikeSessions.length > 1) {
       const bikeDay = dayOrder[(longDayIndex + 4) % 7];
-      newSessions.push({ ...bikeSessions[1], day: bikeDay });
+      if (!usedDays.has(bikeDay)) {
+        newSessions.push({ ...bikeSessions[1], day: bikeDay });
+        usedDays.add(bikeDay);
+      }
     }
     
-    // Add any remaining strength sessions (for cowboy options)
+    // Add any remaining strength sessions (for cowboy options) - ensure proper spacing
     for (let i = 2; i < strengthSessions.length; i++) {
       // Find an available day that doesn't conflict with existing sessions
       let availableDay = '';
       for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
         const candidateDay = dayOrder[(longDayIndex + dayOffset) % 7];
-        const existingSessionsOnDay = newSessions.filter(s => s.day === candidateDay);
-        if (existingSessionsOnDay.length === 0) {
+        if (!usedDays.has(candidateDay)) {
           availableDay = candidateDay;
           break;
         }
@@ -1548,6 +1570,7 @@ Run (25min):
         availableDay = leastBusyDay.day;
       }
       newSessions.push({ ...strengthSessions[i], day: availableDay });
+      usedDays.add(availableDay);
     }
     
     // Sort sessions by day order, then by discipline (strength before endurance)
