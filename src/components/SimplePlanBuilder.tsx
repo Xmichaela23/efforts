@@ -319,7 +319,7 @@ export default function SimplePlanBuilder() {
       <div className="w-full">
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
-            <h1 className="text-3xl font-bold">
+            <h1 className="text-xl font-bold">
               {plan.distance.charAt(0).toUpperCase() + plan.distance.slice(1)} Triathlon Plan
             </h1>
             <button 
@@ -398,7 +398,7 @@ export default function SimplePlanBuilder() {
 
         <div>
           {/* Week Navigation with Swipe Cues */}
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-6 mt-8 bg-white p-4 border-t border-gray-200">
             <div className="flex">
               {plan.weeks.map((week, weekIndex) => (
                 <button
