@@ -1,8 +1,17 @@
 # QUICK START FOR NEW CHAT
 
-## 🎯 CURRENT STATUS: WORKING TEMPLATE-BASED SYSTEM
+## 🚨 CURRENT STATUS: SESSION DISTRIBUTION BUG
 
-**We've successfully built a clean, template-based training plan generator that's working well!**
+**There's a critical bug in the session distribution logic that needs immediate attention.**
+
+**The Problem:** Multiple sessions are being scheduled on the same day, violating polarized training principles.
+
+**Evidence:** 
+- Monday shows 2 sessions (SWIM + STRENGTH) - 66min total
+- Tuesday shows 2 sessions (SWIM + STRENGTH) - 70min total  
+- Wednesday shows 2 sessions (SWIM + STRENGTH) - 74min total
+
+**User's Reaction:** "its a mess and this isnt a plan" and "2 strength training sessions on a monday no actual polarization"
 
 ### ✅ WHAT'S WORKING
 - **Template-based approach** using base templates + multipliers
@@ -12,6 +21,12 @@
 - **12-week progressive plans** with proper phase progression
 - **Clean, minimal UI** with tabbed week navigation
 - **Professional workout details** with warm-ups, cool-downs, and target ranges
+
+### ❌ CRITICAL BUG
+- **Session distribution logic** in `adjustLongSessionDays()` function
+- **8 sessions** in template, **7 days** to distribute
+- **Multiple sessions forced onto same day** (Monday: SWIM + STRENGTH)
+- **Violates polarized training** principles
 
 ## 📋 CURRENT SYSTEM OVERVIEW
 
@@ -35,9 +50,19 @@
 - **Recovery spacing**: Proper session distribution to prevent overtraining
 - **Progressive overload**: Systematic volume and intensity increases
 
-## 🚀 NEXT STEPS
+## 🚨 IMMEDIATE PRIORITY: FIX SESSION DISTRIBUTION
 
-### Immediate Priorities
+### Critical Fix Needed
+1. **Fix session distribution logic** in `adjustLongSessionDays()` function
+2. **Debug why sessions appear on same day** despite `usedDays` checks
+3. **Ensure proper distribution** of 8 balanced training sessions across 7 days
+4. **Maintain polarized training** principles
+
+### Key Files to Focus On
+- **`src/services/SimpleTrainingService.ts`** - Lines 1463-1590 (adjustLongSessionDays function)
+- **`src/components/SimplePlanBuilder.tsx`** - UI display logic
+
+### Future Steps (After Bug Fix)
 1. **Extend to Olympic distance** using the same template approach
 2. **Enhance strength workouts** with more detailed prescriptions
 3. **Add advanced features** like plan comparison and analytics
@@ -112,18 +137,22 @@
 - Don't remove personalization features
 - Don't ignore scientific validation
 - Don't add unnecessary UI complexity
+- **Don't change the training template** - it's scientifically sound (8 balanced sessions)
+- **Don't focus on old algorithm files** - they're archived, not used
+- **Don't modify UI components** - they handle multiple sessions fine
 
 ## 📞 IF YOU GET STUCK
-1. **Read the current documentation** thoroughly
-2. **Understand the template approach** before making changes
-3. **Test with real user data** to ensure personalization works
-4. **Maintain scientific principles** in all modifications
+1. **Read SESSION_DISTRIBUTION_BUG_CONTEXT.md** for complete bug analysis
+2. **Focus on `adjustLongSessionDays()` function** in SimpleTrainingService.ts
+3. **Debug why `usedDays` checks aren't working** - sessions still appear on same day
+4. **Maintain scientific principles** - this is a balanced week of training, not just "sessions"
 
 ## 🎉 SUCCESS INDICATORS
-- Template system generates professional plans
-- All targets are personalized to user baselines
-- UI remains clean and minimal
-- Scientific principles are maintained
-- User experience is smooth and intuitive
+- **Session distribution works properly** - no multiple sessions on same day
+- **Polarized training principles maintained** - proper recovery spacing
+- **Template system generates professional plans** - balanced week of training
+- **All targets are personalized to user baselines** - FTP, paces, 1RM
+- **UI remains clean and minimal** - handles multiple sessions when appropriate
+- **Scientific principles are maintained** - evidence-based training
 
-**The system is working well with a clean, template-based approach that generates professional, personalized training plans!** 🎯 
+**The system needs the session distribution bug fixed to generate proper, polarized training plans!** 🎯 

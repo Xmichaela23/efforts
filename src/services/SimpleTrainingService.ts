@@ -899,11 +899,9 @@ export class SimpleTrainingService {
     const timeMultiplier = SPRINT_TIME_MULTIPLIERS[timeLevel];
     sessions = this.scaleSessions(sessions, timeMultiplier);
     
-    // Add strength if selected
-    if (strengthOption !== 'none') {
-      const strengthHours = SPRINT_STRENGTH_ADDITIONS[strengthOption];
-      sessions = this.addStrengthSessions(sessions, strengthOption, strengthHours, userBaselines, userEquipment);
-    }
+    // Add strength if selected (or remove if none)
+    const strengthHours = strengthOption !== 'none' ? SPRINT_STRENGTH_ADDITIONS[strengthOption] : 0;
+    sessions = this.addStrengthSessions(sessions, strengthOption, strengthHours, userBaselines, userEquipment);
     
     // Adjust for long session days
     sessions = this.adjustLongSessionDays(sessions, longSessionDays);
@@ -1324,7 +1322,7 @@ Run (25min):
     
     const overheadPressSection = userBaselines.overheadPress1RM ? `\n• Overhead Press: 3x6 @ ${ohp}-${ohpRange}lbs (3-4min rest)` : '';
     
-    return `Warm-up: 5min dynamic stretching\n\nMain Set:\n• Deadlifts: 4x5 @ ${deadlift}-${deadliftRange}lbs (3-4min rest)\n• Barbell Rows: 3x8 @ ${Math.round(userBaselines.deadlift1RM * 0.6 / 5) * 5}lbs (3-4min rest)${overheadPressSection}\n• Pull-ups: 3x6-8 (1min rest)\n• Core: Weighted planks 3x45sec\n\nCool-down: 5min stretching`;
+    return `Warm-up: 5min dynamic stretching\n\nMain Set:\n• Squats: 4x5 @ ${squat}-${squatRange}lbs (3-4min rest)\n• Deadlifts: 3x5 @ ${deadlift}-${deadliftRange}lbs (3-4min rest)\n• Bench Press: 3x6 @ ${bench}-${benchRange}lbs (3-4min rest)${overheadPressSection}\n• Pull-ups: 3x6-8 (1min rest)\n• Core: Weighted planks 3x45sec\n\nCool-down: 5min stretching`;
   }
 
   private getUpperBodyWorkout(userBaselines: any): string {
@@ -1351,7 +1349,7 @@ Run (25min):
     const strengthSessions: SimpleSession[] = [];
     
     if (strengthType === 'none') {
-      // No strength sessions
+      // No strength sessions - return original sessions without strength
       return nonStrengthSessions;
     } else if (strengthType === 'traditional') {
       // 2 traditional strength sessions with variety
@@ -1547,10 +1545,11 @@ Run (25min):
       }
     }
     
-    // Add any remaining strength sessions (for cowboy options) - ensure proper spacing
+    // Add any remaining strength sessions (for cowboy options) - smart placement with minimal impact
     for (let i = 2; i < strengthSessions.length; i++) {
-      // Find an available day that doesn't conflict with existing sessions
       let availableDay = '';
+      
+      // Priority 1: Find completely empty day
       for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
         const candidateDay = dayOrder[(longDayIndex + dayOffset) % 7];
         if (!usedDays.has(candidateDay)) {
@@ -1558,11 +1557,37 @@ Run (25min):
           break;
         }
       }
-      // If no empty day found, skip this session to avoid conflicts
+      
+      // Priority 2: If no empty day, find swim day (swim + upper body = natural combo)
+      if (!availableDay) {
+        const swimSessions = newSessions.filter(s => s.discipline === 'swim');
+        for (const swimSession of swimSessions) {
+          if (swimSession.day && !usedDays.has(swimSession.day)) {
+            availableDay = swimSession.day;
+            break;
+          }
+        }
+      }
+      
+      // Priority 3: If still no day, find any day that's not the brick day
+      if (!availableDay) {
+        const brickDay = dayOrder[longDayIndex];
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+          const candidateDay = dayOrder[(longDayIndex + dayOffset) % 7];
+          if (candidateDay !== brickDay) {
+            availableDay = candidateDay;
+            break;
+          }
+        }
+      }
+      
+      // If still no day found, skip this session
       if (!availableDay) {
         console.log(`⚠️ Skipping strength session ${i} - no available days`);
         continue;
       }
+      
+      console.log(`🏋️ Placing 3rd strength session on ${availableDay} (minimal impact strategy)`);
       newSessions.push({ ...strengthSessions[i], day: availableDay });
       usedDays.add(availableDay);
     }

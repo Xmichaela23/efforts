@@ -206,7 +206,7 @@ export const STRENGTH_OPTIONS: StrengthOption[] = [
     name: 'Cowboy Endurance',
     sessionsPerWeek: 3,
     totalHours: 2.5,
-    description: 'Cowboy Endurance follows traditional endurance strength protocols with an additional day of upper body work for race course aesthetics and physical balance',
+    description: 'Cowboy Endurance follows traditional endurance strength protocols with an additional upper body focus day for muscular balance and aesthetics',
     evidence: 'Mixed approach with some research support',
     recovery: '24-48 hours between sessions',
     phasing: 'Taper 2-3 weeks before race, reduce to 1x/week. Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.'
@@ -216,7 +216,7 @@ export const STRENGTH_OPTIONS: StrengthOption[] = [
     name: 'Cowboy Compound',
     sessionsPerWeek: 3,
     totalHours: 3.0,
-    description: 'Cowboy Compound focuses on compound lifts for endurance training and adds an additional day of upper body work for race course aesthetics and physical balance',
+    description: 'Cowboy Compound focuses on compound lifts for endurance training with an additional upper body focus day for muscular balance and aesthetics',
     evidence: 'Experimental approach, not well-studied for triathlon',
     recovery: '48-72 hours between sessions (most demanding)',
     phasing: 'Taper 3-4 weeks before race, reduce to 1x/week. Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.'

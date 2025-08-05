@@ -164,7 +164,7 @@ export default function SimplePlanBuilder() {
       case 2:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold">What strength training do you want?</h2>
+                            <h2 className="text-2xl font-semibold">Would you like to integrate strength?</h2>
             <div className="space-y-4">
               {trainingService.getSprintStrengthOptions().map(option => (
                 <div 
@@ -365,8 +365,8 @@ export default function SimplePlanBuilder() {
                 {(answers.strengthOption === 'cowboy_endurance' || answers.strengthOption === 'cowboy_compound') && (
                   <p className="text-sm text-gray-600 mt-1">
                     {answers.strengthOption === 'cowboy_endurance' 
-                      ? 'Cowboy Endurance follows traditional endurance strength protocols with an additional day of upper body work for race course aesthetics and physical balance.' 
-                      : 'Cowboy Compound focuses on compound lifts for endurance training and adds an additional day of upper body work for race course aesthetics and physical balance.'
+                      ? 'Cowboy Endurance follows traditional endurance strength protocols with an additional upper body focus day for muscular balance and aesthetics.' 
+                      : 'Cowboy Compound focuses on compound lifts for endurance training with an additional upper body focus day for muscular balance and aesthetics.'
                     } Note: Upper body aesthetics work may interfere with key endurance sessions. Consider dropping within 4 weeks of race day.
                   </p>
                 )}
