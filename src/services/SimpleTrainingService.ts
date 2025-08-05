@@ -784,7 +784,7 @@ export class SimpleTrainingService {
       ...week,
       sessions: week.sessions.map(session => {
         // Convert some endurance sessions to tempo for better polarized distribution
-        if (session.type === 'endurance' && session.discipline === 'bike' && Math.random() < 0.3) {
+        if (session.type === 'endurance' && session.discipline === 'bike') {
           return {
             ...session,
             type: 'tempo' as const,
@@ -906,7 +906,7 @@ export class SimpleTrainingService {
     }
     
     // Adjust for long session days
-    sessions = this.adjustLongSessionDays(sessions, longSessionDays as 'weekends' | 'weekdays');
+    sessions = this.adjustLongSessionDays(sessions, longSessionDays);
     
     // Validation is now handled at the plan level in generateSprintPlan
     
