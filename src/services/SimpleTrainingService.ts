@@ -1362,7 +1362,7 @@ Run (25min):
         description: 'Lower body strength session',
         zones: [2],
         strengthType: 'traditional',
-        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base', 0.70) // Base phase 70% 1RM
+        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base') // Will be updated by adjustSessionsForPhase
       });
       strengthSessions.push({
         day: 'TBD', // Will be set by reverse engineering logic
@@ -1373,7 +1373,7 @@ Run (25min):
         description: 'Upper body strength session',
         zones: [2],
         strengthType: 'traditional',
-        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base', 0.70) // Base phase 70% 1RM
+        detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base') // Will be updated by adjustSessionsForPhase
       });
     } else if (strengthType === 'compound') {
       // 2 compound strength sessions with variety
@@ -1386,7 +1386,7 @@ Run (25min):
         description: 'Lower body compound strength session',
         zones: [2],
         strengthType: 'compound',
-        detailedWorkout: this.getCompoundWorkout(userBaselines)
+        detailedWorkout: this.getCompoundWorkout(userBaselines, 0.70) // Will be updated by adjustSessionsForPhase
       });
       strengthSessions.push({
         day: 'TBD', // Will be set by reverse engineering logic
@@ -1397,7 +1397,7 @@ Run (25min):
         description: 'Upper body compound strength session',
         zones: [2],
         strengthType: 'compound',
-        detailedWorkout: this.getCompoundWorkout(userBaselines)
+        detailedWorkout: this.getCompoundWorkout(userBaselines, 0.70) // Will be updated by adjustSessionsForPhase
       });
     } else if (strengthType === 'cowboy_endurance') {
       // 3 sessions: 2 traditional + 1 upper body
@@ -1411,7 +1411,7 @@ Run (25min):
           description: 'Traditional strength session',
           zones: [2],
           strengthType: 'traditional',
-          detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base', 0.70) // Base phase 70% 1RM
+          detailedWorkout: this.getStrengthWorkout('traditional', userBaselines, userEquipment, 'base') // Will be updated by adjustSessionsForPhase
         });
       }
       // Add 3rd upper body session
@@ -1438,7 +1438,7 @@ Run (25min):
           description: 'Compound strength session',
           zones: [2],
           strengthType: 'compound',
-          detailedWorkout: this.getCowboyCompoundWorkout(userBaselines, userEquipment)
+          detailedWorkout: this.getCowboyCompoundWorkout(userBaselines, userEquipment, 0.70) // Will be updated by adjustSessionsForPhase
         });
       }
       // Add 3rd upper body session

@@ -342,7 +342,7 @@ export default function SimplePlanBuilder() {
           </p>
           
           {/* Plan Choices Summary */}
-          <div className="bg-gray-50 p-4 mb-6">
+          <div className="p-4 mb-6">
             <h3 className="font-medium mb-2">Your Plan Choices</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
@@ -367,7 +367,7 @@ export default function SimplePlanBuilder() {
           </div>
           
           {/* Training Plan Summary */}
-          <div className="bg-gray-50 p-6 mb-6">
+          <div className="p-6 mb-6">
             <h2 className="text-xl font-semibold mb-3">Training Methodology</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
               <div>
