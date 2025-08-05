@@ -386,9 +386,77 @@ const SPRINT_STRENGTH_ADDITIONS = {
   cowboy_compound: 3.0    // 3x sessions + upper body
 };
 
+// Time multipliers for 70.3
+const SEVENTY3_TIME_MULTIPLIERS = {
+  minimum: 1.2,    // 8-10 hours
+  moderate: 1.4,   // 10-12 hours
+  serious: 1.6,    // 12-15 hours
+  hardcore: 1.8    // 15+ hours
+};
+
+// Strength additions for 70.3
+const SEVENTY3_STRENGTH_ADDITIONS = {
+  none: 0,
+  traditional: 1.0,  // 2x 30min sessions (lighter for longer distance)
+  compound: 1.5,     // 2x 45min sessions
+  cowboy_endurance: 2.0,  // 2x sessions + upper body (reduced for 70.3)
+  cowboy_compound: 2.5    // 2x sessions + upper body (reduced for 70.3)
+};
+
 export class SimpleTrainingService {
   
   generateSprintPlan(
+    timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
+    strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
+    longSessionDays: string,
+    userBaselines: {
+      ftp?: number;
+      fiveKPace?: string;
+      easyPace?: string;
+      swimPace100?: string;
+      squat1RM?: number;
+      deadlift1RM?: number;
+      bench1RM?: number;
+      overheadPress1RM?: number;
+      age?: number;
+    },
+    userEquipment?: {
+      running?: string[];
+      cycling?: string[];
+      swimming?: string[];
+      strength?: string[];
+    }
+  ): SimpleTrainingPlan {
+    return this.generatePlan('sprint', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+  }
+
+  generateSeventy3Plan(
+    timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
+    strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
+    longSessionDays: string,
+    userBaselines: {
+      ftp?: number;
+      fiveKPace?: string;
+      easyPace?: string;
+      swimPace100?: string;
+      squat1RM?: number;
+      deadlift1RM?: number;
+      bench1RM?: number;
+      overheadPress1RM?: number;
+      age?: number;
+    },
+    userEquipment?: {
+      running?: string[];
+      cycling?: string[];
+      swimming?: string[];
+      strength?: string[];
+    }
+  ): SimpleTrainingPlan {
+    return this.generatePlan('seventy3', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+  }
+
+  private generatePlan(
+    distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman',
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
@@ -417,7 +485,7 @@ export class SimpleTrainingService {
     }
 
     // Generate the plan
-    const plan = this.generatePlanInternal(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    const plan = this.generatePlanInternal(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
     
     // Validate the generated plan
     const validation = this.validatePlan(plan, timeLevel, strengthOption, longSessionDays);
@@ -873,6 +941,7 @@ export class SimpleTrainingService {
   }
 
   private generatePlanInternal(
+    distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman',
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
@@ -880,7 +949,7 @@ export class SimpleTrainingService {
     userEquipment?: any
   ): SimpleTrainingPlan {
     
-    console.log('🏊‍♂️ Generating Sprint plan...');
+    console.log(`🏊‍♂️ Generating ${distance} plan...`);
     console.log('🔧 User baselines received:', {
       ftp: userBaselines.ftp,
       fiveKPace: userBaselines.fiveKPace,
@@ -893,20 +962,18 @@ export class SimpleTrainingService {
     });
     
     // Get base template and personalize with user baselines
-    let sessions = this.createPersonalizedTemplate(userBaselines);
+    let sessions = this.createPersonalizedTemplate(userBaselines, distance);
     
-    // Apply time multiplier
-    const timeMultiplier = SPRINT_TIME_MULTIPLIERS[timeLevel];
+    // Apply time multiplier based on distance
+    const timeMultiplier = this.getTimeMultiplier(distance, timeLevel);
     sessions = this.scaleSessions(sessions, timeMultiplier);
     
     // Add strength if selected (or remove if none)
-    const strengthHours = strengthOption !== 'none' ? SPRINT_STRENGTH_ADDITIONS[strengthOption] : 0;
+    const strengthHours = strengthOption !== 'none' ? this.getStrengthHours(distance, strengthOption) : 0;
     sessions = this.addStrengthSessions(sessions, strengthOption, strengthHours, userBaselines, userEquipment);
     
     // Adjust for long session days
     sessions = this.adjustLongSessionDays(sessions, longSessionDays);
-    
-    // Validation is now handled at the plan level in generateSprintPlan
     
     // Calculate total hours
     const totalHours = sessions.reduce((sum, session) => sum + session.duration, 0) / 60;
@@ -915,7 +982,7 @@ export class SimpleTrainingService {
     const weeks = this.createWeeklyProgression(sessions, 12, userBaselines);
     
     return {
-      distance: 'sprint',
+      distance,
       timeLevel,
       strengthOption,
       longSessionDays,
@@ -930,8 +997,30 @@ export class SimpleTrainingService {
       duration: Math.round(session.duration * multiplier)
     }));
   }
+
+  private getTimeMultiplier(distance: string, timeLevel: string): number {
+    switch (distance) {
+      case 'sprint':
+        return SPRINT_TIME_MULTIPLIERS[timeLevel as keyof typeof SPRINT_TIME_MULTIPLIERS];
+      case 'seventy3':
+        return SEVENTY3_TIME_MULTIPLIERS[timeLevel as keyof typeof SEVENTY3_TIME_MULTIPLIERS];
+      default:
+        return SPRINT_TIME_MULTIPLIERS[timeLevel as keyof typeof SPRINT_TIME_MULTIPLIERS];
+    }
+  }
+
+  private getStrengthHours(distance: string, strengthOption: string): number {
+    switch (distance) {
+      case 'sprint':
+        return SPRINT_STRENGTH_ADDITIONS[strengthOption as keyof typeof SPRINT_STRENGTH_ADDITIONS];
+      case 'seventy3':
+        return SEVENTY3_STRENGTH_ADDITIONS[strengthOption as keyof typeof SEVENTY3_STRENGTH_ADDITIONS];
+      default:
+        return SPRINT_STRENGTH_ADDITIONS[strengthOption as keyof typeof SPRINT_STRENGTH_ADDITIONS];
+    }
+  }
   
-  private createPersonalizedTemplate(userBaselines: any): SimpleSession[] {
+  private createPersonalizedTemplate(userBaselines: any, distance: string = 'sprint'): SimpleSession[] {
     // Calculate personalized targets based on user baselines (Base Phase percentages)
     const easyBikePower = userBaselines.ftp ? Math.round(userBaselines.ftp * 0.65) : 160; // 65% FTP for easy
     const easyBikeRange = userBaselines.ftp ? Math.round(userBaselines.ftp * 0.70) : 170; // 70% FTP for easy range
@@ -952,6 +1041,11 @@ export class SimpleTrainingService {
     console.log(`  • Run: Easy ${easyRunPace}, Tempo ${tempoRunPace}, Threshold ${thresholdRunPace}`);
     console.log(`  • Swim: Easy ${easySwimPace}, Endurance ${enduranceSwimPace}`);
     
+    if (distance === 'seventy3') {
+      return this.createSeventy3Template(userBaselines, easyBikePower, enduranceBikePower, tempoBikePower, enduranceBikeRange, easyRunPace, enduranceSwimPace);
+    }
+    
+    // Default Sprint template
     return [
       {
         day: 'TBD', // Will be set by reverse engineering logic
@@ -1008,6 +1102,80 @@ export class SimpleTrainingService {
         discipline: 'brick',
         type: 'endurance',
         duration: 90, // Longer brick session for long day
+        intensity: 'Zone 2 (Moderate)',
+        description: 'Brick session - bike to run',
+        zones: [2],
+        detailedWorkout: this.getBrickWorkout(enduranceBikePower, easyRunPace, enduranceBikeRange)
+      }
+    ];
+  }
+
+  private createSeventy3Template(
+    userBaselines: any, 
+    easyBikePower: number, 
+    enduranceBikePower: number, 
+    tempoBikePower: number, 
+    enduranceBikeRange: number, 
+    easyRunPace: string, 
+    enduranceSwimPace: string
+  ): SimpleSession[] {
+    // 70.3 template: More endurance focus, longer sessions, less intensity
+    return [
+      {
+        day: 'TBD',
+        discipline: 'swim',
+        type: 'recovery',
+        duration: 45, // Longer swim for 70.3
+        intensity: 'Zone 1 (Recovery - <75% HR)',
+        description: 'Swim technique and recovery',
+        zones: [1],
+        detailedWorkout: this.getSwimRecoveryWorkout(enduranceSwimPace)
+      },
+      {
+        day: 'TBD',
+        discipline: 'bike',
+        type: 'endurance',
+        duration: 60, // Longer bike for 70.3
+        intensity: 'Zone 2 (Endurance - 65-85% FTP)',
+        description: 'Bike endurance session',
+        zones: [2],
+        detailedWorkout: this.getBikeEnduranceWorkout(enduranceBikePower, enduranceBikeRange)
+      },
+      {
+        day: 'TBD',
+        discipline: 'run',
+        type: 'endurance', // More endurance, less tempo for 70.3
+        duration: 45,
+        intensity: 'Zone 2 (Endurance - 65-85% HR)',
+        description: 'Run endurance session',
+        zones: [2],
+        detailedWorkout: this.getRunTempoWorkout(easyRunPace) // Use easy pace for endurance
+      },
+      {
+        day: 'TBD',
+        discipline: 'bike',
+        type: 'endurance',
+        duration: 50,
+        intensity: 'Zone 2 (Endurance - 65-85% FTP)',
+        description: 'Bike endurance session',
+        zones: [2],
+        detailedWorkout: this.getBikeEnduranceWorkout(enduranceBikePower, enduranceBikeRange)
+      },
+      {
+        day: 'TBD',
+        discipline: 'swim',
+        type: 'endurance',
+        duration: 35, // Longer swim for 70.3
+        intensity: 'Zone 2 (Endurance)',
+        description: 'Swim endurance session',
+        zones: [2],
+        detailedWorkout: this.getSwimEnduranceWorkout(enduranceSwimPace)
+      },
+      {
+        day: 'TBD',
+        discipline: 'brick',
+        type: 'endurance',
+        duration: 120, // Longer brick for 70.3 (2 hours)
         intensity: 'Zone 2 (Moderate)',
         description: 'Brick session - bike to run',
         zones: [2],
