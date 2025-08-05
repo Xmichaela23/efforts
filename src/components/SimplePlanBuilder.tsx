@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { SimpleTrainingService, type SimpleTrainingPlan } from '../services/SimpleTrainingService';
 import { useAppContext } from '@/contexts/AppContext';
+import useEmblaCarousel from 'embla-carousel-react';
 
 export default function SimplePlanBuilder() {
   const { loadUserBaselines } = useAppContext();
   const [currentStep, setCurrentStep] = useState(1);
   const [currentWeek, setCurrentWeek] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [plan, setPlan] = useState<SimpleTrainingPlan | null>(null);
   const [userBaselines, setUserBaselines] = useState<any>(null);
   const [isLoadingBaselines, setIsLoadingBaselines] = useState(true);
@@ -71,6 +74,31 @@ export default function SimplePlanBuilder() {
 
   const updateAnswer = (key: string, value: string) => {
     setAnswers(prev => ({ ...prev, [key]: value }));
+  };
+
+  // Touch/swipe handlers for week navigation
+  const onTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null);
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const onTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const onTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+
+    if (isLeftSwipe && currentWeek < plan!.weeks.length - 1) {
+      setCurrentWeek(currentWeek + 1);
+    }
+    if (isRightSwipe && currentWeek > 0) {
+      setCurrentWeek(currentWeek - 1);
+    }
   };
 
     const generatePlan = () => {
@@ -408,22 +436,29 @@ export default function SimplePlanBuilder() {
           <div className="w-full bg-white p-4 border-t border-gray-200">
             <h3 className="text-lg font-semibold mb-4">Your Training Plan</h3>
             <div className="flex items-center justify-between mb-4">
-              <div className="flex space-x-2">
-                {plan.weeks.map((week, weekIndex) => (
-                  <button
-                    key={weekIndex}
-                    onClick={() => setCurrentWeek(weekIndex)}
-                    className={`px-4 py-2 text-sm font-medium transition-colors rounded ${
-                      currentWeek === weekIndex
-                        ? 'text-white bg-blue-600'
-                        : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
-                    }`}
-                  >
-                    Week {week.weekNumber}
-                  </button>
-                ))}
+              <div 
+                className="flex-1 overflow-hidden"
+                onTouchStart={onTouchStart}
+                onTouchMove={onTouchMove}
+                onTouchEnd={onTouchEnd}
+              >
+                <div className="flex space-x-2" style={{ transform: `translateX(-${currentWeek * 80}px)` }}>
+                  {plan.weeks.map((week, weekIndex) => (
+                    <button
+                      key={weekIndex}
+                      onClick={() => setCurrentWeek(weekIndex)}
+                      className={`px-4 py-2 text-sm font-medium transition-colors rounded flex-shrink-0 ${
+                        currentWeek === weekIndex
+                          ? 'text-white bg-blue-600'
+                          : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      Week {week.weekNumber}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded">
+              <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded ml-4">
                 <span>Swipe to navigate</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
