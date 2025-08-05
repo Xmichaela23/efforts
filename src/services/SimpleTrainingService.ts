@@ -1801,8 +1801,8 @@ Run (25min):
         // Peak: Start at 1.1, increase to 1.3 (high intensity, quality focus)
         return 1.1 + (weekProgress * 0.2);
       case 'taper':
-        // Taper: Start at 1.0, reduce to 0.7 (maintain intensity, reduce volume)
-        return 1.0 - (weekProgress * 0.3);
+        // Taper: Start at 0.6, reduce to 0.5 (significant volume reduction for proper taper)
+        return 0.6 - (weekProgress * 0.1);
       default:
         return 1.0;
     }
@@ -1835,7 +1835,7 @@ Run (25min):
       case 'peak':
         return 0.75 + (weekWithinPhase * 0.025); // 75% to 80% 1RM (2.5% per week) - FIXED: was 85-90%
       case 'taper':
-        return 0.70 - (weekWithinPhase * 0.025); // 70% to 67.5% 1RM (reduce 2.5% per week) - FIXED: was 80-72.5%
+        return 0.65 - (weekWithinPhase * 0.025); // 65% to 62.5% 1RM (reduce 2.5% per week) - lighter weights for taper
       default:
         return 0.70;
     }
@@ -1860,8 +1860,8 @@ Run (25min):
         break;
     }
     
-    // Add weekly progression within phase
-    const weeklyProgression = weekWithinPhase * 0.015; // 1.5% increase per week within phase
+    // Add weekly progression within phase (except taper)
+    const weeklyProgression = phase === 'taper' ? 0 : weekWithinPhase * 0.015; // Stop progression in taper
     return Math.round(ftp * (basePercentage + weeklyProgression));
   }
 
@@ -1874,7 +1874,7 @@ Run (25min):
     if (phase === 'base') totalWeeksOfProgression = weekWithinPhase;
     else if (phase === 'build') totalWeeksOfProgression = 5 + weekWithinPhase; // 5 weeks base + build weeks
     else if (phase === 'peak') totalWeeksOfProgression = 8 + weekWithinPhase; // 8 weeks base+build + peak weeks
-    else if (phase === 'taper') totalWeeksOfProgression = 11 + weekWithinPhase; // 11 weeks + taper week
+    else if (phase === 'taper') totalWeeksOfProgression = 11; // Stop progression in taper - use peak level
     
     // Add continuous progression across all phases (faster pace = lower time)
     const weeklyProgression = totalWeeksOfProgression * 0.012; // 1.2% faster per week total
