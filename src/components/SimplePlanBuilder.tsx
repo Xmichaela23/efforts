@@ -396,17 +396,17 @@ export default function SimplePlanBuilder() {
           </div>
         </div>
 
-        <div className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl p-8 border border-white/40">
+        <div className="bg-white">
           {/* Week Navigation */}
-          <div className="flex mb-8 bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden border border-white/20">
+          <div className="flex mb-6 border-b border-gray-200">
             {plan.weeks.map((week, weekIndex) => (
               <button
                 key={weekIndex}
                 onClick={() => setCurrentWeek(weekIndex)}
-                className={`flex-1 px-6 py-4 text-sm font-semibold transition-all duration-300 ${
+                className={`px-6 py-3 text-sm font-medium transition-colors ${
                   currentWeek === weekIndex
-                    ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg'
-                    : 'bg-transparent text-gray-600 hover:text-gray-800 hover:bg-white/50'
+                    ? 'border-b-2 border-gray-900 text-gray-900'
+                    : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
                 Week {week.weekNumber}
@@ -417,11 +417,11 @@ export default function SimplePlanBuilder() {
           {/* Current Week Content */}
           {plan.weeks[currentWeek] && (
             <div>
-              <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8 mb-8 border border-white/30">
-                <h2 className="text-3xl font-bold mb-3 bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+              <div className="mb-4">
+                <h2 className="text-lg font-medium text-gray-900 mb-1">
                   Week {plan.weeks[currentWeek].weekNumber} - {plan.weeks[currentWeek].phase.charAt(0).toUpperCase() + plan.weeks[currentWeek].phase.slice(1)} Phase
                 </h2>
-                <p className="text-xl text-gray-600 font-medium">
+                <p className="text-sm text-gray-600">
                   {plan.weeks[currentWeek].sessions.length} sessions • {plan.weeks[currentWeek].totalHours.toFixed(1)} hours
                 </p>
               </div>
@@ -438,69 +438,66 @@ export default function SimplePlanBuilder() {
                   }, {} as Record<string, any[]>);
 
                   return Object.entries(sessionsByDay).map(([day, sessions], dayIndex) => (
-                    <div key={`${day}-${dayIndex}`} className="bg-white/95 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden border border-white/40 transform transition-all duration-300 hover:scale-[1.02] hover:shadow-3xl">
+                    <div key={`${day}-${dayIndex}`} className="border-b border-gray-200 pb-4 last:border-b-0">
                       {/* Day Header */}
-                      <div className="bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 px-8 py-6 relative overflow-hidden">
-                        <div className="absolute inset-0 bg-gradient-to-r from-white/10 to-transparent"></div>
-                        <div className="relative flex items-center justify-between">
-                          <div className="flex items-center gap-6">
-                            <span className="font-bold text-2xl text-white drop-shadow-lg">{day}</span>
-                            {sessions.length > 1 && (
-                              <span className="px-4 py-2 bg-white/25 backdrop-blur-sm text-white text-sm font-semibold rounded-full border border-white/30">
-                                {sessions.length} SESSIONS
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-white/95 font-semibold text-lg">
-                            {sessions.reduce((total, session) => total + session.duration, 0)}min total
-                          </div>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <span className="font-medium text-base text-gray-900">{day}</span>
+                          {sessions.length > 1 && (
+                            <span className="px-2 py-1 bg-gray-100 text-xs font-medium text-gray-600 rounded">
+                              {sessions.length} sessions
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {sessions.reduce((total, session) => total + session.duration, 0)}min total
                         </div>
                       </div>
                       
                       {/* Sessions */}
-                      <div className="p-8">
+                      <div>
                         {sessions.length === 1 ? (
                           // Single session
                           <div>
-                            <div className="flex items-center gap-4 mb-6">
-                              <span className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-bold rounded-full shadow-lg">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="px-2 py-1 bg-gray-100 text-xs font-medium text-gray-700 rounded">
                                 {sessions[0].discipline.toUpperCase()}
                               </span>
                               {sessions[0].type && (
-                                <span className="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 text-sm font-semibold rounded-full shadow-sm">
+                                <span className="px-2 py-1 bg-gray-50 text-xs font-medium text-gray-600 rounded">
                                   {sessions[0].type}
                                 </span>
                               )}
                             </div>
                             {sessions[0].detailedWorkout && (
-                              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border-l-4 border-blue-500 shadow-lg">
-                                <p className="text-sm font-bold mb-4 text-gray-800">Workout Details:</p>
-                                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-medium">{sessions[0].detailedWorkout}</pre>
+                              <div className="bg-gray-50 p-3 rounded">
+                                <p className="text-sm font-medium mb-2 text-gray-800">Workout Details:</p>
+                                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
                               </div>
                             )}
                           </div>
                         ) : (
                           // Multiple sessions - stacked vertically
-                          <div className="space-y-8">
+                          <div className="space-y-3">
                             {sessions.map((session, sessionIndex) => (
-                              <div key={sessionIndex} className="border-b border-gray-200/50 pb-8 last:border-b-0 last:pb-0">
-                                <div className="flex items-center gap-4 mb-6">
-                                  <span className="px-4 py-2 bg-gradient-to-r from-blue-500 to-blue-600 text-white text-sm font-bold rounded-full shadow-lg">
+                              <div key={sessionIndex} className="border-b border-gray-200 pb-3 last:border-b-0 last:pb-0">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="px-2 py-1 bg-gray-100 text-xs font-medium text-gray-700 rounded">
                                     {session.discipline.toUpperCase()}
                                   </span>
                                   {session.type && (
-                                    <span className="px-4 py-2 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 text-sm font-semibold rounded-full shadow-sm">
+                                    <span className="px-2 py-1 bg-gray-50 text-xs font-medium text-gray-600 rounded">
                                       {session.type}
                                     </span>
                                   )}
-                                  <span className="text-sm text-gray-600 font-semibold">
+                                  <span className="text-sm text-gray-500">
                                     ({session.duration}min)
                                   </span>
                                 </div>
                                 {session.detailedWorkout && (
-                                  <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl p-6 border-l-4 border-blue-500 shadow-lg">
-                                    <p className="text-sm font-bold mb-4 text-gray-800">Workout Details:</p>
-                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed font-medium">{session.detailedWorkout}</pre>
+                                  <div className="bg-gray-50 p-3 rounded">
+                                    <p className="text-sm font-medium mb-2 text-gray-800">Workout Details:</p>
+                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
                                   </div>
                                 )}
                               </div>
@@ -520,8 +517,8 @@ export default function SimplePlanBuilder() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="max-w-5xl mx-auto">
+    <div className="min-h-screen bg-white">
+      <div className="max-w-4xl mx-auto p-4">
         {renderStep()}
       </div>
     </div>
