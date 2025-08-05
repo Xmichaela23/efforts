@@ -397,28 +397,38 @@ export default function SimplePlanBuilder() {
         </div>
 
         <div>
+          {/* Save Button */}
+          <div className="w-full bg-white p-4 border-t border-gray-200">
+            <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+              Save Plan
+            </button>
+          </div>
+
           {/* Week Navigation with Swipe Cues */}
-          <div className="flex items-center justify-between mb-6 mt-8 bg-white p-4 border-t border-gray-200">
-            <div className="flex">
-              {plan.weeks.map((week, weekIndex) => (
-                <button
-                  key={weekIndex}
-                  onClick={() => setCurrentWeek(weekIndex)}
-                  className={`px-6 py-3 text-sm font-medium transition-colors ${
-                    currentWeek === weekIndex
-                      ? 'text-gray-900'
-                      : 'text-gray-500 hover:text-gray-700'
-                  }`}
-                >
-                  Week {week.weekNumber}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded">
-              <span>Swipe to navigate</span>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
+          <div className="w-full bg-white p-4 border-t border-gray-200">
+            <h3 className="text-lg font-semibold mb-4">Your Training Plan</h3>
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex space-x-2">
+                {plan.weeks.map((week, weekIndex) => (
+                  <button
+                    key={weekIndex}
+                    onClick={() => setCurrentWeek(weekIndex)}
+                    className={`px-4 py-2 text-sm font-medium transition-colors rounded ${
+                      currentWeek === weekIndex
+                        ? 'text-white bg-blue-600'
+                        : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
+                    }`}
+                  >
+                    Week {week.weekNumber}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded">
+                <span>Swipe to navigate</span>
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </div>
             </div>
           </div>
 
