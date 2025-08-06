@@ -477,9 +477,9 @@ export default function SimplePlanBuilder() {
               ))}
             </div>
             
-            {/* Full Width Swipeable Area */}
+            {/* Full Week Swipeable Area */}
             <div 
-              className="w-full h-32 relative overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200"
+              className="w-full h-auto min-h-96 relative overflow-hidden"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
@@ -490,7 +490,7 @@ export default function SimplePlanBuilder() {
               >
                 {plan.weeks.map((week, weekIndex) => (
                   <div key={weekIndex} className="w-full flex-shrink-0 px-4">
-                    <div className="text-center">
+                    <div className="text-center mb-4">
                       <h4 className="text-lg font-semibold">
                         Week {week.weekNumber} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
                       </h4>
@@ -498,34 +498,22 @@ export default function SimplePlanBuilder() {
                         {week.sessions.length} sessions • {week.totalHours.toFixed(1)} hours
                       </p>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+                    
+                    {/* Week Workouts */}
+                    <div className="space-y-4">
+                      {(() => {
+                        // Group sessions by day
+                        const sessionsByDay = week.sessions.reduce((acc, session) => {
+                          if (!acc[session.day]) {
+                            acc[session.day] = [];
+                          }
+                          acc[session.day].push(session);
+                          return acc;
+                        }, {} as Record<string, any[]>);
 
-          {/* Current Week Content */}
-          {plan.weeks[currentWeek] && (
-            <div
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={onTouchEnd}
-            >
-
-              <div className="space-y-8">
-                {(() => {
-                  // Group sessions by day
-                  const sessionsByDay = plan.weeks[currentWeek].sessions.reduce((acc, session) => {
-                    if (!acc[session.day]) {
-                      acc[session.day] = [];
-                    }
-                    acc[session.day].push(session);
-                    return acc;
-                  }, {} as Record<string, any[]>);
-
-                  return Object.entries(sessionsByDay).map(([day, sessions], dayIndex) => (
-                    <div key={`${day}-${dayIndex}`} className="mb-4">
-                                                  {/* Day Header */}
+                        return Object.entries(sessionsByDay).map(([day, sessions], dayIndex) => (
+                          <div key={`${day}-${dayIndex}`} className="mb-4">
+                            {/* Day Header */}
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-2">
                                 <span className="font-medium text-sm text-gray-900">{day}</span>
@@ -539,64 +527,69 @@ export default function SimplePlanBuilder() {
                                 {sessions.reduce((total, session) => total + session.duration, 0)}min
                               </div>
                             </div>
-                      
-                      {/* Sessions */}
-                      <div>
-                        {sessions.length === 1 ? (
-                          // Single session
-                          <div>
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-xs font-medium text-gray-700">
-                                {sessions[0].discipline.toUpperCase()}
-                              </span>
-                              {sessions[0].type && (
-                                <span className="text-xs font-medium text-gray-500">
-                                  {sessions[0].type}
-                                </span>
+                            
+                            {/* Sessions */}
+                            <div>
+                              {sessions.length === 1 ? (
+                                // Single session
+                                <div>
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <span className="text-xs font-medium text-gray-700">
+                                      {sessions[0].discipline.toUpperCase()}
+                                    </span>
+                                    {sessions[0].type && (
+                                      <span className="text-xs font-medium text-gray-500">
+                                        {sessions[0].type}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {sessions[0].detailedWorkout && (
+                                    <div className="mt-1">
+                                      <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
+                                      <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
+                                    </div>
+                                  )}
+                                </div>
+                              ) : (
+                                // Multiple sessions - stacked vertically
+                                <div className="space-y-2">
+                                  {sessions.map((session, sessionIndex) => (
+                                    <div key={sessionIndex} className="pb-3 last:pb-0">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-xs font-medium text-gray-700">
+                                          {session.discipline.toUpperCase()}
+                                        </span>
+                                        {session.type && (
+                                          <span className="text-xs font-medium text-gray-500">
+                                            {session.type}
+                                          </span>
+                                        )}
+                                        <span className="text-sm text-gray-500">
+                                          ({session.duration}min)
+                                        </span>
+                                      </div>
+                                      {session.detailedWorkout && (
+                                        <div className="mt-1">
+                                          <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
+                                          <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
                               )}
                             </div>
-                            {sessions[0].detailedWorkout && (
-                              <div className="mt-1">
-                                <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
-                                <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
-                              </div>
-                            )}
                           </div>
-                        ) : (
-                          // Multiple sessions - stacked vertically
-                          <div className="space-y-2">
-                            {sessions.map((session, sessionIndex) => (
-                              <div key={sessionIndex} className="pb-3 last:pb-0">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <span className="text-xs font-medium text-gray-700">
-                                    {session.discipline.toUpperCase()}
-                                  </span>
-                                  {session.type && (
-                                    <span className="text-xs font-medium text-gray-500">
-                                      {session.type}
-                                    </span>
-                                  )}
-                                  <span className="text-sm text-gray-500">
-                                    ({session.duration}min)
-                                  </span>
-                                </div>
-                                {session.detailedWorkout && (
-                                  <div className="mt-1">
-                                    <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
-                                    <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                        ));
+                      })()}
                     </div>
-                  ));
-                })()}
+                  </div>
+                ))}
               </div>
             </div>
-          )}
+          </div>
+
+
           
           {/* Save Button - At Bottom */}
           <div className="w-full bg-white p-4 border-t border-gray-200 mt-6">
