@@ -135,7 +135,7 @@ export class TrainingRulesEngine {
 
   // NEW: Session Generation Rules
   private loadSessionGenerationRules() {
-    // Swim Session Rules
+    // Swim Session Rules - Based on triathlon training science
     this.engine.addRule({
       conditions: {
         all: [{
@@ -154,7 +154,7 @@ export class TrainingRulesEngine {
       }
     });
 
-    // Bike Session Rules
+    // Bike Session Rules - Based on triathlon training science
     this.engine.addRule({
       conditions: {
         all: [{
@@ -173,7 +173,7 @@ export class TrainingRulesEngine {
       }
     });
 
-    // Run Session Rules
+    // Run Session Rules - Based on triathlon training science
     this.engine.addRule({
       conditions: {
         all: [{
@@ -192,7 +192,7 @@ export class TrainingRulesEngine {
       }
     });
 
-    // Strength Session Rules
+    // Strength Session Rules - Based on triathlon training science
     this.engine.addRule({
       conditions: {
         all: [{
@@ -211,7 +211,7 @@ export class TrainingRulesEngine {
       }
     });
 
-    // Brick Session Rules
+    // Brick Session Rules - Based on triathlon training science
     this.engine.addRule({
       conditions: {
         all: [{
@@ -880,10 +880,26 @@ export class TrainingRulesEngine {
 
   // NEW: Apply session-specific rules
   private applySessionRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
+    // Calculate science-based duration based on discipline and session type
+    let calculatedDuration = result.duration;
+    
+    if (params.discipline === 'swim') {
+      calculatedDuration = this.calculateSwimDuration(facts, facts.sessionType || 'endurance');
+    } else if (params.discipline === 'bike') {
+      calculatedDuration = this.calculateBikeDuration(facts, facts.sessionType || 'endurance');
+    } else if (params.discipline === 'run') {
+      calculatedDuration = this.calculateRunDuration(facts, facts.sessionType || 'endurance');
+    } else if (params.discipline === 'strength') {
+      calculatedDuration = this.calculateStrengthDuration(facts, facts.sessionType || 'endurance');
+    } else if (params.discipline === 'brick') {
+      calculatedDuration = this.calculateBrickDuration(facts, facts.sessionType || 'endurance');
+    }
+    
     return {
       ...result,
       discipline: params.discipline,
       description: params.description,
+      duration: calculatedDuration,
       zones: params.zones || result.zones
     };
   }
@@ -893,6 +909,7 @@ export class TrainingRulesEngine {
     return {
       ...result,
       intensity: params.intensity || result.intensity,
+      duration: params.duration || result.duration, // Use duration from session type rules
       zones: params.zones || result.zones,
       description: params.description || result.description
     };
@@ -913,6 +930,116 @@ export class TrainingRulesEngine {
       description: params.focus || 'Strength training',
       zones: [3, 4] // Strength training zones
     };
+  }
+
+  // ===== SCIENCE-BASED DURATION CALCULATIONS =====
+
+  private calculateSwimDuration(facts: TrainingFacts, sessionType: string): number {
+    const baseDuration = this.getBaseSwimDuration(facts.distance);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    
+    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier);
+  }
+
+  private calculateBikeDuration(facts: TrainingFacts, sessionType: string): number {
+    const baseDuration = this.getBaseBikeDuration(facts.distance);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    
+    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier);
+  }
+
+  private calculateRunDuration(facts: TrainingFacts, sessionType: string): number {
+    const baseDuration = this.getBaseRunDuration(facts.distance);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    
+    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier);
+  }
+
+  private calculateStrengthDuration(facts: TrainingFacts, sessionType: string): number {
+    const baseDuration = this.getBaseStrengthDuration(facts.strengthOption);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    
+    return Math.round(baseDuration * phaseMultiplier);
+  }
+
+  private calculateBrickDuration(facts: TrainingFacts, sessionType: string): number {
+    const baseDuration = this.getBaseBrickDuration(facts.distance);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    
+    return Math.round(baseDuration * phaseMultiplier);
+  }
+
+  // Base durations based on triathlon training science
+  private getBaseSwimDuration(distance: string): number {
+    switch (distance) {
+      case 'sprint': return 30; // 30 min for sprint
+      case 'seventy3': return 45; // 45 min for 70.3
+      case 'olympic': return 40; // 40 min for olympic
+      default: return 30;
+    }
+  }
+
+  private getBaseBikeDuration(distance: string): number {
+    switch (distance) {
+      case 'sprint': return 60; // 60 min for sprint
+      case 'seventy3': return 90; // 90 min for 70.3
+      case 'olympic': return 75; // 75 min for olympic
+      default: return 60;
+    }
+  }
+
+  private getBaseRunDuration(distance: string): number {
+    switch (distance) {
+      case 'sprint': return 45; // 45 min for sprint
+      case 'seventy3': return 60; // 60 min for 70.3
+      case 'olympic': return 50; // 50 min for olympic
+      default: return 45;
+    }
+  }
+
+  private getBaseStrengthDuration(strengthOption: string): number {
+    switch (strengthOption) {
+      case 'traditional': return 45; // Traditional strength
+      case 'compound': return 40; // Compound movements
+      case 'cowboy_endurance': return 35; // Endurance-focused
+      case 'cowboy_compound': return 40; // Compound with endurance
+      default: return 45;
+    }
+  }
+
+  private getBaseBrickDuration(distance: string): number {
+    switch (distance) {
+      case 'sprint': return 75; // 75 min for sprint
+      case 'seventy3': return 120; // 120 min for 70.3
+      case 'olympic': return 90; // 90 min for olympic
+      default: return 75;
+    }
+  }
+
+  // Phase-based duration multipliers (progressive overload)
+  private getPhaseDurationMultiplier(phase: string): number {
+    switch (phase) {
+      case 'base': return 0.8; // Build foundation
+      case 'build': return 1.0; // Standard volume
+      case 'peak': return 1.2; // Peak volume
+      case 'taper': return 0.6; // Reduce volume
+      default: return 1.0;
+    }
+  }
+
+  // Session type multipliers (polarized training)
+  private getSessionTypeMultiplier(sessionType: string): number {
+    switch (sessionType) {
+      case 'recovery': return 0.7; // Shorter recovery sessions
+      case 'endurance': return 1.0; // Standard endurance
+      case 'tempo': return 0.8; // Moderate tempo
+      case 'threshold': return 0.9; // High intensity, moderate duration
+      case 'vo2max': return 0.6; // Short, high intensity
+      default: return 1.0;
+    }
   }
 
   private getPhaseForWeek(week: number, totalWeeks: number): 'base' | 'build' | 'peak' | 'taper' {
