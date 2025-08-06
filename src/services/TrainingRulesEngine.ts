@@ -719,8 +719,12 @@ export class TrainingRulesEngine {
   async generateFullPlan(facts: TrainingFacts): Promise<any> {
     const weeks = [];
     const expectedWeeklyHours = this.getExpectedWeeklyHours(facts.distance, facts.timeLevel);
+    const optimalDistribution = this.calculateOptimalTimeDistribution(facts);
+    const timeLimits = this.getDisciplineTimeLimits(facts.distance);
     
     console.log(`🎯 Expected weekly hours for ${facts.distance} ${facts.timeLevel}: ${expectedWeeklyHours}`);
+    console.log('🎯 Optimal time distribution:', optimalDistribution);
+    console.log('🎯 Science-based time limits:', timeLimits);
     
     for (let week = 1; week <= facts.totalWeeks; week++) {
       const weekFacts = { 
@@ -732,6 +736,32 @@ export class TrainingRulesEngine {
       
       const sessions = await this.generateWeeklyPlan(weekFacts);
       const weeklyHours = sessions.reduce((sum, s) => sum + s.duration, 0) / 60;
+      
+      // Calculate discipline hours for this week
+      const disciplineHours: { [discipline: string]: number } = {};
+      sessions.forEach(session => {
+        const discipline = session.discipline;
+        if (discipline) {
+          disciplineHours[discipline] = (disciplineHours[discipline] || 0) + session.duration / 60;
+        }
+      });
+      
+      // Validate against science-based limits
+      let validationWarnings = [];
+      for (const [discipline, hours] of Object.entries(disciplineHours)) {
+        const limits = timeLimits[discipline];
+        if (limits) {
+          if (hours < limits.min) {
+            validationWarnings.push(`${discipline}: ${hours.toFixed(1)}h (below minimum ${limits.min}h)`);
+          } else if (hours > limits.max) {
+            validationWarnings.push(`${discipline}: ${hours.toFixed(1)}h (above maximum ${limits.max}h)`);
+          }
+        }
+      }
+      
+      if (validationWarnings.length > 0) {
+        console.warn(`⚠️ Week ${week} discipline hours outside science-based limits:`, validationWarnings);
+      }
       
       // Validate weekly hours are within acceptable range
       const minHours = expectedWeeklyHours * 0.8; // Allow 20% variance
@@ -745,7 +775,9 @@ export class TrainingRulesEngine {
         weekNumber: week,
         phase: weekFacts.phase,
         sessions,
-        totalHours: weeklyHours
+        totalHours: weeklyHours,
+        disciplineHours,
+        validationWarnings
       });
     }
     
@@ -756,6 +788,8 @@ export class TrainingRulesEngine {
       longSessionDays: facts.longSessionDays,
       totalHours: weeks.reduce((sum, w) => sum + w.totalHours, 0),
       expectedWeeklyHours,
+      optimalDistribution,
+      timeLimits,
       weeks
     };
     
@@ -972,46 +1006,23 @@ export class TrainingRulesEngine {
   // ===== SCIENCE-BASED DURATION CALCULATIONS =====
 
   private calculateSwimDuration(facts: TrainingFacts, sessionType: string): number {
-    const baseDuration = this.getBaseSwimDuration(facts.distance);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
-    
-    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier);
+    return this.calculateFlexibleDuration(facts, 'swim', sessionType, facts.timeLevel);
   }
 
   private calculateBikeDuration(facts: TrainingFacts, sessionType: string): number {
-    const baseDuration = this.getBaseBikeDuration(facts.distance);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
-    
-    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier);
+    return this.calculateFlexibleDuration(facts, 'bike', sessionType, facts.timeLevel);
   }
 
   private calculateRunDuration(facts: TrainingFacts, sessionType: string): number {
-    const baseDuration = this.getBaseRunDuration(facts.distance);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
-    
-    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier);
+    return this.calculateFlexibleDuration(facts, 'run', sessionType, facts.timeLevel);
   }
 
   private calculateStrengthDuration(facts: TrainingFacts, sessionType: string): number {
-    const baseDuration = this.getBaseStrengthDuration(facts.strengthOption);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
-    
-    return Math.round(baseDuration * phaseMultiplier * timeLevelMultiplier);
+    return this.calculateFlexibleDuration(facts, 'strength', sessionType, facts.timeLevel);
   }
 
   private calculateBrickDuration(facts: TrainingFacts, sessionType: string): number {
-    const baseDuration = this.getBaseBrickDuration(facts.distance);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
-    
-    return Math.round(baseDuration * phaseMultiplier * timeLevelMultiplier);
+    return this.calculateFlexibleDuration(facts, 'brick', sessionType, facts.timeLevel);
   }
 
   // Base durations based on triathlon training science
@@ -1347,4 +1358,198 @@ export class TrainingRulesEngine {
   }
 
   // No fallbacks - engine must generate real sessions or fail
+
+  // ===== SCIENCE-BASED TRAINING FLEXIBILITY =====
+
+  // Minimum and maximum hours per discipline based on triathlon science
+  private getDisciplineTimeLimits(distance: string): { [discipline: string]: { min: number, max: number } } {
+    switch (distance) {
+      case 'sprint':
+        return {
+          swim: { min: 1.5, max: 3.0 },    // 1.5-3 hours/week
+          bike: { min: 2.0, max: 4.0 },    // 2-4 hours/week  
+          run: { min: 1.5, max: 3.0 },     // 1.5-3 hours/week
+          strength: { min: 0.5, max: 1.5 }, // 0.5-1.5 hours/week
+          brick: { min: 0.5, max: 1.0 }    // 0.5-1 hour/week
+        };
+      case 'seventy3':
+        return {
+          swim: { min: 2.0, max: 4.0 },    // 2-4 hours/week
+          bike: { min: 4.0, max: 8.0 },    // 4-8 hours/week
+          run: { min: 2.0, max: 4.0 },     // 2-4 hours/week
+          strength: { min: 0.5, max: 2.0 }, // 0.5-2 hours/week
+          brick: { min: 1.0, max: 2.0 }    // 1-2 hours/week
+        };
+      case 'olympic':
+        return {
+          swim: { min: 1.5, max: 3.5 },    // 1.5-3.5 hours/week
+          bike: { min: 3.0, max: 6.0 },    // 3-6 hours/week
+          run: { min: 2.0, max: 4.0 },     // 2-4 hours/week
+          strength: { min: 0.5, max: 1.5 }, // 0.5-1.5 hours/week
+          brick: { min: 0.75, max: 1.5 }   // 0.75-1.5 hours/week
+        };
+      default:
+        return {
+          swim: { min: 1.5, max: 3.0 },
+          bike: { min: 2.0, max: 4.0 },
+          run: { min: 1.5, max: 3.0 },
+          strength: { min: 0.5, max: 1.5 },
+          brick: { min: 0.5, max: 1.0 }
+        };
+    }
+  }
+
+  // ===== DIMINISHING RETURNS & OVERTRAINING PREVENTION =====
+
+  // Calculate diminishing returns multiplier to prevent overtraining
+  private getDiminishingReturnsMultiplier(currentHours: number, targetHours: number): number {
+    const ratio = currentHours / targetHours;
+    
+    if (ratio <= 1.0) {
+      // Below target: full benefit
+      return 1.0;
+    } else if (ratio <= 1.2) {
+      // 20% over target: 80% benefit
+      return 0.8;
+    } else if (ratio <= 1.4) {
+      // 40% over target: 60% benefit
+      return 0.6;
+    } else if (ratio <= 1.6) {
+      // 60% over target: 40% benefit
+      return 0.4;
+    } else {
+      // Beyond 60% over target: 20% benefit (prevent overtraining)
+      return 0.2;
+    }
+  }
+
+  // Calculate optimal time distribution with diminishing returns
+  private calculateOptimalTimeDistribution(facts: TrainingFacts): { [discipline: string]: number } {
+    const timeLimits = this.getDisciplineTimeLimits(facts.distance);
+    const totalHours = this.getExpectedWeeklyHours(facts.distance, facts.timeLevel);
+    
+    // Base distribution percentages (science-based)
+    const baseDistribution = {
+      swim: 0.20,    // 20% for swim
+      bike: 0.45,    // 45% for bike (most important)
+      run: 0.25,     // 25% for run
+      strength: 0.08, // 8% for strength
+      brick: 0.02    // 2% for brick sessions
+    };
+    
+    // Adjust based on user preferences
+    let adjustedDistribution = { ...baseDistribution };
+    
+    // If user has strength preference, increase strength time
+    if (facts.strengthOption && facts.strengthOption !== 'none') {
+      adjustedDistribution.strength = 0.12; // Increase to 12%
+      adjustedDistribution.bike = 0.41;     // Reduce bike slightly
+      adjustedDistribution.run = 0.23;      // Reduce run slightly
+    }
+    
+    // Calculate hours per discipline with diminishing returns
+    const distribution: { [discipline: string]: number } = {};
+    
+    for (const [discipline, percentage] of Object.entries(adjustedDistribution)) {
+      const targetHours = totalHours * percentage;
+      const limits = timeLimits[discipline];
+      
+      // Apply diminishing returns if over target
+      const diminishingMultiplier = this.getDiminishingReturnsMultiplier(targetHours, limits.max);
+      const adjustedTargetHours = targetHours * diminishingMultiplier;
+      
+      // Ensure within science-based limits
+      distribution[discipline] = Math.max(
+        limits.min,
+        Math.min(limits.max, adjustedTargetHours)
+      );
+    }
+    
+    // Redistribute any remaining hours (due to limits and diminishing returns)
+    const allocatedHours = Object.values(distribution).reduce((sum, hours) => sum + hours, 0);
+    const remainingHours = totalHours - allocatedHours;
+    
+    if (remainingHours > 0) {
+      // Add remaining hours to bike (most beneficial for triathlon) with diminishing returns
+      const bikeTarget = distribution.bike + remainingHours;
+      const bikeDiminishingMultiplier = this.getDiminishingReturnsMultiplier(bikeTarget, timeLimits.bike.max);
+      
+      distribution.bike = Math.min(
+        timeLimits.bike.max,
+        distribution.bike + (remainingHours * bikeDiminishingMultiplier)
+      );
+    }
+    
+    console.log('🎯 Optimal time distribution with diminishing returns:', distribution);
+    return distribution;
+  }
+
+  // Calculate session duration with diminishing returns protection
+  private calculateFlexibleDuration(
+    facts: TrainingFacts, 
+    discipline: string, 
+    sessionType: string,
+    userPreference: 'minimum' | 'moderate' | 'serious' | 'hardcore' = 'moderate'
+  ): number {
+    const baseDuration = this.getBaseDurationForDiscipline(discipline, facts.distance);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    const flexibilityMultiplier = this.getFlexibilityMultiplier(userPreference);
+    
+    // Calculate base duration
+    let duration = Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier * flexibilityMultiplier);
+    
+    // Apply diminishing returns for high-volume training
+    const timeLimits = this.getDisciplineTimeLimits(facts.distance);
+    const disciplineLimits = timeLimits[discipline];
+    
+    if (disciplineLimits) {
+      const weeklyHours = this.getExpectedWeeklyHours(facts.distance, facts.timeLevel);
+      const disciplinePercentage = this.getDisciplinePercentage(discipline);
+      const targetDisciplineHours = weeklyHours * disciplinePercentage;
+      
+      // Apply diminishing returns if approaching limits
+      const diminishingMultiplier = this.getDiminishingReturnsMultiplier(targetDisciplineHours, disciplineLimits.max);
+      duration = Math.round(duration * diminishingMultiplier);
+    }
+    
+    // Ensure minimum session duration (15 minutes)
+    return Math.max(15, duration);
+  }
+
+  // Get discipline percentage for diminishing returns calculation
+  private getDisciplinePercentage(discipline: string): number {
+    switch (discipline) {
+      case 'swim': return 0.20;
+      case 'bike': return 0.45;
+      case 'run': return 0.25;
+      case 'strength': return 0.08;
+      case 'brick': return 0.02;
+      default: return 0.20;
+    }
+  }
+
+  // Flexibility multipliers based on user preference
+  private getFlexibilityMultiplier(userPreference: string): number {
+    switch (userPreference) {
+      case 'minimum': return 0.9;  // Slightly shorter sessions
+      case 'moderate': return 1.0; // Standard sessions
+      case 'serious': return 1.1;  // Slightly longer sessions
+      case 'hardcore': return 1.2; // Longer sessions
+      default: return 1.0;
+    }
+  }
+
+  // Get base duration for discipline
+  private getBaseDurationForDiscipline(discipline: string, distance: string): number {
+    switch (discipline) {
+      case 'swim': return this.getBaseSwimDuration(distance);
+      case 'bike': return this.getBaseBikeDuration(distance);
+      case 'run': return this.getBaseRunDuration(distance);
+      case 'strength': return this.getBaseStrengthDuration('traditional'); // Default
+      case 'brick': return this.getBaseBrickDuration(distance);
+      default: return 60;
+    }
+  }
 } 
