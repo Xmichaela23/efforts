@@ -2,6 +2,8 @@
 // Clean, template-based approach replacing complex algorithms
 // Start with Sprint triathlon - one distance at a time
 
+import { TrainingRulesEngine, TrainingFacts } from './TrainingRulesEngine';
+
 export interface SimpleTrainingPlan {
   distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman';
   timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore';
@@ -404,8 +406,13 @@ const SEVENTY3_STRENGTH_ADDITIONS = {
 };
 
 export class SimpleTrainingService {
+  private rulesEngine: TrainingRulesEngine;
+
+  constructor() {
+    this.rulesEngine = new TrainingRulesEngine();
+  }
   
-  generateSprintPlan(
+  async generateSprintPlan(
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
@@ -426,11 +433,11 @@ export class SimpleTrainingService {
       swimming?: string[];
       strength?: string[];
     }
-  ): SimpleTrainingPlan {
-    return this.generatePlan('sprint', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+  ): Promise<SimpleTrainingPlan> {
+    return await this.generatePlan('sprint', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
   }
 
-  generateSeventy3Plan(
+  async generateSeventy3Plan(
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
@@ -451,11 +458,11 @@ export class SimpleTrainingService {
       swimming?: string[];
       strength?: string[];
     }
-  ): SimpleTrainingPlan {
-    return this.generatePlan('seventy3', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+  ): Promise<SimpleTrainingPlan> {
+    return await this.generatePlan('seventy3', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
   }
 
-  private generatePlan(
+  private async generatePlan(
     distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman',
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
@@ -477,7 +484,7 @@ export class SimpleTrainingService {
       swimming?: string[];
       strength?: string[];
     }
-  ): SimpleTrainingPlan {
+  ): Promise<SimpleTrainingPlan> {
     // Validate baselines first
     const baselineValidation = this.validateBaselineData(userBaselines);
     if (!baselineValidation.isValid) {
@@ -485,7 +492,7 @@ export class SimpleTrainingService {
     }
 
     // Generate the plan
-    const plan = this.generatePlanInternal(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    const plan = await this.generatePlanInternal(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
     
     // Validate the generated plan
     const validation = this.validatePlan(plan, timeLevel, strengthOption, longSessionDays);
@@ -940,25 +947,25 @@ export class SimpleTrainingService {
     return { ...plan, weeks: correctedWeeks };
   }
 
-  private generatePlanInternal(
+  private async generatePlanInternal(
     distance: 'sprint' | 'olympic' | 'seventy3' | 'ironman',
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
     userBaselines: any,
     userEquipment?: any
-  ): SimpleTrainingPlan {
+  ): Promise<SimpleTrainingPlan> {
     
     console.log(`🏊‍♂️ Generating ${distance} plan...`);
     
     // Use the solid plan engine for Sprint
     if (distance === 'sprint') {
-      return this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+      return await this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
     }
     
     // Use the solid plan engine for 70.3
     if (distance === 'seventy3') {
-      return this.generateSolid70_3Plan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+      return await this.generateSolid70_3Plan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
     }
     
     // Fallback to original method for other distances
@@ -966,63 +973,57 @@ export class SimpleTrainingService {
   }
   
   // NEW: Solid Sprint Plan Engine
-  private generateSolidSprintPlan(
+  private async generateSolidSprintPlan(
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
     userBaselines: any,
     userEquipment?: any
-  ): SimpleTrainingPlan {
+  ): Promise<SimpleTrainingPlan> {
     
-    console.log('🎯 Generating solid Sprint plan...');
+    console.log('🎯 Generating solid Sprint plan with Rules Engine...');
     
-    // Calculate personalized targets
-    const easyBikePower = Math.round(userBaselines.ftp * 0.65);
-    const enduranceBikePower = Math.round(userBaselines.ftp * 0.75);
-    const tempoBikePower = Math.round(userBaselines.ftp * 0.85);
-    
-    const easyRunPace = this.calculateEasyRunPace(userBaselines);
-    const tempoRunPace = this.calculateTempoRunPace(userBaselines);
-    
-    const easySwimPace = this.calculateEasySwimPace(userBaselines);
-    const enduranceSwimPace = this.calculateEnduranceSwimPace(userBaselines);
-    
-    console.log('🔧 Personalized targets:');
-    console.log(`  • Bike: Easy ${easyBikePower}W, Endurance ${enduranceBikePower}W, Tempo ${tempoBikePower}W`);
-    console.log(`  • Run: Easy ${easyRunPace}, Tempo ${tempoRunPace}`);
-    console.log(`  • Swim: Easy ${easySwimPace}, Endurance ${enduranceSwimPace}`);
-    
-    // Create base weekly template (6 hours = 360 minutes)
-    const baseSessions = this.createSolidBaseTemplate(
-      easyBikePower, enduranceBikePower, tempoBikePower,
-      easyRunPace, tempoRunPace,
-      easySwimPace, enduranceSwimPace
-    );
-    
-    // Create 12-week progression
-    const weeks = this.createSolidWeeklyProgression(baseSessions, userBaselines);
-    
-    // Calculate total hours
-    const totalHours = weeks.reduce((sum, week) => sum + week.totalHours, 0);
-    
-    return {
+    // Create training facts for the rules engine
+    const trainingFacts: TrainingFacts = {
       distance: 'sprint',
+      totalWeeks: 12,
+      currentWeek: 1,
+      philosophy: 'polarized', // Default to polarized for now
       timeLevel,
       strengthOption,
       longSessionDays,
-      totalHours,
-      weeks
+      ftp: userBaselines.ftp,
+      fiveKPace: userBaselines.fiveKPace,
+      easyPace: userBaselines.easyPace,
+      swimPace100: userBaselines.swimPace100,
+      squat1RM: userBaselines.squat1RM,
+      deadlift1RM: userBaselines.deadlift1RM,
+      bench1RM: userBaselines.bench1RM,
+      overheadPress1RM: userBaselines.overheadPress1RM,
+      age: userBaselines.age,
+      phase: 'base',
+      weekWithinPhase: 1,
+      totalPhaseWeeks: 4,
+      discipline: 'bike',
+      sessionType: 'endurance'
     };
+    
+    // Generate plan using rules engine
+    const plan = await this.rulesEngine.generateFullPlan(trainingFacts);
+    
+    console.log('✅ Rules Engine generated plan:', plan);
+    
+    return plan as SimpleTrainingPlan;
   }
   
   // NEW: Solid 70.3 Plan Engine
-  private generateSolid70_3Plan(
+  private async generateSolid70_3Plan(
     timeLevel: 'minimum' | 'moderate' | 'serious' | 'hardcore',
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
     userBaselines: any,
     userEquipment?: any
-  ): SimpleTrainingPlan {
+  ): Promise<SimpleTrainingPlan> {
     
     console.log('🎯 Generating solid 70.3 plan...');
     
@@ -2585,7 +2586,7 @@ Run (25min):
    * Comprehensive test suite for all Sprint combinations
    * Tests all variations of time, strength, long session days, and equipment
    */
-  testAllSprintCombinations(): TestResults {
+  async testAllSprintCombinations(): Promise<TestResults> {
     console.log('🧪 Testing all Sprint combinations...');
     
     const timeLevels: ('minimum' | 'moderate' | 'serious' | 'hardcore')[] = ['minimum', 'moderate', 'serious', 'hardcore'];
@@ -2658,7 +2659,7 @@ Run (25min):
             results.total++;
             
             try {
-              const plan = this.generateSprintPlan(timeLevel, strengthOption, longSessionDay, testBaselines, equipmentScenario.equipment);
+              const plan = await this.generateSprintPlan(timeLevel, strengthOption, longSessionDay, testBaselines, equipmentScenario.equipment);
               const validation = this.validatePlan(plan, timeLevel, strengthOption, longSessionDay);
               
               if (validation.isValid) {
@@ -2725,10 +2726,10 @@ Run (25min):
   /**
    * Run comprehensive tests and generate report
    */
-  runComprehensiveTests(): TestReport {
+  async runComprehensiveTests(): Promise<TestReport> {
     console.log('🚀 Running comprehensive tests...');
     
-    const sprintResults = this.testAllSprintCombinations();
+    const sprintResults = await this.testAllSprintCombinations();
     
     const report: TestReport = {
       timestamp: new Date().toISOString(),
