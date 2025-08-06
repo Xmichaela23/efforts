@@ -182,8 +182,15 @@ export default function SimplePlanBuilder() {
       } else {
         throw new Error(`Unsupported distance: ${answers.distance}`);
       }
+      console.log('🔍 Frontend plan check:', {
+        hasPlan: !!generatedPlan,
+        hasDistance: !!generatedPlan?.distance,
+        hasWeeks: !!generatedPlan?.weeks,
+        weeksLength: generatedPlan?.weeks?.length,
+        firstWeek: generatedPlan?.weeks?.[0]
+      });
       setPlan(generatedPlan);
-          setCurrentWeek(0);
+      setCurrentWeek(0);
     }
   };
 

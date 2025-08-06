@@ -1015,7 +1015,13 @@ export class SimpleTrainingService {
     const plan = await this.rulesEngine.generateFullPlan(trainingFacts);
     
     console.log('✅ Rules Engine generated plan:', plan);
-    
+    console.log('🔍 Plan structure check:', {
+      hasDistance: !!plan.distance,
+      hasWeeks: !!plan.weeks,
+      weeksLength: plan.weeks?.length,
+      firstWeek: plan.weeks?.[0],
+      totalHours: plan.totalHours
+    });
     return plan as SimpleTrainingPlan;
   }
   
