@@ -1,176 +1,144 @@
-# CURRENT SYSTEM STATUS: TEMPLATE-BASED TRAINING PLANS
+# CURRENT SYSTEM STATUS: JSON RULES ENGINE
 
-## Current Status: Working Template-Based System
+## Current Status: Working JSON Rules Engine System
 
 ### ✅ WORKING SYSTEM
-**We've successfully built a clean, template-based training plan generator that's working well!**
+**We've successfully built a scalable, science-based JSON Rules Engine that generates personalized training plans!**
 
-- **Template-based approach** using base templates + multipliers
-- **Sprint triathlon focus** (one distance at a time)
+- **JSON Rules Engine** using json-rules-engine (2,874 stars)
+- **Multi-distance support** (Sprint, Olympic, 70.3, Ironman)
 - **4-step assessment flow** (Distance → Strength → Time → Long Session Day)
 - **Personalized targets** based on user baselines (FTP, paces, 1RM)
 - **12-week progressive plans** with proper phase progression
-- **Clean, minimal UI** with tabbed week navigation
+- **Clean, minimal UI** with swipe navigation
 - **Professional workout details** with warm-ups, cool-downs, and target ranges
+
+## 🚨 CRITICAL RULE: NO FALLBACKS - REAL USER BASELINE DATA ONLY
+
+### **⚠️ ABSOLUTE REQUIREMENT: User Baseline Data Must Be Complete**
+The JSON Rules Engine **WILL NOT WORK** without complete user baseline data. This is by design to ensure scientific accuracy.
+
+#### **✅ REQUIRED BASELINE DATA:**
+- **FTP (Functional Threshold Power)** - Required for bike power calculations
+- **Run Paces** - Either `easyPace` OR `fiveKPace` (for run pace calculations)
+- **Swim Pace** - `swimPace100` (for swim pace calculations)
+- **Strength 1RM Values** - `squat1RM`, `deadlift1RM`, `bench1RM` (for strength calculations)
+
+#### **❌ NO FALLBACKS ALLOWED:**
+- **No age-based estimates** - Only real performance data
+- **No hardcoded defaults** - Everything must come from user baselines
+- **No AI-generated values** - Only actual test results
+- **No placeholder data** - Complete baseline data required
+
+#### **🔒 SYSTEM BEHAVIOR:**
+- **Throws clear errors** when baseline data is missing
+- **Fails fast** - No silent failures or hidden assumptions
+- **Requires validation** before plan generation
+- **No partial plans** - Complete data or no plan
+
+### **🎯 WHY THIS MATTERS:**
+We switched from AI-based generation to a **reliable, science-based JSON Rules Engine** specifically because:
+- **AI was unreliable** - Generated inconsistent, non-scientific plans
+- **Fallbacks were dangerous** - Led to inappropriate training loads
+- **User safety is paramount** - Only real baseline data ensures safe training
+- **Scientific accuracy** - Every calculation must be based on actual performance
 
 ## Current Implementation Status
 
 ### ✅ Working Features
-- **Template-based plan generation** for Sprint triathlon
+- **JSON Rules Engine** for Sprint and 70.3 triathlon
 - **Personalized workout targets** based on user baselines
 - **Professional workout details** with proper structure
-- **Clean, minimal UI** with tabbed week navigation
-- **Strength integration** with 5 different options
+- **Clean swipe interface** with dot indicators and smooth transitions
+- **Complete strength integration** with 5 options and full workout generation
+- **Smart session distribution** with polarized training principles
 - **Progressive overload** across 12-week plans
-- **User baseline management** with comprehensive data collection
+- **Scientific validation** with evidence-based training principles
+- **Multi-distance support** with distance-specific rules
 
-### 🔄 In Development
-- **Additional distances** (Olympic, 70.3, Ironman)
-- **Enhanced strength options** with more detailed workouts
+### 🔄 Future Enhancements
+- **Additional distances** (Olympic, Ironman)
 - **Advanced analytics** for training progress tracking
 - **Real-time data sync** across all integrations
 
-## Scientific Validation
+## 🧪 Test Results
 
-### ✅ Evidence-Based Training
-- **Polarized training**: 80/20 easy/hard ratio enforcement
-- **Research-based**: Uses actual coaching data (Lauersen et al., Rønnestad & Mujika, Beattie et al.)
-- **Strength percentages**: 80-85% 1RM for compound strength (evidence-based)
-- **Recovery spacing**: Proper session distribution prevents overtraining
-- **Progressive overload**: Systematic volume and intensity increases
+### ✅ Sprint Triathlon Plans
+- **All combinations tested** and working
+- **Polarized training** properly implemented
+- **Progressive overload** scientifically applied
+- **Session balance** maintained across disciplines
+- **Recovery spacing** optimized for performance
 
-### ✅ User Experience Validation
-- **Clean interface**: No frames, boxes, or unnecessary elements
-- **Professional workouts**: Detailed sessions with proper structure
-- **Personalized targets**: All based on actual user data
-- **Easy navigation**: Tabbed weeks and clear session organization
+### ✅ 70.3 Half Ironman Plans
+- **Extended volume** properly scaled
+- **Longer sessions** appropriately distributed
+- **Brick sessions** strategically placed
+- **Strength integration** maintained
 
-## Template System Analysis
+## 🐛 Known Issues & Solutions
 
-### Sprint Base Template
-```typescript
-const SPRINT_BASE_TEMPLATE: SimpleSession[] = [
-  {
-    day: 'TBD', // Distributed by reverse engineering logic
-    discipline: 'swim',
-    type: 'recovery',
-    duration: 30,
-    intensity: 'Zone 1 (Recovery - <75% HR)',
-    zones: [1]
-  },
-  {
-    day: 'TBD',
-    discipline: 'strength',
-    type: 'endurance',
-    duration: 45,
-    intensity: 'Traditional strength',
-    zones: [2]
-  },
-  // ... additional sessions
-]
-```
+### ✅ Recently Fixed
+- **Random session generation**: Replaced with deterministic rules engine - FIXED
+- **Missing session types**: Added complete session generation rules - FIXED
+- **Incomplete event processing**: Enhanced to handle all events - FIXED
+- **Generic descriptions**: Now generates specific workout details - FIXED
+- **Poor session distribution**: Implemented polarized training logic - FIXED
+- **All fallbacks removed**: No more age-based estimates or hardcoded defaults - FIXED
 
-### Time Multipliers
-```typescript
-const SPRINT_TIME_MULTIPLIERS = {
-  minimum: 0.8,   // 4.8 hours/week
-  moderate: 1.0,  // 6.0 hours/week
-  serious: 1.2,   // 7.2 hours/week
-  hardcore: 1.4   // 8.4 hours/week
-}
-```
+### 🔍 Debugging Tools Available
+- **Console logging**: Extensive logging for rules engine events
+- **Validation framework**: Comprehensive plan validation
+- **Test scripts**: Systematic testing of all combinations
 
-### Strength Additions
-```typescript
-const SPRINT_STRENGTH_ADDITIONS = {
-  none: 0,
-  traditional: 1.5,      // +1.5 hours
-  compound: 2.0,         // +2.0 hours
-  cowboy_endurance: 3.0, // +3.0 hours
-  cowboy_compound: 3.5   // +3.5 hours
-}
-```
+## 🎯 Current Capabilities
 
-## Personalization System
-
-### User Baseline Integration
-- **FTP**: Bike power targets (65-85% FTP for endurance)
-- **5K Pace**: Run pace targets (tempo and threshold paces)
-- **Easy Pace**: Recovery and endurance run paces
-- **Swim Pace**: Swim targets (recovery and endurance)
-- **1RM Values**: Strength workout weights (80-85% 1RM for compounds)
-- **Age**: Heart rate zone calculations (220-age formula)
-
-### Target Calculation Examples
-```typescript
-// Bike power targets
-const easyBikePower = userBaselines.ftp ? Math.round(userBaselines.ftp * 0.65) : 160;
-const enduranceBikePower = userBaselines.ftp ? Math.round(userBaselines.ftp * 0.75) : 185;
-
-// Run pace targets
-const easyRunPace = this.calculateEasyRunPace(userBaselines);
-const tempoRunPace = this.calculateTempoRunPace(userBaselines);
-
-// Strength weights
-const squat = Math.round(userBaselines.squat1RM * 0.8 / 5) * 5; // 80% 1RM, rounded to 5s
-```
-
-## Success Metrics
-
-### Technical Success
-- ✅ **Template system working**: Clean, scalable approach
-- ✅ **Personalization working**: All targets based on user data
-- ✅ **UI/UX working**: Professional, minimal interface
-- ✅ **Scientific validation**: Evidence-based training principles
-
-### User Success
-- ✅ **Professional plans**: Detailed, realistic workouts
-- ✅ **Easy to use**: Simple 4-step assessment flow
-- ✅ **Personalized**: All targets match user's actual fitness
-- ✅ **Scalable**: Template approach works for different users
-
-## Next Steps
-
-### Immediate Priorities
-1. **Extend to Olympic distance** using the same template approach
-2. **Enhance strength workouts** with more detailed prescriptions
-3. **Add advanced features** like plan comparison and analytics
-4. **Improve real-time sync** for better data integration
-
-### Development Guidelines
-1. **Maintain simplicity**: Keep the template-based approach
-2. **Preserve personalization**: All plans must use user baselines
-3. **Follow science**: Maintain evidence-based training principles
-4. **Keep UI clean**: Minimal design with professional presentation
-
-## Research Foundation
-
-### Evidence-Based Training
-- **Lauersen et al. (2014)**: Injury prevention
-- **Rønnestad & Mujika (2014)**: Cycling performance
-- **Beattie et al. (2014)**: Running economy
-- **Seiler & Tønnessen**: Polarized training model
-
-### Strength Training Percentages
-- **80-85% 1RM**: Standard strength training protocols
-- **3-4 minute rest**: Appropriate for compound lifts
-- **Progressive overload**: Systematic increases across training phases
-- **Recovery spacing**: Proper session distribution prevents overtraining
-
-## Current Architecture
-
-### Core Files
-- **`src/services/SimpleTrainingService.ts`**: Template-based algorithm
-- **`src/components/SimplePlanBuilder.tsx`**: Main UI component
-- **`src/contexts/AppContext.tsx`**: User baseline management
-- **`src/components/TrainingBaselines.tsx`**: Baseline data collection
-
-### Key Features
-- **Template-based approach** using base templates + multipliers
-- **Personalized targets** based on user baselines
+### ✅ What Works Perfectly
+- **JSON Rules Engine** for Sprint and 70.3 triathlon
+- **Personalized workout targets** based on user baselines
 - **Professional workout details** with proper structure
-- **Clean, minimal UI** with tabbed week navigation
-- **Strength integration** with 5 different options
+- **Clean swipe interface** with dot indicators and smooth transitions
+- **Complete strength integration** with 5 options and full workout generation
+- **Smart session distribution** with polarized training principles
 - **Progressive overload** across 12-week plans
+- **Scientific validation** with evidence-based training principles
+- **Multi-distance support** with distance-specific rules
+- **No fallbacks or mocks** - Only real user baseline data
 
-**The system is working well with a clean, template-based approach that generates professional, personalized training plans!** 🎯 
+### 🔄 Future Enhancements
+- **Additional distances** (Olympic, Ironman)
+- **Advanced analytics** for training progress tracking
+- **Real-time data sync** across all integrations
+
+## 🧠 Technical Architecture
+
+### **Core Files**
+- **`src/services/TrainingRulesEngine.ts`**: JSON Rules Engine with science-based rules
+- **`src/services/SimpleTrainingService.ts`**: Integration with rules engine
+- **`src/components/SimplePlanBuilder.tsx`**: UI with swipe interface and updated language
+- **`src/contexts/AppContext.tsx`**: User baseline management
+
+### **Key Methods**
+- **`generateSession()`**: Individual session generation using rules engine
+- **`generateWeeklyPlan()`**: Weekly session distribution with polarized training
+- **`generateFullPlan()`**: Complete plan generation with progression
+- **`getSessionDistribution()`**: Intelligent session placement based on philosophy
+- **`applyPhilosophyRules()`**: Polarized training implementation
+
+## 🧪 Scientific Foundation
+
+### **Training Principles**
+- **Polarized Training**: 80/20 easy/hard ratio enforcement
+- **Progressive Overload**: Systematic volume and intensity increases
+- **Recovery Spacing**: Proper session distribution prevents overtraining
+- **Evidence-Based Percentages**: 80-85% 1RM for compound strength
+
+### **JSON Rules Engine Benefits**
+- **Scalable**: Easy to add new distances, philosophies, strength options
+- **Science-based**: All rules grounded in training research
+- **Deterministic**: Consistent plans without random variations
+- **Personalized**: All sessions based on user's actual data
+- **Maintainable**: Clear rule structure for easy updates
+- **No fallbacks**: Only real user baseline data used
+
+**The JSON Rules Engine is now fully functional with science-based training principles and NO FALLBACKS!** 🎯 
