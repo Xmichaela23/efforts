@@ -1115,7 +1115,7 @@ export class TrainingRulesEngine {
     console.log('🔍 calculateRunDuration called with sessionType:', sessionType);
     
     // Base duration based on user's run pace and distance
-    const baseDuration = this.calculateRunBaseDuration(facts);
+    const baseDuration = this.calculateRunBaseDuration(facts, sessionType);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
     const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
     const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
@@ -1166,29 +1166,16 @@ export class TrainingRulesEngine {
     
     // Brick sessions combine bike + run based on user's capabilities
     const bikeDuration = this.calculateBikeBaseDuration(facts) * 0.7; // 70% bike
-    const runDuration = this.calculateRunBaseDuration(facts) * 0.3;   // 30% run
-    const baseDuration = bikeDuration + runDuration;
+    const runDuration = this.calculateRunBaseDuration(facts, sessionType) * 0.3;   // 30% run
     
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
-    
+    const totalDuration = bikeDuration + runDuration;
     console.log('🔍 Brick duration calculation:', {
       bikeDuration,
       runDuration,
-      baseDuration,
-      phaseMultiplier,
-      sessionMultiplier,
-      timeMultiplier,
-      distance: facts.distance,
-      phase: facts.phase,
-      sessionType,
-      timeLevel: facts.timeLevel
+      totalDuration
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
-    console.log('🔍 Final brick duration:', duration);
-    return duration;
+    return totalDuration;
   }
 
   // SCIENCE-BASED BASE DURATION CALCULATIONS USING USER BASELINE DATA
@@ -1203,26 +1190,27 @@ export class TrainingRulesEngine {
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
+    // INCREASED: Account for multipliers that will reduce these durations
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
-        // Sprint training: 1500-2000m swim sessions (2x race distance)
-        baseDuration = (1750 * pacePer100m) / 60; // Convert to minutes
+        // Sprint training: 2500-3000m swim sessions (3-4x race distance)
+        baseDuration = (2750 * pacePer100m) / 60; // Convert to minutes
         break;
       case 'olympic':
-        // Olympic training: 2500-3000m swim sessions (2x race distance)
-        baseDuration = (2750 * pacePer100m) / 60;
+        // Olympic training: 4000-5000m swim sessions (2.5-3x race distance)
+        baseDuration = (4500 * pacePer100m) / 60;
         break;
       case 'seventy3':
-        // 70.3 training: 3000-4000m swim sessions (2x race distance)
-        baseDuration = (3500 * pacePer100m) / 60;
+        // 70.3 training: 5000-6000m swim sessions (2.5-3x race distance)
+        baseDuration = (5500 * pacePer100m) / 60;
         break;
       default:
-        baseDuration = (2000 * pacePer100m) / 60; // Default 2000m
+        baseDuration = (3000 * pacePer100m) / 60; // Default 3000m
     }
     
-    // Ensure minimum 30 minutes, maximum 120 minutes
-    return Math.max(30, Math.min(120, baseDuration));
+    // Ensure minimum 45 minutes, maximum 150 minutes
+    return Math.max(45, Math.min(150, baseDuration));
   }
 
   private calculateBikeBaseDuration(facts: TrainingFacts): number {
@@ -1232,67 +1220,83 @@ export class TrainingRulesEngine {
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
+    // INCREASED: Account for multipliers that will reduce these durations
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
-        // Sprint training: 40-50km bike sessions (2-2.5x race distance)
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 45);
-        break;
-      case 'olympic':
-        // Olympic training: 60-80km bike sessions (1.5-2x race distance)
+        // Sprint training: 60-80km bike sessions (3-4x race distance)
         baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 70);
         break;
+      case 'olympic':
+        // Olympic training: 80-100km bike sessions (2-2.5x race distance)
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 90);
+        break;
       case 'seventy3':
-        // 70.3 training: 100-120km bike sessions (1.1-1.3x race distance)
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 110);
+        // 70.3 training: 120-140km bike sessions (1.3-1.6x race distance)
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 130);
         break;
       default:
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 60); // Default 60km
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 80); // Default 80km
     }
     
-    // Ensure minimum 45 minutes, maximum 240 minutes
-    return Math.max(45, Math.min(240, baseDuration));
+    // Ensure minimum 60 minutes, maximum 300 minutes
+    return Math.max(60, Math.min(300, baseDuration));
   }
 
-  private calculateRunBaseDuration(facts: TrainingFacts): number {
+  private calculateRunBaseDuration(facts: TrainingFacts, sessionType: string): number {
     if (!facts.easyPace && !facts.fiveK) {
       throw new Error('Run pace (easyPace or fiveK) is required for science-based run duration calculation');
     }
     
-    // Use easyPace if available, otherwise estimate from fiveK
-    let easyPaceSeconds: number;
-    if (facts.easyPace) {
-      easyPaceSeconds = this.parseTimeToSeconds(facts.easyPace);
-    } else if (facts.fiveK) {
-      const fiveKSeconds = this.parseTimeToSeconds(facts.fiveK);
-      // Estimate easy pace as 20% slower than 5K pace
-      easyPaceSeconds = fiveKSeconds * 1.2;
+    // Use appropriate pace based on session type
+    let paceSeconds: number;
+    if (sessionType === 'recovery' || sessionType === 'endurance') {
+      // Zone 2/Recovery: Use easy pace
+      if (facts.easyPace) {
+        paceSeconds = this.parseTimeToSeconds(facts.easyPace);
+      } else if (facts.fiveK) {
+        const fiveKSeconds = this.parseTimeToSeconds(facts.fiveK);
+        // Estimate easy pace as 20% slower than 5K pace
+        paceSeconds = fiveKSeconds * 1.2;
+      } else {
+        throw new Error('Easy pace required for recovery/endurance sessions');
+      }
     } else {
-      throw new Error('No run pace data available');
+      // Tempo/Threshold/VO2max: Use 5K pace or estimate from easy pace
+      if (facts.fiveK) {
+        paceSeconds = this.parseTimeToSeconds(facts.fiveK);
+      } else if (facts.easyPace) {
+        const easyPaceSeconds = this.parseTimeToSeconds(facts.easyPace);
+        // Estimate 5K pace as 20% faster than easy pace
+        paceSeconds = easyPaceSeconds * 0.8;
+      } else {
+        throw new Error('5K pace required for tempo/threshold/VO2max sessions');
+      }
     }
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
+    // INCREASED: Account for multipliers that will reduce these durations
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
-        // Sprint training: 8-12km run sessions (1.6-2.4x race distance)
-        baseDuration = (10 * easyPaceSeconds) / 60;
+        // Sprint training: 12-16km run sessions (2.4-3.2x race distance)
+        baseDuration = (14 * paceSeconds) / 60;
         break;
       case 'olympic':
-        // Olympic training: 12-16km run sessions (1.2-1.6x race distance)
-        baseDuration = (14 * easyPaceSeconds) / 60;
+        // Olympic training: 16-20km run sessions (1.6-2x race distance)
+        baseDuration = (18 * paceSeconds) / 60;
         break;
       case 'seventy3':
-        // 70.3 training: 15-20km run sessions (0.7-1x race distance)
-        baseDuration = (18 * easyPaceSeconds) / 60;
+        // 70.3 training: 20-25km run sessions (0.95-1.2x race distance)
+        baseDuration = (22 * paceSeconds) / 60;
         break;
       default:
-        baseDuration = (12 * easyPaceSeconds) / 60; // Default 12km
+        baseDuration = (16 * paceSeconds) / 60; // Default 16km
     }
     
-    // Ensure minimum 30 minutes, maximum 180 minutes
-    return Math.max(30, Math.min(180, baseDuration));
+    // Ensure minimum 45 minutes, maximum 240 minutes
+    return Math.max(45, Math.min(240, baseDuration));
   }
 
   private calculateBikeTimeFromFTP(ftp: number, distanceKm: number): number {
@@ -2338,35 +2342,28 @@ export class TrainingRulesEngine {
 
   // Get base duration for discipline using science-based calculations
   private getBaseDurationForDiscipline(discipline: string, distance: string): number {
-    // Create a minimal facts object for base duration calculation
+    // Create minimal facts object for base duration calculation
     const minimalFacts: TrainingFacts = {
       distance: distance as 'sprint' | 'olympic' | 'seventy3' | 'ironman',
       totalWeeks: 12,
       currentWeek: 1,
       philosophy: 'polarized',
       timeLevel: 'moderate',
-      strengthOption: 'traditional',
-      longSessionDays: '',
+      strengthOption: 'none',
+      longSessionDays: 'saturday',
       phase: 'base',
       weekWithinPhase: 1,
-      totalPhaseWeeks: 12,
-      // Use reasonable defaults for baseline data
-      ftp: 200,
-      easyPace: '5:30',
-      swimPace100: '1:30',
-      squat: 200,
-      deadlift: 250,
-      bench: 150
+      totalPhaseWeeks: 4
     };
     
     switch (discipline) {
       case 'swim': return this.calculateSwimBaseDuration(minimalFacts);
       case 'bike': return this.calculateBikeBaseDuration(minimalFacts);
-      case 'run': return this.calculateRunBaseDuration(minimalFacts);
+      case 'run': return this.calculateRunBaseDuration(minimalFacts, 'endurance');
       case 'strength': return this.calculateStrengthBaseDuration(minimalFacts);
       case 'brick': 
         const bikeDuration = this.calculateBikeBaseDuration(minimalFacts) * 0.7;
-        const runDuration = this.calculateRunBaseDuration(minimalFacts) * 0.3;
+        const runDuration = this.calculateRunBaseDuration(minimalFacts, 'endurance') * 0.3;
         return bikeDuration + runDuration;
       default: return 60;
     }
