@@ -291,6 +291,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.log('🔍 Database data loaded:', data);
       console.log('🔍 current_fitness from database:', data.current_fitness);
       console.log('🔍 performance_numbers from database:', data.performance_numbers);
+      console.log('🔍 performance_numbers type:', typeof data.performance_numbers);
+      console.log('🔍 performance_numbers keys:', data.performance_numbers ? Object.keys(data.performance_numbers) : 'null/undefined');
       console.log('🔍 age from database:', data.age);
       console.log('🔍 birthday from database:', data.birthday);
       
