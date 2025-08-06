@@ -1580,7 +1580,7 @@ export class TrainingRulesEngine {
     if (optimalLoad === 'high') return 1.0; // Standard optimal load
     if (optimalLoad === 'medium') return 1.0; // Match user's moderate choice
     if (optimalLoad === 'low') return 0.9; // Slightly lower for low capacity
-    return 1.0; // Default - match user's moderate choice
+    throw new Error(`Invalid optimal load: ${optimalLoad}. Must be low, medium, or high.`);
   }
 
   private calculateSeriousTimeMultiplier(): number {
@@ -1634,7 +1634,7 @@ export class TrainingRulesEngine {
         baseHours = 7.0; // 6-8 hours target
         break;
       default:
-        baseHours = 5.0; // Default to moderate
+        throw new Error(`Invalid time level: ${this.facts.timeLevel}. Must be minimum, moderate, serious, or hardcore.`);
     }
     
     // Adjust based on fitness and experience
@@ -2139,9 +2139,9 @@ export class TrainingRulesEngine {
     
     // Distribute sessions based on philosophy with science-based strength placement
     if (facts.philosophy === 'polarized') {
-      // 80/20 polarized training - ensure minimum 2 hard sessions for proper polarized training
+      // 80/20 polarized training - respect total session count
       const easySessions = Math.round(totalSessions * 0.8);
-      const hardSessions = Math.max(2, totalSessions - easySessions); // Minimum 2 hard sessions
+      const hardSessions = totalSessions - easySessions; // Don't force minimum
       const adjustedTotalSessions = easySessions + hardSessions;
       
       // First, place strength sessions with proper spacing
@@ -2168,13 +2168,16 @@ export class TrainingRulesEngine {
       const remainingDays = days.filter(day => !usedDays.includes(day.toLowerCase()));
       
       for (let i = 0; i < easySessions; i++) {
-        const day = remainingDays[i % remainingDays.length] || days[i % days.length];
-        const discipline = this.getDisciplineForDay(i + hardSessions, facts);
-        distribution.push({
-          day,
-          discipline,
-          type: 'recovery'
-        });
+        // Only use remaining days, don't fallback to all days
+        if (i < remainingDays.length) {
+          const day = remainingDays[i];
+          const discipline = this.getDisciplineForDay(i + hardSessions, facts);
+          distribution.push({
+            day,
+            discipline,
+            type: 'recovery'
+          });
+        }
       }
       
       // Add strength sessions to distribution
@@ -2280,8 +2283,8 @@ export class TrainingRulesEngine {
       }
     }
     
-    // Fallback to first available day
-    return days[sessionIndex % days.length];
+    // NO FALLBACKS - Engine must work correctly or fail
+    throw new Error(`No available days for session ${sessionIndex}. Engine must respect session count limits.`);
   }
 
   // NEW: Validate required baseline data
