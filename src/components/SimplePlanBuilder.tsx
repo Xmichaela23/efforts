@@ -407,56 +407,43 @@ export default function SimplePlanBuilder() {
             {plan.weeks.length}-Week Training Plan • {Math.round(plan.totalHours * plan.weeks.length)} hours total
           </p>
           
-          {/* Plan Choices Summary */}
-          <div className="p-4 mb-6">
-            <h3 className="font-medium mb-2">Your Plan Choices</h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          {/* Compact Plan Summary */}
+          <div className="p-3 mb-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <p className="text-gray-700"><strong>Long Session Day:</strong> {answers.longSessionDays}</p>
-              </div>
-              <div>
-                <p className="text-gray-700"><strong>Time Level:</strong> {answers.timeLevel.charAt(0).toUpperCase() + answers.timeLevel.slice(1)} ({plan.totalHours.toFixed(1)} hours/week)</p>
+                <p className="text-gray-700"><strong>Long Day:</strong> {answers.longSessionDays}</p>
+                <p className="text-gray-700"><strong>Level:</strong> {answers.timeLevel.charAt(0).toUpperCase() + answers.timeLevel.slice(1)}</p>
               </div>
               <div>
                 <p className="text-gray-700">
                   <strong>Strength:</strong> {
                     answers.strengthOption === 'none' ? 'None' :
-                    answers.strengthOption === 'traditional' ? 'Traditional (+1.5h)' :
-                    answers.strengthOption === 'compound' ? 'Compound (+2.0h)' :
-                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance (+3.0h)' :
-                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound (+3.5h)' :
+                    answers.strengthOption === 'traditional' ? 'Traditional' :
+                    answers.strengthOption === 'compound' ? 'Compound' :
+                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance' :
+                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound' :
                     answers.strengthOption
                   }
                 </p>
+                <p className="text-gray-700"><strong>Total:</strong> {plan.totalHours.toFixed(1)}h/week</p>
               </div>
             </div>
           </div>
           
-          {/* Training Plan Summary */}
-          <div className="p-6 mb-6">
-            <h2 className="text-xl font-semibold mb-3">Training Methodology</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          {/* Compact Training Methodology */}
+          <div className="p-3 mb-3">
+            <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <h3 className="font-medium mb-2">Polarized Training (80/20 Rule)</h3>
-                <p className="text-gray-700 mb-2">• 80% of training at low intensity (Zone 1-2)</p>
-                <p className="text-gray-700 mb-2">• 20% of training at high intensity (Zone 3-5)</p>
-                <p className="text-gray-700">• Optimizes endurance adaptations and recovery</p>
+                <h3 className="font-medium mb-1 text-xs">80/20 Polarized Training</h3>
+                <p className="text-gray-700 text-xs">• 80% low intensity (Zone 1-2)</p>
+                <p className="text-gray-700 text-xs">• 20% high intensity (Zone 3-5)</p>
               </div>
               <div>
-                <h3 className="font-medium mb-2">Progressive Overload</h3>
-                <p className="text-gray-700 mb-2">• Base Phase (Weeks 1-5): Build aerobic foundation</p>
-                <p className="text-gray-700 mb-2">• Build Phase (Weeks 6-8): Increase intensity</p>
-                <p className="text-gray-700 mb-2">• Peak Phase (Weeks 9-11): Race-specific training</p>
-                <p className="text-gray-700">• Taper Phase (Week 12): Reduce volume, maintain intensity</p>
-              </div>
-              <div>
-                <h3 className="font-medium mb-2">Your Heart Rate Zones</h3>
-                <p className="text-gray-700 mb-2">• Calculated from your age</p>
-                <p className="text-gray-700 mb-2">• Max HR: {userBaselines.age ? (220 - userBaselines.age) : 'N/A'} BPM</p>
-                <p className="text-gray-700 mb-2">• Zone 1 (Recovery): {userBaselines.age ? `${Math.round((220 - userBaselines.age) * 0.65)}-${Math.round((220 - userBaselines.age) * 0.75)}` : 'N/A'} BPM</p>
-                <p className="text-gray-700 mb-2">• Zone 2 (Endurance): {userBaselines.age ? `${Math.round((220 - userBaselines.age) * 0.75)}-${Math.round((220 - userBaselines.age) * 0.85)}` : 'N/A'} BPM</p>
-                <p className="text-gray-700 mb-2">• Zone 3 (Tempo): {userBaselines.age ? `${Math.round((220 - userBaselines.age) * 0.85)}-${Math.round((220 - userBaselines.age) * 0.95)}` : 'N/A'} BPM</p>
-                <p className="text-gray-700">• Zone 4 (Threshold): {userBaselines.age ? `${Math.round((220 - userBaselines.age) * 0.95)}-${Math.round((220 - userBaselines.age) * 1.05)}` : 'N/A'} BPM</p>
+                <h3 className="font-medium mb-1 text-xs">Progressive Overload</h3>
+                <p className="text-gray-700 text-xs">• Base (1-5): Build foundation</p>
+                <p className="text-gray-700 text-xs">• Build (6-8): Increase intensity</p>
+                <p className="text-gray-700 text-xs">• Peak (9-11): Race-specific</p>
+                <p className="text-gray-700 text-xs">• Taper (12): Reduce volume</p>
               </div>
             </div>
           </div>
@@ -537,21 +524,21 @@ export default function SimplePlanBuilder() {
                   }, {} as Record<string, any[]>);
 
                   return Object.entries(sessionsByDay).map(([day, sessions], dayIndex) => (
-                    <div key={`${day}-${dayIndex}`} className="mb-6">
-                      {/* Day Header */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-3">
-                          <span className="font-medium text-base text-gray-900">{day}</span>
-                          {sessions.length > 1 && (
-                            <span className="text-xs text-gray-500">
-                              {sessions.length} sessions
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {sessions.reduce((total, session) => total + session.duration, 0)}min total
-                        </div>
-                      </div>
+                    <div key={`${day}-${dayIndex}`} className="mb-4">
+                                                  {/* Day Header */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm text-gray-900">{day}</span>
+                                {sessions.length > 1 && (
+                                  <span className="text-xs text-gray-500">
+                                    {sessions.length} sessions
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {sessions.reduce((total, session) => total + session.duration, 0)}min
+                              </div>
+                            </div>
                       
                       {/* Sessions */}
                       <div>
@@ -569,15 +556,15 @@ export default function SimplePlanBuilder() {
                               )}
                             </div>
                             {sessions[0].detailedWorkout && (
-                              <div className="mt-2">
-                                <p className="text-sm font-medium mb-2 text-gray-800">Workout Details:</p>
-                                <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
+                              <div className="mt-1">
+                                <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
+                                <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
                               </div>
                             )}
                           </div>
                         ) : (
                           // Multiple sessions - stacked vertically
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             {sessions.map((session, sessionIndex) => (
                               <div key={sessionIndex} className="pb-3 last:pb-0">
                                 <div className="flex items-center gap-3 mb-2">
@@ -594,9 +581,9 @@ export default function SimplePlanBuilder() {
                                   </span>
                                 </div>
                                 {session.detailedWorkout && (
-                                  <div className="mt-2">
-                                    <p className="text-sm font-medium mb-2 text-gray-800">Workout Details:</p>
-                                    <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
+                                  <div className="mt-1">
+                                    <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
+                                    <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
                                   </div>
                                 )}
                               </div>
