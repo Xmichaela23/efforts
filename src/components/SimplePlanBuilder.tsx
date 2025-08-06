@@ -12,6 +12,7 @@ export default function SimplePlanBuilder() {
   const [plan, setPlan] = useState<SimpleTrainingPlan | null>(null);
   const [userBaselines, setUserBaselines] = useState<any>(null);
   const [isLoadingBaselines, setIsLoadingBaselines] = useState(true);
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [answers, setAnswers] = useState({
     distance: '',
     timeLevel: '',
@@ -107,11 +108,13 @@ export default function SimplePlanBuilder() {
     }
   };
 
-    const generatePlan = () => {
+    const generatePlan = async () => {
     if (isLoadingBaselines) {
       alert('Please wait while your fitness data is loading...');
       return;
     }
+    
+    setIsGeneratingPlan(true);
     
     if (answers.distance && answers.timeLevel && answers.strengthOption && answers.longSessionDays && answers.trainingPhilosophy && userBaselines) {
       // Check if required baselines are present for scientifically sound training
@@ -157,34 +160,44 @@ export default function SimplePlanBuilder() {
       
       console.log('🎯 Passing baseline data to training service:', baselineData);
       
-      let generatedPlan;
-      if (answers.distance === 'sprint') {
-        generatedPlan = trainingService.generateSprintPlan(
-          answers.timeLevel as any,
-          answers.strengthOption as any,
-          answers.longSessionDays,
-          baselineData
-        );
-      } else if (answers.distance === 'seventy3') {
-        generatedPlan = trainingService.generateSeventy3Plan(
-          answers.timeLevel as any,
-          answers.strengthOption as any,
-          answers.longSessionDays,
-          baselineData
-        );
-      } else {
-        throw new Error(`Unsupported distance: ${answers.distance}`);
+      try {
+        let generatedPlan;
+        if (answers.distance === 'sprint') {
+          generatedPlan = await trainingService.generateSprintPlan(
+            answers.timeLevel as any,
+            answers.strengthOption as any,
+            answers.longSessionDays,
+            baselineData
+          );
+        } else if (answers.distance === 'seventy3') {
+          generatedPlan = await trainingService.generateSeventy3Plan(
+            answers.timeLevel as any,
+            answers.strengthOption as any,
+            answers.longSessionDays,
+            baselineData
+          );
+        } else {
+          throw new Error(`Unsupported distance: ${answers.distance}`);
+        }
+        
+        console.log('🔍 Frontend plan check:', {
+          hasPlan: !!generatedPlan,
+          hasDistance: !!generatedPlan?.distance,
+          hasWeeks: !!generatedPlan?.weeks,
+          weeksLength: generatedPlan?.weeks?.length,
+          firstWeek: generatedPlan?.weeks?.[0]
+        });
+        console.log('🔍 Full generated plan:', generatedPlan);
+        setPlan(generatedPlan);
+        setCurrentWeek(0);
+      } catch (error) {
+        console.error('❌ Error generating plan:', error);
+        alert(`Failed to generate training plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setIsGeneratingPlan(false);
       }
-      console.log('🔍 Frontend plan check:', {
-        hasPlan: !!generatedPlan,
-        hasDistance: !!generatedPlan?.distance,
-        hasWeeks: !!generatedPlan?.weeks,
-        weeksLength: generatedPlan?.weeks?.length,
-        firstWeek: generatedPlan?.weeks?.[0]
-      });
-      console.log('🔍 Full generated plan:', generatedPlan);
-      setPlan(generatedPlan);
-      setCurrentWeek(0);
+    } else {
+      setIsGeneratingPlan(false);
     }
   };
 
@@ -368,11 +381,11 @@ export default function SimplePlanBuilder() {
                 Back
               </button>
               <button 
-                onClick={generatePlan}
-                disabled={!answers.longSessionDays || isLoadingBaselines}
+                onClick={() => generatePlan()}
+                disabled={!answers.longSessionDays || isLoadingBaselines || isGeneratingPlan}
                 className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
               >
-                {isLoadingBaselines ? 'Loading...' : 'Generate Plan →'}
+                {isLoadingBaselines ? 'Loading...' : isGeneratingPlan ? 'Generating Plan...' : 'Generate Plan →'}
               </button>
             </div>
           </div>

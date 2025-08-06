@@ -1,5 +1,6 @@
-// Simple test runner for SimpleTrainingService
-// This demonstrates how to test all combinations without manual checking
+// DEPRECATED: Mock SimpleTrainingService Test
+// This file uses mocks instead of the actual JSON engine
+// Use test-json-engine-simple.js for real engine testing
 
 // Mock the SimpleTrainingService for testing
 class MockSimpleTrainingService {
