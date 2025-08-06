@@ -664,22 +664,24 @@ export class TrainingRulesEngine {
     console.log('🔍 Generating session for facts:', facts);
     console.log('🔍 Facts discipline:', facts.discipline);
     console.log('🔍 Facts sessionType:', facts.sessionType);
+    console.log('🔍 Facts distance:', facts.distance);
+    console.log('🔍 Facts timeLevel:', facts.timeLevel);
+    console.log('🔍 Facts philosophy:', facts.philosophy);
     
-    // NEW: Validate required baseline data
     const missingData = this.validateRequiredBaselineData(facts);
     if (missingData.length > 0) {
       console.error('❌ Missing baseline data:', missingData);
       console.error('❌ Facts object:', facts);
       throw new Error(`Missing required baseline data: ${missingData.join(', ')}. Please complete your baseline assessment before generating plans.`);
     }
-    
     console.log('✅ Baseline validation passed, running rules engine...');
+    
     const engineResult = await this.engine.run(facts);
     console.log('✅ Rules engine events:', engineResult.events);
     console.log('🔍 Number of events generated:', engineResult.events.length);
     console.log('🔍 Event types:', engineResult.events.map(e => e.type));
     
-    // Check if session generation events are present
+    // Check if we got any session generation events
     const sessionEvents = engineResult.events.filter(e => 
       e.type === 'swim_session' || 
       e.type === 'bike_session' || 
@@ -688,6 +690,14 @@ export class TrainingRulesEngine {
       e.type === 'brick_session'
     );
     console.log('🔍 Session generation events:', sessionEvents);
+    
+    if (sessionEvents.length === 0) {
+      console.warn('⚠️ No session generation events found! This means the discipline rules are not triggering.');
+      console.warn('⚠️ Available facts for discipline rules:', {
+        discipline: facts.discipline,
+        sessionType: facts.sessionType
+      });
+    }
     
     const result = this.processEvents(engineResult.events, facts);
     console.log('✅ Generated session result:', result);
@@ -985,8 +995,14 @@ export class TrainingRulesEngine {
   private applySessionRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
     console.log('🔍 applySessionRules called with params:', params);
     console.log('🔍 Current result before session rules:', result);
+    console.log('🔍 Facts passed to applySessionRules:', {
+      discipline: facts.discipline,
+      sessionType: facts.sessionType,
+      distance: facts.distance,
+      timeLevel: facts.timeLevel,
+      phase: facts.phase
+    });
     
-    // Calculate science-based duration based on discipline and session type
     let calculatedDuration = result.duration;
     
     if (params.discipline === 'swim') {
@@ -1051,7 +1067,26 @@ export class TrainingRulesEngine {
   // ===== SCIENCE-BASED DURATION CALCULATIONS =====
 
   private calculateSwimDuration(facts: TrainingFacts, sessionType: string): number {
-    return this.calculateFlexibleDuration(facts, 'swim', sessionType, facts.timeLevel);
+    console.log('🔍 calculateSwimDuration called with sessionType:', sessionType);
+    const baseDuration = this.getBaseSwimDuration(facts.distance);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    console.log('🔍 Swim duration calculation:', {
+      baseDuration,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
+      distance: facts.distance,
+      phase: facts.phase,
+      sessionType,
+      timeLevel: facts.timeLevel
+    });
+    
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    console.log('🔍 Final swim duration:', duration);
+    return duration;
   }
 
   private calculateBikeDuration(facts: TrainingFacts, sessionType: string): number {
@@ -1072,12 +1107,17 @@ export class TrainingRulesEngine {
 
   // Base durations based on triathlon training science
   private getBaseSwimDuration(distance: string): number {
-    switch (distance) {
-      case 'sprint': return 30; // 30 min for sprint
-      case 'seventy3': return 45; // 45 min for 70.3
-      case 'olympic': return 40; // 40 min for olympic
-      default: return 30;
-    }
+    console.log('🔍 getBaseSwimDuration called with distance:', distance);
+    const baseDurations = {
+      sprint: 30,    // 30 minutes base for sprint
+      olympic: 45,   // 45 minutes base for olympic
+      seventy3: 60,  // 60 minutes base for 70.3
+      ironman: 75    // 75 minutes base for ironman
+    };
+    
+    const duration = baseDurations[distance as keyof typeof baseDurations] || 30;
+    console.log('🔍 Base swim duration for', distance, ':', duration);
+    return duration;
   }
 
   private getBaseBikeDuration(distance: string): number {
