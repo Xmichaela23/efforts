@@ -1066,22 +1066,25 @@ export class TrainingRulesEngine {
     
     // Base duration based on user's swim pace and distance
     const baseDuration = this.calculateSwimBaseDuration(facts);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    // TEMPORARILY REMOVE MULTIPLIERS FOR TESTING
+    // const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    // const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    // const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
     console.log('🔍 Swim duration calculation:', {
       baseDuration,
-      phaseMultiplier,
-      sessionMultiplier,
-      timeMultiplier,
+      // phaseMultiplier,
+      // sessionMultiplier,
+      // timeMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
       timeLevel: facts.timeLevel
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    // const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    const duration = baseDuration; // TEMPORARILY USE BASE DURATION ONLY
     console.log('🔍 Final swim duration:', duration);
     return duration;
   }
@@ -1091,22 +1094,25 @@ export class TrainingRulesEngine {
     
     // Base duration based on user's FTP and distance
     const baseDuration = this.calculateBikeBaseDuration(facts);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    // TEMPORARILY REMOVE MULTIPLIERS FOR TESTING
+    // const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    // const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    // const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
     console.log('🔍 Bike duration calculation:', {
       baseDuration,
-      phaseMultiplier,
-      sessionMultiplier,
-      timeMultiplier,
+      // phaseMultiplier,
+      // sessionMultiplier,
+      // timeMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
       timeLevel: facts.timeLevel
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    // const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    const duration = baseDuration; // TEMPORARILY USE BASE DURATION ONLY
     console.log('🔍 Final bike duration:', duration);
     return duration;
   }
@@ -1116,22 +1122,25 @@ export class TrainingRulesEngine {
     
     // Base duration based on user's run pace and distance
     const baseDuration = this.calculateRunBaseDuration(facts, sessionType);
-    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    // TEMPORARILY REMOVE MULTIPLIERS FOR TESTING
+    // const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    // const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    // const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
     console.log('🔍 Run duration calculation:', {
       baseDuration,
-      phaseMultiplier,
-      sessionMultiplier,
-      timeMultiplier,
+      // phaseMultiplier,
+      // sessionMultiplier,
+      // timeMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
       timeLevel: facts.timeLevel
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    // const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    const duration = baseDuration; // TEMPORARILY USE BASE DURATION ONLY
     console.log('🔍 Final run duration:', duration);
     return duration;
   }
