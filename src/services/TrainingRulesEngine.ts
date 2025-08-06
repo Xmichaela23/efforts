@@ -437,17 +437,21 @@ export class TrainingRulesEngine {
   // ===== PUBLIC API =====
 
   async generateSession(facts: TrainingFacts): Promise<TrainingResult> {
-    try {
-      const { events } = await this.engine.run(facts);
-      
-      // Process events to determine session parameters
-      const result = this.processEvents(events, facts);
-      
-      return result;
-    } catch (error) {
-      console.error('Error generating session:', error);
-      return this.getDefaultSession(facts);
+    console.log('🔍 Generating session with facts:', facts);
+    
+    const { events } = await this.engine.run(facts);
+    console.log('📋 Rules engine events:', events);
+    
+    // Process events to determine session parameters
+    const result = this.processEvents(events, facts);
+    console.log('✅ Generated session result:', result);
+    
+    // Validate that we got a real session, not a fallback
+    if (!result || result.duration === 0) {
+      throw new Error(`Failed to generate valid session for facts: ${JSON.stringify(facts)}`);
     }
+    
+    return result;
   }
 
   async generateWeeklyPlan(facts: TrainingFacts): Promise<any[]> {
@@ -648,14 +652,5 @@ export class TrainingRulesEngine {
     }
   }
 
-  private getDefaultSession(facts: TrainingFacts): TrainingResult {
-    return {
-      intensity: 'medium',
-      duration: 60,
-      zones: [2, 3],
-      description: 'Standard training session',
-      volumeMultiplier: 1.0,
-      intensityMultiplier: 1.0
-    };
-  }
+  // No fallbacks - engine must generate real sessions or fail
 } 
