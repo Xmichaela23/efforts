@@ -1201,27 +1201,28 @@ export class TrainingRulesEngine {
     const paceSeconds = this.parseTimeToSeconds(facts.swimPace100);
     const pacePer100m = paceSeconds / 100; // seconds per meter
     
-    // Calculate base duration based on distance and user's pace
+    // Calculate base duration for TRAINING sessions (not race distances)
+    // Training sessions should be longer than race distances for proper adaptation
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
-        // Sprint: 750m swim, base on user's pace
-        baseDuration = (750 * pacePer100m) / 60; // Convert to minutes
+        // Sprint training: 1500-2000m swim sessions (2x race distance)
+        baseDuration = (1750 * pacePer100m) / 60; // Convert to minutes
         break;
       case 'olympic':
-        // Olympic: 1500m swim, base on user's pace
-        baseDuration = (1500 * pacePer100m) / 60;
+        // Olympic training: 2500-3000m swim sessions (2x race distance)
+        baseDuration = (2750 * pacePer100m) / 60;
         break;
       case 'seventy3':
-        // 70.3: 1900m swim, base on user's pace
-        baseDuration = (1900 * pacePer100m) / 60;
+        // 70.3 training: 3000-4000m swim sessions (2x race distance)
+        baseDuration = (3500 * pacePer100m) / 60;
         break;
       default:
-        baseDuration = (1000 * pacePer100m) / 60; // Default 1000m
+        baseDuration = (2000 * pacePer100m) / 60; // Default 2000m
     }
     
-    // Ensure minimum 20 minutes, maximum 90 minutes
-    return Math.max(20, Math.min(90, baseDuration));
+    // Ensure minimum 30 minutes, maximum 120 minutes
+    return Math.max(30, Math.min(120, baseDuration));
   }
 
   private calculateBikeBaseDuration(facts: TrainingFacts): number {
@@ -1229,27 +1230,28 @@ export class TrainingRulesEngine {
       throw new Error('FTP is required for science-based bike duration calculation');
     }
     
-    // Calculate base duration based on distance and user's FTP
+    // Calculate base duration for TRAINING sessions (not race distances)
+    // Training sessions should be longer than race distances for proper adaptation
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
-        // Sprint: 20km bike, base on user's FTP
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 20);
+        // Sprint training: 40-50km bike sessions (2-2.5x race distance)
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 45);
         break;
       case 'olympic':
-        // Olympic: 40km bike, base on user's FTP
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 40);
+        // Olympic training: 60-80km bike sessions (1.5-2x race distance)
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 70);
         break;
       case 'seventy3':
-        // 70.3: 90km bike, base on user's FTP
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 90);
+        // 70.3 training: 100-120km bike sessions (1.1-1.3x race distance)
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 110);
         break;
       default:
-        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 30); // Default 30km
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 60); // Default 60km
     }
     
-    // Ensure minimum 30 minutes, maximum 180 minutes
-    return Math.max(30, Math.min(180, baseDuration));
+    // Ensure minimum 45 minutes, maximum 240 minutes
+    return Math.max(45, Math.min(240, baseDuration));
   }
 
   private calculateRunBaseDuration(facts: TrainingFacts): number {
@@ -1269,79 +1271,28 @@ export class TrainingRulesEngine {
       throw new Error('No run pace data available');
     }
     
-    // Calculate base duration based on distance and user's pace
+    // Calculate base duration for TRAINING sessions (not race distances)
+    // Training sessions should be longer than race distances for proper adaptation
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
-        // Sprint: 5km run, base on user's easy pace
-        baseDuration = (5 * easyPaceSeconds) / 60;
-        break;
-      case 'olympic':
-        // Olympic: 10km run, base on user's easy pace
+        // Sprint training: 8-12km run sessions (1.6-2.4x race distance)
         baseDuration = (10 * easyPaceSeconds) / 60;
         break;
+      case 'olympic':
+        // Olympic training: 12-16km run sessions (1.2-1.6x race distance)
+        baseDuration = (14 * easyPaceSeconds) / 60;
+        break;
       case 'seventy3':
-        // 70.3: 21km run, base on user's easy pace
-        baseDuration = (21 * easyPaceSeconds) / 60;
+        // 70.3 training: 15-20km run sessions (0.7-1x race distance)
+        baseDuration = (18 * easyPaceSeconds) / 60;
         break;
       default:
-        baseDuration = (8 * easyPaceSeconds) / 60; // Default 8km
+        baseDuration = (12 * easyPaceSeconds) / 60; // Default 12km
     }
     
-    // Ensure minimum 20 minutes, maximum 150 minutes
-    return Math.max(20, Math.min(150, baseDuration));
-  }
-
-  private calculateStrengthBaseDuration(facts: TrainingFacts): number {
-    if (!facts.squat || !facts.deadlift || !facts.bench) {
-      throw new Error('Strength 1RM values (squat, deadlift, bench) are required for science-based strength duration calculation');
-    }
-    
-    // Calculate base duration based on strength program type and user's strength levels
-    let baseDuration: number;
-    switch (facts.strengthOption) {
-      case 'traditional':
-        // Traditional: 5-6 exercises, 3-4 sets each
-        baseDuration = 45;
-        break;
-      case 'compound':
-        // Compound: 4-5 compound movements, 3-4 sets each
-        baseDuration = 40;
-        break;
-      case 'cowboy_endurance':
-        // Cowboy endurance: 6-8 exercises, 2-3 sets each, shorter rest
-        baseDuration = 35;
-        break;
-      case 'cowboy_compound':
-        // Cowboy compound: 4-5 compound movements, 3-4 sets each
-        baseDuration = 40;
-        break;
-      default:
-        baseDuration = 45;
-    }
-    
-    // Adjust based on user's strength levels (higher strength = more rest needed)
-    const avgStrength = (facts.squat + facts.deadlift + facts.bench) / 3;
-    if (avgStrength > 300) {
-      baseDuration += 10; // More rest for stronger athletes
-    } else if (avgStrength < 150) {
-      baseDuration -= 5; // Less rest for beginners
-    }
-    
-    // Ensure minimum 25 minutes, maximum 60 minutes
-    return Math.max(25, Math.min(60, baseDuration));
-  }
-
-  // HELPER METHODS FOR SCIENCE-BASED CALCULATIONS
-  private parseTimeToSeconds(timeString: string): number {
-    // Parse time strings like "1:30", "5:20", "25:30"
-    const parts = timeString.split(':');
-    if (parts.length === 2) {
-      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-    } else if (parts.length === 3) {
-      return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
-    }
-    return parseInt(timeString);
+    // Ensure minimum 30 minutes, maximum 180 minutes
+    return Math.max(30, Math.min(180, baseDuration));
   }
 
   private calculateBikeTimeFromFTP(ftp: number, distanceKm: number): number {
@@ -1349,8 +1300,10 @@ export class TrainingRulesEngine {
     // Assumes 70% of FTP for endurance rides
     const powerAt70Percent = ftp * 0.7;
     
-    // Rough estimate: 1 hour at 70% FTP = ~25-30km for most cyclists
-    const estimatedHours = distanceKm / 25;
+    // More accurate estimate: 1 hour at 70% FTP = ~28-32km for most cyclists
+    // Adjust based on FTP level (higher FTP = faster speed)
+    const speedMultiplier = ftp / 200; // Normalize to 200W baseline
+    const estimatedHours = distanceKm / (30 * speedMultiplier);
     
     return estimatedHours * 60; // Convert to minutes
   }
@@ -2508,5 +2461,57 @@ export class TrainingRulesEngine {
       default: 
         throw new Error(`Invalid user preference: ${userPreference}. Must be minimum, moderate, serious, or hardcore.`);
     }
+  }
+
+  private calculateStrengthBaseDuration(facts: TrainingFacts): number {
+    if (!facts.squat || !facts.deadlift || !facts.bench) {
+      throw new Error('Strength 1RM values (squat, deadlift, bench) are required for science-based strength duration calculation');
+    }
+    
+    // Calculate base duration based on strength program type and user's strength levels
+    let baseDuration: number;
+    switch (facts.strengthOption) {
+      case 'traditional':
+        // Traditional: 5-6 exercises, 3-4 sets each
+        baseDuration = 45;
+        break;
+      case 'compound':
+        // Compound: 4-5 compound movements, 3-4 sets each
+        baseDuration = 40;
+        break;
+      case 'cowboy_endurance':
+        // Cowboy endurance: 6-8 exercises, 2-3 sets each, shorter rest
+        baseDuration = 35;
+        break;
+      case 'cowboy_compound':
+        // Cowboy compound: 4-5 compound movements, 3-4 sets each
+        baseDuration = 40;
+        break;
+      default:
+        baseDuration = 45;
+    }
+    
+    // Adjust based on user's strength levels (higher strength = more rest needed)
+    const avgStrength = (facts.squat + facts.deadlift + facts.bench) / 3;
+    if (avgStrength > 300) {
+      baseDuration += 10; // More rest for stronger athletes
+    } else if (avgStrength < 150) {
+      baseDuration -= 5; // Less rest for beginners
+    }
+    
+    // Ensure minimum 25 minutes, maximum 60 minutes
+    return Math.max(25, Math.min(60, baseDuration));
+  }
+
+  // HELPER METHODS FOR SCIENCE-BASED CALCULATIONS
+  private parseTimeToSeconds(timeString: string): number {
+    // Parse time strings like "1:30", "5:20", "25:30"
+    const parts = timeString.split(':');
+    if (parts.length === 2) {
+      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    } else if (parts.length === 3) {
+      return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+    }
+    return parseInt(timeString);
   }
 } 
