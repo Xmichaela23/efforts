@@ -489,7 +489,7 @@ export default function SimplePlanBuilder() {
                 style={{ transform: `translateX(-${currentWeek * 100}%)` }}
               >
                 {plan.weeks.map((week, weekIndex) => (
-                  <div key={weekIndex} className="w-full flex-shrink-0 px-4">
+                  <div key={weekIndex} className="w-full flex-shrink-0">
                     <div className="text-center mb-4">
                       <h4 className="text-lg font-semibold">
                         Week {week.weekNumber} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
@@ -604,7 +604,7 @@ export default function SimplePlanBuilder() {
 
   return (
     <div className="min-h-screen bg-white">
-      <div className="max-w-4xl mx-auto p-4">
+      <div className="w-full">
         {renderStep()}
       </div>
     </div>
