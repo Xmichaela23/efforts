@@ -94,10 +94,14 @@ export default function SimplePlanBuilder() {
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
+    console.log('Swipe detected:', { distance, isLeftSwipe, isRightSwipe, currentWeek });
+
     if (isLeftSwipe && currentWeek < plan!.weeks.length - 1) {
+      console.log('Swiping left to week', currentWeek + 1);
       setCurrentWeek(currentWeek + 1);
     }
     if (isRightSwipe && currentWeek > 0) {
+      console.log('Swiping right to week', currentWeek - 1);
       setCurrentWeek(currentWeek - 1);
     }
   };
@@ -488,10 +492,11 @@ export default function SimplePlanBuilder() {
             
             {/* Full Width Swipeable Area */}
             <div 
-              className="w-full relative overflow-hidden"
+              className="w-full h-20 relative overflow-hidden touch-pan-y"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
+              style={{ touchAction: 'pan-y' }}
             >
               <div 
                 className="flex transition-transform duration-300 ease-out"
@@ -516,14 +521,6 @@ export default function SimplePlanBuilder() {
           {/* Current Week Content */}
           {plan.weeks[currentWeek] && (
             <div>
-              <div className="mb-4">
-                <h2 className="text-lg font-medium text-gray-900 mb-1">
-                  Week {plan.weeks[currentWeek].weekNumber} - {plan.weeks[currentWeek].phase.charAt(0).toUpperCase() + plan.weeks[currentWeek].phase.slice(1)} Phase
-                </h2>
-                <p className="text-sm text-gray-600">
-                  {plan.weeks[currentWeek].sessions.length} sessions • {plan.weeks[currentWeek].totalHours.toFixed(1)} hours
-                </p>
-              </div>
 
               <div className="space-y-8">
                 {(() => {
