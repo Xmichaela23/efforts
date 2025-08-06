@@ -469,7 +469,7 @@ export default function SimplePlanBuilder() {
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Your Training Plan</h3>
               <div className="flex items-center space-x-1 text-sm text-gray-500">
-                <span>Swipe</span>
+                <span>Swipe to navigate weeks</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
@@ -492,11 +492,10 @@ export default function SimplePlanBuilder() {
             
             {/* Full Width Swipeable Area */}
             <div 
-              className="w-full h-20 relative overflow-hidden touch-pan-y"
+              className="w-full h-32 relative overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
-              style={{ touchAction: 'pan-y' }}
             >
               <div 
                 className="flex transition-transform duration-300 ease-out"
