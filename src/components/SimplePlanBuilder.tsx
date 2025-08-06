@@ -108,6 +108,39 @@ export default function SimplePlanBuilder() {
     }
   };
 
+  // Desktop week navigation
+  const goToWeek = (weekIndex: number) => {
+    if (weekIndex >= 0 && weekIndex < (plan?.weeks?.length || 0)) {
+      setCurrentWeek(weekIndex);
+    }
+  };
+
+  const nextWeek = () => {
+    if (currentWeek < (plan?.weeks?.length || 0) - 1) {
+      setCurrentWeek(currentWeek + 1);
+    }
+  };
+
+  const prevWeek = () => {
+    if (currentWeek > 0) {
+      setCurrentWeek(currentWeek - 1);
+    }
+  };
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyPress = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowLeft') {
+        prevWeek();
+      } else if (e.key === 'ArrowRight') {
+        nextWeek();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyPress);
+    return () => window.removeEventListener('keydown', handleKeyPress);
+  }, [currentWeek, plan?.weeks?.length]);
+
     const generatePlan = async () => {
     if (isLoadingBaselines) {
       alert('Please wait while your fitness data is loading...');
@@ -523,20 +556,67 @@ export default function SimplePlanBuilder() {
               </div>
             </div>
             
-            {/* Week Indicator Dots */}
-            <div className="flex justify-center space-x-2 mb-4">
-              {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((_, weekIndex) => (
-                <div
-                  key={weekIndex}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    currentWeek === weekIndex
-                      ? 'bg-blue-600'
-                      : 'bg-gray-300'
-                  }`}
-                />
-              )) : (
-                <div className="text-sm text-gray-500">Loading weeks...</div>
-              )}
+            {/* Week Navigation Controls */}
+            <div className="flex items-center justify-between mb-4">
+              {/* Desktop Navigation Buttons */}
+              <div className="hidden md:flex items-center space-x-2">
+                <button
+                  onClick={prevWeek}
+                  disabled={currentWeek === 0}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-sm text-gray-600">
+                  Week {currentWeek + 1} of {plan?.weeks?.length || 0}
+                </span>
+                <button
+                  onClick={nextWeek}
+                  disabled={currentWeek >= (plan?.weeks?.length || 0) - 1}
+                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Mobile Week Indicator Dots */}
+              <div className="flex md:hidden justify-center space-x-2">
+                {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((_, weekIndex) => (
+                  <button
+                    key={weekIndex}
+                    onClick={() => goToWeek(weekIndex)}
+                    className={`w-2 h-2 rounded-full transition-colors ${
+                      currentWeek === weekIndex
+                        ? 'bg-blue-600'
+                        : 'bg-gray-300'
+                    }`}
+                  />
+                )) : (
+                  <div className="text-sm text-gray-500">Loading weeks...</div>
+                )}
+              </div>
+
+              {/* Desktop Week Selector */}
+              <div className="hidden md:flex items-center space-x-2">
+                <span className="text-sm text-gray-600">Go to:</span>
+                <select
+                  value={currentWeek}
+                  onChange={(e) => goToWeek(parseInt(e.target.value))}
+                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                >
+                  {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((_, weekIndex) => (
+                    <option key={weekIndex} value={weekIndex}>
+                      Week {weekIndex + 1}
+                    </option>
+                  )) : (
+                    <option>Loading...</option>
+                  )}
+                </select>
+              </div>
             </div>
             
             {/* Full Week Swipeable Area */}

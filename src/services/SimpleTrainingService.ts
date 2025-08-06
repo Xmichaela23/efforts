@@ -1097,6 +1097,12 @@ export class SimpleTrainingService {
             
             return enhancedSession;
           });
+          
+          // Calculate total hours for the week
+          const totalMinutes = enhancedWeek.sessions.reduce((total: number, session: any) => {
+            return total + (session.duration || 0);
+          }, 0);
+          enhancedWeek.totalHours = Math.round((totalMinutes / 60) * 10) / 10; // Round to 1 decimal place
         }
         
         return enhancedWeek;

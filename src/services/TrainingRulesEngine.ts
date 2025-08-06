@@ -2123,36 +2123,42 @@ export class TrainingRulesEngine {
     
     // Distribute sessions based on philosophy with science-based strength placement
     if (facts.philosophy === 'polarized') {
-      // 80/20 polarized training
+      // 80/20 polarized training - ensure minimum 2 hard sessions for proper polarized training
       const easySessions = Math.round(totalSessions * 0.8);
-      const hardSessions = totalSessions - easySessions;
+      const hardSessions = Math.max(2, totalSessions - easySessions); // Minimum 2 hard sessions
+      const adjustedTotalSessions = easySessions + hardSessions;
       
       // First, place strength sessions with proper spacing
       const strengthDays = this.placeStrengthSessions(facts, strengthSessions, days);
       
-      // Place easy sessions (recovery/endurance) on non-strength days
-      let sessionIndex = 0;
-      for (let i = 0; i < easySessions; i++) {
-        const day = this.getNextAvailableDay(days, strengthDays, sessionIndex);
-        const discipline = this.getDisciplineForDay(sessionIndex, facts);
-        distribution.push({
-          day,
-          discipline,
-          type: 'recovery'
-        });
-        sessionIndex++;
-      }
+      // Ensure all 7 days get at least one session for proper weekly structure
+      const availableDays = days.filter(day => !strengthDays.some(s => s.day.toLowerCase() === day.toLowerCase()));
       
-      // Place hard sessions (tempo/threshold) with proper spacing
+      // Place hard sessions first (tempo/threshold) with proper spacing
+      const hardSessionDays = [];
       for (let i = 0; i < hardSessions; i++) {
-        const day = this.getNextAvailableDay(days, strengthDays, sessionIndex, 2); // Skip 2 days between hard sessions
-        const discipline = this.getDisciplineForDay(sessionIndex, facts);
+        const day = this.getNextAvailableDay(availableDays, strengthDays, i, 2); // Skip 2 days between hard sessions
+        hardSessionDays.push(day);
+        const discipline = this.getDisciplineForDay(i, facts);
         distribution.push({
           day,
           discipline,
           type: 'tempo'
         });
-        sessionIndex++;
+      }
+      
+      // Place easy sessions (recovery/endurance) on remaining days
+      const usedDays = [...hardSessionDays, ...strengthDays.map(s => s.day.toLowerCase())];
+      const remainingDays = days.filter(day => !usedDays.includes(day.toLowerCase()));
+      
+      for (let i = 0; i < easySessions; i++) {
+        const day = remainingDays[i % remainingDays.length] || days[i % days.length];
+        const discipline = this.getDisciplineForDay(i + hardSessions, facts);
+        distribution.push({
+          day,
+          discipline,
+          type: 'recovery'
+        });
       }
       
       // Add strength sessions to distribution
