@@ -654,12 +654,18 @@ export class TrainingRulesEngine {
     console.log('✅ Baseline validation passed, running rules engine...');
     const engineResult = await this.engine.run(facts);
     console.log('✅ Rules engine events:', engineResult.events);
+    console.log('🔍 Number of events generated:', engineResult.events.length);
+    console.log('🔍 Event types:', engineResult.events.map(e => e.type));
     
     const result = this.processEvents(engineResult.events, facts);
     console.log('✅ Generated session result:', result);
+    console.log('🔍 Session duration:', result.duration);
+    console.log('🔍 Session discipline:', result.discipline);
+    console.log('🔍 Session description:', result.description);
     
     if (!result || result.duration === 0) {
       console.error('❌ Generated session is invalid:', result);
+      console.error('🔍 Facts that led to this result:', facts);
       throw new Error(`Failed to generate valid session. Please ensure all required baseline data is provided: FTP, run paces, swim pace, and strength 1RM values.`);
     }
     
@@ -712,6 +718,9 @@ export class TrainingRulesEngine {
 
   async generateFullPlan(facts: TrainingFacts): Promise<any> {
     const weeks = [];
+    const expectedWeeklyHours = this.getExpectedWeeklyHours(facts.distance, facts.timeLevel);
+    
+    console.log(`🎯 Expected weekly hours for ${facts.distance} ${facts.timeLevel}: ${expectedWeeklyHours}`);
     
     for (let week = 1; week <= facts.totalWeeks; week++) {
       const weekFacts = { 
@@ -722,12 +731,21 @@ export class TrainingRulesEngine {
       };
       
       const sessions = await this.generateWeeklyPlan(weekFacts);
+      const weeklyHours = sessions.reduce((sum, s) => sum + s.duration, 0) / 60;
+      
+      // Validate weekly hours are within acceptable range
+      const minHours = expectedWeeklyHours * 0.8; // Allow 20% variance
+      const maxHours = expectedWeeklyHours * 1.2;
+      
+      if (weeklyHours < minHours || weeklyHours > maxHours) {
+        console.warn(`⚠️ Week ${week} hours (${weeklyHours.toFixed(1)}) outside expected range (${minHours.toFixed(1)}-${maxHours.toFixed(1)})`);
+      }
       
       weeks.push({
         weekNumber: week,
         phase: weekFacts.phase,
         sessions,
-        totalHours: sessions.reduce((sum, s) => sum + s.duration, 0) / 60
+        totalHours: weeklyHours
       });
     }
     
@@ -737,6 +755,7 @@ export class TrainingRulesEngine {
       strengthOption: facts.strengthOption,
       longSessionDays: facts.longSessionDays,
       totalHours: weeks.reduce((sum, w) => sum + w.totalHours, 0),
+      expectedWeeklyHours,
       weeks
     };
     
@@ -747,6 +766,8 @@ export class TrainingRulesEngine {
   // ===== HELPER METHODS =====
 
   private processEvents(events: any[], facts: TrainingFacts): TrainingResult {
+    console.log('🔍 Processing events:', events.length, 'events');
+    
     let result: TrainingResult = {
       intensity: 'medium',
       duration: 60,
@@ -756,19 +777,25 @@ export class TrainingRulesEngine {
       intensityMultiplier: 1.0
     };
 
+    console.log('🔍 Initial result:', result);
+
     // Process each event to build the session
     for (const event of events) {
+      console.log('🔍 Processing event:', event.type, 'with params:', event.params);
+      
       switch (event.type) {
         case 'sprint_distance_rules':
         case 'seventy3_distance_rules':
         case 'olympic_distance_rules':
           result = this.applyDistanceRules(result, event.params, facts);
+          console.log('🔍 After distance rules:', result);
           break;
           
         case 'polarized_rules':
         case 'threshold_rules':
         case 'pyramid_rules':
           result = this.applyPhilosophyRules(result, event.params, facts);
+          console.log('🔍 After philosophy rules:', result);
           break;
           
         case 'base_progression':
@@ -776,11 +803,13 @@ export class TrainingRulesEngine {
         case 'peak_progression':
         case 'taper_progression':
           result = this.applyProgressionRules(result, event.params, facts);
+          console.log('🔍 After progression rules:', result);
           break;
           
         case 'recovery_session':
         case 'recovery_needed':
           result = this.applyRecoveryRules(result, event.params, facts);
+          console.log('🔍 After recovery rules:', result);
           break;
 
         // NEW: Session generation events
@@ -790,6 +819,7 @@ export class TrainingRulesEngine {
         case 'strength_session':
         case 'brick_session':
           result = this.applySessionRules(result, event.params, facts);
+          console.log('🔍 After session rules:', result);
           break;
 
         case 'recovery_session_type':
@@ -797,6 +827,7 @@ export class TrainingRulesEngine {
         case 'tempo_session_type':
         case 'threshold_session_type':
           result = this.applySessionTypeRules(result, event.params, facts);
+          console.log('🔍 After session type rules:', result);
           break;
 
         // NEW: Strength events
@@ -805,10 +836,16 @@ export class TrainingRulesEngine {
         case 'compound_strength':
         case 'cowboy_strength':
           result = this.applyStrengthRules(result, event.params, facts);
+          console.log('🔍 After strength rules:', result);
+          break;
+          
+        default:
+          console.log('🔍 Unknown event type:', event.type);
           break;
       }
     }
-
+    
+    console.log('🔍 Final result:', result);
     return result;
   }
 
@@ -938,38 +975,43 @@ export class TrainingRulesEngine {
     const baseDuration = this.getBaseSwimDuration(facts.distance);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
     const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
-    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier);
+    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier);
   }
 
   private calculateBikeDuration(facts: TrainingFacts, sessionType: string): number {
     const baseDuration = this.getBaseBikeDuration(facts.distance);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
     const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
-    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier);
+    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier);
   }
 
   private calculateRunDuration(facts: TrainingFacts, sessionType: string): number {
     const baseDuration = this.getBaseRunDuration(facts.distance);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
     const sessionTypeMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
-    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier);
+    return Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier);
   }
 
   private calculateStrengthDuration(facts: TrainingFacts, sessionType: string): number {
     const baseDuration = this.getBaseStrengthDuration(facts.strengthOption);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
-    return Math.round(baseDuration * phaseMultiplier);
+    return Math.round(baseDuration * phaseMultiplier * timeLevelMultiplier);
   }
 
   private calculateBrickDuration(facts: TrainingFacts, sessionType: string): number {
     const baseDuration = this.getBaseBrickDuration(facts.distance);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
-    return Math.round(baseDuration * phaseMultiplier);
+    return Math.round(baseDuration * phaseMultiplier * timeLevelMultiplier);
   }
 
   // Base durations based on triathlon training science
@@ -1039,6 +1081,35 @@ export class TrainingRulesEngine {
       case 'threshold': return 0.9; // High intensity, moderate duration
       case 'vo2max': return 0.6; // Short, high intensity
       default: return 1.0;
+    }
+  }
+
+  // Time level multipliers (progressive overload)
+  private getTimeLevelMultiplier(timeLevel: string): number {
+    switch (timeLevel) {
+      case 'minimum': return 0.8; // Reduced volume
+      case 'moderate': return 1.0; // Standard volume
+      case 'serious': return 1.2; // Increased volume
+      case 'hardcore': return 1.4; // Very high volume
+      default: return 1.0;
+    }
+  }
+
+  // Calculate expected weekly hours based on time level and distance
+  private getExpectedWeeklyHours(distance: string, timeLevel: string): number {
+    const baseHours = this.getBaseWeeklyHours(distance);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(timeLevel);
+    
+    return Math.round(baseHours * timeLevelMultiplier * 10) / 10; // Round to 1 decimal
+  }
+
+  // Base weekly hours for different distances
+  private getBaseWeeklyHours(distance: string): number {
+    switch (distance) {
+      case 'sprint': return 6; // 6 hours/week for sprint
+      case 'seventy3': return 10; // 10 hours/week for 70.3
+      case 'olympic': return 8; // 8 hours/week for olympic
+      default: return 6;
     }
   }
 
