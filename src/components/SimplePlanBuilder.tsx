@@ -97,7 +97,7 @@ export default function SimplePlanBuilder() {
 
     console.log('Swipe detected:', { distance, isLeftSwipe, isRightSwipe, currentWeek });
 
-    if (isLeftSwipe && currentWeek < plan!.weeks.length - 1) {
+    if (isLeftSwipe && plan?.weeks && currentWeek < plan.weeks.length - 1) {
       console.log('Swiping left to week', currentWeek + 1);
       setCurrentWeek(currentWeek + 1);
     }
@@ -182,6 +182,7 @@ export default function SimplePlanBuilder() {
         weeksLength: generatedPlan?.weeks?.length,
         firstWeek: generatedPlan?.weeks?.[0]
       });
+      console.log('🔍 Full generated plan:', generatedPlan);
       setPlan(generatedPlan);
       setCurrentWeek(0);
     }
