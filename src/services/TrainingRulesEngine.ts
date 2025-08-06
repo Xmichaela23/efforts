@@ -718,127 +718,118 @@ export class TrainingRulesEngine {
   }
 
   async generateWeeklyPlan(facts: TrainingFacts): Promise<any[]> {
-    const sessions = [];
+    console.log('🔍 Generating weekly plan for facts:', facts);
     
-    // Determine session distribution based on training philosophy
+    // Set facts for science-based calculations
+    this.setFacts(facts);
+    
+    const sessions = [];
     const sessionDistribution = this.getSessionDistribution(facts);
     
-    // Generate sessions for each planned day
-    for (const sessionPlan of sessionDistribution) {
-      const sessionFacts = { 
-        ...facts, 
-        discipline: sessionPlan.discipline as 'swim' | 'bike' | 'run' | 'strength' | 'brick',
-        sessionType: sessionPlan.type as 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max',
-        day: sessionPlan.day
+    console.log('🔍 Session distribution:', sessionDistribution);
+    
+    for (let i = 0; i < sessionDistribution.length; i++) {
+      const session = sessionDistribution[i];
+      const sessionFacts = {
+        ...facts,
+        discipline: session.discipline as 'swim' | 'bike' | 'run' | 'strength' | 'brick',
+        sessionType: session.type as 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max'
       };
       
-      const session = await this.generateSession(sessionFacts);
+      console.log(`🔍 Generating session ${i + 1}/${sessionDistribution.length}:`, sessionFacts);
       
-      if (session.duration > 0) {
-        // Determine discipline based on session description and rules
-        const discipline = session.discipline || this.determineDiscipline(session.description, facts);
-        
-        // Map intensity to proper session type
-        const type = this.mapIntensityToType(session.intensity, discipline);
-        
-        // Determine if this is a strength session
-        const strengthType = discipline === 'strength' ? this.determineStrengthType(facts.strengthOption) : undefined;
-        
+      try {
+        const result = await this.generateSession(sessionFacts);
         sessions.push({
-          day: sessionPlan.day.charAt(0).toUpperCase() + sessionPlan.day.slice(1), // Capitalize day name
-          discipline,
-          type,
-          duration: session.duration,
-          intensity: session.intensity,
-          description: session.description,
-          zones: session.zones,
-          strengthType,
-          detailedWorkout: `${session.description} - ${session.duration}min`
+          day: session.day,
+          discipline: session.discipline,
+          type: session.type,
+          ...result
         });
+        console.log(`✅ Session ${i + 1} generated:`, result);
+      } catch (error) {
+        console.error(`❌ Failed to generate session ${i + 1}:`, error);
+        throw error;
       }
     }
     
+    console.log('✅ Weekly plan generated:', sessions);
     return sessions;
   }
 
   async generateFullPlan(facts: TrainingFacts): Promise<any> {
-    const weeks = [];
-    const expectedWeeklyHours = this.getExpectedWeeklyHours(facts.distance, facts.timeLevel);
-    const optimalDistribution = this.calculateOptimalTimeDistribution(facts);
-    const timeLimits = this.getDisciplineTimeLimits(facts.distance);
+    console.log('🔍 Generating full plan for facts:', facts);
     
-    console.log(`🎯 Expected weekly hours for ${facts.distance} ${facts.timeLevel}: ${expectedWeeklyHours}`);
-    console.log('🎯 Optimal time distribution:', optimalDistribution);
-    console.log('🎯 Science-based time limits:', timeLimits);
+    // Set facts for science-based calculations
+    this.setFacts(facts);
+    
+    const plan = {
+      distance: facts.distance,
+      totalWeeks: facts.totalWeeks,
+      philosophy: facts.philosophy,
+      timeLevel: facts.timeLevel,
+      strengthOption: facts.strengthOption,
+      longSessionDays: facts.longSessionDays,
+      weeks: []
+    };
+    
+    console.log('🔍 Expected weekly hours:', this.getExpectedWeeklyHours(facts.distance, facts.timeLevel));
+    console.log('🔍 Optimal distribution:', this.calculateOptimalTimeDistribution(facts));
+    console.log('🔍 Time limits:', this.getDisciplineTimeLimits(facts.distance));
     
     for (let week = 1; week <= facts.totalWeeks; week++) {
-      const weekFacts = { 
-        ...facts, 
+      console.log(`🔍 Generating week ${week}/${facts.totalWeeks}`);
+      
+      const weekFacts = {
+        ...facts,
         currentWeek: week,
         phase: this.getPhaseForWeek(week, facts.totalWeeks),
         weekWithinPhase: this.getWeekWithinPhase(week, facts.totalWeeks)
       };
       
-      const sessions = await this.generateWeeklyPlan(weekFacts);
-      const weeklyHours = sessions.reduce((sum, s) => sum + s.duration, 0) / 60;
-      
-      // Calculate discipline hours for this week
-      const disciplineHours: { [discipline: string]: number } = {};
-      sessions.forEach(session => {
-        const discipline = session.discipline;
-        if (discipline) {
-          disciplineHours[discipline] = (disciplineHours[discipline] || 0) + session.duration / 60;
-        }
-      });
-      
-      // Validate against science-based limits
-      let validationWarnings = [];
-      for (const [discipline, hours] of Object.entries(disciplineHours)) {
-        const limits = timeLimits[discipline];
-        if (limits && typeof limits === 'object' && limits.min !== undefined && limits.max !== undefined) {
-          if (hours < limits.min) {
-            validationWarnings.push(`${discipline}: ${hours.toFixed(1)}h (below minimum ${limits.min}h)`);
-          } else if (hours > limits.max) {
-            validationWarnings.push(`${discipline}: ${hours.toFixed(1)}h (above maximum ${limits.max}h)`);
+      try {
+        const weekPlan = await this.generateWeeklyPlan(weekFacts);
+        
+        // Calculate discipline hours for validation
+        const disciplineHours: { [discipline: string]: number } = {};
+        weekPlan.forEach((session: any) => {
+          const discipline = session.discipline || 'unknown';
+          disciplineHours[discipline] = (disciplineHours[discipline] || 0) + (session.duration || 0) / 60; // Convert minutes to hours
+        });
+        
+        // Validate against science-based limits
+        const limits = this.getDisciplineTimeLimits(facts.distance);
+        const validationWarnings: string[] = [];
+        
+        Object.entries(disciplineHours).forEach(([discipline, hours]) => {
+          const disciplineLimits = limits[discipline];
+          if (disciplineLimits && typeof disciplineLimits === 'object' && disciplineLimits.min !== undefined && disciplineLimits.max !== undefined) {
+            if (hours < disciplineLimits.min || hours > disciplineLimits.max) {
+              validationWarnings.push(`${discipline} hours (${hours.toFixed(1)}h) outside science-based limits (${disciplineLimits.min}-${disciplineLimits.max}h)`);
+            }
           }
+        });
+        
+        plan.weeks.push({
+          week,
+          phase: weekFacts.phase,
+          weekWithinPhase: weekFacts.weekWithinPhase,
+          sessions: weekPlan,
+          disciplineHours,
+          validationWarnings
+        });
+        
+        console.log(`✅ Week ${week} generated with ${weekPlan.length} sessions`);
+        if (validationWarnings.length > 0) {
+          console.warn(`⚠️ Week ${week} validation warnings:`, validationWarnings);
         }
+      } catch (error) {
+        console.error(`❌ Failed to generate week ${week}:`, error);
+        throw error;
       }
-      
-      if (validationWarnings.length > 0) {
-        console.warn(`⚠️ Week ${week} discipline hours outside science-based limits:`, validationWarnings);
-      }
-      
-      // Validate weekly hours are within acceptable range
-      const minHours = expectedWeeklyHours * 0.8; // Allow 20% variance
-      const maxHours = expectedWeeklyHours * 1.2;
-      
-      if (weeklyHours < minHours || weeklyHours > maxHours) {
-        console.warn(`⚠️ Week ${week} hours (${weeklyHours.toFixed(1)}) outside expected range (${minHours.toFixed(1)}-${maxHours.toFixed(1)})`);
-      }
-      
-      weeks.push({
-        weekNumber: week,
-        phase: weekFacts.phase,
-        sessions,
-        totalHours: weeklyHours,
-        disciplineHours,
-        validationWarnings
-      });
     }
     
-    const plan = {
-      distance: facts.distance,
-      timeLevel: facts.timeLevel,
-      strengthOption: facts.strengthOption,
-      longSessionDays: facts.longSessionDays,
-      totalHours: weeks.reduce((sum, w) => sum + w.totalHours, 0),
-      expectedWeeklyHours,
-      optimalDistribution,
-      timeLimits,
-      weeks
-    };
-    
-    console.log('✅ Rules Engine generated plan structure:', plan);
+    console.log('✅ Full plan generated with', plan.weeks.length, 'weeks');
     return plan;
   }
 
