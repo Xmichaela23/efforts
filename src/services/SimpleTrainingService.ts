@@ -1020,8 +1020,10 @@ export class SimpleTrainingService {
       hasWeeks: !!plan.weeks,
       weeksLength: plan.weeks?.length,
       firstWeek: plan.weeks?.[0],
+      firstWeekSessions: plan.weeks?.[0]?.sessions?.length,
       totalHours: plan.totalHours
     });
+    console.log('🔍 First week details:', plan.weeks?.[0]);
     return plan as SimpleTrainingPlan;
   }
   
