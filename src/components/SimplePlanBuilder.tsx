@@ -422,6 +422,14 @@ export default function SimplePlanBuilder() {
 
   if (plan) {
     // Debug: Log what's in userBaselines
+    console.log('🔍 UI Rendering Debug:', {
+      hasPlan: !!plan,
+      hasWeeks: !!plan.weeks,
+      weeksLength: plan.weeks?.length,
+      firstWeek: plan.weeks?.[0],
+      firstWeekSessions: plan.weeks?.[0]?.sessions?.length,
+      currentWeek: currentWeek
+    });
 
     
     return (
