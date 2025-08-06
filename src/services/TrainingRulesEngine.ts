@@ -570,11 +570,11 @@ export class TrainingRulesEngine {
                             facts.phase === 'peak' ? 1.4 :
                             facts.phase === 'build' ? 1.2 : 1.0;
     
-    return {
-      ...result,
-      volumeMultiplier: volumeMultiplier,
-      duration: Math.round(baseVolume * 60 * volumeMultiplier / 7) // Distribute across week
-    };
+          return {
+        ...result,
+        volumeMultiplier: volumeMultiplier,
+        duration: Math.max(30, Math.round(baseVolume * 60 * volumeMultiplier / 7)) // Minimum 30min session
+      };
   }
 
   private applyPhilosophyRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
