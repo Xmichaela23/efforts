@@ -472,7 +472,7 @@ export default function SimplePlanBuilder() {
                     answers.strengthOption
                   }
                 </p>
-                <p className="text-gray-700"><strong>Total:</strong> {plan.totalHours.toFixed(1)}h/week</p>
+                <p className="text-gray-700"><strong>Total:</strong> {plan?.totalHours ? plan.totalHours.toFixed(1) : '0.0'}h/week</p>
               </div>
             </div>
           </div>
@@ -544,7 +544,7 @@ export default function SimplePlanBuilder() {
                         Week {week.weekNumber} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
                       </h4>
                       <p className="text-sm text-gray-600">
-                        {week.sessions.length} sessions • {week.totalHours.toFixed(1)} hours
+                        {week.sessions.length} sessions • {week?.totalHours ? week.totalHours.toFixed(1) : '0.0'} hours
                       </p>
                     </div>
                     
