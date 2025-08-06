@@ -1037,6 +1037,10 @@ export class SimpleTrainingService {
       daysSinceLastHardSession: 3
     };
     
+    console.log('🔍 User baselines structure:', userBaselines);
+    console.log('🔍 Performance numbers:', userBaselines.performanceNumbers);
+    console.log('🔍 Training facts being passed to rules engine:', trainingFacts);
+    
     // Generate plan using rules engine
     const plan = await this.rulesEngine.generateFullPlan(trainingFacts);
     

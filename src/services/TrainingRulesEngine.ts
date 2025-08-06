@@ -641,18 +641,24 @@ export class TrainingRulesEngine {
   // ===== PUBLIC API =====
 
   async generateSession(facts: TrainingFacts): Promise<TrainingResult> {
-    console.log('🔍 Generating session with facts:', facts);
+    console.log('�� Generating session for facts:', facts);
     
-    const { events } = await this.engine.run(facts);
-    console.log('📋 Rules engine events:', events);
+    // Validate required baseline data before generating session
+    const missingData = this.validateRequiredBaselineData(facts);
+    if (missingData.length > 0) {
+      throw new Error(`Missing required baseline data: ${missingData.join(', ')}. Please complete your baseline assessment before generating plans.`);
+    }
     
-    // Process events to determine session parameters
-    const result = this.processEvents(events, facts);
+    // Run the rules engine
+    const engineResult = await this.engine.run(facts);
+    console.log('✅ Rules engine events:', engineResult.events);
+    
+    const result = this.processEvents(engineResult.events, facts);
     console.log('✅ Generated session result:', result);
     
     // Validate that we got a real session, not a fallback
     if (!result || result.duration === 0) {
-      throw new Error(`Failed to generate valid session for facts: ${JSON.stringify(facts)}`);
+      throw new Error(`Failed to generate valid session. Please ensure all required baseline data is provided: FTP, run paces, swim pace, and strength 1RM values.`);
     }
     
     return result;
@@ -1091,6 +1097,47 @@ export class TrainingRulesEngine {
   private getDisciplineForDay(sessionIndex: number, facts: TrainingFacts): string {
     const disciplines = ['swim', 'bike', 'run'];
     return disciplines[sessionIndex % disciplines.length];
+  }
+
+  // NEW: Validate required baseline data
+  private validateRequiredBaselineData(facts: TrainingFacts): string[] {
+    const missing = [];
+    
+    // Check for FTP (required for bike calculations)
+    if (!facts.ftp) {
+      missing.push('FTP (Functional Threshold Power)');
+    }
+    
+    // Check for run paces (need either easyPace or fiveK)
+    if (!facts.easyPace && !facts.fiveK) {
+      missing.push('Run pace (either easyPace or fiveK time)');
+    }
+    
+    // Check for swim pace
+    if (!facts.swimPace100) {
+      missing.push('Swim pace (100m time)');
+    }
+    
+    // Check for strength data if strength is selected
+    if (facts.strengthOption && facts.strengthOption !== 'none') {
+      if (!facts.squat) missing.push('Squat 1RM');
+      if (!facts.deadlift) missing.push('Deadlift 1RM');
+      if (!facts.bench) missing.push('Bench Press 1RM');
+    }
+    
+    console.log('🔍 Baseline validation - missing:', missing);
+    console.log('🔍 Available baseline data:', {
+      ftp: facts.ftp,
+      easyPace: facts.easyPace,
+      fiveK: facts.fiveK,
+      swimPace100: facts.swimPace100,
+      squat: facts.squat,
+      deadlift: facts.deadlift,
+      bench: facts.bench,
+      strengthOption: facts.strengthOption
+    });
+    
+    return missing;
   }
 
   // No fallbacks - engine must generate real sessions or fail

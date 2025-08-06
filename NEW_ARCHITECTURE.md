@@ -28,11 +28,17 @@ The JSON Rules Engine **WILL NOT WORK** without complete user baseline data. Thi
 - **No partial plans** - Complete data or no plan
 
 ### **🎯 WHY THIS MATTERS:**
-We switched from AI-based generation to a **reliable, science-based JSON Rules Engine** specifically because:
-- **AI was unreliable** - Generated inconsistent, non-scientific plans
-- **Fallbacks were dangerous** - Led to inappropriate training loads
-- **User safety is paramount** - Only real baseline data ensures safe training
-- **Scientific accuracy** - Every calculation must be based on actual performance
+We built a **clean, reliable, scalable JSON Rules Engine** that adapts to user preferences before generating plans. This approach ensures:
+- **Reliability** - Consistent, science-based plan generation
+- **Scalability** - Easy to add new distances and preferences
+- **User Safety** - Only real baseline data ensures safe training
+- **Scientific Accuracy** - Every calculation based on actual performance
+
+### **🔧 FUTURE AI INTEGRATION:**
+- **AI will be used for tracking** user metrics from wearables (Garmin, etc.)
+- **Plan generation remains** clean, reliable JSON Rules Engine
+- **AI enhances tracking** - not plan generation
+- **Separation of concerns** - reliable plans + smart tracking
 
 ## Core Philosophy
 
