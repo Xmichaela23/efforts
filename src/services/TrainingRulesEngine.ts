@@ -2213,16 +2213,25 @@ export class TrainingRulesEngine {
       });
     }
     
-    // Add brick session on long day if specified
+    // ENSURE user's long day is included
     if (facts.longSessionDays) {
       const longDay = facts.longSessionDays.toLowerCase();
-      const brickIndex = distribution.findIndex(s => s.day.toLowerCase() === longDay);
-      if (brickIndex >= 0) {
-        distribution[brickIndex] = {
+      const longDayExists = distribution.findIndex(s => s.day.toLowerCase() === longDay);
+      
+      if (longDayExists >= 0) {
+        // Replace existing session with brick
+        distribution[longDayExists] = {
           day: longDay,
           discipline: 'brick',
           type: 'endurance'
         };
+      } else {
+        // Add brick session to user's chosen long day
+        distribution.push({
+          day: longDay,
+          discipline: 'brick',
+          type: 'endurance'
+        });
       }
     }
     
