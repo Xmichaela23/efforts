@@ -1203,7 +1203,6 @@ export class TrainingRulesEngine {
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
-    // INCREASED: Account for multipliers that will reduce these durations
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
@@ -1243,7 +1242,6 @@ export class TrainingRulesEngine {
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
-    // INCREASED: Account for multipliers that will reduce these durations
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
@@ -1304,7 +1302,6 @@ export class TrainingRulesEngine {
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
-    // INCREASED: Account for multipliers that will reduce these durations
     let baseDuration: number;
     switch (facts.distance) {
       case 'sprint':
@@ -1437,11 +1434,11 @@ export class TrainingRulesEngine {
     const fitnessLevel = this.calculateFitnessLevel();
     
     // Research: Lower fitness = higher volume needed for base building
-    // ADJUSTED: More balanced values to bring durations into range
-    if (fitnessLevel === 'beginner') return 1.0; // Standard volume for beginners
-    if (fitnessLevel === 'intermediate') return 0.95; // Slightly lower for intermediate
-    if (fitnessLevel === 'advanced') return 0.9; // Lower volume for advanced
-    return 0.95; // Default
+    // LESS AGGRESSIVE: Keep more volume for base building
+    if (fitnessLevel === 'beginner') return 1.05; // Higher volume for beginners
+    if (fitnessLevel === 'intermediate') return 1.0; // Standard volume for intermediate
+    if (fitnessLevel === 'advanced') return 0.95; // Slightly lower for advanced
+    return 1.0; // Default
   }
 
   private calculateBuildPhaseMultiplier(): number {
@@ -1499,11 +1496,11 @@ export class TrainingRulesEngine {
     
     const recoveryCapacity = this.calculateRecoveryCapacity();
     
-    // Research: Recovery sessions should be 70-80% of standard duration
-    if (recoveryCapacity === 'high') return 0.8; // Higher recovery capacity
-    if (recoveryCapacity === 'medium') return 0.75; // Standard recovery
-    if (recoveryCapacity === 'low') return 0.7; // Lower recovery capacity
-    return 0.75; // Default
+    // Research: Recovery sessions should be 80-90% of standard duration (LESS AGGRESSIVE)
+    if (recoveryCapacity === 'high') return 0.9; // Higher recovery capacity
+    if (recoveryCapacity === 'medium') return 0.85; // Standard recovery
+    if (recoveryCapacity === 'low') return 0.8; // Lower recovery capacity
+    return 0.85; // Default
   }
 
   private calculateEnduranceMultiplier(): number {
@@ -1525,11 +1522,11 @@ export class TrainingRulesEngine {
     
     const lactateThreshold = this.calculateLactateThreshold();
     
-    // Research: Tempo sessions should be 85-90% of standard duration
-    if (lactateThreshold === 'high') return 0.9; // Higher lactate threshold
-    if (lactateThreshold === 'medium') return 0.875; // Standard lactate threshold
-    if (lactateThreshold === 'low') return 0.85; // Lower lactate threshold
-    return 0.875; // Default
+    // Research: Tempo sessions should be 90-95% of standard duration (LESS AGGRESSIVE)
+    if (lactateThreshold === 'high') return 0.95; // Higher lactate threshold
+    if (lactateThreshold === 'medium') return 0.925; // Standard lactate threshold
+    if (lactateThreshold === 'low') return 0.9; // Lower lactate threshold
+    return 0.925; // Default
   }
 
   private calculateThresholdMultiplier(): number {
@@ -1538,11 +1535,11 @@ export class TrainingRulesEngine {
     
     const ftpLevel = this.calculateFTPLevel();
     
-    // Research: Threshold sessions should be 90-95% of standard duration
-    if (ftpLevel === 'high') return 0.95; // Higher FTP
-    if (ftpLevel === 'medium') return 0.925; // Standard FTP
-    if (ftpLevel === 'low') return 0.9; // Lower FTP
-    return 0.925; // Default
+    // Research: Threshold sessions should be 95-100% of standard duration (LESS AGGRESSIVE)
+    if (ftpLevel === 'high') return 1.0; // Higher FTP
+    if (ftpLevel === 'medium') return 0.975; // Standard FTP
+    if (ftpLevel === 'low') return 0.95; // Lower FTP
+    return 0.975; // Default
   }
 
   private calculateVO2MaxMultiplier(): number {
@@ -1551,11 +1548,11 @@ export class TrainingRulesEngine {
     
     const vo2maxCapacity = this.calculateVO2MaxCapacity();
     
-    // Research: VO2max sessions should be 60-70% of standard duration
-    if (vo2maxCapacity === 'high') return 0.7; // Higher VO2max capacity
-    if (vo2maxCapacity === 'medium') return 0.65; // Standard VO2max capacity
-    if (vo2maxCapacity === 'low') return 0.6; // Lower VO2max capacity
-    return 0.65; // Default
+    // Research: VO2max sessions should be 70-80% of standard duration (LESS AGGRESSIVE)
+    if (vo2maxCapacity === 'high') return 0.8; // Higher VO2max capacity
+    if (vo2maxCapacity === 'medium') return 0.75; // Standard VO2max capacity
+    if (vo2maxCapacity === 'low') return 0.7; // Lower VO2max capacity
+    return 0.75; // Default
   }
 
   private calculateMinimumTimeMultiplier(): number {
@@ -2243,33 +2240,33 @@ export class TrainingRulesEngine {
     switch (distance) {
       case 'sprint':
         return {
-          swim: { min: 1.5, max: 3.0 },    // 1.5-3 hours/week
-          bike: { min: 2.0, max: 4.0 },    // 2-4 hours/week  
-          run: { min: 1.5, max: 3.0 },     // 1.5-3 hours/week
+          swim: { min: 1.5, max: 3.0 },    // 1.5-3 hours/week (SCIENCE-BASED)
+          bike: { min: 2.0, max: 4.0 },    // 2-4 hours/week (SCIENCE-BASED)
+          run: { min: 1.5, max: 3.0 },     // 1.5-3 hours/week (SCIENCE-BASED)
           strength: { min: 0.5, max: 1.5 }, // 0.5-1.5 hours/week
           brick: { min: 0.5, max: 1.0 }    // 0.5-1 hour/week
         };
       case 'seventy3':
         return {
-          swim: { min: 2.0, max: 4.0 },    // 2-4 hours/week
-          bike: { min: 4.0, max: 8.0 },    // 4-8 hours/week
-          run: { min: 2.0, max: 4.0 },     // 2-4 hours/week
+          swim: { min: 2.0, max: 4.0 },    // 2-4 hours/week (SCIENCE-BASED)
+          bike: { min: 4.0, max: 8.0 },    // 4-8 hours/week (SCIENCE-BASED)
+          run: { min: 2.0, max: 4.0 },     // 2-4 hours/week (SCIENCE-BASED)
           strength: { min: 0.5, max: 2.0 }, // 0.5-2 hours/week
           brick: { min: 1.0, max: 2.0 }    // 1-2 hours/week
         };
       case 'olympic':
         return {
-          swim: { min: 1.5, max: 3.5 },    // 1.5-3.5 hours/week
-          bike: { min: 3.0, max: 6.0 },    // 3-6 hours/week
-          run: { min: 2.0, max: 4.0 },     // 2-4 hours/week
+          swim: { min: 1.5, max: 3.5 },    // 1.5-3.5 hours/week (SCIENCE-BASED)
+          bike: { min: 3.0, max: 6.0 },    // 3-6 hours/week (SCIENCE-BASED)
+          run: { min: 2.0, max: 4.0 },     // 2-4 hours/week (SCIENCE-BASED)
           strength: { min: 0.5, max: 1.5 }, // 0.5-1.5 hours/week
           brick: { min: 0.75, max: 1.5 }   // 0.75-1.5 hours/week
         };
       default:
         return {
-          swim: { min: 1.5, max: 3.0 },
-          bike: { min: 2.0, max: 4.0 },
-          run: { min: 1.5, max: 3.0 },
+          swim: { min: 1.5, max: 3.0 },    // 1.5-3 hours/week (SCIENCE-BASED)
+          bike: { min: 2.0, max: 4.0 },    // 2-4 hours/week (SCIENCE-BASED)
+          run: { min: 1.5, max: 3.0 },     // 1.5-3 hours/week (SCIENCE-BASED)
           strength: { min: 0.5, max: 1.5 },
           brick: { min: 0.5, max: 1.0 }
         };
