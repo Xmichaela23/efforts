@@ -1194,6 +1194,13 @@ export class TrainingRulesEngine {
     const paceSeconds = this.parseTimeToSeconds(facts.swimPace100);
     const pacePer100m = paceSeconds / 100; // seconds per meter
     
+    console.log('🔍 Swim base duration calculation:', {
+      swimPace100: facts.swimPace100,
+      paceSeconds,
+      pacePer100m,
+      distance: facts.distance
+    });
+    
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
     // INCREASED: Account for multipliers that will reduce these durations
@@ -1215,6 +1222,11 @@ export class TrainingRulesEngine {
         baseDuration = (3000 * pacePer100m) / 60; // Default 3000m
     }
     
+    console.log('🔍 Swim base duration result:', {
+      baseDuration,
+      finalDuration: Math.max(45, Math.min(150, baseDuration))
+    });
+    
     // Ensure minimum 45 minutes, maximum 150 minutes
     return Math.max(45, Math.min(150, baseDuration));
   }
@@ -1223,6 +1235,11 @@ export class TrainingRulesEngine {
     if (!facts.ftp) {
       throw new Error('FTP is required for science-based bike duration calculation');
     }
+    
+    console.log('🔍 Bike base duration calculation:', {
+      ftp: facts.ftp,
+      distance: facts.distance
+    });
     
     // Calculate base duration for TRAINING sessions (not race distances)
     // Training sessions should be longer than race distances for proper adaptation
@@ -1244,6 +1261,11 @@ export class TrainingRulesEngine {
       default:
         baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 80); // Default 80km
     }
+    
+    console.log('🔍 Bike base duration result:', {
+      baseDuration,
+      finalDuration: Math.max(60, Math.min(300, baseDuration))
+    });
     
     // Ensure minimum 60 minutes, maximum 300 minutes
     return Math.max(60, Math.min(300, baseDuration));
@@ -1415,10 +1437,11 @@ export class TrainingRulesEngine {
     const fitnessLevel = this.calculateFitnessLevel();
     
     // Research: Lower fitness = higher volume needed for base building
-    if (fitnessLevel === 'beginner') return 0.9; // Higher volume for beginners
-    if (fitnessLevel === 'intermediate') return 0.85; // Standard volume
-    if (fitnessLevel === 'advanced') return 0.8; // Lower volume for advanced
-    return 0.85; // Default
+    // ADJUSTED: More balanced values to bring durations into range
+    if (fitnessLevel === 'beginner') return 1.0; // Standard volume for beginners
+    if (fitnessLevel === 'intermediate') return 0.95; // Slightly lower for intermediate
+    if (fitnessLevel === 'advanced') return 0.9; // Lower volume for advanced
+    return 0.95; // Default
   }
 
   private calculateBuildPhaseMultiplier(): number {
@@ -1428,10 +1451,11 @@ export class TrainingRulesEngine {
     const experienceLevel = this.calculateExperienceLevel();
     
     // Research: More experience = higher intensity tolerance
-    if (experienceLevel === 'beginner') return 1.0; // Standard intensity
-    if (experienceLevel === 'intermediate') return 1.05; // Higher intensity
-    if (experienceLevel === 'advanced') return 1.1; // Highest intensity
-    return 1.05; // Default
+    // ADJUSTED: More balanced values to bring durations into range
+    if (experienceLevel === 'beginner') return 1.05; // Slightly higher intensity
+    if (experienceLevel === 'intermediate') return 1.1; // Higher intensity
+    if (experienceLevel === 'advanced') return 1.15; // Highest intensity
+    return 1.1; // Default
   }
 
   private calculatePeakPhaseMultiplier(): number {
@@ -1441,10 +1465,11 @@ export class TrainingRulesEngine {
     const performancePotential = this.calculatePerformancePotential();
     
     // Research: Higher potential = higher peak volume
-    if (performancePotential === 'low') return 1.1; // Lower peak volume
-    if (performancePotential === 'medium') return 1.15; // Standard peak volume
-    if (performancePotential === 'high') return 1.2; // Higher peak volume
-    return 1.15; // Default
+    // ADJUSTED: More balanced values to bring durations into range
+    if (performancePotential === 'low') return 1.15; // Lower peak volume
+    if (performancePotential === 'medium') return 1.2; // Standard peak volume
+    if (performancePotential === 'high') return 1.25; // Higher peak volume
+    return 1.2; // Default
   }
 
   private calculateTaperPhaseMultiplier(): number {
@@ -1455,10 +1480,11 @@ export class TrainingRulesEngine {
     const raceDistance = this.facts.distance;
     
     // Research: Longer distance = longer taper needed
-    let baseTaper = 0.65;
-    if (raceDistance === 'sprint') baseTaper = 0.7;
-    if (raceDistance === 'olympic') baseTaper = 0.65;
-    if (raceDistance === 'seventy3') baseTaper = 0.6;
+    // ADJUSTED: More balanced values to bring durations into range
+    let baseTaper = 0.75;
+    if (raceDistance === 'sprint') baseTaper = 0.8;
+    if (raceDistance === 'olympic') baseTaper = 0.75;
+    if (raceDistance === 'seventy3') baseTaper = 0.7;
     
     // Adjust based on recovery capacity
     if (recoveryCapacity === 'high') baseTaper += 0.05;
@@ -1539,11 +1565,11 @@ export class TrainingRulesEngine {
     const trainingEfficiency = this.calculateTrainingEfficiency();
     
     // Research: Minimum training should be 85-90% of standard volume
-    // ADJUSTED: More conservative values to bring durations into range
-    if (trainingEfficiency === 'high') return 0.95; // Higher efficiency
-    if (trainingEfficiency === 'medium') return 0.9; // Standard efficiency
-    if (trainingEfficiency === 'low') return 0.85; // Lower efficiency
-    return 0.9; // Default
+    // ADJUSTED: Slightly more aggressive values to bring durations into range
+    if (trainingEfficiency === 'high') return 1.0; // Higher efficiency
+    if (trainingEfficiency === 'medium') return 0.95; // Standard efficiency
+    if (trainingEfficiency === 'low') return 0.9; // Lower efficiency
+    return 0.95; // Default
   }
 
   private calculateModerateTimeMultiplier(): number {
@@ -1553,11 +1579,11 @@ export class TrainingRulesEngine {
     const optimalLoad = this.calculateOptimalTrainingLoad();
     
     // Research: Moderate training should be 100% of standard volume
-    // ADJUSTED: More conservative values to bring durations into range
-    if (optimalLoad === 'high') return 0.95; // Higher optimal load
-    if (optimalLoad === 'medium') return 0.9; // Standard optimal load
-    if (optimalLoad === 'low') return 0.85; // Lower optimal load
-    return 0.9; // Default
+    // ADJUSTED: Slightly more aggressive values to bring durations into range
+    if (optimalLoad === 'high') return 1.05; // Higher optimal load
+    if (optimalLoad === 'medium') return 1.0; // Standard optimal load
+    if (optimalLoad === 'low') return 0.95; // Lower optimal load
+    return 1.0; // Default
   }
 
   private calculateSeriousTimeMultiplier(): number {
@@ -1567,11 +1593,11 @@ export class TrainingRulesEngine {
     const volumeTolerance = this.calculateVolumeTolerance();
     
     // Research: Serious training should be 120-130% of standard volume
-    // ADJUSTED: More conservative values to bring durations into range
-    if (volumeTolerance === 'high') return 1.0; // Higher volume tolerance
-    if (volumeTolerance === 'medium') return 0.95; // Standard volume tolerance
-    if (volumeTolerance === 'low') return 0.9; // Lower volume tolerance
-    return 0.95; // Default
+    // ADJUSTED: Slightly more aggressive values to bring durations into range
+    if (volumeTolerance === 'high') return 1.1; // Higher volume tolerance
+    if (volumeTolerance === 'medium') return 1.05; // Standard volume tolerance
+    if (volumeTolerance === 'low') return 1.0; // Lower volume tolerance
+    return 1.05; // Default
   }
 
   private calculateHardcoreTimeMultiplier(): number {
@@ -1581,11 +1607,11 @@ export class TrainingRulesEngine {
     const eliteCapacity = this.calculateEliteCapacity();
     
     // Research: Hardcore training should be 140-150% of standard volume
-    // ADJUSTED: More conservative values to bring durations into range
-    if (eliteCapacity === 'high') return 1.05; // Higher elite capacity
-    if (eliteCapacity === 'medium') return 1.0; // Standard elite capacity
-    if (eliteCapacity === 'low') return 0.95; // Lower elite capacity
-    return 1.0; // Default
+    // ADJUSTED: Slightly more aggressive values to bring durations into range
+    if (eliteCapacity === 'high') return 1.15; // Higher elite capacity
+    if (eliteCapacity === 'medium') return 1.1; // Standard elite capacity
+    if (eliteCapacity === 'low') return 1.05; // Lower elite capacity
+    return 1.1; // Default
   }
 
   private calculateSprintWeeklyHours(): number {
