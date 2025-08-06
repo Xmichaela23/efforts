@@ -470,33 +470,52 @@ export default function SimplePlanBuilder() {
           <div className="w-full bg-white p-4 border-t border-gray-200">
             <h3 className="text-lg font-semibold mb-4">Your Training Plan</h3>
             <div className="flex items-center justify-between mb-4">
-              <div 
-                className="flex-1 overflow-hidden"
-                onTouchStart={onTouchStart}
-                onTouchMove={onTouchMove}
-                onTouchEnd={onTouchEnd}
-              >
-                <div className="flex space-x-2" style={{ transform: `translateX(-${currentWeek * 80}px)` }}>
-                  {plan.weeks.map((week, weekIndex) => (
-                    <button
-                      key={weekIndex}
-                      onClick={() => setCurrentWeek(weekIndex)}
-                      className={`px-4 py-2 text-sm font-medium transition-colors rounded flex-shrink-0 ${
-                        currentWeek === weekIndex
-                          ? 'text-white bg-blue-600'
-                          : 'text-gray-600 bg-gray-100 hover:bg-gray-200'
-                      }`}
-                    >
-                      Week {week.weekNumber}
-                    </button>
-                  ))}
-                </div>
-              </div>
-              <div className="flex items-center space-x-2 text-sm text-gray-600 bg-gray-100 px-3 py-2 rounded ml-4">
-                <span>Swipe to navigate</span>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <h3 className="text-lg font-semibold">Your Training Plan</h3>
+              <div className="flex items-center space-x-1 text-sm text-gray-500">
+                <span>Swipe</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
+              </div>
+            </div>
+            
+            {/* Week Indicator Dots */}
+            <div className="flex justify-center space-x-2 mb-4">
+              {plan.weeks.map((_, weekIndex) => (
+                <div
+                  key={weekIndex}
+                  className={`w-2 h-2 rounded-full transition-colors ${
+                    currentWeek === weekIndex
+                      ? 'bg-blue-600'
+                      : 'bg-gray-300'
+                  }`}
+                />
+              ))}
+            </div>
+            
+            {/* Swipeable Week Content */}
+            <div 
+              className="relative overflow-hidden"
+              onTouchStart={onTouchStart}
+              onTouchMove={onTouchMove}
+              onTouchEnd={onTouchEnd}
+            >
+              <div 
+                className="flex transition-transform duration-300 ease-out"
+                style={{ transform: `translateX(-${currentWeek * 100}%)` }}
+              >
+                {plan.weeks.map((week, weekIndex) => (
+                  <div key={weekIndex} className="w-full flex-shrink-0">
+                    <div className="text-center mb-4">
+                      <h4 className="text-lg font-semibold">
+                        Week {week.weekNumber} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
+                      </h4>
+                      <p className="text-sm text-gray-600">
+                        {week.sessions.length} sessions • {week.totalHours.toFixed(1)} hours
+                      </p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
