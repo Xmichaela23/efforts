@@ -64,8 +64,8 @@ export interface TrainingFacts {
   totalPhaseWeeks: number;
   
   // Session Context
-  discipline: 'swim' | 'bike' | 'run' | 'strength' | 'brick';
-  sessionType: 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max';
+  discipline?: 'swim' | 'bike' | 'run' | 'strength' | 'brick';
+  sessionType?: 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max';
   previousSessionIntensity?: 'low' | 'medium' | 'high';
   daysSinceLastHardSession?: number;
 }
@@ -96,6 +96,7 @@ export interface TrainingResult {
   description: string;
   volumeMultiplier: number;
   intensityMultiplier: number;
+  discipline?: 'swim' | 'bike' | 'run' | 'strength' | 'brick';
 }
 
 export class TrainingRulesEngine {
@@ -127,6 +128,180 @@ export class TrainingRulesEngine {
     
     // Load recovery and balance rules
     this.loadRecoveryRules();
+    
+    // NEW: Load session generation rules
+    this.loadSessionGenerationRules();
+  }
+
+  // NEW: Session Generation Rules
+  private loadSessionGenerationRules() {
+    // Swim Session Rules
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'discipline',
+          operator: 'equal',
+          value: 'swim'
+        }]
+      },
+      event: {
+        type: 'swim_session',
+        params: {
+          discipline: 'swim',
+          description: 'Swim session',
+          zones: [1, 2]
+        }
+      }
+    });
+
+    // Bike Session Rules
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'discipline',
+          operator: 'equal',
+          value: 'bike'
+        }]
+      },
+      event: {
+        type: 'bike_session',
+        params: {
+          discipline: 'bike',
+          description: 'Bike session',
+          zones: [2, 3]
+        }
+      }
+    });
+
+    // Run Session Rules
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'discipline',
+          operator: 'equal',
+          value: 'run'
+        }]
+      },
+      event: {
+        type: 'run_session',
+        params: {
+          discipline: 'run',
+          description: 'Run session',
+          zones: [2, 3]
+        }
+      }
+    });
+
+    // Strength Session Rules
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'discipline',
+          operator: 'equal',
+          value: 'strength'
+        }]
+      },
+      event: {
+        type: 'strength_session',
+        params: {
+          discipline: 'strength',
+          description: 'Strength session',
+          zones: [3, 4]
+        }
+      }
+    });
+
+    // Brick Session Rules
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'discipline',
+          operator: 'equal',
+          value: 'brick'
+        }]
+      },
+      event: {
+        type: 'brick_session',
+        params: {
+          discipline: 'brick',
+          description: 'Brick session',
+          zones: [3, 4]
+        }
+      }
+    });
+
+    // Session Type Rules
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'sessionType',
+          operator: 'equal',
+          value: 'recovery'
+        }]
+      },
+      event: {
+        type: 'recovery_session_type',
+        params: {
+          intensity: 'low',
+          zones: [1, 2],
+          description: 'Recovery session'
+        }
+      }
+    });
+
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'sessionType',
+          operator: 'equal',
+          value: 'endurance'
+        }]
+      },
+      event: {
+        type: 'endurance_session_type',
+        params: {
+          intensity: 'medium',
+          zones: [2, 3],
+          description: 'Endurance session'
+        }
+      }
+    });
+
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'sessionType',
+          operator: 'equal',
+          value: 'tempo'
+        }]
+      },
+      event: {
+        type: 'tempo_session_type',
+        params: {
+          intensity: 'high',
+          zones: [3, 4],
+          description: 'Tempo session'
+        }
+      }
+    });
+
+    this.engine.addRule({
+      conditions: {
+        all: [{
+          fact: 'sessionType',
+          operator: 'equal',
+          value: 'threshold'
+        }]
+      },
+      event: {
+        type: 'threshold_session_type',
+        params: {
+          intensity: 'high',
+          zones: [4, 5],
+          description: 'Threshold session'
+        }
+      }
+    });
   }
 
   private loadDistanceRules() {
@@ -486,16 +661,23 @@ export class TrainingRulesEngine {
   async generateWeeklyPlan(facts: TrainingFacts): Promise<any[]> {
     const sessions = [];
     
-    // Generate sessions for each day of the week
-    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    // Determine session distribution based on training philosophy
+    const sessionDistribution = this.getSessionDistribution(facts);
     
-    for (const day of days) {
-      const dayFacts = { ...facts, day };
-      const session = await this.generateSession(dayFacts);
+    // Generate sessions for each planned day
+    for (const sessionPlan of sessionDistribution) {
+      const sessionFacts = { 
+        ...facts, 
+        discipline: sessionPlan.discipline as 'swim' | 'bike' | 'run' | 'strength' | 'brick',
+        sessionType: sessionPlan.type as 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max',
+        day: sessionPlan.day
+      };
+      
+      const session = await this.generateSession(sessionFacts);
       
       if (session.duration > 0) {
         // Determine discipline based on session description and rules
-        const discipline = this.determineDiscipline(session.description, facts);
+        const discipline = session.discipline || this.determineDiscipline(session.description, facts);
         
         // Map intensity to proper session type
         const type = this.mapIntensityToType(session.intensity, discipline);
@@ -504,7 +686,7 @@ export class TrainingRulesEngine {
         const strengthType = discipline === 'strength' ? this.determineStrengthType(facts.strengthOption) : undefined;
         
         sessions.push({
-          day: day.charAt(0).toUpperCase() + day.slice(1), // Capitalize day name
+          day: sessionPlan.day.charAt(0).toUpperCase() + sessionPlan.day.slice(1), // Capitalize day name
           discipline,
           type,
           duration: session.duration,
@@ -592,6 +774,30 @@ export class TrainingRulesEngine {
         case 'recovery_needed':
           result = this.applyRecoveryRules(result, event.params, facts);
           break;
+
+        // NEW: Session generation events
+        case 'swim_session':
+        case 'bike_session':
+        case 'run_session':
+        case 'strength_session':
+        case 'brick_session':
+          result = this.applySessionRules(result, event.params, facts);
+          break;
+
+        case 'recovery_session_type':
+        case 'endurance_session_type':
+        case 'tempo_session_type':
+        case 'threshold_session_type':
+          result = this.applySessionTypeRules(result, event.params, facts);
+          break;
+
+        // NEW: Strength events
+        case 'no_strength':
+        case 'traditional_strength':
+        case 'compound_strength':
+        case 'cowboy_strength':
+          result = this.applyStrengthRules(result, event.params, facts);
+          break;
       }
     }
 
@@ -619,7 +825,8 @@ export class TrainingRulesEngine {
   private applyPhilosophyRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
     // Apply philosophy-specific intensity and zone distributions
     if (facts.philosophy === 'polarized') {
-      const isHardSession = Math.random() < params.hardRatio;
+      // Use session type to determine intensity instead of random
+      const isHardSession = facts.sessionType === 'tempo' || facts.sessionType === 'threshold';
       return {
         ...result,
         intensity: isHardSession ? 'high' : 'low',
@@ -629,7 +836,7 @@ export class TrainingRulesEngine {
     }
     
     if (facts.philosophy === 'threshold') {
-      const isThresholdSession = Math.random() < params.thresholdRatio;
+      const isThresholdSession = facts.sessionType === 'threshold';
       return {
         ...result,
         intensity: isThresholdSession ? 'high' : 'medium',
@@ -660,6 +867,43 @@ export class TrainingRulesEngine {
       duration: params.duration || 30,
       volumeMultiplier: params.volumeMultiplier || 0.7,
       description: params.focus || 'Recovery session'
+    };
+  }
+
+  // NEW: Apply session-specific rules
+  private applySessionRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
+    return {
+      ...result,
+      discipline: params.discipline,
+      description: params.description,
+      zones: params.zones || result.zones
+    };
+  }
+
+  // NEW: Apply session type rules
+  private applySessionTypeRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
+    return {
+      ...result,
+      intensity: params.intensity || result.intensity,
+      zones: params.zones || result.zones,
+      description: params.description || result.description
+    };
+  }
+
+  // NEW: Apply strength rules
+  private applyStrengthRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
+    if (params.strengthSessions === 0) {
+      return {
+        ...result,
+        duration: 0, // Skip strength sessions
+        description: 'No strength training'
+      };
+    }
+    
+    return {
+      ...result,
+      description: params.focus || 'Strength training',
+      zones: [3, 4] // Strength training zones
     };
   }
 
@@ -736,6 +980,100 @@ export class TrainingRulesEngine {
   private determineStrengthType(strengthOption?: string): 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' {
     if (!strengthOption || strengthOption === 'none') return 'traditional';
     return strengthOption as 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
+  }
+
+  // NEW: Get session distribution based on training philosophy
+  private getSessionDistribution(facts: TrainingFacts): Array<{day: string, discipline: string, type: string}> {
+    const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    const distribution = [];
+    
+    // Base session count based on distance and time level
+    let totalSessions = 6; // Default for sprint
+    if (facts.distance === 'seventy3') totalSessions = 8;
+    if (facts.distance === 'olympic') totalSessions = 7;
+    
+    // Adjust for time level
+    const timeMultiplier = {
+      minimum: 0.8,
+      moderate: 1.0,
+      serious: 1.2,
+      hardcore: 1.4
+    }[facts.timeLevel] || 1.0;
+    
+    totalSessions = Math.round(totalSessions * timeMultiplier);
+    
+    // Add strength sessions
+    const strengthSessions = {
+      none: 0,
+      traditional: 2,
+      compound: 2,
+      cowboy_endurance: 3,
+      cowboy_compound: 3
+    }[facts.strengthOption] || 0;
+    
+    totalSessions += strengthSessions;
+    
+    // Distribute sessions based on philosophy
+    if (facts.philosophy === 'polarized') {
+      // 80/20 polarized training
+      const easySessions = Math.round(totalSessions * 0.8);
+      const hardSessions = totalSessions - easySessions;
+      
+      // Place easy sessions (recovery/endurance)
+      for (let i = 0; i < easySessions; i++) {
+        const day = days[i % days.length];
+        const discipline = this.getDisciplineForDay(i, facts);
+        distribution.push({
+          day,
+          discipline,
+          type: 'recovery'
+        });
+      }
+      
+      // Place hard sessions (tempo/threshold)
+      for (let i = 0; i < hardSessions; i++) {
+        const day = days[(i + 2) % days.length]; // Skip a day between hard sessions
+        const discipline = this.getDisciplineForDay(i + easySessions, facts);
+        distribution.push({
+          day,
+          discipline,
+          type: 'tempo'
+        });
+      }
+    } else {
+      // Threshold training - more balanced
+      for (let i = 0; i < totalSessions; i++) {
+        const day = days[i % days.length];
+        const discipline = this.getDisciplineForDay(i, facts);
+        const type = i % 2 === 0 ? 'endurance' : 'tempo';
+        distribution.push({
+          day,
+          discipline,
+          type
+        });
+      }
+    }
+    
+    // Add brick session on long day if specified
+    if (facts.longSessionDays) {
+      const longDay = facts.longSessionDays.toLowerCase();
+      const brickIndex = distribution.findIndex(s => s.day.toLowerCase() === longDay);
+      if (brickIndex >= 0) {
+        distribution[brickIndex] = {
+          day: longDay,
+          discipline: 'brick',
+          type: 'endurance'
+        };
+      }
+    }
+    
+    return distribution;
+  }
+
+  // NEW: Get discipline for session based on position and facts
+  private getDisciplineForDay(sessionIndex: number, facts: TrainingFacts): string {
+    const disciplines = ['swim', 'bike', 'run'];
+    return disciplines[sessionIndex % disciplines.length];
   }
 
   // No fallbacks - engine must generate real sessions or fail

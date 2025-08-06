@@ -1034,8 +1034,7 @@ export class SimpleTrainingService {
       phase: 'base',
       weekWithinPhase: 1,
       totalPhaseWeeks: 4,
-      discipline: 'bike',
-      sessionType: 'endurance',
+      // Remove hardcoded discipline and sessionType - let rules engine determine them
       // Provide default values for optional facts
       previousSessionIntensity: 'low',
       daysSinceLastHardSession: 3
@@ -1117,8 +1116,7 @@ export class SimpleTrainingService {
       phase: 'base',
       weekWithinPhase: 1,
       totalPhaseWeeks: 4,
-      discipline: 'bike',
-      sessionType: 'endurance',
+      // Remove hardcoded discipline and sessionType - let rules engine determine them
       // Provide default values for optional facts
       previousSessionIntensity: 'low',
       daysSinceLastHardSession: 3
