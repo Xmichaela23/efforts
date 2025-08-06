@@ -462,8 +462,14 @@ export class TrainingRulesEngine {
       
       if (session.duration > 0) {
         sessions.push({
-          day,
-          ...session
+          day: day.charAt(0).toUpperCase() + day.slice(1), // Capitalize day name
+          discipline: 'bike', // Default discipline
+          type: session.intensity === 'high' ? 'threshold' : 'endurance',
+          duration: session.duration,
+          intensity: session.intensity,
+          description: session.description,
+          zones: session.zones,
+          detailedWorkout: `${session.description} - ${session.duration}min`
         });
       }
     }
@@ -492,7 +498,7 @@ export class TrainingRulesEngine {
       });
     }
     
-    return {
+    const plan = {
       distance: facts.distance,
       timeLevel: facts.timeLevel,
       strengthOption: facts.strengthOption,
@@ -500,6 +506,9 @@ export class TrainingRulesEngine {
       totalHours: weeks.reduce((sum, w) => sum + w.totalHours, 0),
       weeks
     };
+    
+    console.log('✅ Rules Engine generated plan structure:', plan);
+    return plan;
   }
 
   // ===== HELPER METHODS =====

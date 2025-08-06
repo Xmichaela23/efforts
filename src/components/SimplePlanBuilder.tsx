@@ -16,7 +16,8 @@ export default function SimplePlanBuilder() {
     distance: '',
     timeLevel: '',
     strengthOption: '',
-    longSessionDays: ''
+    longSessionDays: '',
+    trainingPhilosophy: ''
   });
 
   // Load user baselines on component mount
@@ -112,7 +113,7 @@ export default function SimplePlanBuilder() {
       return;
     }
     
-    if (answers.distance && answers.timeLevel && answers.strengthOption && answers.longSessionDays && userBaselines) {
+    if (answers.distance && answers.timeLevel && answers.strengthOption && answers.longSessionDays && answers.trainingPhilosophy && userBaselines) {
       // Check if required baselines are present for scientifically sound training
       const missingBaselines = [];
       
@@ -157,7 +158,8 @@ export default function SimplePlanBuilder() {
         deadlift1RM: userBaselines.performanceNumbers.deadlift,
         bench1RM: userBaselines.performanceNumbers.bench,
         overheadPress1RM: userBaselines.performanceNumbers.overheadPress1RM,
-        age: userBaselines.age
+        age: userBaselines.age,
+        trainingPhilosophy: answers.trainingPhilosophy
       };
       
       console.log('🎯 Passing baseline data to training service:', baselineData);
@@ -228,14 +230,13 @@ export default function SimplePlanBuilder() {
             <div className="space-y-4">
               {trainingService.getSprintStrengthOptions().map(option => (
                 <div 
-                  key={option.id}
+                  key={option.value}
                   className={`cursor-pointer hover:bg-gray-50 ${
-                    answers.strengthOption === option.id ? 'text-blue-600' : ''
+                    answers.strengthOption === option.value ? 'text-blue-600' : ''
                   }`}
-                  onClick={() => updateAnswer('strengthOption', option.id)}
+                  onClick={() => updateAnswer('strengthOption', option.value)}
                 >
-                  <h3 className="font-medium">{option.name}</h3>
-                  <p className="text-sm text-gray-600">{option.description}</p>
+                  <h3 className="font-medium">{option.label}</h3>
                 </div>
               ))}
             </div>
@@ -260,6 +261,42 @@ export default function SimplePlanBuilder() {
       case 3:
         return (
           <div className="space-y-6">
+            <h2 className="text-2xl font-semibold">What's your training philosophy?</h2>
+            <div className="space-y-4">
+              {trainingService.getTrainingPhilosophies().map(option => (
+                <div 
+                  key={option.value}
+                  className={`cursor-pointer hover:bg-gray-50 p-4 rounded ${
+                    answers.trainingPhilosophy === option.value ? 'bg-blue-50 border-blue-200' : ''
+                  }`}
+                  onClick={() => updateAnswer('trainingPhilosophy', option.value)}
+                >
+                  <h3 className="font-medium">{option.label}</h3>
+                  <p className="text-sm text-gray-600">{option.description}</p>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-4">
+              <button 
+                onClick={() => setCurrentStep(2)}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+              >
+                Back
+              </button>
+              <button 
+                onClick={() => setCurrentStep(4)}
+                disabled={!answers.trainingPhilosophy}
+                className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
+              >
+                Continue →
+              </button>
+            </div>
+          </div>
+        );
+
+      case 4:
+        return (
+          <div className="space-y-6">
             <div className="mb-4">
               <h2 className="text-2xl font-semibold">How much time can you train?</h2>
               <p className="text-sm text-gray-600 mt-1">
@@ -282,13 +319,13 @@ export default function SimplePlanBuilder() {
             </div>
             <div className="flex gap-4">
               <button 
-                onClick={() => setCurrentStep(2)}
+                onClick={() => setCurrentStep(3)}
                 className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
               >
                 Back
               </button>
               <button 
-                onClick={() => setCurrentStep(4)}
+                onClick={() => setCurrentStep(5)}
                 disabled={!answers.timeLevel}
                 className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
               >
@@ -298,7 +335,7 @@ export default function SimplePlanBuilder() {
           </div>
         );
 
-      case 4:
+      case 5:
         return (
           <div className="space-y-6">
             <h2 className="text-2xl font-semibold">When do you prefer your long workout?</h2>
@@ -385,7 +422,7 @@ export default function SimplePlanBuilder() {
         <div className="mb-6">
           <div className="flex justify-between items-center mb-4">
             <h1 className="text-xl font-bold">
-              {plan.distance.charAt(0).toUpperCase() + plan.distance.slice(1)} Triathlon Plan
+              {plan.distance ? plan.distance.charAt(0).toUpperCase() + plan.distance.slice(1) : 'Triathlon'} Plan
             </h1>
             <button 
               onClick={() => {
@@ -395,7 +432,8 @@ export default function SimplePlanBuilder() {
                   distance: '',
                   timeLevel: '', 
                   strengthOption: '', 
-                  longSessionDays: ''
+                  longSessionDays: '',
+                  trainingPhilosophy: ''
                 });
               }}
               className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
@@ -412,7 +450,7 @@ export default function SimplePlanBuilder() {
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="text-gray-700"><strong>Long Day:</strong> {answers.longSessionDays}</p>
-                <p className="text-gray-700"><strong>Level:</strong> {answers.timeLevel.charAt(0).toUpperCase() + answers.timeLevel.slice(1)}</p>
+                <p className="text-gray-700"><strong>Level:</strong> {answers.timeLevel ? answers.timeLevel.charAt(0).toUpperCase() + answers.timeLevel.slice(1) : 'Unknown'}</p>
               </div>
               <div>
                 <p className="text-gray-700">

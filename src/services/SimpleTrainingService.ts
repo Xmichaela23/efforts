@@ -988,7 +988,7 @@ export class SimpleTrainingService {
       distance: 'sprint',
       totalWeeks: 12,
       currentWeek: 1,
-      philosophy: 'polarized', // Default to polarized for now
+      philosophy: userBaselines.trainingPhilosophy || 'polarized', // Allow user to choose philosophy
       timeLevel,
       strengthOption,
       longSessionDays,
@@ -1005,7 +1005,10 @@ export class SimpleTrainingService {
       weekWithinPhase: 1,
       totalPhaseWeeks: 4,
       discipline: 'bike',
-      sessionType: 'endurance'
+      sessionType: 'endurance',
+      // Provide default values for optional facts
+      previousSessionIntensity: 'low',
+      daysSinceLastHardSession: 3
     };
     
     // Generate plan using rules engine
@@ -1025,40 +1028,42 @@ export class SimpleTrainingService {
     userEquipment?: any
   ): Promise<SimpleTrainingPlan> {
     
-    console.log('🎯 Generating solid 70.3 plan...');
+    console.log('🎯 Generating solid 70.3 plan with Rules Engine...');
     
-    // Calculate personalized targets (higher for 70.3)
-    const easyBikePower = Math.round(userBaselines.ftp * 0.65);
-    const enduranceBikePower = Math.round(userBaselines.ftp * 0.75);
-    const tempoBikePower = Math.round(userBaselines.ftp * 0.85);
-    
-    const easyRunPace = this.calculateEasyRunPace(userBaselines);
-    const tempoRunPace = this.calculateTempoRunPace(userBaselines);
-    
-    const easySwimPace = this.calculateEasySwimPace(userBaselines);
-    const enduranceSwimPace = this.calculateEnduranceSwimPace(userBaselines);
-    
-    // Create base weekly template (10 hours = 600 minutes for 70.3)
-    const baseSessions = this.createSolid70_3Template(
-      easyBikePower, enduranceBikePower, tempoBikePower,
-      easyRunPace, tempoRunPace,
-      easySwimPace, enduranceSwimPace
-    );
-    
-    // Create 12-week progression
-    const weeks = this.createSolidWeeklyProgression(baseSessions, userBaselines);
-    
-    // Calculate total hours
-    const totalHours = weeks.reduce((sum, week) => sum + week.totalHours, 0);
-    
-    return {
+    // Create training facts for the rules engine
+    const trainingFacts: TrainingFacts = {
       distance: 'seventy3',
+      totalWeeks: 16,
+      currentWeek: 1,
+      philosophy: userBaselines.trainingPhilosophy || 'polarized', // Allow user to choose philosophy
       timeLevel,
       strengthOption,
       longSessionDays,
-      totalHours,
-      weeks
+      ftp: userBaselines.ftp,
+      fiveKPace: userBaselines.fiveKPace,
+      easyPace: userBaselines.easyPace,
+      swimPace100: userBaselines.swimPace100,
+      squat1RM: userBaselines.squat1RM,
+      deadlift1RM: userBaselines.deadlift1RM,
+      bench1RM: userBaselines.bench1RM,
+      overheadPress1RM: userBaselines.overheadPress1RM,
+      age: userBaselines.age,
+      phase: 'base',
+      weekWithinPhase: 1,
+      totalPhaseWeeks: 4,
+      discipline: 'bike',
+      sessionType: 'endurance',
+      // Provide default values for optional facts
+      previousSessionIntensity: 'low',
+      daysSinceLastHardSession: 3
     };
+    
+    // Generate plan using rules engine
+    const plan = await this.rulesEngine.generateFullPlan(trainingFacts);
+    
+    console.log('✅ Rules Engine generated 70.3 plan:', plan);
+    
+    return plan as SimpleTrainingPlan;
   }
   
   // NEW: Solid Base Template for Sprint
@@ -2572,11 +2577,21 @@ Run (25min):
   
   getSprintStrengthOptions() {
     return [
-      { id: 'none', name: 'No Strength', description: 'Pure endurance training only', timeAddition: '+0 hours' },
-      { id: 'traditional', name: 'Traditional', description: '2x/week traditional strength training', timeAddition: '+1.5 hours' },
-      { id: 'compound', name: 'Compound', description: '2x/week compound lifts with evidence-based percentages', timeAddition: '+2.0 hours' },
-      { id: 'cowboy_endurance', name: 'Cowboy Endurance', description: '3x/week traditional + upper body focus', timeAddition: '+3.0 hours' },
-      { id: 'cowboy_compound', name: 'Cowboy Compound', description: '3x/week compound + upper body focus', timeAddition: '+3.5 hours' }
+      { value: 'none', label: 'No Strength Training' },
+      { value: 'traditional', label: 'Traditional Strength (2x/week)' },
+      { value: 'compound', label: 'Compound Movements (2x/week)' },
+      { value: 'cowboy_endurance', label: 'Cowboy Endurance (3x/week)' },
+      { value: 'cowboy_compound', label: 'Cowboy Compound (3x/week)' }
+    ];
+  }
+
+  // NEW: Get available training philosophies
+  getTrainingPhilosophies() {
+    return [
+      { value: 'polarized', label: 'Polarized Training (80/20)', description: '80% easy, 20% hard sessions' },
+      { value: 'threshold', label: 'Threshold Training (60/40)', description: '60% threshold, 40% tempo work' },
+      { value: 'pyramid', label: 'Pyramid Training', description: 'Gradual intensity build' },
+      { value: 'sweet_spot', label: 'Sweet Spot Training', description: 'Sustained threshold work' }
     ];
   }
 
