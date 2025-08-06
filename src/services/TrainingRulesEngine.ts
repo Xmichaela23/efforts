@@ -1576,11 +1576,11 @@ export class TrainingRulesEngine {
     const optimalLoad = this.calculateOptimalTrainingLoad();
     
     // Research: Moderate training should be 100% of standard volume
-    // ADJUSTED: Less aggressive values to bring durations into range
-    if (optimalLoad === 'high') return 1.1; // Higher optimal load
-    if (optimalLoad === 'medium') return 1.05; // Standard optimal load
-    if (optimalLoad === 'low') return 1.0; // Lower optimal load
-    return 1.05; // Default
+    // ALIGNED: Conservative values to match user's 5-6 hour choice
+    if (optimalLoad === 'high') return 1.0; // Standard optimal load
+    if (optimalLoad === 'medium') return 0.95; // Slightly lower for moderate
+    if (optimalLoad === 'low') return 0.9; // Lower optimal load
+    return 0.95; // Default - conservative
   }
 
   private calculateSeriousTimeMultiplier(): number {
@@ -1618,16 +1618,16 @@ export class TrainingRulesEngine {
     const fitnessLevel = this.calculateFitnessLevel();
     const experienceLevel = this.calculateExperienceLevel();
     
-    // Base hours for sprint distance
-    let baseHours = 7;
+    // Base hours for sprint distance - ALIGNED WITH USER CHOICE
+    let baseHours = 5.5; // Target 5-6 hours for moderate time level
     
     // Adjust based on fitness and experience
-    if (fitnessLevel === 'beginner') baseHours += 1;
-    if (fitnessLevel === 'advanced') baseHours -= 1;
-    if (experienceLevel === 'beginner') baseHours += 0.5;
-    if (experienceLevel === 'advanced') baseHours -= 0.5;
+    if (fitnessLevel === 'beginner') baseHours += 0.5; // 6 hours
+    if (fitnessLevel === 'advanced') baseHours -= 0.5; // 5 hours
+    if (experienceLevel === 'beginner') baseHours += 0.25; // +0.25 hours
+    if (experienceLevel === 'advanced') baseHours -= 0.25; // -0.25 hours
     
-    return Math.max(6, Math.min(9, baseHours)); // Ensure 6-9 hours range
+    return Math.max(4.5, Math.min(7, baseHours)); // Ensure 4.5-7 hours range
   }
 
   private calculateOlympicWeeklyHours(): number {
