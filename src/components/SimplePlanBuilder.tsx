@@ -462,14 +462,18 @@ export default function SimplePlanBuilder() {
           </div>
         </div>
 
-        <div>
+        <div
+          onTouchStart={onTouchStart}
+          onTouchMove={onTouchMove}
+          onTouchEnd={onTouchEnd}
+        >
 
           {/* Week Navigation - Full Width Swipe */}
           <div className="w-full bg-white p-4 border-t border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Your Training Plan</h3>
               <div className="flex items-center space-x-1 text-sm text-gray-500">
-                <span>Swipe to navigate weeks</span>
+                <span>Swipe entire plan to navigate weeks</span>
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
