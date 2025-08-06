@@ -1067,24 +1067,23 @@ export class TrainingRulesEngine {
     // Base duration based on user's swim pace and distance
     const baseDuration = this.calculateSwimBaseDuration(facts);
     
-    // TEMPORARILY REMOVE MULTIPLIERS FOR TESTING
-    // const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    // const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    // const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    // RESTORE MULTIPLIERS WITH CONSERVATIVE VALUES
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
     console.log('🔍 Swim duration calculation:', {
       baseDuration,
-      // phaseMultiplier,
-      // sessionMultiplier,
-      // timeMultiplier,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
       timeLevel: facts.timeLevel
     });
     
-    // const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
-    const duration = baseDuration; // TEMPORARILY USE BASE DURATION ONLY
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
     console.log('🔍 Final swim duration:', duration);
     return duration;
   }
@@ -1095,24 +1094,23 @@ export class TrainingRulesEngine {
     // Base duration based on user's FTP and distance
     const baseDuration = this.calculateBikeBaseDuration(facts);
     
-    // TEMPORARILY REMOVE MULTIPLIERS FOR TESTING
-    // const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    // const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    // const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    // RESTORE MULTIPLIERS WITH CONSERVATIVE VALUES
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
     console.log('🔍 Bike duration calculation:', {
       baseDuration,
-      // phaseMultiplier,
-      // sessionMultiplier,
-      // timeMultiplier,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
       timeLevel: facts.timeLevel
     });
     
-    // const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
-    const duration = baseDuration; // TEMPORARILY USE BASE DURATION ONLY
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
     console.log('🔍 Final bike duration:', duration);
     return duration;
   }
@@ -1123,24 +1121,23 @@ export class TrainingRulesEngine {
     // Base duration based on user's run pace and distance
     const baseDuration = this.calculateRunBaseDuration(facts, sessionType);
     
-    // TEMPORARILY REMOVE MULTIPLIERS FOR TESTING
-    // const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
-    // const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
-    // const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    // RESTORE MULTIPLIERS WITH CONSERVATIVE VALUES
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
     console.log('🔍 Run duration calculation:', {
       baseDuration,
-      // phaseMultiplier,
-      // sessionMultiplier,
-      // timeMultiplier,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
       timeLevel: facts.timeLevel
     });
     
-    // const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
-    const duration = baseDuration; // TEMPORARILY USE BASE DURATION ONLY
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
     console.log('🔍 Final run duration:', duration);
     return duration;
   }
@@ -1542,10 +1539,11 @@ export class TrainingRulesEngine {
     const trainingEfficiency = this.calculateTrainingEfficiency();
     
     // Research: Minimum training should be 85-90% of standard volume
-    if (trainingEfficiency === 'high') return 0.85; // Higher efficiency
-    if (trainingEfficiency === 'medium') return 0.875; // Standard efficiency
-    if (trainingEfficiency === 'low') return 0.9; // Lower efficiency
-    return 0.875; // Default
+    // ADJUSTED: More conservative values to bring durations into range
+    if (trainingEfficiency === 'high') return 0.95; // Higher efficiency
+    if (trainingEfficiency === 'medium') return 0.9; // Standard efficiency
+    if (trainingEfficiency === 'low') return 0.85; // Lower efficiency
+    return 0.9; // Default
   }
 
   private calculateModerateTimeMultiplier(): number {
@@ -1555,10 +1553,11 @@ export class TrainingRulesEngine {
     const optimalLoad = this.calculateOptimalTrainingLoad();
     
     // Research: Moderate training should be 100% of standard volume
-    if (optimalLoad === 'high') return 1.05; // Higher optimal load
-    if (optimalLoad === 'medium') return 1.0; // Standard optimal load
-    if (optimalLoad === 'low') return 0.95; // Lower optimal load
-    return 1.0; // Default
+    // ADJUSTED: More conservative values to bring durations into range
+    if (optimalLoad === 'high') return 0.95; // Higher optimal load
+    if (optimalLoad === 'medium') return 0.9; // Standard optimal load
+    if (optimalLoad === 'low') return 0.85; // Lower optimal load
+    return 0.9; // Default
   }
 
   private calculateSeriousTimeMultiplier(): number {
@@ -1568,10 +1567,11 @@ export class TrainingRulesEngine {
     const volumeTolerance = this.calculateVolumeTolerance();
     
     // Research: Serious training should be 120-130% of standard volume
-    if (volumeTolerance === 'high') return 1.3; // Higher volume tolerance
-    if (volumeTolerance === 'medium') return 1.25; // Standard volume tolerance
-    if (volumeTolerance === 'low') return 1.2; // Lower volume tolerance
-    return 1.25; // Default
+    // ADJUSTED: More conservative values to bring durations into range
+    if (volumeTolerance === 'high') return 1.0; // Higher volume tolerance
+    if (volumeTolerance === 'medium') return 0.95; // Standard volume tolerance
+    if (volumeTolerance === 'low') return 0.9; // Lower volume tolerance
+    return 0.95; // Default
   }
 
   private calculateHardcoreTimeMultiplier(): number {
@@ -1581,10 +1581,11 @@ export class TrainingRulesEngine {
     const eliteCapacity = this.calculateEliteCapacity();
     
     // Research: Hardcore training should be 140-150% of standard volume
-    if (eliteCapacity === 'high') return 1.5; // Higher elite capacity
-    if (eliteCapacity === 'medium') return 1.45; // Standard elite capacity
-    if (eliteCapacity === 'low') return 1.4; // Lower elite capacity
-    return 1.45; // Default
+    // ADJUSTED: More conservative values to bring durations into range
+    if (eliteCapacity === 'high') return 1.05; // Higher elite capacity
+    if (eliteCapacity === 'medium') return 1.0; // Standard elite capacity
+    if (eliteCapacity === 'low') return 0.95; // Lower elite capacity
+    return 1.0; // Default
   }
 
   private calculateSprintWeeklyHours(): number {
