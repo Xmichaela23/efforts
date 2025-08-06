@@ -985,7 +985,7 @@ export class SimpleTrainingService {
     console.log('🔍 User baselines performance numbers:', userBaselines.performanceNumbers);
     console.log('🔍 Performance numbers keys:', userBaselines.performanceNumbers ? Object.keys(userBaselines.performanceNumbers) : 'null/undefined');
     
-    // Create training facts for the rules engine
+    // Create training facts for the rules engine - Pass ALL baseline data
     const trainingFacts: TrainingFacts = {
       distance: 'sprint',
       totalWeeks: 12,
@@ -994,15 +994,43 @@ export class SimpleTrainingService {
       timeLevel,
       strengthOption,
       longSessionDays,
+      
+      // Performance numbers
       ftp: userBaselines.performanceNumbers?.ftp,
-      fiveKPace: userBaselines.performanceNumbers?.fiveK,
+      fiveK: userBaselines.performanceNumbers?.fiveK, // Database field: fiveK
       easyPace: userBaselines.performanceNumbers?.easyPace,
       swimPace100: userBaselines.performanceNumbers?.swimPace100,
-      squat1RM: userBaselines.performanceNumbers?.squat,
-      deadlift1RM: userBaselines.performanceNumbers?.deadlift,
-      bench1RM: userBaselines.performanceNumbers?.bench,
+      squat: userBaselines.performanceNumbers?.squat, // Database field: squat
+      deadlift: userBaselines.performanceNumbers?.deadlift, // Database field: deadlift
+      bench: userBaselines.performanceNumbers?.bench, // Database field: bench
       overheadPress1RM: userBaselines.performanceNumbers?.overheadPress1RM,
+      
+      // Additional performance data
+      avgSpeed: userBaselines.performanceNumbers?.avgSpeed,
+      swim200Time: userBaselines.performanceNumbers?.swim200Time,
+      swim400Time: userBaselines.performanceNumbers?.swim400Time,
+      tenK: userBaselines.performanceNumbers?.tenK,
+      halfMarathon: userBaselines.performanceNumbers?.halfMarathon,
+      marathon: userBaselines.performanceNumbers?.marathon,
+      
+      // User profile
       age: userBaselines.age,
+      height: userBaselines.height,
+      weight: userBaselines.weight,
+      gender: userBaselines.gender,
+      units: userBaselines.units,
+      
+      // Training context
+      currentFitness: userBaselines.currentFitness,
+      disciplines: userBaselines.disciplines,
+      injuryHistory: userBaselines.injuryHistory,
+      injuryRegions: userBaselines.injuryRegions,
+      trainingBackground: userBaselines.trainingBackground,
+      
+      // Equipment
+      equipment: userBaselines.equipment,
+      
+      // Training state
       phase: 'base',
       weekWithinPhase: 1,
       totalPhaseWeeks: 4,
@@ -1040,7 +1068,7 @@ export class SimpleTrainingService {
     
     console.log('🎯 Generating solid 70.3 plan with Rules Engine...');
     
-    // Create training facts for the rules engine
+    // Create training facts for the rules engine - Pass ALL baseline data
     const trainingFacts: TrainingFacts = {
       distance: 'seventy3',
       totalWeeks: 16,
@@ -1049,15 +1077,43 @@ export class SimpleTrainingService {
       timeLevel,
       strengthOption,
       longSessionDays,
+      
+      // Performance numbers
       ftp: userBaselines.performanceNumbers?.ftp,
-      fiveKPace: userBaselines.performanceNumbers?.fiveK,
+      fiveK: userBaselines.performanceNumbers?.fiveK, // Database field: fiveK
       easyPace: userBaselines.performanceNumbers?.easyPace,
       swimPace100: userBaselines.performanceNumbers?.swimPace100,
-      squat1RM: userBaselines.performanceNumbers?.squat,
-      deadlift1RM: userBaselines.performanceNumbers?.deadlift,
-      bench1RM: userBaselines.performanceNumbers?.bench,
+      squat: userBaselines.performanceNumbers?.squat, // Database field: squat
+      deadlift: userBaselines.performanceNumbers?.deadlift, // Database field: deadlift
+      bench: userBaselines.performanceNumbers?.bench, // Database field: bench
       overheadPress1RM: userBaselines.performanceNumbers?.overheadPress1RM,
+      
+      // Additional performance data
+      avgSpeed: userBaselines.performanceNumbers?.avgSpeed,
+      swim200Time: userBaselines.performanceNumbers?.swim200Time,
+      swim400Time: userBaselines.performanceNumbers?.swim400Time,
+      tenK: userBaselines.performanceNumbers?.tenK,
+      halfMarathon: userBaselines.performanceNumbers?.halfMarathon,
+      marathon: userBaselines.performanceNumbers?.marathon,
+      
+      // User profile
       age: userBaselines.age,
+      height: userBaselines.height,
+      weight: userBaselines.weight,
+      gender: userBaselines.gender,
+      units: userBaselines.units,
+      
+      // Training context
+      currentFitness: userBaselines.currentFitness,
+      disciplines: userBaselines.disciplines,
+      injuryHistory: userBaselines.injuryHistory,
+      injuryRegions: userBaselines.injuryRegions,
+      trainingBackground: userBaselines.trainingBackground,
+      
+      // Equipment
+      equipment: userBaselines.equipment,
+      
+      // Training state
       phase: 'base',
       weekWithinPhase: 1,
       totalPhaseWeeks: 4,

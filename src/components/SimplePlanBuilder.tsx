@@ -150,15 +150,8 @@ export default function SimplePlanBuilder() {
       }
       
       const baselineData = {
-        ftp: userBaselines.performanceNumbers.ftp,
-        fiveKPace: userBaselines.performanceNumbers.fiveK,
-        easyPace: userBaselines.performanceNumbers.easyPace,
-        swimPace100: userBaselines.performanceNumbers.swimPace100,
-        squat1RM: userBaselines.performanceNumbers.squat,
-        deadlift1RM: userBaselines.performanceNumbers.deadlift,
-        bench1RM: userBaselines.performanceNumbers.bench,
-        overheadPress1RM: userBaselines.performanceNumbers.overheadPress1RM,
-        age: userBaselines.age,
+        // Pass ALL baseline data to the training service
+        ...userBaselines,
         trainingPhilosophy: answers.trainingPhilosophy
       };
       

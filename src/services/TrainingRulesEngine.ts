@@ -18,16 +18,45 @@ export interface TrainingFacts {
   strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
   longSessionDays: string;
   
-  // User Baselines
+  // User Baselines - Match database field names exactly
   ftp?: number;
-  fiveKPace?: string;
+  fiveK?: string; // Database field name
   easyPace?: string;
   swimPace100?: string;
-  squat1RM?: number;
-  deadlift1RM?: number;
-  bench1RM?: number;
+  squat?: number; // Database field name
+  deadlift?: number; // Database field name
+  bench?: number; // Database field name
   overheadPress1RM?: number;
   age?: number;
+  
+  // Additional baseline fields from AppContext
+  avgSpeed?: number;
+  swim200Time?: string;
+  swim400Time?: string;
+  tenK?: string;
+  halfMarathon?: string;
+  marathon?: string;
+  
+  // User profile fields
+  height?: number;
+  weight?: number;
+  gender?: 'male' | 'female' | 'prefer_not_to_say';
+  units?: 'metric' | 'imperial';
+  
+  // Training context
+  currentFitness?: string;
+  disciplines?: string[];
+  injuryHistory?: string;
+  injuryRegions?: string[];
+  trainingBackground?: string;
+  
+  // Equipment
+  equipment?: {
+    running?: string[];
+    cycling?: string[];
+    swimming?: string[];
+    strength?: string[];
+  };
   
   // Dynamic Training State
   phase: 'base' | 'build' | 'peak' | 'taper';
@@ -465,14 +494,24 @@ export class TrainingRulesEngine {
       const session = await this.generateSession(dayFacts);
       
       if (session.duration > 0) {
+        // Determine discipline based on session description and rules
+        const discipline = this.determineDiscipline(session.description, facts);
+        
+        // Map intensity to proper session type
+        const type = this.mapIntensityToType(session.intensity, discipline);
+        
+        // Determine if this is a strength session
+        const strengthType = discipline === 'strength' ? this.determineStrengthType(facts.strengthOption) : undefined;
+        
         sessions.push({
           day: day.charAt(0).toUpperCase() + day.slice(1), // Capitalize day name
-          discipline: 'bike', // Default discipline
-          type: session.intensity === 'high' ? 'threshold' : 'endurance',
+          discipline,
+          type,
           duration: session.duration,
           intensity: session.intensity,
           description: session.description,
           zones: session.zones,
+          strengthType,
           detailedWorkout: `${session.description} - ${session.duration}min`
         });
       }
@@ -650,6 +689,53 @@ export class TrainingRulesEngine {
       case 'taper': return week - baseWeeks - buildWeeks - peakWeeks;
       default: return 1;
     }
+  }
+
+  // ===== SESSION MAPPING HELPERS =====
+
+  private determineDiscipline(description: string, facts: TrainingFacts): 'swim' | 'bike' | 'run' | 'strength' | 'brick' {
+    const desc = description.toLowerCase();
+    
+    // Check for strength indicators
+    if (desc.includes('strength') || desc.includes('squat') || desc.includes('deadlift') || 
+        desc.includes('bench') || desc.includes('press') || desc.includes('weight')) {
+      return 'strength';
+    }
+    
+    // Check for swim indicators
+    if (desc.includes('swim') || desc.includes('pool') || desc.includes('freestyle') || 
+        desc.includes('backstroke') || desc.includes('breaststroke')) {
+      return 'swim';
+    }
+    
+    // Check for run indicators
+    if (desc.includes('run') || desc.includes('jog') || desc.includes('tempo') || 
+        desc.includes('pace') || desc.includes('5k') || desc.includes('10k')) {
+      return 'run';
+    }
+    
+    // Check for brick sessions
+    if (desc.includes('brick') || desc.includes('transition')) {
+      return 'brick';
+    }
+    
+    // Default to bike for triathlon training
+    return 'bike';
+  }
+
+  private mapIntensityToType(intensity: string, discipline: string): 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max' {
+    if (intensity === 'low') return 'recovery';
+    if (intensity === 'medium') return 'endurance';
+    if (intensity === 'high') {
+      // For strength, use threshold; for others, use tempo
+      return discipline === 'strength' ? 'threshold' : 'tempo';
+    }
+    return 'endurance'; // Default
+  }
+
+  private determineStrengthType(strengthOption?: string): 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' {
+    if (!strengthOption || strengthOption === 'none') return 'traditional';
+    return strengthOption as 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound';
   }
 
   // No fallbacks - engine must generate real sessions or fail
