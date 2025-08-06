@@ -1040,6 +1040,15 @@ export class SimpleTrainingService {
     console.log('🔍 User baselines structure:', userBaselines);
     console.log('🔍 Performance numbers:', userBaselines.performanceNumbers);
     console.log('🔍 Training facts being passed to rules engine:', trainingFacts);
+    console.log('🔍 Key baseline values:', {
+      ftp: trainingFacts.ftp,
+      fiveK: trainingFacts.fiveK,
+      easyPace: trainingFacts.easyPace,
+      swimPace100: trainingFacts.swimPace100,
+      squat: trainingFacts.squat,
+      deadlift: trainingFacts.deadlift,
+      bench: trainingFacts.bench
+    });
     
     // Generate plan using rules engine
     const plan = await this.rulesEngine.generateFullPlan(trainingFacts);

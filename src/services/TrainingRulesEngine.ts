@@ -1137,6 +1137,12 @@ export class TrainingRulesEngine {
       strengthOption: facts.strengthOption
     });
     
+    // If we have the data, don't report it as missing
+    if (facts.ftp && (facts.easyPace || facts.fiveK) && facts.swimPace100) {
+      console.log('✅ All required baseline data is present');
+      return [];
+    }
+    
     return missing;
   }
 
