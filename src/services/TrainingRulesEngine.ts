@@ -642,6 +642,8 @@ export class TrainingRulesEngine {
 
   async generateSession(facts: TrainingFacts): Promise<TrainingResult> {
     console.log('🔍 Generating session for facts:', facts);
+    console.log('🔍 Facts discipline:', facts.discipline);
+    console.log('🔍 Facts sessionType:', facts.sessionType);
     
     // NEW: Validate required baseline data
     const missingData = this.validateRequiredBaselineData(facts);
@@ -656,6 +658,16 @@ export class TrainingRulesEngine {
     console.log('✅ Rules engine events:', engineResult.events);
     console.log('🔍 Number of events generated:', engineResult.events.length);
     console.log('🔍 Event types:', engineResult.events.map(e => e.type));
+    
+    // Check if session generation events are present
+    const sessionEvents = engineResult.events.filter(e => 
+      e.type === 'swim_session' || 
+      e.type === 'bike_session' || 
+      e.type === 'run_session' || 
+      e.type === 'strength_session' || 
+      e.type === 'brick_session'
+    );
+    console.log('🔍 Session generation events:', sessionEvents);
     
     const result = this.processEvents(engineResult.events, facts);
     console.log('✅ Generated session result:', result);
@@ -951,28 +963,41 @@ export class TrainingRulesEngine {
 
   // NEW: Apply session-specific rules
   private applySessionRules(result: TrainingResult, params: any, facts: TrainingFacts): TrainingResult {
+    console.log('🔍 applySessionRules called with params:', params);
+    console.log('🔍 Current result before session rules:', result);
+    
     // Calculate science-based duration based on discipline and session type
     let calculatedDuration = result.duration;
     
     if (params.discipline === 'swim') {
       calculatedDuration = this.calculateSwimDuration(facts, facts.sessionType || 'endurance');
+      console.log('🔍 Calculated swim duration:', calculatedDuration);
     } else if (params.discipline === 'bike') {
       calculatedDuration = this.calculateBikeDuration(facts, facts.sessionType || 'endurance');
+      console.log('🔍 Calculated bike duration:', calculatedDuration);
     } else if (params.discipline === 'run') {
       calculatedDuration = this.calculateRunDuration(facts, facts.sessionType || 'endurance');
+      console.log('🔍 Calculated run duration:', calculatedDuration);
     } else if (params.discipline === 'strength') {
       calculatedDuration = this.calculateStrengthDuration(facts, facts.sessionType || 'endurance');
+      console.log('🔍 Calculated strength duration:', calculatedDuration);
     } else if (params.discipline === 'brick') {
       calculatedDuration = this.calculateBrickDuration(facts, facts.sessionType || 'endurance');
+      console.log('🔍 Calculated brick duration:', calculatedDuration);
     }
     
-    return {
+    console.log('🔍 Final calculated duration:', calculatedDuration);
+    
+    const finalResult = {
       ...result,
       discipline: params.discipline,
       description: params.description,
       duration: calculatedDuration,
       zones: params.zones || result.zones
     };
+    
+    console.log('🔍 Final result after session rules:', finalResult);
+    return finalResult;
   }
 
   // NEW: Apply session type rules
