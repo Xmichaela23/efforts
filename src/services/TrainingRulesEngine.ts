@@ -2095,6 +2095,7 @@ export class TrainingRulesEngine {
   private getSessionDistribution(facts: TrainingFacts): Array<{day: string, discipline: string, type: string}> {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const distribution = [];
+    let hasBrickSession = false; // Track if we need to add brick session
     
     // Base session count based on distance - SCIENCE-BASED
     let totalSessions: number;
@@ -2139,10 +2140,18 @@ export class TrainingRulesEngine {
     
     // Distribute sessions based on philosophy with science-based strength placement
     if (facts.philosophy === 'polarized') {
-      // 80/20 polarized training - respect total session count
-      const easySessions = Math.round(totalSessions * 0.8);
-      const hardSessions = totalSessions - easySessions; // Don't force minimum
-      const adjustedTotalSessions = easySessions + hardSessions;
+      // 80/20 polarized training - include brick session in distribution
+      let adjustedTotalSessions = totalSessions;
+      
+      // If user has long day, reserve one session for brick
+      if (facts.longSessionDays) {
+        adjustedTotalSessions = totalSessions - 1; // Reserve one for brick
+        hasBrickSession = true;
+      }
+      
+      // Calculate polarized distribution for remaining sessions
+      const easySessions = Math.round(adjustedTotalSessions * 0.8);
+      const hardSessions = adjustedTotalSessions - easySessions;
       
       // First, place strength sessions with proper spacing
       const strengthDays = this.placeStrengthSessions(facts, strengthSessions, days);
@@ -2213,8 +2222,8 @@ export class TrainingRulesEngine {
       });
     }
     
-    // ENSURE user's long day is included (but respect polarized distribution)
-    if (facts.longSessionDays) {
+    // ENSURE user's long day is included as part of polarized distribution
+    if (facts.longSessionDays && hasBrickSession) {
       const longDay = facts.longSessionDays.toLowerCase();
       const longDayExists = distribution.findIndex(s => s.day.toLowerCase() === longDay);
       
