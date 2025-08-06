@@ -2,14 +2,15 @@
 
 A comprehensive fitness training application built with React, TypeScript, and Supabase, featuring **template-based training plan generation** and integration with fitness platforms like Garmin and Strava.
 
-## 🎯 CURRENT STATUS: ENHANCED SIMPLE TEMPLATE-BASED SYSTEM
+## 🎯 CURRENT STATUS: SOLID PLAN ENGINE WITH SWIPE INTERFACE
 
-### ✅ WORKING SYSTEM: SimpleTrainingService
-**We've successfully built and enhanced a clean, template-based training plan generator:**
+### ✅ WORKING SYSTEM: Solid Plan Engine
+**We've successfully built and deployed a solid, scalable training plan generator with clean swipe interface:**
 
 **Core System (`SimpleTrainingService.ts`):**
+- **Solid plan engine** with `generateSolidSprintPlan` and `generateSolid70_3Plan` methods
 - **Template-based approach** using base templates + multipliers
-- **Sprint triathlon focus** (one distance at a time)
+- **Multi-distance support** (Sprint and 70.3 triathlon)
 - **4-step assessment flow** (Distance → Strength → Time → Long Session Day)
 - **Personalized targets** based on user baselines (FTP, paces, 1RM)
 - **12-week progressive plans** with proper phase progression
@@ -17,8 +18,8 @@ A comprehensive fitness training application built with React, TypeScript, and S
 - **Scientific workout generation** with evidence-based percentages
 
 **UI (`SimplePlanBuilder.tsx`):**
-- **Clean, minimal interface** (no cards, boxes, frames)
-- **Tabbed week navigation** for plan display
+- **Clean swipe interface** with dot indicators and smooth transitions
+- **No ugly pill buttons** - replaced with intuitive swipe navigation
 - **Professional workout details** with warm-ups, cool-downs, and target ranges
 - **Rounded weights** for easy plate math
 - **Proper session distribution** around user's chosen long day
@@ -28,18 +29,20 @@ A comprehensive fitness training application built with React, TypeScript, and S
 1. **Scientifically Sound Plans**: Based on real coaching data and research
 2. **Personalized Targets**: All paces, power, and weights based on user baselines
 3. **Professional Workouts**: Detailed sessions with proper structure
-4. **Clean UI**: Minimal, tabbed interface that looks professional
+4. **Clean Swipe UI**: Intuitive mobile-friendly interface
 5. **Proper Recovery**: Sessions distributed around long day with recovery spacing
 6. **Smart Strength Distribution**: 3-tier placement strategy for Cowboy options
 7. **Complete Workout Generation**: All strength options with evidence-based percentages
 8. **Progressive Overload**: Strength weights properly progress through phases (70%→75%→80%→65% 1RM)
 9. **Proper Taper Phase**: Reduces session count from 8 to 4-6 sessions, eliminates extra strength sessions
+10. **Multi-Distance Support**: Sprint and 70.3 triathlon with distance-specific templates
 
 ## 🧠 Current Architecture
 
-### **Template-Based System**
+### **Solid Plan Engine**
 **Core Service**: `src/services/SimpleTrainingService.ts`
-- **Base Templates**: Sprint triathlon with 6-8 sessions per week
+- **Solid Plan Methods**: `generateSolidSprintPlan` and `generateSolid70_3Plan`
+- **Base Templates**: Sprint (6 hours/week) and 70.3 (10 hours/week with two long sessions)
 - **Time Multipliers**: Scale sessions based on user's time commitment
 - **Strength Integration**: 5 strength options with complete workout generation
 - **Personalization**: User baselines drive all targets and weights
@@ -50,13 +53,13 @@ A comprehensive fitness training application built with React, TypeScript, and S
 
 **UI Integration**: `src/components/SimplePlanBuilder.tsx`
 - **4-Step Assessment**: Distance → Strength → Time → Long Session Day
-- **Plan Display**: Tabbed weeks with professional workout details
+- **Swipe Interface**: Clean dot indicators and smooth week navigation
 - **User Baselines**: Loaded from user profile (no manual input)
 - **Validation**: Strict enforcement of required baseline data
 - **Updated Language**: More conversational and clear strength integration messaging
 
 ### **Scientific Foundation**
-- **Polarized Training**: 80/20 easy/hard ratio enforcement
+- **Polarized Training**: 80/20 rule enforcement
 - **Research-Based**: Uses actual coaching data (Lauersen et al., Rønnestad & Mujika, Beattie et al.)
 - **Strength Percentages**: 80-85% 1RM for compound strength (evidence-based)
 - **Recovery Spacing**: Proper session distribution to prevent overtraining
@@ -67,13 +70,14 @@ A comprehensive fitness training application built with React, TypeScript, and S
 ## 🎨 User Experience
 
 ### **Assessment Flow**
-1. **Distance**: Sprint Triathlon (currently implemented)
+1. **Distance**: Sprint Triathlon or 70.3 Triathlon
 2. **Strength**: 5 options from none to cowboy compound with clear descriptions
 3. **Time**: 4 levels (minimum to hardcore) with clear hour ranges
 4. **Long Session Day**: User picks their preferred long workout day
 
 ### **Plan Display**
-- **Professional Layout**: Clean, minimal design with tabbed weeks
+- **Swipe Interface**: Clean dot indicators and smooth transitions between weeks
+- **Professional Layout**: Clean, minimal design with swipe navigation
 - **Detailed Workouts**: Warm-ups, main sets, cool-downs with target ranges
 - **Personalized Targets**: All based on user's actual baseline data
 - **Rounded Weights**: Easy plate math for strength workouts
@@ -107,33 +111,34 @@ A comprehensive fitness training application built with React, TypeScript, and S
 ## 📊 Current Features
 
 ### ✅ Working Features
-- **Template-based plan generation** for Sprint triathlon
+- **Solid plan generation** for Sprint and 70.3 triathlon
 - **Personalized workout targets** based on user baselines
 - **Professional workout details** with proper structure
-- **Clean, minimal UI** with tabbed week navigation
+- **Clean swipe interface** with dot indicators and smooth transitions
 - **Complete strength integration** with 5 different options and full workout generation
 - **Smart session distribution** with 3-tier placement strategy
 - **Progressive overload** across 12-week plans
 - **User baseline management** with comprehensive data collection
 - **Scientific workout generation** with evidence-based percentages
+- **Multi-distance support** with distance-specific templates
 
 ### 🔄 In Development
-- **Additional distances** (Olympic, 70.3, Ironman)
+- **Additional distances** (Olympic, Ironman)
 - **Enhanced analytics** for training progress tracking
 - **Real-time data sync** across all integrations
 
 ## 🚀 Development Status
 
 ### **Current Focus**
-- **Sprint triathlon plans** are working and professional
-- **Template system** is proven and scalable
-- **UI/UX** is clean and user-friendly
+- **Sprint and 70.3 triathlon plans** are working and professional
+- **Solid plan engine** is proven and scalable
+- **Swipe UI** is clean and user-friendly
 - **Scientific foundation** is sound and evidence-based
 - **Strength distribution** is smart and scientifically sound
 - **Workout generation** is complete and evidence-based
 
 ### **Next Steps**
-1. **Extend to other distances** using the same template approach
+1. **Extend to other distances** using the same solid plan approach
 2. **Add advanced features** like plan comparison and analytics
 3. **Improve real-time sync** for better data integration
 
@@ -148,17 +153,17 @@ A comprehensive fitness training application built with React, TypeScript, and S
 - **Distribution logic**: Smart 3-tier placement strategy for additional sessions
 
 ### **User Experience Validation**
-- **Clean interface**: No frames, boxes, or unnecessary elements
+- **Clean swipe interface**: No ugly buttons, smooth transitions
 - **Professional workouts**: Detailed sessions with proper structure
 - **Personalized targets**: All based on actual user data
-- **Easy navigation**: Tabbed weeks and clear session organization
+- **Easy navigation**: Swipe weeks and clear session organization
 - **Clear messaging**: Updated language for strength integration
 
 ## 📚 Documentation
 
 ### **Key Files**
-- **`src/services/SimpleTrainingService.ts`**: Core template-based algorithm with smart distribution
-- **`src/components/SimplePlanBuilder.tsx`**: Main UI component with updated language
+- **`src/services/SimpleTrainingService.ts`**: Core solid plan engine with smart distribution
+- **`src/components/SimplePlanBuilder.tsx`**: Main UI component with swipe interface
 - **`src/contexts/AppContext.tsx`**: User baseline management
 - **`src/components/TrainingBaselines.tsx`**: Baseline data collection
 - **`src/services/TrainingTemplates.ts`**: Strength option definitions and descriptions
@@ -173,19 +178,21 @@ A comprehensive fitness training application built with React, TypeScript, and S
 ## 🎯 Success Metrics
 
 ### **Technical Success**
-- ✅ **Template system working**: Clean, scalable approach
+- ✅ **Solid plan engine working**: Clean, scalable approach
 - ✅ **Personalization working**: All targets based on user data
-- ✅ **UI/UX working**: Professional, minimal interface
+- ✅ **Swipe UI working**: Professional, intuitive interface
 - ✅ **Scientific validation**: Evidence-based training principles
 - ✅ **Distribution working**: Smart placement strategy for all strength options
 - ✅ **Workout generation**: Complete exercise prescriptions
+- ✅ **Multi-distance support**: Sprint and 70.3 with distance-specific templates
 
 ### **User Success**
 - ✅ **Professional plans**: Detailed, realistic workouts
 - ✅ **Easy to use**: Simple 4-step assessment flow
 - ✅ **Personalized**: All targets match user's actual fitness
-- ✅ **Scalable**: Template approach works for different users
+- ✅ **Scalable**: Solid plan approach works for different users
 - ✅ **Complete strength**: All 3 sessions properly placed for Cowboy options
+- ✅ **Intuitive navigation**: Clean swipe interface
 
 ## 🚀 Deployment
 
@@ -201,19 +208,19 @@ A comprehensive fitness training application built with React, TypeScript, and S
 ## 📞 Support & Development
 
 ### **Current State**
-- **Sprint triathlon plans**: Fully functional and professional
-- **Template system**: Proven and ready for expansion
-- **UI/UX**: Clean, minimal, and user-friendly
+- **Sprint and 70.3 triathlon plans**: Fully functional and professional
+- **Solid plan engine**: Proven and ready for expansion
+- **Swipe UI**: Clean, intuitive, and user-friendly
 - **Scientific foundation**: Sound and evidence-based
 - **Strength distribution**: Smart and scientifically sound
 - **Workout generation**: Complete and evidence-based
 
 ### **Development Guidelines**
-1. **Maintain simplicity**: Keep the template-based approach
+1. **Maintain simplicity**: Keep the solid plan approach
 2. **Preserve personalization**: All plans must use user baselines
 3. **Follow science**: Maintain evidence-based training principles
-4. **Keep UI clean**: Minimal design with professional presentation
+4. **Keep UI clean**: Swipe interface with professional presentation
 5. **Ensure distribution**: Smart placement strategy for all session types
 6. **Complete workouts**: Full exercise prescriptions with proper structure
 
-**The system is working excellently with a clean, template-based approach that generates professional, personalized training plans with smart session distribution and complete workout generation!** 🎯
+**The system is working excellently with a solid plan engine that generates professional, personalized training plans with smart session distribution, complete workout generation, and a clean swipe interface!** 🎯
