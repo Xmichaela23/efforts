@@ -105,7 +105,9 @@ export class TrainingRulesEngine {
 
   constructor() {
     this.engine = new Engine();
+    console.log('🔍 TrainingRulesEngine constructor called');
     this.loadTrainingRules();
+    console.log('🔍 Training rules loaded');
   }
 
   // ===== CORE TRAINING RULES =====
@@ -113,28 +115,39 @@ export class TrainingRulesEngine {
   private loadTrainingRules() {
     // Clear existing rules
     this.engine = new Engine();
+    console.log('🔍 Engine created, loading rules...');
 
     // Load distance-specific rules
     this.loadDistanceRules();
+    console.log('🔍 Distance rules loaded');
     
     // Load philosophy-specific rules
     this.loadPhilosophyRules();
+    console.log('🔍 Philosophy rules loaded');
     
     // Load progression rules
     this.loadProgressionRules();
+    console.log('🔍 Progression rules loaded');
     
     // Load strength integration rules
     this.loadStrengthRules();
+    console.log('🔍 Strength rules loaded');
     
     // Load recovery and balance rules
     this.loadRecoveryRules();
+    console.log('🔍 Recovery rules loaded');
     
     // NEW: Load session generation rules
     this.loadSessionGenerationRules();
+    console.log('🔍 Session generation rules loaded');
+    
+    console.log('🔍 All training rules loaded successfully');
   }
 
   // NEW: Session Generation Rules
   private loadSessionGenerationRules() {
+    console.log('🔍 Loading session generation rules...');
+    
     // Swim Session Rules - Based on triathlon training science
     this.engine.addRule({
       conditions: {
@@ -153,6 +166,7 @@ export class TrainingRulesEngine {
         }
       }
     });
+    console.log('🔍 Swim session rule added');
 
     // Bike Session Rules - Based on triathlon training science
     this.engine.addRule({
@@ -172,6 +186,7 @@ export class TrainingRulesEngine {
         }
       }
     });
+    console.log('🔍 Bike session rule added');
 
     // Run Session Rules - Based on triathlon training science
     this.engine.addRule({
@@ -191,6 +206,7 @@ export class TrainingRulesEngine {
         }
       }
     });
+    console.log('🔍 Run session rule added');
 
     // Strength Session Rules - Based on triathlon training science
     this.engine.addRule({
@@ -210,6 +226,7 @@ export class TrainingRulesEngine {
         }
       }
     });
+    console.log('🔍 Strength session rule added');
 
     // Brick Session Rules - Based on triathlon training science
     this.engine.addRule({
@@ -229,7 +246,8 @@ export class TrainingRulesEngine {
         }
       }
     });
-
+    console.log('🔍 Brick session rule added');
+    
     // Session Type Rules
     this.engine.addRule({
       conditions: {
@@ -302,6 +320,8 @@ export class TrainingRulesEngine {
         }
       }
     });
+    
+    console.log('🔍 All session generation rules loaded');
   }
 
   private loadDistanceRules() {
