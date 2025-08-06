@@ -982,6 +982,8 @@ export class SimpleTrainingService {
   ): Promise<SimpleTrainingPlan> {
     
     console.log('🎯 Generating solid Sprint plan with Rules Engine...');
+    console.log('🔍 User baselines performance numbers:', userBaselines.performanceNumbers);
+    console.log('🔍 Performance numbers keys:', userBaselines.performanceNumbers ? Object.keys(userBaselines.performanceNumbers) : 'null/undefined');
     
     // Create training facts for the rules engine
     const trainingFacts: TrainingFacts = {
@@ -999,7 +1001,7 @@ export class SimpleTrainingService {
       squat1RM: userBaselines.performanceNumbers?.squat,
       deadlift1RM: userBaselines.performanceNumbers?.deadlift,
       bench1RM: userBaselines.performanceNumbers?.bench,
-      overheadPress1RM: userBaselines.performanceNumbers?.overheadPress,
+      overheadPress1RM: userBaselines.performanceNumbers?.overheadPress1RM,
       age: userBaselines.age,
       phase: 'base',
       weekWithinPhase: 1,
@@ -1054,7 +1056,7 @@ export class SimpleTrainingService {
       squat1RM: userBaselines.performanceNumbers?.squat,
       deadlift1RM: userBaselines.performanceNumbers?.deadlift,
       bench1RM: userBaselines.performanceNumbers?.bench,
-      overheadPress1RM: userBaselines.performanceNumbers?.overheadPress,
+      overheadPress1RM: userBaselines.performanceNumbers?.overheadPress1RM,
       age: userBaselines.age,
       phase: 'base',
       weekWithinPhase: 1,

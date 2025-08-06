@@ -457,7 +457,7 @@ export default function SimplePlanBuilder() {
             </button>
           </div>
           <p className="text-gray-600 mb-6">
-            {plan.weeks.length}-Week Training Plan • {Math.round(plan.totalHours * plan.weeks.length)} hours total
+            {plan.weeks && plan.weeks.length > 0 ? `${plan.weeks.length}-Week Training Plan • ${Math.round(plan.totalHours * plan.weeks.length)} hours total` : 'Loading plan details...'}
           </p>
           
           {/* Compact Plan Summary */}
@@ -518,7 +518,7 @@ export default function SimplePlanBuilder() {
             
             {/* Week Indicator Dots */}
             <div className="flex justify-center space-x-2 mb-4">
-              {plan.weeks.map((_, weekIndex) => (
+              {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((_, weekIndex) => (
                 <div
                   key={weekIndex}
                   className={`w-2 h-2 rounded-full transition-colors ${
@@ -527,7 +527,9 @@ export default function SimplePlanBuilder() {
                       : 'bg-gray-300'
                   }`}
                 />
-              ))}
+              )) : (
+                <div className="text-sm text-gray-500">Loading weeks...</div>
+              )}
             </div>
             
             {/* Full Week Swipeable Area */}
@@ -541,7 +543,7 @@ export default function SimplePlanBuilder() {
                 className="flex transition-transform duration-300 ease-out"
                 style={{ transform: `translateX(-${currentWeek * 100}%)` }}
               >
-                {plan.weeks.map((week, weekIndex) => (
+                {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((week, weekIndex) => (
                   <div key={weekIndex} className="w-full flex-shrink-0">
                     <div className="text-center mb-4">
                       <h4 className="text-lg font-semibold">
@@ -637,7 +639,14 @@ export default function SimplePlanBuilder() {
                       })()}
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="w-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="text-lg text-gray-600 mb-2">Loading Plan...</div>
+                      <div className="text-sm text-gray-500">Generating your personalized training plan</div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
