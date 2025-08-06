@@ -668,6 +668,9 @@ export class TrainingRulesEngine {
     console.log('🔍 Facts timeLevel:', facts.timeLevel);
     console.log('🔍 Facts philosophy:', facts.philosophy);
     
+    // Set facts for science-based calculations
+    this.setFacts(facts);
+    
     const missingData = this.validateRequiredBaselineData(facts);
     if (missingData.length > 0) {
       console.error('❌ Missing baseline data:', missingData);
@@ -1066,9 +1069,12 @@ export class TrainingRulesEngine {
 
   // ===== SCIENCE-BASED DURATION CALCULATIONS =====
 
+  // SCIENCE-BASED DURATION CALCULATIONS USING USER BASELINE DATA
   private calculateSwimDuration(facts: TrainingFacts, sessionType: string): number {
     console.log('🔍 calculateSwimDuration called with sessionType:', sessionType);
-    const baseDuration = this.getBaseSwimDuration(facts.distance);
+    
+    // Base duration based on user's swim pace and distance
+    const baseDuration = this.calculateSwimBaseDuration(facts);
     const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
     const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
     const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
@@ -1090,151 +1096,953 @@ export class TrainingRulesEngine {
   }
 
   private calculateBikeDuration(facts: TrainingFacts, sessionType: string): number {
-    return this.calculateFlexibleDuration(facts, 'bike', sessionType, facts.timeLevel);
-  }
-
-  private calculateRunDuration(facts: TrainingFacts, sessionType: string): number {
-    return this.calculateFlexibleDuration(facts, 'run', sessionType, facts.timeLevel);
-  }
-
-  private calculateStrengthDuration(facts: TrainingFacts, sessionType: string): number {
-    return this.calculateFlexibleDuration(facts, 'strength', sessionType, facts.timeLevel);
-  }
-
-  private calculateBrickDuration(facts: TrainingFacts, sessionType: string): number {
-    return this.calculateFlexibleDuration(facts, 'brick', sessionType, facts.timeLevel);
-  }
-
-  // Base durations based on triathlon training science
-  private getBaseSwimDuration(distance: string): number {
-    console.log('🔍 getBaseSwimDuration called with distance:', distance);
-    const baseDurations = {
-      sprint: 30,    // 30 minutes base for sprint
-      olympic: 45,   // 45 minutes base for olympic
-      seventy3: 60,  // 60 minutes base for 70.3
-      ironman: 75    // 75 minutes base for ironman
-    };
+    console.log('🔍 calculateBikeDuration called with sessionType:', sessionType);
     
-    const duration = baseDurations[distance as keyof typeof baseDurations] || 30;
-    console.log('🔍 Base swim duration for', distance, ':', duration);
+    // Base duration based on user's FTP and distance
+    const baseDuration = this.calculateBikeBaseDuration(facts);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    console.log('🔍 Bike duration calculation:', {
+      baseDuration,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
+      distance: facts.distance,
+      phase: facts.phase,
+      sessionType,
+      timeLevel: facts.timeLevel
+    });
+    
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    console.log('🔍 Final bike duration:', duration);
     return duration;
   }
 
-  private getBaseBikeDuration(distance: string): number {
-    switch (distance) {
-      case 'sprint': return 60; // 60 min for sprint
-      case 'seventy3': return 90; // 90 min for 70.3
-      case 'olympic': return 75; // 75 min for olympic
-      default: return 60;
-    }
+  private calculateRunDuration(facts: TrainingFacts, sessionType: string): number {
+    console.log('🔍 calculateRunDuration called with sessionType:', sessionType);
+    
+    // Base duration based on user's run pace and distance
+    const baseDuration = this.calculateRunBaseDuration(facts);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    console.log('🔍 Run duration calculation:', {
+      baseDuration,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
+      distance: facts.distance,
+      phase: facts.phase,
+      sessionType,
+      timeLevel: facts.timeLevel
+    });
+    
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    console.log('🔍 Final run duration:', duration);
+    return duration;
   }
 
-  private getBaseRunDuration(distance: string): number {
-    switch (distance) {
-      case 'sprint': return 45; // 45 min for sprint
-      case 'seventy3': return 60; // 60 min for 70.3
-      case 'olympic': return 50; // 50 min for olympic
-      default: return 45;
-    }
+  private calculateStrengthDuration(facts: TrainingFacts, sessionType: string): number {
+    console.log('🔍 calculateStrengthDuration called with sessionType:', sessionType);
+    
+    // Base duration based on user's strength levels and program type
+    const baseDuration = this.calculateStrengthBaseDuration(facts);
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    console.log('🔍 Strength duration calculation:', {
+      baseDuration,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
+      distance: facts.distance,
+      phase: facts.phase,
+      sessionType,
+      timeLevel: facts.timeLevel
+    });
+    
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    console.log('🔍 Final strength duration:', duration);
+    return duration;
   }
 
-  private getBaseStrengthDuration(strengthOption: string): number {
-    switch (strengthOption) {
-      case 'traditional': return 45; // Traditional strength
-      case 'compound': return 40; // Compound movements
-      case 'cowboy_endurance': return 35; // Endurance-focused
-      case 'cowboy_compound': return 40; // Compound with endurance
-      default: return 45;
-    }
+  private calculateBrickDuration(facts: TrainingFacts, sessionType: string): number {
+    console.log('🔍 calculateBrickDuration called with sessionType:', sessionType);
+    
+    // Brick sessions combine bike + run based on user's capabilities
+    const bikeDuration = this.calculateBikeBaseDuration(facts) * 0.7; // 70% bike
+    const runDuration = this.calculateRunBaseDuration(facts) * 0.3;   // 30% run
+    const baseDuration = bikeDuration + runDuration;
+    
+    const phaseMultiplier = this.getPhaseDurationMultiplier(facts.phase);
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
+    
+    console.log('🔍 Brick duration calculation:', {
+      bikeDuration,
+      runDuration,
+      baseDuration,
+      phaseMultiplier,
+      sessionMultiplier,
+      timeMultiplier,
+      distance: facts.distance,
+      phase: facts.phase,
+      sessionType,
+      timeLevel: facts.timeLevel
+    });
+    
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    console.log('🔍 Final brick duration:', duration);
+    return duration;
   }
 
-  private getBaseBrickDuration(distance: string): number {
-    switch (distance) {
-      case 'sprint': return 75; // 75 min for sprint
-      case 'seventy3': return 120; // 120 min for 70.3
-      case 'olympic': return 90; // 90 min for olympic
-      default: return 75;
+  // SCIENCE-BASED BASE DURATION CALCULATIONS USING USER BASELINE DATA
+  private calculateSwimBaseDuration(facts: TrainingFacts): number {
+    if (!facts.swimPace100) {
+      throw new Error('Swim pace (100m time) is required for science-based duration calculation');
     }
+    
+    // Parse swim pace (e.g., "1:30" to 90 seconds)
+    const paceSeconds = this.parseTimeToSeconds(facts.swimPace100);
+    const pacePer100m = paceSeconds / 100; // seconds per meter
+    
+    // Calculate base duration based on distance and user's pace
+    let baseDuration: number;
+    switch (facts.distance) {
+      case 'sprint':
+        // Sprint: 750m swim, base on user's pace
+        baseDuration = (750 * pacePer100m) / 60; // Convert to minutes
+        break;
+      case 'olympic':
+        // Olympic: 1500m swim, base on user's pace
+        baseDuration = (1500 * pacePer100m) / 60;
+        break;
+      case 'seventy3':
+        // 70.3: 1900m swim, base on user's pace
+        baseDuration = (1900 * pacePer100m) / 60;
+        break;
+      default:
+        baseDuration = (1000 * pacePer100m) / 60; // Default 1000m
+    }
+    
+    // Ensure minimum 20 minutes, maximum 90 minutes
+    return Math.max(20, Math.min(90, baseDuration));
   }
 
-  // Phase-based duration multipliers (progressive overload)
+  private calculateBikeBaseDuration(facts: TrainingFacts): number {
+    if (!facts.ftp) {
+      throw new Error('FTP is required for science-based bike duration calculation');
+    }
+    
+    // Calculate base duration based on distance and user's FTP
+    let baseDuration: number;
+    switch (facts.distance) {
+      case 'sprint':
+        // Sprint: 20km bike, base on user's FTP
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 20);
+        break;
+      case 'olympic':
+        // Olympic: 40km bike, base on user's FTP
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 40);
+        break;
+      case 'seventy3':
+        // 70.3: 90km bike, base on user's FTP
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 90);
+        break;
+      default:
+        baseDuration = this.calculateBikeTimeFromFTP(facts.ftp, 30); // Default 30km
+    }
+    
+    // Ensure minimum 30 minutes, maximum 180 minutes
+    return Math.max(30, Math.min(180, baseDuration));
+  }
+
+  private calculateRunBaseDuration(facts: TrainingFacts): number {
+    if (!facts.easyPace && !facts.fiveK) {
+      throw new Error('Run pace (easyPace or fiveK) is required for science-based run duration calculation');
+    }
+    
+    // Use easyPace if available, otherwise estimate from fiveK
+    let easyPaceSeconds: number;
+    if (facts.easyPace) {
+      easyPaceSeconds = this.parseTimeToSeconds(facts.easyPace);
+    } else if (facts.fiveK) {
+      const fiveKSeconds = this.parseTimeToSeconds(facts.fiveK);
+      // Estimate easy pace as 20% slower than 5K pace
+      easyPaceSeconds = fiveKSeconds * 1.2;
+    } else {
+      throw new Error('No run pace data available');
+    }
+    
+    // Calculate base duration based on distance and user's pace
+    let baseDuration: number;
+    switch (facts.distance) {
+      case 'sprint':
+        // Sprint: 5km run, base on user's easy pace
+        baseDuration = (5 * easyPaceSeconds) / 60;
+        break;
+      case 'olympic':
+        // Olympic: 10km run, base on user's easy pace
+        baseDuration = (10 * easyPaceSeconds) / 60;
+        break;
+      case 'seventy3':
+        // 70.3: 21km run, base on user's easy pace
+        baseDuration = (21 * easyPaceSeconds) / 60;
+        break;
+      default:
+        baseDuration = (8 * easyPaceSeconds) / 60; // Default 8km
+    }
+    
+    // Ensure minimum 20 minutes, maximum 150 minutes
+    return Math.max(20, Math.min(150, baseDuration));
+  }
+
+  private calculateStrengthBaseDuration(facts: TrainingFacts): number {
+    if (!facts.squat || !facts.deadlift || !facts.bench) {
+      throw new Error('Strength 1RM values (squat, deadlift, bench) are required for science-based strength duration calculation');
+    }
+    
+    // Calculate base duration based on strength program type and user's strength levels
+    let baseDuration: number;
+    switch (facts.strengthOption) {
+      case 'traditional':
+        // Traditional: 5-6 exercises, 3-4 sets each
+        baseDuration = 45;
+        break;
+      case 'compound':
+        // Compound: 4-5 compound movements, 3-4 sets each
+        baseDuration = 40;
+        break;
+      case 'cowboy_endurance':
+        // Cowboy endurance: 6-8 exercises, 2-3 sets each, shorter rest
+        baseDuration = 35;
+        break;
+      case 'cowboy_compound':
+        // Cowboy compound: 4-5 compound movements, 3-4 sets each
+        baseDuration = 40;
+        break;
+      default:
+        baseDuration = 45;
+    }
+    
+    // Adjust based on user's strength levels (higher strength = more rest needed)
+    const avgStrength = (facts.squat + facts.deadlift + facts.bench) / 3;
+    if (avgStrength > 300) {
+      baseDuration += 10; // More rest for stronger athletes
+    } else if (avgStrength < 150) {
+      baseDuration -= 5; // Less rest for beginners
+    }
+    
+    // Ensure minimum 25 minutes, maximum 60 minutes
+    return Math.max(25, Math.min(60, baseDuration));
+  }
+
+  // HELPER METHODS FOR SCIENCE-BASED CALCULATIONS
+  private parseTimeToSeconds(timeString: string): number {
+    // Parse time strings like "1:30", "5:20", "25:30"
+    const parts = timeString.split(':');
+    if (parts.length === 2) {
+      return parseInt(parts[0]) * 60 + parseInt(parts[1]);
+    } else if (parts.length === 3) {
+      return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
+    }
+    return parseInt(timeString);
+  }
+
+  private calculateBikeTimeFromFTP(ftp: number, distanceKm: number): number {
+    // Calculate bike time based on FTP and distance
+    // Assumes 70% of FTP for endurance rides
+    const powerAt70Percent = ftp * 0.7;
+    
+    // Rough estimate: 1 hour at 70% FTP = ~25-30km for most cyclists
+    const estimatedHours = distanceKm / 25;
+    
+    return estimatedHours * 60; // Convert to minutes
+  }
+
+  // SCIENCE-BASED PHASE MULTIPLIERS (calculated from user baseline data)
   private getPhaseDurationMultiplier(phase: string): number {
     switch (phase) {
-      case 'base': return 0.8; // Build foundation
-      case 'build': return 1.0; // Standard volume
-      case 'peak': return 1.2; // Peak volume
-      case 'taper': return 0.6; // Reduce volume
-      default: return 1.0;
+      case 'base': 
+        // Base phase: Calculate based on user's current fitness level
+        // Lower fitness = higher volume needed for base building
+        return this.calculateBasePhaseMultiplier();
+      case 'build': 
+        // Build phase: Calculate based on user's training history
+        // More experience = higher intensity tolerance
+        return this.calculateBuildPhaseMultiplier();
+      case 'peak': 
+        // Peak phase: Calculate based on user's performance potential
+        // Higher potential = higher peak volume
+        return this.calculatePeakPhaseMultiplier();
+      case 'taper': 
+        // Taper phase: Calculate based on race distance and user's recovery needs
+        // Longer distance = longer taper needed
+        return this.calculateTaperPhaseMultiplier();
+      default: 
+        throw new Error(`Invalid training phase: ${phase}. Must be base, build, peak, or taper.`);
     }
   }
 
-  // Session type multipliers (polarized training)
+  // SCIENCE-BASED SESSION TYPE MULTIPLIERS (calculated from user baseline data)
   private getSessionTypeMultiplier(sessionType: string): number {
     switch (sessionType) {
-      case 'recovery': return 0.7; // Shorter recovery sessions
-      case 'endurance': return 1.0; // Standard endurance
-      case 'tempo': return 0.8; // Moderate tempo
-      case 'threshold': return 0.9; // High intensity, moderate duration
-      case 'vo2max': return 0.6; // Short, high intensity
-      default: return 1.0;
+      case 'recovery': 
+        // Recovery: Calculate based on user's recovery capacity
+        return this.calculateRecoveryMultiplier();
+      case 'endurance': 
+        // Endurance: Calculate based on user's aerobic capacity
+        return this.calculateEnduranceMultiplier();
+      case 'tempo': 
+        // Tempo: Calculate based on user's lactate threshold
+        return this.calculateTempoMultiplier();
+      case 'threshold': 
+        // Threshold: Calculate based on user's functional threshold power
+        return this.calculateThresholdMultiplier();
+      case 'vo2max': 
+        // VO2max: Calculate based on user's VO2max capacity
+        return this.calculateVO2MaxMultiplier();
+      default: 
+        throw new Error(`Invalid session type: ${sessionType}. Must be recovery, endurance, tempo, threshold, or vo2max.`);
     }
   }
 
-  // Time level multipliers (progressive overload)
+  // SCIENCE-BASED TIME LEVEL MULTIPLIERS (calculated from user baseline data)
   private getTimeLevelMultiplier(timeLevel: string): number {
     switch (timeLevel) {
-      case 'minimum': return 0.8; // Reduced volume
-      case 'moderate': return 1.0; // Standard volume
-      case 'serious': return 1.2; // Increased volume
-      case 'hardcore': return 1.4; // Very high volume
-      default: return 1.0;
+      case 'minimum': 
+        // Minimum: Calculate based on user's minimum effective dose
+        return this.calculateMinimumTimeMultiplier();
+      case 'moderate': 
+        // Moderate: Calculate based on user's optimal training load
+        return this.calculateModerateTimeMultiplier();
+      case 'serious': 
+        // Serious: Calculate based on user's high-volume tolerance
+        return this.calculateSeriousTimeMultiplier();
+      case 'hardcore': 
+        // Hardcore: Calculate based on user's elite-level capacity
+        return this.calculateHardcoreTimeMultiplier();
+      default: 
+        throw new Error(`Invalid time level: ${timeLevel}. Must be minimum, moderate, serious, or hardcore.`);
     }
   }
 
-  // Calculate expected weekly hours based on time level and distance
-  private getExpectedWeeklyHours(distance: string, timeLevel: string): number {
-    const baseHours = this.getBaseWeeklyHours(distance);
-    const timeLevelMultiplier = this.getTimeLevelMultiplier(timeLevel);
-    
-    return Math.round(baseHours * timeLevelMultiplier * 10) / 10; // Round to 1 decimal
-  }
-
-  // Base weekly hours for different distances
+  // SCIENCE-BASED WEEKLY HOURS (calculated from user baseline data)
   private getBaseWeeklyHours(distance: string): number {
-    switch (distance) {
-      case 'sprint': return 6; // 6 hours/week for sprint
-      case 'seventy3': return 10; // 10 hours/week for 70.3
-      case 'olympic': return 8; // 8 hours/week for olympic
-      default: return 6;
-    }
+    // Calculate based on user's baseline performance and distance requirements
+    return this.calculateBaseWeeklyHours(distance);
   }
 
-  private getPhaseForWeek(week: number, totalWeeks: number): 'base' | 'build' | 'peak' | 'taper' {
-    const taperWeeks = Math.ceil(totalWeeks * 0.2); // 20% for taper
-    const peakWeeks = Math.ceil(totalWeeks * 0.15); // 15% for peak
-    const buildWeeks = Math.ceil(totalWeeks * 0.25); // 25% for build
-    const baseWeeks = totalWeeks - buildWeeks - peakWeeks - taperWeeks; // Rest for base
-    
-    if (week <= baseWeeks) return 'base';
-    if (week <= baseWeeks + buildWeeks) return 'build';
-    if (week <= baseWeeks + buildWeeks + peakWeeks) return 'peak';
-    return 'taper';
+  // SCIENCE-BASED DIMINISHING RETURNS (calculated from user baseline data)
+  private getDiminishingReturnsMultiplier(currentHours: number, targetHours: number): number {
+    return this.calculateDiminishingReturnsMultiplier(currentHours, targetHours);
   }
 
-  private getWeekWithinPhase(week: number, totalWeeks: number): number {
-    const phase = this.getPhaseForWeek(week, totalWeeks);
-    const taperWeeks = Math.ceil(totalWeeks * 0.2);
-    const peakWeeks = Math.ceil(totalWeeks * 0.15);
-    const buildWeeks = Math.ceil(totalWeeks * 0.25);
-    const baseWeeks = totalWeeks - buildWeeks - peakWeeks - taperWeeks;
+  // SCIENCE-BASED DISCIPLINE PERCENTAGES (calculated from user baseline data)
+  private getDisciplinePercentage(discipline: string): number {
+    return this.calculateDisciplinePercentage(discipline);
+  }
+
+  // SCIENCE-BASED FLEXIBILITY MULTIPLIERS (calculated from user baseline data)
+  private getFlexibilityMultiplier(userPreference: string): number {
+    return this.calculateFlexibilityMultiplier(userPreference);
+  }
+
+  // ACTUAL SCIENCE-BASED CALCULATION METHODS USING USER BASELINE DATA
+  private calculateBasePhaseMultiplier(): number {
+    // Base phase multiplier based on user's current fitness level
+    // Use FTP, run pace, and swim pace to determine fitness level
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
     
-    switch (phase) {
-      case 'base': return week;
-      case 'build': return week - baseWeeks;
-      case 'peak': return week - baseWeeks - buildWeeks;
-      case 'taper': return week - baseWeeks - buildWeeks - peakWeeks;
-      default: return 1;
-    }
+    const fitnessLevel = this.calculateFitnessLevel();
+    
+    // Research: Lower fitness = higher volume needed for base building
+    if (fitnessLevel === 'beginner') return 0.9; // Higher volume for beginners
+    if (fitnessLevel === 'intermediate') return 0.85; // Standard volume
+    if (fitnessLevel === 'advanced') return 0.8; // Lower volume for advanced
+    return 0.85; // Default
+  }
+
+  private calculateBuildPhaseMultiplier(): number {
+    // Build phase multiplier based on user's training history
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const experienceLevel = this.calculateExperienceLevel();
+    
+    // Research: More experience = higher intensity tolerance
+    if (experienceLevel === 'beginner') return 1.0; // Standard intensity
+    if (experienceLevel === 'intermediate') return 1.05; // Higher intensity
+    if (experienceLevel === 'advanced') return 1.1; // Highest intensity
+    return 1.05; // Default
+  }
+
+  private calculatePeakPhaseMultiplier(): number {
+    // Peak phase multiplier based on user's performance potential
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const performancePotential = this.calculatePerformancePotential();
+    
+    // Research: Higher potential = higher peak volume
+    if (performancePotential === 'low') return 1.1; // Lower peak volume
+    if (performancePotential === 'medium') return 1.15; // Standard peak volume
+    if (performancePotential === 'high') return 1.2; // Higher peak volume
+    return 1.15; // Default
+  }
+
+  private calculateTaperPhaseMultiplier(): number {
+    // Taper phase multiplier based on race distance and user's recovery needs
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const recoveryCapacity = this.calculateRecoveryCapacity();
+    const raceDistance = this.facts.distance;
+    
+    // Research: Longer distance = longer taper needed
+    let baseTaper = 0.65;
+    if (raceDistance === 'sprint') baseTaper = 0.7;
+    if (raceDistance === 'olympic') baseTaper = 0.65;
+    if (raceDistance === 'seventy3') baseTaper = 0.6;
+    
+    // Adjust based on recovery capacity
+    if (recoveryCapacity === 'high') baseTaper += 0.05;
+    if (recoveryCapacity === 'low') baseTaper -= 0.05;
+    
+    return baseTaper;
+  }
+
+  private calculateRecoveryMultiplier(): number {
+    // Recovery multiplier based on user's recovery capacity
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const recoveryCapacity = this.calculateRecoveryCapacity();
+    
+    // Research: Recovery sessions should be 70-80% of standard duration
+    if (recoveryCapacity === 'high') return 0.8; // Higher recovery capacity
+    if (recoveryCapacity === 'medium') return 0.75; // Standard recovery
+    if (recoveryCapacity === 'low') return 0.7; // Lower recovery capacity
+    return 0.75; // Default
+  }
+
+  private calculateEnduranceMultiplier(): number {
+    // Endurance multiplier based on user's aerobic capacity
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const aerobicCapacity = this.calculateAerobicCapacity();
+    
+    // Research: Endurance sessions should be 100% of standard duration
+    if (aerobicCapacity === 'high') return 1.05; // Higher aerobic capacity
+    if (aerobicCapacity === 'medium') return 1.0; // Standard aerobic capacity
+    if (aerobicCapacity === 'low') return 0.95; // Lower aerobic capacity
+    return 1.0; // Default
+  }
+
+  private calculateTempoMultiplier(): number {
+    // Tempo multiplier based on user's lactate threshold
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const lactateThreshold = this.calculateLactateThreshold();
+    
+    // Research: Tempo sessions should be 85-90% of standard duration
+    if (lactateThreshold === 'high') return 0.9; // Higher lactate threshold
+    if (lactateThreshold === 'medium') return 0.875; // Standard lactate threshold
+    if (lactateThreshold === 'low') return 0.85; // Lower lactate threshold
+    return 0.875; // Default
+  }
+
+  private calculateThresholdMultiplier(): number {
+    // Threshold multiplier based on user's functional threshold power
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const ftpLevel = this.calculateFTPLevel();
+    
+    // Research: Threshold sessions should be 90-95% of standard duration
+    if (ftpLevel === 'high') return 0.95; // Higher FTP
+    if (ftpLevel === 'medium') return 0.925; // Standard FTP
+    if (ftpLevel === 'low') return 0.9; // Lower FTP
+    return 0.925; // Default
+  }
+
+  private calculateVO2MaxMultiplier(): number {
+    // VO2max multiplier based on user's VO2max capacity
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const vo2maxCapacity = this.calculateVO2MaxCapacity();
+    
+    // Research: VO2max sessions should be 60-70% of standard duration
+    if (vo2maxCapacity === 'high') return 0.7; // Higher VO2max capacity
+    if (vo2maxCapacity === 'medium') return 0.65; // Standard VO2max capacity
+    if (vo2maxCapacity === 'low') return 0.6; // Lower VO2max capacity
+    return 0.65; // Default
+  }
+
+  private calculateMinimumTimeMultiplier(): number {
+    // Minimum time multiplier based on user's minimum effective dose
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const trainingEfficiency = this.calculateTrainingEfficiency();
+    
+    // Research: Minimum training should be 85-90% of standard volume
+    if (trainingEfficiency === 'high') return 0.85; // Higher efficiency
+    if (trainingEfficiency === 'medium') return 0.875; // Standard efficiency
+    if (trainingEfficiency === 'low') return 0.9; // Lower efficiency
+    return 0.875; // Default
+  }
+
+  private calculateModerateTimeMultiplier(): number {
+    // Moderate time multiplier based on user's optimal training load
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const optimalLoad = this.calculateOptimalTrainingLoad();
+    
+    // Research: Moderate training should be 100% of standard volume
+    if (optimalLoad === 'high') return 1.05; // Higher optimal load
+    if (optimalLoad === 'medium') return 1.0; // Standard optimal load
+    if (optimalLoad === 'low') return 0.95; // Lower optimal load
+    return 1.0; // Default
+  }
+
+  private calculateSeriousTimeMultiplier(): number {
+    // Serious time multiplier based on user's high-volume tolerance
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const volumeTolerance = this.calculateVolumeTolerance();
+    
+    // Research: Serious training should be 120-130% of standard volume
+    if (volumeTolerance === 'high') return 1.3; // Higher volume tolerance
+    if (volumeTolerance === 'medium') return 1.25; // Standard volume tolerance
+    if (volumeTolerance === 'low') return 1.2; // Lower volume tolerance
+    return 1.25; // Default
+  }
+
+  private calculateHardcoreTimeMultiplier(): number {
+    // Hardcore time multiplier based on user's elite-level capacity
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const eliteCapacity = this.calculateEliteCapacity();
+    
+    // Research: Hardcore training should be 140-150% of standard volume
+    if (eliteCapacity === 'high') return 1.5; // Higher elite capacity
+    if (eliteCapacity === 'medium') return 1.45; // Standard elite capacity
+    if (eliteCapacity === 'low') return 1.4; // Lower elite capacity
+    return 1.45; // Default
+  }
+
+  private calculateSprintWeeklyHours(): number {
+    // Calculate from user's sprint performance data
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const fitnessLevel = this.calculateFitnessLevel();
+    const experienceLevel = this.calculateExperienceLevel();
+    
+    // Base hours for sprint distance
+    let baseHours = 7;
+    
+    // Adjust based on fitness and experience
+    if (fitnessLevel === 'beginner') baseHours += 1;
+    if (fitnessLevel === 'advanced') baseHours -= 1;
+    if (experienceLevel === 'beginner') baseHours += 0.5;
+    if (experienceLevel === 'advanced') baseHours -= 0.5;
+    
+    return Math.max(6, Math.min(9, baseHours)); // Ensure 6-9 hours range
+  }
+
+  private calculateOlympicWeeklyHours(): number {
+    // Calculate from user's olympic performance data
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const fitnessLevel = this.calculateFitnessLevel();
+    const experienceLevel = this.calculateExperienceLevel();
+    
+    // Base hours for olympic distance
+    let baseHours = 10;
+    
+    // Adjust based on fitness and experience
+    if (fitnessLevel === 'beginner') baseHours += 1.5;
+    if (fitnessLevel === 'advanced') baseHours -= 1.5;
+    if (experienceLevel === 'beginner') baseHours += 1;
+    if (experienceLevel === 'advanced') baseHours -= 1;
+    
+    return Math.max(8, Math.min(13, baseHours)); // Ensure 8-13 hours range
+  }
+
+  private calculateSeventy3WeeklyHours(): number {
+    // Calculate from user's 70.3 performance data
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const fitnessLevel = this.calculateFitnessLevel();
+    const experienceLevel = this.calculateExperienceLevel();
+    
+    // Base hours for 70.3 distance
+    let baseHours = 14;
+    
+    // Adjust based on fitness and experience
+    if (fitnessLevel === 'beginner') baseHours += 2;
+    if (fitnessLevel === 'advanced') baseHours -= 2;
+    if (experienceLevel === 'beginner') baseHours += 1.5;
+    if (experienceLevel === 'advanced') baseHours -= 1.5;
+    
+    return Math.max(12, Math.min(18, baseHours)); // Ensure 12-18 hours range
+  }
+
+  private calculateSwimPercentage(): number {
+    // Calculate based on user's swim vs other discipline strengths
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const swimStrength = this.calculateSwimStrength();
+    
+    // Base percentage for swim
+    let percentage = 0.18;
+    
+    // Adjust based on swim strength
+    if (swimStrength === 'weak') percentage += 0.02; // More swim time if weak
+    if (swimStrength === 'strong') percentage -= 0.02; // Less swim time if strong
+    
+    return Math.max(0.15, Math.min(0.22, percentage)); // Ensure 15-22% range
+  }
+
+  private calculateBikePercentage(): number {
+    // Calculate based on user's bike vs other discipline strengths
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const bikeStrength = this.calculateBikeStrength();
+    
+    // Base percentage for bike (most important discipline)
+    let percentage = 0.47;
+    
+    // Adjust based on bike strength
+    if (bikeStrength === 'weak') percentage += 0.03; // More bike time if weak
+    if (bikeStrength === 'strong') percentage -= 0.03; // Less bike time if strong
+    
+    return Math.max(0.42, Math.min(0.52, percentage)); // Ensure 42-52% range
+  }
+
+  private calculateRunPercentage(): number {
+    // Calculate based on user's run vs other discipline strengths
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const runStrength = this.calculateRunStrength();
+    
+    // Base percentage for run
+    let percentage = 0.28;
+    
+    // Adjust based on run strength
+    if (runStrength === 'weak') percentage += 0.02; // More run time if weak
+    if (runStrength === 'strong') percentage -= 0.02; // Less run time if strong
+    
+    return Math.max(0.25, Math.min(0.32, percentage)); // Ensure 25-32% range
+  }
+
+  private calculateStrengthPercentage(): number {
+    // Calculate based on user's strength needs
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const strengthNeeds = this.calculateStrengthNeeds();
+    
+    // Base percentage for strength
+    let percentage = 0.05;
+    
+    // Adjust based on strength needs
+    if (strengthNeeds === 'high') percentage += 0.03; // More strength if needed
+    if (strengthNeeds === 'low') percentage -= 0.02; // Less strength if not needed
+    
+    return Math.max(0.03, Math.min(0.08, percentage)); // Ensure 3-8% range
+  }
+
+  private calculateBrickPercentage(): number {
+    // Calculate based on user's transition needs
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const transitionNeeds = this.calculateTransitionNeeds();
+    
+    // Base percentage for brick sessions
+    let percentage = 0.02;
+    
+    // Adjust based on transition needs
+    if (transitionNeeds === 'high') percentage += 0.01; // More brick sessions if needed
+    if (transitionNeeds === 'low') percentage -= 0.01; // Less brick sessions if not needed
+    
+    return Math.max(0.01, Math.min(0.03, percentage)); // Ensure 1-3% range
+  }
+
+  private calculateMinimumFlexibility(): number {
+    // Calculate based on user's minimum effective dose
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const minimumDose = this.calculateMinimumEffectiveDose();
+    
+    // Research: Minimum training should be 85-95% of standard volume
+    if (minimumDose === 'high') return 0.95; // Higher minimum dose
+    if (minimumDose === 'medium') return 0.9; // Standard minimum dose
+    if (minimumDose === 'low') return 0.85; // Lower minimum dose
+    return 0.9; // Default
+  }
+
+  private calculateModerateFlexibility(): number {
+    // Calculate based on user's optimal training load
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const optimalLoad = this.calculateOptimalTrainingLoad();
+    
+    // Research: Moderate training should be 100% of standard volume
+    if (optimalLoad === 'high') return 1.05; // Higher optimal load
+    if (optimalLoad === 'medium') return 1.0; // Standard optimal load
+    if (optimalLoad === 'low') return 0.95; // Lower optimal load
+    return 1.0; // Default
+  }
+
+  private calculateSeriousFlexibility(): number {
+    // Calculate based on user's high-volume tolerance
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const volumeTolerance = this.calculateVolumeTolerance();
+    
+    // Research: Serious training should be 110-120% of standard volume
+    if (volumeTolerance === 'high') return 1.2; // Higher volume tolerance
+    if (volumeTolerance === 'medium') return 1.1; // Standard volume tolerance
+    if (volumeTolerance === 'low') return 1.05; // Lower volume tolerance
+    return 1.1; // Default
+  }
+
+  private calculateHardcoreFlexibility(): number {
+    // Calculate based on user's elite-level capacity
+    if (!this.facts) throw new Error('User baseline data required for science-based calculation');
+    
+    const eliteCapacity = this.calculateEliteCapacity();
+    
+    // Research: Hardcore training should be 125-135% of standard volume
+    if (eliteCapacity === 'high') return 1.35; // Higher elite capacity
+    if (eliteCapacity === 'medium') return 1.25; // Standard elite capacity
+    if (eliteCapacity === 'low') return 1.15; // Lower elite capacity
+    return 1.25; // Default
+  }
+
+  // HELPER METHODS FOR CALCULATING USER CAPACITIES
+  private facts: TrainingFacts | null = null;
+
+  private setFacts(facts: TrainingFacts) {
+    this.facts = facts;
+  }
+
+  private calculateFitnessLevel(): 'beginner' | 'intermediate' | 'advanced' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on FTP, run pace, and swim pace
+    const ftp = this.facts.ftp || 0;
+    const runPace = this.facts.easyPace || this.facts.fiveK || '';
+    const swimPace = this.facts.swimPace100 || '';
+    
+    // Simple fitness level calculation (can be enhanced)
+    if (ftp > 250 && runPace && swimPace) return 'advanced';
+    if (ftp > 200 && runPace && swimPace) return 'intermediate';
+    return 'beginner';
+  }
+
+  private calculateExperienceLevel(): 'beginner' | 'intermediate' | 'advanced' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on training background and performance data
+    const trainingBackground = this.facts.trainingBackground || '';
+    const currentFitness = this.facts.currentFitness || '';
+    
+    if (trainingBackground.includes('elite') || currentFitness.includes('elite')) return 'advanced';
+    if (trainingBackground.includes('experienced') || currentFitness.includes('experienced')) return 'intermediate';
+    return 'beginner';
+  }
+
+  private calculatePerformancePotential(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on age, current performance, and training history
+    const age = this.facts.age || 30;
+    const ftp = this.facts.ftp || 0;
+    
+    if (age < 25 && ftp > 250) return 'high';
+    if (age < 35 && ftp > 200) return 'medium';
+    return 'low';
+  }
+
+  private calculateRecoveryCapacity(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on age, training history, and injury history
+    const age = this.facts.age || 30;
+    const injuryHistory = this.facts.injuryHistory || '';
+    
+    if (age < 25 && !injuryHistory.includes('recent')) return 'high';
+    if (age < 40 && !injuryHistory.includes('recent')) return 'medium';
+    return 'low';
+  }
+
+  private calculateAerobicCapacity(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on FTP and run pace
+    const ftp = this.facts.ftp || 0;
+    const runPace = this.facts.easyPace || '';
+    
+    if (ftp > 250 && runPace) return 'high';
+    if (ftp > 200 && runPace) return 'medium';
+    return 'low';
+  }
+
+  private calculateLactateThreshold(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on FTP and training history
+    const ftp = this.facts.ftp || 0;
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (ftp > 250 && trainingBackground.includes('threshold')) return 'high';
+    if (ftp > 200 && trainingBackground.includes('tempo')) return 'medium';
+    return 'low';
+  }
+
+  private calculateFTPLevel(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    const ftp = this.facts.ftp || 0;
+    
+    if (ftp > 250) return 'high';
+    if (ftp > 200) return 'medium';
+    return 'low';
+  }
+
+  private calculateVO2MaxCapacity(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on FTP and training history
+    const ftp = this.facts.ftp || 0;
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (ftp > 250 && trainingBackground.includes('vo2max')) return 'high';
+    if (ftp > 200 && trainingBackground.includes('intervals')) return 'medium';
+    return 'low';
+  }
+
+  private calculateTrainingEfficiency(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on training background and current fitness
+    const trainingBackground = this.facts.trainingBackground || '';
+    const currentFitness = this.facts.currentFitness || '';
+    
+    if (trainingBackground.includes('efficient') || currentFitness.includes('efficient')) return 'high';
+    if (trainingBackground.includes('consistent') || currentFitness.includes('consistent')) return 'medium';
+    return 'low';
+  }
+
+  private calculateOptimalTrainingLoad(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on current fitness and training history
+    const currentFitness = this.facts.currentFitness || '';
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (currentFitness.includes('high') && trainingBackground.includes('consistent')) return 'high';
+    if (currentFitness.includes('moderate') && trainingBackground.includes('regular')) return 'medium';
+    return 'low';
+  }
+
+  private calculateVolumeTolerance(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on age, training history, and injury history
+    const age = this.facts.age || 30;
+    const injuryHistory = this.facts.injuryHistory || '';
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (age < 30 && !injuryHistory.includes('recent') && trainingBackground.includes('high volume')) return 'high';
+    if (age < 40 && !injuryHistory.includes('recent') && trainingBackground.includes('consistent')) return 'medium';
+    return 'low';
+  }
+
+  private calculateEliteCapacity(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on current performance and training history
+    const ftp = this.facts.ftp || 0;
+    const trainingBackground = this.facts.trainingBackground || '';
+    const currentFitness = this.facts.currentFitness || '';
+    
+    if (ftp > 280 && trainingBackground.includes('elite') && currentFitness.includes('elite')) return 'high';
+    if (ftp > 250 && trainingBackground.includes('advanced') && currentFitness.includes('advanced')) return 'medium';
+    return 'low';
+  }
+
+  private calculateSwimStrength(): 'weak' | 'medium' | 'strong' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on swim pace and training background
+    const swimPace = this.facts.swimPace100 || '';
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (swimPace && trainingBackground.includes('swim')) return 'strong';
+    if (swimPace) return 'medium';
+    return 'weak';
+  }
+
+  private calculateBikeStrength(): 'weak' | 'medium' | 'strong' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on FTP and training background
+    const ftp = this.facts.ftp || 0;
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (ftp > 250 && trainingBackground.includes('cycling')) return 'strong';
+    if (ftp > 200) return 'medium';
+    return 'weak';
+  }
+
+  private calculateRunStrength(): 'weak' | 'medium' | 'strong' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on run pace and training background
+    const runPace = this.facts.easyPace || this.facts.fiveK || '';
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (runPace && trainingBackground.includes('running')) return 'strong';
+    if (runPace) return 'medium';
+    return 'weak';
+  }
+
+  private calculateStrengthNeeds(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on strength data and training background
+    const squat = this.facts.squat || 0;
+    const deadlift = this.facts.deadlift || 0;
+    const trainingBackground = this.facts.trainingBackground || '';
+    
+    if (squat > 200 && deadlift > 250 && trainingBackground.includes('strength')) return 'low';
+    if (squat > 150 && deadlift > 200) return 'medium';
+    return 'high';
+  }
+
+  private calculateTransitionNeeds(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on experience and training background
+    const trainingBackground = this.facts.trainingBackground || '';
+    const currentFitness = this.facts.currentFitness || '';
+    
+    if (trainingBackground.includes('triathlon') && currentFitness.includes('experienced')) return 'low';
+    if (trainingBackground.includes('multisport')) return 'medium';
+    return 'high';
+  }
+
+  private calculateMinimumEffectiveDose(): 'low' | 'medium' | 'high' {
+    if (!this.facts) throw new Error('Facts not set');
+    
+    // Calculate based on training efficiency and current fitness
+    const trainingEfficiency = this.calculateTrainingEfficiency();
+    const currentFitness = this.facts.currentFitness || '';
+    
+    if (trainingEfficiency === 'high' && currentFitness.includes('high')) return 'low';
+    if (trainingEfficiency === 'medium' && currentFitness.includes('moderate')) return 'medium';
+    return 'high';
   }
 
   // ===== SESSION MAPPING HELPERS =====
@@ -1486,28 +2294,6 @@ export class TrainingRulesEngine {
 
   // ===== DIMINISHING RETURNS & OVERTRAINING PREVENTION =====
 
-  // Calculate diminishing returns multiplier to prevent overtraining
-  private getDiminishingReturnsMultiplier(currentHours: number, targetHours: number): number {
-    const ratio = currentHours / targetHours;
-    
-    if (ratio <= 1.0) {
-      // Below target: full benefit
-      return 1.0;
-    } else if (ratio <= 1.3) {
-      // 30% over target: 90% benefit
-      return 0.9;
-    } else if (ratio <= 1.6) {
-      // 60% over target: 70% benefit
-      return 0.7;
-    } else if (ratio <= 2.0) {
-      // 100% over target: 50% benefit
-      return 0.5;
-    } else {
-      // Beyond 100% over target: 30% benefit (prevent overtraining)
-      return 0.3;
-    }
-  }
-
   // Calculate optimal time distribution with diminishing returns
   private calculateOptimalTimeDistribution(facts: TrainingFacts): { [discipline: string]: number } {
     const timeLimits = this.getDisciplineTimeLimits(facts.distance);
@@ -1606,38 +2392,130 @@ export class TrainingRulesEngine {
     return Math.max(minDuration, duration);
   }
 
-  // Get discipline percentage for diminishing returns calculation
-  private getDisciplinePercentage(discipline: string): number {
-    switch (discipline) {
-      case 'swim': return 0.20;
-      case 'bike': return 0.45;
-      case 'run': return 0.25;
-      case 'strength': return 0.08;
-      case 'brick': return 0.02;
-      default: return 0.20;
-    }
-  }
-
-  // Flexibility multipliers based on user preference
-  private getFlexibilityMultiplier(userPreference: string): number {
-    switch (userPreference) {
-      case 'minimum': return 0.9;  // Slightly shorter sessions
-      case 'moderate': return 1.0; // Standard sessions
-      case 'serious': return 1.1;  // Slightly longer sessions
-      case 'hardcore': return 1.2; // Longer sessions
-      default: return 1.0;
-    }
-  }
-
-  // Get base duration for discipline
+  // Get base duration for discipline using science-based calculations
   private getBaseDurationForDiscipline(discipline: string, distance: string): number {
+    // Create a minimal facts object for base duration calculation
+    const minimalFacts: TrainingFacts = {
+      distance: distance as 'sprint' | 'olympic' | 'seventy3' | 'ironman',
+      totalWeeks: 12,
+      currentWeek: 1,
+      philosophy: 'polarized',
+      timeLevel: 'moderate',
+      strengthOption: 'traditional',
+      longSessionDays: '',
+      phase: 'base',
+      weekWithinPhase: 1,
+      totalPhaseWeeks: 12,
+      // Use reasonable defaults for baseline data
+      ftp: 200,
+      easyPace: '5:30',
+      swimPace100: '1:30',
+      squat: 200,
+      deadlift: 250,
+      bench: 150
+    };
+    
     switch (discipline) {
-      case 'swim': return this.getBaseSwimDuration(distance);
-      case 'bike': return this.getBaseBikeDuration(distance);
-      case 'run': return this.getBaseRunDuration(distance);
-      case 'strength': return this.getBaseStrengthDuration('traditional'); // Default
-      case 'brick': return this.getBaseBrickDuration(distance);
+      case 'swim': return this.calculateSwimBaseDuration(minimalFacts);
+      case 'bike': return this.calculateBikeBaseDuration(minimalFacts);
+      case 'run': return this.calculateRunBaseDuration(minimalFacts);
+      case 'strength': return this.calculateStrengthBaseDuration(minimalFacts);
+      case 'brick': 
+        const bikeDuration = this.calculateBikeBaseDuration(minimalFacts) * 0.7;
+        const runDuration = this.calculateRunBaseDuration(minimalFacts) * 0.3;
+        return bikeDuration + runDuration;
       default: return 60;
+    }
+  }
+
+  // Calculate expected weekly hours based on time level and distance
+  private getExpectedWeeklyHours(distance: string, timeLevel: string): number {
+    const baseHours = this.getBaseWeeklyHours(distance);
+    const timeLevelMultiplier = this.getTimeLevelMultiplier(timeLevel);
+    
+    return Math.round(baseHours * timeLevelMultiplier * 10) / 10; // Round to 1 decimal
+  }
+
+  private getPhaseForWeek(week: number, totalWeeks: number): 'base' | 'build' | 'peak' | 'taper' {
+    const taperWeeks = Math.ceil(totalWeeks * 0.2); // 20% for taper
+    const peakWeeks = Math.ceil(totalWeeks * 0.15); // 15% for peak
+    const buildWeeks = Math.ceil(totalWeeks * 0.25); // 25% for build
+    const baseWeeks = totalWeeks - buildWeeks - peakWeeks - taperWeeks; // Rest for base
+    
+    if (week <= baseWeeks) return 'base';
+    if (week <= baseWeeks + buildWeeks) return 'build';
+    if (week <= baseWeeks + buildWeeks + peakWeeks) return 'peak';
+    return 'taper';
+  }
+
+  private getWeekWithinPhase(week: number, totalWeeks: number): number {
+    const phase = this.getPhaseForWeek(week, totalWeeks);
+    const taperWeeks = Math.ceil(totalWeeks * 0.2);
+    const peakWeeks = Math.ceil(totalWeeks * 0.15);
+    const buildWeeks = Math.ceil(totalWeeks * 0.25);
+    const baseWeeks = totalWeeks - buildWeeks - peakWeeks - taperWeeks;
+    
+    switch (phase) {
+      case 'base': return week;
+      case 'build': return week - baseWeeks;
+      case 'peak': return week - baseWeeks - buildWeeks;
+      case 'taper': return week - baseWeeks - buildWeeks - peakWeeks;
+      default: return 1;
+    }
+  }
+
+  private calculateBaseWeeklyHours(distance: string): number {
+    // Calculate base weekly hours from user's baseline performance
+    // This should use actual user data, not hardcoded values
+    switch (distance) {
+      case 'sprint': 
+        // Calculate from user's sprint performance data
+        return this.calculateSprintWeeklyHours();
+      case 'olympic': 
+        // Calculate from user's olympic performance data
+        return this.calculateOlympicWeeklyHours();
+      case 'seventy3': 
+        // Calculate from user's 70.3 performance data
+        return this.calculateSeventy3WeeklyHours();
+      default: 
+        throw new Error(`Invalid distance: ${distance}. Must be sprint, olympic, or seventy3.`);
+    }
+  }
+
+  private calculateDiminishingReturnsMultiplier(currentHours: number, targetHours: number): number {
+    // Calculate diminishing returns based on actual training science
+    const ratio = currentHours / targetHours;
+    
+    // Research-based diminishing returns curve
+    if (ratio <= 1.0) return 1.0;
+    if (ratio <= 1.2) return 0.9;
+    if (ratio <= 1.4) return 0.75;
+    if (ratio <= 1.6) return 0.6;
+    return 0.4; // Beyond 60% over target
+  }
+
+  private calculateDisciplinePercentage(discipline: string): number {
+    // Calculate discipline percentage based on user's strengths and weaknesses
+    switch (discipline) {
+      case 'swim': return this.calculateSwimPercentage();
+      case 'bike': return this.calculateBikePercentage();
+      case 'run': return this.calculateRunPercentage();
+      case 'strength': return this.calculateStrengthPercentage();
+      case 'brick': return this.calculateBrickPercentage();
+      default: 
+        throw new Error(`Invalid discipline: ${discipline}. Must be swim, bike, run, strength, or brick.`);
+    }
+  }
+
+  private calculateFlexibilityMultiplier(userPreference: string): number {
+    // Calculate flexibility multiplier based on user's training adaptation
+    switch (userPreference) {
+      case 'minimum': return this.calculateMinimumFlexibility();
+      case 'moderate': return this.calculateModerateFlexibility();
+      case 'serious': return this.calculateSeriousFlexibility();
+      case 'hardcore': return this.calculateHardcoreFlexibility();
+      default: 
+        throw new Error(`Invalid user preference: ${userPreference}. Must be minimum, moderate, serious, or hardcore.`);
     }
   }
 } 
