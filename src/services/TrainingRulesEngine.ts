@@ -1575,12 +1575,12 @@ export class TrainingRulesEngine {
     
     const optimalLoad = this.calculateOptimalTrainingLoad();
     
-    // Research: Moderate training should be 100% of standard volume
-    // ALIGNED: Conservative values to match user's 5-6 hour choice
+    // FLEXIBLE: Respect user's time level choice
+    // User chose "4-6 hours/week (moderate)" - target 5 hours
     if (optimalLoad === 'high') return 1.0; // Standard optimal load
-    if (optimalLoad === 'medium') return 0.95; // Slightly lower for moderate
-    if (optimalLoad === 'low') return 0.9; // Lower optimal load
-    return 0.95; // Default - conservative
+    if (optimalLoad === 'medium') return 1.0; // Match user's moderate choice
+    if (optimalLoad === 'low') return 0.9; // Slightly lower for low capacity
+    return 1.0; // Default - match user's moderate choice
   }
 
   private calculateSeriousTimeMultiplier(): number {
@@ -1612,22 +1612,38 @@ export class TrainingRulesEngine {
   }
 
   private calculateSprintWeeklyHours(): number {
-    // Calculate from user's sprint performance data
+    // Calculate from user's sprint performance data and time level choice
     if (!this.facts) throw new Error('User baseline data required for science-based calculation');
     
     const fitnessLevel = this.calculateFitnessLevel();
     const experienceLevel = this.calculateExperienceLevel();
     
-    // Base hours for sprint distance - ALIGNED WITH USER CHOICE
-    let baseHours = 4.5; // Target 4-5 hours for moderate time level (science-based)
+    // FLEXIBLE: Use user's time level choice to determine target hours
+    let baseHours: number;
+    switch (this.facts.timeLevel) {
+      case 'minimum':
+        baseHours = 4.0; // 3-5 hours target
+        break;
+      case 'moderate':
+        baseHours = 5.0; // 4-6 hours target (user's choice)
+        break;
+      case 'serious':
+        baseHours = 6.0; // 5-7 hours target
+        break;
+      case 'hardcore':
+        baseHours = 7.0; // 6-8 hours target
+        break;
+      default:
+        baseHours = 5.0; // Default to moderate
+    }
     
     // Adjust based on fitness and experience
-    if (fitnessLevel === 'beginner') baseHours += 0.5; // 5 hours
-    if (fitnessLevel === 'advanced') baseHours -= 0.5; // 4 hours
-    if (experienceLevel === 'beginner') baseHours += 0.25; // +0.25 hours
-    if (experienceLevel === 'advanced') baseHours -= 0.25; // -0.25 hours
+    if (fitnessLevel === 'beginner') baseHours += 0.5;
+    if (fitnessLevel === 'advanced') baseHours -= 0.5;
+    if (experienceLevel === 'beginner') baseHours += 0.25;
+    if (experienceLevel === 'advanced') baseHours -= 0.25;
     
-    return Math.max(3.5, Math.min(6, baseHours)); // Ensure 3.5-6 hours range
+    return Math.max(3.0, Math.min(8, baseHours)); // Flexible range based on user choice
   }
 
   private calculateOlympicWeeklyHours(): number {
