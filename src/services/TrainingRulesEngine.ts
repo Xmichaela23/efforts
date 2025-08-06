@@ -641,23 +641,25 @@ export class TrainingRulesEngine {
   // ===== PUBLIC API =====
 
   async generateSession(facts: TrainingFacts): Promise<TrainingResult> {
-    console.log('�� Generating session for facts:', facts);
+    console.log('🔍 Generating session for facts:', facts);
     
-    // Validate required baseline data before generating session
+    // NEW: Validate required baseline data
     const missingData = this.validateRequiredBaselineData(facts);
     if (missingData.length > 0) {
+      console.error('❌ Missing baseline data:', missingData);
+      console.error('❌ Facts object:', facts);
       throw new Error(`Missing required baseline data: ${missingData.join(', ')}. Please complete your baseline assessment before generating plans.`);
     }
     
-    // Run the rules engine
+    console.log('✅ Baseline validation passed, running rules engine...');
     const engineResult = await this.engine.run(facts);
     console.log('✅ Rules engine events:', engineResult.events);
     
     const result = this.processEvents(engineResult.events, facts);
     console.log('✅ Generated session result:', result);
     
-    // Validate that we got a real session, not a fallback
     if (!result || result.duration === 0) {
+      console.error('❌ Generated session is invalid:', result);
       throw new Error(`Failed to generate valid session. Please ensure all required baseline data is provided: FTP, run paces, swim pace, and strength 1RM values.`);
     }
     
