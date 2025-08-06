@@ -2213,24 +2213,24 @@ export class TrainingRulesEngine {
       });
     }
     
-    // ENSURE user's long day is included
+    // ENSURE user's long day is included (but respect polarized distribution)
     if (facts.longSessionDays) {
       const longDay = facts.longSessionDays.toLowerCase();
       const longDayExists = distribution.findIndex(s => s.day.toLowerCase() === longDay);
       
       if (longDayExists >= 0) {
-        // Replace existing session with brick
+        // Replace existing session with brick (counts as hard session for polarized)
         distribution[longDayExists] = {
           day: longDay,
           discipline: 'brick',
-          type: 'endurance'
+          type: 'endurance' // Brick is hard session
         };
       } else {
-        // Add brick session to user's chosen long day
+        // Add brick session to user's chosen long day (counts as hard session)
         distribution.push({
           day: longDay,
           discipline: 'brick',
-          type: 'endurance'
+          type: 'endurance' // Brick is hard session
         });
       }
     }

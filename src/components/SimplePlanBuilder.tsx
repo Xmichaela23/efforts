@@ -653,7 +653,14 @@ export default function SimplePlanBuilder() {
                           return acc;
                         }, {} as Record<string, any[]>);
 
-                        return Object.entries(sessionsByDay).map(([day, sessions], dayIndex) => (
+                        // Show all 7 days, including rest days
+                        const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+                        
+                        return allDays.map((day, dayIndex) => {
+                          const sessions = sessionsByDay[day] || [];
+                          const hasSessions = sessions.length > 0;
+                          
+                          return (
                           <div key={`${day}-${dayIndex}`} className="mb-4">
                             {/* Day Header */}
                             <div className="flex items-center justify-between mb-2">
@@ -672,7 +679,12 @@ export default function SimplePlanBuilder() {
                             
                             {/* Sessions */}
                             <div>
-                              {sessions.length === 1 ? (
+                              {!hasSessions ? (
+                                // Rest day
+                                <div className="text-xs text-gray-500 italic">
+                                  Rest
+                                </div>
+                              ) : sessions.length === 1 ? (
                                 // Single session
                                 <div>
                                   <div className="flex items-center gap-3 mb-2">
@@ -722,7 +734,8 @@ export default function SimplePlanBuilder() {
                               )}
                             </div>
                           </div>
-                        ));
+                        );
+                        });
                       })()}
                     </div>
                   </div>
