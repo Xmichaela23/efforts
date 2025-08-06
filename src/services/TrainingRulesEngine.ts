@@ -1619,15 +1619,15 @@ export class TrainingRulesEngine {
     const experienceLevel = this.calculateExperienceLevel();
     
     // Base hours for sprint distance - ALIGNED WITH USER CHOICE
-    let baseHours = 5.5; // Target 5-6 hours for moderate time level
+    let baseHours = 4.5; // Target 4-5 hours for moderate time level (science-based)
     
     // Adjust based on fitness and experience
-    if (fitnessLevel === 'beginner') baseHours += 0.5; // 6 hours
-    if (fitnessLevel === 'advanced') baseHours -= 0.5; // 5 hours
+    if (fitnessLevel === 'beginner') baseHours += 0.5; // 5 hours
+    if (fitnessLevel === 'advanced') baseHours -= 0.5; // 4 hours
     if (experienceLevel === 'beginner') baseHours += 0.25; // +0.25 hours
     if (experienceLevel === 'advanced') baseHours -= 0.25; // -0.25 hours
     
-    return Math.max(4.5, Math.min(7, baseHours)); // Ensure 4.5-7 hours range
+    return Math.max(3.5, Math.min(6, baseHours)); // Ensure 3.5-6 hours range
   }
 
   private calculateOlympicWeeklyHours(): number {
@@ -2080,14 +2080,14 @@ export class TrainingRulesEngine {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const distribution = [];
     
-    // Base session count based on distance - NO FALLBACKS
+    // Base session count based on distance - SCIENCE-BASED
     let totalSessions: number;
     if (facts.distance === 'sprint') {
-      totalSessions = 6;
+      totalSessions = 4; // Sprint: 4-5 days/week (science-based)
     } else if (facts.distance === 'seventy3') {
-      totalSessions = 8;
+      totalSessions = 8; // 70.3: 6-8 days/week
     } else if (facts.distance === 'olympic') {
-      totalSessions = 7;
+      totalSessions = 6; // Olympic: 5-6 days/week
     } else {
       throw new Error(`Unsupported distance: ${facts.distance}. Only sprint, olympic, and seventy3 are supported.`);
     }
@@ -2131,7 +2131,7 @@ export class TrainingRulesEngine {
       // First, place strength sessions with proper spacing
       const strengthDays = this.placeStrengthSessions(facts, strengthSessions, days);
       
-      // Ensure all 7 days get at least one session for proper weekly structure
+      // Use available days for proper session distribution (not forcing 7 days)
       const availableDays = days.filter(day => !strengthDays.some(s => s.day.toLowerCase() === day.toLowerCase()));
       
       // Place hard sessions first (tempo/threshold) with proper spacing
