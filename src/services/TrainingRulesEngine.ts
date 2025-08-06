@@ -750,7 +750,7 @@ export class TrainingRulesEngine {
       let validationWarnings = [];
       for (const [discipline, hours] of Object.entries(disciplineHours)) {
         const limits = timeLimits[discipline];
-        if (limits) {
+        if (limits && typeof limits === 'object' && limits.min !== undefined && limits.max !== undefined) {
           if (hours < limits.min) {
             validationWarnings.push(`${discipline}: ${hours.toFixed(1)}h (below minimum ${limits.min}h)`);
           } else if (hours > limits.max) {
@@ -1408,18 +1408,18 @@ export class TrainingRulesEngine {
     if (ratio <= 1.0) {
       // Below target: full benefit
       return 1.0;
-    } else if (ratio <= 1.2) {
-      // 20% over target: 80% benefit
-      return 0.8;
-    } else if (ratio <= 1.4) {
-      // 40% over target: 60% benefit
-      return 0.6;
+    } else if (ratio <= 1.3) {
+      // 30% over target: 90% benefit
+      return 0.9;
     } else if (ratio <= 1.6) {
-      // 60% over target: 40% benefit
-      return 0.4;
+      // 60% over target: 70% benefit
+      return 0.7;
+    } else if (ratio <= 2.0) {
+      // 100% over target: 50% benefit
+      return 0.5;
     } else {
-      // Beyond 60% over target: 20% benefit (prevent overtraining)
-      return 0.2;
+      // Beyond 100% over target: 30% benefit (prevent overtraining)
+      return 0.3;
     }
   }
 
@@ -1500,7 +1500,7 @@ export class TrainingRulesEngine {
     // Calculate base duration
     let duration = Math.round(baseDuration * phaseMultiplier * sessionTypeMultiplier * timeLevelMultiplier * flexibilityMultiplier);
     
-    // Apply diminishing returns for high-volume training
+    // Apply diminishing returns only for very high volume (less aggressive)
     const timeLimits = this.getDisciplineTimeLimits(facts.distance);
     const disciplineLimits = timeLimits[discipline];
     
@@ -1509,13 +1509,16 @@ export class TrainingRulesEngine {
       const disciplinePercentage = this.getDisciplinePercentage(discipline);
       const targetDisciplineHours = weeklyHours * disciplinePercentage;
       
-      // Apply diminishing returns if approaching limits
-      const diminishingMultiplier = this.getDiminishingReturnsMultiplier(targetDisciplineHours, disciplineLimits.max);
-      duration = Math.round(duration * diminishingMultiplier);
+      // Only apply diminishing returns if significantly over target (less aggressive)
+      if (targetDisciplineHours > disciplineLimits.max * 1.2) {
+        const diminishingMultiplier = this.getDiminishingReturnsMultiplier(targetDisciplineHours, disciplineLimits.max);
+        duration = Math.round(duration * diminishingMultiplier);
+      }
     }
     
-    // Ensure minimum session duration (15 minutes)
-    return Math.max(15, duration);
+    // Ensure minimum session duration (30 minutes for most sessions, 15 for recovery)
+    const minDuration = sessionType === 'recovery' ? 15 : 30;
+    return Math.max(minDuration, duration);
   }
 
   // Get discipline percentage for diminishing returns calculation
