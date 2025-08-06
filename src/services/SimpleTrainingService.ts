@@ -958,18 +958,15 @@ export class SimpleTrainingService {
     
     console.log(`🏊‍♂️ Generating ${distance} plan...`);
     
-    // Use the solid plan engine for Sprint
+    // Generate plan using rules engine for supported distances
     if (distance === 'sprint') {
-      return await this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+      return this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    } else if (distance === 'seventy3') {
+      return this.generateSolid70_3Plan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    } else {
+      // NO FALLBACKS - throw error for unsupported distances
+      throw new Error(`Distance "${distance}" is not supported. Only sprint and seventy3 are currently supported.`);
     }
-    
-    // Use the solid plan engine for 70.3
-    if (distance === 'seventy3') {
-      return await this.generateSolid70_3Plan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
-    }
-    
-    // Fallback to original method for other distances
-    return this.generateLegacyPlan(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
   }
   
   // NEW: Solid Sprint Plan Engine
@@ -1618,7 +1615,7 @@ export class SimpleTrainingService {
 
   // Run pace calculations based on actual baseline data
   private calculateEasyRunPace(userBaselines: any): string {
-    // Use actual easy pace if available, otherwise estimate from 5K or age
+    // Use actual easy pace if available, otherwise estimate from 5K
     if (userBaselines.easyPace) {
       const easyMinutes = this.parseTimeToMinutes(userBaselines.easyPace);
       const easyRange = easyMinutes + 0.25; // Add 15 seconds for range
@@ -1633,10 +1630,8 @@ export class SimpleTrainingService {
       return `${this.minutesToPace(easyMinutes)}-${this.minutesToPace(easyRange)}/mile`;
     }
     
-    // Fallback: estimate from age
-    const maxHR = 220 - (userBaselines.age || 30);
-    const easyPace = Math.round((maxHR * 0.7) / 20);
-    return `${easyPace}:30-${easyPace}:45/mile`;
+    // NO FALLBACKS - throw error if required data missing
+    throw new Error('Missing required baseline data for run pace calculation. Need either easyPace or fiveKPace.');
   }
 
   private calculateTempoRunPace(userBaselines: any): string {
@@ -1658,10 +1653,8 @@ export class SimpleTrainingService {
       return `${this.minutesToPace(tempoMinutes)}-${this.minutesToPace(tempoRange)}/mile`;
     }
     
-    // Fallback: estimate from age
-    const maxHR = 220 - (userBaselines.age || 30);
-    const tempoPace = Math.round((maxHR * 0.85) / 22);
-    return `${tempoPace}:00-${tempoPace}:15/mile`;
+    // NO FALLBACKS - throw error if required data missing
+    throw new Error('Missing required baseline data for tempo pace calculation. Need either fiveKPace or easyPace.');
   }
 
   private calculateThresholdRunPace(userBaselines: any): string {
@@ -1675,7 +1668,6 @@ export class SimpleTrainingService {
       return `${this.minutesToPace(thresholdMinutes)}-${this.minutesToPace(thresholdRange)}/mile`;
     }
     
-    // Fallback: estimate from easy pace
     if (userBaselines.easyPace) {
       const easyMinutes = this.parseTimeToMinutes(userBaselines.easyPace);
       const thresholdMinutes = easyMinutes - 1.0; // Subtract 60 seconds per mile
@@ -1683,10 +1675,8 @@ export class SimpleTrainingService {
       return `${this.minutesToPace(thresholdMinutes)}-${this.minutesToPace(thresholdRange)}/mile`;
     }
     
-    // Fallback: estimate from age
-    const maxHR = 220 - (userBaselines.age || 30);
-    const thresholdPace = Math.round((maxHR * 0.9) / 24);
-    return `${thresholdPace}:30-${thresholdPace}:45/mile`;
+    // NO FALLBACKS - throw error if required data missing
+    throw new Error('Missing required baseline data for threshold pace calculation. Need either fiveKPace or easyPace.');
   }
 
   // Swim pace calculations based on actual baseline data
@@ -1698,10 +1688,8 @@ export class SimpleTrainingService {
       return `${userBaselines.swimPace100}-${this.minutesToPace(easyRange)}/100m`;
     }
     
-    // Fallback: estimate from age
-    const maxHR = 220 - (userBaselines.age || 30);
-    const easyPace = Math.round((maxHR * 0.7) / 12);
-    return `${easyPace}:45-${easyPace}:54/100yd`;
+    // NO FALLBACKS - throw error if required data missing
+    throw new Error('Missing required baseline data for swim pace calculation. Need swimPace100.');
   }
 
   private calculateEnduranceSwimPace(userBaselines: any): string {
@@ -1713,10 +1701,8 @@ export class SimpleTrainingService {
       return `${this.minutesToPace(enduranceMinutes)}-${this.minutesToPace(enduranceRange)}/100m`;
     }
     
-    // Fallback: estimate from age
-    const maxHR = 220 - (userBaselines.age || 30);
-    const endurancePace = Math.round((maxHR * 0.8) / 14);
-    return `${endurancePace}:30-${endurancePace}:39/100yd`;
+    // NO FALLBACKS - throw error if required data missing
+    throw new Error('Missing required baseline data for endurance swim pace calculation. Need swimPace100.');
   }
 
   // Helper functions for time parsing
@@ -2445,7 +2431,10 @@ Run (25min):
   }
 
   private getBikePowerForWeek(ftp: number | undefined, phase: string, weekWithinPhase: number, type: 'endurance' | 'endurance_range' | 'tempo' | 'tempo_range'): number {
-    if (!ftp) return type.includes('tempo') ? 210 : 165;
+    // NO FALLBACKS - require FTP for accurate power calculations
+    if (!ftp) {
+      throw new Error('Missing FTP value. FTP is required for accurate bike power calculations.');
+    }
     
     let basePercentage = 0;
     switch (type) {
@@ -2488,9 +2477,9 @@ Run (25min):
   }
 
   private adjustStrengthWeightsForPhase(workout: string, phase: string, userBaselines: any): string {
-    // Safety check - if no userBaselines, return original workout
+    // NO FALLBACKS - require userBaselines for accurate strength calculations
     if (!userBaselines) {
-      return workout;
+      throw new Error('Missing user baselines. User baselines are required for accurate strength weight calculations.');
     }
     
     console.log(`🏋️ Adjusting strength weights for ${phase} phase...`);
@@ -2536,9 +2525,9 @@ Run (25min):
   }
 
   private adjustBikePowerForPhase(workout: string, phase: string, userBaselines: any): string {
-    // Safety check - if no userBaselines or FTP, return original workout
+    // NO FALLBACKS - require userBaselines and FTP for accurate bike power calculations
     if (!userBaselines || !userBaselines.ftp) {
-      return workout;
+      throw new Error('Missing user baselines or FTP. Both are required for accurate bike power calculations.');
     }
     
     console.log(`🚴 Adjusting bike power for ${phase} phase...`);

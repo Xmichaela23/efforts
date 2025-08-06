@@ -963,8 +963,8 @@ export class TrainingRulesEngine {
       return 'brick';
     }
     
-    // Default to bike for triathlon training
-    return 'bike';
+    // If no discipline can be determined, throw error instead of defaulting
+    throw new Error(`Cannot determine discipline from description: "${description}". Description must contain clear discipline indicators.`);
   }
 
   private mapIntensityToType(intensity: string, discipline: string): 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max' {
@@ -974,7 +974,9 @@ export class TrainingRulesEngine {
       // For strength, use threshold; for others, use tempo
       return discipline === 'strength' ? 'threshold' : 'tempo';
     }
-    return 'endurance'; // Default
+    
+    // If intensity is not recognized, throw error instead of defaulting
+    throw new Error(`Invalid intensity: "${intensity}". Must be low, medium, or high.`);
   }
 
   private determineStrengthType(strengthOption?: string): 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' {
@@ -987,10 +989,17 @@ export class TrainingRulesEngine {
     const days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
     const distribution = [];
     
-    // Base session count based on distance and time level
-    let totalSessions = 6; // Default for sprint
-    if (facts.distance === 'seventy3') totalSessions = 8;
-    if (facts.distance === 'olympic') totalSessions = 7;
+    // Base session count based on distance - NO FALLBACKS
+    let totalSessions: number;
+    if (facts.distance === 'sprint') {
+      totalSessions = 6;
+    } else if (facts.distance === 'seventy3') {
+      totalSessions = 8;
+    } else if (facts.distance === 'olympic') {
+      totalSessions = 7;
+    } else {
+      throw new Error(`Unsupported distance: ${facts.distance}. Only sprint, olympic, and seventy3 are supported.`);
+    }
     
     // Adjust for time level
     const timeMultiplier = {
@@ -998,7 +1007,11 @@ export class TrainingRulesEngine {
       moderate: 1.0,
       serious: 1.2,
       hardcore: 1.4
-    }[facts.timeLevel] || 1.0;
+    }[facts.timeLevel];
+    
+    if (!timeMultiplier) {
+      throw new Error(`Invalid time level: ${facts.timeLevel}. Must be minimum, moderate, serious, or hardcore.`);
+    }
     
     totalSessions = Math.round(totalSessions * timeMultiplier);
     
@@ -1009,7 +1022,11 @@ export class TrainingRulesEngine {
       compound: 2,
       cowboy_endurance: 3,
       cowboy_compound: 3
-    }[facts.strengthOption] || 0;
+    }[facts.strengthOption];
+    
+    if (strengthSessions === undefined) {
+      throw new Error(`Invalid strength option: ${facts.strengthOption}. Must be none, traditional, compound, cowboy_endurance, or cowboy_compound.`);
+    }
     
     totalSessions += strengthSessions;
     
