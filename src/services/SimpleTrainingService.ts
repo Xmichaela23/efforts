@@ -511,14 +511,14 @@ export class SimpleTrainingService {
   private validateBaselineData(baselines: any): ValidationResult {
     const issues: string[] = [];
     
-    // Required data checks
-    if (!baselines.ftp || baselines.ftp < 150 || baselines.ftp > 400) {
+    // Required data checks - use correct field paths
+    if (!baselines.performanceNumbers?.ftp || baselines.performanceNumbers.ftp < 150 || baselines.performanceNumbers.ftp > 400) {
       issues.push('FTP must be between 150-400W');
     }
-    if (!baselines.fiveKPace && !baselines.easyPace) {
+    if (!baselines.performanceNumbers?.fiveK && !baselines.performanceNumbers?.easyPace) {
       issues.push('Run pace data required (5K time or easy pace)');
     }
-    if (!baselines.swimPace100) {
+    if (!baselines.performanceNumbers?.swimPace100) {
       issues.push('Swim pace data required');
     }
     if (!baselines.age || baselines.age < 18 || baselines.age > 75) {
