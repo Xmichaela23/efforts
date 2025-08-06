@@ -1063,7 +1063,154 @@ export class SimpleTrainingService {
       totalHours: plan.totalHours
     });
     console.log('🔍 First week details:', plan.weeks?.[0]);
-    return plan as SimpleTrainingPlan;
+    
+    // Add detailed workout information to each session
+    const enhancedPlan = this.addDetailedWorkoutsToPlan(plan, userBaselines, userEquipment);
+    
+    return enhancedPlan as SimpleTrainingPlan;
+  }
+  
+  // Add detailed workout information to plan sessions
+  private addDetailedWorkoutsToPlan(plan: any, userBaselines: any, userEquipment?: any): any {
+    console.log('🔍 Adding detailed workouts to plan...');
+    
+    const enhancedPlan = { ...plan };
+    
+    if (enhancedPlan.weeks) {
+      enhancedPlan.weeks = enhancedPlan.weeks.map((week: any) => {
+        const enhancedWeek = { ...week };
+        
+        if (enhancedWeek.sessions) {
+          enhancedWeek.sessions = enhancedWeek.sessions.map((session: any) => {
+            const enhancedSession = { ...session };
+            
+            // Generate detailed workout based on discipline and type
+            enhancedSession.detailedWorkout = this.generateDetailedWorkout(
+              session.discipline,
+              session.type,
+              session.duration,
+              session.intensity,
+              userBaselines,
+              userEquipment,
+              week.phase
+            );
+            
+            return enhancedSession;
+          });
+        }
+        
+        return enhancedWeek;
+      });
+    }
+    
+    console.log('✅ Enhanced plan with detailed workouts');
+    return enhancedPlan;
+  }
+  
+  // Generate detailed workout description
+  private generateDetailedWorkout(
+    discipline: string,
+    type: string,
+    duration: number,
+    intensity: string,
+    userBaselines: any,
+    userEquipment?: any,
+    phase?: string
+  ): string {
+    const currentPhase = phase || 'base';
+    const roundedDuration = Math.round(duration);
+    
+    switch (discipline) {
+      case 'swim':
+        return this.generateSwimWorkout(type, roundedDuration, userBaselines, currentPhase);
+      case 'bike':
+        return this.generateBikeWorkout(type, roundedDuration, userBaselines, currentPhase);
+      case 'run':
+        return this.generateRunWorkout(type, roundedDuration, userBaselines, currentPhase);
+      case 'strength':
+        return this.generateStrengthWorkout(type, roundedDuration, userBaselines, userEquipment, currentPhase);
+      case 'brick':
+        return this.generateBrickWorkout(type, roundedDuration, userBaselines, currentPhase);
+      default:
+        return `${discipline.toUpperCase()} ${type} session - ${roundedDuration} minutes`;
+    }
+  }
+  
+  // Generate swim workout details
+  private generateSwimWorkout(type: string, duration: number, userBaselines: any, phase: string): string {
+    const swimPace = userBaselines.performanceNumbers?.swimPace100 || '2:00/100m';
+    
+    switch (type) {
+      case 'recovery':
+        return `Swim Recovery Session - ${duration}min\nTarget: ${swimPace} (Recovery - 65-75% HR)\nFocus: Technique and easy swimming`;
+      case 'endurance':
+        return `Swim Endurance Session - ${duration}min\nTarget: ${swimPace} (Endurance - 75-85% HR)\nFocus: Aerobic capacity and stroke efficiency`;
+      case 'tempo':
+        return `Swim Tempo Session - ${duration}min\nTarget: ${swimPace} (Tempo - 85-95% HR)\nFocus: Lactate threshold and race pace`;
+      default:
+        return `Swim ${type} session - ${duration}min`;
+    }
+  }
+  
+  // Generate bike workout details
+  private generateBikeWorkout(type: string, duration: number, userBaselines: any, phase: string): string {
+    const ftp = userBaselines.performanceNumbers?.ftp || 200;
+    const powerZone = type === 'recovery' ? Math.round(ftp * 0.65) : 
+                     type === 'endurance' ? Math.round(ftp * 0.75) :
+                     type === 'tempo' ? Math.round(ftp * 0.85) : Math.round(ftp * 0.95);
+    
+    switch (type) {
+      case 'recovery':
+        return `Bike Recovery Session - ${duration}min\nTarget: ${powerZone}W (Recovery - 65-75% FTP)\nFocus: Active recovery and easy spinning`;
+      case 'endurance':
+        return `Bike Endurance Session - ${duration}min\nTarget: ${powerZone}W (Endurance - 75-85% FTP)\nFocus: Aerobic base and muscular endurance`;
+      case 'tempo':
+        return `Bike Tempo Session - ${duration}min\nTarget: ${powerZone}W (Tempo - 85-95% FTP)\nFocus: Lactate threshold and sustainable power`;
+      default:
+        return `Bike ${type} session - ${duration}min`;
+    }
+  }
+  
+  // Generate run workout details
+  private generateRunWorkout(type: string, duration: number, userBaselines: any, phase: string): string {
+    const easyPace = userBaselines.performanceNumbers?.easyPace || '6:00/km';
+    const fiveKPace = userBaselines.performanceNumbers?.fiveK || '25:00';
+    
+    switch (type) {
+      case 'recovery':
+        return `Run Recovery Session - ${duration}min\nTarget: ${easyPace} (Recovery - 65-75% HR)\nFocus: Easy running and recovery`;
+      case 'endurance':
+        return `Run Endurance Session - ${duration}min\nTarget: ${easyPace} (Endurance - 75-85% HR)\nFocus: Aerobic base and running economy`;
+      case 'tempo':
+        return `Run Tempo Session - ${duration}min\nTarget: ${fiveKPace} pace (Tempo - 85-95% HR)\nFocus: Lactate threshold and race pace`;
+      default:
+        return `Run ${type} session - ${duration}min`;
+    }
+  }
+  
+  // Generate strength workout details
+  private generateStrengthWorkout(type: string, duration: number, userBaselines: any, userEquipment?: any, phase?: string): string {
+    const currentPhase = phase || 'base';
+    const squat = userBaselines.performanceNumbers?.squat || 135;
+    const deadlift = userBaselines.performanceNumbers?.deadlift || 185;
+    const bench = userBaselines.performanceNumbers?.bench || 135;
+    
+    const progression = currentPhase === 'base' ? 0.7 : currentPhase === 'build' ? 0.8 : currentPhase === 'peak' ? 0.9 : 0.6;
+    
+    return `Strength Session - ${duration}min\nSquats: 3x8 @ ${Math.round(squat * progression)}lbs\nDeadlifts: 3x6 @ ${Math.round(deadlift * progression)}lbs\nBench: 3x8 @ ${Math.round(bench * progression)}lbs\nFocus: Compound movements and functional strength`;
+  }
+  
+  // Generate brick workout details
+  private generateBrickWorkout(type: string, duration: number, userBaselines: any, phase?: string): string {
+    const currentPhase = phase || 'base';
+    const ftp = userBaselines.performanceNumbers?.ftp || 200;
+    const easyPace = userBaselines.performanceNumbers?.easyPace || '6:00/km';
+    const bikePower = Math.round(ftp * 0.75);
+    
+    const bikeDuration = Math.round(duration * 0.7);
+    const runDuration = Math.round(duration * 0.3);
+    
+    return `Brick Session - ${duration}min\nBike: ${bikeDuration}min @ ${bikePower}W\nRun: ${runDuration}min @ ${easyPace}\nFocus: Transition practice and race simulation`;
   }
   
   // NEW: Solid 70.3 Plan Engine
@@ -1137,7 +1284,10 @@ export class SimpleTrainingService {
     
     console.log('✅ Rules Engine generated 70.3 plan:', plan);
     
-    return plan as SimpleTrainingPlan;
+    // Add detailed workout information to each session
+    const enhancedPlan = this.addDetailedWorkoutsToPlan(plan, userBaselines, userEquipment);
+    
+    return enhancedPlan as SimpleTrainingPlan;
   }
   
   // NEW: Solid Base Template for Sprint

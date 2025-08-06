@@ -586,7 +586,7 @@ export default function SimplePlanBuilder() {
                                 )}
                               </div>
                               <div className="text-xs text-gray-500">
-                                {sessions.reduce((total, session) => total + session.duration, 0)}min
+                                {Math.round(sessions.reduce((total, session) => total + session.duration, 0))}min
                               </div>
                             </div>
                             
@@ -627,7 +627,7 @@ export default function SimplePlanBuilder() {
                                           </span>
                                         )}
                                         <span className="text-sm text-gray-500">
-                                          ({session.duration}min)
+                                          ({Math.round(session.duration)}min)
                                         </span>
                                       </div>
                                       {session.detailedWorkout && (

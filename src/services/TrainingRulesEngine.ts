@@ -2106,7 +2106,7 @@ export class TrainingRulesEngine {
     
     totalSessions = Math.round(totalSessions * timeMultiplier);
     
-    // Add strength sessions
+    // Add strength sessions with science-based placement
     const strengthSessions = {
       none: 0,
       traditional: 2,
@@ -2121,37 +2121,54 @@ export class TrainingRulesEngine {
     
     totalSessions += strengthSessions;
     
-    // Distribute sessions based on philosophy
+    // Distribute sessions based on philosophy with science-based strength placement
     if (facts.philosophy === 'polarized') {
       // 80/20 polarized training
       const easySessions = Math.round(totalSessions * 0.8);
       const hardSessions = totalSessions - easySessions;
       
-      // Place easy sessions (recovery/endurance)
+      // First, place strength sessions with proper spacing
+      const strengthDays = this.placeStrengthSessions(facts, strengthSessions, days);
+      
+      // Place easy sessions (recovery/endurance) on non-strength days
+      let sessionIndex = 0;
       for (let i = 0; i < easySessions; i++) {
-        const day = days[i % days.length];
-        const discipline = this.getDisciplineForDay(i, facts);
+        const day = this.getNextAvailableDay(days, strengthDays, sessionIndex);
+        const discipline = this.getDisciplineForDay(sessionIndex, facts);
         distribution.push({
           day,
           discipline,
           type: 'recovery'
         });
+        sessionIndex++;
       }
       
-      // Place hard sessions (tempo/threshold)
+      // Place hard sessions (tempo/threshold) with proper spacing
       for (let i = 0; i < hardSessions; i++) {
-        const day = days[(i + 2) % days.length]; // Skip a day between hard sessions
-        const discipline = this.getDisciplineForDay(i + easySessions, facts);
+        const day = this.getNextAvailableDay(days, strengthDays, sessionIndex, 2); // Skip 2 days between hard sessions
+        const discipline = this.getDisciplineForDay(sessionIndex, facts);
         distribution.push({
           day,
           discipline,
           type: 'tempo'
         });
+        sessionIndex++;
       }
+      
+      // Add strength sessions to distribution
+      strengthDays.forEach(strengthDay => {
+        distribution.push({
+          day: strengthDay.day,
+          discipline: 'strength',
+          type: 'endurance' // Strength is typically endurance-focused
+        });
+      });
     } else {
       // Threshold training - more balanced
+      const strengthDays = this.placeStrengthSessions(facts, strengthSessions, days);
+      
       for (let i = 0; i < totalSessions; i++) {
-        const day = days[i % days.length];
+        const day = this.getNextAvailableDay(days, strengthDays, i);
         const discipline = this.getDisciplineForDay(i, facts);
         const type = i % 2 === 0 ? 'endurance' : 'tempo';
         distribution.push({
@@ -2160,6 +2177,15 @@ export class TrainingRulesEngine {
           type
         });
       }
+      
+      // Add strength sessions to distribution
+      strengthDays.forEach(strengthDay => {
+        distribution.push({
+          day: strengthDay.day,
+          discipline: 'strength',
+          type: 'endurance'
+        });
+      });
     }
     
     // Add brick session on long day if specified
@@ -2180,8 +2206,60 @@ export class TrainingRulesEngine {
 
   // NEW: Get discipline for session based on position and facts
   private getDisciplineForDay(sessionIndex: number, facts: TrainingFacts): string {
-    const disciplines = ['swim', 'bike', 'run'];
+    // Include strength in discipline rotation if strength is selected
+    const baseDisciplines = ['swim', 'bike', 'run'];
+    const disciplines = facts.strengthOption && facts.strengthOption !== 'none' 
+      ? [...baseDisciplines, 'strength'] 
+      : baseDisciplines;
+    
     return disciplines[sessionIndex % disciplines.length];
+  }
+
+  // Science-based strength session placement
+  private placeStrengthSessions(facts: TrainingFacts, strengthCount: number, days: string[]): Array<{day: string, type: string}> {
+    const strengthDays: Array<{day: string, type: string}> = [];
+    
+    if (strengthCount === 0) return strengthDays;
+    
+    // Science-based strength placement rules:
+    // 1. At least 2 days between strength sessions
+    // 2. Prefer placement on recovery days (early in week)
+    // 3. Avoid placement on long session days if possible
+    
+    const longDay = facts.longSessionDays?.toLowerCase();
+    const availableDays = days.filter(day => day.toLowerCase() !== longDay);
+    
+    // Place strength sessions with proper spacing
+    for (let i = 0; i < strengthCount; i++) {
+      const dayIndex = i * 3; // Every 3rd day for proper spacing
+      const day = availableDays[dayIndex % availableDays.length];
+      
+      strengthDays.push({
+        day,
+        type: 'endurance'
+      });
+    }
+    
+    return strengthDays;
+  }
+
+  // Get next available day avoiding strength days and respecting spacing
+  private getNextAvailableDay(days: string[], strengthDays: Array<{day: string, type: string}>, sessionIndex: number, minSpacing: number = 1): string {
+    const strengthDayNames = strengthDays.map(s => s.day.toLowerCase());
+    
+    // Find next available day that's not a strength day and respects spacing
+    for (let i = 0; i < days.length; i++) {
+      const dayIndex = (sessionIndex + i) % days.length;
+      const day = days[dayIndex];
+      
+      // Check if this day is available (not a strength day)
+      if (!strengthDayNames.includes(day.toLowerCase())) {
+        return day;
+      }
+    }
+    
+    // Fallback to first available day
+    return days[sessionIndex % days.length];
   }
 
   // NEW: Validate required baseline data
