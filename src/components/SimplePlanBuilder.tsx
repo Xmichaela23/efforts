@@ -459,16 +459,9 @@ export default function SimplePlanBuilder() {
         </div>
 
         <div>
-          {/* Save Button */}
-          <div className="w-full bg-white p-4 border-t border-gray-200">
-            <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-              Save Plan
-            </button>
-          </div>
 
-          {/* Week Navigation with Swipe Cues */}
+          {/* Week Navigation - Full Width Swipe */}
           <div className="w-full bg-white p-4 border-t border-gray-200">
-            <h3 className="text-lg font-semibold mb-4">Your Training Plan</h3>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Your Training Plan</h3>
               <div className="flex items-center space-x-1 text-sm text-gray-500">
@@ -493,9 +486,9 @@ export default function SimplePlanBuilder() {
               ))}
             </div>
             
-            {/* Swipeable Week Content */}
+            {/* Full Width Swipeable Area */}
             <div 
-              className="relative overflow-hidden"
+              className="w-full relative overflow-hidden"
               onTouchStart={onTouchStart}
               onTouchMove={onTouchMove}
               onTouchEnd={onTouchEnd}
@@ -505,8 +498,8 @@ export default function SimplePlanBuilder() {
                 style={{ transform: `translateX(-${currentWeek * 100}%)` }}
               >
                 {plan.weeks.map((week, weekIndex) => (
-                  <div key={weekIndex} className="w-full flex-shrink-0">
-                    <div className="text-center mb-4">
+                  <div key={weekIndex} className="w-full flex-shrink-0 px-4">
+                    <div className="text-center">
                       <h4 className="text-lg font-semibold">
                         Week {week.weekNumber} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
                       </h4>
@@ -617,6 +610,13 @@ export default function SimplePlanBuilder() {
               </div>
             </div>
           )}
+          
+          {/* Save Button - At Bottom */}
+          <div className="w-full bg-white p-4 border-t border-gray-200 mt-6">
+            <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
+              Save Plan
+            </button>
+          </div>
         </div>
       </div>
     );
