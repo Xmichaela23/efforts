@@ -408,7 +408,7 @@ export default function SimplePlanBuilder() {
           </p>
           
           {/* Compact Plan Summary */}
-          <div className="p-3 mb-3">
+          <div className="mb-3">
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <p className="text-gray-700"><strong>Long Day:</strong> {answers.longSessionDays}</p>
@@ -431,7 +431,7 @@ export default function SimplePlanBuilder() {
           </div>
           
           {/* Compact Training Methodology */}
-          <div className="p-3 mb-3">
+          <div className="mb-3">
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <h3 className="font-medium mb-1 text-xs">80/20 Polarized Training</h3>
@@ -452,7 +452,7 @@ export default function SimplePlanBuilder() {
         <div>
 
           {/* Week Navigation - Full Width Swipe */}
-          <div className="w-full bg-white p-4 border-t border-gray-200">
+          <div className="w-full bg-white border-t border-gray-200">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Your Training Plan</h3>
               <div className="flex items-center space-x-1 text-sm text-gray-500">
@@ -591,8 +591,8 @@ export default function SimplePlanBuilder() {
 
 
           
-          {/* Save Button - At Bottom */}
-          <div className="w-full bg-white p-4 border-t border-gray-200 mt-6">
+                      {/* Save Button - At Bottom */}
+            <div className="w-full bg-white border-t border-gray-200 mt-6">
             <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
               Save Plan
             </button>
