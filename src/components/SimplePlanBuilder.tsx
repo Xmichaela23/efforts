@@ -634,7 +634,7 @@ export default function SimplePlanBuilder() {
                   <div key={weekIndex} className="w-full flex-shrink-0">
                     <div className="text-center mb-4">
                       <h4 className="text-lg font-semibold">
-                        Week {week.weekNumber} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
+                        Week {weekIndex + 1} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
                       </h4>
                       <p className="text-sm text-gray-600">
                         {week.sessions.length} sessions • {week?.totalHours ? week.totalHours.toFixed(1) : '0.0'} hours
