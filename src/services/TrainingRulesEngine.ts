@@ -1072,18 +1072,24 @@ export class TrainingRulesEngine {
     const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
     const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
+    // SCIENCE-BASED: Apply week progression multiplier for coach-level plans
+    const progression = this.getWeekProgression(facts);
+    const progressionMultiplier = progression.sessionDurationMultiplier;
+    
     console.log('🔍 Swim duration calculation:', {
       baseDuration,
       phaseMultiplier,
       sessionMultiplier,
       timeMultiplier,
+      progressionMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
-      timeLevel: facts.timeLevel
+      timeLevel: facts.timeLevel,
+      week: facts.currentWeek
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier * progressionMultiplier;
     console.log('🔍 Final swim duration:', duration);
     return duration;
   }
@@ -1099,18 +1105,24 @@ export class TrainingRulesEngine {
     const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
     const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
+    // SCIENCE-BASED: Apply week progression multiplier for coach-level plans
+    const progression = this.getWeekProgression(facts);
+    const progressionMultiplier = progression.sessionDurationMultiplier;
+    
     console.log('🔍 Bike duration calculation:', {
       baseDuration,
       phaseMultiplier,
       sessionMultiplier,
       timeMultiplier,
+      progressionMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
-      timeLevel: facts.timeLevel
+      timeLevel: facts.timeLevel,
+      week: facts.currentWeek
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier * progressionMultiplier;
     console.log('🔍 Final bike duration:', duration);
     return duration;
   }
@@ -1126,18 +1138,24 @@ export class TrainingRulesEngine {
     const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
     const timeMultiplier = this.getTimeLevelMultiplier(facts.timeLevel);
     
+    // SCIENCE-BASED: Apply week progression multiplier for coach-level plans
+    const progression = this.getWeekProgression(facts);
+    const progressionMultiplier = progression.sessionDurationMultiplier;
+    
     console.log('🔍 Run duration calculation:', {
       baseDuration,
       phaseMultiplier,
       sessionMultiplier,
       timeMultiplier,
+      progressionMultiplier,
       distance: facts.distance,
       phase: facts.phase,
       sessionType,
-      timeLevel: facts.timeLevel
+      timeLevel: facts.timeLevel,
+      week: facts.currentWeek
     });
     
-    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier;
+    const duration = baseDuration * phaseMultiplier * sessionMultiplier * timeMultiplier * progressionMultiplier;
     console.log('🔍 Final run duration:', duration);
     return duration;
   }
@@ -2114,10 +2132,13 @@ export class TrainingRulesEngine {
     const distribution = [];
     let hasBrickSession = false; // Track if we need to add brick session
     
-    // Base session count based on distance - SCIENCE-BASED
+    // SCIENCE-BASED: Get week progression for coach-level plans
+    const progression = this.getWeekProgression(facts);
+    
+    // Base session count based on week progression - SCIENCE-BASED
     let totalSessions: number;
     if (facts.distance === 'sprint') {
-      totalSessions = 4; // Sprint: 4-5 days/week (science-based)
+      totalSessions = progression.sessionCount; // Use progression-based session count
     } else if (facts.distance === 'seventy3') {
       totalSessions = 8; // 70.3: 6-8 days/week
     } else if (facts.distance === 'olympic') {
@@ -2171,6 +2192,32 @@ export class TrainingRulesEngine {
       const easySessions = Math.round(adjustedTotalSessions * 0.8);
       const hardSessions = adjustedTotalSessions - easySessions;
       
+      // SCIENCE-BASED: Adjust intensity based on week progression
+      let hardSessionType = 'threshold';
+      let easySessionType = 'endurance';
+      
+      if (progression.intensityLevel === 'introduction') {
+        // Week 1: No threshold work, all endurance
+        hardSessionType = 'endurance';
+        easySessionType = 'endurance';
+      } else if (progression.intensityLevel === 'foundation') {
+        // Weeks 2-4: Introduce tempo, no threshold yet
+        hardSessionType = 'tempo';
+        easySessionType = 'endurance';
+      } else if (progression.intensityLevel === 'build') {
+        // Weeks 5-8: Introduce threshold work
+        hardSessionType = 'threshold';
+        easySessionType = 'endurance';
+      } else if (progression.intensityLevel === 'peak') {
+        // Weeks 9-11: Full threshold and VO2max work
+        hardSessionType = 'threshold';
+        easySessionType = 'endurance';
+      } else if (progression.intensityLevel === 'taper') {
+        // Week 12: Reduce intensity, maintain sharpness
+        hardSessionType = 'tempo';
+        easySessionType = 'endurance';
+      }
+      
       // First, place strength sessions with proper spacing
       const strengthDays = this.placeStrengthSessions(facts, strengthSessions, days);
       
@@ -2183,11 +2230,11 @@ export class TrainingRulesEngine {
         const day = this.getNextAvailableDay(availableDays, strengthDays, i, 2); // Skip 2 days between hard sessions
         hardSessionDays.push(day);
         const discipline = this.getDisciplineForDay(i, facts);
-        // SCIENCE-BASED: Use "threshold" for hard sessions in polarized training (Zone 4)
+        // SCIENCE-BASED: Use progression-based session types
         distribution.push({
           day,
           discipline,
-          type: 'threshold'
+          type: hardSessionType
         });
       }
       
@@ -2203,11 +2250,11 @@ export class TrainingRulesEngine {
         if (i < optimizedRemainingDays.length) {
           const day = optimizedRemainingDays[i];
           const discipline = this.getDisciplineForDay(i + hardSessions, facts);
-          // SCIENCE-BASED: Use "endurance" for easy sessions in polarized training (80% of sessions)
+          // SCIENCE-BASED: Use progression-based session types
           distribution.push({
             day,
             discipline,
-            type: 'endurance'
+            type: easySessionType
           });
         }
       }
@@ -2713,5 +2760,61 @@ export class TrainingRulesEngine {
       return parseInt(parts[0]) * 3600 + parseInt(parts[1]) * 60 + parseInt(parts[2]);
     }
     return parseInt(timeString);
+  }
+
+  // SCIENCE-BASED: Week 1-12 progression logic for coach-level plans
+  private getWeekProgression(facts: TrainingFacts): {
+    phase: string;
+    sessionCount: number;
+    intensityLevel: 'introduction' | 'foundation' | 'build' | 'peak' | 'taper';
+    sessionDurationMultiplier: number;
+    description: string;
+  } {
+    const week = facts.currentWeek;
+    
+    // SCIENCE-BASED: Coach-level progression for 12-week plans
+    if (week === 1) {
+      return {
+        phase: 'introduction',
+        sessionCount: 4,
+        intensityLevel: 'introduction',
+        sessionDurationMultiplier: 0.7, // Shorter sessions for confidence
+        description: 'Welcome to triathlon training! Focus on building confidence and establishing routine.'
+      };
+    } else if (week >= 2 && week <= 4) {
+      return {
+        phase: 'foundation',
+        sessionCount: 4,
+        intensityLevel: 'foundation',
+        sessionDurationMultiplier: 0.8, // Building foundation
+        description: 'Building your aerobic base and getting comfortable with all three disciplines.'
+      };
+    } else if (week >= 5 && week <= 8) {
+      return {
+        phase: 'build',
+        sessionCount: 5,
+        intensityLevel: 'build',
+        sessionDurationMultiplier: 0.9, // Introducing intensity
+        description: 'Introducing harder sessions and building race-specific fitness.'
+      };
+    } else if (week >= 9 && week <= 11) {
+      return {
+        phase: 'peak',
+        sessionCount: 5,
+        intensityLevel: 'peak',
+        sessionDurationMultiplier: 1.0, // Peak training
+        description: 'Peak training phase - race-specific work and high-intensity sessions.'
+      };
+    } else if (week === 12) {
+      return {
+        phase: 'taper',
+        sessionCount: 3,
+        intensityLevel: 'taper',
+        sessionDurationMultiplier: 0.6, // Taper for race
+        description: 'Taper week - reducing volume while maintaining sharpness for race day.'
+      };
+    }
+    
+    throw new Error(`Invalid week: ${week}. Must be 1-12 for 12-week plans.`);
   }
 } 
