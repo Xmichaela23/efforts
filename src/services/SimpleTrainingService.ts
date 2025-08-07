@@ -432,9 +432,10 @@ export class SimpleTrainingService {
       cycling?: string[];
       swimming?: string[];
       strength?: string[];
-    }
+    },
+    weekNumber: number = 1
   ): Promise<SimpleTrainingPlan> {
-    return await this.generatePlan('sprint', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    return await this.generatePlan('sprint', timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment, weekNumber);
   }
 
   async generateSeventy3Plan(
@@ -483,7 +484,8 @@ export class SimpleTrainingService {
       cycling?: string[];
       swimming?: string[];
       strength?: string[];
-    }
+    },
+    weekNumber: number = 1
   ): Promise<SimpleTrainingPlan> {
     // Validate baselines first
     const baselineValidation = this.validateBaselineData(userBaselines);
@@ -492,7 +494,7 @@ export class SimpleTrainingService {
     }
 
     // Generate the plan
-    const plan = await this.generatePlanInternal(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+    const plan = await this.generatePlanInternal(distance, timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment, weekNumber);
     
     // Validate the generated plan
     const validation = this.validatePlan(plan, timeLevel, strengthOption, longSessionDays);
@@ -953,14 +955,15 @@ export class SimpleTrainingService {
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
     userBaselines: any,
-    userEquipment?: any
+    userEquipment?: any,
+    weekNumber: number = 1
   ): Promise<SimpleTrainingPlan> {
     
     console.log(`🏊‍♂️ Generating ${distance} plan...`);
     
     // Generate plan using rules engine for supported distances
     if (distance === 'sprint') {
-      return this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
+      return this.generateSolidSprintPlan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment, weekNumber);
     } else if (distance === 'seventy3') {
       return this.generateSolid70_3Plan(timeLevel, strengthOption, longSessionDays, userBaselines, userEquipment);
     } else {
@@ -975,7 +978,8 @@ export class SimpleTrainingService {
     strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound',
     longSessionDays: string,
     userBaselines: any,
-    userEquipment?: any
+    userEquipment?: any,
+    weekNumber: number = 1
   ): Promise<SimpleTrainingPlan> {
     
     console.log('🎯 Generating solid Sprint plan with Rules Engine...');
@@ -986,7 +990,7 @@ export class SimpleTrainingService {
     const trainingFacts: TrainingFacts = {
       distance: 'sprint',
       totalWeeks: 12,
-      currentWeek: 1,
+      currentWeek: weekNumber,
       philosophy: userBaselines.trainingPhilosophy || 'polarized', // Allow user to choose philosophy
       timeLevel,
       strengthOption,

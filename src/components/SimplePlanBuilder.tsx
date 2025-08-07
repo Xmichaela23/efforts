@@ -200,7 +200,9 @@ export default function SimplePlanBuilder() {
             answers.timeLevel as any,
             answers.strengthOption as any,
             answers.longSessionDays,
-            baselineData
+            baselineData,
+            undefined, // userEquipment
+            currentWeek + 1 // Pass the current week number (1-based)
           );
         } else if (answers.distance === 'seventy3') {
           generatedPlan = await trainingService.generateSeventy3Plan(
