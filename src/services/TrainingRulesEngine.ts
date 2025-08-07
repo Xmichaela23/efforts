@@ -1170,18 +1170,29 @@ export class TrainingRulesEngine {
   private calculateBrickDuration(facts: TrainingFacts, sessionType: string): number {
     console.log('🔍 calculateBrickDuration called with sessionType:', sessionType);
     
+    // SCIENCE-BASED: Sprint brick sessions should be 90-105 minutes total
     // Brick sessions combine bike + run based on user's capabilities
-    const bikeDuration = this.calculateBikeBaseDuration(facts) * 0.7; // 70% bike
-    const runDuration = this.calculateRunBaseDuration(facts, sessionType) * 0.3;   // 30% run
+    const bikeDuration = this.calculateBikeBaseDuration(facts) * 0.6; // 60% bike (reduced from 70%)
+    const runDuration = this.calculateRunBaseDuration(facts, sessionType) * 0.25;   // 25% run (reduced from 30%)
     
-    const totalDuration = bikeDuration + runDuration;
+    // Apply session type multiplier to both components
+    const sessionMultiplier = this.getSessionTypeMultiplier(sessionType);
+    const adjustedBikeDuration = bikeDuration * sessionMultiplier;
+    const adjustedRunDuration = runDuration * sessionMultiplier;
+    
+    const totalDuration = adjustedBikeDuration + adjustedRunDuration;
+    
     console.log('🔍 Brick duration calculation:', {
       bikeDuration,
       runDuration,
+      sessionMultiplier,
+      adjustedBikeDuration,
+      adjustedRunDuration,
       totalDuration
     });
     
-    return totalDuration;
+    // SCIENCE-BASED: Ensure brick sessions are 90-105 minutes for sprint
+    return Math.max(90, Math.min(105, totalDuration));
   }
 
   // SCIENCE-BASED BASE DURATION CALCULATIONS USING USER BASELINE DATA
@@ -1496,11 +1507,12 @@ export class TrainingRulesEngine {
     
     const recoveryCapacity = this.calculateRecoveryCapacity();
     
-    // Research: Recovery sessions should be 85-95% of standard duration (LESS AGGRESSIVE)
-    if (recoveryCapacity === 'high') return 0.95; // Higher recovery capacity
-    if (recoveryCapacity === 'medium') return 0.9; // Standard recovery
-    if (recoveryCapacity === 'low') return 0.85; // Lower recovery capacity
-    return 0.9; // Default
+    // SCIENCE-BASED: Sprint recovery sessions should be 60-75 minutes (not 102+)
+    // Recovery sessions should be 70-85% of standard duration
+    if (recoveryCapacity === 'high') return 0.75; // Higher recovery capacity = shorter sessions
+    if (recoveryCapacity === 'medium') return 0.7; // Standard recovery = 70% of base
+    if (recoveryCapacity === 'low') return 0.65; // Lower recovery capacity = even shorter
+    return 0.7; // Default 70%
   }
 
   private calculateEnduranceMultiplier(): number {
@@ -1509,11 +1521,12 @@ export class TrainingRulesEngine {
     
     const aerobicCapacity = this.calculateAerobicCapacity();
     
-    // Research: Endurance sessions should be 100% of standard duration
-    if (aerobicCapacity === 'high') return 1.05; // Higher aerobic capacity
-    if (aerobicCapacity === 'medium') return 1.0; // Standard aerobic capacity
-    if (aerobicCapacity === 'low') return 0.95; // Lower aerobic capacity
-    return 1.0; // Default
+    // SCIENCE-BASED: Sprint endurance sessions should be 45-90 minutes
+    // Endurance sessions should be 80-95% of standard duration
+    if (aerobicCapacity === 'high') return 0.85; // Higher aerobic capacity
+    if (aerobicCapacity === 'medium') return 0.8; // Standard aerobic capacity
+    if (aerobicCapacity === 'low') return 0.75; // Lower aerobic capacity
+    return 0.8; // Default 80%
   }
 
   private calculateTempoMultiplier(): number {
@@ -1522,11 +1535,12 @@ export class TrainingRulesEngine {
     
     const lactateThreshold = this.calculateLactateThreshold();
     
-    // Research: Tempo sessions should be 95-100% of standard duration (LESS AGGRESSIVE)
-    if (lactateThreshold === 'high') return 1.0; // Higher lactate threshold
-    if (lactateThreshold === 'medium') return 0.975; // Standard lactate threshold
-    if (lactateThreshold === 'low') return 0.95; // Lower lactate threshold
-    return 0.975; // Default
+    // SCIENCE-BASED: Sprint tempo sessions should be 45-75 minutes
+    // Tempo sessions should be 75-90% of standard duration
+    if (lactateThreshold === 'high') return 0.8; // Higher lactate threshold
+    if (lactateThreshold === 'medium') return 0.75; // Standard lactate threshold
+    if (lactateThreshold === 'low') return 0.7; // Lower lactate threshold
+    return 0.75; // Default 75%
   }
 
   private calculateThresholdMultiplier(): number {
@@ -1535,11 +1549,12 @@ export class TrainingRulesEngine {
     
     const ftpLevel = this.calculateFTPLevel();
     
-    // Research: Threshold sessions should be 100-105% of standard duration (LESS AGGRESSIVE)
-    if (ftpLevel === 'high') return 1.05; // Higher FTP
-    if (ftpLevel === 'medium') return 1.025; // Standard FTP
-    if (ftpLevel === 'low') return 1.0; // Lower FTP
-    return 1.025; // Default
+    // SCIENCE-BASED: Sprint threshold sessions should be 45-75 minutes
+    // Threshold sessions should be 75-90% of standard duration
+    if (ftpLevel === 'high') return 0.8; // Higher FTP
+    if (ftpLevel === 'medium') return 0.75; // Standard FTP
+    if (ftpLevel === 'low') return 0.7; // Lower FTP
+    return 0.75; // Default 75%
   }
 
   private calculateVO2MaxMultiplier(): number {
@@ -1548,11 +1563,12 @@ export class TrainingRulesEngine {
     
     const vo2maxCapacity = this.calculateVO2MaxCapacity();
     
-    // Research: VO2max sessions should be 75-85% of standard duration (LESS AGGRESSIVE)
-    if (vo2maxCapacity === 'high') return 0.85; // Higher VO2max capacity
-    if (vo2maxCapacity === 'medium') return 0.8; // Standard VO2max capacity
-    if (vo2maxCapacity === 'low') return 0.75; // Lower VO2max capacity
-    return 0.8; // Default
+    // SCIENCE-BASED: Sprint VO2max sessions should be 30-60 minutes
+    // VO2max sessions should be 50-70% of standard duration
+    if (vo2maxCapacity === 'high') return 0.6; // Higher VO2max capacity
+    if (vo2maxCapacity === 'medium') return 0.55; // Standard VO2max capacity
+    if (vo2maxCapacity === 'low') return 0.5; // Lower VO2max capacity
+    return 0.55; // Default 55%
   }
 
   private calculateMinimumTimeMultiplier(): number {
@@ -2138,7 +2154,7 @@ export class TrainingRulesEngine {
     
     totalSessions += strengthSessions;
     
-    // Distribute sessions based on philosophy with science-based strength placement
+    // SCIENCE-BASED: Distribute sessions based on philosophy with optimal rest spacing
     if (facts.philosophy === 'polarized') {
       // 80/20 polarized training - include brick session in distribution
       let adjustedTotalSessions = totalSessions;
@@ -2159,7 +2175,7 @@ export class TrainingRulesEngine {
       // Use available days for proper session distribution (not forcing 7 days)
       const availableDays = days.filter(day => !strengthDays.some(s => s.day.toLowerCase() === day.toLowerCase()));
       
-      // Place hard sessions first (tempo/threshold) with proper spacing
+      // SCIENCE-BASED: Place hard sessions first with optimal spacing to prevent consecutive rest days
       const hardSessionDays = [];
       for (let i = 0; i < hardSessions; i++) {
         const day = this.getNextAvailableDay(availableDays, strengthDays, i, 2); // Skip 2 days between hard sessions
@@ -2172,14 +2188,17 @@ export class TrainingRulesEngine {
         });
       }
       
-      // Place easy sessions (recovery/endurance) on remaining days
+      // SCIENCE-BASED: Place easy sessions strategically to avoid consecutive rest days
       const usedDays = [...hardSessionDays, ...strengthDays.map(s => s.day.toLowerCase())];
       const remainingDays = days.filter(day => !usedDays.includes(day.toLowerCase()));
       
+      // Optimize rest day distribution to prevent consecutive rest days
+      const optimizedRemainingDays = this.optimizeRestDayDistribution(remainingDays, easySessions);
+      
       for (let i = 0; i < easySessions; i++) {
         // Only use remaining days, don't fallback to all days
-        if (i < remainingDays.length) {
-          const day = remainingDays[i];
+        if (i < optimizedRemainingDays.length) {
+          const day = optimizedRemainingDays[i];
           const discipline = this.getDisciplineForDay(i + hardSessions, facts);
           distribution.push({
             day,
@@ -2245,6 +2264,32 @@ export class TrainingRulesEngine {
     }
     
     return distribution;
+  }
+
+  // SCIENCE-BASED: Optimize rest day distribution to prevent consecutive rest days
+  private optimizeRestDayDistribution(remainingDays: string[], easySessions: number): string[] {
+    if (easySessions >= remainingDays.length) {
+      return remainingDays; // Use all remaining days
+    }
+    
+    // SCIENCE-BASED: Spread sessions to avoid consecutive rest days
+    // For sprint with 4-5 sessions, we want 2-3 rest days spread out
+    const optimizedDays = [];
+    const step = Math.floor(remainingDays.length / easySessions);
+    
+    for (let i = 0; i < easySessions && i * step < remainingDays.length; i++) {
+      optimizedDays.push(remainingDays[i * step]);
+    }
+    
+    // If we didn't get enough days, add from the end
+    while (optimizedDays.length < easySessions && optimizedDays.length < remainingDays.length) {
+      const lastIndex = remainingDays.length - 1 - (optimizedDays.length - easySessions);
+      if (lastIndex >= 0 && !optimizedDays.includes(remainingDays[lastIndex])) {
+        optimizedDays.push(remainingDays[lastIndex]);
+      }
+    }
+    
+    return optimizedDays;
   }
 
   // NEW: Get discipline for session based on position and facts
