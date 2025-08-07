@@ -3,12 +3,12 @@
 
 // Scientific training standards for 70.3 (based on research)
 const SEVENTY3_SCIENCE_STANDARDS = {
-  // Volume standards (hours per week) - Based on Rønnestad & Mujika (2014)
+  // Volume standards (hours per week) - Based on Rønnestad & Mujika (2014), Mikkola et al. (2021)
   volume: {
     minimum: { min: 8, max: 10, description: 'Basic completion training' },
     moderate: { min: 10, max: 12, description: 'Balanced training' },
-    serious: { min: 12, max: 15, description: 'Competitive training' },
-    hardcore: { min: 15, max: 20, description: 'Elite performance' }
+    serious: { min: 12, max: 14, description: 'Competitive training' },
+    hardcore: { min: 14, max: 16, description: 'Elite performance' }
   },
   
   // 80/20 polarized training standards - Based on Seiler & Tønnessen (2009)

@@ -6,31 +6,31 @@ const strengthOptions = ['none', 'stability_focus', 'power_development', 'compou
 const trainingDays = [4, 5, 6, 7];
 const weeklyHours = [6, 8, 10, 12, 15, 18];
 
-// Distance constraints
+// Distance constraints (Updated based on research verification)
 const distanceConstraints = {
   sprint: {
-    minDays: 4,
-    maxDays: 7,
-    minHours: 6,
-    maxHours: 12
+    minDays: 3,
+    maxDays: 5,
+    minHours: 4,
+    maxHours: 8
   },
   olympic: {
-    minDays: 5,
-    maxDays: 7,
-    minHours: 8,
-    maxHours: 15
+    minDays: 4,
+    maxDays: 6,
+    minHours: 6,
+    maxHours: 12
   },
   seventy3: {
     minDays: 5,
     maxDays: 7,
-    minHours: 10,
-    maxHours: 18
+    minHours: 8,
+    maxHours: 16
   },
   ironman: {
     minDays: 6,
     maxDays: 7,
     minHours: 12,
-    maxHours: 18
+    maxHours: 20
   }
 };
 

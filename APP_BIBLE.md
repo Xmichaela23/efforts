@@ -8,21 +8,21 @@
 - **Context-first development** - read this bible before starting any work
 - **Test the entire system** after any changes, not just the modified component
 
-### **Success Pattern: AI Plan Generation Fix**
-- **Problem**: Validation errors blocking AI plan generation
-- **Wrong approach**: Fix validation in isolation → breaks other components
-- **Right approach**: Understand full flow (TrainingBaselines → AppContext → RealTrainingAI → PlanEngine) → fix root cause → enable full AI generation
-- **Result**: Working AI plans with hundreds of combinations
+### **Success Pattern: JSON Rules Engine**
+- **Problem**: Complex algorithm approach was over-engineered
+- **Wrong approach**: Build complex algorithms with multiple fallbacks
+- **Right approach**: Simple JSON rules engine with no fallbacks, fail fast
+- **Result**: Clean, reliable, scalable 70.3 triathlon training plans
 
 ### **Anti-Patterns to Avoid**
 - ❌ Making changes without understanding the full system
 - ❌ Fixing symptoms instead of root causes
-- ❌ Breaking working components to fix broken ones
-- ❌ Ignoring data flow between components
+- ❌ Adding fallbacks or hardcoded defaults
+- ❌ Building complex algorithms instead of simple rules
 
 ## 🎯 APP OVERVIEW
 
-**Efforts** is a comprehensive training app that creates personalized training plans based on individual fitness assessments and goals. The app integrates with Garmin/Strava for data import and uses intelligent analysis to generate unique training plans.
+**Efforts** is a comprehensive training app that creates personalized training plans based on individual fitness assessments and goals. The app integrates with Garmin/Strava for data import and uses **JSON Rules Engine** to generate unique training plans.
 
 ## 🎨 PRODUCTION DESIGN RULES
 
@@ -30,6 +30,8 @@
 - **No Cards**: Eliminate card containers and frames
 - **No Borders**: Remove all borders and frames
 - **No Frames**: Clean, borderless design
+- **No Black Boxes**: No dark backgrounds or containers
+- **No Blue Buttons**: No blue primary buttons or CTAs
 - **Tab Language**: Simple underline under active tab (established in CompletedTab)
 - **Typography**: Inter font family
 - **Minimal**: Clean, uncluttered interface
@@ -61,7 +63,7 @@
 - **Manual Supplementation**: Users still need to add some metrics manually
 
 ### **3. Plan Building**
-- **AI Plans**: Automated plan generation (70.3, Half Marathon, Century, etc.)
+- **JSON Rules Engine**: 70.3 triathlon training plans (current focus)
 - **Manual Plans**: Coach-friendly workout creation
 - **Both**: Reference baseline data for intensity setting
 
@@ -94,10 +96,31 @@
 ```
 User Flow:
 1. Training Baselines (Fitness Assessment) → user_baselines table
-2. Plan Builder (Goal Assessment) → AI Analysis → plan generation
-3. PlanEngine → Creates unique training plans
+2. Plan Builder (Goal Assessment) → JSON Rules Engine → plan generation
+3. TrainingRulesEngine → Creates unique training plans
 4. Workout Execution → Logging & tracking
 ```
+
+## 🎯 CURRENT FOCUS: 70.3 JSON RULES ENGINE
+
+### **Core System:**
+- **JSON Rules Engine** using json-rules-engine (2,874 stars)
+- **70.3-Specific Rules**: Swim 60min, Bike 120min, Run 90min, Brick 150min
+- **80/20 Polarized Distribution**: 5 easy + 1 hard sessions
+- **Week Progression**: Introduction → Build → Peak → Taper
+- **No Fallbacks**: Fail fast when data missing
+
+### **Required Baseline Data:**
+- **FTP (Functional Threshold Power)** - Required for bike power calculations
+- **Run Paces** - Either `easyPace` OR `fiveKPace` (for run pace calculations)
+- **Swim Pace** - `swimPace100` (for swim pace calculations)
+- **Strength 1RM Values** - `squat1RM`, `deadlift1RM`, `bench1RM` (for strength calculations)
+
+### **System Behavior:**
+- **Throws clear errors** when baseline data is missing
+- **Fails fast** - No silent failures or hidden assumptions
+- **Requires validation** before plan generation
+- **No partial plans** - Complete data or no plan
 
 ## 🎯 USER INTERFACE FLOW
 
@@ -108,7 +131,7 @@ User Flow:
 ### Navigation Restructuring (TO BE IMPLEMENTED)
 
 #### **Current State (Calendar Page Dropdowns):**
-- **Build** dropdown - AI plans and manual builders
+- **Build** dropdown - JSON Rules Engine plans and manual builders
 - **Log** dropdown - Strength and mobility logging
 - **Plans** dropdown - Current and completed plans
 - **Completed** dropdown - Workout analytics

@@ -1,7 +1,52 @@
 import React, { useState, useEffect } from 'react';
-import { SimpleTrainingService, type SimpleTrainingPlan } from '../services/SimpleTrainingService';
+import { TrainingEngine, type TrainingPlan } from '../services/TrainingEngine';
 import { useAppContext } from '@/contexts/AppContext';
 import useEmblaCarousel from 'embla-carousel-react';
+
+// Define proper types for user baselines
+interface UserBaselines {
+  age: number;
+  performanceNumbers?: {
+    ftp?: number;
+    fiveK?: string | number;
+    easyPace?: string | number;
+    swimPace100?: string | number;
+    squat?: number;
+    deadlift?: number;
+    bench?: number;
+    overheadPress1RM?: number;
+  };
+  equipment?: {
+    running?: string[];
+    cycling?: string[];
+    swimming?: string[];
+    strength?: string[];
+  };
+}
+
+// Type for the baseline data passed to TrainingEngine
+interface BaselineData {
+  ftp?: number;
+  fiveK?: string;
+  easyPace?: string;
+  swimPace100?: string;
+  squat?: number;
+  deadlift?: number;
+  bench?: number;
+  overheadPress1RM?: number;
+  age: number;
+}
+
+// Define proper types for answers
+interface PlanAnswers {
+  distance: 'sprint' | 'seventy3' | '';
+  timeLevel: 'minimum' | 'moderate' | 'serious' | 'maximum' | '';
+  strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' | '';
+  longBikeDay: string;
+  longRunDay: string;
+  longSessionDays: 'weekend' | 'custom';
+  recoveryPreference: 'active' | 'rest' | 'mixed';
+}
 
 export default function SimplePlanBuilder() {
   const { loadUserBaselines } = useAppContext();
@@ -9,44 +54,46 @@ export default function SimplePlanBuilder() {
   const [currentWeek, setCurrentWeek] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  const [plan, setPlan] = useState<SimpleTrainingPlan | null>(null);
-  const [userBaselines, setUserBaselines] = useState<any>(null);
+  const [plan, setPlan] = useState<TrainingPlan | null>(null);
+  const [userBaselines, setUserBaselines] = useState<UserBaselines | null>(null);
   const [isLoadingBaselines, setIsLoadingBaselines] = useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-  const [answers, setAnswers] = useState({
+  const [error, setError] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<PlanAnswers>({
     distance: '',
     timeLevel: '',
     strengthOption: '',
-    longSessionDays: '',
-    trainingPhilosophy: ''
+    longBikeDay: '',
+    longRunDay: '',
+    longSessionDays: 'weekend',
+    recoveryPreference: 'active'
   });
 
   // Load user baselines on component mount
   useEffect(() => {
-    // Set loading state immediately when component mounts
     setIsLoadingBaselines(true);
+    setError(null);
     
     const loadBaselines = async () => {
       try {
         console.log('Loading user baselines...');
-        console.log('🔍 About to call loadUserBaselines...');
         
         // Test if user is logged in
         const { supabase } = await import('@/lib/supabase');
         const { data: { user } } = await supabase.auth.getUser();
-        console.log('🔍 Current user:', user ? `User ID: ${user.id}` : 'No user logged in');
+        console.log('Current user:', user ? `User ID: ${user.id}` : 'No user logged in');
         
-        let baselines;
+        let baselines: UserBaselines | null = null;
         try {
           baselines = await loadUserBaselines();
-          console.log('🔍 loadUserBaselines returned:', baselines);
+          console.log('loadUserBaselines returned:', baselines);
         } catch (error) {
-          console.error('🔍 Error calling loadUserBaselines:', error);
+          console.error('Error calling loadUserBaselines:', error);
           baselines = null;
         }
-        console.log('Baselines loaded:', baselines);
+        
         if (baselines) {
-          console.log('✅ Baselines found:', {
+          console.log('Baselines found:', {
             age: baselines.age,
             ftp: baselines.performanceNumbers?.ftp,
             fiveK: baselines.performanceNumbers?.fiveK,
@@ -58,14 +105,14 @@ export default function SimplePlanBuilder() {
           });
           setUserBaselines(baselines);
         } else {
-          // No baselines found - user needs to provide data
-          console.error('❌ No user baselines found. User must provide fitness data.');
+          console.error('No user baselines found. User must provide fitness data.');
           setUserBaselines(null);
+          setError('Please complete your fitness profile before generating training plans.');
         }
       } catch (error) {
         console.error('Error loading baselines:', error);
-        // NO DEFAULTS - user must have real baseline data
         setUserBaselines(null);
+        setError('Failed to load your fitness data. Please try again.');
       } finally {
         setIsLoadingBaselines(false);
       }
@@ -73,10 +120,10 @@ export default function SimplePlanBuilder() {
     loadBaselines();
   }, [loadUserBaselines]);
 
-  const trainingService = new SimpleTrainingService();
+  const trainingEngine = new TrainingEngine();
 
-  const updateAnswer = (key: string, value: string) => {
-    setAnswers(prev => ({ ...prev, [key]: value }));
+  const updateAnswer = (key: keyof PlanAnswers, value: string) => {
+    setAnswers(prev => ({ ...prev, [key]: value as any }));
   };
 
   // Touch/swipe handlers for week navigation
@@ -108,15 +155,14 @@ export default function SimplePlanBuilder() {
     }
   };
 
-  // Desktop week navigation
   const goToWeek = (weekIndex: number) => {
-    if (weekIndex >= 0 && weekIndex < (plan?.weeks?.length || 0)) {
+    if (plan?.weeks && weekIndex >= 0 && weekIndex < plan.weeks.length) {
       setCurrentWeek(weekIndex);
     }
   };
 
   const nextWeek = () => {
-    if (currentWeek < (plan?.weeks?.length || 0) - 1) {
+    if (plan?.weeks && currentWeek < plan.weeks.length - 1) {
       setCurrentWeek(currentWeek + 1);
     }
   };
@@ -127,7 +173,6 @@ export default function SimplePlanBuilder() {
     }
   };
 
-  // Keyboard navigation
   useEffect(() => {
     const handleKeyPress = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
@@ -139,19 +184,42 @@ export default function SimplePlanBuilder() {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [currentWeek, plan?.weeks?.length]);
+  }, [currentWeek, plan]);
 
-    const generatePlan = async () => {
+  const generatePlan = async () => {
     if (isLoadingBaselines) {
-      alert('Please wait while your fitness data is loading...');
+      setError('Please wait while your fitness data is loading...');
       return;
     }
     
-    setIsGeneratingPlan(true);
+    console.log('Generate Plan Debug:', {
+      hasDistance: !!answers.distance,
+      hasTimeLevel: !!answers.timeLevel,
+      hasStrengthOption: !!answers.strengthOption,
+      hasLongBikeDay: !!answers.longBikeDay,
+      hasLongRunDay: !!answers.longRunDay,
+      hasUserBaselines: !!userBaselines,
+      userBaselines: userBaselines
+    });
     
-    if (answers.distance && answers.timeLevel && answers.strengthOption && answers.longSessionDays && answers.trainingPhilosophy && userBaselines) {
+    setIsGeneratingPlan(true);
+    setError(null);
+    
+    if (answers.distance && answers.timeLevel && answers.strengthOption && answers.longSessionDays && userBaselines) {
       // Check if required baselines are present for scientifically sound training
-      const missingBaselines = [];
+      const missingBaselines: string[] = [];
+      
+      console.log('Baseline Validation Debug:', {
+        ftp: userBaselines.performanceNumbers?.ftp,
+        fiveK: userBaselines.performanceNumbers?.fiveK,
+        easyPace: userBaselines.performanceNumbers?.easyPace,
+        swimPace100: userBaselines.performanceNumbers?.swimPace100,
+        age: userBaselines.age,
+        squat: userBaselines.performanceNumbers?.squat,
+        deadlift: userBaselines.performanceNumbers?.deadlift,
+        bench: userBaselines.performanceNumbers?.bench,
+        strengthOption: answers.strengthOption
+      });
       
       // For cycling: FTP is ideal, but we can work with estimated power
       if (!userBaselines.performanceNumbers?.ftp) {
@@ -180,54 +248,82 @@ export default function SimplePlanBuilder() {
         if (!userBaselines.performanceNumbers?.bench) missingBaselines.push('Bench 1RM');
       }
       
+      console.log('Missing baselines:', missingBaselines);
+      
       if (missingBaselines.length > 0) {
-        alert(`Missing required baselines for personalized training: ${missingBaselines.join(', ')}.\n\nPlease complete your fitness profile with these performance numbers.`);
+        setError(`Missing required fitness data: ${missingBaselines.join(', ')}.\n\nPlease complete your fitness profile with these performance numbers.`);
+        setIsGeneratingPlan(false);
         return;
       }
       
-      const baselineData = {
-        // Pass ALL baseline data to the training service
-        ...userBaselines,
-        trainingPhilosophy: answers.trainingPhilosophy
+      // Validate custom day selection if needed
+      if (answers.longSessionDays === 'custom' && (!answers.longBikeDay || !answers.longRunDay)) {
+        setError('Please select both your long bike day and long run day.');
+        setIsGeneratingPlan(false);
+        return;
+      }
+      
+      // Map baseline data to the expected structure
+      const baselineData: BaselineData = {
+        ftp: userBaselines.performanceNumbers?.ftp,
+        fiveK: userBaselines.performanceNumbers?.fiveK?.toString(),
+        easyPace: userBaselines.performanceNumbers?.easyPace?.toString(),
+        swimPace100: userBaselines.performanceNumbers?.swimPace100?.toString(),
+        squat: userBaselines.performanceNumbers?.squat,
+        deadlift: userBaselines.performanceNumbers?.deadlift,
+        bench: userBaselines.performanceNumbers?.bench,
+        overheadPress1RM: userBaselines.performanceNumbers?.overheadPress1RM,
+        age: userBaselines.age
       };
       
-      console.log('🎯 Passing baseline data to training service:', baselineData);
+      console.log('Passing baseline data to training service:', baselineData);
       
       try {
         let generatedPlan;
-        if (answers.distance === 'sprint') {
-          generatedPlan = await trainingService.generateSprintPlan(
-            answers.timeLevel as any,
-            answers.strengthOption as any,
-            answers.longSessionDays,
-            baselineData,
-            undefined, // userEquipment
-            currentWeek + 1 // Pass the current week number (1-based)
-          );
-        } else if (answers.distance === 'seventy3') {
-          generatedPlan = await trainingService.generateSeventy3Plan(
-            answers.timeLevel as any,
-            answers.strengthOption as any,
-            answers.longSessionDays,
-            baselineData
-          );
-        } else {
-          throw new Error(`Unsupported distance: ${answers.distance}`);
+        // Determine long session days based on user choice
+        let longBikeDay = 'Saturday';
+        let longRunDay = 'Sunday';
+        
+        if (answers.longSessionDays === 'custom') {
+          longBikeDay = answers.longBikeDay;
+          longRunDay = answers.longRunDay;
         }
         
-        console.log('🔍 Frontend plan check:', {
+        console.log('Plan Generation Debug:', {
+          distance: answers.distance,
+          timeLevel: answers.timeLevel,
+          strengthOption: answers.strengthOption,
+          longBikeDay,
+          longRunDay,
+          recoveryPreference: answers.recoveryPreference
+        });
+      
+        // Use the new TrainingEngine for all distances
+        generatedPlan = await trainingEngine.generatePlan(
+          'triathlon',
+          answers.distance,
+          answers.timeLevel,
+          answers.strengthOption,
+          longBikeDay,
+          longRunDay,
+          answers.recoveryPreference,
+          baselineData,
+          userBaselines.equipment // Pass equipment data
+        );
+        
+        console.log('Frontend plan check:', {
           hasPlan: !!generatedPlan,
           hasDistance: !!generatedPlan?.distance,
           hasWeeks: !!generatedPlan?.weeks,
           weeksLength: generatedPlan?.weeks?.length,
           firstWeek: generatedPlan?.weeks?.[0]
         });
-        console.log('🔍 Full generated plan:', generatedPlan);
+        console.log('Full generated plan:', generatedPlan);
         setPlan(generatedPlan);
         setCurrentWeek(0);
       } catch (error) {
-        console.error('❌ Error generating plan:', error);
-        alert(`Failed to generate training plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        console.error('Error generating plan:', error);
+        setError(`Failed to generate training plan: ${error instanceof Error ? error.message : 'Unknown error'}`);
       } finally {
         setIsGeneratingPlan(false);
       }
@@ -244,8 +340,8 @@ export default function SimplePlanBuilder() {
             <h2 className="text-2xl font-semibold">What are you training for?</h2>
             <div className="space-y-4">
               <div 
-                className={`cursor-pointer hover:bg-gray-50 p-4 rounded ${
-                  answers.distance === 'sprint' ? 'bg-blue-50 border-blue-200' : ''
+                className={`cursor-pointer hover:bg-gray-50 p-4 ${
+                  answers.distance === 'sprint' ? 'bg-gray-100' : ''
                 }`}
                 onClick={() => updateAnswer('distance', 'sprint')}
               >
@@ -253,8 +349,8 @@ export default function SimplePlanBuilder() {
                 <p className="text-sm text-gray-600">Complete in 1-1.5 hours • 8-12 weeks training</p>
               </div>
               <div 
-                className={`cursor-pointer hover:bg-gray-50 p-4 rounded ${
-                  answers.distance === 'seventy3' ? 'bg-blue-50 border-blue-200' : ''
+                className={`cursor-pointer hover:bg-gray-50 p-4 ${
+                  answers.distance === 'seventy3' ? 'bg-gray-100' : ''
                 }`}
                 onClick={() => updateAnswer('distance', 'seventy3')}
               >
@@ -275,17 +371,31 @@ export default function SimplePlanBuilder() {
       case 2:
         return (
           <div className="space-y-6">
-                            <h2 className="text-2xl font-semibold">Would you like to integrate strength?</h2>
+            <h2 className="text-2xl font-semibold">Would you like to integrate strength?</h2>
+            <div className="p-3 bg-gray-50 text-sm text-gray-700 mb-4">
+              <strong>Strength Training Options:</strong>
+              <ul className="mt-2 space-y-1 text-xs">
+                <li>• <strong>Traditional/Compound (2x/week):</strong> Standard strength maintenance</li>
+                <li>• <strong>Cowboy Options (3x/week):</strong> Include a 3rd upper body session for balance and aesthetics</li>
+              </ul>
+            </div>
             <div className="space-y-4">
-              {trainingService.getSprintStrengthOptions().map(option => (
+              {[
+                { value: 'none', label: 'No strength training', description: 'Pure endurance focus • 0 additional hours' },
+                { value: 'traditional', label: 'Traditional strength (2x/week)', description: 'Endurance strength maintenance • +1-1.5 hours/week • 2 sessions' },
+                { value: 'compound', label: 'Compound movements only (2x/week)', description: 'Power development for triathlon • +1.5-2 hours/week • 2 sessions' },
+                { value: 'cowboy_endurance', label: 'Cowboy endurance strength (3x/week)', description: 'Functional endurance + 3rd upper body session for balance/aesthetics • +2-2.5 hours/week • 3 sessions • Consider this when choosing your weekly hours' },
+                { value: 'cowboy_compound', label: 'Cowboy compound strength (3x/week)', description: 'Advanced strength + 3rd upper body session for balance/aesthetics • +2.5-3 hours/week • 3 sessions • Consider this when choosing your weekly hours' }
+              ].map(option => (
                 <div 
                   key={option.value}
                   className={`cursor-pointer hover:bg-gray-50 ${
-                    answers.strengthOption === option.value ? 'text-blue-600' : ''
+                    answers.strengthOption === option.value ? 'text-gray-900' : ''
                   }`}
                   onClick={() => updateAnswer('strengthOption', option.value)}
                 >
                   <h3 className="font-medium">{option.label}</h3>
+                  <p className="text-sm text-gray-600">{option.description}</p>
                 </div>
               ))}
             </div>
@@ -299,7 +409,7 @@ export default function SimplePlanBuilder() {
               <button 
                 onClick={() => setCurrentStep(3)}
                 disabled={!answers.strengthOption}
-                className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
               >
                 Continue →
               </button>
@@ -310,15 +420,30 @@ export default function SimplePlanBuilder() {
       case 3:
         return (
           <div className="space-y-6">
-            <h2 className="text-2xl font-semibold">What's your training philosophy?</h2>
+            <h2 className="text-2xl font-semibold">How much time can you commit?</h2>
+            {answers.strengthOption && answers.strengthOption !== 'none' && (
+              <div className="p-3 bg-gray-50 text-sm text-gray-700">
+                <strong>Note:</strong> Your strength choice adds {answers.strengthOption === 'traditional' ? '+1-1.5' : answers.strengthOption === 'compound' ? '+1.5-2' : answers.strengthOption === 'cowboy_endurance' ? '+2-2.5' : '+2.5-3'} hours/week to your training time.
+                {(answers.strengthOption === 'cowboy_endurance' || answers.strengthOption === 'cowboy_compound') && (
+                  <div className="mt-2 text-xs text-gray-600">
+                    <strong>Cowboy options include a 3rd upper body session for balance and aesthetics.</strong>
+                  </div>
+                )}
+              </div>
+            )}
             <div className="space-y-4">
-              {trainingService.getTrainingPhilosophies().map(option => (
+              {[
+                { key: 'minimum', label: 'Minimum', description: '8-10 hours/week • 6-7 sessions • First-time 70.3 athletes, honors time and scheduling limitations' },
+                { key: 'moderate', label: 'Moderate', description: '10-12 hours/week • 7-8 sessions • Good for consistent training, balanced approach' },
+                { key: 'serious', label: 'Serious', description: '12-14 hours/week • 8-9 sessions • Experienced athletes, performance focus' },
+                { key: 'maximum', label: 'Maximum', description: '14-16 hours/week • 9-10 sessions • Advanced athletes, multiple 70.3s completed' }
+              ].map(option => (
                 <div 
-                  key={option.value}
-                  className={`cursor-pointer hover:bg-gray-50 p-4 rounded ${
-                    answers.trainingPhilosophy === option.value ? 'bg-blue-50 border-blue-200' : ''
+                  key={option.key}
+                  className={`cursor-pointer hover:bg-gray-50 ${
+                    answers.timeLevel === option.key ? 'text-gray-900' : ''
                   }`}
-                  onClick={() => updateAnswer('trainingPhilosophy', option.value)}
+                  onClick={() => updateAnswer('timeLevel', option.key)}
                 >
                   <h3 className="font-medium">{option.label}</h3>
                   <p className="text-sm text-gray-600">{option.description}</p>
@@ -334,8 +459,8 @@ export default function SimplePlanBuilder() {
               </button>
               <button 
                 onClick={() => setCurrentStep(4)}
-                disabled={!answers.trainingPhilosophy}
-                className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
+                disabled={!answers.timeLevel}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
               >
                 Continue →
               </button>
@@ -346,26 +471,67 @@ export default function SimplePlanBuilder() {
       case 4:
         return (
           <div className="space-y-6">
-            <div className="mb-4">
-              <h2 className="text-2xl font-semibold">How much time can you train?</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Training for: <span className="font-medium">{answers.distance === 'sprint' ? 'Sprint Triathlon' : '70.3 Triathlon'}</span>
-              </p>
-            </div>
+            <h2 className="text-2xl font-semibold">When are your long sessions?</h2>
             <div className="space-y-4">
-              {trainingService.getTimeOptions(answers.distance).map(option => (
-                <div 
-                  key={option.key}
-                  className={`cursor-pointer hover:bg-gray-50 ${
-                    answers.timeLevel === option.key ? 'text-blue-600' : ''
-                  }`}
-                  onClick={() => updateAnswer('timeLevel', option.key)}
-                >
-                  <h3 className="font-medium">{option.label}</h3>
-                  <p className="text-sm text-gray-600">{option.description}</p>
-                </div>
-              ))}
+              <div 
+                className={`cursor-pointer hover:bg-gray-50 ${
+                  answers.longSessionDays === 'weekend' ? 'text-gray-900' : ''
+                }`}
+                onClick={() => updateAnswer('longSessionDays', 'weekend')}
+              >
+                <h3 className="font-medium">Weekend (Saturday/Sunday)</h3>
+                <p className="text-sm text-gray-600">Traditional long bike Saturday, long run Sunday</p>
+              </div>
+              <div 
+                className={`cursor-pointer hover:bg-gray-50 ${
+                  answers.longSessionDays === 'custom' ? 'text-gray-900' : ''
+                }`}
+                onClick={() => updateAnswer('longSessionDays', 'custom')}
+              >
+                <h3 className="font-medium">Custom days</h3>
+                <p className="text-sm text-gray-600">Choose your own long session days</p>
+              </div>
             </div>
+            
+            {answers.longSessionDays === 'custom' && (
+              <div className="space-y-4 mt-4 p-4 bg-gray-50">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Long Bike Day</label>
+                  <select 
+                    value={answers.longBikeDay}
+                    onChange={(e) => updateAnswer('longBikeDay', e.target.value)}
+                    className="w-full px-3 py-2 text-sm"
+                  >
+                    <option value="">Select day</option>
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-2">Long Run Day</label>
+                  <select 
+                    value={answers.longRunDay}
+                    onChange={(e) => updateAnswer('longRunDay', e.target.value)}
+                    className="w-full px-3 py-2 text-sm"
+                  >
+                    <option value="">Select day</option>
+                    <option value="Monday">Monday</option>
+                    <option value="Tuesday">Tuesday</option>
+                    <option value="Wednesday">Wednesday</option>
+                    <option value="Thursday">Thursday</option>
+                    <option value="Friday">Friday</option>
+                    <option value="Saturday">Saturday</option>
+                    <option value="Sunday">Sunday</option>
+                  </select>
+                </div>
+              </div>
+            )}
+            
             <div className="flex gap-4">
               <button 
                 onClick={() => setCurrentStep(3)}
@@ -374,53 +540,11 @@ export default function SimplePlanBuilder() {
                 Back
               </button>
               <button 
-                onClick={() => setCurrentStep(5)}
-                disabled={!answers.timeLevel}
-                className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
+                onClick={generatePlan}
+                disabled={isGeneratingPlan || (answers.longSessionDays === 'custom' && (!answers.longBikeDay || !answers.longRunDay))}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
               >
-                Continue →
-              </button>
-            </div>
-          </div>
-        );
-
-      case 5:
-        return (
-          <div className="space-y-6">
-            <h2 className="text-2xl font-semibold">When do you prefer your long workout?</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium mb-1">Select your preferred day for your long session:</label>
-                <div className="grid grid-cols-2 gap-0">
-                  {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
-                    <button
-                      key={day}
-                      onClick={() => updateAnswer('longSessionDays', day)}
-                      className={`px-3 py-2 text-sm ${
-                        answers.longSessionDays === day 
-                          ? 'text-blue-600 bg-blue-50' 
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-4">
-              <button 
-                onClick={() => setCurrentStep(4)}
-                className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-              >
-                Back
-              </button>
-              <button 
-                onClick={() => generatePlan()}
-                disabled={!answers.longSessionDays || isLoadingBaselines || isGeneratingPlan}
-                className="flex-1 px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
-              >
-                {isLoadingBaselines ? 'Loading...' : isGeneratingPlan ? 'Generating Plan...' : 'Generate Plan →'}
+                {isGeneratingPlan ? 'Generating Plan...' : 'Generate Plan'}
               </button>
             </div>
           </div>
@@ -431,345 +555,175 @@ export default function SimplePlanBuilder() {
     }
   };
 
-  // Show loading while baselines are being loaded
   if (isLoadingBaselines) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <div className="text-center">
-          <div className="text-lg text-blue-600 mb-4">Loading Your Fitness Profile...</div>
-          <div className="text-gray-700 mb-4">
-            Please wait while we load your personalized training data.
-          </div>
-        </div>
+        <div className="text-lg text-gray-600 mb-4">Loading Your Fitness Profile...</div>
+        <div className="text-sm text-gray-500">Please wait while we load your performance data...</div>
       </div>
     );
   }
-  
-  // Show error if no baselines found after loading
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="text-lg text-gray-900 mb-4">Error</div>
+        <div className="text-sm text-gray-600 mb-4 whitespace-pre-line">{error}</div>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+        >
+          Try Again
+        </button>
+      </div>
+    );
+  }
+
   if (!userBaselines) {
     return (
       <div className="max-w-2xl mx-auto p-6">
-        <div className="text-center">
-          <div className="text-lg text-red-600 mb-4">Fitness Profile Required</div>
-          <div className="text-gray-700 mb-4">
-            You need to complete your fitness profile to generate a personalized training plan.
-          </div>
-          <div className="text-sm text-gray-500">
-            Please complete your fitness profile during account registration with FTP, 5K time or easy pace, swim pace (100m), age, and strength data.
-          </div>
+        <div className="text-lg text-gray-900 mb-4">Complete Your Fitness Profile</div>
+        <div className="text-sm text-gray-600 mb-4">
+          Please complete your fitness assessment before generating training plans. 
+          We need your performance data to create safe, personalized training plans.
         </div>
+        <button 
+          onClick={() => window.location.href = '/baselines'}
+          className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+        >
+          Go to Fitness Assessment
+        </button>
       </div>
     );
   }
 
-  if (plan) {
-    // Debug: Log what's in userBaselines
-    console.log('🔍 UI Rendering Debug:', {
-      hasPlan: !!plan,
-      hasWeeks: !!plan.weeks,
-      weeksLength: plan.weeks?.length,
-      firstWeek: plan.weeks?.[0],
-      firstWeekSessions: plan.weeks?.[0]?.sessions?.length,
-      currentWeek: currentWeek
-    });
-
-    
+  if (!plan) {
     return (
-      <div className="w-full">
-        <div className="mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h1 className="text-xl font-bold">
-              {plan.distance ? plan.distance.charAt(0).toUpperCase() + plan.distance.slice(1) : 'Triathlon'} Plan
-            </h1>
-            <button 
-              onClick={() => {
-                setPlan(null);
-                setCurrentStep(1);
-                setAnswers({ 
-                  distance: '',
-                  timeLevel: '', 
-                  strengthOption: '', 
-                  longSessionDays: '',
-                  trainingPhilosophy: ''
-                });
-              }}
-              className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
-            >
-              ← Dashboard
-            </button>
-          </div>
-          <p className="text-gray-600 mb-6">
-            {plan.weeks && plan.weeks.length > 0 ? `${plan.weeks.length}-Week Training Plan • ${Math.round(plan.totalHours * plan.weeks.length)} hours total` : 'Loading plan details...'}
-          </p>
-          
-          {/* Compact Plan Summary */}
-          <div className="mb-3">
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <p className="text-gray-700"><strong>Long Day:</strong> {answers.longSessionDays}</p>
-                <p className="text-gray-700"><strong>Level:</strong> {answers.timeLevel ? answers.timeLevel.charAt(0).toUpperCase() + answers.timeLevel.slice(1) : 'Unknown'}</p>
-              </div>
-              <div>
-                <p className="text-gray-700">
-                  <strong>Strength:</strong> {
-                    answers.strengthOption === 'none' ? 'None' :
-                    answers.strengthOption === 'traditional' ? 'Traditional' :
-                    answers.strengthOption === 'compound' ? 'Compound' :
-                    answers.strengthOption === 'cowboy_endurance' ? 'Cowboy Endurance' :
-                    answers.strengthOption === 'cowboy_compound' ? 'Cowboy Compound' :
-                    answers.strengthOption
-                  }
-                </p>
-                <p className="text-gray-700"><strong>Total:</strong> {plan?.totalHours ? plan.totalHours.toFixed(1) : '0.0'}h/week</p>
-              </div>
-            </div>
-          </div>
-          
-          {/* Compact Training Methodology */}
-          <div className="mb-3">
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div>
-                <h3 className="font-medium mb-1 text-xs">80/20 Polarized Training</h3>
-                <p className="text-gray-700 text-xs">• 80% low intensity (Zone 1-2)</p>
-                <p className="text-gray-700 text-xs">• 20% high intensity (Zone 3-5)</p>
-              </div>
-              <div>
-                <h3 className="font-medium mb-1 text-xs">Progressive Overload</h3>
-                <p className="text-gray-700 text-xs">• Base (1-5): Build foundation</p>
-                <p className="text-gray-700 text-xs">• Build (6-8): Increase intensity</p>
-                <p className="text-gray-700 text-xs">• Peak (9-11): Race-specific</p>
-                <p className="text-gray-700 text-xs">• Taper (12): Reduce volume</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div>
-
-          {/* Week Navigation - Full Width Swipe */}
-          <div className="w-full bg-white border-t border-gray-200">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Your Training Plan</h3>
-              <div className="flex items-center space-x-1 text-sm text-gray-500">
-                <span>Swipe to navigate weeks</span>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </div>
-            </div>
-            
-            {/* Week Navigation Controls */}
-            <div className="flex items-center justify-between mb-4">
-              {/* Desktop Navigation Buttons */}
-              <div className="hidden md:flex items-center space-x-2">
-                <button
-                  onClick={prevWeek}
-                  disabled={currentWeek === 0}
-                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <span className="text-sm text-gray-600">
-                  Week {currentWeek + 1} of {plan?.weeks?.length || 0}
-                </span>
-                <button
-                  onClick={nextWeek}
-                  disabled={currentWeek >= (plan?.weeks?.length || 0) - 1}
-                  className="p-2 rounded-full bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Mobile Week Indicator Dots */}
-              <div className="flex md:hidden justify-center space-x-2">
-                {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((_, weekIndex) => (
-                  <button
-                    key={weekIndex}
-                    onClick={() => goToWeek(weekIndex)}
-                    className={`w-2 h-2 rounded-full transition-colors ${
-                      currentWeek === weekIndex
-                        ? 'bg-blue-600'
-                        : 'bg-gray-300'
-                    }`}
-                  />
-                )) : (
-                  <div className="text-sm text-gray-500">Loading weeks...</div>
-                )}
-              </div>
-
-              {/* Desktop Week Selector */}
-              <div className="hidden md:flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Go to:</span>
-                <select
-                  value={currentWeek}
-                  onChange={(e) => goToWeek(parseInt(e.target.value))}
-                  className="text-sm border border-gray-300 rounded px-2 py-1"
-                >
-                  {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((_, weekIndex) => (
-                    <option key={weekIndex} value={weekIndex}>
-                      Week {weekIndex + 1}
-                    </option>
-                  )) : (
-                    <option>Loading...</option>
-                  )}
-                </select>
-              </div>
-            </div>
-            
-            {/* Full Week Swipeable Area */}
-            <div 
-              className="w-full h-auto min-h-96 relative overflow-hidden"
-              onTouchStart={onTouchStart}
-              onTouchMove={onTouchMove}
-              onTouchEnd={onTouchEnd}
-            >
-              <div 
-                className="flex transition-transform duration-300 ease-out"
-                style={{ transform: `translateX(-${currentWeek * 100}%)` }}
-              >
-                {plan.weeks && plan.weeks.length > 0 ? plan.weeks.map((week, weekIndex) => (
-                  <div key={weekIndex} className="w-full flex-shrink-0">
-                    <div className="text-center mb-4">
-                      <h4 className="text-lg font-semibold">
-                        Week {weekIndex + 1} - {week.phase.charAt(0).toUpperCase() + week.phase.slice(1)} Phase
-                      </h4>
-                      <p className="text-sm text-gray-600">
-                        {week.sessions.length} sessions • {week?.totalHours ? week.totalHours.toFixed(1) : '0.0'} hours
-                      </p>
-                    </div>
-                    
-                    {/* Week Workouts */}
-                    <div className="space-y-4">
-                      {(() => {
-                        // Group sessions by day
-                        const sessionsByDay = week.sessions.reduce((acc, session) => {
-                          if (!acc[session.day]) {
-                            acc[session.day] = [];
-                          }
-                          acc[session.day].push(session);
-                          return acc;
-                        }, {} as Record<string, any[]>);
-
-                        // Show all 7 days, including rest days
-                        const allDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
-                        
-                        return allDays.map((day, dayIndex) => {
-                          const sessions = sessionsByDay[day] || [];
-                          const hasSessions = sessions.length > 0;
-                          
-                          return (
-                          <div key={`${day}-${dayIndex}`} className="mb-4">
-                            {/* Day Header */}
-                            <div className="flex items-center justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-sm text-gray-900">{day}</span>
-                                {sessions.length > 1 && (
-                                  <span className="text-xs text-gray-500">
-                                    {sessions.length} sessions
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {Math.round(sessions.reduce((total, session) => total + session.duration, 0))}min
-                              </div>
-                            </div>
-                            
-                            {/* Sessions */}
-                            <div>
-                              {!hasSessions ? (
-                                // Rest day
-                                <div className="text-xs text-gray-500 italic">
-                                  Rest
-                                </div>
-                              ) : sessions.length === 1 ? (
-                                // Single session
-                                <div>
-                                  <div className="flex items-center gap-3 mb-2">
-                                    <span className="text-xs font-medium text-gray-700">
-                                      {sessions[0].discipline.toUpperCase()}
-                                    </span>
-                                    {sessions[0].type && (
-                                      <span className="text-xs font-medium text-gray-500">
-                                        {sessions[0].type}
-                                      </span>
-                                    )}
-                                  </div>
-                                  {sessions[0].detailedWorkout && (
-                                    <div className="mt-1">
-                                      <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
-                                      <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{sessions[0].detailedWorkout}</pre>
-                                    </div>
-                                  )}
-                                </div>
-                              ) : (
-                                // Multiple sessions - stacked vertically
-                                <div className="space-y-2">
-                                  {sessions.map((session, sessionIndex) => (
-                                    <div key={sessionIndex} className="pb-3 last:pb-0">
-                                      <div className="flex items-center gap-3 mb-2">
-                                        <span className="text-xs font-medium text-gray-700">
-                                          {session.discipline.toUpperCase()}
-                                        </span>
-                                        {session.type && (
-                                          <span className="text-xs font-medium text-gray-500">
-                                            {session.type}
-                                          </span>
-                                        )}
-                                        <span className="text-sm text-gray-500">
-                                          ({Math.round(session.duration)}min)
-                                        </span>
-                                      </div>
-                                      {session.detailedWorkout && (
-                                        <div className="mt-1">
-                                          <p className="text-xs font-medium mb-1 text-gray-800">Details:</p>
-                                          <pre className="text-xs text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        );
-                        });
-                      })()}
-                    </div>
-                  </div>
-                )) : (
-                  <div className="w-full flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="text-lg text-gray-600 mb-2">Loading Plan...</div>
-                      <div className="text-sm text-gray-500">Generating your personalized training plan</div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-
-          
-                      {/* Save Button - At Bottom */}
-            <div className="w-full bg-white border-t border-gray-200 mt-6">
-            <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-medium hover:bg-blue-700 transition-colors">
-              Save Plan
-            </button>
-          </div>
-        </div>
+      <div className="max-w-2xl mx-auto p-6">
+        {renderStep()}
       </div>
     );
   }
+
+  const currentWeekData = plan.weeks[currentWeek];
+  const totalWeeks = plan.weeks.length;
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="w-full">
-        {renderStep()}
+    <div className="max-w-4xl mx-auto p-6">
+      {/* Week Navigation */}
+      <div className="w-full bg-white">
+        <div className="flex items-center justify-between mb-6">
+          <button
+            onClick={prevWeek}
+            disabled={currentWeek === 0}
+            className="p-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            ←
+          </button>
+          
+          <div className="text-center">
+            <h1 className="text-2xl font-semibold">Week {currentWeek + 1} of {totalWeeks}</h1>
+                         <p className="text-sm text-gray-600">{plan.event} Training Plan</p>
+          </div>
+          
+          <button
+            onClick={nextWeek}
+            disabled={currentWeek === totalWeeks - 1}
+            className="p-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            →
+          </button>
+        </div>
+        
+        {/* Week Dots */}
+        <div className="flex justify-center space-x-2 mb-6">
+          {plan.weeks.map((_, index) => (
+            <button
+              key={index}
+              onClick={() => goToWeek(index)}
+              className={`w-2 h-2 transition-colors ${
+                index === currentWeek
+                  ? 'bg-gray-900'
+                  : 'bg-gray-300 hover:bg-gray-400'
+              }`}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Total Hours Summary */}
+      <div className="mb-6 p-4 bg-gray-50">
+        <div className="text-sm font-medium text-gray-900 mb-2">Week {currentWeek + 1} Summary:</div>
+        <div className="text-sm text-gray-700">
+          <strong>Total Hours:</strong> {Math.round(currentWeekData.sessions.reduce((total, session) => total + session.duration, 0) / 60 * 10) / 10} hours
+          <br />
+          <strong>Total Sessions:</strong> {currentWeekData.sessions.length} sessions
+          <br />
+          <strong>Strength Sessions:</strong> {currentWeekData.sessions.filter(s => s.discipline === 'strength').length} sessions
+        </div>
+      </div>
+
+      {/* Week Content */}
+      <div className="space-y-6">
+        {(() => {
+          // Group sessions by day
+          const sessionsByDay: { [key: string]: any[] } = {};
+          currentWeekData.sessions.forEach(session => {
+            if (!sessionsByDay[session.day]) {
+              sessionsByDay[session.day] = [];
+            }
+            sessionsByDay[session.day].push(session);
+          });
+
+          // Display grouped sessions
+          return Object.entries(sessionsByDay).map(([day, sessions]) => (
+            <div key={day} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">{day}</h3>
+                <span className="text-sm text-gray-600">{sessions.length} session{sessions.length > 1 ? 's' : ''}</span>
+              </div>
+              
+              {sessions.map((session, index) => (
+                <div key={index} className="space-y-2 ml-4 border-l-2 border-gray-200 pl-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">{session.discipline}</span>
+                    <span className="text-xs text-gray-500">{session.duration} min</span>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <div className="text-sm text-gray-600">
+                      <strong>Type:</strong> {session.type}
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <strong>Intensity:</strong> {session.intensity}
+                    </div>
+                    {session.description && (
+                      <div className="text-sm text-gray-600">
+                        <strong>Description:</strong> {session.description}
+                      </div>
+                    )}
+                    {session.detailedWorkout && (
+                      <div className="mt-3 p-3 bg-gray-50">
+                        <div className="text-sm font-medium text-gray-900 mb-2">Workout Details:</div>
+                        <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ));
+        })()}
+      </div>
+
+      {/* Bottom Navigation */}
+      <div className="w-full bg-white mt-6">
+        <button 
+          onClick={() => setPlan(null)}
+          className="w-full py-3 px-6 font-medium hover:bg-gray-50 transition-colors"
+        >
+          Create New Plan
+        </button>
       </div>
     </div>
   );
