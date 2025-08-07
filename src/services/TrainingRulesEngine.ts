@@ -2166,7 +2166,8 @@ export class TrainingRulesEngine {
         hasBrickSession = true;
       }
       
-      // Calculate polarized distribution for remaining sessions
+      // SCIENCE-BASED: Calculate proper 80/20 polarized distribution
+      // For 4 total sessions: 3.2 easy (80%) + 0.8 hard (20%) = 3 easy, 1 hard
       const easySessions = Math.round(adjustedTotalSessions * 0.8);
       const hardSessions = adjustedTotalSessions - easySessions;
       
@@ -2182,11 +2183,11 @@ export class TrainingRulesEngine {
         const day = this.getNextAvailableDay(availableDays, strengthDays, i, 2); // Skip 2 days between hard sessions
         hardSessionDays.push(day);
         const discipline = this.getDisciplineForDay(i, facts);
-        // SCIENCE-BASED: Use "tempo" for hard sessions in polarized training
+        // SCIENCE-BASED: Use "threshold" for hard sessions in polarized training (Zone 4)
         distribution.push({
           day,
           discipline,
-          type: 'tempo'
+          type: 'threshold'
         });
       }
       
@@ -2254,14 +2255,14 @@ export class TrainingRulesEngine {
         distribution[longDayExists] = {
           day: longDay,
           discipline: 'brick',
-          type: 'endurance' // SCIENCE-BASED: Brick sessions are endurance-focused
+          type: 'threshold' // SCIENCE-BASED: Brick sessions are hard sessions (Zone 4)
         };
       } else {
         // Add brick session to user's chosen long day (counts as hard session)
         distribution.push({
           day: longDay,
           discipline: 'brick',
-          type: 'endurance' // SCIENCE-BASED: Brick sessions are endurance-focused
+          type: 'threshold' // SCIENCE-BASED: Brick sessions are hard sessions (Zone 4)
         });
       }
     }
