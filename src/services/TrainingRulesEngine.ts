@@ -2091,11 +2091,12 @@ export class TrainingRulesEngine {
   }
 
   private mapIntensityToType(intensity: string, discipline: string): 'recovery' | 'endurance' | 'tempo' | 'threshold' | 'vo2max' {
-    if (intensity === 'low') return 'recovery';
-    if (intensity === 'medium') return 'endurance';
+    // SCIENCE-BASED: Correct session type mapping for training
+    if (intensity === 'low') return 'endurance'; // Zone 2, easy but not recovery
+    if (intensity === 'medium') return 'tempo'; // Zone 3, moderate intensity
     if (intensity === 'high') {
-      // For strength, use threshold; for others, use tempo
-      return discipline === 'strength' ? 'threshold' : 'tempo';
+      // For strength, use threshold; for others, use threshold for very hard sessions
+      return discipline === 'strength' ? 'threshold' : 'threshold';
     }
     
     // If intensity is not recognized, throw error instead of defaulting
@@ -2181,6 +2182,7 @@ export class TrainingRulesEngine {
         const day = this.getNextAvailableDay(availableDays, strengthDays, i, 2); // Skip 2 days between hard sessions
         hardSessionDays.push(day);
         const discipline = this.getDisciplineForDay(i, facts);
+        // SCIENCE-BASED: Use "tempo" for hard sessions in polarized training
         distribution.push({
           day,
           discipline,
@@ -2200,10 +2202,11 @@ export class TrainingRulesEngine {
         if (i < optimizedRemainingDays.length) {
           const day = optimizedRemainingDays[i];
           const discipline = this.getDisciplineForDay(i + hardSessions, facts);
+          // SCIENCE-BASED: Use "endurance" for easy sessions in polarized training (80% of sessions)
           distribution.push({
             day,
             discipline,
-            type: 'recovery'
+            type: 'endurance'
           });
         }
       }
@@ -2213,7 +2216,7 @@ export class TrainingRulesEngine {
         distribution.push({
           day: strengthDay.day,
           discipline: 'strength',
-          type: 'endurance' // Strength is typically endurance-focused
+          type: 'threshold' // SCIENCE-BASED: Strength training is threshold intensity
         });
       });
     } else {
@@ -2236,7 +2239,7 @@ export class TrainingRulesEngine {
         distribution.push({
           day: strengthDay.day,
           discipline: 'strength',
-          type: 'endurance'
+          type: 'threshold' // SCIENCE-BASED: Strength training is threshold intensity
         });
       });
     }
@@ -2251,14 +2254,14 @@ export class TrainingRulesEngine {
         distribution[longDayExists] = {
           day: longDay,
           discipline: 'brick',
-          type: 'endurance' // Brick is hard session
+          type: 'endurance' // SCIENCE-BASED: Brick sessions are endurance-focused
         };
       } else {
         // Add brick session to user's chosen long day (counts as hard session)
         distribution.push({
           day: longDay,
           discipline: 'brick',
-          type: 'endurance' // Brick is hard session
+          type: 'endurance' // SCIENCE-BASED: Brick sessions are endurance-focused
         });
       }
     }
