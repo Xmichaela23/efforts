@@ -107,9 +107,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         throw new Error('User must be logged in');
       }
 
-      // Calculate 90 days ago (for training analysis) with ±1s nudge to avoid duplicate range conflicts
-      const endDate = Math.floor(Date.now() / 1000) + 1; // nudge +1s
-      const startDate = endDate - (90 * 24 * 60 * 60) - 1; // nudge -1s
+      // Calculate 90 days ago (for training analysis) with ±60s nudge to avoid duplicate range conflicts
+      const endDate = Math.floor(Date.now() / 1000) + 60; // nudge +60s
+      const startDate = endDate - (90 * 24 * 60 * 60) - 60; // nudge -60s
 
       // Call backfill API via swift-task proxy
       const response = await fetch(
@@ -152,9 +152,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         throw new Error('User must be logged in');
       }
 
-      // Calculate 90 days ago (for workout history) with ±1s nudge
-      const endDate = Math.floor(Date.now() / 1000) + 1; // nudge +1s
-      const startDate = endDate - (90 * 24 * 60 * 60) - 1; // nudge -1s
+      // Calculate 90 days ago (for workout history) with ±60s nudge
+      const endDate = Math.floor(Date.now() / 1000) + 60; // nudge +60s
+      const startDate = endDate - (90 * 24 * 60 * 60) - 60; // nudge -60s
 
       // Call backfill API via swift-task proxy
       const response = await fetch(
