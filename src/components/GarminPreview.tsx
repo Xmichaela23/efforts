@@ -152,32 +152,49 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         throw new Error('User must be logged in');
       }
 
-      // Calculate 90 days ago (for workout history) with ±60s nudge
-      const endDate = Math.floor(Date.now() / 1000) + 60; // nudge +60s
-      const startDate = endDate - (90 * 24 * 60 * 60) - 60; // nudge -60s
-
-      // Call backfill API via swift-task proxy
-      const response = await fetch(
-        `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=${startDate}&summaryEndTimeInSeconds=${endDate}&token=${accessToken}`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json'
+      // Helper to call the swift-task backfill for a given window
+      const callBackfill = async (start: number, end: number) => {
+        const res = await fetch(
+          `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=${start}&summaryEndTimeInSeconds=${end}&token=${accessToken}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            }
           }
-        }
-      );
+        );
+        return res.status;
+      };
 
-      // Backfill returns 202 (accepted), not 200
-      if (response.status === 202) {
+      // Build three non-overlapping ~30-day windows with ±60s nudge
+      const now = Math.floor(Date.now() / 1000);
+      const day = 24 * 60 * 60;
+      const end3 = now + 60;                // [now-30d-60s, now+60s]
+      const start3 = end3 - (30 * day) - 60;
+      const end2 = start3 + 60;             // [now-60d-60s, now-30d+60s]
+      const start2 = end2 - (30 * day) - 60;
+      const end1 = start2 + 60;             // [now-90d-60s, now-60d+60s]
+      const start1 = end1 - (30 * day) - 60;
+
+      const statuses: number[] = [];
+      for (const [s, e] of [[start1, end1], [start2, end2], [start3, end3]] as [number, number][]) {
+        try {
+          const status = await callBackfill(s, e);
+          statuses.push(status);
+        } catch (e) {
+          // keep going; a window may have been previously processed
+        }
+      }
+
+      // Consider success if any window returned 202 or 409 (already processed)
+      if (statuses.some((st) => st === 202 || st === 409)) {
         setHistoryStatus('success');
-        // Auto-redirect after success message
         setTimeout(() => {
-          // Navigate to main dashboard (user will see populated Completed dropdown)
           window.location.href = '/';
         }, 2000);
       } else {
-        throw new Error(`Workout history backfill failed: ${response.status}`);
+        throw new Error(`Workout history backfill failed: ${statuses.join(',') || 'no response'}`);
       }
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Failed to request workout history');
