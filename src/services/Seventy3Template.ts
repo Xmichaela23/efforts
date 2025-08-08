@@ -96,9 +96,9 @@ export function getSeventy3Template(trainingFrequency: number, phase: string = '
       baseSessions = [
         { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Recovery Swim', zones: [2] },
         { day: 'Tuesday', discipline: 'bike', type: 'tempo', duration: 75, intensity: 'Zone 3', description: 'Tempo Bike', zones: [3] },
-        { day: 'Wednesday', discipline: 'bike', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Easy Bike', zones: [2] },
+        { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy Run', zones: [2] },
         { day: 'Thursday', discipline: 'swim', type: 'threshold', duration: 40, intensity: 'Zone 4', description: 'Threshold Swim', zones: [4] },
-        { day: 'Friday', discipline: 'run', type: 'threshold', duration: 50, intensity: 'Zone 4', description: 'Threshold Run', zones: [4] },
+        { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy Bike', zones: [2] },
         { day: 'Saturday', discipline: 'bike', type: 'endurance', duration: 135, intensity: 'Zone 2', description: 'Long Bike', zones: [2] },
         { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 105, intensity: 'Zone 2', description: 'Long Run', zones: [2] }
       ];
@@ -108,9 +108,9 @@ export function getSeventy3Template(trainingFrequency: number, phase: string = '
       baseSessions = [
         { day: 'Monday', discipline: 'swim', type: 'endurance', duration: 45, intensity: 'Zone 2', description: 'Recovery Swim', zones: [2] },
         { day: 'Tuesday', discipline: 'bike', type: 'vo2max', duration: 60, intensity: 'Zone 5', description: 'VO2 Max Bike', zones: [5] },
-        { day: 'Wednesday', discipline: 'bike', type: 'endurance', duration: 90, intensity: 'Zone 2', description: 'Easy Bike', zones: [2] },
+        { day: 'Wednesday', discipline: 'run', type: 'endurance', duration: 60, intensity: 'Zone 2', description: 'Easy Run', zones: [2] },
         { day: 'Thursday', discipline: 'swim', type: 'threshold', duration: 35, intensity: 'Zone 4', description: 'Threshold Swim', zones: [4] },
-        { day: 'Friday', discipline: 'run', type: 'vo2max', duration: 45, intensity: 'Zone 5', description: 'VO2 Max Run', zones: [5] },
+        { day: 'Friday', discipline: 'bike', type: 'endurance', duration: 75, intensity: 'Zone 2', description: 'Easy Bike', zones: [2] },
         { day: 'Saturday', discipline: 'bike', type: 'endurance', duration: 150, intensity: 'Zone 2', description: 'Long Bike', zones: [2] },
         { day: 'Sunday', discipline: 'run', type: 'endurance', duration: 120, intensity: 'Zone 2', description: 'Long Run', zones: [2] }
       ];

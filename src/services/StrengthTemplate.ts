@@ -232,7 +232,14 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
   const adjustedRowWeight = Math.round(rowWeight * progressionMultiplier);
   
   // Get exercise variations based on week and phase
-  const exerciseVariations = getExerciseVariations(weekNumber || 1, phase, strengthType);
+  const squatVariation = getExerciseVariations(phase, weekNumber || 1, 'squat')[0];
+  const deadliftVariation = getExerciseVariations(phase, weekNumber || 1, 'deadlift')[0];
+  const lungeVariation = getExerciseVariations(phase, weekNumber || 1, 'lunge')[0];
+  const carryVariation = getExerciseVariations(phase, weekNumber || 1, 'carry')[0];
+  const pullVariation = getExerciseVariations(phase, weekNumber || 1, 'pull')[0];
+  const pushVariation = getExerciseVariations(phase, weekNumber || 1, 'push')[0];
+  const rowVariation = getExerciseVariations(phase, weekNumber || 1, 'row')[0];
+  const coreVariation = getExerciseVariations(phase, weekNumber || 1, 'core')[0];
   
   // Check available equipment - match UI options
   const hasFullGym = userEquipment?.strength?.includes('Full commercial gym access') || userEquipment?.strength?.includes('Full barbell + plates');
@@ -257,17 +264,17 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const traditionalLowerReps = isTaperPhase ? 6 : (isBasePhase ? 12 : 10);
       
       if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps} @ ${adjustedSquatWeight}lbs (2min rest), ${exerciseVariations.deadlift} ${traditionalLowerSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps} @ ${adjustedSquatWeight}lbs (2min rest), ${deadliftVariation} ${traditionalLowerSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.deadlift} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${deadliftVariation} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs (2min rest), ${exerciseVariations.deadlift} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs (3min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs (2min rest), ${deadliftVariation} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs (3min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasResistanceBands) {
         return `Warm-up: 5min dynamic stretching\nMain Set: Band Squats ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), Band Deadlifts ${traditionalLowerSets}x8 each (3min rest), Band Lunges ${traditionalLowerSets}x12 each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasBodyweightOnly || !hasBarbell && !hasDumbbells && !hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (3min rest), ${exerciseVariations.lunge} ${traditionalLowerSets}x20 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (3min rest), ${carryVariation} ${traditionalLowerSets}x20 each (2min rest)\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (3min rest), ${exerciseVariations.lunge} ${traditionalLowerSets}x20 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (3min rest), ${carryVariation} ${traditionalLowerSets}x20 each (2min rest)\nCool-down: 5min static stretching`;
       }
       
     case 'traditional_upper':
@@ -276,19 +283,19 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const traditionalUpperReps = isTaperPhase ? 6 : (isBasePhase ? 12 : 10);
       
       if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedBenchWeight}lbs (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedRowWeight}lbs (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedOverheadWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedBenchWeight}lbs (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedRowWeight}lbs (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedOverheadWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasResistanceBands) {
         return `Warm-up: 5min dynamic stretching\nMain Set: Band Push-ups ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), Band Rows ${traditionalUpperSets}x${traditionalUpperReps} each (2min rest), Band Overhead Press ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasPullUpBar) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), Pull-ups ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pullVariation} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${pullVariation} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasBodyweightOnly || !hasBarbell && !hasDumbbells && !hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
       }
       
     case 'traditional':
@@ -297,7 +304,7 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const traditionalReps = isTaperPhase ? 6 : 10;
       
       if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${traditionalSets}x${traditionalReps} @ ${adjustedSquatWeight}lbs (2min rest), Deadlift ${traditionalSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), Bench Press ${traditionalSets}x${traditionalReps} @ ${adjustedBenchWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalSets}x${traditionalReps} @ ${adjustedSquatWeight}lbs (2min rest), ${deadliftVariation} ${traditionalSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), ${benchWeight} ${traditionalSets}x${traditionalReps} @ ${adjustedBenchWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasDumbbells) {
         return `Warm-up: 5min dynamic stretching\nMain Set: Goblet Squats ${traditionalSets}x${traditionalReps} (2min rest), Dumbbell Deadlifts ${traditionalSets}x6 (3min rest), Dumbbell Bench Press ${traditionalSets}x${traditionalReps} (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
@@ -315,13 +322,13 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const cowboyTime = isTaperPhase ? 30 : (isBasePhase ? 60 : 45);
       
       if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.deadlift} ${cowboySets}x8 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${cowboySets}x${cowboyReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${deadliftVariation} ${cowboySets}x8 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${lungeVariation} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs (2min rest), ${exerciseVariations.deadlift} ${cowboySets}x8 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${cowboySets}x${cowboyReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs (2min rest), ${deadliftVariation} ${cowboySets}x8 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs (3min rest), ${lungeVariation} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasBodyweightOnly || !hasDumbbells && !hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${cowboySets}x8 each (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${cowboySets}x${cowboyReps * 2} (2min rest), ${lungeVariation} ${cowboySets}x8 each (3min rest), ${carryVariation} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${cowboySets}x8 each (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${cowboySets}x${cowboyReps * 2} (2min rest), ${lungeVariation} ${cowboySets}x8 each (3min rest), ${carryVariation} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       }
       
     case 'cowboy_endurance_walks':
@@ -330,13 +337,13 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const walksTime = isTaperPhase ? 30 : (isBasePhase ? 60 : 45);
       
       if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec @ ${Math.round(adjustedDeadliftWeight * 0.3)}lbs each (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${carryVariation} ${walksSets}x${walksTime}sec @ ${Math.round(adjustedDeadliftWeight * 0.3)}lbs each (2min rest), ${pullVariation} ${walksSets}x6 (3min rest), ${rowVariation} ${walksSets}x12 each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec @ ${Math.round(adjustedDeadliftWeight * 0.3)}lbs each (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${carryVariation} ${walksSets}x${walksTime}sec @ ${Math.round(adjustedDeadliftWeight * 0.3)}lbs each (2min rest), ${pullVariation} ${walksSets}x6 (3min rest), ${rowVariation} ${walksSets}x12 each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasBodyweightOnly || !hasDumbbells && !hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${carryVariation} ${walksSets}x${walksTime}sec (2min rest), ${pullVariation} ${walksSets}x6 (3min rest), ${rowVariation} ${walksSets}x12 (2min rest)\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${carryVariation} ${walksSets}x${walksTime}sec (2min rest), ${pullVariation} ${walksSets}x6 (3min rest), ${rowVariation} ${walksSets}x12 (2min rest)\nCool-down: 5min static stretching`;
       }
       
     case 'cowboy_endurance_upper':
@@ -344,13 +351,13 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const upperReps = isTaperPhase ? 8 : (isBasePhase ? 15 : 12);
       
       if (hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${upperSets}x${upperReps} @ ${adjustedBenchWeight}lbs, ${exerciseVariations.overhead} ${upperSets}x${upperReps} @ ${adjustedOverheadWeight}lbs, ${exerciseVariations.row} ${upperSets}x${upperReps} @ ${adjustedRowWeight}lbs, ${exerciseVariations.curl} ${upperSets}x12 @ ${Math.round(adjustedBenchWeight * 0.4)}lbs\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${upperSets}x${upperReps} @ ${adjustedBenchWeight}lbs, ${coreVariation} ${upperSets}x${upperReps} @ ${adjustedOverheadWeight}lbs, ${rowVariation} ${upperSets}x${upperReps} @ ${adjustedRowWeight}lbs, ${coreVariation} ${upperSets}x12 @ ${Math.round(adjustedBenchWeight * 0.4)}lbs\nCool-down: 5min static stretching`;
       } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${upperSets}x${upperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each, ${exerciseVariations.overhead} ${upperSets}x${upperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each, ${exerciseVariations.row} ${upperSets}x${upperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each, ${exerciseVariations.curl} ${upperSets}x12 each @ ${Math.round(adjustedBenchWeight * 0.2)}lbs each\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${upperSets}x${upperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each, ${coreVariation} ${upperSets}x${upperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each, ${rowVariation} ${upperSets}x${upperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each, ${coreVariation} ${upperSets}x12 each @ ${Math.round(adjustedBenchWeight * 0.2)}lbs each\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${upperSets}x${upperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs, ${exerciseVariations.overhead} ${upperSets}x${upperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs, ${exerciseVariations.row} ${upperSets}x${upperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each, ${exerciseVariations.curl} ${upperSets}x12 each @ ${Math.round(adjustedBenchWeight * 0.2)}lbs each\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${upperSets}x${upperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs, ${coreVariation} ${upperSets}x${upperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs, ${rowVariation} ${upperSets}x${upperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each, ${coreVariation} ${upperSets}x12 each @ ${Math.round(adjustedBenchWeight * 0.2)}lbs each\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${upperSets}x${upperReps * 2}, ${exerciseVariations.overhead} ${upperSets}x${upperReps}, ${exerciseVariations.row} ${upperSets}x${upperReps}, ${exerciseVariations.curl} ${upperSets}x12\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${upperSets}x${upperReps * 2}, ${coreVariation} ${upperSets}x${upperReps}, ${rowVariation} ${upperSets}x${upperReps}, ${coreVariation} ${upperSets}x12\nCool-down: 5min static stretching`;
       }
       
     default:
@@ -386,42 +393,63 @@ function getProgressionMultiplier(weekNumber: number, phase: string): number {
   return progression;
 }
 
-// Exercise variety: Different variations while maintaining muscle continuity
-function getExerciseVariations(weekNumber: number, phase: string, strengthType: string): any {
+// Exercise variety system with rotation
+const getExerciseVariations = (phase: string, weekNumber: number, exerciseType: string): string[] => {
   const variations = {
-    // Lower body variations
-    squat: ['Goblet Squats', 'Front Squats', 'Back Squats', 'Box Squats', 'Split Squats'],
-    deadlift: ['Dumbbell Deadlifts', 'Romanian Deadlifts', 'Sumo Deadlifts', 'Single-leg Deadlifts', 'Kettlebell Deadlifts'],
-    singleLeg: ['Single-leg Romanian Deadlifts', 'Bulgarian Split Squats', 'Step-ups', 'Single-leg Squats', 'Lateral Lunges'],
-    lunge: ['Walking Lunges', 'Reverse Lunges', 'Lateral Lunges', 'Curtsy Lunges', 'Jumping Lunges'],
-    
-    // Upper body variations
-    bench: ['Dumbbell Bench Press', 'Barbell Bench Press', 'Incline Press', 'Floor Press', 'Push-ups'],
-    overhead: ['Dumbbell Overhead Press', 'Barbell Overhead Press', 'Kettlebell Press', 'Pike Push-ups', 'Handstand Push-ups'],
-    row: ['Dumbbell Rows', 'Barbell Rows', 'Kettlebell Rows', 'Inverted Rows', 'Cable Rows'],
-    pushup: ['Push-ups', 'Diamond Push-ups', 'Wide Push-ups', 'Decline Push-ups', 'Pike Push-ups'],
-    
-    // Functional variations
-    carry: ['Farmer\'s Walks', 'Suitcase Carries', 'Bear Crawls', 'Crab Walks', 'Duck Walks'],
-    pullup: ['Pull-ups', 'Chin-ups', 'Assisted Pull-ups', 'Negative Pull-ups', 'Band-assisted Pull-ups'],
-    curl: ['Dumbbell Curls', 'Barbell Curls', 'Hammer Curls', 'Concentration Curls', 'Preacher Curls']
+    squat: {
+      base: ['Goblet Squats', 'Front Squats', 'Back Squats', 'Bulgarian Split Squats'],
+      build: ['Front Squats', 'Back Squats', 'Bulgarian Split Squats', 'Step-ups'],
+      peak: ['Back Squats', 'Bulgarian Split Squats', 'Pistol Squats', 'Box Jumps'],
+      taper: ['Bodyweight squats', 'Air squats', 'Wall sits', 'Step-ups']
+    },
+    deadlift: {
+      base: ['Dumbbell Deadlifts', 'Romanian Deadlifts', 'Sumo Deadlifts', 'Single-leg Deadlifts'],
+      build: ['Romanian Deadlifts', 'Sumo Deadlifts', 'Single-leg Deadlifts', 'Kettlebell Swings'],
+      peak: ['Sumo Deadlifts', 'Single-leg Deadlifts', 'Clean & Press', 'Snatch Grip Deadlifts'],
+      taper: ['Bodyweight deadlifts', 'Good mornings', 'Bird dogs', 'Superman holds']
+    },
+    lunge: {
+      base: ['Walking Lunges', 'Reverse Lunges', 'Lateral Lunges', 'Split Squats'],
+      build: ['Reverse Lunges', 'Lateral Lunges', 'Split Squats', 'Step-ups'],
+      peak: ['Lateral Lunges', 'Split Squats', 'Box Jumps', 'Plyometric Lunges'],
+      taper: ['Walking lunges', 'Step-ups', 'Bodyweight lunges', 'Wall sits']
+    },
+    carry: {
+      base: ['Farmer\'s Walks', 'Suitcase Carries', 'Bear Crawls', 'Crab Walks'],
+      build: ['Suitcase Carries', 'Bear Crawls', 'Crab Walks', 'Medicine Ball Carries'],
+      peak: ['Bear Crawls', 'Crab Walks', 'Medicine Ball Carries', 'Sandbag Carries'],
+      taper: ['Bodyweight carries', 'Plank walks', 'Crab walks', 'Bear crawls']
+    },
+    pull: {
+      base: ['Pull-ups', 'Chin-ups', 'Assisted Pull-ups', 'Inverted Rows'],
+      build: ['Chin-ups', 'Assisted Pull-ups', 'Inverted Rows', 'TRX Rows'],
+      peak: ['Assisted Pull-ups', 'Inverted Rows', 'TRX Rows', 'Ring Rows'],
+      taper: ['Bodyweight rows', 'Wall rows', 'Inverted rows', 'Assisted pull-ups']
+    },
+    push: {
+      base: ['Dumbbell Bench Press', 'Push-ups', 'Incline Press', 'Decline Push-ups'],
+      build: ['Push-ups', 'Incline Press', 'Decline Push-ups', 'Diamond Push-ups'],
+      peak: ['Incline Press', 'Decline Push-ups', 'Diamond Push-ups', 'Plyometric Push-ups'],
+      taper: ['Push-ups', 'Wall push-ups', 'Incline push-ups', 'Knee push-ups']
+    },
+    row: {
+      base: ['Dumbbell Rows', 'Barbell Rows', 'Kettlebell Rows', 'Single-arm Rows'],
+      build: ['Barbell Rows', 'Kettlebell Rows', 'Single-arm Rows', 'Cable Rows'],
+      peak: ['Kettlebell Rows', 'Single-arm Rows', 'Cable Rows', 'T-bar Rows'],
+      taper: ['Bodyweight rows', 'Band rows', 'Wall rows', 'Inverted rows']
+    },
+    core: {
+      base: ['Planks', 'Side Planks', 'Dead Bugs', 'Bird Dogs'],
+      build: ['Side Planks', 'Dead Bugs', 'Bird Dogs', 'Russian Twists'],
+      peak: ['Dead Bugs', 'Bird Dogs', 'Russian Twists', 'Anti-rotation Press'],
+      taper: ['Planks', 'Side planks', 'Dead bugs', 'Bird dogs']
+    }
   };
-  
-  // Select variations based on week cycle and phase
-  const weekCycle = (weekNumber - 1) % 4; // 4-week cycle
-  const phaseCycle = phase === 'base' ? 0 : phase === 'build' ? 1 : phase === 'peak' ? 2 : 3;
-  
-  const selectedVariations: any = {};
-  
-  // Select exercises based on week cycle and phase
-  Object.keys(variations).forEach(muscleGroup => {
-    const exerciseList = variations[muscleGroup as keyof typeof variations];
-    const index = (weekCycle + phaseCycle) % exerciseList.length;
-    selectedVariations[muscleGroup] = exerciseList[index];
-  });
-  
-  return selectedVariations;
-}
+
+  const phaseVariations = variations[exerciseType as keyof typeof variations]?.[phase as keyof typeof variations.squat] || variations.squat.base;
+  const weekCycle = (weekNumber - 1) % phaseVariations.length;
+  return [phaseVariations[weekCycle]];
+};
 
 function getPhaseIntensityMultiplier(phase: string): number {
   switch (phase) {
