@@ -4,42 +4,63 @@
 const SUPABASE_FUNCTION_BASE = 'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task';
 
 export interface GarminActivity {
-activityId: number;
-activityName: string;
-activityType: {
-  typeId: number;
-  typeKey: string;
-  parentTypeId?: number;
-};
-eventType: {
-  typeId: number;
-  typeKey: string;
-};
-startTimeLocal: string;
-startTimeGMT: string;
-distance: number;
-duration: number;
-movingDuration: number;
-elapsedDuration: number;
-elevationGain: number;
-elevationLoss: number;
-averageSpeed: number;
-maxSpeed: number;
-averageHR?: number;
-maxHR?: number;
-averagePower?: number;
-maxPower?: number;
-normalizedPower?: number;
-calories: number;
-averageRunningCadence?: number;
-maxRunningCadence?: number;
-strokes?: number;
-poolLength?: number;
-unitOfPoolLength?: {
-  unitId: number;
-  unitKey: string;
-  factor: number;
-};
+  activityId: number;
+  activityName: string;
+  activityType: {
+    typeId: number;
+    typeKey: string;
+    parentTypeId?: number;
+  };
+  eventType: {
+    typeId: number;
+    typeKey: string;
+  };
+  startTimeLocal: string;
+  startTimeGMT: string;
+  distance: number;
+  duration: number;
+  movingDuration: number;
+  elapsedDuration: number;
+  elevationGain: number;
+  elevationLoss: number;
+  averageSpeed: number;
+  maxSpeed: number;
+  averageHR?: number;
+  maxHR?: number;
+  averagePower?: number;
+  maxPower?: number;
+  normalizedPower?: number;
+  calories: number;
+  averageRunningCadence?: number;
+  maxRunningCadence?: number;
+  strokes?: number;
+  poolLength?: number;
+  unitOfPoolLength?: {
+    unitId: number;
+    unitKey: string;
+    factor: number;
+  };
+  // Additional metrics
+  averagePace?: number;
+  maxPace?: number;
+  averageCadence?: number;
+  maxCadence?: number;
+  // Training load metrics
+  tss?: number;
+  intensityFactor?: number;
+  // Additional power metrics
+  functionalThresholdPower?: number;
+  // Additional heart rate metrics
+  hrv?: number;
+  // Additional speed metrics
+  averageSpeedMph?: number;
+  maxSpeedMph?: number;
+  // Additional distance metrics
+  distanceMiles?: number;
+  distanceYards?: number;
+  // Additional time metrics
+  movingTime?: number;
+  elapsedTime?: number;
 }
 
 export interface DetectedMetric {
@@ -176,18 +197,45 @@ static async fetchRecentActivities(): Promise<GarminActivity[]> {
       elevationGain: activity.elevation_gain_meters || 0,
       elevationLoss: activity.elevation_loss_meters || 0,
       averageSpeed: activity.avg_speed_mps || 0,
-      maxSpeed: 0,
+      maxSpeed: activity.max_speed_mps || 0,
       averageHR: activity.avg_heart_rate,
       maxHR: activity.max_heart_rate,
       averagePower: activity.avg_power,
       maxPower: activity.max_power,
-      normalizedPower: 0,
+      normalizedPower: activity.normalized_power || 0,
       calories: activity.calories || 0,
-      averageRunningCadence: 0,
-      maxRunningCadence: 0,
-      strokes: 0,
-      poolLength: 0,
-      unitOfPoolLength: undefined
+      // Enhanced cadence data
+      averageRunningCadence: activity.avg_running_cadence || activity.avg_run_cadence || 0,
+      maxRunningCadence: activity.max_running_cadence || activity.max_run_cadence || 0,
+      // Enhanced swim data
+      strokes: activity.strokes || 0,
+      poolLength: activity.pool_length || 0,
+      unitOfPoolLength: activity.unit_of_pool_length ? {
+        unitId: activity.unit_of_pool_length.unit_id || 0,
+        unitKey: activity.unit_of_pool_length.unit_key || 'meters',
+        factor: activity.unit_of_pool_length.factor || 1
+      } : undefined,
+      // Additional metrics
+      averagePace: activity.avg_pace,
+      maxPace: activity.max_pace,
+      averageCadence: activity.avg_cadence || activity.avg_bike_cadence,
+      maxCadence: activity.max_cadence || activity.max_bike_cadence,
+      // Training load metrics
+      tss: activity.tss || activity.training_stress_score,
+      intensityFactor: activity.intensity_factor || activity.if,
+      // Additional power metrics
+      functionalThresholdPower: activity.ftp || activity.functional_threshold_power,
+      // Additional heart rate metrics
+      hrv: activity.hrv || activity.heart_rate_variability,
+      // Additional speed metrics
+      averageSpeedMph: activity.avg_speed_mph,
+      maxSpeedMph: activity.max_speed_mph,
+      // Additional distance metrics
+      distanceMiles: activity.distance_miles,
+      distanceYards: activity.distance_yards,
+      // Additional time metrics
+      movingTime: activity.moving_time || activity.moving_duration,
+      elapsedTime: activity.elapsed_time || activity.elapsed_duration
     }));
 
     const runningActivities = formattedActivities.filter(a =>

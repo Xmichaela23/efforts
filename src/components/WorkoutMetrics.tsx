@@ -1,12 +1,13 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Activity, Clock, Zap, Heart } from 'lucide-react';
+import { Activity, Clock, Zap, Heart, TrendingUp, MapPin, Droplets } from 'lucide-react';
 
 interface WorkoutMetricsProps {
   workout: {
+    type?: string;
     distance?: number;
-    duration?: number; // 🔧 ADDED: The actual field name used in the data
+    duration?: number;
     elapsed_time?: number;
     moving_time?: number;
     avg_speed?: number;
@@ -25,6 +26,15 @@ interface WorkoutMetricsProps {
     calories?: number;
     tss?: number;
     intensity_factor?: number;
+    // Swim specific
+    strokes?: number;
+    pool_length?: number;
+    // Run specific
+    avg_running_cadence?: number;
+    max_running_cadence?: number;
+    // Bike specific
+    avg_bike_cadence?: number;
+    max_bike_cadence?: number;
   };
 }
 
@@ -48,51 +58,261 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const formatSpeed = (speed?: number) => {
+    if (!speed) return 'N/A';
+    return `${speed.toFixed(1)} km/h`;
+  };
+
+  const formatPower = (power?: number) => {
+    if (!power) return 'N/A';
+    return `${Math.round(power)}W`;
+  };
+
+  const formatCadence = (cadence?: number) => {
+    if (!cadence) return 'N/A';
+    return `${Math.round(cadence)} rpm`;
+  };
+
+  const formatElevation = (elevation?: number) => {
+    if (!elevation) return 'N/A';
+    return `${Math.round(elevation)}m`;
+  };
+
+  const getWorkoutType = () => {
+    return workout.type || 'ride';
+  };
+
+  const isBike = getWorkoutType() === 'ride' || getWorkoutType() === 'bike';
+  const isRun = getWorkoutType() === 'run';
+  const isSwim = getWorkoutType() === 'swim';
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Distance</CardTitle>
-          <Activity className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{workout.distance?.toFixed(2) || 'N/A'}</div>
-          <p className="text-xs text-muted-foreground">km</p>
-        </CardContent>
-      </Card>
+    <div className="space-y-6">
+      {/* Basic Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Distance</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{workout.distance?.toFixed(2) || 'N/A'}</div>
+            <p className="text-xs text-muted-foreground">km</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Duration</CardTitle>
-          <Clock className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{formatTime(workout.duration || workout.elapsed_time)}</div>
-          <p className="text-xs text-muted-foreground">Moving: {formatTime(workout.moving_time)}</p>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Duration</CardTitle>
+            <Clock className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{formatTime(workout.duration || workout.elapsed_time)}</div>
+            <p className="text-xs text-muted-foreground">Moving: {formatTime(workout.moving_time)}</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Heart Rate</CardTitle>
-          <Heart className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{workout.avg_heart_rate || 'N/A'}</div>
-          <p className="text-xs text-muted-foreground">Max: {workout.max_heart_rate || 'N/A'} bpm</p>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Heart Rate</CardTitle>
+            <Heart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{workout.avg_heart_rate || 'N/A'}</div>
+            <p className="text-xs text-muted-foreground">Max: {workout.max_heart_rate || 'N/A'} bpm</p>
+          </CardContent>
+        </Card>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Power</CardTitle>
-          <Zap className="h-4 w-4 text-muted-foreground" />
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{workout.avg_power || 'N/A'}</div>
-          <p className="text-xs text-muted-foreground">Max: {workout.max_power || 'N/A'} W</p>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Calories</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{workout.calories || 'N/A'}</div>
+            <p className="text-xs text-muted-foreground">kcal</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Sport-Specific Metrics */}
+      {isBike && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Power</CardTitle>
+              <Zap className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatPower(workout.avg_power)}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatPower(workout.max_power)}</p>
+              {workout.normalized_power && (
+                <p className="text-xs text-muted-foreground">NP: {formatPower(workout.normalized_power)}</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Speed</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatSpeed(workout.avg_speed)}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatSpeed(workout.max_speed)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Cadence</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCadence(workout.avg_cadence || workout.avg_bike_cadence)}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatCadence(workout.max_cadence || workout.max_bike_cadence)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Elevation</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatElevation(workout.elevation_gain)}</div>
+              <p className="text-xs text-muted-foreground">Loss: {formatElevation(workout.elevation_loss)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isRun && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pace</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatPace(workout.avg_pace)}</div>
+              <p className="text-xs text-muted-foreground">per km</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Speed</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatSpeed(workout.avg_speed)}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatSpeed(workout.max_speed)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Cadence</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatCadence(workout.avg_running_cadence || workout.avg_cadence)}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatCadence(workout.max_running_cadence || workout.max_cadence)}</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Elevation</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatElevation(workout.elevation_gain)}</div>
+              <p className="text-xs text-muted-foreground">Loss: {formatElevation(workout.elevation_loss)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {isSwim && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pace</CardTitle>
+              <Droplets className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatPace(workout.avg_pace)}</div>
+              <p className="text-xs text-muted-foreground">per 100m</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Strokes</CardTitle>
+              <Activity className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{workout.strokes || 'N/A'}</div>
+              <p className="text-xs text-muted-foreground">total strokes</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pool Length</CardTitle>
+              <Droplets className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{workout.pool_length || 'N/A'}</div>
+              <p className="text-xs text-muted-foreground">meters</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Speed</CardTitle>
+              <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{formatSpeed(workout.avg_speed)}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatSpeed(workout.max_speed)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Training Load Metrics */}
+      {(workout.tss || workout.intensity_factor) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {workout.tss && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Training Stress Score</CardTitle>
+                <Zap className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{workout.tss}</div>
+                <p className="text-xs text-muted-foreground">TSS</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {workout.intensity_factor && (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Intensity Factor</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{workout.intensity_factor.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">IF</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
     </div>
   );
 };

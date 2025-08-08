@@ -330,7 +330,14 @@ export const useWorkouts = () => {
               date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
               duration: Math.round((activity.duration_seconds || 0) / 60),
               distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
+              description: `Imported from Garmin Connect - ${activity.activity_type}`,
+              userComments: "",
+              completedManually: false,
               workout_status: "completed" as const,
+              created_at: activity.created_at || new Date().toISOString(),
+              updated_at: activity.updated_at || new Date().toISOString(),
+              intervals: [],
+              strength_exercises: [],
               
               // GPS and location data
               timestamp: activity.start_time,
@@ -351,7 +358,11 @@ export const useWorkouts = () => {
               avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
               max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
               
-              // Cadence data
+              // Run-specific pace data (convert min/km to seconds for display)
+              avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
+              max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
+              
+              // Cadence data (use run-specific cadence for runs, bike for rides)
               avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
               max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
               
@@ -361,6 +372,40 @@ export const useWorkouts = () => {
               
               // Additional metrics
               avg_temperature: activity.avg_temperature,
+              
+              // Additional optional properties from Workout interface
+              normalized_power: activity.normalized_power,
+              tss: activity.tss,
+              intensity_factor: activity.intensity_factor,
+              max_temperature: activity.max_temperature,
+              total_timer_time: activity.total_timer_time,
+              total_elapsed_time: activity.total_elapsed_time,
+              total_work: activity.total_work,
+              total_descent: activity.total_descent,
+              avg_vam: activity.avg_vam,
+              total_training_effect: activity.total_training_effect,
+              total_anaerobic_effect: activity.total_anaerobic_effect,
+              functional_threshold_power: activity.functional_threshold_power,
+              threshold_heart_rate: activity.threshold_heart_rate,
+              hr_calc_type: activity.hr_calc_type,
+              pwr_calc_type: activity.pwr_calc_type,
+              age: activity.age,
+              weight: activity.weight,
+              height: activity.height,
+              gender: activity.gender,
+              default_max_heart_rate: activity.default_max_heart_rate,
+              resting_heart_rate: activity.resting_heart_rate,
+              dist_setting: activity.dist_setting,
+              weight_setting: activity.weight_setting,
+              avg_fractional_cadence: activity.avg_fractional_cadence,
+              avg_left_pedal_smoothness: activity.avg_left_pedal_smoothness,
+              avg_left_torque_effectiveness: activity.avg_left_torque_effectiveness,
+              max_fractional_cadence: activity.max_fractional_cadence,
+              left_right_balance: activity.left_right_balance,
+              threshold_power: activity.threshold_power,
+              total_cycles: activity.total_cycles,
+              deviceInfo: activity.deviceInfo,
+              steps: activity.steps,
               
               // Create comprehensive metrics object for CompletedTab compatibility
               metrics: {
@@ -391,6 +436,7 @@ export const useWorkouts = () => {
                 normalized_power: activity.normalized_power,
                 intensity_factor: activity.intensity_factor,
                 tss: activity.tss,
+                training_stress_score: activity.tss,
                 avg_vam: activity.avg_vam,
                 total_work: activity.total_work,
                 total_descent: activity.total_descent,
@@ -413,6 +459,7 @@ export const useWorkouts = () => {
                 left_right_balance: activity.left_right_balance,
                 threshold_power: activity.threshold_power,
                 total_cycles: activity.total_cycles,
+                max_temperature: activity.max_temperature,
               }
             }));
             console.log(`✅ Found ${garminWorkouts.length} Garmin workouts`);
@@ -609,6 +656,28 @@ export const useWorkouts = () => {
             avg_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.avg_run_cadence : activity.avg_bike_cadence,
             max_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.max_run_cadence : activity.max_bike_cadence,
             
+            // Swim-specific data
+            strokes: activity.strokes || undefined,
+            pool_length: activity.pool_length || undefined,
+            
+            // Training load metrics
+            tss: activity.tss || activity.training_stress_score,
+            intensity_factor: activity.intensity_factor || activity.if,
+            
+            // Additional power metrics
+            normalized_power: activity.normalized_power,
+            
+            // Additional heart rate metrics
+            hrv: activity.hrv || activity.heart_rate_variability,
+            
+            // Additional distance metrics
+            distance_miles: activity.distance_miles,
+            distance_yards: activity.distance_yards,
+            
+            // Additional speed metrics
+            avg_speed_mph: activity.avg_speed_mph,
+            max_speed_mph: activity.max_speed_mph,
+            
             // Run-specific data
             steps: activity.steps,
             
@@ -637,6 +706,16 @@ export const useWorkouts = () => {
               avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
               max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
               steps: activity.steps,
+              // Swim-specific metrics
+              strokes: activity.strokes,
+              pool_length: activity.pool_length,
+              // Training load metrics
+              tss: activity.tss || activity.training_stress_score,
+              intensity_factor: activity.intensity_factor || activity.if,
+              // Additional power metrics
+              normalized_power: activity.normalized_power,
+              // Additional heart rate metrics
+              hrv: activity.hrv || activity.heart_rate_variability,
             }
           };
 
