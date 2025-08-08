@@ -90,6 +90,84 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
 
+  // Format workout display: "Run - Tempo (45min)" or "Lift - Upper"
+  const formatWorkoutDisplay = (workout: any) => {
+    const discipline = getDisciplineName(workout.type);
+    const type = getWorkoutType(workout);
+    
+    if (workout.type === 'strength') {
+      return `${discipline} - ${type}`;
+    } else {
+      const duration = workout.duration ? `(${formatDuration(workout.duration)})` : '';
+      return `${discipline} - ${type} ${duration}`.trim();
+    }
+  };
+
+  // Get discipline name
+  const getDisciplineName = (type: string): string => {
+    switch (type) {
+      case 'run': return 'Run';
+      case 'ride': 
+      case 'bike': return 'Ride';
+      case 'swim': return 'Swim';
+      case 'strength': return 'Lift';
+      case 'mobility': return 'Mobility';
+      default: return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  // Get workout type/focus
+  const getWorkoutType = (workout: any): string => {
+    // Check for specific workout types in name or description
+    const name = workout.name?.toLowerCase() || '';
+    const description = workout.description?.toLowerCase() || '';
+    const text = `${name} ${description}`;
+
+    // Cardio workout types
+    if (text.includes('tempo') || text.includes('threshold')) return 'Tempo';
+    if (text.includes('endurance') || text.includes('long')) return 'Endurance';
+    if (text.includes('intervals') || text.includes('intervals')) return 'Intervals';
+    if (text.includes('drills') || text.includes('technique')) return 'Drills';
+    if (text.includes('easy') || text.includes('recovery')) return 'Easy';
+    if (text.includes('hard') || text.includes('race')) return 'Hard';
+
+    // Strength workout types
+    if (text.includes('upper') || text.includes('push')) return 'Upper';
+    if (text.includes('lower') || text.includes('legs')) return 'Lower';
+    if (text.includes('compound') || text.includes('full')) return 'Compound';
+    if (text.includes('core') || text.includes('abs')) return 'Core';
+
+    // Default types
+    switch (workout.type) {
+      case 'run': return 'Easy';
+      case 'ride': return 'Endurance';
+      case 'swim': return 'Drills';
+      case 'strength': return 'Compound';
+      case 'mobility': return 'Stretch';
+      default: return 'Workout';
+    }
+  };
+
+  // Format duration
+  const formatDuration = (duration: any): string => {
+    if (!duration) return '';
+    
+    const minutes = typeof duration === 'number' ? duration : parseInt(duration);
+    if (isNaN(minutes)) return '';
+    
+    if (minutes < 60) {
+      return `${minutes}min`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      if (remainingMinutes === 0) {
+        return `${hours}h`;
+      } else {
+        return `${hours}h ${remainingMinutes}min`;
+      }
+    }
+  };
+
   // Format the date for display
   const formatDisplayDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
@@ -266,7 +344,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {displayWorkouts.length === 0 ? (
-        // 🔥 COMPRESSED: Minimal empty state
+        // Empty state
         <div className="w-full py-2 px-4">
           <div className="text-center">
             <p className="text-muted-foreground text-xs">
@@ -280,31 +358,46 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           </div>
         </div>
       ) : (
-        // 🔥 COMPRESSED: Tight row of smaller workout symbols
+        // Clean planned workout display
         <div className="w-full px-4">
-          <div className="flex items-center justify-center gap-4 py-3">
+          <div className="space-y-2 py-2">
             {displayWorkouts.map((workout) => (
               <button
                 key={workout.id}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
-                  console.log('🎯 Symbol clicked:', workout);
+                  console.log('🎯 Workout clicked:', workout);
                   onEditEffort && onEditEffort(workout);
                 }}
-                onTouchStart={(e) => {
-                  e.stopPropagation();
-                }}
-                onTouchEnd={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('🎯 Symbol touched:', workout);
-                  onEditEffort && onEditEffort(workout);
-                }}
-                className={`p-3 rounded-lg active:scale-95 transition-transform cursor-pointer ${getIconColor(workout)}`}
-                style={{ minWidth: '44px', minHeight: '44px' }}
+                className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-gray-50 ${
+                  workout.workout_status === 'completed' 
+                    ? 'bg-green-50 border-green-200' 
+                    : 'bg-white border-gray-200'
+                }`}
               >
-                {getIcon(workout.type)}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${getIconColor(workout)}`}>
+                      {getIcon(workout.type)}
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-medium text-sm">
+                        {formatWorkoutDisplay(workout)}
+                      </div>
+                      {workout.workout_status === 'completed' && (
+                        <div className="text-xs text-green-600 font-medium">
+                          Completed
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {workout.duration && (
+                    <div className="text-xs text-muted-foreground">
+                      {formatDuration(workout.duration)}
+                    </div>
+                  )}
+                </div>
               </button>
             ))}
           </div>

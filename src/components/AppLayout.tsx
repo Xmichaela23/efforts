@@ -14,6 +14,7 @@ import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
+import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
@@ -587,13 +588,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : selectedWorkout ? (
-            <div className="pt-4">
-              <WorkoutDetail
+            <div className="pt-4 h-full">
+              <UnifiedWorkoutView
                 workout={selectedWorkout}
                 onUpdateWorkout={handleUpdateWorkout}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
                 onClose={handleBackToDashboard}
+                onDelete={handleDeleteWorkout}
               />
             </div>
           ) : (
