@@ -27,6 +27,8 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
   // Backfill state for workout history (6+ months)
   const [historyStatus, setHistoryStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
   const [historyError, setHistoryError] = useState('');
+  const [directStatus, setDirectStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
+  const [directError, setDirectError] = useState('');
 
   const fetchAndAnalyzeData = async () => {
     setLoading(true);
@@ -202,6 +204,110 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     }
   };
 
+  // Direct 90-day import using Activities API (list + details)
+  const importActivityDetails = async () => {
+    setDirectStatus('requesting');
+    setDirectError('');
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        'https://yyriamwvtvzlkumqrvpm.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+      );
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('User must be logged in');
+
+      // Get user's Garmin connection for garmin_user_id
+      const { data: userConnection } = await supabase
+        .from('user_connections')
+        .select('*')
+        .eq('provider', 'garmin')
+        .single();
+      if (!userConnection) throw new Error('No Garmin connection found');
+
+      const now = new Date();
+      const dayMs = 24 * 60 * 60 * 1000;
+      const windows = [
+        { end: new Date(now.getTime()), start: new Date(now.getTime() - 30 * dayMs) },
+        { end: new Date(now.getTime() - 30 * dayMs + 1000), start: new Date(now.getTime() - 60 * dayMs) },
+        { end: new Date(now.getTime() - 60 * dayMs + 1000), start: new Date(now.getTime() - 90 * dayMs) }
+      ];
+
+      let importedCount = 0;
+
+      for (const w of windows) {
+        // Page through activities list for the window
+        let start = 0;
+        const limit = 100;
+        while (true) {
+          const listUrl = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/modern/proxy/activitylist-service/activities/search/activities?start=${start}&limit=${limit}&startDate=${w.start.toISOString().slice(0,10)}&endDate=${w.end.toISOString().slice(0,10)}&token=${accessToken}`;
+          const listRes = await fetch(listUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json'
+            }
+          });
+          if (!listRes.ok) break;
+          const list = await listRes.json();
+          if (!Array.isArray(list) || list.length === 0) break;
+
+          for (const item of list) {
+            const activityId = item.activityId || item.activityIdStr || item.activityId?.toString();
+            if (!activityId) continue;
+            // Fetch detail
+            const detailUrl = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/modern/proxy/activity-service/activity/${activityId}&token=${accessToken}`;
+            const detRes = await fetch(detailUrl, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            if (!detRes.ok) continue;
+            const detail = await detRes.json();
+
+            // Normalize and upsert into garmin_activities
+            const row = {
+              user_id: session.user.id,
+              garmin_user_id: userConnection.connection_data?.user_id,
+              garmin_activity_id: String(detail.activityId || activityId),
+              activity_type: detail.activityType?.typeKey || item.activityType?.typeKey,
+              start_time: detail.startTimeGMT || detail.startTimeLocal || item.startTimeGMT || item.startTimeLocal,
+              duration_seconds: Math.round(detail.duration || item.duration || 0),
+              distance_meters: detail.distance || item.distance || null,
+              calories: detail.calories || item.calories || null,
+              avg_heart_rate: detail.averageHR || item.averageHR || null,
+              max_heart_rate: detail.maxHR || item.maxHR || null,
+              avg_power: detail.averagePower || item.averagePower || null,
+              max_power: detail.maxPower || item.maxPower || null,
+              avg_speed_mps: detail.averageSpeed || item.averageSpeed || null,
+              max_speed_mps: detail.maxSpeed || item.maxSpeed || null,
+              elevation_gain_meters: detail.elevationGain || item.elevationGain || null,
+              elevation_loss_meters: detail.elevationLoss || item.elevationLoss || null,
+              raw_data: detail
+            } as any;
+
+            await supabase
+              .from('garmin_activities')
+              .upsert(row, { onConflict: 'garmin_activity_id' });
+            importedCount += 1;
+          }
+
+          // Next page
+          start += limit;
+          if (list.length < limit) break;
+        }
+      }
+
+      setDirectStatus('success');
+      // Optionally kick off import to workouts here or instruct user
+    } catch (err) {
+      setDirectError(err instanceof Error ? err.message : 'Failed to import activity details');
+      setDirectStatus('error');
+    }
+  };
+
   const toggleMetric = (metricKey: string) => {
     const newSelected = new Set(selectedMetrics);
     if (newSelected.has(metricKey)) {
@@ -312,12 +418,21 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       <div className="space-y-6">
         <div className="text-center">
           <button
-            onClick={requestHistoricalData}
+            onClick={importActivityDetails}
             className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
           >
             <Download className="h-4 w-4 inline mr-2" />
-            Import 90 Day Workout History
+            Import Activity Details (90 Days)
           </button>
+          {directStatus === 'requesting' && (
+            <p className="text-xs text-gray-500 mt-2">Importing…</p>
+          )}
+          {directStatus === 'error' && (
+            <p className="text-xs text-red-600 mt-2">{directError}</p>
+          )}
+          {directStatus === 'success' && (
+            <p className="text-xs text-green-600 mt-2">Imported. Run Garmin import to map into workouts.</p>
+          )}
         </div>
 
         <div className="text-center">
