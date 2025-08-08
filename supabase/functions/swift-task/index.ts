@@ -1,21 +1,38 @@
+/* global Deno */
+// Declare Deno for TypeScript in this project context (Edge runtime provides it at runtime)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+declare const Deno: any;
 // Supabase Edge Function: swift-task
 // Purpose: Safe proxy for a limited set of Garmin Activities API endpoints
 // Usage (GET):
 //  /functions/v1/swift-task?path=/modern/proxy/activitylist-service/activities/search/activities?start=0&limit=100&startDate=YYYY-MM-DD&endDate=YYYY-MM-DD&token=GARMIN_ACCESS_TOKEN
 //  /functions/v1/swift-task?path=/modern/proxy/activity-service/activity/{activityId}&token=GARMIN_ACCESS_TOKEN
+//  /functions/v1/swift-task?path=/wellness-api/rest/backfill/activities&summaryStartTimeInSeconds=UNIX&summaryEndTimeInSeconds=UNIX&token=GARMIN_ACCESS_TOKEN
 
 // Notes:
 // - Only whitelisted paths are allowed
 // - Requires a valid `token` (Garmin OAuth access token) provided by the client
 // - This function simply forwards the request and returns the upstream response
 
-const GARMIN_BASE = 'https://connectapi.garmin.com';
+const GARMIN_CONNECT_BASE = 'https://connectapi.garmin.com';
+const GARMIN_APIS_BASE = 'https://apis.garmin.com';
+
+function getBaseForPath(path: string): string {
+  // Wellness endpoints live on apis.garmin.com; modern/proxy lives on connectapi.garmin.com
+  if (path.startsWith('/wellness-api/')) return GARMIN_APIS_BASE;
+  return GARMIN_CONNECT_BASE;
+}
 
 function isAllowedPath(path: string): boolean {
   // Restrict to read-only activity endpoints we need
   return (
+    // Modern proxy endpoints (listing + activity details)
     path.startsWith('/modern/proxy/activitylist-service/activities/search/activities') ||
-    path.startsWith('/modern/proxy/activity-service/activity/')
+    path.startsWith('/modern/proxy/activity-service/activity/') ||
+    // Wellness endpoints for official backfill and reads
+    path.startsWith('/wellness-api/rest/activities') ||
+    path.startsWith('/wellness-api/rest/activityDetails') ||
+    path.startsWith('/wellness-api/rest/backfill/activities')
   );
 }
 
@@ -46,7 +63,8 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const target = `${GARMIN_BASE}${path}`;
+    const targetBase = getBaseForPath(path);
+    const target = `${targetBase}${path}`;
 
     const upstream = await fetch(target, {
       method: 'GET',
