@@ -1,6 +1,6 @@
-# Efforts - Joel’s 12‑Week Balanced Triathlon Training
+# Efforts - Proven 12‑Week Balanced Triathlon Training
 
-A React + TypeScript app that generates 12‑week triathlon plans using Joel’s balanced methodology. Rule‑driven, no fallbacks, clean 3‑file engine.
+A React + TypeScript app that generates 12‑week triathlon plans using proven balanced methodology. Rule‑driven, no fallbacks, clean 3‑file engine.
 
 ## Core Philosophy
 - Periodization: Base (1–4), Build (5–8), Peak (9–11), Taper (12)

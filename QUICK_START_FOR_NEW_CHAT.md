@@ -1,6 +1,6 @@
 # Efforts – Quick Start
 
-- Methodology: Joel’s 12‑week balanced system
+- Methodology: Proven 12‑week balanced system
   - Base (1–4), Build (5–8), Peak (9–11), Taper (12)
   - Swim 2, Bike 3 (Taper 2), Run 2; strength phase‑aware
   - Intensity targets: Base 70–85% Z2; Build 50–70%; Peak 40–60%; Taper 70–85%

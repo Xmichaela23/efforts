@@ -1,6 +1,6 @@
-// TrainingEngine.ts - Joel's Proven Methodology Engine
-// The brain that implements Joel's proven 12-week periodization with traditional strength integration
-// Based on Joel's balanced methodology - our single source of truth
+// TrainingEngine.ts - Proven Training Methodology Engine
+// The brain that implements proven 12-week periodization with traditional strength integration
+// Based on proven balanced methodology - our single source of truth
 // No fallbacks, no complexity - just clean, science-based personalization
 
 import { getSeventy3Template, generateDetailedWorkout, SessionTemplate, UserBaselines } from './Seventy3Template';
@@ -226,9 +226,9 @@ export class TrainingEngine {
     return weeks;
   }
 
-  // Based on Joel's proven 12-week periodization with traditional strength integration
+  // Based on proven 12-week periodization with traditional strength integration
   private getPhaseForWeek(weekNum: number, totalWeeks: number = 12): 'base' | 'build' | 'peak' | 'taper' {
-    // Joel's proven 12-week periodization - balanced methodology
+    // Proven 12-week periodization - balanced methodology
     if (weekNum <= 4) return 'base';      // Weeks 1-4: Build aerobic foundation
     if (weekNum <= 8) return 'build';     // Weeks 5-8: Increase intensity and specificity
     if (weekNum <= 11) return 'peak';     // Weeks 9-11: Race-specific training
@@ -631,7 +631,7 @@ export class TrainingEngine {
   // 80/20 Triathlon Volume Progression - Matt Fitzgerald & David Warden (2019)
   // Based on proven training plans with hundreds of successful testimonials
   private getPhaseMultiplier(phase: string, weekNum: number, totalWeeks: number = 12): number {
-    // Joel's conservative scaling to keep moderate plans ~10–12h, peak ~12–14h
+    // Proven conservative scaling to keep moderate plans ~10–12h, peak ~12–14h
     if (phase === 'base') {
       // Base: gentle ramp (weeks 1–4) from 0.9 → 1.0
       const baseWeek = Math.min(weekNum, 4);
@@ -744,17 +744,17 @@ export class TrainingEngine {
     const currentPhase = this.getPhaseForWeek(weekNumber);
     const minBikeForPhase = currentPhase === 'taper' ? 2 : 3;
     
-    // Joel's Proven Methodology Volume Requirements - Based on Joel's training plans for all distances
-    // Based on Joel's proven training plans for all distances
+    // Proven Methodology Volume Requirements - Based on Proven Training Methodology
+    // Based on Proven Training Methodology for all distances
     const minimumSessions = {
       'sprint': { swim: 2, bike: 2, run: 2 },
       'olympic': { swim: 2, bike: 3, run: 2 },
       'seventy3': { 
         swim: 2, bike: minBikeForPhase, run: 2, 
         volume: { 
-          swim: { base: 4000, build: 5000, peak: 6000, taper: 3000 }, // Joel's swim volumes
-          bike: { base: 120, build: 150, peak: 180, taper: 90 },       // Joel's bike volumes
-          run: { base: 60, build: 90, peak: 120, taper: 45 }           // Joel's run volumes
+          swim: { base: 4000, build: 5000, peak: 6000, taper: 3000 }, // Proven swim volumes
+          bike: { base: 120, build: 150, peak: 180, taper: 90 },       // Proven bike volumes
+          run: { base: 60, build: 90, peak: 120, taper: 45 }           // Proven run volumes
         }
       },
       'ironman': { swim: 2, bike: 4, run: 3 }
@@ -788,26 +788,26 @@ export class TrainingEngine {
     let validZone2Range: [number, number];
     let validZone3plusRange: [number, number];
     
-    // Joel's Methodology: Phase-specific intensity distribution
-    // Maintains Joel's balanced approach while adapting to training phase
+    // Proven Methodology: Phase-specific intensity distribution
+    // Maintains Proven balanced approach while adapting to training phase
     switch (phase) {
       case 'base':
-        // Joel's Base: Build aerobic foundation (low intensity focus)
+        // Proven Base: Build aerobic foundation (low intensity focus)
         validZone2Range = [70, 85];
         validZone3plusRange = [15, 30];
         break;
       case 'build':
-        // Joel's Build: Add race-pace work while maintaining balance
+        // Proven Build: Add race-pace work while maintaining balance
         validZone2Range = [50, 70];
         validZone3plusRange = [30, 50];
         break;
       case 'peak':
-        // Joel's Peak: Race-specific training with balanced principles
+        // Proven Peak: Race-specific training with balanced principles
         validZone2Range = [40, 60];
         validZone3plusRange = [40, 60];
         break;
       case 'taper':
-        // Joel's Taper: Reduce volume while maintaining balanced intensity distribution
+        // Proven Taper: Reduce volume while maintaining balanced intensity distribution
         validZone2Range = [70, 85];
         validZone3plusRange = [15, 30];
         break;

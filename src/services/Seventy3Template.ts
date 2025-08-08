@@ -1,5 +1,5 @@
-// Seventy3Template.ts - Joel's Proven Methodology 70.3 Training Template
-// Based on Joel's proven 12-week periodization with traditional strength integration
+// Seventy3Template.ts - Proven Training Methodology 70.3 Training Template
+// Based on proven 12-week periodization with traditional strength integration
 // No fallbacks, no complexity - just clean, science-based 70.3 plans
 
 export interface SessionTemplate {

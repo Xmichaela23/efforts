@@ -10,7 +10,7 @@
 - `StrengthTemplate.ts` – Traditional/Cowboy generation with spacing/recovery rules
 - `TrainingEngine.ts` – periodization, scaling, validation (phase‑aware minimums, intensity, recovery)
 
-## 🧭 Training Blueprint (Joel)
+## 🧭 Training Blueprint (Proven Training Methodology)
 - Phases: Base (1–4), Build (5–8), Peak (9–11), Taper (12)
 - Weekly pattern: Swim 2; Bike 3 (Tue hard, mid‑week Z2, Sat long; Taper 2); Run 2
 - Strength: Traditional 2/1–2/0–1; Cowboy 3/2/1 with taper auto‑limit
