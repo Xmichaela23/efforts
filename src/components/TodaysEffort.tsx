@@ -314,18 +314,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   if (loading) {
     return (
-      <div className="w-full py-2">
-        <div className="text-center">
-          <p className="text-muted-foreground text-sm">Loading...</p>
-        </div>
+      <div className="w-full h-32 flex items-center justify-center" style={{fontFamily: 'Inter, sans-serif'}}>
+        <p className="text-muted-foreground text-sm">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full" style={{fontFamily: 'Inter, sans-serif'}}>
-      {/* 🔥 COMPRESSED: Minimal header with inline layout */}
-      <div className="flex items-center justify-between mb-3 px-4">
+    <div className="w-full h-32 flex flex-col" style={{fontFamily: 'Inter, sans-serif'}}>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">
@@ -343,11 +341,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         <AddEffortDropdown />
       </div>
 
-      {displayWorkouts.length === 0 ? (
-        // Empty state
-        <div className="w-full py-2 px-4">
-          <div className="text-center">
-            <p className="text-muted-foreground text-xs">
+      {/* Content area - fills remaining space */}
+      <div className="flex-1 overflow-auto">
+        {displayWorkouts.length === 0 ? (
+          // Empty state
+          <div className="flex items-center justify-center h-full px-4">
+            <p className="text-muted-foreground text-xs text-center">
               {isPastDate 
                 ? 'No effort logged' 
                 : isToday 
@@ -356,53 +355,53 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               }
             </p>
           </div>
-        </div>
-      ) : (
-        // Clean planned workout display
-        <div className="w-full px-4">
-          <div className="space-y-2 py-2">
-            {displayWorkouts.map((workout) => (
-              <button
-                key={workout.id}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  console.log('🎯 Workout clicked:', workout);
-                  onEditEffort && onEditEffort(workout);
-                }}
-                className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-gray-50 ${
-                  workout.workout_status === 'completed' 
-                    ? 'bg-green-50 border-green-200' 
-                    : 'bg-white border-gray-200'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${getIconColor(workout)}`}>
-                      {getIcon(workout.type)}
-                    </div>
-                    <div className="flex-1">
-                      <div className="font-medium text-sm">
-                        {formatWorkoutDisplay(workout)}
+        ) : (
+          // Clean planned workout display
+          <div className="px-4 pb-2">
+            <div className="space-y-2">
+              {displayWorkouts.map((workout) => (
+                <button
+                  key={workout.id}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('🎯 Workout clicked:', workout);
+                    onEditEffort && onEditEffort(workout);
+                  }}
+                  className={`w-full text-left p-2 rounded-lg border transition-colors hover:bg-gray-50 ${
+                    workout.workout_status === 'completed' 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-white border-gray-200'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className={`p-1.5 rounded-lg ${getIconColor(workout)}`}>
+                        {getIcon(workout.type)}
                       </div>
-                      {workout.workout_status === 'completed' && (
-                        <div className="text-xs text-green-600 font-medium">
-                          Completed
+                      <div className="flex-1">
+                        <div className="font-medium text-sm">
+                          {formatWorkoutDisplay(workout)}
                         </div>
-                      )}
+                        {workout.workout_status === 'completed' && (
+                          <div className="text-xs text-green-600 font-medium">
+                            Completed
+                          </div>
+                        )}
+                      </div>
                     </div>
+                    {workout.duration && (
+                      <div className="text-xs text-muted-foreground">
+                        {formatDuration(workout.duration)}
+                      </div>
+                    )}
                   </div>
-                  {workout.duration && (
-                    <div className="text-xs text-muted-foreground">
-                      {formatDuration(workout.duration)}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
