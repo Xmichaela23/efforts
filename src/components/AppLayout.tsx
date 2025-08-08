@@ -55,11 +55,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
 
-  // Ultra-simple transform state
-  const [transform, setTransform] = useState(0);
-  const [isSwipeDetected, setIsSwipeDetected] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const wrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (selectedWorkout) {
@@ -74,147 +70,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [selectedWorkout?.id]);
 
-  // Simple transform sync
-  useEffect(() => {
-    setTransform(showSummary ? -50 : 0);
-  }, [showSummary]);
 
-  // Add modern swipe handlers
-  useEffect(() => {
-    const container = containerRef.current;
-    const wrapper = wrapperRef.current;
-    if (!container || !wrapper) return;
 
-    let startX = 0;
-    let currentX = 0;
-    let isPointerDown = false;
-    let hasMovedHorizontally = false;
 
-    const handlePointerDown = (clientX: number) => {
-      startX = clientX;
-      currentX = clientX;
-      isPointerDown = true;
-      hasMovedHorizontally = false;
-      // Disable CSS transition for live tracking
-      wrapper.style.transition = 'none';
-    };
-
-    const handlePointerMove = (clientX: number, preventDefault: () => void) => {
-      if (!isPointerDown) return;
-      currentX = clientX;
-      const deltaX = currentX - startX;
-      const deltaY = 0; // We don't track Y for simplicity
-
-      // Start horizontal movement immediately on any horizontal motion
-      if (Math.abs(deltaX) > 2) {
-        if (!hasMovedHorizontally) {
-          hasMovedHorizontally = true;
-          setIsSwipeDetected(true);
-          preventDefault();
-        }
-
-        // Live transform - content follows finger immediately
-        const baseTransform = showSummary ? -50 : 0;
-        const dragPercent = (deltaX / window.innerWidth) * 100;
-        let newTransform = baseTransform + dragPercent;
-
-        // Soft bounds with resistance at edges
-        if (newTransform > 0) {
-          newTransform = newTransform * 0.3; // Resistance when going past calendar
-        } else if (newTransform < -100) {
-          newTransform = -100 + (newTransform + 100) * 0.3; // Resistance past summary
-        }
-
-        wrapper.style.transform = `translateX(${newTransform}%)`;
-      }
-    };
-
-    const handlePointerUp = () => {
-      if (!isPointerDown) return;
-
-      // Re-enable CSS transition for snap animation
-      wrapper.style.transition = 'transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1)';
-
-      if (hasMovedHorizontally) {
-        const deltaX = currentX - startX;
-        const velocity = Math.abs(deltaX);
-
-        // Smart threshold - smaller swipe needed if fast, larger if slow
-        const threshold = velocity > 100 ? 30 : 80;
-
-        if (Math.abs(deltaX) > threshold) {
-          if (deltaX > 0 && showSummary) {
-            // Swipe right: summary → calendar
-            setShowSummary(false);
-            setDateWorkouts([]);
-            setCurrentWorkoutIndex(0);
-          } else if (deltaX < 0 && !showSummary) {
-            // Swipe left: calendar → summary
-            const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
-            setDateWorkouts(workoutsForDate);
-            setCurrentWorkoutIndex(0);
-            setShowSummary(true);
-          } else {
-            // Snap back to current position
-            wrapper.style.transform = `translateX(${showSummary ? -50 : 0}%)`;
-          }
-        } else {
-          // Snap back to current position
-          wrapper.style.transform = `translateX(${showSummary ? -50 : 0}%)`;
-        }
-      }
-
-      // Reset everything
-      isPointerDown = false;
-      hasMovedHorizontally = false;
-      setIsSwipeDetected(false);
-    };
-
-    // Mouse events
-    const handleMouseDown = (e: MouseEvent) => {
-      handlePointerDown(e.clientX);
-    };
-
-    const handleMouseMove = (e: MouseEvent) => {
-      handlePointerMove(e.clientX, () => e.preventDefault());
-    };
-
-    const handleMouseUp = (e: MouseEvent) => {
-      handlePointerUp();
-    };
-
-    // Touch events
-    const handleTouchStart = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      handlePointerDown(touch.clientX);
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      const touch = e.touches[0];
-      handlePointerMove(touch.clientX, () => e.preventDefault());
-    };
-
-    const handleTouchEnd = (e: TouchEvent) => {
-      handlePointerUp();
-    };
-
-    // Add listeners
-    container.addEventListener('mousedown', handleMouseDown, { passive: true });
-    container.addEventListener('mousemove', handleMouseMove, { passive: false });
-    container.addEventListener('mouseup', handleMouseUp, { passive: true });
-    container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    container.addEventListener('touchend', handleTouchEnd, { passive: true });
-
-    return () => {
-      container.removeEventListener('mousedown', handleMouseDown);
-      container.removeEventListener('mousemove', handleMouseMove);
-      container.removeEventListener('mouseup', handleMouseUp);
-      container.removeEventListener('touchstart', handleTouchStart);
-      container.removeEventListener('touchmove', handleTouchMove);
-      container.removeEventListener('touchend', handleTouchEnd);
-    };
-  }, [showSummary, workouts, selectedDate]);
 
   const formatHeaderDate = () => {
     const today = new Date();
@@ -565,22 +423,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   // Dead simple swipe detection
-  const handleSwipeLeft = () => {
-    if (!showSummary) {
-      const workoutsForDate = workouts?.filter(w => w.date === selectedDate) || [];
-      setDateWorkouts(workoutsForDate);
-      setCurrentWorkoutIndex(0);
-      setShowSummary(true);
-    }
-  };
 
-  const handleSwipeRight = () => {
-    if (showSummary) {
-      setShowSummary(false);
-      setDateWorkouts([]);
-      setCurrentWorkoutIndex(0);
-    }
-  };
 
   // Show import page
   if (showImportPage) {
@@ -754,104 +597,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : (
-            <div
-              ref={containerRef}
-              className="relative w-full h-full"
-              style={{
-                overflow: 'hidden'
-              }}
-            >
-              {/* Swipe capture overlay - only visible during potential swipes */}
-              {isSwipeDetected && (
-                <div
-                  className="absolute inset-0 z-50"
-                  style={{
-                    backgroundColor: 'transparent',
-                    pointerEvents: 'auto'
-                  }}
+            <div className="w-full h-full">
+              <div className="space-y-2 pt-4">
+                <TodaysEffort
+                  selectedDate={selectedDate}
+                  onAddEffort={handleAddEffort}
+                  onViewCompleted={handleViewCompleted}
+                  onEditEffort={handleEditEffort}
                 />
-              )}
-
-              <div
-                ref={wrapperRef}
-                className="flex h-full"
-                style={{
-                  width: '200%',
-                  transform: `translateX(${transform}%)`,
-                  transition: 'transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1)',
-                  willChange: 'transform',
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden'
-                }}
-              >
-                {/* Calendar Panel */}
-                <div className="w-1/2 flex-shrink-0">
-                  <div className="space-y-2 pt-4">
-                    <TodaysEffort
-                      selectedDate={selectedDate}
-                      onAddEffort={handleAddEffort}
-                      onViewCompleted={handleViewCompleted}
-                      onEditEffort={handleEditEffort}
-                    />
-                    <WorkoutCalendar
-                      onAddEffort={handleAddEffort}
-                      onSelectType={handleSelectEffortType}
-                      onSelectWorkout={handleEditEffort}
-                      onViewCompleted={handleViewCompleted}
-                      onEditEffort={handleEditEffort}
-                      onDateSelect={handleDateSelect}
-                      onSelectRoutine={handleSelectRoutine}
-                      onSelectDiscipline={handleSelectDiscipline}
-                      onOpenPlanBuilder={handleOpenPlanBuilder}
-                      isSwipingHorizontally={isSwipeDetected}
-                      currentPlans={currentPlans}
-                      completedPlans={completedPlans}
-                    />
-                  </div>
-                </div>
-
-                {/* Summary Panel */}
-                <div className="w-1/2 flex-shrink-0">
-                  <div className="pt-4">
-                    {currentWorkout ? (
-                      <WorkoutSummary
-                        workout={currentWorkout}
-                        onClose={() => {
-                          setShowSummary(false);
-                          setDateWorkouts([]);
-                          setCurrentWorkoutIndex(0);
-                        }}
-                        onDelete={handleDeleteWorkout}
-                      />
-                    ) : showSummary ? (
-                      <div className="flex flex-col items-center justify-center py-16 px-4">
-                        <h2 className="text-lg font-medium mb-4">No workouts for this date</h2>
-                        <p className="text-muted-foreground mb-8 text-center">
-                          Add a workout to get started
-                        </p>
-                        <div className="flex flex-col items-center gap-4">
-                          <NewEffortDropdown
-                            onSelectType={(type) => {
-                              setShowSummary(false);
-                              handleAddEffort(type, selectedDate);
-                            }}
-                            onOpenPlanBuilder={handleOpenPlanBuilder}
-                          />
-                          <button
-                            onClick={() => {
-                              setShowSummary(false);
-                              setDateWorkouts([]);
-                              setCurrentWorkoutIndex(0);
-                            }}
-                            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            ← Back to calendar
-                          </button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                </div>
+                <WorkoutCalendar
+                  onAddEffort={handleAddEffort}
+                  onSelectType={handleSelectEffortType}
+                  onSelectWorkout={handleEditEffort}
+                  onViewCompleted={handleViewCompleted}
+                  onEditEffort={handleEditEffort}
+                  onDateSelect={handleDateSelect}
+                  onSelectRoutine={handleSelectRoutine}
+                  onSelectDiscipline={handleSelectDiscipline}
+                  onOpenPlanBuilder={handleOpenPlanBuilder}
+                  currentPlans={currentPlans}
+                  completedPlans={completedPlans}
+                />
               </div>
             </div>
           )}

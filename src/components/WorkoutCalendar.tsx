@@ -36,7 +36,6 @@ interface WorkoutCalendarProps {
   onSelectRoutine?: (type: string) => void;
   onSelectDiscipline?: (discipline: string) => void;
   onOpenPlanBuilder?: () => void;
-  isSwipingHorizontally?: boolean;
   currentPlans?: Plan[]; // NEW: AI-generated current plans
   completedPlans?: Plan[]; // NEW: Completed plans
 }
@@ -51,7 +50,6 @@ export default function WorkoutCalendar({
   onSelectRoutine,
   onSelectDiscipline,
   onOpenPlanBuilder,
-  isSwipingHorizontally = false,
   currentPlans = [], // NEW: Default to empty array
   completedPlans = [] // NEW: Default to empty array
 }: WorkoutCalendarProps) {
@@ -120,15 +118,7 @@ export default function WorkoutCalendar({
   const handleDateClick = (day: number, event: React.MouseEvent | React.TouchEvent) => {
     if (!day) return;
     
-    // 🚨 NEW: Ignore date clicks during horizontal swipes
-    if (isSwipingHorizontally) {
-      console.log('🚫 Ignoring date click during swipe');
-      event.preventDefault();
-      event.stopPropagation();
-      return;
-    }
-    
-    // Prevent event from bubbling up to parent swipe handlers
+    // Prevent event from bubbling up to parent handlers
     event.preventDefault();
     event.stopPropagation();
     
@@ -168,6 +158,29 @@ export default function WorkoutCalendar({
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     return dateStr === selectedDate;
+  };
+
+  // Helper functions for discipline display
+  const getDisciplineName = (type: string): string => {
+    switch (type) {
+      case 'run': return 'Run';
+      case 'ride': 
+      case 'bike': return 'Ride';
+      case 'swim': return 'Swim';
+      case 'strength': return 'Lift';
+      default: return type.charAt(0).toUpperCase() + type.slice(1);
+    }
+  };
+
+  const getDisciplineColor = (type: string): string => {
+    switch (type) {
+      case 'run': return 'bg-green-100 text-green-800';
+      case 'ride': 
+      case 'bike': return 'bg-blue-100 text-blue-800';
+      case 'swim': return 'bg-cyan-100 text-cyan-800';
+      case 'strength': return 'bg-orange-100 text-orange-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
   };
 
   const days = getDaysInMonth();
@@ -233,11 +246,9 @@ export default function WorkoutCalendar({
                     ${day ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
                     ${day && isToday(day) ? 'bg-gray-100 border-gray-200' : ''}
                     ${day && isSelected(day) ? 'bg-gray-200 border-gray-300' : ''}
-                    ${isSwipingHorizontally ? 'pointer-events-none' : ''}
                   `}
                   onClick={(e) => day && handleDateClick(day, e)}
-                  onTouchEnd={(e) => day && handleDateClick(day, e)}
-                  disabled={!day || isSwipingHorizontally}
+                  disabled={!day}
                   type="button"
                 >
                   {day && (
@@ -247,21 +258,23 @@ export default function WorkoutCalendar({
                         {day}
                       </div>
                       
-                      {/* Workout indicators */}
+                      {/* Discipline names */}
                       {dayWorkouts.length > 0 && (
                         <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
-                          {dayWorkouts.slice(0, 3).map((workout, idx) => (
+                          {dayWorkouts.slice(0, 2).map((workout, idx) => (
                             <div
                               key={workout.id || idx}
-                              className={`w-2 h-2 rounded-full ${
-                                DISCIPLINE_COLORS[workout.type as keyof typeof DISCIPLINE_COLORS] || 'bg-gray-500'
+                              className={`text-[10px] font-medium px-1 py-0.5 rounded ${
+                                getDisciplineColor(workout.type)
                               }`}
                               title={workout.name || workout.type}
-                            />
+                            >
+                              {getDisciplineName(workout.type)}
+                            </div>
                           ))}
-                          {dayWorkouts.length > 3 && (
+                          {dayWorkouts.length > 2 && (
                             <div className="text-[10px] text-muted-foreground font-medium leading-none">
-                              +{dayWorkouts.length - 3}
+                              +{dayWorkouts.length - 2}
                             </div>
                           )}
                         </div>
