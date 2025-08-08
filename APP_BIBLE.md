@@ -1,24 +1,30 @@
 # EFFORTS APP BIBLE 📚
 
 ## 🎯 DEVELOPMENT PHILOSOPHY
+- Rule‑driven engine, not ad‑hoc algorithms
+- No fallbacks: fail fast when baseline data is missing
+- Clean, readable, small files
 
-### **Holistic Problem-Solving Approach**
-- **NEVER fix one component in isolation** - always consider system-wide impact
-- **Understand the full data flow** before making any changes
-- **Context-first development** - read this bible before starting any work
-- **Test the entire system** after any changes, not just the modified component
+## ✅ Clean 3‑File Engine
+- `Seventy3Template.ts` – phase templates + detailed workouts (swim/bike/run)
+- `StrengthTemplate.ts` – Traditional/Cowboy generation with spacing/recovery rules
+- `TrainingEngine.ts` – periodization, scaling, validation (phase‑aware minimums, intensity, recovery)
 
-### **Success Pattern: Clean 3-File Architecture**
-- **Problem**: Complex algorithm approach was over-engineered
-- **Wrong approach**: Build complex algorithms with multiple fallbacks
-- **Right approach**: Simple 3-file architecture with no fallbacks, fail fast
-- **Result**: Clean, reliable, scalable 70.3 triathlon training plans
+## 🧭 Training Blueprint (Joel)
+- Phases: Base (1–4), Build (5–8), Peak (9–11), Taper (12)
+- Weekly pattern: Swim 2; Bike 3 (Tue hard, mid‑week Z2, Sat long; Taper 2); Run 2
+- Strength: Traditional 2/1–2/0–1; Cowboy 3/2/1 with taper auto‑limit
+- Intensity (endurance only): Base 70–85% Z2; Build 50–70%; Peak 40–60%; Taper 70–85%
+- Caps: Bike VO2 24–30min (3–5min reps), Bike TH 30–40min; Run VO2 18–24min (3min reps), Run TH 20–30min
 
-### **Anti-Patterns to Avoid**
-- ❌ Making changes without understanding the full system
-- ❌ Fixing symptoms instead of root causes
-- ❌ Adding fallbacks or hardcoded defaults
-- ❌ Building complex algorithms instead of simple rules
+## 🔒 Required Baselines (No Fallbacks)
+FTP, run pace (easy or 5K), swim 100‑yd pace, and 1RM (if strength enabled).
+
+## 🖥️ UI Principles
+Minimal Scandinavian look, edge‑to‑edge mobile, swipe weeks, 4‑step setup.
+
+## 🚀 Deploy
+Git→Netlify with `netlify.toml` (build `npm run build`, publish `dist`, SPA redirects). Push to `main` to deploy.
 
 ## 🎯 APP OVERVIEW
 

@@ -359,38 +359,34 @@ function generateBikeWorkout(session: SessionTemplate, userPerformance: UserBase
         return `Warm-up: 15min easy spinning\nMain Set: ${tempoIntervals}x${tempoTime}min @ tempo effort (${tempoLow}-${tempoHigh}W target), 5min easy between\nCool-down: 10min easy`;
       }
       
-    case 'threshold':
-      const thresholdIntervals = isBikeFocused ? 3 : 2;
-      const thresholdTime = Math.floor((adjustedDuration * 0.7 / thresholdIntervals));
-      
+    case 'threshold': {
+      // Cap total threshold work 30–40min. Prefer 10–12min reps.
+      const maxTotal = 40;
+      const available = Math.min(maxTotal, Math.floor(adjustedDuration * 0.7));
+      const repLen = 10; // minutes
+      const reps = Math.max(2, Math.min(4, Math.floor(available / repLen)));
       if (hasPowerMeter) {
-        const thresholdLow = Math.round(ftp * 0.88);
-        const thresholdHigh = Math.round(ftp * 0.95);
-        return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x${thresholdTime}min @ ${thresholdLow}-${thresholdHigh}W, 5min easy between\nCool-down: 10min easy`;
-      } else if (hasHeartRate) {
-        return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x${thresholdTime}min @ 85-90% max HR, 5min easy between\nCool-down: 10min easy`;
-      } else {
-        const thresholdLow = Math.round(ftp * 0.88);
-        const thresholdHigh = Math.round(ftp * 0.95);
-        return `Warm-up: 15min easy spinning\nMain Set: ${thresholdIntervals}x${thresholdTime}min @ threshold effort (${thresholdLow}-${thresholdHigh}W target), 5min easy between\nCool-down: 10min easy`;
+        const thLow = Math.round(ftp * 0.88);
+        const thHigh = Math.round(ftp * 0.95);
+        return `Warm-up: 15min easy spinning\nMain Set: ${reps}x${repLen}min @ ${thLow}-${thHigh}W, 5min easy between\nCool-down: 10min easy`;
       }
-      
-    case 'vo2max':
-      const vo2Intervals = isBikeFocused ? 6 : 5;
-      const vo2Time = Math.floor((adjustedDuration * 0.8 / vo2Intervals));
-      
+      return `Warm-up: 15min easy spinning\nMain Set: ${reps}x${repLen}min @ threshold effort, 5min easy between\nCool-down: 10min easy`;
+    }
+       
+    case 'vo2max': {
+      // Cap VO2 max total work at 24–30min; use 3–5min reps, 1:1 recovery.
+      const maxTotal = 30;
+      const available = Math.min(maxTotal, Math.floor(adjustedDuration * 0.6));
+      const repLen = 4; // minutes
+      const reps = Math.max(3, Math.min(6, Math.floor(available / repLen)));
       if (hasPowerMeter) {
         const vo2Low = Math.round(ftp * 1.05);
         const vo2High = Math.round(ftp * 1.15);
-        return `Warm-up: 15min easy spinning\nMain Set: ${vo2Intervals}x${vo2Time}min @ ${vo2Low}-${vo2High}W, 3min easy between\nCool-down: 10min easy`;
-      } else if (hasHeartRate) {
-        return `Warm-up: 15min easy spinning\nMain Set: ${vo2Intervals}x${vo2Time}min @ 90-95% max HR, 3min easy between\nCool-down: 10min easy`;
-      } else {
-        const vo2Low = Math.round(ftp * 1.05);
-        const vo2High = Math.round(ftp * 1.15);
-        return `Warm-up: 15min easy spinning\nMain Set: ${vo2Intervals}x${vo2Time}min @ VO2 max effort (${vo2Low}-${vo2High}W target), 3min easy between\nCool-down: 10min easy`;
+        return `Warm-up: 15min easy spinning\nMain Set: ${reps}x${repLen}min @ ${vo2Low}-${vo2High}W, ${repLen}min easy between\nCool-down: 10min easy`;
       }
-      
+      return `Warm-up: 15min easy spinning\nMain Set: ${reps}x${repLen}min @ VO2 max effort, ${repLen}min easy between\nCool-down: 10min easy`;
+    }
+       
     default:
       return session.description;
   }
@@ -419,55 +415,29 @@ function generateRunWorkout(session: SessionTemplate, userPerformance: UserBasel
   const focusMultiplier = isRunFocused ? 1.2 : 1.0;
   
   switch (type) {
-    case 'endurance':
-      const enduranceTime = Math.floor((adjustedDuration * 0.8) * focusMultiplier);
-      
-      if (hasGPS) {
-        const easyPaceRange = calculateEasyPaceRange(easyPace);
-        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ ${easyPaceRange}\nCool-down: 10min easy jog`;
-      } else if (hasHeartRate) {
-        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ Zone 2 (65-75% max HR)\nCool-down: 10min easy jog`;
-      } else {
-        const easyPaceRange = calculateEasyPaceRange(easyPace);
-        return `Warm-up: 10min easy jog\nMain Set: ${enduranceTime}min steady @ conversational pace (target: ${easyPaceRange})\nCool-down: 10min easy jog`;
-      }
-      
-    case 'tempo':
-      const tempoIntervals = isRunFocused ? 4 : 3;
-      const tempoTime = Math.floor((adjustedDuration * 0.6 / tempoIntervals));
-      
-      if (hasGPS) {
-        const tempoPaceRange = calculateTempoRunPaceRange(easyPace);
-        return `Warm-up: 15min easy jog\nMain Set: ${tempoIntervals}x${tempoTime}min @ tempo pace (target: ${tempoPaceRange}), 3min easy between\nCool-down: 10min easy jog`;
-      } else {
-        const tempoPaceRange = calculateTempoRunPaceRange(easyPace);
-        return `Warm-up: 15min easy jog\nMain Set: ${tempoIntervals}x${tempoTime}min @ tempo effort (target: ${tempoPaceRange}), 3min easy between\nCool-down: 10min easy jog`;
-      }
-      
-    case 'threshold':
-      const thresholdIntervals = isRunFocused ? 3 : 2;
-      const thresholdTime = Math.floor((adjustedDuration * 0.7 / thresholdIntervals));
-      
-      if (hasGPS) {
-        const thresholdPaceRange = calculateThresholdRunPaceRange(easyPace);
-        return `Warm-up: 15min easy jog\nMain Set: ${thresholdIntervals}x${thresholdTime}min @ threshold pace (target: ${thresholdPaceRange}), 5min easy between\nCool-down: 10min easy jog`;
-      } else {
-        const thresholdPaceRange = calculateThresholdRunPaceRange(easyPace);
-        return `Warm-up: 15min easy jog\nMain Set: ${thresholdIntervals}x${thresholdTime}min @ threshold effort (target: ${thresholdPaceRange}), 5min easy between\nCool-down: 10min easy jog`;
-      }
-      
-    case 'vo2max':
-      const vo2Intervals = isRunFocused ? 6 : 5;
-      const vo2Time = Math.floor((adjustedDuration * 0.8 / vo2Intervals));
-      
-      if (hasGPS) {
-        const vo2PaceRange = calculateVO2RunPaceRange(easyPace);
-        return `Warm-up: 15min easy jog\nMain Set: ${vo2Intervals}x${vo2Time}min @ VO2 max pace (target: ${vo2PaceRange}), 3min easy between\nCool-down: 10min easy jog`;
-      } else {
-        const vo2PaceRange = calculateVO2RunPaceRange(easyPace);
-        return `Warm-up: 15min easy jog\nMain Set: ${vo2Intervals}x${vo2Time}min @ VO2 max effort (target: ${vo2PaceRange}), 3min easy between\nCool-down: 10min easy jog`;
-      }
-      
+    case 'endurance': {
+      const zone2Time = Math.floor((adjustedDuration * 0.75) * focusMultiplier);
+      return `Warm-up: 10min easy jog\nMain Set: ${zone2Time}min steady @ ${easyPace}/mile\nCool-down: 10min easy jog`;
+    }
+    case 'tempo': {
+      const total = Math.min(35, Math.floor(adjustedDuration * 0.6));
+      const repLen = 10;
+      const reps = Math.max(2, Math.min(3, Math.floor(total / repLen)));
+      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ tempo pace (${fiveKPace}/mile ±), 5min easy between\nCool-down: 10min easy`;
+    }
+    case 'threshold': {
+      const total = Math.min(30, Math.floor(adjustedDuration * 0.7));
+      const repLen = 10;
+      const reps = Math.max(2, Math.min(3, Math.floor(total / repLen)));
+      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ threshold pace, 5min easy between\nCool-down: 10min easy`;
+    }
+    case 'vo2max': {
+      const maxTotal = 24; // cap run VO2 18–24min
+      const available = Math.min(maxTotal, Math.floor(adjustedDuration * 0.6));
+      const repLen = 3;
+      const reps = Math.max(4, Math.min(8, Math.floor(available / repLen)));
+      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ VO2 pace, ${repLen}min easy between\nCool-down: 10min easy`;
+    }
     default:
       return session.description;
   }
