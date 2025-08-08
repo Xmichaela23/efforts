@@ -59,6 +59,7 @@ export default function SimplePlanBuilder() {
   const [isLoadingBaselines, setIsLoadingBaselines] = useState(true);
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showOverview, setShowOverview] = useState(false);
   const [answers, setAnswers] = useState<PlanAnswers>({
     distance: '',
     timeLevel: '',
@@ -638,14 +639,19 @@ export default function SimplePlanBuilder() {
   const totalWeeks = plan.weeks.length;
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div
+      className="max-w-4xl mx-auto px-0 sm:px-6 py-6"
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+    >
       {/* Week Navigation */}
       <div className="w-full bg-white">
         <div className="flex items-center justify-between mb-6">
           <button
             onClick={prevWeek}
             disabled={currentWeek === 0}
-            className="p-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-3 rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ←
           </button>
@@ -658,14 +664,24 @@ export default function SimplePlanBuilder() {
           <button
             onClick={nextWeek}
             disabled={currentWeek === totalWeeks - 1}
-            className="p-2 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-3 rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             →
           </button>
         </div>
         
-        {/* Week Dots */}
-        <div className="flex justify-center space-x-2 mb-6">
+        {/* Overview toggle */}
+        <div className="flex items-center justify-center mb-3">
+          <button
+            className="text-sm text-gray-600 underline"
+            onClick={() => setShowOverview(!showOverview)}
+          >
+            {showOverview ? 'Hide Overview' : 'Show Overview'}
+          </button>
+        </div>
+
+        {/* Week Dots / Overview */}
+        <div className="flex justify-center space-x-2 mb-6 overflow-x-auto px-2">
           {plan.weeks.map((_, index) => (
             <button
               key={index}
@@ -678,6 +694,26 @@ export default function SimplePlanBuilder() {
             />
           ))}
         </div>
+        {showOverview && (
+          <div className="mb-6 overflow-x-auto">
+            <div className="flex gap-2 min-w-full">
+              {plan.weeks.map((w, i) => {
+                const hrs = Math.round(w.sessions.reduce((t, s) => t + s.duration, 0) / 60 * 10) / 10;
+                return (
+                  <button
+                    key={i}
+                    onClick={() => goToWeek(i)}
+                    className={`flex-shrink-0 w-24 p-2 border rounded-md text-left ${i===currentWeek?'border-gray-900':'border-gray-200'}`}
+                  >
+                    <div className="text-xs text-gray-600">Week {i+1}</div>
+                    <div className="text-sm font-medium">{hrs}h</div>
+                    <div className="text-[11px] text-gray-500">{w.sessions.length} sessions</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Total Hours Summary */}
@@ -693,7 +729,7 @@ export default function SimplePlanBuilder() {
       </div>
 
       {/* Week Content */}
-      <div className="space-y-6">
+      <div className="space-y-6 -mx-4 sm:mx-0">
         {(() => {
           // Group sessions by day
           const sessionsByDay: { [key: string]: any[] } = {};
@@ -706,14 +742,14 @@ export default function SimplePlanBuilder() {
 
           // Display grouped sessions
           return Object.entries(sessionsByDay).map(([day, sessions]) => (
-            <div key={day} className="space-y-4">
+            <div key={day} className="space-y-4 px-4 sm:px-0">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-medium">{day}</h3>
                 <span className="text-sm text-gray-600">{sessions.length} session{sessions.length > 1 ? 's' : ''}</span>
               </div>
               
               {sessions.map((session, index) => (
-                <div key={index} className="space-y-2 ml-4 border-l-2 border-gray-200 pl-4">
+                <div key={index} className="space-y-2 ml-0 rounded-lg border border-gray-200 p-3 sm:p-4 bg-white">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-gray-700">{session.discipline}</span>
                     <span className="text-xs text-gray-500">{session.duration} min</span>
@@ -732,7 +768,7 @@ export default function SimplePlanBuilder() {
                       </div>
                     )}
                     {session.detailedWorkout && (
-                      <div className="mt-3 p-3 bg-gray-50">
+                      <div className="mt-3 p-3 bg-gray-50 rounded-md">
                         <div className="text-sm font-medium text-gray-900 mb-2">Workout Details:</div>
                         <pre className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{session.detailedWorkout}</pre>
                       </div>
