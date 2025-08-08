@@ -1,10 +1,11 @@
-# Efforts - Complete System Overview
+# Efforts - 80/20 Triathlon Training System
 
-## 🎯 CURRENT STATUS: Clean 3-File Architecture
+## 🎯 CURRENT STATUS: 80/20 Methodology Implementation
 
-**We've successfully built a clean, modular training system with scientifically sound 70.3 triathlon plans.**
+**We've successfully implemented Matt Fitzgerald & David Warden's proven 80/20 Triathlon methodology as our TrainingEngine DNA.**
 
 ### **📚 Essential Documentation:**
+- **[80/20 Methodology](src/services/80-20-methodology.md)** - Our single source of truth and TrainingEngine DNA  
 - **[App Bible](APP_BIBLE.md)** - Complete design rules, development philosophy, and system architecture
 - **[App Overview](QUICK_START_FOR_NEW_CHAT.md)** - Complete system overview, architecture, and current status
 
@@ -42,7 +43,7 @@ We built a **clean, modular training system** that adapts to user preferences be
 
 ### ✅ **Core System: Clean 3-File Architecture**
 - **`Seventy3Template.ts`** (280 lines) - 70.3-specific template with detailed workouts
-- **`StrengthTemplate.ts`** (200 lines) - All 5 strength options with evidence-based percentages
+- **`StrengthTemplate.ts`** (200 lines) - 2 strength options with scientific distribution
 - **`TrainingEngine.ts`** (250 lines) - The brain that personalizes everything
 - **Multi-distance support** (Sprint and 70.3 triathlon)
 - **4-step assessment flow**: Distance → Strength → Time → Long Session Day
@@ -53,6 +54,12 @@ We built a **clean, modular training system** that adapts to user preferences be
 - **Progressive overload** with scientific phase progression
 - **Clean, minimal UI** with swipe navigation
 - **Professional workout details** with warm-ups, cool-downs, and target ranges
+
+### ✅ **Strength Training Options**
+- **Traditional (2x/week)**: Lower body focus + Upper body focus (6-day training week)
+- **Cowboy (3x/week)**: 2 functional sessions + 1 upper body session (7-day training week)
+- **Scientific distribution**: Based on training science principles (48-72h spacing, recovery windows)
+- **Equipment-aware**: Adapts to user's available equipment
 
 ### ✅ **User Experience**
 - **Simple 4-step assessment** with clear choices
@@ -74,7 +81,7 @@ We built a **clean, modular training system** that adapts to user preferences be
 ### **Clean 3-File System**
 **Core Files**: 
 - **`src/services/Seventy3Template.ts`** - 70.3-specific template with detailed workouts
-- **`src/services/StrengthTemplate.ts`** - All 5 strength options with evidence-based percentages
+- **`src/services/StrengthTemplate.ts`** - 2 strength options with scientific distribution
 - **`src/services/TrainingEngine.ts`** - The brain that personalizes everything
 
 **UI Integration**: `src/components/SimplePlanBuilder.tsx`
@@ -89,6 +96,13 @@ We built a **clean, modular training system** that adapts to user preferences be
 - **Progressive Overload**: Systematic volume and intensity increases
 - **Recovery Spacing**: Proper session distribution prevents overtraining
 - **Evidence-Based Percentages**: 75% 1RM for compound strength
+- **Scientific Distribution**: Session spacing based on training science, not hardcoded days
+
+### **Strength Training Science**
+- **Traditional**: Lower/upper body split for balanced development
+- **Cowboy**: Functional endurance + upper body aesthetics
+- **Recovery Windows**: 48-72h between functional sessions, 24h minimum for upper body
+- **Equipment Adaptation**: Workouts adapt to available equipment (barbell/dumbbells)
 
 ### **Clean Architecture Benefits**
 - **Scalable**: Easy to add new distances, philosophies, strength options

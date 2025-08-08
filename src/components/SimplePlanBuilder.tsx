@@ -41,7 +41,7 @@ interface BaselineData {
 interface PlanAnswers {
   distance: 'sprint' | 'seventy3' | '';
   timeLevel: 'minimum' | 'moderate' | 'serious' | 'maximum' | '';
-  strengthOption: 'none' | 'traditional' | 'compound' | 'cowboy_endurance' | 'cowboy_compound' | '';
+  strengthOption: 'none' | 'traditional' | 'cowboy_endurance' | '';
   longBikeDay: string;
   longRunDay: string;
   longSessionDays: 'weekend' | 'custom';
@@ -341,7 +341,7 @@ export default function SimplePlanBuilder() {
             <div className="space-y-4">
               <div 
                 className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                  answers.distance === 'sprint' ? 'bg-gray-100' : ''
+                  answers.distance === 'sprint' ? 'bg-gray-200' : ''
                 }`}
                 onClick={() => updateAnswer('distance', 'sprint')}
               >
@@ -350,7 +350,7 @@ export default function SimplePlanBuilder() {
               </div>
               <div 
                 className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                  answers.distance === 'seventy3' ? 'bg-gray-100' : ''
+                  answers.distance === 'seventy3' ? 'bg-gray-200' : ''
                 }`}
                 onClick={() => updateAnswer('distance', 'seventy3')}
               >
@@ -375,22 +375,21 @@ export default function SimplePlanBuilder() {
             <div className="p-3 bg-gray-50 text-sm text-gray-700 mb-4">
               <strong>Strength Training Options:</strong>
               <ul className="mt-2 space-y-1 text-xs">
-                <li>• <strong>Traditional/Compound (2x/week):</strong> Standard strength maintenance</li>
-                <li>• <strong>Cowboy Options (3x/week):</strong> Include a 3rd upper body session for balance and aesthetics</li>
+                <li>• <strong>Traditional (2x/week):</strong> Standard strength maintenance</li>
+                <li>• <strong>Cowboy (3x/week):</strong> Includes 3rd day for balance and aesthetics</li>
               </ul>
             </div>
             <div className="space-y-4">
               {[
-                { value: 'none', label: 'No strength training', description: 'Pure endurance focus • 0 additional hours' },
-                { value: 'traditional', label: 'Traditional strength (2x/week)', description: 'Endurance strength maintenance • +1-1.5 hours/week • 2 sessions' },
-                { value: 'compound', label: 'Compound movements only (2x/week)', description: 'Power development for triathlon • +1.5-2 hours/week • 2 sessions' },
-                { value: 'cowboy_endurance', label: 'Cowboy endurance strength (3x/week)', description: 'Functional endurance + 3rd upper body session for balance/aesthetics • +2-2.5 hours/week • 3 sessions • Consider this when choosing your weekly hours' },
-                { value: 'cowboy_compound', label: 'Cowboy compound strength (3x/week)', description: 'Advanced strength + 3rd upper body session for balance/aesthetics • +2.5-3 hours/week • 3 sessions • Consider this when choosing your weekly hours' }
+                { value: 'none', label: 'No strength training', description: 'Pure endurance focus • 0 additional hours • 6-day training week' },
+                                  { value: 'traditional', label: 'Traditional (2x/week)', description: 'Standard strength maintenance • +1.8h/week • 2 sessions • 6-day training week' },
+        
+                                  { value: 'cowboy_endurance', label: 'Cowboy (3x/week)', description: 'Includes 3rd day for balance and aesthetics • +2.2h/week • 3 sessions • 7-day training week' }
               ].map(option => (
                 <div 
                   key={option.value}
-                  className={`cursor-pointer hover:bg-gray-50 ${
-                    answers.strengthOption === option.value ? 'text-gray-900' : ''
+                  className={`cursor-pointer hover:bg-gray-50 p-4 ${
+                    answers.strengthOption === option.value ? 'bg-gray-200 text-gray-900' : ''
                   }`}
                   onClick={() => updateAnswer('strengthOption', option.value)}
                 >
@@ -423,30 +422,60 @@ export default function SimplePlanBuilder() {
             <h2 className="text-2xl font-semibold">How much time can you commit?</h2>
             {answers.strengthOption && answers.strengthOption !== 'none' && (
               <div className="p-3 bg-gray-50 text-sm text-gray-700">
-                <strong>Note:</strong> Your strength choice adds {answers.strengthOption === 'traditional' ? '+1-1.5' : answers.strengthOption === 'compound' ? '+1.5-2' : answers.strengthOption === 'cowboy_endurance' ? '+2-2.5' : '+2.5-3'} hours/week to your training time.
-                {(answers.strengthOption === 'cowboy_endurance' || answers.strengthOption === 'cowboy_compound') && (
+                <strong>Strength Time Impact:</strong>
+                                    {answers.strengthOption === 'traditional' && (
+                      <span> +1.8h/week (2 sessions) - Fits in all time levels ✅</span>
+                    )}
+                
+                {answers.strengthOption === 'cowboy_endurance' && (
+                  <span> +2.2h/week (3 sessions) - Requires Moderate or higher ⚠️</span>
+                )}
+                {answers.strengthOption === 'cowboy_endurance' && (
                   <div className="mt-2 text-xs text-gray-600">
-                    <strong>Cowboy options include a 3rd upper body session for balance and aesthetics.</strong>
+                    <strong>Cowboy includes a 3rd session for balance and aesthetics.</strong>
                   </div>
                 )}
               </div>
             )}
             <div className="space-y-4">
               {[
-                { key: 'minimum', label: 'Minimum', description: '8-10 hours/week • 6-7 sessions • First-time 70.3 athletes, honors time and scheduling limitations' },
-                { key: 'moderate', label: 'Moderate', description: '10-12 hours/week • 7-8 sessions • Good for consistent training, balanced approach' },
-                { key: 'serious', label: 'Serious', description: '12-14 hours/week • 8-9 sessions • Experienced athletes, performance focus' },
-                { key: 'maximum', label: 'Maximum', description: '14-16 hours/week • 9-10 sessions • Advanced athletes, multiple 70.3s completed' }
+                { 
+                  key: 'minimum', 
+                  label: 'Minimum', 
+                  description: '8-10 hours/week • 6-day training week • First-time 70.3 athletes, honors time and scheduling limitations',
+                  compatible: !answers.strengthOption || answers.strengthOption === 'none' || answers.strengthOption === 'traditional'
+                },
+                { 
+                  key: 'moderate', 
+                  label: 'Moderate', 
+                  description: '10-12 hours/week • 6-7 day training week • Good for consistent training, balanced approach',
+                  compatible: true
+                },
+                { 
+                  key: 'serious', 
+                  label: 'Serious', 
+                  description: '12-14 hours/week • 7-day training week • Experienced athletes, performance focus',
+                  compatible: true
+                },
+                { 
+                  key: 'maximum', 
+                  label: 'Maximum', 
+                  description: '14-16 hours/week • 7-day training week • Advanced athletes, multiple 70.3s completed',
+                  compatible: true
+                }
               ].map(option => (
                 <div 
                   key={option.key}
-                  className={`cursor-pointer hover:bg-gray-50 ${
-                    answers.timeLevel === option.key ? 'text-gray-900' : ''
-                  }`}
-                  onClick={() => updateAnswer('timeLevel', option.key)}
+                  className={`cursor-pointer hover:bg-gray-50 p-4 ${
+                    answers.timeLevel === option.key ? 'bg-gray-200 text-gray-900' : ''
+                  } ${!option.compatible ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  onClick={() => option.compatible && updateAnswer('timeLevel', option.key)}
                 >
                   <h3 className="font-medium">{option.label}</h3>
                   <p className="text-sm text-gray-600">{option.description}</p>
+                  {!option.compatible && (
+                    <p className="text-xs text-red-600 mt-1">⚠️ Requires Moderate or higher for your strength choice</p>
+                  )}
                 </div>
               ))}
             </div>
@@ -474,8 +503,8 @@ export default function SimplePlanBuilder() {
             <h2 className="text-2xl font-semibold">When are your long sessions?</h2>
             <div className="space-y-4">
               <div 
-                className={`cursor-pointer hover:bg-gray-50 ${
-                  answers.longSessionDays === 'weekend' ? 'text-gray-900' : ''
+                className={`cursor-pointer hover:bg-gray-50 p-4 ${
+                  answers.longSessionDays === 'weekend' ? 'bg-gray-200 text-gray-900' : ''
                 }`}
                 onClick={() => updateAnswer('longSessionDays', 'weekend')}
               >
@@ -483,8 +512,8 @@ export default function SimplePlanBuilder() {
                 <p className="text-sm text-gray-600">Traditional long bike Saturday, long run Sunday</p>
               </div>
               <div 
-                className={`cursor-pointer hover:bg-gray-50 ${
-                  answers.longSessionDays === 'custom' ? 'text-gray-900' : ''
+                className={`cursor-pointer hover:bg-gray-50 p-4 ${
+                  answers.longSessionDays === 'custom' ? 'bg-gray-200 text-gray-900' : ''
                 }`}
                 onClick={() => updateAnswer('longSessionDays', 'custom')}
               >

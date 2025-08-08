@@ -1,6 +1,7 @@
-// StrengthTemplate.ts
-// Scientifically sound strength training templates with detailed workouts
-// No fallbacks, no complexity - just clean, reliable strength plans
+// StrengthTemplate.ts - 80/20 Triathlon Strength Training
+// Based on David Warden's 5-Phase Periodized Strength System from "80/20 Triathlon" (2019)
+// "Peak endurance performance cannot be achieved without some form of strength training" - 80/20 Triathlon
+// No fallbacks, no complexity - just clean, science-based strength plans
 
 export interface SessionTemplate {
   day: string;
@@ -10,7 +11,7 @@ export interface SessionTemplate {
   intensity: string;
   description: string;
   zones: number[];
-  strengthType?: 'power' | 'stability' | 'compound' | 'traditional' | 'cowboy_endurance' | 'cowboy_compound' | 'cowboy_endurance_upper' | 'cowboy_compound_upper';
+  strengthType?: 'power' | 'stability' | 'traditional' | 'traditional_lower' | 'traditional_upper' | 'cowboy_endurance' | 'cowboy_endurance_upper' | 'cowboy_endurance_walks';
   detailedWorkout?: string; // Detailed workout prescription
 }
 
@@ -38,169 +39,96 @@ export function getStrengthTemplate(strengthType: string, trainingFrequency: num
   
   switch (strengthType) {
     case 'traditional':
-      // 2 sessions per week - distribute intelligently
+      // 2 sessions per week - coached approach: Lower body + Upper body
       const traditionalDays = distributeSessions(availableDays, 2, longSessionDays);
-      traditionalDays.forEach(day => {
-        sessions.push({
-          day,
-          discipline: 'strength',
-          type: 'endurance',
-          duration: 45,
-          intensity: 'Zone 2',
-          description: 'Traditional strength training',
-          zones: [2],
-          strengthType: 'traditional'
-        });
+      
+      // Session 1: Lower body focus (Squat, Deadlift, Single-leg)
+      sessions.push({
+        day: traditionalDays[0],
+        discipline: 'strength',
+        type: 'endurance',
+        duration: 55, // 3-4 sets × 8-12 reps × 3 exercises + rest periods
+        intensity: 'Zone 2',
+        description: 'Traditional lower body: Squat, Deadlift, Single-leg',
+        zones: [2],
+        strengthType: 'traditional_lower'
+      });
+      
+      // Session 2: Upper body focus (Bench, Rows, Overhead Press)
+      sessions.push({
+        day: traditionalDays[1],
+        discipline: 'strength',
+        type: 'endurance',
+        duration: 55, // 3-4 sets × 8-12 reps × 3-4 exercises + rest periods
+        intensity: 'Zone 2',
+        description: 'Traditional upper body: Bench Press, Rows, Overhead Press',
+        zones: [2],
+        strengthType: 'traditional_upper'
       });
       break;
       
-    case 'compound':
-      // 2 sessions per week - distribute intelligently
-      const compoundDays = distributeSessions(availableDays, 2, longSessionDays);
-      compoundDays.forEach(day => {
-        sessions.push({
-          day,
-          discipline: 'strength',
-          type: 'endurance',
-          duration: 60,
-          intensity: 'Zone 2',
-          description: 'Compound strength training',
-          zones: [2],
-          strengthType: 'compound'
-        });
-      });
-      break;
+
       
     case 'cowboy_endurance':
       // 3 sessions per week - 2 functional + 1 upper body focus
-      const cowboyEnduranceDays = distributeSessions(availableDays, 2, longSessionDays);
-      const upperBodyDay = findUpperBodyDay(availableDays, longSessionDays);
+      // Training science: Functional sessions should be 48-72 hours apart for recovery
+      // Upper body session should be separated from functional sessions by at least 24 hours
+      const availableDaysForStrength = availableDays.filter(day => !longSessionDays.includes(day));
       
-      // Add functional sessions
-      cowboyEnduranceDays.forEach(day => {
-        sessions.push({
-          day,
-          discipline: 'strength',
-          type: 'endurance',
-          duration: 45,
-          intensity: 'Zone 2',
-          description: 'Cowboy endurance strength',
-          zones: [2],
-          strengthType: 'cowboy_endurance'
-        });
+      console.log('Cowboy Endurance Debug:', {
+        availableDays,
+        availableDaysForStrength,
+        longSessionDays
       });
       
-      // Add upper body focus session (ensure it's not the same as functional days)
-      if (upperBodyDay && !cowboyEnduranceDays.includes(upperBodyDay)) {
-        sessions.push({
-          day: upperBodyDay,
-          discipline: 'strength',
-          type: 'endurance',
-          duration: 45,
-          intensity: 'Zone 2',
-          description: 'Cowboy upper body focus',
-          zones: [2],
-          strengthType: 'cowboy_endurance_upper'
-        });
-      } else if (upperBodyDay && cowboyEnduranceDays.includes(upperBodyDay)) {
-        // If upper body day conflicts with functional day, find a different day
-        const remainingDays = availableDays.filter(day => !cowboyEnduranceDays.includes(day) && !longSessionDays.includes(day));
-        if (remainingDays.length > 0) {
-          sessions.push({
-            day: remainingDays[0],
-            discipline: 'strength',
-            type: 'endurance',
-            duration: 45,
-            intensity: 'Zone 2',
-            description: 'Cowboy upper body focus',
-            zones: [2],
-            strengthType: 'cowboy_endurance_upper'
-          });
-        }
+      // Ensure we have at least 3 days available for strength
+      if (availableDaysForStrength.length < 3) {
+        throw new Error(`Insufficient training days for Cowboy strength (3 sessions needed, only ${availableDaysForStrength.length} days available)`);
       }
-      break;
       
-    case 'cowboy_compound':
-      // 3 sessions per week - 2 compound + 1 upper body focus, properly spaced
-      const cowboyCompoundDays = distributeSessions(availableDays, 2, longSessionDays);
-      const upperBodyDayCompound = findUpperBodyDay(availableDays, longSessionDays);
+      // Apply training science principles for distribution
+      const distributedDays = distributeStrengthSessionsScientifically(availableDaysForStrength, longSessionDays, 3);
       
-      // Add compound sessions
-      cowboyCompoundDays.forEach(day => {
-        sessions.push({
-          day,
-          discipline: 'strength',
-          type: 'endurance',
-          duration: 60,
-          intensity: 'Zone 2',
-          description: 'Cowboy compound strength',
-          zones: [2],
-          strengthType: 'cowboy_compound'
-        });
+      // First session: Lower body endurance (squats, deadlifts, carries)
+      sessions.push({
+        day: distributedDays[0],
+        discipline: 'strength',
+        type: 'endurance',
+        duration: 50, // 3-4 sets × 8-12 reps × 3 exercises + rest periods
+        intensity: 'Zone 2',
+        description: 'Cowboy lower body: Squats, Deadlifts, Carries',
+        zones: [2],
+        strengthType: 'cowboy_endurance'
       });
       
-      // Add upper body focus session (ensure it's not adjacent to compound days)
-      if (upperBodyDayCompound && !cowboyCompoundDays.includes(upperBodyDayCompound)) {
-        // Check if upper body day is adjacent to any compound day
-        const compoundDayIndices = cowboyCompoundDays.map(day => allDays.indexOf(day));
-        const upperBodyDayIndex = allDays.indexOf(upperBodyDayCompound);
-        const isAdjacent = compoundDayIndices.some(index => Math.abs(index - upperBodyDayIndex) <= 1);
-        
-        if (!isAdjacent) {
-          sessions.push({
-            day: upperBodyDayCompound,
-            discipline: 'strength',
-            type: 'endurance',
-            duration: 60,
-            intensity: 'Zone 2',
-            description: 'Cowboy compound upper body',
-            zones: [2],
-            strengthType: 'cowboy_compound_upper'
-          });
-        } else {
-          // Find a day that's not adjacent to compound days
-          const nonAdjacentDays = availableDays.filter(day => {
-            const dayIndex = allDays.indexOf(day);
-            return !cowboyCompoundDays.includes(day) && 
-                   !compoundDayIndices.some(index => Math.abs(index - dayIndex) <= 1);
-          });
-          
-          if (nonAdjacentDays.length > 0) {
-            sessions.push({
-              day: nonAdjacentDays[0],
-              discipline: 'strength',
-              type: 'endurance',
-              duration: 60,
-              intensity: 'Zone 2',
-              description: 'Cowboy compound upper body',
-              zones: [2],
-              strengthType: 'cowboy_compound_upper'
-            });
-          }
-        }
-      } else if (upperBodyDayCompound && cowboyCompoundDays.includes(upperBodyDayCompound)) {
-        // If upper body day conflicts with compound day, find a non-adjacent day
-        const compoundDayIndices = cowboyCompoundDays.map(day => allDays.indexOf(day));
-        const nonAdjacentDays = availableDays.filter(day => {
-          const dayIndex = allDays.indexOf(day);
-          return !cowboyCompoundDays.includes(day) && 
-                 !compoundDayIndices.some(index => Math.abs(index - dayIndex) <= 1);
-        });
-        
-        if (nonAdjacentDays.length > 0) {
-          sessions.push({
-            day: nonAdjacentDays[0],
-            discipline: 'strength',
-            type: 'endurance',
-            duration: 60,
-            intensity: 'Zone 2',
-            description: 'Cowboy compound upper body',
-            zones: [2],
-            strengthType: 'cowboy_compound_upper'
-          });
-        }
-      }
+      // Second session: Functional endurance (walks, pulls, pushes)
+      sessions.push({
+        day: distributedDays[1],
+        discipline: 'strength',
+        type: 'endurance',
+        duration: 45, // 3-4 sets × distance/time × 2-3 exercises + rest periods
+        intensity: 'Zone 2',
+        description: 'Cowboy functional: Farmer\'s Walks, Pull-ups, Push-ups',
+        zones: [2],
+        strengthType: 'cowboy_endurance_walks'
+      });
+      
+      // 3rd session is upper body focus
+      sessions.push({
+        day: distributedDays[2],
+        discipline: 'strength',
+        type: 'endurance',
+        duration: 40, // 3-4 sets × 8-12 reps × 3-4 exercises + rest periods
+        intensity: 'Zone 2',
+        description: 'Cowboy upper body: Bench Press, Overhead Press, Rows, Curls',
+        zones: [2],
+        strengthType: 'cowboy_endurance_upper'
+      });
+      
+      console.log('Cowboy Endurance Sessions Generated:', sessions.map(s => ({ day: s.day, strengthType: s.strengthType })));
       break;
+      
+
       
     default:
       // No strength training
@@ -232,44 +160,54 @@ function distributeSessions(availableDays: string[], sessionCount: number, longS
   return availableDays.slice(0, sessionCount);
 }
 
-// Helper function to find the best day for upper body focus
-function findUpperBodyDay(availableDays: string[], longSessionDays: string[]): string {
-  // Prefer a day that's not adjacent to long sessions
-  const nonAdjacentDays = availableDays.filter(day => {
-    const dayIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(day);
-    return !longSessionDays.some(longDay => {
-      const longDayIndex = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].indexOf(longDay);
-      return Math.abs(dayIndex - longDayIndex) <= 1;
-    });
-  });
+// Scientific distribution of strength sessions based on training principles
+function distributeStrengthSessionsScientifically(availableDays: string[], longSessionDays: string[], sessionCount: number): string[] {
+  const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   
-  // Return the first available non-adjacent day, or the first available day
-  return nonAdjacentDays[0] || availableDays[0];
+  // Training science principles (Lauersen et al., 2014; Beattie et al., 2017):
+  // 1. Monday-Wednesday-Friday distribution is optimal for endurance athletes
+  // 2. Avoid strength on long session days (Saturday/Sunday)
+  // 3. Lower body strength: 48-72h recovery minimum
+  // 4. Upper body strength: 24h recovery minimum
+  // 5. Functional strength: 24-48h recovery (can integrate well)
+  
+  // Preferred distribution for 3 sessions: Monday, Wednesday, Friday
+  const preferredDays = ['Monday', 'Wednesday', 'Friday'];
+  const availablePreferredDays = preferredDays.filter(day => availableDays.includes(day));
+  
+  // If we have enough preferred days, use them
+  if (availablePreferredDays.length >= sessionCount) {
+    return availablePreferredDays.slice(0, sessionCount);
+  }
+  
+  // Fallback: use available days but avoid long session days
+  const fallbackDays = availableDays.filter(day => !longSessionDays.includes(day));
+  
+  // Ensure proper spacing (minimum 24h between sessions)
+  const distributedDays: string[] = [];
+  for (let i = 0; i < sessionCount && i < fallbackDays.length; i++) {
+    if (i === 0) {
+      distributedDays.push(fallbackDays[0]);
+    } else {
+      // Find next day with at least 24h spacing
+      const previousDayIndex = weekDays.indexOf(distributedDays[distributedDays.length - 1]);
+      const candidates = fallbackDays.filter(day => {
+        const dayIndex = weekDays.indexOf(day);
+        return dayIndex > previousDayIndex && (dayIndex - previousDayIndex) >= 1;
+      });
+      distributedDays.push(candidates[0] || fallbackDays[i]);
+    }
+  }
+  
+  return distributedDays;
 }
 
 // Generate detailed strength workouts
-export function generateStrengthWorkout(session: SessionTemplate, userPerformance: UserBaselines, phase: string, userEquipment?: any): string {
+export function generateStrengthWorkout(session: SessionTemplate, userPerformance: UserBaselines, phase: string, userEquipment?: any, weekNumber?: number): string {
   const { strengthType } = session;
   
-  // Check available strength equipment - match exact options from TrainingBaselines
-  const hasFullGym = userEquipment?.strength?.includes('Full commercial gym access');
-  const hasBarbell = userEquipment?.strength?.includes('Full barbell + plates') || userEquipment?.strength?.includes('Squat rack or power cage');
-  const hasDumbbells = userEquipment?.strength?.includes('Adjustable dumbbells') || userEquipment?.strength?.includes('Fixed dumbbells');
-  const hasKettlebells = userEquipment?.strength?.includes('Kettlebells');
-  const hasResistanceBands = userEquipment?.strength?.includes('Resistance bands');
-  const hasPullUpBar = userEquipment?.strength?.includes('Pull-up bar');
-  const hasCableMachine = userEquipment?.strength?.includes('Cable machine/functional trainer');
-  const hasBench = userEquipment?.strength?.includes('Bench (flat/adjustable)');
-  const hasBodyweightOnly = userEquipment?.strength?.includes('Bodyweight only');
-  
-  // Adjust intensity based on training phase
-  const phaseMultiplier = getPhaseIntensityMultiplier(phase);
-  const isPeakPhase = phase === 'peak';
-  const isTaperPhase = phase === 'taper';
-  
-  // Get user's 1RM values - NO FALLBACKS
   if (!userPerformance.squat || !userPerformance.deadlift || !userPerformance.bench) {
-    throw new Error('1RM data required for strength training: squat, deadlift, and bench press values must be provided');
+    throw new Error('Strength 1RM values required for strength workouts');
   }
   
   const squat1RM = userPerformance.squat;
@@ -285,14 +223,81 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
   const rowWeight = Math.round(bench1RM * 0.60); // 60% of 1RM for rows
   const powerCleanWeight = Math.round(deadlift1RM * 0.60); // 60% of 1RM for power cleans
   
+  // Progressive overload: Increase weight by 2.5-5% every 3-4 weeks
+  const progressionMultiplier = getProgressionMultiplier(weekNumber || 1, phase);
+  const adjustedSquatWeight = Math.round(squatWeight * progressionMultiplier);
+  const adjustedDeadliftWeight = Math.round(deadliftWeight * progressionMultiplier);
+  const adjustedBenchWeight = Math.round(benchWeight * progressionMultiplier);
+  const adjustedOverheadWeight = Math.round(overheadWeight * progressionMultiplier);
+  const adjustedRowWeight = Math.round(rowWeight * progressionMultiplier);
+  
+  // Get exercise variations based on week and phase
+  const exerciseVariations = getExerciseVariations(weekNumber || 1, phase, strengthType);
+  
+  // Check available equipment - match UI options
+  const hasFullGym = userEquipment?.strength?.includes('Full commercial gym access') || userEquipment?.strength?.includes('Full barbell + plates');
+  const hasBarbell = userEquipment?.strength?.includes('Full barbell + plates') || userEquipment?.strength?.includes('Squat rack or power cage');
+  const hasDumbbells = userEquipment?.strength?.includes('Adjustable dumbbells') || userEquipment?.strength?.includes('Fixed dumbbells');
+  const hasKettlebells = userEquipment?.strength?.includes('Kettlebells');
+  const hasPullUpBar = userEquipment?.strength?.includes('Pull-up bar');
+  const hasResistanceBands = userEquipment?.strength?.includes('Resistance bands');
+  const hasCableMachine = userEquipment?.strength?.includes('Cable machine/functional trainer');
+  const hasBodyweightOnly = userEquipment?.strength?.includes('Bodyweight only') || (!hasBarbell && !hasDumbbells && !hasKettlebells);
+  
+  // Phase-based intensity adjustments
+  const isBasePhase = phase === 'base';
+  const isBuildPhase = phase === 'build';
+  const isPeakPhase = phase === 'peak';
+  const isTaperPhase = phase === 'taper';
+  
   switch (strengthType) {
+    case 'traditional_lower':
+      // Lower body focus with progressive overload and variety
+      const traditionalLowerSets = isPeakPhase ? 4 : 3;
+      const traditionalLowerReps = isTaperPhase ? 6 : (isBasePhase ? 12 : 10);
+      
+      if (hasFullGym || hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps} @ ${adjustedSquatWeight}lbs (2min rest), ${exerciseVariations.deadlift} ${traditionalLowerSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.deadlift} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs (2min rest), ${exerciseVariations.deadlift} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs (3min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasResistanceBands) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Band Squats ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), Band Deadlifts ${traditionalLowerSets}x8 each (3min rest), Band Lunges ${traditionalLowerSets}x12 each (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasBodyweightOnly || !hasBarbell && !hasDumbbells && !hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (3min rest), ${exerciseVariations.lunge} ${traditionalLowerSets}x20 each (2min rest)\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${traditionalLowerSets}x${traditionalLowerReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${traditionalLowerSets}x8 each (3min rest), ${exerciseVariations.lunge} ${traditionalLowerSets}x20 each (2min rest)\nCool-down: 5min static stretching`;
+      }
+      
+    case 'traditional_upper':
+      // Upper body focus with progressive overload and variety
+      const traditionalUpperSets = isPeakPhase ? 4 : 3;
+      const traditionalUpperReps = isTaperPhase ? 6 : (isBasePhase ? 12 : 10);
+      
+      if (hasFullGym || hasBarbell) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedBenchWeight}lbs (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedRowWeight}lbs (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedOverheadWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasResistanceBands) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: Band Push-ups ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), Band Rows ${traditionalUpperSets}x${traditionalUpperReps} each (2min rest), Band Overhead Press ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasPullUpBar) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), Pull-ups ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasBodyweightOnly || !hasBarbell && !hasDumbbells && !hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+      } else {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${traditionalUpperSets}x${traditionalUpperReps * 2} (2min rest), ${exerciseVariations.row} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest), ${exerciseVariations.overhead} ${traditionalUpperSets}x${traditionalUpperReps} (2min rest)\nCool-down: 5min static stretching`;
+      }
+      
     case 'traditional':
-      // Endurance strength: 3-4 sets, 8-12 reps, 2-3 min rest (Lauersen et al., 2014)
+      // Legacy case for backward compatibility
       const traditionalSets = isPeakPhase ? 4 : 3;
       const traditionalReps = isTaperPhase ? 6 : 10;
       
       if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${traditionalSets}x${traditionalReps} @ ${squatWeight}lbs (2min rest), Deadlift ${traditionalSets}x6 @ ${deadliftWeight}lbs (3min rest), Bench Press ${traditionalSets}x${traditionalReps} @ ${benchWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: Squat ${traditionalSets}x${traditionalReps} @ ${adjustedSquatWeight}lbs (2min rest), Deadlift ${traditionalSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), Bench Press ${traditionalSets}x${traditionalReps} @ ${adjustedBenchWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasDumbbells) {
         return `Warm-up: 5min dynamic stretching\nMain Set: Goblet Squats ${traditionalSets}x${traditionalReps} (2min rest), Dumbbell Deadlifts ${traditionalSets}x6 (3min rest), Dumbbell Bench Press ${traditionalSets}x${traditionalReps} (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
@@ -303,85 +308,119 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
         return `Warm-up: 5min dynamic stretching\nMain Set: Bodyweight Squats ${traditionalSets}x${traditionalReps * 2} (2min rest), Single-leg Deadlifts ${traditionalSets}x8 each (3min rest), Push-ups ${traditionalSets}x${traditionalReps * 2} (2min rest)\nCool-down: 5min static stretching`;
       }
       
-    case 'compound':
-      // Endurance compound: 3-4 sets, 6-8 reps, 2-3 min rest (Rønnestad & Mujika, 2014)
-      const compoundSets = isPeakPhase ? 4 : 3;
-      const compoundReps = isTaperPhase ? 4 : 8;
-      
-      if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Power Clean ${compoundSets}x4 @ ${powerCleanWeight}lbs (3min rest), Squat ${compoundSets}x${compoundReps} @ ${squatWeight}lbs (2min rest), Deadlift ${compoundSets}x4 @ ${deadliftWeight}lbs (3min rest)\nCool-down: 5min static stretching`;
-      } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Clean ${compoundSets}x4 (3min rest), Goblet Squats ${compoundSets}x${compoundReps} (2min rest), Dumbbell Deadlifts ${compoundSets}x4 (3min rest)\nCool-down: 5min static stretching`;
-      } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Clean ${compoundSets}x4 (3min rest), Kettlebell Goblet Squats ${compoundSets}x${compoundReps} (2min rest), Kettlebell Deadlifts ${compoundSets}x4 (3min rest)\nCool-down: 5min static stretching`;
-      } else if (hasBodyweightOnly || !hasBarbell && !hasDumbbells && !hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Jump Squats ${compoundSets}x8 (3min rest), Bodyweight Squats ${compoundSets}x${compoundReps * 2} (2min rest), Single-leg Deadlifts ${compoundSets}x6 each (3min rest)\nCool-down: 5min static stretching`;
-      } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Jump Squats ${compoundSets}x8 (3min rest), Bodyweight Squats ${compoundSets}x${compoundReps * 2} (2min rest), Single-leg Deadlifts ${compoundSets}x6 each (3min rest)\nCool-down: 5min static stretching`;
-      }
-      
     case 'cowboy_endurance':
-      // Endurance functional: 3-4 sets, distance-based, 2-3 min rest (Beattie et al., 2017)
+      // Endurance lower body with progressive overload and variety
       const cowboySets = isPeakPhase ? 4 : 3;
-      const cowboyDistance = isTaperPhase ? 75 : 100;
+      const cowboyReps = isTaperPhase ? 8 : (isBasePhase ? 15 : 12);
+      const cowboyTime = isTaperPhase ? 30 : (isBasePhase ? 60 : 45);
       
       if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks with dumbbells ${cowboySets}x${cowboyDistance}m (2min rest), Dumbbell carries ${cowboySets}x50m (2min rest), Pull-ups ${cowboySets}x6 (3min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${exerciseVariations.deadlift} ${cowboySets}x8 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Farmer's walks with kettlebells ${cowboySets}x${cowboyDistance}m (2min rest), Kettlebell carries ${cowboySets}x50m (2min rest), Pull-ups ${cowboySets}x6 (3min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs (2min rest), ${exerciseVariations.deadlift} ${cowboySets}x8 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasBodyweightOnly || !hasDumbbells && !hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${cowboySets}x8 each (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Walking lunges ${cowboySets}x${cowboyDistance}m (2min rest), Bear crawls ${cowboySets}x50m (2min rest), Pull-ups ${cowboySets}x6 (3min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.squat} ${cowboySets}x${cowboyReps * 2} (2min rest), ${exerciseVariations.singleLeg} ${cowboySets}x8 each (3min rest), ${exerciseVariations.lunge} ${cowboySets}x12 each leg (2min rest)\nCool-down: 5min static stretching`;
       }
       
-    case 'cowboy_compound':
-      // Endurance compound: 3-4 sets, 6-8 reps, 2-3 min rest (Rønnestad & Mujika, 2014)
-      const cowboyCompoundSets = isPeakPhase ? 4 : 3;
-      const cowboyCompoundReps = isTaperPhase ? 4 : 8;
+    case 'cowboy_endurance_walks':
+      // Endurance functional with progressive overload and variety
+      const walksSets = isPeakPhase ? 4 : 3;
+      const walksTime = isTaperPhase ? 30 : (isBasePhase ? 60 : 45);
       
-      if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Deadlift ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${deadliftWeight}lbs (3min rest), Overhead press ${cowboyCompoundSets}x${cowboyCompoundReps} @ ${overheadWeight}lbs (2min rest), Rows ${cowboyCompoundSets}x8 @ ${rowWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
-      } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Clean & Press ${cowboyCompoundSets}x${cowboyCompoundReps} (3min rest), Dumbbell Squat to Press ${cowboyCompoundSets}x${cowboyCompoundReps} (2min rest), Dumbbell Romanian Deadlift ${cowboyCompoundSets}x8 (2min rest)\nCool-down: 5min static stretching`;
+      if (hasDumbbells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec @ ${Math.round(adjustedDeadliftWeight * 0.3)}lbs each (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Clean & Press ${cowboyCompoundSets}x${cowboyCompoundReps} (3min rest), Kettlebell Squat to Press ${cowboyCompoundSets}x${cowboyCompoundReps} (2min rest), Kettlebell Romanian Deadlift ${cowboyCompoundSets}x8 (2min rest)\nCool-down: 5min static stretching`;
-      } else if (hasBodyweightOnly || !hasBarbell && !hasDumbbells && !hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Burpees ${cowboyCompoundSets}x${cowboyCompoundReps} (3min rest), Jump Squats ${cowboyCompoundSets}x${cowboyCompoundReps} (2min rest), Single-leg Romanian Deadlifts ${cowboyCompoundSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec @ ${Math.round(adjustedDeadliftWeight * 0.3)}lbs each (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
+      } else if (hasBodyweightOnly || !hasDumbbells && !hasKettlebells) {
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 (2min rest)\nCool-down: 5min static stretching`;
       } else {
-        // Fallback to bodyweight if no specific equipment detected
-        return `Warm-up: 5min dynamic stretching\nMain Set: Burpees ${cowboyCompoundSets}x${cowboyCompoundReps} (3min rest), Jump Squats ${cowboyCompoundSets}x${cowboyCompoundReps} (2min rest), Single-leg Romanian Deadlifts ${cowboyCompoundSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.carry} ${walksSets}x${walksTime}sec (2min rest), ${exerciseVariations.pullup} ${walksSets}x6 (3min rest), ${exerciseVariations.row} ${walksSets}x12 (2min rest)\nCool-down: 5min static stretching`;
       }
       
     case 'cowboy_endurance_upper':
       const upperSets = isPeakPhase ? 4 : 3;
-      const upperReps = isTaperPhase ? 8 : 12;
+      const upperReps = isTaperPhase ? 8 : (isBasePhase ? 15 : 12);
       
       if (hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Bench Press ${upperSets}x${upperReps} @ ${benchWeight}lbs, Overhead Press ${upperSets}x${upperReps} @ ${overheadWeight}lbs, Barbell Rows ${upperSets}x${upperReps} @ ${rowWeight}lbs, Bicep Curls ${upperSets}x12 @ ${Math.round(benchWeight * 0.4)}lbs\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${upperSets}x${upperReps} @ ${adjustedBenchWeight}lbs, ${exerciseVariations.overhead} ${upperSets}x${upperReps} @ ${adjustedOverheadWeight}lbs, ${exerciseVariations.row} ${upperSets}x${upperReps} @ ${adjustedRowWeight}lbs, ${exerciseVariations.curl} ${upperSets}x12 @ ${Math.round(adjustedBenchWeight * 0.4)}lbs\nCool-down: 5min static stretching`;
       } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Bench Press ${upperSets}x${upperReps}, Dumbbell Overhead Press ${upperSets}x${upperReps}, Dumbbell Rows ${upperSets}x${upperReps} each, Dumbbell Curls ${upperSets}x12 each\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${upperSets}x${upperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each, ${exerciseVariations.overhead} ${upperSets}x${upperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each, ${exerciseVariations.row} ${upperSets}x${upperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each, ${exerciseVariations.curl} ${upperSets}x12 each @ ${Math.round(adjustedBenchWeight * 0.2)}lbs each\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Floor Press ${upperSets}x${upperReps}, Kettlebell Press ${upperSets}x${upperReps}, Kettlebell Rows ${upperSets}x${upperReps} each, Kettlebell Curls ${upperSets}x12 each\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.bench} ${upperSets}x${upperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs, ${exerciseVariations.overhead} ${upperSets}x${upperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs, ${exerciseVariations.row} ${upperSets}x${upperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each, ${exerciseVariations.curl} ${upperSets}x12 each @ ${Math.round(adjustedBenchWeight * 0.2)}lbs each\nCool-down: 5min static stretching`;
       } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Push-ups ${upperSets}x${upperReps * 2}, Pike Push-ups ${upperSets}x${upperReps}, Inverted Rows ${upperSets}x${upperReps}, Diamond Push-ups ${upperSets}x12\nCool-down: 5min static stretching`;
-      }
-      
-    case 'cowboy_compound_upper':
-      const compoundUpperSets = isPeakPhase ? 4 : 3;
-      const compoundUpperReps = isTaperPhase ? 6 : 8;
-      
-      if (hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Bench Press ${compoundUpperSets}x${compoundUpperReps} @ ${benchWeight}lbs, Overhead Press ${compoundUpperSets}x${compoundUpperReps} @ ${overheadWeight}lbs, Barbell Rows ${compoundUpperSets}x${compoundUpperReps} @ ${rowWeight}lbs, Close-Grip Bench Press ${compoundUpperSets}x8 @ ${Math.round(benchWeight * 0.8)}lbs\nCool-down: 5min static stretching`;
-      } else if (hasDumbbells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Dumbbell Bench Press ${compoundUpperSets}x${compoundUpperReps}, Dumbbell Overhead Press ${compoundUpperSets}x${compoundUpperReps}, Dumbbell Rows ${compoundUpperSets}x${compoundUpperReps} each, Dumbbell Floor Press ${compoundUpperSets}x8 each\nCool-down: 5min static stretching`;
-      } else if (hasKettlebells) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Kettlebell Floor Press ${compoundUpperSets}x${compoundUpperReps}, Kettlebell Press ${compoundUpperSets}x${compoundUpperReps}, Kettlebell Rows ${compoundUpperSets}x${compoundUpperReps} each, Kettlebell Floor Press ${compoundUpperSets}x8 each\nCool-down: 5min static stretching`;
-      } else {
-        return `Warm-up: 5min dynamic stretching\nMain Set: Push-ups ${compoundUpperSets}x${compoundUpperReps * 2}, Pike Push-ups ${compoundUpperSets}x${compoundUpperReps}, Inverted Rows ${compoundUpperSets}x${compoundUpperReps}, Diamond Push-ups ${compoundUpperSets}x8\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${exerciseVariations.pushup} ${upperSets}x${upperReps * 2}, ${exerciseVariations.overhead} ${upperSets}x${upperReps}, ${exerciseVariations.row} ${upperSets}x${upperReps}, ${exerciseVariations.curl} ${upperSets}x12\nCool-down: 5min static stretching`;
       }
       
     default:
       return session.description;
   }
+}
+
+// Progressive overload: Increase weight by 2.5-5% every 3-4 weeks
+function getProgressionMultiplier(weekNumber: number, phase: string): number {
+  const baseMultiplier = 1.0;
+  const weeklyIncrease = 0.025; // 2.5% per week
+  const maxWeeks = 12;
+  
+  // Calculate progression based on week
+  let progression = baseMultiplier + (weekNumber - 1) * weeklyIncrease;
+  
+  // Phase-based adjustments
+  switch (phase) {
+    case 'base':
+      progression = Math.min(progression, 1.15); // Cap at 15% increase in base
+      break;
+    case 'build':
+      progression = Math.min(progression, 1.25); // Cap at 25% increase in build
+      break;
+    case 'peak':
+      progression = Math.min(progression, 1.30); // Cap at 30% increase in peak
+      break;
+    case 'taper':
+      progression = Math.max(progression * 0.8, 1.0); // Reduce by 20% in taper
+      break;
+  }
+  
+  return progression;
+}
+
+// Exercise variety: Different variations while maintaining muscle continuity
+function getExerciseVariations(weekNumber: number, phase: string, strengthType: string): any {
+  const variations = {
+    // Lower body variations
+    squat: ['Goblet Squats', 'Front Squats', 'Back Squats', 'Box Squats', 'Split Squats'],
+    deadlift: ['Dumbbell Deadlifts', 'Romanian Deadlifts', 'Sumo Deadlifts', 'Single-leg Deadlifts', 'Kettlebell Deadlifts'],
+    singleLeg: ['Single-leg Romanian Deadlifts', 'Bulgarian Split Squats', 'Step-ups', 'Single-leg Squats', 'Lateral Lunges'],
+    lunge: ['Walking Lunges', 'Reverse Lunges', 'Lateral Lunges', 'Curtsy Lunges', 'Jumping Lunges'],
+    
+    // Upper body variations
+    bench: ['Dumbbell Bench Press', 'Barbell Bench Press', 'Incline Press', 'Floor Press', 'Push-ups'],
+    overhead: ['Dumbbell Overhead Press', 'Barbell Overhead Press', 'Kettlebell Press', 'Pike Push-ups', 'Handstand Push-ups'],
+    row: ['Dumbbell Rows', 'Barbell Rows', 'Kettlebell Rows', 'Inverted Rows', 'Cable Rows'],
+    pushup: ['Push-ups', 'Diamond Push-ups', 'Wide Push-ups', 'Decline Push-ups', 'Pike Push-ups'],
+    
+    // Functional variations
+    carry: ['Farmer\'s Walks', 'Suitcase Carries', 'Bear Crawls', 'Crab Walks', 'Duck Walks'],
+    pullup: ['Pull-ups', 'Chin-ups', 'Assisted Pull-ups', 'Negative Pull-ups', 'Band-assisted Pull-ups'],
+    curl: ['Dumbbell Curls', 'Barbell Curls', 'Hammer Curls', 'Concentration Curls', 'Preacher Curls']
+  };
+  
+  // Select variations based on week cycle and phase
+  const weekCycle = (weekNumber - 1) % 4; // 4-week cycle
+  const phaseCycle = phase === 'base' ? 0 : phase === 'build' ? 1 : phase === 'peak' ? 2 : 3;
+  
+  const selectedVariations: any = {};
+  
+  // Select exercises based on week cycle and phase
+  Object.keys(variations).forEach(muscleGroup => {
+    const exerciseList = variations[muscleGroup as keyof typeof variations];
+    const index = (weekCycle + phaseCycle) % exerciseList.length;
+    selectedVariations[muscleGroup] = exerciseList[index];
+  });
+  
+  return selectedVariations;
 }
 
 function getPhaseIntensityMultiplier(phase: string): number {

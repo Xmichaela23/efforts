@@ -8,10 +8,10 @@
 - **Context-first development** - read this bible before starting any work
 - **Test the entire system** after any changes, not just the modified component
 
-### **Success Pattern: JSON Rules Engine**
+### **Success Pattern: Clean 3-File Architecture**
 - **Problem**: Complex algorithm approach was over-engineered
 - **Wrong approach**: Build complex algorithms with multiple fallbacks
-- **Right approach**: Simple JSON rules engine with no fallbacks, fail fast
+- **Right approach**: Simple 3-file architecture with no fallbacks, fail fast
 - **Result**: Clean, reliable, scalable 70.3 triathlon training plans
 
 ### **Anti-Patterns to Avoid**
@@ -63,7 +63,7 @@
 - **Manual Supplementation**: Users still need to add some metrics manually
 
 ### **3. Plan Building**
-- **JSON Rules Engine**: 70.3 triathlon training plans (current focus)
+- **Clean 3-File Architecture**: 70.3 triathlon training plans (current focus)
 - **Manual Plans**: Coach-friendly workout creation
 - **Both**: Reference baseline data for intensity setting
 
@@ -96,15 +96,15 @@
 ```
 User Flow:
 1. Training Baselines (Fitness Assessment) → user_baselines table
-2. Plan Builder (Goal Assessment) → JSON Rules Engine → plan generation
-3. TrainingRulesEngine → Creates unique training plans
+2. Plan Builder (Goal Assessment) → TrainingEngine → plan generation
+3. TrainingEngine → Creates unique training plans
 4. Workout Execution → Logging & tracking
 ```
 
-## 🎯 CURRENT FOCUS: 70.3 JSON RULES ENGINE
+## 🎯 CURRENT FOCUS: 70.3 CLEAN 3-FILE ARCHITECTURE
 
 ### **Core System:**
-- **JSON Rules Engine** using json-rules-engine (2,874 stars)
+- **Clean 3-File Architecture**: `Seventy3Template.ts`, `StrengthTemplate.ts`, `TrainingEngine.ts`
 - **70.3-Specific Rules**: Swim 60min, Bike 120min, Run 90min, Brick 150min
 - **80/20 Polarized Distribution**: 5 easy + 1 hard sessions
 - **Week Progression**: Introduction → Build → Peak → Taper

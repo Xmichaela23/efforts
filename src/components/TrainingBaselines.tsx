@@ -1229,7 +1229,7 @@ return (
                                 {disciplineId === 'swimming' && (
                                   <div className="space-y-3">
                                     <div>
-                                      <label className="text-xs text-gray-600">100m Pace (mm:ss)</label>
+                                      <label className="text-xs text-gray-600">100 Yard Pace (mm:ss)</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.swimPace100 || ''}
