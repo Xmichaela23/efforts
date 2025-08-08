@@ -361,7 +361,7 @@ export default function SimplePlanBuilder() {
             <div className="space-y-4">
               <div 
                 className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                  answers.distance === 'sprint' ? 'bg-gray-200' : ''
+                  answers.distance === 'sprint' ? 'bg-gray-200 text-gray-900' : ''
                 }`}
                 onClick={() => updateAnswer('distance', 'sprint')}
               >
@@ -370,7 +370,7 @@ export default function SimplePlanBuilder() {
               </div>
               <div 
                 className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                  answers.distance === 'seventy3' ? 'bg-gray-200' : ''
+                  answers.distance === 'seventy3' ? 'bg-gray-200 text-gray-900' : ''
                 }`}
                 onClick={() => updateAnswer('distance', 'seventy3')}
               >
@@ -487,7 +487,7 @@ export default function SimplePlanBuilder() {
                 <div 
                   key={option.key}
                   className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                    answers.timeLevel === option.key ? 'bg-gray-200 text-gray-900' : ''
+                    answers.timeLevel === option.key ? 'bg-gray-200' : ''
                   } ${!option.compatible ? 'opacity-50 cursor-not-allowed' : ''}`}
                   onClick={() => option.compatible && updateAnswer('timeLevel', option.key)}
                 >
@@ -524,7 +524,7 @@ export default function SimplePlanBuilder() {
             <div className="space-y-4">
               <div 
                 className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                  answers.longSessionDays === 'weekend' ? 'bg-gray-200 text-gray-900' : ''
+                  answers.longSessionDays === 'weekend' ? 'bg-gray-200' : ''
                 }`}
                 onClick={() => updateAnswer('longSessionDays', 'weekend')}
               >
@@ -533,7 +533,7 @@ export default function SimplePlanBuilder() {
               </div>
               <div 
                 className={`cursor-pointer hover:bg-gray-50 p-4 ${
-                  answers.longSessionDays === 'custom' ? 'bg-gray-200 text-gray-900' : ''
+                  answers.longSessionDays === 'custom' ? 'bg-gray-200' : ''
                 }`}
                 onClick={() => updateAnswer('longSessionDays', 'custom')}
               >
