@@ -54,6 +54,8 @@ export default function SimplePlanBuilder() {
   const [currentWeek, setCurrentWeek] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [isHorizontalSwipe, setIsHorizontalSwipe] = useState(false);
   const [plan, setPlan] = useState<TrainingPlan | null>(null);
   const [userBaselines, setUserBaselines] = useState<UserBaselines | null>(null);
   const [isLoadingBaselines, setIsLoadingBaselines] = useState(true);
@@ -129,29 +131,46 @@ export default function SimplePlanBuilder() {
 
   // Touch/swipe handlers for week navigation
   const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 1) return; // ignore multi-touch
     setTouchEnd(null);
+    setIsHorizontalSwipe(false);
     setTouchStart(e.targetTouches[0].clientX);
+    setTouchStartY(e.targetTouches[0].clientY);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    setTouchEnd(e.targetTouches[0].clientX);
+    if (e.touches.length > 1) return; // ignore multi-touch
+    const x = e.targetTouches[0].clientX;
+    const y = e.targetTouches[0].clientY;
+    setTouchEnd(x);
+
+    if (touchStart !== null && touchStartY !== null) {
+      const dx = Math.abs(x - touchStart);
+      const dy = Math.abs(y - touchStartY);
+      // determine gesture type once
+      if (!isHorizontalSwipe && dx > 10 && dx > dy) {
+        setIsHorizontalSwipe(true);
+      }
+      // prevent vertical scroll jank only when clearly swiping horizontally
+      if (isHorizontalSwipe) {
+        e.preventDefault();
+      }
+    }
   };
 
   const onTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
-    const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 50;
-    const isRightSwipe = distance < -50;
 
-    console.log('Swipe detected:', { distance, isLeftSwipe, isRightSwipe, currentWeek });
+    const distanceX = touchStart - touchEnd;
+    const isLeftSwipe = distanceX > 50;
+    const isRightSwipe = distanceX < -50;
+
+    if (!isHorizontalSwipe) return; // ignore vertical gestures
 
     if (isLeftSwipe && plan?.weeks && currentWeek < plan.weeks.length - 1) {
-      console.log('Swiping left to week', currentWeek + 1);
       setCurrentWeek(currentWeek + 1);
     }
     if (isRightSwipe && currentWeek > 0) {
-      console.log('Swiping right to week', currentWeek - 1);
       setCurrentWeek(currentWeek - 1);
     }
   };
