@@ -136,8 +136,18 @@ const formatPace = (paceValue: any): string => {
   }
   
   // For average pace, calculate from distance and duration for accuracy
-  const distanceMeters = Number(workoutData.distance_meters);
-  const durationSeconds = Number(workoutData.duration_seconds);
+  // Try multiple field name conventions
+  const distanceMeters = Number(workoutData.distance_meters || (workoutData.distance * 1609.34)); // Convert miles to meters if needed
+  const durationSeconds = Number(workoutData.duration_seconds || (workoutData.duration * 60)); // Convert minutes to seconds if needed
+  
+  console.log('🔍 formatPace debug:', {
+    distance_meters: workoutData.distance_meters,
+    distance: workoutData.distance,
+    duration_seconds: workoutData.duration_seconds, 
+    duration: workoutData.duration,
+    calculated_distanceMeters: distanceMeters,
+    calculated_durationSeconds: durationSeconds
+  });
   
   if (distanceMeters && durationSeconds && distanceMeters > 0 && durationSeconds > 0) {
     // Convert meters to miles
@@ -149,6 +159,7 @@ const formatPace = (paceValue: any): string => {
     
     const minutes = Math.floor(paceMinPerMile);
     const seconds = Math.round((paceMinPerMile - minutes) * 60);
+    console.log('🔍 formatPace calculated:', `${minutes}:${seconds.toString().padStart(2, '0')}/mi`);
     return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
   }
   
