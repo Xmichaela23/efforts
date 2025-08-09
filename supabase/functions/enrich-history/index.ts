@@ -99,12 +99,31 @@ Deno.serve(async (req: Request) => {
         const elevGain = summary.totalElevationGainInMeters ?? null;
         const elevLoss = summary.totalElevationLossInMeters ?? null;
 
+        // Best-effort extract starting coordinates from samples if present
+        let startingLat: number | null = null;
+        let startingLng: number | null = null;
+        try {
+          const samples = (activityDetail as any)?.samples || {};
+          const lats: number[] | undefined = samples.latitudeInDegrees || samples.latitudes || samples.latitude || undefined;
+          const lngs: number[] | undefined = samples.longitudeInDegrees || samples.longitudes || samples.longitude || undefined;
+          if (Array.isArray(lats) && Array.isArray(lngs) && lats.length > 0 && lngs.length > 0) {
+            startingLat = typeof lats[0] === 'number' ? lats[0] : Number(lats[0]);
+            startingLng = typeof lngs[0] === 'number' ? lngs[0] : Number(lngs[0]);
+          }
+        } catch (_) {
+          // optional
+        }
+
+        const typeKey = (summary.activityType && typeof summary.activityType === 'object')
+          ? (summary.activityType.typeKey || summary.activityType.typeId || null)
+          : (summary.activityType || null);
+
         const record: any = {
           user_id: appUserId,
           garmin_user_id: garminUserId,
           garmin_activity_id: String(summaryId),
           activity_id: summary.activityId || null,
-          activity_type: summary.activityType || null,
+          activity_type: typeKey,
           start_time: summary.startTimeInSeconds ? new Date(summary.startTimeInSeconds * 1000).toISOString() : null,
           start_time_offset_seconds: summary.startTimeOffsetInSeconds || 0,
           duration_seconds: summary.durationInSeconds || null,
@@ -129,7 +148,10 @@ Deno.serve(async (req: Request) => {
           is_web_upload: summary.isWebUpload || false,
           raw_data: activityDetail,
           samples_data: activityDetail.samples || null,
+          starting_latitude: startingLat,
+          starting_longitude: startingLng,
           created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         };
 
         // Upsert via PostgREST

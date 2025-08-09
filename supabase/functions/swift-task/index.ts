@@ -33,7 +33,8 @@ function isAllowedPath(path: string): boolean {
     path.startsWith('/wellness-api/rest/activities') ||
     path.startsWith('/wellness-api/rest/activityDetails') ||
     path.startsWith('/wellness-api/rest/backfill/activities') ||
-    path.startsWith('/wellness-api/rest/user/permissions')
+    path.startsWith('/wellness-api/rest/user/permissions') ||
+    path.startsWith('/wellness-api/rest/user/id')
   );
 }
 

@@ -28,6 +28,8 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
   const [historyStatus, setHistoryStatus] = useState<'idle' | 'requesting' | 'enriching' | 'success' | 'error'>('idle');
   const [historyError, setHistoryError] = useState('');
   const [importProgress, setImportProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
+  const [importCounts, setImportCounts] = useState<{ added: number; skipped: number }>({ added: 0, skipped: 0 });
+  const [enrichInfo, setEnrichInfo] = useState<{ windows: number; total: number } | null>(null);
 
   const fetchAndAnalyzeData = async () => {
     setLoading(true);
@@ -141,6 +143,8 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setHistoryStatus('requesting');
     setHistoryError('');
     setImportProgress({ done: 0, total: 90 });
+    setImportCounts({ added: 0, skipped: 0 });
+    setEnrichInfo(null);
 
     try {
       const { createClient } = await import('@supabase/supabase-js');
@@ -162,120 +166,56 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       const garminAccessToken: string | undefined = userConnection.access_token || userConnection.connection_data?.access_token;
       if (!garminAccessToken) throw new Error('Missing Garmin access token');
 
-      const startOfUtcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
-      const now = new Date();
-
-      const mapType = (t?: string): 'run' | 'ride' | 'swim' | 'strength' => {
-        const s = (t || '').toLowerCase();
-        if (s.includes('swim')) return 'swim';
-        if (s.includes('cycl') || s.includes('bik') || s.includes('ride')) return 'ride';
-        if (s.includes('strength') || s.includes('weight')) return 'strength';
-        if (s.includes('run') || s.includes('jog') || s.includes('walk')) return 'run';
-        return 'run';
-      };
-
-      for (let i = 0; i < 90; i++) {
-        setImportProgress({ done: i, total: 90 });
-
-        const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-        day.setUTCDate(day.getUTCDate() - i);
-        const dayStart = Math.floor(startOfUtcDay(day));
-        const dayEnd = dayStart + 24 * 60 * 60 - 1;
-
-        const path = `/wellness-api/rest/activities?uploadStartTimeInSeconds=${dayStart}&uploadEndTimeInSeconds=${dayEnd}`;
-        const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${garminAccessToken}`;
-
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Accept': 'application/json'
+      // Ensure we have connection_data.user_id for enrichment mapping
+      try {
+        const hasUserId = Boolean(userConnection.connection_data?.user_id);
+        if (!hasUserId) {
+          const path = '/wellness-api/rest/user/id';
+          const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${garminAccessToken}`;
+          const resp = await fetch(url, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Accept': 'application/json'
+            }
+          });
+          if (resp.ok) {
+            const body = await resp.json();
+            const garminUserId = body?.userId;
+            if (garminUserId) {
+              const newConnectionData = { ...(userConnection.connection_data || {}), user_id: garminUserId };
+              await supabase
+                .from('user_connections')
+                .update({ connection_data: newConnectionData })
+                .eq('user_id', session.user.id)
+                .eq('provider', 'garmin');
+            }
           }
-        });
-
-        if (!resp.ok) { await new Promise((r) => setTimeout(r, 120)); continue; }
-        const items: any[] = await resp.json();
-        if (!Array.isArray(items) || items.length === 0) { await new Promise((r) => setTimeout(r, 80)); continue; }
-
-        const friendlyNames = items.map((a) => {
-          const summary = a.summary || a;
-          const sid = summary.summaryId ?? summary.activityId;
-          return sid ? `Garmin Activity ${sid}` : null;
-        }).filter(Boolean) as string[];
-
-        const { data: existing } = await supabase
-          .from('workouts')
-          .select('friendly_name')
-          .eq('user_id', session.user.id)
-          .in('friendly_name', friendlyNames);
-        const existingSet = new Set((existing || []).map((e: any) => e.friendly_name));
-
-        const rows = items.map((a) => {
-          const s = a.summary || a;
-          const summaryId = s.summaryId ?? s.activityId;
-          if (!summaryId) return null;
-          const friendly = `Garmin Activity ${summaryId}`;
-          if (existingSet.has(friendly)) return null;
-
-          const startIso = s.startTimeInSeconds ? new Date(s.startTimeInSeconds * 1000).toISOString() : null;
-          const dateStr = startIso ? startIso.split('T')[0] : new Date().toISOString().split('T')[0];
-          const durationSec = Math.round(s.durationInSeconds ?? s.duration ?? 0);
-          const avgSpd = s.averageSpeedInMetersPerSecond ?? s.averageSpeed ?? null;
-          const maxSpd = s.maxSpeedInMetersPerSecond ?? s.maxSpeed ?? null;
-          const typeKey = (s.activityType?.typeKey || s.activityType || '') as string;
-          const wType = mapType(typeKey);
-
-          return {
-            name: s.activityName ? `Garmin ${s.activityName}` : `Garmin ${typeKey || 'Activity'}`,
-            type: wType,
-            date: dateStr,
-            duration: Math.round(durationSec / 60),
-            description: `Imported from Garmin Connect - ${typeKey}`,
-            usercomments: '',
-            completedmanually: false,
-            workout_status: 'completed',
-            intervals: JSON.stringify([]),
-            strength_exercises: JSON.stringify([]),
-            user_id: session.user.id,
-            avg_heart_rate: s.averageHeartRateInBeatsPerMinute ?? null,
-            max_heart_rate: s.maxHeartRateInBeatsPerMinute ?? null,
-            avg_power: s.averagePowerInWatts ?? null,
-            max_power: s.maxPowerInWatts ?? null,
-            avg_speed: avgSpd ? avgSpd * 3.6 : null,
-            max_speed: maxSpd ? maxSpd * 3.6 : null,
-            elevation_gain: s.totalElevationGainInMeters ?? null,
-            elevation_loss: s.totalElevationLossInMeters ?? null,
-            calories: s.activeKilocalories ?? null,
-            distance: s.distanceInMeters ? s.distanceInMeters / 1000 : null,
-            timestamp: startIso,
-            friendly_name: friendly,
-            moving_time: durationSec,
-            elapsed_time: durationSec,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          };
-        }).filter(Boolean);
-
-        if ((rows as any[]).length > 0) {
-          const { error } = await supabase.from('workouts').insert(rows as any[]);
-          if (error) throw error;
         }
-
-        await new Promise((r) => setTimeout(r, 120));
+      } catch (_) {
+        // non-fatal
       }
 
-      // Switch to enriching state and kick off server enrichment in background
-      setImportProgress({ done: 90, total: 90 });
+      // Directly run enrichment server-side for 90 days (no client inserts to workouts)
       setHistoryStatus('enriching');
       try {
-        await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/enrich-history', {
+        const enrichResp = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/enrich-history', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ token: garminAccessToken, days: 30 })
+          body: JSON.stringify({ token: garminAccessToken, days: 90 })
         });
+        if (enrichResp.ok) {
+          const body = await enrichResp.json().catch(() => null);
+          if (body && typeof body.windows === 'number' && typeof body.total === 'number') {
+            setEnrichInfo({ windows: body.windows, total: body.total });
+          }
+        } else {
+          const errText = await enrichResp.text();
+          throw new Error(`Enrichment failed: ${enrichResp.status} ${errText}`);
+        }
       } catch (_) {
         // ignore enrich errors
       }
@@ -410,8 +350,18 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
             {historyStatus === 'success' && (<>Import 90 Day Workout History</>)}
             {historyStatus === 'error' && (<>Retry Import</>)}
           </button>
+          {historyStatus === 'requesting' && (
+            <p className="text-xs text-gray-600 mt-2">Added {importCounts.added}, Skipped {importCounts.skipped}</p>
+          )}
+          {historyStatus === 'enriching' && !enrichInfo && (
+            <p className="text-xs text-gray-600 mt-2">Waiting for details to populate…</p>
+          )}
           {historyStatus === 'success' && (
-            <p className="text-xs text-green-600 mt-2">Done. Refresh Completed to view history.</p>
+            <p className="text-xs text-green-600 mt-2">
+              Done. Added {importCounts.added}, Skipped {importCounts.skipped}.
+              {enrichInfo ? ` Enriched ${enrichInfo.total} activity details across ${enrichInfo.windows} day windows.` : ''}
+              Refresh Completed to view history.
+            </p>
           )}
           {historyStatus === 'error' && (
             <p className="text-xs text-red-600 mt-2">{historyError}</p>
