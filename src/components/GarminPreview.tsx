@@ -205,7 +205,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ token: garminAccessToken, days: 90 })
+          body: JSON.stringify({ token: garminAccessToken, days: 180 })
         });
         if (enrichResp.ok) {
           const body = await enrichResp.json().catch(() => null);
@@ -346,8 +346,8 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
               <>Importing… {importProgress.done}/{importProgress.total}</>
             )}
             {historyStatus === 'enriching' && (<>Enriching history…</>)}
-            {historyStatus === 'idle' && (<>Import 90 Day Workout History</>)}
-            {historyStatus === 'success' && (<>Import 90 Day Workout History</>)}
+            {historyStatus === 'idle' && (<>Import 180 Day Workout History</>)}
+            {historyStatus === 'success' && (<>Import 180 Day Workout History</>)}
             {historyStatus === 'error' && (<>Retry Import</>)}
           </button>
           {historyStatus === 'requesting' && (
