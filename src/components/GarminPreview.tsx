@@ -25,8 +25,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
   const [backfillError, setBackfillError] = useState('');
   
   // Backfill state for workout history (6+ months)
-  const [historyStatus, setHistoryStatus] = useState<'idle' | 'requesting' | 'success' | 'error'>('idle');
+  const [historyStatus, setHistoryStatus] = useState<'idle' | 'requesting' | 'enriching' | 'success' | 'error'>('idle');
   const [historyError, setHistoryError] = useState('');
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number }>({ done: 0, total: 0 });
 
   const fetchAndAnalyzeData = async () => {
     setLoading(true);
@@ -139,6 +140,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
   const requestHistoricalData = async () => {
     setHistoryStatus('requesting');
     setHistoryError('');
+    setImportProgress({ done: 0, total: 90 });
 
     try {
       const { createClient } = await import('@supabase/supabase-js');
@@ -149,7 +151,6 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('User must be logged in');
 
-      // Get Garmin connection for access token
       const { data: userConnection, error: connErr } = await supabase
         .from('user_connections')
         .select('*')
@@ -161,23 +162,21 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       const garminAccessToken: string | undefined = userConnection.access_token || userConnection.connection_data?.access_token;
       if (!garminAccessToken) throw new Error('Missing Garmin access token');
 
-      // Helper to compute UTC day boundaries
       const startOfUtcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
-
-      // Loop last 90 days in 24h slices (UTC), fetch summaries, insert into workouts
       const now = new Date();
 
-      // Map Garmin activity type to app workout type
       const mapType = (t?: string): 'run' | 'ride' | 'swim' | 'strength' => {
         const s = (t || '').toLowerCase();
         if (s.includes('swim')) return 'swim';
-        if (s.includes('cycl') || s.includes('bik') || s.includes('ride')) return 'ride'; // matches road_biking, indoor_cycling, bike ride
+        if (s.includes('cycl') || s.includes('bik') || s.includes('ride')) return 'ride';
         if (s.includes('strength') || s.includes('weight')) return 'strength';
         if (s.includes('run') || s.includes('jog') || s.includes('walk')) return 'run';
         return 'run';
       };
 
       for (let i = 0; i < 90; i++) {
+        setImportProgress({ done: i, total: 90 });
+
         const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
         day.setUTCDate(day.getUTCDate() - i);
         const dayStart = Math.floor(startOfUtcDay(day));
@@ -194,18 +193,16 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           }
         });
 
-        if (!resp.ok) { await new Promise((r) => setTimeout(r, 150)); continue; }
+        if (!resp.ok) { await new Promise((r) => setTimeout(r, 120)); continue; }
         const items: any[] = await resp.json();
-        if (!Array.isArray(items) || items.length === 0) { await new Promise((r) => setTimeout(r, 100)); continue; }
+        if (!Array.isArray(items) || items.length === 0) { await new Promise((r) => setTimeout(r, 80)); continue; }
 
-        // Build friendly names for dedupe (Garmin Activity <summaryId>)
         const friendlyNames = items.map((a) => {
           const summary = a.summary || a;
           const sid = summary.summaryId ?? summary.activityId;
           return sid ? `Garmin Activity ${sid}` : null;
         }).filter(Boolean) as string[];
 
-        // Query existing to avoid duplicates
         const { data: existing } = await supabase
           .from('workouts')
           .select('friendly_name')
@@ -213,7 +210,6 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           .in('friendly_name', friendlyNames);
         const existingSet = new Set((existing || []).map((e: any) => e.friendly_name));
 
-        // Map to workouts rows
         const rows = items.map((a) => {
           const s = a.summary || a;
           const summaryId = s.summaryId ?? s.activityId;
@@ -226,7 +222,6 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           const durationSec = Math.round(s.durationInSeconds ?? s.duration ?? 0);
           const avgSpd = s.averageSpeedInMetersPerSecond ?? s.averageSpeed ?? null;
           const maxSpd = s.maxSpeedInMetersPerSecond ?? s.maxSpeed ?? null;
-
           const typeKey = (s.activityType?.typeKey || s.activityType || '') as string;
           const wType = mapType(typeKey);
 
@@ -242,17 +237,16 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
             intervals: JSON.stringify([]),
             strength_exercises: JSON.stringify([]),
             user_id: session.user.id,
-            // Metrics
             avg_heart_rate: s.averageHeartRateInBeatsPerMinute ?? null,
             max_heart_rate: s.maxHeartRateInBeatsPerMinute ?? null,
             avg_power: s.averagePowerInWatts ?? null,
             max_power: s.maxPowerInWatts ?? null,
-            avg_speed: avgSpd ? avgSpd * 3.6 : null, // km/h
+            avg_speed: avgSpd ? avgSpd * 3.6 : null,
             max_speed: maxSpd ? maxSpd * 3.6 : null,
             elevation_gain: s.totalElevationGainInMeters ?? null,
             elevation_loss: s.totalElevationLossInMeters ?? null,
             calories: s.activeKilocalories ?? null,
-            distance: s.distanceInMeters ? s.distanceInMeters / 1000 : null, // km
+            distance: s.distanceInMeters ? s.distanceInMeters / 1000 : null,
             timestamp: startIso,
             friendly_name: friendly,
             moving_time: durationSec,
@@ -267,11 +261,26 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           if (error) throw error;
         }
 
-        await new Promise((r) => setTimeout(r, 150));
+        await new Promise((r) => setTimeout(r, 120));
+      }
+
+      // Switch to enriching state and kick off server enrichment in background
+      setImportProgress({ done: 90, total: 90 });
+      setHistoryStatus('enriching');
+      try {
+        await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/enrich-history', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ token: garminAccessToken, days: 30 })
+        });
+      } catch (_) {
+        // ignore enrich errors
       }
 
       setHistoryStatus('success');
-      // No auto-analyze; user can analyze after import
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Failed to import workout history');
       setHistoryStatus('error');
@@ -390,10 +399,23 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           <button
             onClick={requestHistoricalData}
             className="px-6 py-3 text-black hover:text-blue-600 transition-colors font-medium border border-gray-300 rounded-md"
+            disabled={historyStatus === 'requesting' || historyStatus === 'enriching'}
           >
             <Download className="h-4 w-4 inline mr-2" />
-            Import 90 Day Workout History
+            {historyStatus === 'requesting' && (
+              <>Importing… {importProgress.done}/{importProgress.total}</>
+            )}
+            {historyStatus === 'enriching' && (<>Enriching history…</>)}
+            {historyStatus === 'idle' && (<>Import 90 Day Workout History</>)}
+            {historyStatus === 'success' && (<>Import 90 Day Workout History</>)}
+            {historyStatus === 'error' && (<>Retry Import</>)}
           </button>
+          {historyStatus === 'success' && (
+            <p className="text-xs text-green-600 mt-2">Done. Refresh Completed to view history.</p>
+          )}
+          {historyStatus === 'error' && (
+            <p className="text-xs text-red-600 mt-2">{historyError}</p>
+          )}
         </div>
 
         <div className="text-center">
