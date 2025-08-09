@@ -174,15 +174,14 @@ export default function WorkoutCalendar({
     }
   };
 
-  const getDisciplineColor = (type: string): string => {
-    switch (type) {
-      case 'run': return 'bg-green-100 text-green-800';
-      case 'walk': return 'bg-yellow-100 text-yellow-800';
-      case 'ride': 
-      case 'bike': return 'bg-blue-100 text-blue-800';
-      case 'swim': return 'bg-cyan-100 text-cyan-800';
-      case 'strength': return 'bg-orange-100 text-orange-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const getDisciplineColor = (type: string, isCompleted?: boolean): string => {
+    // Color code by status: completed = green, planned = orange
+    if (isCompleted) {
+      // All completed workouts are green
+      return 'bg-green-100 text-green-800';
+    } else {
+      // All planned workouts are orange  
+      return 'bg-orange-100 text-orange-800';
     }
   };
 
@@ -264,17 +263,20 @@ export default function WorkoutCalendar({
                       {/* Discipline names */}
                       {dayWorkouts.length > 0 && (
                         <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
-                          {dayWorkouts.slice(0, 2).map((workout, idx) => (
-                            <div
-                              key={workout.id || idx}
-                              className={`text-[10px] font-medium px-1 py-0.5 rounded ${
-                                getDisciplineColor(workout.type)
-                              }`}
-                              title={workout.name || workout.type}
-                            >
-                              {getDisciplineName(workout.type)}
-                            </div>
-                          ))}
+                          {dayWorkouts.slice(0, 2).map((workout, idx) => {
+                            const isCompleted = workout.workout_status === 'completed';
+                            return (
+                              <div
+                                key={workout.id || idx}
+                                className={`text-[10px] font-medium px-1 py-0.5 rounded ${
+                                  getDisciplineColor(workout.type, isCompleted)
+                                }`}
+                                title={workout.name || workout.type}
+                              >
+                                {getDisciplineName(workout.type)}
+                              </div>
+                            );
+                          })}
                           {dayWorkouts.length > 2 && (
                             <div className="text-[10px] text-muted-foreground font-medium leading-none">
                               +{dayWorkouts.length - 2}
