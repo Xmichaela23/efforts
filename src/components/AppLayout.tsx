@@ -60,43 +60,26 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   useEffect(() => {
     if (selectedWorkout) {
-      // Debug logging for smart tab routing
-      console.log('🔍 Smart tab routing for workout:', {
-        name: selectedWorkout.name,
-        type: selectedWorkout.type,
-        workout_status: selectedWorkout.workout_status,
-        activity_type: selectedWorkout.activity_type,
-        hasIntervals: !!selectedWorkout.intervals,
-        hasTargetPower: !!selectedWorkout.target_power,
-        hasTargetPace: !!selectedWorkout.target_pace,
-        hasDescription: !!selectedWorkout.description,
-        hasWorkoutType: !!selectedWorkout.workout_type
-      });
-      
       // Smart tab routing based on workout status and type
       if (selectedWorkout.type === 'strength') {
-        console.log('✅ Routing to COMPLETED tab (strength workout)');
         setActiveTab('completed');
       } else if (selectedWorkout.workout_status === 'completed') {
         // Check if this was a planned workout that got completed
-        const hasPlannedData = selectedWorkout.intervals || selectedWorkout.target_power || 
-                               selectedWorkout.target_pace || selectedWorkout.description || 
-                               selectedWorkout.workout_type;
-        
-        console.log('🔍 Completed workout - hasPlannedData:', hasPlannedData);
+        // Be more specific about what constitutes "planned data" to avoid false positives
+        const hasPlannedData = (selectedWorkout.intervals && selectedWorkout.intervals.length > 0) || 
+                               selectedWorkout.target_power || 
+                               selectedWorkout.target_pace ||
+                               (selectedWorkout.workout_type && selectedWorkout.workout_type !== selectedWorkout.type);
         
         if (hasPlannedData) {
           // B) Completed planned workout -> Summary tab (shows planned vs actual)
-          console.log('✅ Routing to SUMMARY tab (completed planned workout)');
           setActiveTab('summary');
         } else {
           // C) Completed workout without plan -> Completed tab (just show data)
-          console.log('✅ Routing to COMPLETED tab (completed workout without plan)');
           setActiveTab('completed');
         }
       } else {
         // A) Planned workout -> Planned tab
-        console.log('✅ Routing to PLANNED tab (planned workout)');
         setActiveTab('planned');
       }
     }

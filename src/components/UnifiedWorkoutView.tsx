@@ -30,13 +30,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [activeTab, setActiveTab] = useState(isCompleted ? 'completed' : 'planned');
 
   const getWorkoutType = () => {
-    // Debug logging to see what we're working with
-    console.log('🔍 UnifiedWorkoutView workout data:', {
-      type: workout.type,
-      activity_type: workout.activity_type,
-      name: workout.name
-    });
-
     if (workout.type === 'run') return 'run';
     if (workout.type === 'ride') return 'ride';
     if (workout.type === 'swim') return 'swim';
@@ -46,49 +39,38 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // Handle Garmin activity types FIRST (more reliable than name)
     if (workout.activity_type) {
       const activityType = workout.activity_type.toLowerCase();
-      console.log('🔍 Checking activity_type:', activityType);
       
       if (activityType.includes('walking') || activityType.includes('walk')) {
-        console.log('✅ Detected as WALK from activity_type');
         return 'walk';
       }
       if (activityType.includes('running') || activityType.includes('run')) {
-        console.log('✅ Detected as RUN from activity_type');
         return 'run';
       }
       if (activityType.includes('cycling') || activityType.includes('bike') || activityType.includes('ride')) {
-        console.log('✅ Detected as RIDE from activity_type');
         return 'ride';
       }
       if (activityType.includes('swimming') || activityType.includes('swim')) {
-        console.log('✅ Detected as SWIM from activity_type');
         return 'swim';
       }
       if (activityType.includes('strength') || activityType.includes('weight')) {
-        console.log('✅ Detected as STRENGTH from activity_type');
         return 'strength';
       }
     }
     
     // Fallback logic for legacy names (only if no activity_type match)
     if (workout.name?.toLowerCase().includes('walk')) {
-      console.log('✅ Detected as WALK from name fallback');
       return 'walk';
     }
     if (workout.name?.toLowerCase().includes('run')) {
-      console.log('✅ Detected as RUN from name fallback');
       return 'run';
     }
     if (workout.name?.toLowerCase().includes('cycle') || workout.name?.toLowerCase().includes('ride')) {
-      console.log('✅ Detected as RIDE from name fallback');
       return 'ride';
     }
     if (workout.name?.toLowerCase().includes('swim')) {
-      console.log('✅ Detected as SWIM from name fallback');
       return 'swim';
     }
     
-    console.log('⚠️ No type detected, defaulting to RIDE');
     return 'ride'; // default to ride for cycling files
   };
 
@@ -276,9 +258,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="completed" className="flex-1">
             {isCompleted ? (
               <div className="h-full">
-                {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim') ? (
+                {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                   <CompletedTab 
-                    workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength'}
+                    workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
                     workoutData={workout}
                   />
                 ) : workout.type === 'strength' ? (
