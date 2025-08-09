@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Calendar, Bike, Activity, Waves, Dumbbell } from 'lucide-react';
+// Icons removed for clean text-only interface
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -65,31 +65,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     loadWorkoutsForDate();
   }, [workouts, selectedDate]); // Changed from activeDate to selectedDate
 
-  const getIcon = (type: string) => {
-    switch (type) {
-      case 'swim': return <Waves className="h-5 w-5" />;
-      case 'ride': return <Bike className="h-5 w-5" />;
-      case 'run': return <Activity className="h-5 w-5" />;
-      case 'walk': return <Activity className="h-5 w-5" />;
-      case 'strength': return <Dumbbell className="h-5 w-5" />;
-      case 'mobility': return <Move className="h-5 w-5" />;
-      default: return <Activity className="h-5 w-5" />;
-    }
-  };
+  // Icons removed - using text-only interface
 
-  const getIconColor = (workout: any) => {
-    const isCompleted = workout.workout_status === 'completed';
-    
-    switch (workout.type) {
-      case 'swim': return isCompleted ? 'text-cyan-300' : 'text-cyan-600';
-      case 'ride': return isCompleted ? 'text-blue-300' : 'text-blue-600';
-      case 'run': return isCompleted ? 'text-green-300' : 'text-green-600';
-      case 'walk': return isCompleted ? 'text-yellow-300' : 'text-yellow-600';
-      case 'strength': return isCompleted ? 'text-orange-300' : 'text-orange-600';
-      case 'mobility': return isCompleted ? 'text-purple-300' : 'text-purple-600';
-      default: return isCompleted ? 'text-gray-300' : 'text-gray-600';
-    }
-  };
+  // Icon colors removed - using text-only interface
 
   // Format workout display: "Run - Tempo (45min)" or "Lift - Upper"
   const formatWorkoutDisplay = (workout: any) => {
@@ -225,7 +203,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">
             {formatDisplayDate(activeDate)}
           </span>
@@ -273,9 +250,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className={`p-1 rounded ${getIconColor(workout)}`}>
-                        {getIcon(workout.type)}
-                      </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-medium text-xs">
                           {getDisciplineName(workout.type)}
