@@ -138,7 +138,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     }
   };
 
-  // 6+ month backfill for workout history
+  // 6+ month backfill for workout history using chunked backfill
   const requestHistoricalData = async () => {
     setHistoryStatus('requesting');
     setHistoryError('');
@@ -166,10 +166,10 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       const garminAccessToken: string | undefined = userConnection.access_token || userConnection.connection_data?.access_token;
       if (!garminAccessToken) throw new Error('Missing Garmin access token');
 
-      // Ensure we have connection_data.user_id for enrichment mapping
-      try {
-        const hasUserId = Boolean(userConnection.connection_data?.user_id);
-        if (!hasUserId) {
+      // Ensure we have connection_data.user_id for mapping
+      let garminUserId = userConnection.connection_data?.user_id;
+      if (!garminUserId) {
+        try {
           const path = '/wellness-api/rest/user/id';
           const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${garminAccessToken}`;
           const resp = await fetch(url, {
@@ -181,7 +181,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           });
           if (resp.ok) {
             const body = await resp.json();
-            const garminUserId = body?.userId;
+            garminUserId = body?.userId;
             if (garminUserId) {
               const newConnectionData = { ...(userConnection.connection_data || {}), user_id: garminUserId };
               await supabase
@@ -191,33 +191,41 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
                 .eq('provider', 'garmin');
             }
           }
+        } catch (_) {
+          // non-fatal
         }
-      } catch (_) {
-        // non-fatal
       }
 
-      // Directly run enrichment server-side for 90 days (no client inserts to workouts)
+      // Use chunked import function that calls backfill in 24h windows
       setHistoryStatus('enriching');
       try {
-        const enrichResp = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/enrich-history', {
+        const importResp = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/import-garmin-history', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ token: garminAccessToken, days: 180 })
+          body: JSON.stringify({ 
+            token: garminAccessToken, 
+            days: 90,
+            garminUserId: garminUserId
+          })
         });
-        if (enrichResp.ok) {
-          const body = await enrichResp.json().catch(() => null);
-          if (body && typeof body.windows === 'number' && typeof body.total === 'number') {
-            setEnrichInfo({ windows: body.windows, total: body.total });
+        
+        if (importResp.ok) {
+          const body = await importResp.json();
+          if (body && typeof body.windows === 'number' && typeof body.successful === 'number') {
+            setEnrichInfo({ windows: body.windows, total: body.successful });
+            setImportCounts({ added: body.successful, skipped: body.failed });
           }
         } else {
-          const errText = await enrichResp.text();
-          throw new Error(`Enrichment failed: ${enrichResp.status} ${errText}`);
+          const errText = await importResp.text();
+          throw new Error(`Import failed: ${importResp.status} ${errText}`);
         }
-      } catch (_) {
-        // ignore enrich errors
+      } catch (err) {
+        setHistoryError(err instanceof Error ? err.message : 'Failed to import workout history');
+        setHistoryStatus('error');
+        return;
       }
 
       setHistoryStatus('success');
@@ -342,12 +350,10 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
             disabled={historyStatus === 'requesting' || historyStatus === 'enriching'}
           >
             <Download className="h-4 w-4 inline mr-2" />
-            {historyStatus === 'requesting' && (
-              <>Importing… {importProgress.done}/{importProgress.total}</>
-            )}
-            {historyStatus === 'enriching' && (<>Enriching history…</>)}
-            {historyStatus === 'idle' && (<>Import 180 Day Workout History</>)}
-            {historyStatus === 'success' && (<>Import 180 Day Workout History</>)}
+            {historyStatus === 'requesting' && (<>Preparing backfill…</>)}
+            {historyStatus === 'enriching' && (<>Importing 90 days in 24h chunks…</>)}
+            {historyStatus === 'idle' && (<>Import 90 Day Workout History</>)}
+            {historyStatus === 'success' && (<>Import 90 Day Workout History</>)}
             {historyStatus === 'error' && (<>Retry Import</>)}
           </button>
           {historyStatus === 'requesting' && (
@@ -358,9 +364,8 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           )}
           {historyStatus === 'success' && (
             <p className="text-xs text-green-600 mt-2">
-              Done. Added {importCounts.added}, Skipped {importCounts.skipped}.
-              {enrichInfo ? ` Enriched ${enrichInfo.total} activity details across ${enrichInfo.windows} day windows.` : ''}
-              Refresh Completed to view history.
+              Done. Triggered backfill for {enrichInfo?.windows || 0} day windows ({importCounts.added} successful, {importCounts.skipped} failed).
+              History will flow via webhooks within minutes. Refresh Completed to view.
             </p>
           )}
           {historyStatus === 'error' && (
