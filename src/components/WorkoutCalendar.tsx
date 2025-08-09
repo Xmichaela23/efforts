@@ -95,16 +95,17 @@ export default function WorkoutCalendar({
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
-    // 🔧 FIXED: Apply same filtering logic as TodaysEffort
+    // 🔧 FIXED: Apply same filtering logic as TodaysEffort - show both planned AND completed
     const today = new Date().toLocaleDateString('en-CA');
     
     const filtered = workouts.filter((w) => {
       if (!w || w.date !== dateStr) return false;
       
-      // For today and future dates: show only planned workouts
+      // For today and future dates: show both planned AND completed workouts
       if (dateStr >= today) {
         const isPlanned = w.workout_status === 'planned' || !w.workout_status;
-        return isPlanned;
+        const isCompleted = w.workout_status === 'completed';
+        return isPlanned || isCompleted; // ✅ FIXED: Show both planned AND completed
       } 
       // For past dates: show both planned and completed for reference
       else {
@@ -164,6 +165,7 @@ export default function WorkoutCalendar({
   const getDisciplineName = (type: string): string => {
     switch (type) {
       case 'run': return 'Run';
+      case 'walk': return 'Walk';
       case 'ride': 
       case 'bike': return 'Ride';
       case 'swim': return 'Swim';
@@ -175,6 +177,7 @@ export default function WorkoutCalendar({
   const getDisciplineColor = (type: string): string => {
     switch (type) {
       case 'run': return 'bg-green-100 text-green-800';
+      case 'walk': return 'bg-yellow-100 text-yellow-800';
       case 'ride': 
       case 'bike': return 'bg-blue-100 text-blue-800';
       case 'swim': return 'bg-cyan-100 text-cyan-800';
