@@ -70,34 +70,62 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  };
 
  const formatSpeed = (speedValue: any): string => {
-  // useWorkouts.ts transforms max_speed_mps → max_speed (km/h), avg_speed_mps → avg_speed (km/h)
-  const maxSpeedKmh = Number(workoutData.max_speed);
-  const avgSpeedKmh = Number(workoutData.avg_speed);
+  // 🚨 TESTING: This is the UPDATED formatSpeed function - if you see this log, the fix is loaded!
+  console.log('🚨 UPDATED formatSpeed function is running!');
   
-  console.log('🔍 formatSpeed debug:', {
-    max_speed: workoutData.max_speed,
-    avg_speed: workoutData.avg_speed,
-    calculated_maxSpeedKmh: maxSpeedKmh,
-    calculated_avgSpeedKmh: avgSpeedKmh
-  });
+  // 🔧 FIXED: This function should actually be looking for BEST PACE, not speed
+  // For running/walking, we want the fastest pace (lowest time per km)
+  // For cycling, we want the fastest speed (highest km/h)
   
-  if (maxSpeedKmh && maxSpeedKmh > 0) {
-    // Convert km/h to mph: multiply by 0.621371
-    const speedMph = maxSpeedKmh * 0.621371;
-    console.log('🔍 formatSpeed using max_speed:', speedMph.toFixed(1));
-    return speedMph.toFixed(1);
+  if (workoutType === 'run' || workoutType === 'walk') {
+    // For running/walking: Look for best pace (fastest pace = lowest time per km)
+    const maxPaceSecondsPerKm = Number(workoutData.max_pace);
+    const avgPaceSecondsPerKm = Number(workoutData.avg_pace);
+    
+    console.log('🔍 formatSpeed (RUN/WALK) - looking for best pace:', {
+      max_pace: workoutData.max_pace,
+      avg_pace: workoutData.avg_pace,
+      maxPaceSecondsPerKm,
+      avgPaceSecondsPerKm
+    });
+    
+    // Use max_pace (fastest pace) if available, otherwise avg_pace
+    const paceSecondsPerKm = maxPaceSecondsPerKm || avgPaceSecondsPerKm;
+    
+    if (paceSecondsPerKm && paceSecondsPerKm > 0) {
+      // Convert seconds per km to minutes per mile
+      const paceSecondsPerMile = paceSecondsPerKm * 1.60934;
+      const minutes = Math.floor(paceSecondsPerMile / 60);
+      const seconds = Math.round(paceSecondsPerMile % 60);
+      const paceString = `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
+      console.log('🔍 formatSpeed returning best pace:', paceString);
+      return paceString;
+    }
+  } else {
+    // For cycling: Look for fastest speed (highest km/h)
+    const maxSpeedKmh = Number(workoutData.max_speed);
+    const avgSpeedKmh = Number(workoutData.avg_speed);
+    
+    console.log('🔍 formatSpeed (CYCLE) - looking for fastest speed:', {
+      max_speed: workoutData.max_speed,
+      avg_speed: workoutData.avg_speed,
+      maxSpeedKmh,
+      avgSpeedKmh
+    });
+    
+    // Use max_speed (fastest speed) if available, otherwise avg_speed
+    const speedKmh = maxSpeedKmh || avgSpeedKmh;
+    
+    if (speedKmh && speedKmh > 0) {
+      // Convert km/h to mph: multiply by 0.621371
+      const speedMph = speedKmh * 0.621371;
+      console.log('🔍 formatSpeed returning fastest speed:', speedMph.toFixed(1), 'mph');
+      return `${speedMph.toFixed(1)} mph`;
+    }
   }
   
-  // Fallback for average speed
-  if (avgSpeedKmh && avgSpeedKmh > 0) {
-    // Convert km/h to mph: multiply by 0.621371
-    const speedMph = avgSpeedKmh * 0.621371;
-    console.log('🔍 formatSpeed using avg_speed:', speedMph.toFixed(1));
-    return speedMph.toFixed(1);
-  }
-  
-  console.log('🔍 formatSpeed returning 0.0 - no speed data found');
-  return '0.0';
+  console.log('🔍 formatSpeed returning N/A - no pace/speed data found');
+  return 'N/A';
 };
 
  const formatElevation = (m: any): string => {
