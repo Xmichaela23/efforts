@@ -206,7 +206,83 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       }
 
       setHistoryStatus('success');
-      // Do not auto-analyze; data will flow via webhooks. User can analyze after data arrives.
+
+      // Light enrichment for last 30 days using wellness activityDetails
+      try {
+        const enrichDays = 30;
+        for (let i = 0; i < enrichDays; i++) {
+          const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+          day.setUTCDate(day.getUTCDate() - i);
+          const dayStart = Math.floor(startOfUtcDay(day));
+          const dayEnd = dayStart + 24 * 60 * 60 - 1;
+
+          const detailsPath = `/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=${dayStart}&uploadEndTimeInSeconds=${dayEnd}`;
+          const detailsUrl = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(detailsPath)}&token=${garminAccessToken}`;
+
+          const dResp = await fetch(detailsUrl, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Accept': 'application/json'
+            }
+          });
+
+          if (!dResp.ok) {
+            await new Promise((r) => setTimeout(r, 150));
+            continue;
+          }
+
+          const details: any[] = await dResp.json();
+          if (!Array.isArray(details) || details.length === 0) {
+            await new Promise((r) => setTimeout(r, 150));
+            continue;
+          }
+
+          for (const activityDetail of details) {
+            const summary = activityDetail.summary || {};
+            const summaryId = activityDetail.summaryId || summary.summaryId;
+            if (!summaryId) continue;
+
+            const updateObj: any = {
+              raw_data: activityDetail,
+              samples_data: activityDetail.samples || null,
+            };
+
+            // Copy key metrics from summary if present
+            const avgHr = summary.averageHeartRateInBeatsPerMinute;
+            const maxHr = summary.maxHeartRateInBeatsPerMinute;
+            const avgPow = summary.averagePowerInWatts;
+            const maxPow = summary.maxPowerInWatts;
+            const avgSpd = summary.averageSpeedInMetersPerSecond;
+            const maxSpd = summary.maxSpeedInMetersPerSecond;
+            const elevGain = summary.totalElevationGainInMeters;
+            const elevLoss = summary.totalElevationLossInMeters;
+
+            if (avgHr != null) updateObj.avg_heart_rate = Math.round(avgHr);
+            if (maxHr != null) updateObj.max_heart_rate = Math.round(maxHr);
+            if (avgPow != null) updateObj.avg_power = Math.round(avgPow);
+            if (maxPow != null) updateObj.max_power = Math.round(maxPow);
+            if (avgSpd != null) updateObj.avg_speed_mps = avgSpd;
+            if (maxSpd != null) updateObj.max_speed_mps = maxSpd;
+            if (elevGain != null) updateObj.elevation_gain_meters = elevGain;
+            if (elevLoss != null) updateObj.elevation_loss_meters = elevLoss;
+
+            await supabase
+              .from('garmin_activities')
+              .update(updateObj)
+              .eq('garmin_activity_id', String(summaryId))
+              .eq('user_id', session.user.id);
+
+            await new Promise((r) => setTimeout(r, 75));
+          }
+
+          await new Promise((r) => setTimeout(r, 150));
+        }
+      } catch {
+        // Ignore enrichment failures; summaries already imported via webhooks
+      }
+
+      // Do not auto-analyze; user can analyze after data arrives
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Failed to request workout history');
       setHistoryStatus('error');
