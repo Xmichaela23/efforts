@@ -384,8 +384,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         {getIcon(workout.type)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="font-medium text-xs truncate">
-                          {formatWorkoutDisplay(workout)}
+                        <div className="font-medium text-xs">
+                          {getDisciplineName(workout.type)}
                         </div>
                       </div>
                     </div>
