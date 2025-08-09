@@ -540,7 +540,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
      {/* 🏠 TITLE AND WEATHER HEADER */}
      <div className="flex items-center justify-between">
        <h1 className="text-2xl font-semibold text-black">
-         {generateTitle()}
+         {workoutData.name || generateTitle()}
        </h1>
        <div className="flex items-center gap-4 text-lg">
          <span className="text-black">
