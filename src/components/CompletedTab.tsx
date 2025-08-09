@@ -72,20 +72,31 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  const formatSpeed = (speedValue: any): string => {
   // useWorkouts.ts transforms max_speed_mps → max_speed (km/h), avg_speed_mps → avg_speed (km/h)
   const maxSpeedKmh = Number(workoutData.max_speed);
+  const avgSpeedKmh = Number(workoutData.avg_speed);
+  
+  console.log('🔍 formatSpeed debug:', {
+    max_speed: workoutData.max_speed,
+    avg_speed: workoutData.avg_speed,
+    calculated_maxSpeedKmh: maxSpeedKmh,
+    calculated_avgSpeedKmh: avgSpeedKmh
+  });
+  
   if (maxSpeedKmh && maxSpeedKmh > 0) {
     // Convert km/h to mph: multiply by 0.621371
     const speedMph = maxSpeedKmh * 0.621371;
+    console.log('🔍 formatSpeed using max_speed:', speedMph.toFixed(1));
     return speedMph.toFixed(1);
   }
   
   // Fallback for average speed
-  const avgSpeedKmh = Number(workoutData.avg_speed);
   if (avgSpeedKmh && avgSpeedKmh > 0) {
     // Convert km/h to mph: multiply by 0.621371
     const speedMph = avgSpeedKmh * 0.621371;
+    console.log('🔍 formatSpeed using avg_speed:', speedMph.toFixed(1));
     return speedMph.toFixed(1);
   }
   
+  console.log('🔍 formatSpeed returning 0.0 - no speed data found');
   return '0.0';
 };
 
@@ -742,7 +753,7 @@ const formatPace = (paceValue: any): string => {
        {/* Max Speed */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.max_speed ? formatSpeed(workoutData.metrics.max_speed) : 'N/A'}
+           {workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Max Speed</div>
