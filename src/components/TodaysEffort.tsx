@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Plus, Activity, Bike, Waves, Dumbbell, Move, ChevronDown, Calendar } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Calendar } from 'lucide-react';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -205,116 +204,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const isPastDate = activeDate < today;
   const isToday = activeDate === today;
 
-  // Add Effort Dropdown Component
-  const AddEffortDropdown = () => {
-    if (isPastDate) {
-      // Past dates: Only show Log options
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button 
-              className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              <Plus className="h-4 w-4" />
-              Log effort
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem
-              onClick={() => onAddEffort('log-run', activeDate)}
-              className="cursor-pointer"
-            >
-              <Activity className="h-4 w-4 mr-2" />
-              Log Run
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('log-ride', activeDate)}
-              className="cursor-pointer"
-            >
-              <Bike className="h-4 w-4 mr-2" />
-              Log Ride
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('log-swim', activeDate)}
-              className="cursor-pointer"
-            >
-              <Waves className="h-4 w-4 mr-2" />
-              Log Swim
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('log-strength', activeDate)}
-              className="cursor-pointer"
-            >
-              <Dumbbell className="h-4 w-4 mr-2" />
-              Log Strength
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('log-mobility', activeDate)}
-              className="cursor-pointer"
-            >
-              <Activity className="h-4 w-4 mr-2" />
-              Log Mobility
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    } else {
-      // Today and future: Show Build options
-      return (
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button 
-              className="text-black hover:text-gray-600 transition-colors text-sm font-medium flex items-center gap-2"
-              style={{fontFamily: 'Inter, sans-serif'}}
-            >
-              <Plus className="h-4 w-4" />
-              Add effort
-              <ChevronDown className="h-3 w-3" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start">
-            <DropdownMenuItem
-              onClick={() => onAddEffort('run', activeDate)}
-              className="cursor-pointer"
-            >
-              <Activity className="h-4 w-4 mr-2" />
-              Run
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('ride', activeDate)}
-              className="cursor-pointer"
-            >
-              <Bike className="h-4 w-4 mr-2" />
-              Ride
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('swim', activeDate)}
-              className="cursor-pointer"
-            >
-              <Waves className="h-4 w-4 mr-2" />
-              Swim
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('strength', activeDate)}
-              className="cursor-pointer"
-            >
-              <Dumbbell className="h-4 w-4 mr-2" />
-              Strength
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onAddEffort('mobility', activeDate)}
-              className="cursor-pointer"
-            >
-              <Move className="h-4 w-4 mr-2" />
-              Mobility
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      );
-    }
-  };
+
 
   if (loading) {
     return (
@@ -340,9 +230,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </span>
           )}
         </div>
-        
-        {/* Add effort button always visible */}
-        <AddEffortDropdown />
       </div>
 
       {/* Content area - fills remaining space */}
