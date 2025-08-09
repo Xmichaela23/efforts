@@ -18,8 +18,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   onUpdateWorkout,
   onDelete
 }) => {
-  const [activeTab, setActiveTab] = useState('planned');
-
   if (!workout) {
     return (
       <div className="p-6 text-center">
@@ -28,11 +26,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
   }
 
+  const isCompleted = workout.workout_status === 'completed';
+  const [activeTab, setActiveTab] = useState(isCompleted ? 'completed' : 'planned');
+
   const getWorkoutType = () => {
     if (workout.type === 'run') return 'run';
     if (workout.type === 'ride') return 'ride';
     if (workout.type === 'swim') return 'swim';
     if (workout.type === 'strength') return 'strength';
+    
+    // Handle Garmin activity types
+    if (workout.activity_type) {
+      const activityType = workout.activity_type.toLowerCase();
+      if (activityType.includes('running') || activityType.includes('run')) return 'run';
+      if (activityType.includes('cycling') || activityType.includes('bike') || activityType.includes('ride')) return 'ride';
+      if (activityType.includes('swimming') || activityType.includes('swim')) return 'swim';
+      if (activityType.includes('strength') || activityType.includes('weight')) return 'strength';
+    }
     
     // Fallback logic for legacy names
     if (workout.name?.toLowerCase().includes('run')) return 'run';
@@ -41,8 +51,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     
     return 'ride'; // default to ride for cycling files
   };
-
-  const isCompleted = workout.workout_status === 'completed';
 
   return (
     <div className="w-full h-full flex flex-col">

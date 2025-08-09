@@ -34,14 +34,14 @@ function startOfUtcDaySeconds(d: Date): number {
 }
 
 async function triggerBackfillWindow(token: string, garminUserId: string, startTime: number, endTime: number) {
-  const url = `${GARMIN_APIS_BASE}/wellness-api/rest/backfill/activities?summaryStartTimeInSeconds=${startTime}&summaryEndTimeInSeconds=${endTime}&userId=${garminUserId}`;
+  // Try the backfill endpoint without userId param (might be inferred from token)
+  const url = `${GARMIN_APIS_BASE}/wellness-api/rest/backfill/activities?summaryStartTimeInSeconds=${startTime}&summaryEndTimeInSeconds=${endTime}`;
   
   try {
     const resp = await fetch(url, {
-      method: 'POST',
+      method: 'GET',
       headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json'
+        Authorization: `Bearer ${token}`
       }
     });
     
