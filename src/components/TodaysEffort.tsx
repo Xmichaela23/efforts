@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-// Icons removed for clean text-only interface
+import { Calendar, MapPin, Zap, Heart, Mountain, Clock, Activity, Bike, Waves, Dumbbell, Weight } from 'lucide-react';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -69,17 +69,49 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Icon colors removed - using text-only interface
 
-  // Format workout display: "Run - Tempo (45min)" or "Lift - Upper"
-  const formatWorkoutDisplay = (workout: any) => {
+  // Format rich workout metrics display
+  const formatRichWorkoutDisplay = (workout: any) => {
     const discipline = getDisciplineName(workout.type);
-    const type = getWorkoutType(workout);
+    const duration = workout.duration ? formatDuration(workout.duration) : 'N/A';
     
-    if (workout.type === 'strength') {
-      return `${discipline} - ${type}`;
-    } else {
-      const duration = workout.duration ? `(${formatDuration(workout.duration)})` : '';
-      return `${discipline} - ${type} ${duration}`.trim();
-    }
+    // Get metrics based on workout type
+    const getMetrics = () => {
+      if (workout.type === 'strength') {
+        // Strength: weight range and exercise count
+        const exercises = workout.exercises?.length || workout.sets?.length || 0;
+        const weights = workout.exercises?.flatMap(ex => ex.sets?.map(set => set.weight)).filter(w => w) || [];
+        const minWeight = weights.length ? Math.min(...weights) : null;
+        const maxWeight = weights.length ? Math.max(...weights) : null;
+        const weightRange = minWeight && maxWeight ? `${minWeight}-${maxWeight} lbs` : 'N/A';
+        const calories = workout.calories || workout.metrics?.calories || 'N/A';
+        
+        return [
+          { icon: Dumbbell, value: `${exercises} exercises` },
+          { icon: Weight, value: weightRange },
+          { icon: Activity, value: `${calories} cal` }
+        ];
+      } else {
+        // Endurance: distance, pace/speed, heart rate, elevation
+        const distance = workout.distance ? `${(workout.distance / 1000).toFixed(1)} mi` : 'N/A';
+        const isRun = workout.type === 'run' || workout.type === 'walk';
+        const pace = workout.avg_pace || workout.metrics?.avg_pace;
+        const speed = workout.avg_speed || workout.metrics?.avg_speed;
+        const paceSpeed = isRun && pace ? `${Math.floor(pace/60)}:${(pace%60).toString().padStart(2,'0')}/mi` :
+                         speed ? `${speed.toFixed(1)} mph` : 'N/A';
+        const heartRate = workout.avg_heart_rate || workout.metrics?.avg_heart_rate || 'N/A';
+        const elevation = workout.elevation_gain || workout.metrics?.elevation_gain;
+        const elevationFt = elevation ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
+        
+        return [
+          { icon: MapPin, value: distance },
+          { icon: Zap, value: paceSpeed },
+          { icon: Heart, value: `${heartRate} bpm` },
+          { icon: Mountain, value: elevationFt }
+        ];
+      }
+    };
+    
+    return { discipline, duration, metrics: getMetrics() };
   };
 
   // Get discipline name
@@ -248,25 +280,33 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       : 'bg-white border border-gray-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium text-xs">
-                          {getDisciplineName(workout.type)}
-                        </div>
+                  <div className="space-y-1">
+                    {/* Title and Duration Row */}
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm">
+                        {workout.name || getDisciplineName(workout.type)}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        {workout.workout_status === 'completed' && (
+                          <span className="text-green-600 font-medium">✓</span>
+                        )}
+                        <span className="text-muted-foreground">
+                          {formatRichWorkoutDisplay(workout).duration}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                      {workout.workout_status === 'completed' && (
-                        <div className="text-xs text-green-600 font-medium">
-                          ✓
-                        </div>
-                      )}
-                      {workout.duration && (
-                        <div className="text-xs text-muted-foreground">
-                          {formatDuration(workout.duration)}
-                        </div>
-                      )}
+                    
+                    {/* Metrics Row */}
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      {formatRichWorkoutDisplay(workout).metrics.map((metric, index) => {
+                        const IconComponent = metric.icon;
+                        return (
+                          <div key={index} className="flex items-center gap-1">
+                            <IconComponent className="h-3 w-3" />
+                            <span>{metric.value}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 </button>
