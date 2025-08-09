@@ -192,7 +192,7 @@ export default function WorkoutCalendar({
       {/* Navigation moved to bottom tab bar */}
       
       <div className="w-full bg-white">
-        <div className="p-1">
+        <div className="px-1">
           <div className="flex items-center justify-center gap-6 mb-4">
             <Button 
               className="bg-transparent text-muted-foreground border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]" 
@@ -220,8 +220,8 @@ export default function WorkoutCalendar({
             ))}
           </div>
 
-          {/* Calendar grid - improved responsiveness without transform/shadow effects */}
-          <div className="grid gap-3 grid-cols-7">
+          {/* Calendar grid - edge-to-edge immersive design */}
+          <div className="grid gap-1 grid-cols-7">
             {days.map((day, index) => {
               const dayWorkouts = day ? getWorkoutsForDate(day) : [];
               

@@ -549,7 +549,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </header>
 
       <main className="mobile-main-content pb-24">
-        <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
+        <div className="w-full">
           {showPlanBuilder ? (
             <div className="pt-4">
               <PlanBuilder
@@ -620,7 +620,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           ) : (
             <div className="w-full h-full">
-              <div className="space-y-2 pt-4">
+              <div className="space-y-1 pt-2">
                 <TodaysEffort
                   selectedDate={selectedDate}
                   onAddEffort={handleAddEffort}
@@ -648,8 +648,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
       {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
-        <div className="fixed bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3">
-          <div className="w-full max-w-sm mx-auto sm:max-w-md md:max-w-4xl">
+        <div className="fixed bottom-2 left-2 right-2 bg-white border border-gray-200 rounded-lg shadow-sm px-2 py-2">
+          <div className="w-full">
             <div className="flex justify-around items-center">
               <NewEffortDropdown 
                 onSelectType={handleSelectEffortType} 
