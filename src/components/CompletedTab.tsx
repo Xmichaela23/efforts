@@ -134,14 +134,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
 
  // Format pace using basic calculation from distance and duration
 const formatPace = (paceValue: any): string => {
-  // For max pace, use Garmin's max_pace_min_per_km field
+  // For max pace, use transformed max_pace field (seconds per km from useWorkouts)
   if (paceValue === (workoutData.metrics?.max_pace || workoutData.max_pace)) {
-    const maxPaceMinPerKm = Number(workoutData.max_pace_min_per_km);
-    if (maxPaceMinPerKm && maxPaceMinPerKm > 0) {
-      // Convert min/km to min/mile: multiply by 1.60934
-      const paceMinPerMile = maxPaceMinPerKm * 1.60934;
-      const minutes = Math.floor(paceMinPerMile);
-      const seconds = Math.round((paceMinPerMile - minutes) * 60);
+    const maxPaceSecondsPerKm = Number(workoutData.max_pace);
+    if (maxPaceSecondsPerKm && maxPaceSecondsPerKm > 0) {
+      // Convert seconds per km to seconds per mile: multiply by 1.60934
+      const maxPaceSecondsPerMile = maxPaceSecondsPerKm * 1.60934;
+      const minutes = Math.floor(maxPaceSecondsPerMile / 60);
+      const seconds = Math.round(maxPaceSecondsPerMile % 60);
       return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
     }
   }
