@@ -149,7 +149,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('User must be logged in');
 
-      // Get Garmin connection for access token
+      // Get Garmin connection for access token and garmin user id
       const { data: userConnection, error: connErr } = await supabase
         .from('user_connections')
         .select('*')
@@ -159,16 +159,26 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       if (connErr || !userConnection) throw new Error('No Garmin connection found');
 
       const garminAccessToken: string | undefined = userConnection.access_token || userConnection.connection_data?.access_token;
+      const garminUserId: string | undefined = userConnection.connection_data?.user_id;
       if (!garminAccessToken) throw new Error('Missing Garmin access token');
+      if (!garminUserId) throw new Error('Missing Garmin user id');
 
       // Helper to compute UTC day boundaries
       const startOfUtcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
 
-      // Loop last 90 days in 24h slices (UTC)
+      // Loop last 90 days in 24h slices (UTC), fetch summaries, upsert
       const now = new Date();
-      let successes = 0;
-      let conflicts = 0;
-      let failures = 0;
+      let imported = 0;
+      let seen = 0;
+
+      // Helper to upsert batch
+      const upsertBatch = async (rows: any[]) => {
+        if (!rows.length) return;
+        const { error } = await supabase
+          .from('garmin_activities')
+          .upsert(rows, { onConflict: 'garmin_activity_id' });
+        if (error) throw error;
+      };
 
       for (let i = 0; i < 90; i++) {
         const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
@@ -176,7 +186,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
         const dayStart = Math.floor(startOfUtcDay(day));
         const dayEnd = dayStart + 24 * 60 * 60 - 1;
 
-        const path = `/wellness-api/rest/backfill/activities?summaryStartTimeInSeconds=${dayStart}&summaryEndTimeInSeconds=${dayEnd}`;
+        const path = `/wellness-api/rest/activities?uploadStartTimeInSeconds=${dayStart}&uploadEndTimeInSeconds=${dayEnd}`;
         const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${garminAccessToken}`;
 
         const resp = await fetch(url, {
@@ -187,27 +197,68 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           }
         });
 
-        if (resp.status === 202) {
-          successes++;
-        } else if (resp.status === 409) {
-          conflicts++;
-        } else if (resp.ok) {
-          successes++;
-        } else {
-          failures++;
+        if (!resp.ok) {
+          // Skip days with errors (often empty windows)
+          await new Promise((r) => setTimeout(r, 150));
+          continue;
         }
 
-        // Gentle throttle to respect rate limits
-        await new Promise((r) => setTimeout(r, 200));
-      }
+        const items: any[] = await resp.json();
+        if (!Array.isArray(items) || items.length === 0) {
+          await new Promise((r) => setTimeout(r, 100));
+          continue;
+        }
 
-      if (failures > 0 && successes === 0 && conflicts === 0) {
-        throw new Error(`Backfill failed for all days (failures: ${failures})`);
+        seen += items.length;
+        const rows = items.map((a) => {
+          const summary = a.summary || a; // some responses embed under "summary"
+          const garminActivityId = String(summary.summaryId ?? summary.activityId ?? '');
+          if (!garminActivityId) return null;
+
+          const avgSpeed = summary.averageSpeedInMetersPerSecond ?? summary.averageSpeed ?? null;
+          const maxSpeed = summary.maxSpeedInMetersPerSecond ?? summary.maxSpeed ?? null;
+
+          return {
+            user_id: session.user.id,
+            garmin_user_id: garminUserId,
+            garmin_activity_id: garminActivityId,
+            activity_id: summary.activityId ? String(summary.activityId) : null,
+            activity_type: summary.activityType || summary.activityType?.typeKey || null,
+            start_time: summary.startTimeInSeconds ? new Date(summary.startTimeInSeconds * 1000).toISOString() : null,
+            start_time_offset_seconds: summary.startTimeOffsetInSeconds || 0,
+            duration_seconds: Math.round(summary.durationInSeconds ?? summary.duration ?? 0),
+            distance_meters: summary.distanceInMeters ?? summary.distance ?? null,
+            calories: summary.activeKilocalories ?? summary.calories ?? null,
+            avg_speed_mps: avgSpeed,
+            max_speed_mps: maxSpeed,
+            avg_pace_min_per_km: avgSpeed ? (1000 / avgSpeed) / 60 : null,
+            max_pace_min_per_km: maxSpeed ? (1000 / maxSpeed) / 60 : null,
+            avg_heart_rate: summary.averageHeartRateInBeatsPerMinute ?? summary.averageHR ?? null,
+            max_heart_rate: summary.maxHeartRateInBeatsPerMinute ?? summary.maxHR ?? null,
+            avg_bike_cadence: summary.averageBikeCadenceInRoundsPerMinute ?? null,
+            max_bike_cadence: summary.maxBikeCadenceInRoundsPerMinute ?? null,
+            avg_run_cadence: summary.averageRunCadenceInStepsPerMinute ?? null,
+            max_run_cadence: summary.maxRunCadenceInStepsPerMinute ?? null,
+            elevation_gain_meters: summary.totalElevationGainInMeters ?? summary.elevationGain ?? null,
+            elevation_loss_meters: summary.totalElevationLossInMeters ?? summary.elevationLoss ?? null,
+            device_name: summary.deviceName ?? null,
+            is_parent: summary.isParent ?? false,
+            parent_summary_id: summary.parentSummaryId ?? null,
+            manual: summary.manual ?? false,
+            is_web_upload: summary.isWebUpload ?? false,
+            created_at: new Date().toISOString(),
+          };
+        }).filter(Boolean);
+
+        await upsertBatch(rows as any[]);
+        imported += (rows as any[]).length;
+
+        await new Promise((r) => setTimeout(r, 150));
       }
 
       setHistoryStatus('success');
 
-      // Light enrichment for last 30 days using wellness activityDetails
+      // Light enrichment for last 30 days using wellness activityDetails (kept)
       try {
         const enrichDays = 30;
         for (let i = 0; i < enrichDays; i++) {
@@ -227,16 +278,9 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
             }
           });
 
-          if (!dResp.ok) {
-            await new Promise((r) => setTimeout(r, 150));
-            continue;
-          }
-
+          if (!dResp.ok) { await new Promise((r) => setTimeout(r, 150)); continue; }
           const details: any[] = await dResp.json();
-          if (!Array.isArray(details) || details.length === 0) {
-            await new Promise((r) => setTimeout(r, 150));
-            continue;
-          }
+          if (!Array.isArray(details) || details.length === 0) { await new Promise((r) => setTimeout(r, 150)); continue; }
 
           for (const activityDetail of details) {
             const summary = activityDetail.summary || {};
@@ -248,7 +292,6 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
               samples_data: activityDetail.samples || null,
             };
 
-            // Copy key metrics from summary if present
             const avgHr = summary.averageHeartRateInBeatsPerMinute;
             const maxHr = summary.maxHeartRateInBeatsPerMinute;
             const avgPow = summary.averagePowerInWatts;
@@ -278,13 +321,10 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
 
           await new Promise((r) => setTimeout(r, 150));
         }
-      } catch {
-        // Ignore enrichment failures; summaries already imported via webhooks
-      }
+      } catch {}
 
-      // Do not auto-analyze; user can analyze after data arrives
     } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : 'Failed to request workout history');
+      setHistoryError(err instanceof Error ? err.message : 'Failed to import workout history');
       setHistoryStatus('error');
     }
   };
