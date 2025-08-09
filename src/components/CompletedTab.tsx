@@ -211,7 +211,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     const isSwim = workoutType === 'swim';
     const isWalk = workoutType === 'walk';
     
-    // Walking gets simplified metrics: time, distance, calories, elevation only
+    // Walking gets simplified metrics: time, distance, heart rate, calories, elevation
     if (isWalk) {
       return [
         {
@@ -222,6 +222,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
           label: 'Distance',
           value: formatDistance(workoutData.distance),
           unit: useImperial ? 'mi' : 'mi'
+        },
+        {
+          label: 'Heart Rate',
+          value: workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate ? safeNumber(workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate) : 'N/A',
+          unit: 'bpm'
         },
         {
           label: 'Calories',
