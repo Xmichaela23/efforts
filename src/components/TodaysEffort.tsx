@@ -71,6 +71,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       case 'swim': return <Waves className="h-5 w-5" />;
       case 'ride': return <Bike className="h-5 w-5" />;
       case 'run': return <Activity className="h-5 w-5" />;
+      case 'walk': return <Activity className="h-5 w-5" />;
       case 'strength': return <Dumbbell className="h-5 w-5" />;
       case 'mobility': return <Move className="h-5 w-5" />;
       default: return <Activity className="h-5 w-5" />;
@@ -84,6 +85,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       case 'swim': return isCompleted ? 'text-cyan-300' : 'text-cyan-600';
       case 'ride': return isCompleted ? 'text-blue-300' : 'text-blue-600';
       case 'run': return isCompleted ? 'text-green-300' : 'text-green-600';
+      case 'walk': return isCompleted ? 'text-yellow-300' : 'text-yellow-600';
       case 'strength': return isCompleted ? 'text-orange-300' : 'text-orange-600';
       case 'mobility': return isCompleted ? 'text-purple-300' : 'text-purple-600';
       default: return isCompleted ? 'text-gray-300' : 'text-gray-600';
@@ -107,6 +109,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const getDisciplineName = (type: string): string => {
     switch (type) {
       case 'run': return 'Run';
+      case 'walk': return 'Walk';
       case 'ride': 
       case 'bike': return 'Ride';
       case 'swim': return 'Swim';
@@ -140,6 +143,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // Default types
     switch (workout.type) {
       case 'run': return 'Easy';
+      case 'walk': return 'Easy';
       case 'ride': return 'Endurance';
       case 'swim': return 'Drills';
       case 'strength': return 'Compound';

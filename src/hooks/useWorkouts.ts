@@ -604,8 +604,9 @@ export const useWorkouts = () => {
           }
 
           // Map activity type from Garmin to our workout types
-          const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" => {
+          const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" | "walk" => {
             const type = activityType?.toLowerCase() || '';
+            if (type.includes('walk') || type.includes('hiking')) return 'walk';
             if (type.includes('run') || type.includes('jog')) return 'run';
             if (type.includes('bike') || type.includes('cycling') || type.includes('cycle')) return 'ride';
             if (type.includes('swim')) return 'swim';
