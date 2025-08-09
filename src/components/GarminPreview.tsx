@@ -149,7 +149,7 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('User must be logged in');
 
-      // Get Garmin connection for access token and garmin user id
+      // Get Garmin connection for access token
       const { data: userConnection, error: connErr } = await supabase
         .from('user_connections')
         .select('*')
@@ -159,25 +159,22 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       if (connErr || !userConnection) throw new Error('No Garmin connection found');
 
       const garminAccessToken: string | undefined = userConnection.access_token || userConnection.connection_data?.access_token;
-      const garminUserId: string | undefined = userConnection.connection_data?.user_id;
       if (!garminAccessToken) throw new Error('Missing Garmin access token');
-      if (!garminUserId) throw new Error('Missing Garmin user id');
 
       // Helper to compute UTC day boundaries
       const startOfUtcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
 
-      // Loop last 90 days in 24h slices (UTC), fetch summaries, upsert
+      // Loop last 90 days in 24h slices (UTC), fetch summaries, insert into workouts
       const now = new Date();
-      let imported = 0;
-      let seen = 0;
 
-      // Helper to upsert batch
-      const upsertBatch = async (rows: any[]) => {
-        if (!rows.length) return;
-        const { error } = await supabase
-          .from('garmin_activities')
-          .upsert(rows, { onConflict: 'garmin_activity_id' });
-        if (error) throw error;
+      // Map Garmin activity type to app workout type
+      const mapType = (t?: string): 'run' | 'ride' | 'swim' | 'strength' => {
+        const s = (t || '').toLowerCase();
+        if (s.includes('run') || s.includes('jog')) return 'run';
+        if (s.includes('bike') || s.includes('cycling') || s.includes('ride')) return 'ride';
+        if (s.includes('swim')) return 'swim';
+        if (s.includes('strength') || s.includes('weight')) return 'strength';
+        return 'run';
       };
 
       for (let i = 0; i < 90; i++) {
@@ -197,132 +194,84 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           }
         });
 
-        if (!resp.ok) {
-          // Skip days with errors (often empty windows)
-          await new Promise((r) => setTimeout(r, 150));
-          continue;
-        }
-
+        if (!resp.ok) { await new Promise((r) => setTimeout(r, 150)); continue; }
         const items: any[] = await resp.json();
-        if (!Array.isArray(items) || items.length === 0) {
-          await new Promise((r) => setTimeout(r, 100));
-          continue;
-        }
+        if (!Array.isArray(items) || items.length === 0) { await new Promise((r) => setTimeout(r, 100)); continue; }
 
-        seen += items.length;
+        // Build friendly names for dedupe (Garmin Activity <summaryId>)
+        const friendlyNames = items.map((a) => {
+          const summary = a.summary || a;
+          const sid = summary.summaryId ?? summary.activityId;
+          return sid ? `Garmin Activity ${sid}` : null;
+        }).filter(Boolean) as string[];
+
+        // Query existing to avoid duplicates
+        const { data: existing } = await supabase
+          .from('workouts')
+          .select('friendly_name')
+          .eq('user_id', session.user.id)
+          .in('friendly_name', friendlyNames);
+        const existingSet = new Set((existing || []).map((e: any) => e.friendly_name));
+
+        // Map to workouts rows
         const rows = items.map((a) => {
-          const summary = a.summary || a; // some responses embed under "summary"
-          const garminActivityId = String(summary.summaryId ?? summary.activityId ?? '');
-          if (!garminActivityId) return null;
+          const s = a.summary || a;
+          const summaryId = s.summaryId ?? s.activityId;
+          if (!summaryId) return null;
+          const friendly = `Garmin Activity ${summaryId}`;
+          if (existingSet.has(friendly)) return null;
 
-          const avgSpeed = summary.averageSpeedInMetersPerSecond ?? summary.averageSpeed ?? null;
-          const maxSpeed = summary.maxSpeedInMetersPerSecond ?? summary.maxSpeed ?? null;
+          const startIso = s.startTimeInSeconds ? new Date(s.startTimeInSeconds * 1000).toISOString() : null;
+          const dateStr = startIso ? startIso.split('T')[0] : new Date().toISOString().split('T')[0];
+          const durationSec = Math.round(s.durationInSeconds ?? s.duration ?? 0);
+          const avgSpd = s.averageSpeedInMetersPerSecond ?? s.averageSpeed ?? null;
+          const maxSpd = s.maxSpeedInMetersPerSecond ?? s.maxSpeed ?? null;
+
+          const typeKey = (s.activityType?.typeKey || s.activityType || '') as string;
+          const wType = mapType(typeKey);
 
           return {
+            name: s.activityName ? `Garmin ${s.activityName}` : `Garmin ${typeKey || 'Activity'}`,
+            type: wType,
+            date: dateStr,
+            duration: Math.round(durationSec / 60),
+            description: `Imported from Garmin Connect - ${typeKey}`,
+            usercomments: '',
+            completedmanually: false,
+            workout_status: 'completed',
+            intervals: JSON.stringify([]),
+            strength_exercises: JSON.stringify([]),
             user_id: session.user.id,
-            garmin_user_id: garminUserId,
-            garmin_activity_id: garminActivityId,
-            activity_id: summary.activityId ? String(summary.activityId) : null,
-            activity_type: summary.activityType || summary.activityType?.typeKey || null,
-            start_time: summary.startTimeInSeconds ? new Date(summary.startTimeInSeconds * 1000).toISOString() : null,
-            start_time_offset_seconds: summary.startTimeOffsetInSeconds || 0,
-            duration_seconds: Math.round(summary.durationInSeconds ?? summary.duration ?? 0),
-            distance_meters: summary.distanceInMeters ?? summary.distance ?? null,
-            calories: summary.activeKilocalories ?? summary.calories ?? null,
-            avg_speed_mps: avgSpeed,
-            max_speed_mps: maxSpeed,
-            avg_pace_min_per_km: avgSpeed ? (1000 / avgSpeed) / 60 : null,
-            max_pace_min_per_km: maxSpeed ? (1000 / maxSpeed) / 60 : null,
-            avg_heart_rate: summary.averageHeartRateInBeatsPerMinute ?? summary.averageHR ?? null,
-            max_heart_rate: summary.maxHeartRateInBeatsPerMinute ?? summary.maxHR ?? null,
-            avg_bike_cadence: summary.averageBikeCadenceInRoundsPerMinute ?? null,
-            max_bike_cadence: summary.maxBikeCadenceInRoundsPerMinute ?? null,
-            avg_run_cadence: summary.averageRunCadenceInStepsPerMinute ?? null,
-            max_run_cadence: summary.maxRunCadenceInStepsPerMinute ?? null,
-            elevation_gain_meters: summary.totalElevationGainInMeters ?? summary.elevationGain ?? null,
-            elevation_loss_meters: summary.totalElevationLossInMeters ?? summary.elevationLoss ?? null,
-            device_name: summary.deviceName ?? null,
-            is_parent: summary.isParent ?? false,
-            parent_summary_id: summary.parentSummaryId ?? null,
-            manual: summary.manual ?? false,
-            is_web_upload: summary.isWebUpload ?? false,
+            // Metrics
+            avg_heart_rate: s.averageHeartRateInBeatsPerMinute ?? null,
+            max_heart_rate: s.maxHeartRateInBeatsPerMinute ?? null,
+            avg_power: s.averagePowerInWatts ?? null,
+            max_power: s.maxPowerInWatts ?? null,
+            avg_speed: avgSpd ? avgSpd * 3.6 : null, // km/h
+            max_speed: maxSpd ? maxSpd * 3.6 : null,
+            elevation_gain: s.totalElevationGainInMeters ?? null,
+            elevation_loss: s.totalElevationLossInMeters ?? null,
+            calories: s.activeKilocalories ?? null,
+            distance: s.distanceInMeters ? s.distanceInMeters / 1000 : null, // km
+            timestamp: startIso,
+            friendly_name: friendly,
+            moving_time: durationSec,
+            elapsed_time: durationSec,
             created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
           };
         }).filter(Boolean);
 
-        await upsertBatch(rows as any[]);
-        imported += (rows as any[]).length;
+        if ((rows as any[]).length > 0) {
+          const { error } = await supabase.from('workouts').insert(rows as any[]);
+          if (error) throw error;
+        }
 
         await new Promise((r) => setTimeout(r, 150));
       }
 
       setHistoryStatus('success');
-
-      // Light enrichment for last 30 days using wellness activityDetails (kept)
-      try {
-        const enrichDays = 30;
-        for (let i = 0; i < enrichDays; i++) {
-          const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-          day.setUTCDate(day.getUTCDate() - i);
-          const dayStart = Math.floor(startOfUtcDay(day));
-          const dayEnd = dayStart + 24 * 60 * 60 - 1;
-
-          const detailsPath = `/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=${dayStart}&uploadEndTimeInSeconds=${dayEnd}`;
-          const detailsUrl = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(detailsPath)}&token=${garminAccessToken}`;
-
-          const dResp = await fetch(detailsUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Accept': 'application/json'
-            }
-          });
-
-          if (!dResp.ok) { await new Promise((r) => setTimeout(r, 150)); continue; }
-          const details: any[] = await dResp.json();
-          if (!Array.isArray(details) || details.length === 0) { await new Promise((r) => setTimeout(r, 150)); continue; }
-
-          for (const activityDetail of details) {
-            const summary = activityDetail.summary || {};
-            const summaryId = activityDetail.summaryId || summary.summaryId;
-            if (!summaryId) continue;
-
-            const updateObj: any = {
-              raw_data: activityDetail,
-              samples_data: activityDetail.samples || null,
-            };
-
-            const avgHr = summary.averageHeartRateInBeatsPerMinute;
-            const maxHr = summary.maxHeartRateInBeatsPerMinute;
-            const avgPow = summary.averagePowerInWatts;
-            const maxPow = summary.maxPowerInWatts;
-            const avgSpd = summary.averageSpeedInMetersPerSecond;
-            const maxSpd = summary.maxSpeedInMetersPerSecond;
-            const elevGain = summary.totalElevationGainInMeters;
-            const elevLoss = summary.totalElevationLossInMeters;
-
-            if (avgHr != null) updateObj.avg_heart_rate = Math.round(avgHr);
-            if (maxHr != null) updateObj.max_heart_rate = Math.round(maxHr);
-            if (avgPow != null) updateObj.avg_power = Math.round(avgPow);
-            if (maxPow != null) updateObj.max_power = Math.round(maxPow);
-            if (avgSpd != null) updateObj.avg_speed_mps = avgSpd;
-            if (maxSpd != null) updateObj.max_speed_mps = maxSpd;
-            if (elevGain != null) updateObj.elevation_gain_meters = elevGain;
-            if (elevLoss != null) updateObj.elevation_loss_meters = elevLoss;
-
-            await supabase
-              .from('garmin_activities')
-              .update(updateObj)
-              .eq('garmin_activity_id', String(summaryId))
-              .eq('user_id', session.user.id);
-
-            await new Promise((r) => setTimeout(r, 75));
-          }
-
-          await new Promise((r) => setTimeout(r, 150));
-        }
-      } catch {}
-
+      // No auto-analyze; user can analyze after import
     } catch (err) {
       setHistoryError(err instanceof Error ? err.message : 'Failed to import workout history');
       setHistoryStatus('error');
