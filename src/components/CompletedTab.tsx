@@ -135,25 +135,23 @@ const formatPace = (paceValue: any): string => {
     }
   }
   
-  // For average pace, calculate from distance and duration for accuracy
-  // Try multiple field name conventions
-  const distanceMeters = Number(workoutData.distance_meters || (workoutData.distance * 1609.34)); // Convert miles to meters if needed
-  const durationSeconds = Number(workoutData.duration_seconds || (workoutData.duration * 60)); // Convert minutes to seconds if needed
+  // For average pace, calculate from distance and duration
+  // useWorkouts.ts transforms Garmin data: duration_seconds → duration (minutes), distance_meters → distance (km)
+  const distanceKm = Number(workoutData.distance); // Already in km from useWorkouts transformation
+  const durationMinutes = Number(workoutData.duration); // Already in minutes from useWorkouts transformation
   
   console.log('🔍 formatPace debug:', {
-    distance_meters: workoutData.distance_meters,
-    distance: workoutData.distance,
-    duration_seconds: workoutData.duration_seconds, 
-    duration: workoutData.duration,
-    calculated_distanceMeters: distanceMeters,
-    calculated_durationSeconds: durationSeconds
+    raw_distance_meters: workoutData.distance_meters,
+    transformed_distance_km: workoutData.distance,
+    raw_duration_seconds: workoutData.duration_seconds, 
+    transformed_duration_minutes: workoutData.duration,
+    calculated_distanceKm: distanceKm,
+    calculated_durationMinutes: durationMinutes
   });
   
-  if (distanceMeters && durationSeconds && distanceMeters > 0 && durationSeconds > 0) {
-    // Convert meters to miles
-    const distanceMiles = distanceMeters / 1609.34;
-    // Convert seconds to minutes
-    const durationMinutes = durationSeconds / 60;
+  if (distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
+    // Convert km to miles
+    const distanceMiles = distanceKm * 0.621371;
     // Calculate pace in minutes per mile
     const paceMinPerMile = durationMinutes / distanceMiles;
     

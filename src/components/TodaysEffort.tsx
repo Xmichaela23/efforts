@@ -119,16 +119,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         
         const isRun = workout.type === 'run' || workout.type === 'walk';
         
-                      // Handle pace/speed using basic calculation from distance and duration
+                      // Handle pace/speed using transformed data from useWorkouts
               let paceSpeed = 'N/A';
-              const distanceMeters = Number(workout.distance_meters);
-              const durationSeconds = Number(workout.duration_seconds);
+              // useWorkouts.ts transforms: duration_seconds → duration (minutes), distance_meters → distance (km)
+              const distanceKm = Number(workout.distance);
+              const durationMinutes = Number(workout.duration);
               const avgSpeedMps = Number(workout.avg_speed_mps);
               
-              if (isRun && distanceMeters && durationSeconds && distanceMeters > 0 && durationSeconds > 0) {
-                // Calculate pace from distance and duration for accuracy
-                const distanceMiles = distanceMeters / 1609.34;
-                const durationMinutes = durationSeconds / 60;
+              if (isRun && distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
+                // Calculate pace from transformed distance/duration
+                const distanceMiles = distanceKm * 0.621371; // Convert km to miles
                 const paceMinPerMile = durationMinutes / distanceMiles;
                 const minutes = Math.floor(paceMinPerMile);
                 const seconds = Math.round((paceMinPerMile - minutes) * 60);
