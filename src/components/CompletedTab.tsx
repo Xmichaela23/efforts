@@ -211,6 +211,31 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     const isSwim = workoutType === 'swim';
     const isWalk = workoutType === 'walk';
     
+    // Walking gets simplified metrics: time, distance, calories, elevation only
+    if (isWalk) {
+      return [
+        {
+          label: 'Duration', 
+          value: formatDuration(workoutData.duration)
+        },
+        {
+          label: 'Distance',
+          value: formatDistance(workoutData.distance),
+          unit: useImperial ? 'mi' : 'mi'
+        },
+        {
+          label: 'Calories',
+          value: workoutData.metrics?.calories || workoutData.calories ? safeNumber(workoutData.metrics?.calories || workoutData.calories) : 'N/A',
+          unit: 'cal'
+        },
+        {
+          label: 'Elevation',
+          value: formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain),
+          unit: useImperial ? 'ft' : 'ft'
+        }
+      ];
+    }
+    
     const baseMetrics = [
       {
         label: 'Distance',
@@ -302,6 +327,22 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    const isBike = workoutType === 'ride';
    const isSwim = workoutType === 'swim';
    const isWalk = workoutType === 'walk';
+   
+   // Walking gets minimal advanced metrics
+   if (isWalk) {
+     return [
+       {
+         label: 'Avg Pace',
+         value: formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace),
+         unit: '/mi'
+       },
+       {
+         label: 'Max Pace',
+         value: formatPace(workoutData.metrics?.max_pace || workoutData.max_pace),
+         unit: '/mi'
+       }
+     ];
+   }
    
    const baseMetrics = [
      {
