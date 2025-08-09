@@ -548,7 +548,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      <main className="mobile-main-content pb-20">
+      <main className="mobile-main-content pb-24">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showPlanBuilder ? (
             <div className="pt-4">
@@ -648,7 +648,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
       {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 safe-area-pb">
+        <div className="fixed bottom-4 left-4 right-4 bg-white border border-gray-200 rounded-lg shadow-sm px-4 py-3">
           <div className="w-full max-w-sm mx-auto sm:max-w-md md:max-w-4xl">
             <div className="flex justify-around items-center">
               <NewEffortDropdown 
