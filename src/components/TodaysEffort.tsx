@@ -199,7 +199,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }
 
   return (
-    <div className="w-full h-32 flex flex-col" style={{fontFamily: 'Inter, sans-serif'}}>
+    <div className="w-full h-40 flex flex-col" style={{fontFamily: 'Inter, sans-serif'}}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">

@@ -647,7 +647,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </main>
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
-      {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
+      {!(selectedWorkout || showStrengthLogger || showMobilityLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines) && (
         <div className="fixed bottom-2 left-2 right-2 bg-white border border-gray-200 rounded-lg shadow-sm px-2 py-2">
           <div className="w-full">
             <div className="flex justify-around items-center">
