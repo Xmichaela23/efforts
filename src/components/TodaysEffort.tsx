@@ -318,16 +318,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   if (loading) {
     return (
-      <div className="w-full h-32 flex items-center justify-center" style={{fontFamily: 'Inter, sans-serif'}}>
+      <div className="w-full h-24 flex items-center justify-center" style={{fontFamily: 'Inter, sans-serif'}}>
         <p className="text-muted-foreground text-sm">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="w-full h-32 flex flex-col" style={{fontFamily: 'Inter, sans-serif'}}>
+    <div className="w-full h-24 flex flex-col" style={{fontFamily: 'Inter, sans-serif'}}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 px-4 flex-shrink-0">
+      <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm font-medium text-foreground">
@@ -360,9 +360,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </p>
           </div>
         ) : (
-          // Clean planned workout display
-          <div className="px-4 pb-2">
-            <div className="space-y-2">
+          // Compact workout display - better for multiple workouts
+          <div className="px-3 pb-2">
+            <div className="space-y-1">
               {displayWorkouts.map((workout) => (
                 <button
                   key={workout.id}
@@ -372,33 +372,35 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     console.log('🎯 Workout clicked:', workout);
                     onEditEffort && onEditEffort(workout);
                   }}
-                  className={`w-full text-left p-2 rounded-lg border transition-colors hover:bg-gray-50 ${
+                  className={`w-full text-left p-1.5 rounded-md transition-colors hover:bg-gray-50 ${
                     workout.workout_status === 'completed' 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-white border-gray-200'
+                      ? 'bg-green-50' 
+                      : 'bg-white border border-gray-200'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className={`p-1.5 rounded-lg ${getIconColor(workout)}`}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <div className={`p-1 rounded ${getIconColor(workout)}`}>
                         {getIcon(workout.type)}
                       </div>
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-xs truncate">
                           {formatWorkoutDisplay(workout)}
                         </div>
-                        {workout.workout_status === 'completed' && (
-                          <div className="text-xs text-green-600 font-medium">
-                            Completed
-                          </div>
-                        )}
                       </div>
                     </div>
-                    {workout.duration && (
-                      <div className="text-xs text-muted-foreground">
-                        {formatDuration(workout.duration)}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {workout.workout_status === 'completed' && (
+                        <div className="text-xs text-green-600 font-medium">
+                          ✓
+                        </div>
+                      )}
+                      {workout.duration && (
+                        <div className="text-xs text-muted-foreground">
+                          {formatDuration(workout.duration)}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </button>
               ))}
