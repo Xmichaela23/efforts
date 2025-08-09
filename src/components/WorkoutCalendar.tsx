@@ -229,7 +229,7 @@ export default function WorkoutCalendar({
                 <button
                   key={index}
                   className={`
-                    w-full h-16 p-2 transition-all duration-100 rounded-lg
+                    w-full h-20 p-2 transition-all duration-100 rounded-lg
                     flex flex-col items-center justify-start
                     min-h-[44px] touch-manipulation select-none
                     ${day ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
