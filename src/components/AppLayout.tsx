@@ -14,6 +14,8 @@ import AllPlansInterface from './AllPlansInterface';
 import StrengthPlansView from './StrengthPlansView';
 import WorkoutSummary from './WorkoutSummary';
 import NewEffortDropdown from './NewEffortDropdown';
+import LogEffortDropdown from './LogEffortDropdown';
+import AllEffortsDropdown from './AllEffortsDropdown';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
@@ -546,7 +548,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      <main className="mobile-main-content">
+      <main className="mobile-main-content pb-20">
         <div className="w-full max-w-sm mx-auto px-4 sm:max-w-md md:max-w-4xl md:px-6">
           {showPlanBuilder ? (
             <div className="pt-4">
@@ -643,6 +645,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           )}
         </div>
       </main>
+
+      {/* Bottom Navigation Tab Bar - Instagram style */}
+      {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 safe-area-pb">
+          <div className="w-full max-w-sm mx-auto sm:max-w-md md:max-w-4xl">
+            <div className="flex justify-around items-center">
+              <NewEffortDropdown 
+                onSelectType={handleSelectEffortType} 
+                onOpenPlanBuilder={handleOpenPlanBuilder}
+              />
+              <LogEffortDropdown onSelectType={handleSelectEffortType} />
+              <PlansDropdown 
+                onSelectRoutine={handleSelectRoutine}
+                currentPlans={currentPlans}
+                completedPlans={completedPlans}
+              />
+              <AllEffortsDropdown onSelectWorkout={handleEditEffort} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

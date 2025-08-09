@@ -189,20 +189,7 @@ export default function WorkoutCalendar({
 
   return (
     <div className="w-full">
-      {/* FIXED: Extra tight spacing - more overlap between buttons */}
-      <div className="w-full flex justify-center items-center mb-2 -space-x-2 flex-nowrap px-4">
-        <NewEffortDropdown 
-          onSelectType={onSelectType} 
-          onOpenPlanBuilder={onOpenPlanBuilder}
-        />
-        <LogEffortDropdown onSelectType={onSelectType} />
-        <PlansDropdown 
-          onSelectRoutine={onSelectRoutine}
-          currentPlans={currentPlans}
-          completedPlans={completedPlans}
-        />
-        <AllEffortsDropdown onSelectWorkout={onSelectWorkout} />
-      </div>
+      {/* Navigation moved to bottom tab bar */}
       
       <div className="w-full bg-white">
         <div className="p-1">
