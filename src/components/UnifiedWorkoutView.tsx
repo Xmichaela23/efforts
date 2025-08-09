@@ -101,7 +101,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             <Calendar className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg">{workout.name || 'Workout'}</h2>
+            <h2 className="font-semibold text-lg">{workout.name || workout.activity_type || 'Workout'}</h2>
             <p className="text-sm text-muted-foreground">
               {new Date(workout.date).toLocaleDateString('en-US', {
                 weekday: 'long',
