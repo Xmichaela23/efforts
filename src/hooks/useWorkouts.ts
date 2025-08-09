@@ -614,10 +614,49 @@ export const useWorkouts = () => {
             return 'run'; // Default to run for endurance activities
           };
 
+          // Generate location-based title from GPS coordinates
+          const generateLocationTitle = (lat: number | null, lng: number | null, activityType: string) => {
+            if (!lat || !lng) return null;
+            
+            let location = '';
+            // Los Angeles area
+            if (lat >= 33.7 && lat <= 34.5 && lng >= -118.9 && lng <= -117.9) {
+              location = 'Los Angeles';
+            }
+            // Pasadena area (more specific)  
+            else if (lat >= 34.1 && lat <= 34.2 && lng >= -118.2 && lng <= -118.0) {
+              location = 'Pasadena';
+            }
+            // San Francisco Bay Area
+            else if (lat >= 37.4 && lat <= 37.8 && lng >= -122.5 && lng <= -122.0) {
+              location = 'San Francisco';
+            }
+            
+            if (location) {
+              const formattedType = activityType === 'ride' ? 'Cycling' : 
+                                 activityType === 'run' ? 'Running' :
+                                 activityType === 'walk' ? 'Walking' :
+                                 activityType === 'swim' ? 'Swimming' :
+                                 activityType === 'strength' ? 'Strength Training' :
+                                 activityType.charAt(0).toUpperCase() + activityType.slice(1);
+              
+              return `${location} ${formattedType}`;
+            }
+            
+            return null;
+          };
+
           // Transform garmin_activities data to workout format
+          const workoutType = getWorkoutType(activity.activity_type);
+          const locationTitle = generateLocationTitle(
+            activity.starting_latitude, 
+            activity.starting_longitude, 
+            workoutType
+          );
+          
           const workoutData = {
-            name: activity.activity_name || `Garmin ${activity.activity_type || 'Activity'}`,
-            type: getWorkoutType(activity.activity_type),
+            name: locationTitle || activity.activity_name || `Garmin ${activity.activity_type || 'Activity'}`,
+            type: workoutType,
             date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
             duration: Math.round((activity.duration_seconds || 0) / 60), // Convert seconds to minutes
             distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined, // Convert meters to km

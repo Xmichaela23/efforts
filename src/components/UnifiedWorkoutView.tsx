@@ -92,6 +92,55 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     return 'ride'; // default to ride for cycling files
   };
 
+  // Generate a nice title from GPS location + activity type
+  const generateWorkoutTitle = () => {
+    const activityType = getWorkoutType();
+    
+    // Get location from coordinates if available
+    const lat = workout.starting_latitude || workout.start_position_lat;
+    const lng = workout.starting_longitude || workout.start_position_long;
+    
+    let location = '';
+    if (lat && lng) {
+      const latNum = Number(lat);
+      const lngNum = Number(lng);
+      
+      // Los Angeles area
+      if (latNum >= 33.7 && latNum <= 34.5 && lngNum >= -118.9 && lngNum <= -117.9) {
+        location = 'Los Angeles';
+      }
+      // Pasadena area (more specific)  
+      else if (latNum >= 34.1 && latNum <= 34.2 && lngNum >= -118.2 && lngNum <= -118.0) {
+        location = 'Pasadena';
+      }
+      // San Francisco Bay Area
+      else if (latNum >= 37.4 && latNum <= 37.8 && lngNum >= -122.5 && lngNum <= -122.0) {
+        location = 'San Francisco';
+      }
+      // Add more locations as needed
+      else {
+        location = 'Unknown Location';
+      }
+    }
+    
+    // Format activity type nicely
+    const formattedType = activityType === 'ride' ? 'Cycling' : 
+                         activityType === 'run' ? 'Running' :
+                         activityType === 'walk' ? 'Walking' :
+                         activityType === 'swim' ? 'Swimming' :
+                         activityType === 'strength' ? 'Strength Training' :
+                         activityType.charAt(0).toUpperCase() + activityType.slice(1);
+    
+    // Create title: "Location + Activity Type" or fallback
+    if (location && location !== 'Unknown Location') {
+      return `${location} ${formattedType}`;
+    } else if (workout.name && !workout.name.includes('Garmin Activity')) {
+      return workout.name;
+    } else {
+      return formattedType;
+    }
+  };
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
@@ -101,7 +150,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             <Calendar className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg">{workout.name || workout.activity_type || 'Workout'}</h2>
+            <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
             <p className="text-sm text-muted-foreground">
               {new Date(workout.date).toLocaleDateString('en-US', {
                 weekday: 'long',
