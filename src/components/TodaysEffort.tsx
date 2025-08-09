@@ -69,13 +69,24 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Icon colors removed - using text-only interface
 
-  // Format rich workout metrics display
+  // Format rich workout display - different for planned vs completed
   const formatRichWorkoutDisplay = (workout: any) => {
     const discipline = getDisciplineName(workout.type);
     const duration = workout.duration ? formatDuration(workout.duration) : 'N/A';
+    const isCompleted = workout.workout_status === 'completed';
     
-    // Get metrics based on workout type
+    // Get metrics/description based on workout status
     const getMetrics = () => {
+      if (!isCompleted) {
+        // PLANNED: Show workout description/structure
+        const description = workout.description || workout.intervals?.map(i => i.description).join(', ') || 
+                           workout.workout_type || 'Planned workout';
+        return [
+          { icon: Activity, value: description }
+        ];
+      }
+      
+      // COMPLETED: Show actual metrics
       if (workout.type === 'strength') {
         // Strength: exercise count, weight range, total sets
         const exercises = workout.exercises?.length || workout.sets?.length || 0;
@@ -286,10 +297,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-sm">
                         {workout.name || getDisciplineName(workout.type)}
+                        {workout.workout_status !== 'completed' && (
+                          <span className="text-xs text-orange-600 ml-2">(Planned)</span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        {workout.workout_status === 'completed' && (
+                        {workout.workout_status === 'completed' ? (
                           <span className="text-green-600 font-medium">✓</span>
+                        ) : (
+                          <span className="text-orange-600 font-medium">📋</span>
                         )}
                         <span className="text-muted-foreground">
                           {formatRichWorkoutDisplay(workout).duration}
