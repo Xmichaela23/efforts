@@ -60,13 +60,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   useEffect(() => {
     if (selectedWorkout) {
+      // Smart tab routing based on workout status and type
       if (selectedWorkout.type === 'strength') {
         setActiveTab('completed');
       } else if (selectedWorkout.workout_status === 'completed') {
-        // 🔧 FIX: Completed workouts (like FIT imports) should show Completed tab
-        setActiveTab('completed');
+        // Check if this was a planned workout that got completed
+        const hasPlannedData = selectedWorkout.intervals || selectedWorkout.target_power || 
+                               selectedWorkout.target_pace || selectedWorkout.description || 
+                               selectedWorkout.workout_type;
+        
+        if (hasPlannedData) {
+          // B) Completed planned workout -> Summary tab (shows planned vs actual)
+          setActiveTab('summary');
+        } else {
+          // C) Completed workout without plan -> Completed tab (just show data)
+          setActiveTab('completed');
+        }
       } else {
-        setActiveTab('summary');
+        // A) Planned workout -> Planned tab
+        setActiveTab('planned');
       }
     }
   }, [selectedWorkout?.id]);
