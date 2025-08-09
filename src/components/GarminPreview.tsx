@@ -170,10 +170,10 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
       // Map Garmin activity type to app workout type
       const mapType = (t?: string): 'run' | 'ride' | 'swim' | 'strength' => {
         const s = (t || '').toLowerCase();
-        if (s.includes('run') || s.includes('jog')) return 'run';
-        if (s.includes('bike') || s.includes('cycling') || s.includes('ride')) return 'ride';
         if (s.includes('swim')) return 'swim';
+        if (s.includes('cycl') || s.includes('bik') || s.includes('ride')) return 'ride'; // matches road_biking, indoor_cycling, bike ride
         if (s.includes('strength') || s.includes('weight')) return 'strength';
+        if (s.includes('run') || s.includes('jog') || s.includes('walk')) return 'run';
         return 'run';
       };
 
