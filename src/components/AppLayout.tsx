@@ -289,6 +289,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const handleDateSelect = (date: string) => {
     setSelectedDate(date);
+    
+    // Smart tab routing for calendar date clicks
+    const workoutsForDate = workouts.filter(w => w.date === date);
+    
+    if (workoutsForDate.length > 0) {
+      // If there are workouts for this date, select the first one and trigger smart routing
+      const firstWorkout = workoutsForDate[0];
+      setSelectedWorkout(firstWorkout);
+      // The useEffect for selectedWorkout will handle the smart tab routing
+    }
   };
 
   const handleEditEffort = (workout: any) => {
