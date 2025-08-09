@@ -5,7 +5,7 @@ import { Map } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 
 interface CompletedTabProps {
- workoutType: 'ride' | 'run' | 'swim' | 'strength';
+ workoutType: 'ride' | 'run' | 'swim' | 'strength' | 'walk';
  workoutData: any;
 }
 
@@ -209,6 +209,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     const isRun = workoutType === 'run';
     const isBike = workoutType === 'ride';
     const isSwim = workoutType === 'swim';
+    const isWalk = workoutType === 'walk';
     
     const baseMetrics = [
       {
@@ -300,6 +301,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    const isRun = workoutType === 'run';
    const isBike = workoutType === 'ride';
    const isSwim = workoutType === 'swim';
+   const isWalk = workoutType === 'walk';
    
    const baseMetrics = [
      {
@@ -557,35 +559,35 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
          </div>
        </div>
        
-       {/* Dynamic Speed/Pace based on workout type */}
-       {workoutType === 'run' ? (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Avg Pace</div>
-           </div>
-         </div>
-       ) : workoutType === 'swim' ? (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Avg Pace</div>
-           </div>
-         </div>
-       ) : (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed)}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Avg Speed</div>
-           </div>
-         </div>
-       )}
+             {/* Dynamic Speed/Pace based on workout type */}
+      {workoutType === 'run' || workoutType === 'walk' ? (
+        <div className="px-2 py-1">
+          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+          </div>
+          <div className="text-xs text-[#666666] font-normal">
+            <div className="font-medium">Avg Pace</div>
+          </div>
+        </div>
+      ) : workoutType === 'swim' ? (
+        <div className="px-2 py-1">
+          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+          </div>
+          <div className="text-xs text-[#666666] font-normal">
+            <div className="font-medium">Avg Pace</div>
+          </div>
+        </div>
+      ) : (
+        <div className="px-2 py-1">
+          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed)}
+          </div>
+          <div className="text-xs text-[#666666] font-normal">
+            <div className="font-medium">Avg Speed</div>
+          </div>
+        </div>
+      )}
        
        {/* Dynamic Power/Cadence based on workout type */}
        {workoutType === 'ride' ? (

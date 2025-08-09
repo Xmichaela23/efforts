@@ -34,11 +34,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     if (workout.type === 'ride') return 'ride';
     if (workout.type === 'swim') return 'swim';
     if (workout.type === 'strength') return 'strength';
+    if (workout.type === 'walk') return 'walk';
     
     // Handle Garmin activity types
     if (workout.activity_type) {
       const activityType = workout.activity_type.toLowerCase();
       if (activityType.includes('running') || activityType.includes('run')) return 'run';
+      if (activityType.includes('walking') || activityType.includes('walk')) return 'walk';
       if (activityType.includes('cycling') || activityType.includes('bike') || activityType.includes('ride')) return 'ride';
       if (activityType.includes('swimming') || activityType.includes('swim')) return 'swim';
       if (activityType.includes('strength') || activityType.includes('weight')) return 'strength';
@@ -46,6 +48,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     
     // Fallback logic for legacy names
     if (workout.name?.toLowerCase().includes('run')) return 'run';
+    if (workout.name?.toLowerCase().includes('walk')) return 'walk';
     if (workout.name?.toLowerCase().includes('cycle') || workout.name?.toLowerCase().includes('ride')) return 'ride';
     if (workout.name?.toLowerCase().includes('swim')) return 'swim';
     
