@@ -119,19 +119,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         
         const isRun = workout.type === 'run' || workout.type === 'walk';
         
-        // Handle pace/speed more robustly
-        let paceSpeed = 'N/A';
-        const pace = workout.avg_pace || workout.metrics?.avg_pace;
-        const speed = workout.avg_speed || workout.metrics?.avg_speed;
-        
-        if (isRun && pace && pace > 0) {
-          // Pace in seconds per mile/km
-          const paceMinutes = Math.floor(pace / 60);
-          const paceSeconds = Math.round(pace % 60);
-          paceSpeed = `${paceMinutes}:${paceSeconds.toString().padStart(2,'0')}/mi`;
-        } else if (speed && speed > 0) {
-          paceSpeed = `${Math.round(speed * 10) / 10} mph`;
-        }
+                      // Handle pace/speed using basic calculation from distance and duration
+              let paceSpeed = 'N/A';
+              const distanceMeters = Number(workout.distance_meters);
+              const durationSeconds = Number(workout.duration_seconds);
+              const avgSpeedMps = Number(workout.avg_speed_mps);
+              
+              if (isRun && distanceMeters && durationSeconds && distanceMeters > 0 && durationSeconds > 0) {
+                // Calculate pace from distance and duration for accuracy
+                const distanceMiles = distanceMeters / 1609.34;
+                const durationMinutes = durationSeconds / 60;
+                const paceMinPerMile = durationMinutes / distanceMiles;
+                const minutes = Math.floor(paceMinPerMile);
+                const seconds = Math.round((paceMinPerMile - minutes) * 60);
+                paceSpeed = `${minutes}:${seconds.toString().padStart(2,'0')}/mi`;
+              } else if (avgSpeedMps && avgSpeedMps > 0) {
+                // Convert m/s to mph: multiply by 2.237
+                const speedMph = avgSpeedMps * 2.237;
+                paceSpeed = `${Math.round(speedMph * 10) / 10} mph`;
+              }
         
         const heartRate = workout.avg_heart_rate || workout.metrics?.avg_heart_rate;
         const hrDisplay = heartRate && heartRate > 0 ? `${Math.round(heartRate)} bpm` : 'N/A';

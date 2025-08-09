@@ -111,15 +111,39 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    return `${f}°F`;
  };
 
- // Format pace (seconds) to MM:SS format
- const formatPace = (seconds: any): string => {
-   const num = Number(seconds);
-   if (!num || isNaN(num)) return 'N/A';
-   
-   const minutes = Math.floor(num / 60);
-   const secs = Math.floor(num % 60);
-   return `${minutes}:${secs.toString().padStart(2, '0')}`;
- };
+ // Format pace using basic calculation from distance and duration
+const formatPace = (paceValue: any): string => {
+  // Calculate pace from distance and duration for accuracy
+  const distanceMeters = Number(workoutData.distance_meters);
+  const durationSeconds = Number(workoutData.duration_seconds);
+  
+  if (distanceMeters && durationSeconds && distanceMeters > 0 && durationSeconds > 0) {
+    // Convert meters to miles
+    const distanceMiles = distanceMeters / 1609.34;
+    // Convert seconds to minutes
+    const durationMinutes = durationSeconds / 60;
+    // Calculate pace in minutes per mile
+    const paceMinPerMile = durationMinutes / distanceMiles;
+    
+    const minutes = Math.floor(paceMinPerMile);
+    const seconds = Math.round((paceMinPerMile - minutes) * 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
+  }
+  
+  // Fallback to Garmin's speed field if distance/duration not available
+  const avgSpeedMps = Number(workoutData.avg_speed_mps);
+  if (avgSpeedMps && avgSpeedMps > 0) {
+    // Convert m/s to mph: multiply by 2.237
+    const speedMph = avgSpeedMps * 2.237;
+    // Convert to pace: 60 / speed = min/mile
+    const paceMinPerMile = 60 / speedMph;
+    const minutes = Math.floor(paceMinPerMile);
+    const seconds = Math.round((paceMinPerMile - minutes) * 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
+  }
+  
+  return 'N/A';
+};
 
  // Format swim pace (seconds per 100m) to MM:SS format
  const formatSwimPace = (seconds: any): string => {
