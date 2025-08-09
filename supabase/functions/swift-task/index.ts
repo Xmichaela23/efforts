@@ -32,12 +32,26 @@ function isAllowedPath(path: string): boolean {
     // Wellness endpoints for official backfill and reads
     path.startsWith('/wellness-api/rest/activities') ||
     path.startsWith('/wellness-api/rest/activityDetails') ||
-    path.startsWith('/wellness-api/rest/backfill/activities')
+    path.startsWith('/wellness-api/rest/backfill/activities') ||
+    path.startsWith('/wellness-api/rest/user/permissions')
   );
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, content-type',
+  } as Record<string, string>;
 }
 
 Deno.serve(async (req: Request) => {
   try {
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders() });
+    }
+
     const url = new URL(req.url);
     const path = url.searchParams.get('path') || '';
     const token = url.searchParams.get('token') || '';
@@ -45,21 +59,21 @@ Deno.serve(async (req: Request) => {
     if (!path) {
       return new Response(JSON.stringify({ error: 'Missing required query param: path' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });
     }
 
     if (!token) {
       return new Response(JSON.stringify({ error: 'Missing required query param: token' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });
     }
 
     if (!isAllowedPath(path)) {
       return new Response(JSON.stringify({ error: 'Path not allowed' }), {
         status: 403,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...corsHeaders() },
       });
     }
 
@@ -80,12 +94,12 @@ Deno.serve(async (req: Request) => {
 
     return new Response(body, {
       status: upstream.status,
-      headers: { 'Content-Type': contentType },
+      headers: { 'Content-Type': contentType, ...corsHeaders() },
     });
   } catch (err) {
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() },
     });
   }
 });
