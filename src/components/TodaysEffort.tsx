@@ -77,18 +77,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     // Get metrics based on workout type
     const getMetrics = () => {
       if (workout.type === 'strength') {
-        // Strength: weight range and exercise count
+        // Strength: exercise count, weight range, total sets
         const exercises = workout.exercises?.length || workout.sets?.length || 0;
         const weights = workout.exercises?.flatMap(ex => ex.sets?.map(set => set.weight)).filter(w => w) || [];
         const minWeight = weights.length ? Math.min(...weights) : null;
         const maxWeight = weights.length ? Math.max(...weights) : null;
         const weightRange = minWeight && maxWeight ? `${minWeight}-${maxWeight} lbs` : 'N/A';
-        const calories = workout.calories || workout.metrics?.calories || 'N/A';
+        const totalSets = workout.exercises?.reduce((total, ex) => total + (ex.sets?.length || 0), 0) || 
+                          workout.total_sets || 'N/A';
         
         return [
           { icon: Dumbbell, value: `${exercises} exercises` },
           { icon: Weight, value: weightRange },
-          { icon: Activity, value: `${calories} cal` }
+          { icon: Clock, value: `${totalSets} sets` }
         ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
