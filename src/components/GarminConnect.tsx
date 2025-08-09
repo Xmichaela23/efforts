@@ -140,6 +140,57 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       const tokenData = await tokenResponse.json();
       
       await saveConnectionData(tokenData);
+
+      // One-time: fetch and save Garmin userId if missing
+      try {
+        // Get Supabase session for auth header
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabaseClient = createClient(
+          'https://yyriamwvtvzlkumqrvpm.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+        );
+        const { data: { session } } = await supabaseClient.auth.getSession();
+        if (session) {
+          // Check if user_id already stored
+          const { data: existing } = await supabaseClient
+            .from('user_connections')
+            .select('connection_data')
+            .eq('provider', 'garmin')
+            .single();
+
+          const hasUserId = !!existing?.connection_data?.user_id;
+          if (!hasUserId) {
+            // Fetch Garmin user id via proxy
+            const path = '/wellness-api/rest/user/id';
+            const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${tokenData.access_token}`;
+            const resp = await fetch(url, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Accept': 'application/json'
+              }
+            });
+            if (resp.ok) {
+              const body = await resp.json();
+              const garminUserId = body?.userId;
+              if (garminUserId) {
+                // Merge existing connection_data with user_id
+                const newConnectionData = {
+                  ...(existing?.connection_data || {}),
+                  user_id: garminUserId
+                };
+                await supabaseClient
+                  .from('user_connections')
+                  .update({ connection_data: newConnectionData })
+                  .eq('provider', 'garmin');
+              }
+            }
+          }
+        }
+      } catch (_) {
+        // Non-fatal if user id fetch/save fails
+      }
+
       setConnectionStatus('connected');
       setLastSync(new Date());
       
