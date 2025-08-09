@@ -70,19 +70,19 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  };
 
  const formatSpeed = (speedValue: any): string => {
-  // Use Garmin's max_speed_mps field for max speed
-  const maxSpeedMps = Number(workoutData.max_speed_mps);
-  if (maxSpeedMps && maxSpeedMps > 0) {
-    // Convert m/s to mph: multiply by 2.237
-    const speedMph = maxSpeedMps * 2.237;
+  // useWorkouts.ts transforms max_speed_mps → max_speed (km/h), avg_speed_mps → avg_speed (km/h)
+  const maxSpeedKmh = Number(workoutData.max_speed);
+  if (maxSpeedKmh && maxSpeedKmh > 0) {
+    // Convert km/h to mph: multiply by 0.621371
+    const speedMph = maxSpeedKmh * 0.621371;
     return speedMph.toFixed(1);
   }
   
   // Fallback for average speed
-  const avgSpeedMps = Number(workoutData.avg_speed_mps);
-  if (avgSpeedMps && avgSpeedMps > 0) {
-    // Convert m/s to mph: multiply by 2.237
-    const speedMph = avgSpeedMps * 2.237;
+  const avgSpeedKmh = Number(workoutData.avg_speed);
+  if (avgSpeedKmh && avgSpeedKmh > 0) {
+    // Convert km/h to mph: multiply by 0.621371
+    const speedMph = avgSpeedKmh * 0.621371;
     return speedMph.toFixed(1);
   }
   
