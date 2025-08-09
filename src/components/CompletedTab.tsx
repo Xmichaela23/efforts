@@ -535,7 +535,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  ];
 
  return (
-   <div className="space-y-6" style={{fontFamily: 'Inter, sans-serif'}}>
+  <div className="space-y-6 px-4 py-2" style={{fontFamily: 'Inter, sans-serif'}}>
      
      {/* 🏠 TITLE AND WEATHER HEADER */}
      <div className="flex items-center justify-between">
