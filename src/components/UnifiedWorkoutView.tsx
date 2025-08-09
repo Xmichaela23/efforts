@@ -36,13 +36,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       'workout.name': workout.name
     });
 
-    if (workout.type === 'run') return 'run';
-    if (workout.type === 'ride') return 'ride';
-    if (workout.type === 'swim') return 'swim';
-    if (workout.type === 'strength') return 'strength';
-    if (workout.type === 'walk') return 'walk';
-    
-    // Handle Garmin activity types FIRST (more reliable than name)
+    // Handle Garmin activity types FIRST (more reliable than stored type)
     if (workout.activity_type) {
       const activityType = workout.activity_type.toLowerCase();
       console.log('🔍 Processing activity_type:', activityType);
@@ -68,6 +62,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         return 'strength';
       }
     }
+    
+    // Check stored type (for manually created workouts)
+    if (workout.type === 'run') return 'run';
+    if (workout.type === 'ride') return 'ride';
+    if (workout.type === 'swim') return 'swim';
+    if (workout.type === 'strength') return 'strength';
+    if (workout.type === 'walk') return 'walk';
     
     // Fallback logic for legacy names (only if no activity_type match)
     if (workout.name?.toLowerCase().includes('walk')) {
