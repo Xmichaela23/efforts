@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Calendar } from 'lucide-react';
+import { Calendar, Bike, Activity, Waves, Dumbbell } from 'lucide-react';
 
 interface TodaysEffortProps {
   selectedDate?: string;
