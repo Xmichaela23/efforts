@@ -141,67 +141,42 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
     setHistoryError('');
 
     try {
-      // Get user session token for Supabase authentication
       const { createClient } = await import('@supabase/supabase-js');
       const supabase = createClient(
         'https://yyriamwvtvzlkumqrvpm.supabase.co',
         'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
       );
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('User must be logged in');
-      }
+      if (!session) throw new Error('User must be logged in');
 
-      // Fetch user's Garmin connection (token + garmin user id)
+      // Get Garmin connection for access token
       const { data: userConnection, error: connErr } = await supabase
         .from('user_connections')
         .select('*')
         .eq('user_id', session.user.id)
         .eq('provider', 'garmin')
         .single();
-
-      if (connErr || !userConnection) {
-        throw new Error('No Garmin connection found');
-      }
+      if (connErr || !userConnection) throw new Error('No Garmin connection found');
 
       const garminAccessToken: string | undefined = userConnection.access_token || userConnection.connection_data?.access_token;
-      const garminUserId: string | undefined = userConnection.connection_data?.user_id;
+      if (!garminAccessToken) throw new Error('Missing Garmin access token');
 
-      if (!garminAccessToken) {
-        throw new Error('Missing Garmin access token');
-      }
-      if (!garminUserId) {
-        throw new Error('Missing Garmin user id in connection');
-      }
+      // Helper to compute UTC day boundaries
+      const startOfUtcDay = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000;
 
-      // Date range: last 90 days
-      const end = new Date();
-      const start = new Date(end.getTime() - 90 * 24 * 60 * 60 * 1000);
-      const toYMD = (d: Date) => d.toISOString().slice(0, 10);
-      const startDate = toYMD(start);
-      const endDate = toYMD(end);
+      // Loop last 90 days in 24h slices (UTC)
+      const now = new Date();
+      let successes = 0;
+      let conflicts = 0;
+      let failures = 0;
 
-      // Page through activities via existing proxy (modern/proxy)
-      let offset = 0;
-      const limit = 100;
-      let totalImported = 0;
-      let totalSeen = 0;
-      const ENRICH_LIMIT = 50;
-      const toEnrichIds: string[] = [];
+      for (let i = 0; i < 90; i++) {
+        const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+        day.setUTCDate(day.getUTCDate() - i);
+        const dayStart = Math.floor(startOfUtcDay(day));
+        const dayEnd = dayStart + 24 * 60 * 60 - 1;
 
-      // Helper to upsert in chunks
-      const upsertBatch = async (rows: any[]) => {
-        if (!rows.length) return;
-        const { error } = await supabase
-          .from('garmin_activities')
-          .upsert(rows, { onConflict: 'garmin_activity_id' });
-        if (error) throw error;
-      };
-
-      // Loop pages
-      // Stop when an empty page is returned
-      while (true) {
-        const path = `/modern/proxy/activitylist-service/activities/search/activities?start=${offset}&limit=${limit}&startDate=${startDate}&endDate=${endDate}`;
+        const path = `/wellness-api/rest/backfill/activities?summaryStartTimeInSeconds=${dayStart}&summaryEndTimeInSeconds=${dayEnd}`;
         const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${garminAccessToken}`;
 
         const resp = await fetch(url, {
@@ -212,137 +187,28 @@ const GarminPreview: React.FC<GarminPreviewProps> = ({
           }
         });
 
-        if (!resp.ok) {
-          throw new Error(`History import failed: ${resp.status} ${resp.statusText}`);
+        if (resp.status === 202) {
+          successes++;
+        } else if (resp.status === 409) {
+          conflicts++;
+        } else if (resp.ok) {
+          successes++;
+        } else {
+          failures++;
         }
 
-        const items: any[] = await resp.json();
-        if (!Array.isArray(items) || items.length === 0) break;
-
-        totalSeen += items.length;
-
-        // Map to garmin_activities rows
-        const rows = items
-          .map((a) => {
-            const activityId = a.activityId ?? a.summaryId ?? a.activityIdLong ?? null;
-            if (!activityId) return null;
-
-            // Collect most recent N for enrichment
-            if (toEnrichIds.length < ENRICH_LIMIT) {
-              toEnrichIds.push(String(activityId));
-            }
-
-            const avgSpeed = a.averageSpeed ?? a.averageSpeedInMetersPerSecond ?? null;
-            const maxSpeed = a.maxSpeed ?? a.maxSpeedInMetersPerSecond ?? null;
-
-            return {
-              user_id: session.user.id,
-              garmin_user_id: garminUserId,
-              garmin_activity_id: String(activityId),
-              activity_id: a.activityId ? String(a.activityId) : null,
-              activity_type: a.activityType?.typeKey || a.activityType || null,
-              start_time: a.startTimeGMT || a.startTimeLocal || null,
-              start_time_offset_seconds: a.startTimeOffsetInSeconds || 0,
-              duration_seconds: Math.round(a.duration ?? a.durationInSeconds ?? 0),
-              distance_meters: a.distance ?? a.distanceInMeters ?? null,
-              calories: a.calories ?? a.activeKilocalories ?? null,
-              avg_speed_mps: avgSpeed,
-              max_speed_mps: maxSpeed,
-              avg_pace_min_per_km: avgSpeed ? (1000 / avgSpeed) / 60 : null,
-              max_pace_min_per_km: maxSpeed ? (1000 / maxSpeed) / 60 : null,
-              avg_heart_rate: a.averageHR ?? a.averageHeartRateInBeatsPerMinute ?? null,
-              max_heart_rate: a.maxHR ?? a.maxHeartRateInBeatsPerMinute ?? null,
-              avg_bike_cadence: a.averageBikeCadenceInRoundsPerMinute ?? null,
-              max_bike_cadence: a.maxBikeCadenceInRoundsPerMinute ?? null,
-              avg_run_cadence: a.averageRunCadenceInStepsPerMinute ?? a.averageRunningCadence ?? null,
-              max_run_cadence: a.maxRunCadenceInStepsPerMinute ?? a.maxRunningCadence ?? null,
-              elevation_gain_meters: a.elevationGain ?? a.totalElevationGainInMeters ?? null,
-              elevation_loss_meters: a.elevationLoss ?? a.totalElevationLossInMeters ?? null,
-              device_name: a.deviceName ?? null,
-              is_parent: a.isParent ?? false,
-              parent_summary_id: a.parentSummaryId ?? null,
-              manual: a.manual ?? false,
-              is_web_upload: a.isWebUpload ?? false,
-              created_at: new Date().toISOString(),
-            };
-          })
-          .filter(Boolean);
-
-        // Upsert this page
-        await upsertBatch(rows as any[]);
-        totalImported += (rows as any[]).length;
-
-        // Next page
-        offset += limit;
-        // Small throttle
-        await new Promise((r) => setTimeout(r, 150));
+        // Gentle throttle to respect rate limits
+        await new Promise((r) => setTimeout(r, 200));
       }
 
-      // Light enrichment for the most recent N imported activities (no full streams)
-      for (const id of toEnrichIds) {
-        try {
-          const detailsPath = `/modern/proxy/activity-service/activity/${encodeURIComponent(id)}`;
-          const detailsUrl = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(detailsPath)}&token=${garminAccessToken}`;
-          const dResp = await fetch(detailsUrl, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Accept': 'application/json'
-            }
-          });
-          if (!dResp.ok) {
-            continue;
-          }
-          const detail = await dResp.json();
-
-          const summary = detail?.summary || detail?.summaryDTO || detail || {};
-          const avgPower = summary.averagePowerInWatts ?? summary.averagePower ?? null;
-          const maxPower = summary.maxPowerInWatts ?? summary.maxPower ?? null;
-          const avgHr = summary.averageHeartRateInBeatsPerMinute ?? summary.averageHR ?? null;
-          const maxHr = summary.maxHeartRateInBeatsPerMinute ?? summary.maxHR ?? null;
-          const avgSpeed = summary.averageSpeedInMetersPerSecond ?? summary.averageSpeed ?? null;
-          const maxSpeed = summary.maxSpeedInMetersPerSecond ?? summary.maxSpeed ?? null;
-          const elevGain = summary.totalElevationGainInMeters ?? summary.elevationGain ?? null;
-          const elevLoss = summary.totalElevationLossInMeters ?? summary.elevationLoss ?? null;
-          const deviceName = summary.deviceName ?? detail?.device?.displayName ?? null;
-
-          const updateObj: any = {
-            raw_data: detail,
-          };
-
-          if (avgPower != null) updateObj.avg_power = Math.round(avgPower);
-          if (maxPower != null) updateObj.max_power = Math.round(maxPower);
-          if (avgHr != null) updateObj.avg_heart_rate = Math.round(avgHr);
-          if (maxHr != null) updateObj.max_heart_rate = Math.round(maxHr);
-          if (avgSpeed != null) updateObj.avg_speed_mps = avgSpeed;
-          if (maxSpeed != null) updateObj.max_speed_mps = maxSpeed;
-          if (elevGain != null) updateObj.elevation_gain_meters = elevGain;
-          if (elevLoss != null) updateObj.elevation_loss_meters = elevLoss;
-          if (deviceName != null) updateObj.device_name = deviceName;
-
-          await supabase
-            .from('garmin_activities')
-            .update(updateObj)
-            .eq('garmin_activity_id', id)
-            .eq('user_id', session.user.id);
-
-          // small delay to be kind to API
-          await new Promise((r) => setTimeout(r, 120));
-        } catch {
-          // ignore single-enrichment failures
-        }
+      if (failures > 0 && successes === 0 && conflicts === 0) {
+        throw new Error(`Backfill failed for all days (failures: ${failures})`);
       }
 
       setHistoryStatus('success');
-
-      // After import, optionally kick off analyze flow so user can accept metrics
-      try {
-        await fetchAndAnalyzeData();
-      } catch {
-        // Non-fatal: analysis can be run manually via button
-      }
+      // Do not auto-analyze; data will flow via webhooks. User can analyze after data arrives.
     } catch (err) {
-      setHistoryError(err instanceof Error ? err.message : 'Failed to import workout history');
+      setHistoryError(err instanceof Error ? err.message : 'Failed to request workout history');
       setHistoryStatus('error');
     }
   };
