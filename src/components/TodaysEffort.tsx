@@ -171,7 +171,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     }
   };
 
-  // Format the date for display
+  // Format the date for display - compact format with date included
   const formatDisplayDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00'); // Add time to avoid timezone issues
     const today = new Date();
@@ -185,12 +185,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const isYesterday = dateString === yesterday.toLocaleDateString('en-CA');
     const isTomorrow = dateString === tomorrow.toLocaleDateString('en-CA');
 
+    // Get compact date format (e.g., "Aug 9")
+    const compactDate = date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+
     if (isToday) {
-      return 'Today';
+      return `Today, ${compactDate}`;
     } else if (isYesterday) {
-      return 'Yesterday';
+      return `Yesterday, ${compactDate}`;
     } else if (isTomorrow) {
-      return 'Tomorrow';
+      return `Tomorrow, ${compactDate}`;
     } else {
       // Format as "Mon, Jan 15" for other dates
       return date.toLocaleDateString('en-US', { 

@@ -540,11 +540,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
 
             <div className="flex items-center pr-4">
-              {!(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary) && (
-                <span className="text-lg font-normal text-muted-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                  {formatHeaderDate()}
-                </span>
-              )}
+              {/* Date removed - now shown in TodaysEffort */}
             </div>
           </div>
         </div>
