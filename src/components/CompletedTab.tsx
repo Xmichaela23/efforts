@@ -69,15 +69,25 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    return num.toFixed(1);
  };
 
- const formatSpeed = (kmh: any): string => {
-   const num = Number(kmh);
-   if (!num || isNaN(num)) return '0.0';
-   
-   if (useImperial) {
-     return (num * 0.621371).toFixed(1);
-   }
-   return num.toFixed(1);
- };
+ const formatSpeed = (speedValue: any): string => {
+  // Use Garmin's max_speed_mps field for max speed
+  const maxSpeedMps = Number(workoutData.max_speed_mps);
+  if (maxSpeedMps && maxSpeedMps > 0) {
+    // Convert m/s to mph: multiply by 2.237
+    const speedMph = maxSpeedMps * 2.237;
+    return speedMph.toFixed(1);
+  }
+  
+  // Fallback for average speed
+  const avgSpeedMps = Number(workoutData.avg_speed_mps);
+  if (avgSpeedMps && avgSpeedMps > 0) {
+    // Convert m/s to mph: multiply by 2.237
+    const speedMph = avgSpeedMps * 2.237;
+    return speedMph.toFixed(1);
+  }
+  
+  return '0.0';
+};
 
  const formatElevation = (m: any): string => {
    const num = Number(m);
@@ -113,7 +123,19 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
 
  // Format pace using basic calculation from distance and duration
 const formatPace = (paceValue: any): string => {
-  // Calculate pace from distance and duration for accuracy
+  // For max pace, use Garmin's max_pace_min_per_km field
+  if (paceValue === (workoutData.metrics?.max_pace || workoutData.max_pace)) {
+    const maxPaceMinPerKm = Number(workoutData.max_pace_min_per_km);
+    if (maxPaceMinPerKm && maxPaceMinPerKm > 0) {
+      // Convert min/km to min/mile: multiply by 1.60934
+      const paceMinPerMile = maxPaceMinPerKm * 1.60934;
+      const minutes = Math.floor(paceMinPerMile);
+      const seconds = Math.round((paceMinPerMile - minutes) * 60);
+      return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
+    }
+  }
+  
+  // For average pace, calculate from distance and duration for accuracy
   const distanceMeters = Number(workoutData.distance_meters);
   const durationSeconds = Number(workoutData.duration_seconds);
   
@@ -125,18 +147,6 @@ const formatPace = (paceValue: any): string => {
     // Calculate pace in minutes per mile
     const paceMinPerMile = durationMinutes / distanceMiles;
     
-    const minutes = Math.floor(paceMinPerMile);
-    const seconds = Math.round((paceMinPerMile - minutes) * 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-  }
-  
-  // Fallback to Garmin's speed field if distance/duration not available
-  const avgSpeedMps = Number(workoutData.avg_speed_mps);
-  if (avgSpeedMps && avgSpeedMps > 0) {
-    // Convert m/s to mph: multiply by 2.237
-    const speedMph = avgSpeedMps * 2.237;
-    // Convert to pace: 60 / speed = min/mile
-    const paceMinPerMile = 60 / speedMph;
     const minutes = Math.floor(paceMinPerMile);
     const seconds = Math.round((paceMinPerMile - minutes) * 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
