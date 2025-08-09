@@ -104,20 +104,45 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
-        const distance = workout.distance ? `${(workout.distance / 1000).toFixed(1)} mi` : 'N/A';
+        // Handle distance - could be in meters, miles, or other units
+        let distance = 'N/A';
+        if (workout.distance) {
+          const dist = Number(workout.distance);
+          if (dist > 1000) {
+            // Probably meters, convert to miles
+            distance = `${Math.round((dist / 1609.34) * 10) / 10} mi`;
+          } else {
+            // Probably already in miles or km
+            distance = `${Math.round(dist * 10) / 10} mi`;
+          }
+        }
+        
         const isRun = workout.type === 'run' || workout.type === 'walk';
+        
+        // Handle pace/speed more robustly
+        let paceSpeed = 'N/A';
         const pace = workout.avg_pace || workout.metrics?.avg_pace;
         const speed = workout.avg_speed || workout.metrics?.avg_speed;
-        const paceSpeed = isRun && pace ? `${Math.floor(pace/60)}:${(pace%60).toString().padStart(2,'0')}/mi` :
-                         speed ? `${speed.toFixed(1)} mph` : 'N/A';
-        const heartRate = workout.avg_heart_rate || workout.metrics?.avg_heart_rate || 'N/A';
+        
+        if (isRun && pace && pace > 0) {
+          // Pace in seconds per mile/km
+          const paceMinutes = Math.floor(pace / 60);
+          const paceSeconds = Math.round(pace % 60);
+          paceSpeed = `${paceMinutes}:${paceSeconds.toString().padStart(2,'0')}/mi`;
+        } else if (speed && speed > 0) {
+          paceSpeed = `${Math.round(speed * 10) / 10} mph`;
+        }
+        
+        const heartRate = workout.avg_heart_rate || workout.metrics?.avg_heart_rate;
+        const hrDisplay = heartRate && heartRate > 0 ? `${Math.round(heartRate)} bpm` : 'N/A';
+        
         const elevation = workout.elevation_gain || workout.metrics?.elevation_gain;
-        const elevationFt = elevation ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
+        const elevationFt = elevation && elevation > 0 ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
         
         return [
           { icon: MapPin, value: distance },
           { icon: Zap, value: paceSpeed },
-          { icon: Heart, value: `${heartRate} bpm` },
+          { icon: Heart, value: hrDisplay },
           { icon: Mountain, value: elevationFt }
         ];
       }
