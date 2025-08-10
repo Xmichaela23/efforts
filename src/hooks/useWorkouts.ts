@@ -134,6 +134,7 @@ export interface Workout {
   // Garmin-specific fields
   isGarminImported?: boolean;
   garmin_activity_id?: string;
+  gps_track?: any; // GPS track data from Garmin
 }
 
 export const useWorkouts = () => {
@@ -841,10 +842,13 @@ export const useWorkouts = () => {
               normalized_power: activity.normalized_power,
               // Additional heart rate metrics
               hrv: activity.hrv || activity.heart_rate_variability,
-              // Additional Garmin metrics
-              avg_vam: activity.avg_vam,
-            }
-          };
+                          // Additional Garmin metrics
+            avg_vam: activity.avg_vam,
+          },
+          
+          // GPS track data
+          gps_track: activity.gps_track,
+        };
 
           // Use existing addWorkout function to save the data
           await addWorkout(workoutData as Omit<Workout, "id">);
