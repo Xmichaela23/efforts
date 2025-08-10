@@ -594,7 +594,7 @@ export const useWorkouts = () => {
         isGarminImported: w.isGarminImported,
         garmin_activity_id: w.garmin_activity_id,
         gps_track: w.gps_track
-      });
+      }));
 
       console.log(`✅ Final mapped workouts: ${mapped.length}`);
       setWorkouts(mapped);
