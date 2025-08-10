@@ -155,13 +155,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
   ];
 
-  // Get today's date string
+  // Get today's date string - FIXED: Use PST timezone to avoid date shifting
   const getTodayDateString = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // Use PST timezone to avoid date shifting issues
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+    return today;
   };
 
   // Calculate simple total volume for save button
@@ -404,12 +402,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
+    // FIXED: Use consistent PST timezone for date to avoid shifting to tomorrow
+    const workoutDate = scheduledWorkout?.date || getTodayDateString();
+
     // Prepare the workout data
     const completedWorkout = {
       id: scheduledWorkout?.id || Date.now().toString(),
-      name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString()}`,
+      name: scheduledWorkout?.name || `Strength - ${new Date().toLocaleDateString('en-US', { timeZone: 'America/Los_Angeles' })}`,
       type: 'strength' as const,
-      date: scheduledWorkout?.date || new Date().toISOString().split('T')[0],
+      date: workoutDate,
       description: validExercises
         .map(ex => `${ex.name}: ${ex.sets.filter(s => s.reps > 0 && s.weight > 0).length}/${ex.sets.length} sets`)
         .join(', '),

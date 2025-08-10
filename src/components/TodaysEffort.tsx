@@ -18,7 +18,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const { useImperial, workouts, loading } = useAppContext();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
 
-  const today = new Date().toLocaleDateString('en-CA');
+  // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const activeDate = selectedDate || today;
 
   const loadWorkoutsForDate = () => {
