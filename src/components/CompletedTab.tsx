@@ -44,6 +44,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   selectedMetric,
   useImperial
 }) => {
+  const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
   
   if (!gpsTrack || gpsTrack.length === 0) {
@@ -55,7 +56,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   }
 
   const getMetricValue = (point: any) => {
-    switch (selectedMetric) {
+    switch (localSelectedMetric) {
       case 'heartrate':
         return point.heartRate;
       case 'speed':
@@ -108,7 +109,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   });
 
   const getMetricColor = () => {
-    switch (selectedMetric) {
+    switch (localSelectedMetric) {
       case 'heartrate':
         return '#ef4444'; // Red
       case 'speed':
@@ -123,15 +124,11 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   };
 
   const getMetricLabel = () => {
-    switch (selectedMetric) {
+    switch (localSelectedMetric) {
       case 'heartrate':
         return 'Heart Rate (BPM)';
       case 'speed':
         return 'Speed (mph)';
-      case 'power':
-        return 'Power (W)';
-      case 'vam':
-        return 'Elevation (ft)';
       default:
         return 'Elevation (ft)';
     }
@@ -174,10 +171,10 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             yAxisId="right"
             orientation="right"
             tickFormatter={(value) => {
-              if (selectedMetric === 'heartrate') return `${value} bpm`;
-              if (selectedMetric === 'speed') return `${value.toFixed(1)} mph`;
-              if (selectedMetric === 'power') return `${value.toFixed(0)} W`;
-              if (selectedMetric === 'vam') return `${value} ft`;
+              if (localSelectedMetric === 'heartrate') return `${value} bpm`;
+              if (localSelectedMetric === 'speed') return `${value.toFixed(1)} mph`;
+              if (localSelectedMetric === 'power') return `${value.toFixed(0)} W`;
+              if (localSelectedMetric === 'vam') return `${value} ft`;
               return value;
             }}
             stroke={getMetricColor()}
@@ -205,19 +202,44 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             dot={false}
             activeDot={{ r: 4, fill: "#1f2937" }}
           />
+
+          {/* Performance Metric Line - Only show when metric data is available */}
+          {localSelectedMetric !== 'vam' && (
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="metricValue"
+              stroke={getMetricColor()}
+              strokeWidth={2}
+              dot={false}
+              activeDot={{ r: 4, fill: getMetricColor() }}
+            />
+          )}
           
           {/* Tooltip */}
           <Tooltip
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 const elevation = payload.find(p => p.dataKey === 'elevation')?.value;
+                const metricValue = payload.find(p => p.dataKey === 'metricValue')?.value;
                 
                 return (
                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
+                    {metricValue && localSelectedMetric !== 'vam' && (
+                      <p className="text-gray-600" style={{ color: getMetricColor() }}>
+                        {getMetricLabel()}: {metricValue}
+                        {localSelectedMetric === 'heartrate' && ' bpm'}
+                        {localSelectedMetric === 'speed' && ' mph'}
+                        {localSelectedMetric === 'power' && ' W'}
+                      </p>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">
-                      GPS coordinates and elevation data available
+                      {localSelectedMetric === 'vam' 
+                        ? 'GPS coordinates and elevation data available'
+                        : 'GPS coordinates, elevation, and performance data available'
+                      }
                     </p>
                   </div>
                 );
@@ -228,6 +250,26 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         </ComposedChart>
       </ResponsiveContainer>
       
+      {/* Metric Selection Buttons */}
+      <div className="mt-3 px-2">
+        <div className="text-xs text-gray-600 mb-2">Select metric to overlay:</div>
+        <div className="flex flex-wrap gap-2">
+          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
+            <button
+              key={metric}
+              onClick={() => setLocalSelectedMetric(metric.toLowerCase().replace(' ', ''))}
+                              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  localSelectedMetric === metric.toLowerCase().replace(' ', '')
+                    ? 'bg-gray-200 text-black'
+                    : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
+                }`}
+            >
+              {metric}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Scroll Control Slider */}
       <div className="mt-3 px-2">
         <div className="text-xs text-gray-600 mb-2">Scroll through workout</div>
@@ -255,7 +297,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             }}
           />
         </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-xs text-gray-500 mt-1">
           <span>{Math.round(scrollRange[0])}%</span>
           <span>{Math.round(scrollRange[1])}%</span>
         </div>
