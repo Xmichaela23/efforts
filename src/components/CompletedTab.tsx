@@ -801,6 +801,18 @@ const formatPace = (paceValue: any): string => {
            </div>
          </div>
        )}
+
+       {/* TSS - Show for running too */}
+       {workoutType === 'run' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">TSS</div>
+           </div>
+         </div>
+       )}
        
        {/* Intensity Factor - Only show for cycling */}
        {workoutType === 'ride' && (
@@ -813,9 +825,33 @@ const formatPace = (paceValue: any): string => {
            </div>
          </div>
        )}
+
+       {/* Intensity Factor - Show for running too */}
+       {workoutType === 'run' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Intensity Factor</div>
+           </div>
+         </div>
+       )}
        
        {/* Normalized Power - Only show for cycling */}
        {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)}` : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Norm Power</div>
+           </div>
+         </div>
+       )}
+
+       {/* Normalized Power - Show for running too */}
+       {workoutType === 'run' && (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
              {workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)}` : 'N/A'}
@@ -857,6 +893,16 @@ const formatPace = (paceValue: any): string => {
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">VAM</div>
+         </div>
+       </div>
+
+       {/* Temperature - Show for all workout types */}
+       <div className="px-2 py-1">
+         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           {formatTemperature(workoutData.avg_temperature)}
+         </div>
+         <div className="text-xs text-[#666666] font-normal">
+           <div className="font-medium">Temperature</div>
          </div>
        </div>
        
