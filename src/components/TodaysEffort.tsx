@@ -89,28 +89,43 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       
       // COMPLETED: Show actual metrics
       if (workout.type === 'strength') {
-        // Strength: exercise count, weight range, total sets
+        // Strength: show exercise abbreviations with their set/rep/weight info
         // Read from strength_exercises field which contains the actual workout data
-        const exercises = workout.strength_exercises?.length || 0;
+        const exercises = workout.strength_exercises || [];
         
-        // Extract weights from all sets across all exercises
-        const weights = workout.strength_exercises?.flatMap(ex => 
-          ex.sets?.map(set => set.weight).filter(w => w && w > 0)
-        ) || [];
-        
-        const minWeight = weights.length ? Math.min(...weights) : null;
-        const maxWeight = weights.length ? Math.max(...weights) : null;
-        const weightRange = minWeight && maxWeight ? `${minWeight}-${maxWeight} lbs` : 'N/A';
-        
-        // Count total sets across all exercises
-        const totalSets = workout.strength_exercises?.reduce((total, ex) => 
-          total + (ex.sets?.length || 0), 0
-        ) || 0;
+        if (exercises.length > 0) {
+          // Create exercise summaries with abbreviations
+          const exerciseSummaries = exercises.map(ex => {
+            const exerciseName = ex.name || '';
+            const sets = ex.sets?.length || 0;
+            const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / sets || 0;
+            const weight = ex.sets?.[0]?.weight || 0;
+            
+            // Create exercise abbreviation
+            let abbreviation = '';
+            if (exerciseName.toLowerCase().includes('overhead press')) abbreviation = 'OHP';
+            else if (exerciseName.toLowerCase().includes('bench press')) abbreviation = 'BP';
+            else if (exerciseName.toLowerCase().includes('deadlift')) abbreviation = 'DL';
+            else if (exerciseName.toLowerCase().includes('squat')) abbreviation = 'SQ';
+            else if (exerciseName.toLowerCase().includes('row')) abbreviation = 'ROW';
+            else if (exerciseName.toLowerCase().includes('curl')) abbreviation = 'CURL';
+            else {
+              // Take first letter of each word
+              abbreviation = exerciseName.split(' ').map(word => word[0]).join('').toUpperCase();
+            }
+            
+            return `${abbreviation} ${sets}s ${Math.round(avgReps)}r ${weight}lbs`;
+          });
+          
+          return exerciseSummaries.map((summary, index) => ({
+            icon: null,
+            value: summary
+          }));
+        }
 
+        // Fallback if no exercises
         return [
-          { icon: Dumbbell, value: `${exercises} exercises` },
-          { icon: Weight, value: weightRange },
-          { icon: Clock, value: `${totalSets} sets` }
+          { icon: null, value: 'No exercises' }
         ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
