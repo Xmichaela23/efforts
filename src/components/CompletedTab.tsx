@@ -565,7 +565,8 @@ const formatPace = (paceValue: any): string => {
    // Fallback calculation
    else if (workoutData.elevation_gain && workoutData.duration) {
      const elevationM = Number(workoutData.elevation_gain);
-     const durationHours = workoutData.duration / 3600;
+     // workoutData.duration is in MINUTES, convert to hours
+     const durationHours = (workoutData.duration * 60) / 3600;
      const vam = Math.round(elevationM / durationHours);
      console.log('✅ calculateVAM using fallback calc:', vam, 'm/h');
      return `${vam} m/h`;
@@ -641,6 +642,11 @@ const formatPace = (paceValue: any): string => {
          <span className="text-black">
            {formatTime(workoutData.timestamp)}
          </span>
+         {workoutData.avg_temperature && (
+           <span className="text-black">
+             {formatTemperature(workoutData.avg_temperature)}
+           </span>
+         )}
        </div>
      </div>
      
