@@ -99,7 +99,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             const exerciseName = ex.name || '';
             const sets = ex.sets?.length || 0;
             const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / sets || 0;
-            const weight = ex.sets?.[0]?.weight || 0;
+            // Use the exercise's weight field, not the first set's weight
+            const weight = ex.weight || ex.sets?.[0]?.weight || 0;
             
             // Create exercise abbreviation
             let abbreviation = '';
@@ -117,15 +118,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             return `${abbreviation} ${sets}s ${Math.round(avgReps)}r ${weight}lbs`;
           });
           
-          return exerciseSummaries.map((summary, index) => ({
-            icon: Activity,
-            value: summary
-          }));
+          return exerciseSummaries.map((summary, index) => {
+            console.log('🔍 Creating metric for strength exercise:', { summary, icon: Dumbbell });
+            return {
+              icon: Dumbbell,
+              value: summary
+            };
+          });
         }
 
         // Fallback if no exercises
         return [
-          { icon: Activity, value: 'No exercises' }
+          { icon: Dumbbell, value: 'No exercises' }
         ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
