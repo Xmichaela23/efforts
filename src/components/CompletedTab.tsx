@@ -904,9 +904,7 @@ const formatPace = (paceValue: any): string => {
 
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
      <div>
-       <h3 className="text-lg font-semibold mb-2 text-black">
-         GPS Route Map & Elevation Profile
-       </h3>
+
        
        {/* 🎛️ CHART TABS - Above both visualizations */}
        <div className="flex gap-1 flex-wrap mb-2">
