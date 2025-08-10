@@ -239,9 +239,20 @@ const formatPace = (paceValue: any): string => {
    const dateValue = dateStr || workoutData.date || workoutData.start_date;
    if (!dateValue) return 'N/A';
    
-   // Parse "2025-07-04" directly without Date constructor to avoid timezone issues
-   const dateParts = dateValue.split('-'); // ["2025", "07", "04"]
-   return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`; // "7/4"
+   // Handle ISO timestamp format (e.g., "2025-07-04T15:30:00Z")
+   if (typeof dateValue === 'string' && dateValue.includes('T')) {
+     const datePart = dateValue.split('T')[0]; // Extract "2025-07-04" part
+     const dateParts = datePart.split('-'); // ["2025", "07", "04"]
+     return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`; // "7/4"
+   }
+   
+   // Handle date-only format (e.g., "2025-07-04")
+   if (typeof dateValue === 'string' && dateValue.includes('-')) {
+     const dateParts = dateValue.split('-'); // ["2025", "07", "04"]
+     return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`; // "7/4"
+   }
+   
+   return 'N/A';
  };
 
  const getCityFromCoordinates = (lat: any, lng: any): string => {
@@ -273,11 +284,13 @@ const formatPace = (paceValue: any): string => {
  };
 
  const generateTitle = (): string => {
-   const date = formatDate(workoutData.date);
+   // 🔧 GARMIN DATA EXTRACTION: Use timestamp for Garmin activities, date for manual workouts
+   const date = formatDate(workoutData.timestamp || workoutData.date);
    const city = getCityFromCoordinates(workoutData.start_position_lat, workoutData.start_position_long);
    const title = `${date} ${city} ${workoutData.type}`;
    console.log('🔍 generateTitle result:', title);
    console.log('🔍 generateTitle debugging:', {
+     timestamp: workoutData.timestamp,
      date: workoutData.date,
      start_position_lat: workoutData.start_position_lat,
      start_position_long: workoutData.start_position_long,
@@ -893,15 +906,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
 
-       {/* Temperature - Show for all workout types */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {formatTemperature(workoutData.avg_temperature)}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Temperature</div>
-         </div>
-       </div>
+
        
        {/* Moving Time */}
        <div className="px-2 py-1">

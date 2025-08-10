@@ -787,9 +787,9 @@ export const useWorkouts = () => {
             strokes: activity.strokes || undefined,
             pool_length: activity.pool_length || undefined,
             
-            // Training load metrics
-            tss: activity.tss || activity.training_stress_score,
-            intensity_factor: activity.intensity_factor || activity.if,
+            // Training load metrics - Use correct Garmin field names
+            tss: activity.training_stress_score,
+            intensity_factor: activity.intensity_factor,
             
             // Additional power metrics
             normalized_power: activity.normalized_power,
@@ -826,6 +826,7 @@ export const useWorkouts = () => {
               avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
               max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
               avg_temperature: activity.avg_temperature,
+              max_temperature: activity.max_temperature,
               // Run-specific metrics
               avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
               max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
