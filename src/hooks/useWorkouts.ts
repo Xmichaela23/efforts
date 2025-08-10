@@ -345,45 +345,21 @@ export const useWorkouts = () => {
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
         strength_exercises: (() => {
-          // Check if strength_exercises exists and parse it
-          if (w.strength_exercises) {
-            try {
-              if (typeof w.strength_exercises === 'string') {
-                const parsed = JSON.parse(w.strength_exercises);
-                console.log("🔍 Successfully parsed strength_exercises:", parsed);
-                return parsed;
-              } else {
-                console.log("🔍 strength_exercises already parsed:", w.strength_exercises);
-                return w.strength_exercises;
-              }
-            } catch (parseError) {
-              console.error("🔍 Error parsing strength_exercises:", parseError);
-              return [];
-            }
-          }
-          
-          // Fallback: try to parse from description field for strength workouts
+          // For strength workouts, read from description field since that's where the data is stored
           if (w.type === 'strength' && w.description) {
-            try {
-              // Try to extract exercise data from description
-              const exerciseData = w.description;
-              console.log("🔍 Using description as fallback for strength workout:", exerciseData);
-              
-              // For now, return a basic structure based on the description
-              return [{
-                id: 'temp-1',
-                name: 'Workout',
-                sets: 1,
-                reps: 1,
-                weight: 0,
-                notes: exerciseData,
-                weightMode: 'same' as const,
-                completed_sets: []
-              }];
-            } catch (error) {
-              console.log("🔍 Could not parse description as exercise data");
-              return [];
-            }
+            console.log(`🔍 Reading strength workout details from description for "${w.name}":`, w.description);
+            
+            // Create a basic structure based on the description
+            return [{
+              id: 'temp-1',
+              name: 'Strength Workout',
+              sets: 1,
+              reps: 1,
+              weight: 0,
+              notes: w.description,
+              weightMode: 'same' as const,
+              completed_sets: []
+            }];
           }
           
           return [];
