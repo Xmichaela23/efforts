@@ -90,14 +90,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       // COMPLETED: Show actual metrics
       if (workout.type === 'strength') {
         // Strength: exercise count, weight range, total sets
-        const exercises = workout.exercises?.length || workout.sets?.length || 0;
-        const weights = workout.exercises?.flatMap(ex => ex.sets?.map(set => set.weight)).filter(w => w) || [];
+        // Read from strength_exercises field which contains the actual workout data
+        const exercises = workout.strength_exercises?.length || 0;
+        
+        // Extract weights from all sets across all exercises
+        const weights = workout.strength_exercises?.flatMap(ex => 
+          ex.sets?.map(set => set.weight).filter(w => w && w > 0)
+        ) || [];
+        
         const minWeight = weights.length ? Math.min(...weights) : null;
         const maxWeight = weights.length ? Math.max(...weights) : null;
         const weightRange = minWeight && maxWeight ? `${minWeight}-${maxWeight} lbs` : 'N/A';
-        const totalSets = workout.exercises?.reduce((total, ex) => total + (ex.sets?.length || 0), 0) || 
-                          workout.total_sets || 'N/A';
         
+        // Count total sets across all exercises
+        const totalSets = workout.strength_exercises?.reduce((total, ex) => 
+          total + (ex.sets?.length || 0), 0
+        ) || 0;
+
         return [
           { icon: Dumbbell, value: `${exercises} exercises` },
           { icon: Weight, value: weightRange },
