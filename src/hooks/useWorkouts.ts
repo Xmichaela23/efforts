@@ -344,7 +344,38 @@ export const useWorkouts = () => {
         created_at: w.created_at,
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
-        strength_exercises: w.strength_exercises ? (typeof w.strength_exercises === 'string' ? JSON.parse(w.strength_exercises) : w.strength_exercises) : [],
+        strength_exercises: (() => {
+          // Check if strength_exercises exists, otherwise try to parse from description
+          if (w.strength_exercises) {
+            return typeof w.strength_exercises === 'string' ? JSON.parse(w.strength_exercises) : w.strength_exercises;
+          }
+          
+          // Fallback: try to parse from description field for strength workouts
+          if (w.type === 'strength' && w.description) {
+            try {
+              // Try to extract exercise data from description
+              const exerciseData = w.description;
+              console.log("🔍 Using description as fallback for strength workout:", exerciseData);
+              
+              // For now, return a basic structure based on the description
+              return [{
+                id: 'temp-1',
+                name: 'Workout',
+                sets: 1,
+                reps: 1,
+                weight: 0,
+                notes: exerciseData,
+                weightMode: 'same' as const,
+                completed_sets: []
+              }];
+            } catch (error) {
+              console.log("🔍 Could not parse description as exercise data");
+              return [];
+            }
+          }
+          
+          return [];
+        })(),
         avg_heart_rate: w.avg_heart_rate,
         max_heart_rate: w.max_heart_rate,
         avg_power: w.avg_power,
