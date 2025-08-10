@@ -241,25 +241,19 @@ async function processActivityDetails(activityDetails) {
       // Process ALL sensor data from samples
       let avgPower = null, maxPower = null;
       let avgHeartRate = null, maxHeartRate = null;
-      let avgSpeed = null, maxSpeed = null;
       let avgCadence = null, maxCadence = null;
       let avgTemperature = null, maxTemperature = null;
-      let totalDistance = null;
-      let elevationGain = 0, elevationLoss = 0;
       let gpsTrack = [];
       let allSensorData = [];
       
       if (samples.length > 0) {
-        const powerValues = [], heartRateValues = [], speedValues = [], cadenceValues = [], tempValues = [];
-        let lastElevation = null;
+        const powerValues = [], heartRateValues = [], cadenceValues = [], tempValues = [];
         
         for (const sample of samples) {
           const sensorReading = {
             timestamp: sample.startTimeInSeconds,
             power: sample.powerInWatts || null,
             heartRate: sample.heartRate || null,
-            speed: sample.speedMetersPerSecond || null,
-            distance: sample.totalDistanceInMeters || null,
             latitude: sample.latitudeInDegree || null,
             longitude: sample.longitudeInDegree || null,
             elevation: sample.elevationInMeters || null,
@@ -278,7 +272,6 @@ async function processActivityDetails(activityDetails) {
           // Collect values for averaging
           if (sample.powerInWatts !== undefined && sample.powerInWatts !== null) powerValues.push(sample.powerInWatts);
           if (sample.heartRate !== undefined && sample.heartRate !== null) heartRateValues.push(sample.heartRate);
-          if (sample.speedMetersPerSecond !== undefined && sample.speedMetersPerSecond !== null) speedValues.push(sample.speedMetersPerSecond);
           if (sample.airTemperatureCelcius !== undefined && sample.airTemperatureCelcius !== null) tempValues.push(sample.airTemperatureCelcius);
           
           const cadence = sample.bikeCadenceInRPM || sample.stepsPerMinute || sample.swimCadenceInStrokesPerMinute || sample.directWheelchairCadence;
@@ -294,19 +287,10 @@ async function processActivityDetails(activityDetails) {
             });
           }
           
-          // Elevation gain/loss calculation
+          // GPS elevation tracking (for display only, not for calculations)
           if (sample.elevationInMeters !== undefined && sample.elevationInMeters !== null) {
-            if (lastElevation !== null) {
-              const elevationChange = sample.elevationInMeters - lastElevation;
-              if (elevationChange > 0) elevationGain += elevationChange;
-              else elevationLoss += Math.abs(elevationChange);
-            }
-            lastElevation = sample.elevationInMeters;
-          }
-          
-          // Track total distance
-          if (sample.totalDistanceInMeters !== undefined && sample.totalDistanceInMeters !== null) {
-            totalDistance = sample.totalDistanceInMeters;
+            // Store elevation for GPS track display, but don't calculate totals
+            // We use Garmin's official elevation data instead
           }
         }
         
@@ -319,10 +303,6 @@ async function processActivityDetails(activityDetails) {
           avgHeartRate = Math.round(heartRateValues.reduce((a, b) => a + b) / heartRateValues.length);
           maxHeartRate = Math.max(...heartRateValues);
         }
-        if (speedValues.length > 0) {
-          avgSpeed = speedValues.reduce((a, b) => a + b) / speedValues.length;
-          maxSpeed = Math.max(...speedValues);
-        }
         if (cadenceValues.length > 0) {
           avgCadence = Math.round(cadenceValues.reduce((a, b) => a + b) / cadenceValues.length);
           maxCadence = Math.max(...cadenceValues);
@@ -332,7 +312,7 @@ async function processActivityDetails(activityDetails) {
           maxTemperature = Math.max(...tempValues);
         }
         
-        console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Speed: ${avgSpeed ? `${avgSpeed.toFixed(1)} m/s avg, ${maxSpeed.toFixed(1)} m/s max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points Elevation: +${elevationGain.toFixed(1)}m / -${elevationLoss.toFixed(1)}m`);
+        console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points Elevation: Using Garmin official data`);
       }
       
       // Convert Garmin activity to our format with ALL available fields
@@ -362,11 +342,11 @@ async function processActivityDetails(activityDetails) {
         max_push_cadence: activity.maxPushCadenceInPushesPerMinute || null,
         avg_power: avgPower || null,
         max_power: maxPower || null,
-        avg_speed_mps: avgSpeed || activity.averageSpeedInMetersPerSecond || null,
-        max_speed_mps: maxSpeed || activity.maxSpeedInMetersPerSecond || null,
-        distance_meters: totalDistance || activity.distanceInMeters || null,
-        elevation_gain_meters: elevationGain > 0 ? elevationGain : activity.totalElevationGainInMeters || null,
-        elevation_loss_meters: elevationLoss > 0 ? elevationLoss : activity.totalElevationLossInMeters || null,
+        avg_speed_mps: activity.averageSpeedInMetersPerSecond || null,
+        max_speed_mps: activity.maxSpeedInMetersPerSecond || null,
+        distance_meters: activity.distanceInMeters || null,
+        elevation_gain_meters: activity.totalElevationGainInMeters || null,
+        elevation_loss_meters: activity.totalElevationLossInMeters || null,
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
         starting_latitude: activity.startingLatitudeInDegree || null,

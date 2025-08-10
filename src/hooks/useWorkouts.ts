@@ -131,6 +131,9 @@ export interface Workout {
   avg_pace?: number;
   max_pace?: number;
   steps?: number;
+  // Garmin-specific fields
+  isGarminImported?: boolean;
+  garmin_activity_id?: string;
 }
 
 export const useWorkouts = () => {
@@ -179,32 +182,144 @@ export const useWorkouts = () => {
 
       console.log("🔍 Fetching workouts for user:", user.id);
 
-      // Fetch manual/planned workouts from workouts table
-      const { data, error } = await supabase
+      // 🔧 FIXED: Fetch BOTH workouts table AND Garmin activities to show all workouts
+      
+      // Step 1: Fetch manual/planned workouts from workouts table
+      const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
         .select("*")
         .eq("user_id", user.id)
         .order("date", { ascending: false });
 
-      if (error) {
-        console.error("❌ Supabase error:", error);
-        throw error;
+      if (manualError) {
+        console.error("❌ Supabase error fetching manual workouts:", manualError);
+        throw manualError;
       }
 
-      const mapped = data.map((w) => ({
+      console.log(`✅ Found ${manualWorkouts?.length || 0} manual/planned workouts`);
+
+      // Step 2: Fetch Garmin activities (if user has Garmin connection)
+      let garminWorkouts: any[] = [];
+      try {
+        const { data: userConnection, error: connectionError } = await supabase
+          .from("user_connections")
+          .select("connection_data")
+          .eq("user_id", user.id)
+          .eq("provider", "garmin")
+          .single();
+
+        if (!connectionError && userConnection?.connection_data?.user_id) {
+          const garminUserId = userConnection.connection_data.user_id;
+          console.log("🔗 Found Garmin connection, fetching activities for user:", garminUserId);
+
+          const { data: garminActivities, error: garminError } = await supabase
+            .from("garmin_activities")
+            .select("*")
+            .eq("garmin_user_id", garminUserId)
+            .order("start_time", { ascending: false });
+
+          if (!garminError && garminActivities) {
+            console.log(`✅ Found ${garminActivities.length} Garmin activities`);
+            
+            // Transform Garmin activities to workout format
+            garminWorkouts = garminActivities.map(activity => {
+              // Map activity type from Garmin to our workout types
+              const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" | "walk" => {
+                const type = activityType?.toLowerCase() || '';
+                if (type.includes('walk') || type.includes('hiking')) return 'walk';
+                if (type.includes('run') || type.includes('jog')) return 'run';
+                if (type.includes('bike') || type.includes('cycling') || type.includes('cycle')) return 'ride';
+                if (type.includes('swim')) return 'swim';
+                if (type.includes('strength') || type.includes('weight')) return 'strength';
+                return 'run'; // Default to run for endurance activities
+              };
+
+              const workoutType = getWorkoutType(activity.activity_type);
+              const activityDate = activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0];
+
+              return {
+                id: `garmin_${activity.garmin_activity_id || activity.id}`,
+                name: activity.activity_name || `Garmin ${workoutType}`,
+                type: workoutType,
+                duration: Math.round(activity.duration_seconds / 60) || 0,
+                date: activityDate,
+                description: `Imported from Garmin - ${activity.activity_type || 'Activity'}`,
+                userComments: "",
+                completedManually: false,
+                workout_status: 'completed' as const,
+                created_at: activity.start_time,
+                updated_at: activity.start_time,
+                intervals: [],
+                strength_exercises: [],
+                // Map Garmin metrics to workout fields
+                avg_heart_rate: activity.avg_heart_rate,
+                max_heart_rate: activity.max_heart_rate,
+                avg_power: activity.avg_power,
+                max_power: activity.max_power,
+                avg_speed: activity.avg_speed,
+                max_speed: activity.max_speed,
+                avg_cadence: activity.avg_cadence,
+                max_cadence: activity.max_cadence,
+                elevation_gain: activity.elevation_gain_meters,
+                elevation_loss: activity.elevation_loss_meters,
+                calories: activity.calories,
+                distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
+                timestamp: activity.start_time,
+                start_position_lat: activity.start_position_lat,
+                start_position_long: activity.start_position_long,
+                friendly_name: `Garmin ${activity.garmin_activity_id}`,
+                moving_time: activity.moving_time_seconds,
+                elapsed_time: activity.duration_seconds,
+                // Add pace fields for running/walking
+                avg_pace: workoutType === 'run' || workoutType === 'walk' ? activity.avg_pace : undefined,
+                max_pace: workoutType === 'run' || workoutType === 'walk' ? activity.max_pace : undefined,
+                // Add steps for running/walking
+                steps: workoutType === 'run' || workoutType === 'walk' ? activity.steps : undefined,
+                // Mark as Garmin-imported
+                isGarminImported: true,
+                garmin_activity_id: activity.garmin_activity_id
+              };
+            });
+          }
+        }
+      } catch (garminError) {
+        console.log("⚠️ Error fetching Garmin activities (continuing with manual workouts):", garminError);
+      }
+
+      // Step 3: Merge both workout sources and remove duplicates
+      const allWorkouts = [...(manualWorkouts || []), ...garminWorkouts];
+      
+      // Remove duplicate Garmin activities (keep manual workouts if they exist for same date/type)
+      const uniqueWorkouts = allWorkouts.filter((workout, index, self) => {
+        if (workout.isGarminImported) {
+          // For Garmin workouts, check if there's a manual workout for the same date/type
+          const hasManualDuplicate = self.some(w => 
+            !w.isGarminImported && 
+            w.date === workout.date && 
+            w.type === workout.type
+          );
+          return !hasManualDuplicate;
+        }
+        return true; // Keep all manual workouts
+      });
+
+      console.log(`✅ Total unique workouts after merge: ${uniqueWorkouts.length}`);
+
+      // Step 4: Map and set workouts
+      const mapped = uniqueWorkouts.map((w) => ({
         id: w.id,
         name: w.name,
         type: w.type,
         duration: w.duration,
         date: w.date,
         description: w.description,
-        userComments: w.usercomments ?? "",
-        completedManually: w.completedmanually ?? false,
+        userComments: w.userComments ?? w.usercomments ?? "",
+        completedManually: w.completedManually ?? w.completedmanually ?? false,
         workout_status: w.workout_status ?? "planned",
         created_at: w.created_at,
         updated_at: w.updated_at,
-        intervals: w.intervals ? JSON.parse(w.intervals) : [],
-        strength_exercises: w.strength_exercises ? JSON.parse(w.strength_exercises) : [],
+        intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
+        strength_exercises: w.strength_exercises ? (typeof w.strength_exercises === 'string' ? JSON.parse(w.strength_exercises) : w.strength_exercises) : [],
         avg_heart_rate: w.avg_heart_rate,
         max_heart_rate: w.max_heart_rate,
         avg_power: w.avg_power,
@@ -254,229 +369,22 @@ export const useWorkouts = () => {
         left_right_balance: w.left_right_balance,
         threshold_power: w.threshold_power,
         total_cycles: w.total_cycles,
-        deviceInfo: w.device_info,
-        metrics: {
-          avg_heart_rate: w.avg_heart_rate,
-          max_heart_rate: w.max_heart_rate,
-          avg_power: w.avg_power,
-          max_power: w.max_power,
-          normalized_power: w.normalized_power,
-          avg_speed: w.avg_speed,
-          max_speed: w.max_speed,
-          avg_cadence: w.avg_cadence,
-          max_cadence: w.max_cadence,
-          elevation_gain: w.elevation_gain,
-          elevation_loss: w.elevation_loss,
-          calories: w.calories,
-          training_stress_score: w.tss,
-          intensity_factor: w.intensity_factor,
-          avg_temperature: w.avg_temperature,
-          max_temperature: w.max_temperature,
-          total_timer_time: w.total_timer_time,
-          total_elapsed_time: w.total_elapsed_time,
-          total_work: w.total_work,
-          total_descent: w.total_descent,
-          avg_vam: w.avg_vam,
-          total_training_effect: w.total_training_effect,
-          total_anaerobic_effect: w.total_anaerobic_effect,
-          functional_threshold_power: w.functional_threshold_power,
-          threshold_heart_rate: w.threshold_heart_rate,
-          hr_calc_type: w.hr_calc_type,
-          pwr_calc_type: w.pwr_calc_type,
-          age: w.age,
-          weight: w.weight,
-          height: w.height,
-          gender: w.gender,
-          default_max_heart_rate: w.default_max_heart_rate,
-          resting_heart_rate: w.resting_heart_rate,
-          dist_setting: w.dist_setting,
-          weight_setting: w.weight_setting,
-          avg_fractional_cadence: w.avg_fractional_cadence,
-          avg_left_pedal_smoothness: w.avg_left_pedal_smoothness,
-          avg_left_torque_effectiveness: w.avg_left_torque_effectiveness,
-          max_fractional_cadence: w.max_fractional_cadence,
-          left_right_balance: w.left_right_balance,
-          threshold_power: w.threshold_power,
-          total_cycles: w.total_cycles,
-        }
+        deviceInfo: w.deviceInfo || w.device_info,
+        metrics: w.metrics,
+        // Run-specific fields
+        avg_pace: w.avg_pace,
+        max_pace: w.max_pace,
+        steps: w.steps,
+        // Garmin-specific fields
+        isGarminImported: w.isGarminImported,
+        garmin_activity_id: w.garmin_activity_id
       }));
 
-      console.log(`✅ Found ${mapped.length} manual workouts`);
-
-      // 🆕 Also fetch Garmin workouts
-      try {
-        const { data: userConnection } = await supabase
-          .from("user_connections")
-          .select("connection_data")
-          .eq("user_id", user.id)
-          .eq("provider", "garmin")
-          .single();
-
-        if (userConnection?.connection_data?.user_id) {
-          const { data: garminActivities } = await supabase
-            .from("garmin_activities")
-            .select("*")
-            .eq("garmin_user_id", userConnection.connection_data.user_id)
-            .order("start_time", { ascending: false });
-
-          if (garminActivities) {
-            const garminWorkouts = garminActivities.map((activity) => ({
-              id: `garmin-${activity.garmin_activity_id}`,
-              name: activity.activity_name || `${activity.activity_type}`,
-              type: activity.activity_type?.toLowerCase().includes('run') ? 'run' as const :
-                    activity.activity_type?.toLowerCase().includes('bike') || activity.activity_type?.toLowerCase().includes('cycling') ? 'ride' as const :
-                    activity.activity_type?.toLowerCase().includes('swim') ? 'swim' as const : 
-                    activity.activity_type?.toLowerCase().includes('strength') ? 'strength' as const : 'run' as const,
-              date: activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0],
-              duration: Math.round((activity.duration_seconds || 0) / 60),
-              distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
-              description: `Imported from Garmin Connect - ${activity.activity_type}`,
-              userComments: "",
-              completedManually: false,
-              workout_status: "completed" as const,
-              created_at: activity.created_at || new Date().toISOString(),
-              updated_at: activity.updated_at || new Date().toISOString(),
-              intervals: [],
-              strength_exercises: [],
-              
-              // GPS and location data
-              timestamp: activity.start_time,
-              start_position_lat: activity.starting_latitude,
-              start_position_long: activity.starting_longitude,
-              friendly_name: `Garmin Activity ${activity.garmin_activity_id}`,
-              
-              // Performance metrics
-              avg_heart_rate: activity.avg_heart_rate,
-              max_heart_rate: activity.max_heart_rate,
-              avg_power: activity.avg_power,
-              max_power: activity.max_power,
-              calories: activity.calories,
-              elevation_gain: activity.elevation_gain_meters,
-              elevation_loss: activity.elevation_loss_meters,
-              
-              // Speed and pace (convert m/s to km/h for avg_speed)
-              avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
-              max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
-              
-              // Run-specific pace data (convert min/km to seconds for display)
-              avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
-              max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
-              
-              // Cadence data (use run-specific cadence for runs, bike for rides)
-              avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
-              max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
-              
-              // Time data
-              moving_time: Math.round(activity.duration_seconds || 0),
-              elapsed_time: Math.round(activity.duration_seconds || 0),
-              
-              // Additional metrics
-              avg_temperature: activity.avg_temperature,
-              
-              // Additional optional properties from Workout interface
-              normalized_power: activity.normalized_power,
-              tss: activity.tss,
-              intensity_factor: activity.intensity_factor,
-              max_temperature: activity.max_temperature,
-              total_timer_time: activity.total_timer_time,
-              total_elapsed_time: activity.total_elapsed_time,
-              total_work: activity.total_work,
-              total_descent: activity.total_descent,
-              avg_vam: activity.avg_vam,
-              total_training_effect: activity.total_training_effect,
-              total_anaerobic_effect: activity.total_anaerobic_effect,
-              functional_threshold_power: activity.functional_threshold_power,
-              threshold_heart_rate: activity.threshold_heart_rate,
-              hr_calc_type: activity.hr_calc_type,
-              pwr_calc_type: activity.pwr_calc_type,
-              age: activity.age,
-              weight: activity.weight,
-              height: activity.height,
-              gender: activity.gender,
-              default_max_heart_rate: activity.default_max_heart_rate,
-              resting_heart_rate: activity.resting_heart_rate,
-              dist_setting: activity.dist_setting,
-              weight_setting: activity.weight_setting,
-              avg_fractional_cadence: activity.avg_fractional_cadence,
-              avg_left_pedal_smoothness: activity.avg_left_pedal_smoothness,
-              avg_left_torque_effectiveness: activity.avg_left_torque_effectiveness,
-              max_fractional_cadence: activity.max_fractional_cadence,
-              left_right_balance: activity.left_right_balance,
-              threshold_power: activity.threshold_power,
-              total_cycles: activity.total_cycles,
-              deviceInfo: activity.deviceInfo,
-              steps: activity.steps,
-              
-              // Create comprehensive metrics object for CompletedTab compatibility
-              metrics: {
-                avg_heart_rate: activity.avg_heart_rate,
-                max_heart_rate: activity.max_heart_rate,
-                avg_power: activity.avg_power,
-                max_power: activity.max_power,
-                calories: activity.calories,
-                elevation_gain: activity.elevation_gain_meters,
-                elevation_loss: activity.elevation_loss_meters,
-                avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
-                max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
-                avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
-                max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
-                avg_temperature: activity.avg_temperature,
-                moving_time: Math.round(activity.duration_seconds || 0),
-                elapsed_time: Math.round(activity.duration_seconds || 0),
-                distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
-                duration: Math.round((activity.duration_seconds || 0) / 60),
-                start_time: activity.start_time,
-                activity_type: activity.activity_type,
-                garmin_activity_id: activity.garmin_activity_id,
-                // Add any other metrics that might be available in the garmin_activities table
-                total_training_effect: activity.total_training_effect,
-                total_anaerobic_effect: activity.total_anaerobic_effect,
-                functional_threshold_power: activity.functional_threshold_power,
-                threshold_heart_rate: activity.threshold_heart_rate,
-                normalized_power: activity.normalized_power,
-                intensity_factor: activity.intensity_factor,
-                tss: activity.tss,
-                training_stress_score: activity.tss,
-                avg_vam: activity.avg_vam,
-                total_work: activity.total_work,
-                total_descent: activity.total_descent,
-                total_timer_time: activity.total_timer_time,
-                total_elapsed_time: activity.total_elapsed_time,
-                hr_calc_type: activity.hr_calc_type,
-                pwr_calc_type: activity.pwr_calc_type,
-                age: activity.age,
-                weight: activity.weight,
-                height: activity.height,
-                gender: activity.gender,
-                default_max_heart_rate: activity.default_max_heart_rate,
-                resting_heart_rate: activity.resting_heart_rate,
-                dist_setting: activity.dist_setting,
-                weight_setting: activity.weight_setting,
-                avg_fractional_cadence: activity.avg_fractional_cadence,
-                avg_left_pedal_smoothness: activity.avg_left_pedal_smoothness,
-                avg_left_torque_effectiveness: activity.avg_left_torque_effectiveness,
-                max_fractional_cadence: activity.max_fractional_cadence,
-                left_right_balance: activity.left_right_balance,
-                threshold_power: activity.threshold_power,
-                total_cycles: activity.total_cycles,
-                max_temperature: activity.max_temperature,
-              }
-            }));
-            console.log(`✅ Found ${garminWorkouts.length} Garmin workouts`);
-            mapped.push(...garminWorkouts);
-          }
-        }
-      } catch (garminError) {
-        console.log("🔇 No Garmin workouts found");
-      }
-
-      // Sort all workouts by date
-      const sorted = mapped.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
-      console.log(`✅ Total workouts: ${sorted.length}`);
-      setWorkouts(sorted);
-    } catch (err) {
-      console.error("❌ Error in fetchWorkouts:", err);
+      console.log(`✅ Final mapped workouts: ${mapped.length}`);
+      setWorkouts(mapped);
+    } catch (error) {
+      console.error("❌ Error in fetchWorkouts:", error);
+      setWorkouts([]);
     } finally {
       setLoading(false);
     }
@@ -663,7 +571,7 @@ export const useWorkouts = () => {
             description: `Imported from Garmin Connect - ${activity.activity_type}`,
             userComments: "",
             completedManually: false,
-            workout_status: "completed",
+            workout_status: "completed" as const,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             intervals: [],
@@ -693,8 +601,8 @@ export const useWorkouts = () => {
             max_pace: activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined,
             
             // Cadence data (use run-specific cadence for runs, bike for rides)
-            avg_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.avg_run_cadence : activity.avg_bike_cadence,
-            max_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.max_run_cadence : activity.max_bike_cadence,
+            avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
+            max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
             
             // Swim-specific data
             strokes: activity.strokes || undefined,
@@ -739,8 +647,8 @@ export const useWorkouts = () => {
               elevation_loss: activity.elevation_loss_meters,
               avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined,
               max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined,
-              avg_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.avg_run_cadence : activity.avg_bike_cadence,
-              max_cadence: getWorkoutType(activity.activity_type) === 'run' ? activity.max_run_cadence : activity.max_bike_cadence,
+              avg_cadence: activity.avg_running_cadence || activity.avg_bike_cadence,
+              max_cadence: activity.max_running_cadence || activity.max_bike_cadence,
               avg_temperature: activity.avg_temperature,
               // Run-specific metrics
               avg_pace: activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined,
