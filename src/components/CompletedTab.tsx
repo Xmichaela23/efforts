@@ -70,14 +70,20 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   // Process GPS data for chart
   const chartData = gpsTrack.map((point, index) => {
     const distance = index * 0.01; // Approximate distance in miles (simplified)
+    
+    // Debug: Log first few points to see actual data structure
+    if (index < 3) {
+      console.log(`GPS Point ${index}:`, point);
+    }
+    
     const metricValue = getMetricValue(point);
     return {
       distance: parseFloat(distance.toFixed(2)),
-      elevation: point.elevation || 0,
-      heartRate: point.heartRate || null,
-      speed: point.speed || null,
-      cadence: point.cadence || null,
-      timestamp: point.timestamp,
+      elevation: point.elevation || point.altitude || 0,
+      heartRate: point.heartRate || point.heart_rate || point.hr || null,
+      speed: point.speed || point.speedMetersPerSecond || null,
+      cadence: point.cadence || point.bikeCadenceInRPM || null,
+      timestamp: point.timestamp || point.startTimeInSeconds || null,
       metricValue: metricValue
     };
   });
@@ -96,6 +102,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       default:
         return true;
     }
+  });
+
+  console.log('Chart data debug:', {
+    totalPoints: gpsTrack.length,
+    chartDataPoints: chartData.length,
+    validDataPoints: validData.length,
+    selectedMetric,
+    samplePoint: chartData[0]
   });
 
   const getMetricColor = () => {
