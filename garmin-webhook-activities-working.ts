@@ -312,7 +312,34 @@ async function processActivityDetails(activityDetails) {
           maxTemperature = Math.max(...tempValues);
         }
         
-        console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points Elevation: Using Garmin official data`);
+        // 🔧 FIX: Calculate elevation gain from GPS samples instead of trusting Garmin's field
+        let calculatedElevationGain = 0;
+        let calculatedElevationLoss = 0;
+        
+        if (gpsTrack.length > 1) {
+          for (let i = 1; i < gpsTrack.length; i++) {
+            const prevElevation = gpsTrack[i - 1].elevation;
+            const currElevation = gpsTrack[i].elevation;
+            
+            if (prevElevation !== null && currElevation !== null) {
+              const elevationDiff = currElevation - prevElevation;
+              if (elevationDiff > 0) {
+                calculatedElevationGain += elevationDiff;
+              } else if (elevationDiff < 0) {
+                calculatedElevationLoss += Math.abs(elevationDiff);
+              }
+            }
+          }
+          
+          // Round to nearest meter
+          calculatedElevationGain = Math.round(calculatedElevationGain);
+          calculatedElevationLoss = Math.round(calculatedElevationLoss);
+          
+          console.log(`🔧 CALCULATED ELEVATION: Gain: ${calculatedElevationGain}m (${Math.round(calculatedElevationGain * 3.28084)}ft), Loss: ${calculatedElevationLoss}m (${Math.round(calculatedElevationLoss * 3.28084)}ft)`);
+          console.log(`🔧 GARMIN'S FIELD: totalElevationGainInMeters: ${activity.totalElevationGainInMeters}m (${Math.round((activity.totalElevationGainInMeters || 0) * 3.28084)}ft)`);
+        }
+        
+        console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points Elevation: Using GPS-calculated data`);
       }
       
       // Convert Garmin activity to our format with ALL available fields
@@ -345,8 +372,9 @@ async function processActivityDetails(activityDetails) {
         avg_speed_mps: activity.averageSpeedInMetersPerSecond || null,
         max_speed_mps: activity.maxSpeedInMetersPerSecond || null,
         distance_meters: activity.distanceInMeters || null,
-        elevation_gain_meters: activity.totalElevationGainInMeters || null,
-        elevation_loss_meters: activity.totalElevationLossInMeters || null,
+        // 🔧 FIX: Use GPS-calculated elevation instead of Garmin's incorrect field
+        elevation_gain_meters: calculatedElevationGain > 0 ? calculatedElevationGain : (activity.totalElevationGainInMeters || null),
+        elevation_loss_meters: calculatedElevationLoss > 0 ? calculatedElevationLoss : (activity.totalElevationLossInMeters || null),
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
         starting_latitude: activity.startingLatitudeInDegree || null,
