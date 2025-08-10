@@ -315,6 +315,7 @@ export const useWorkouts = () => {
                 updated_at: activity.start_time,
                 intervals: [],
                 strength_exercises: [],
+                
                 // Map Garmin metrics to workout fields - CORRECT FIELD MAPPING
                 avg_heart_rate: activity.avg_heart_rate,
                 max_heart_rate: activity.max_heart_rate,
@@ -335,7 +336,7 @@ export const useWorkouts = () => {
                 start_position_lat: activity.starting_latitude,
                 start_position_long: activity.starting_longitude,
                 friendly_name: `Garmin ${activity.garmin_activity_id}`,
-                moving_time: activity.moving_time_seconds,
+                moving_time: activity.duration_seconds, // FIXED: Use duration_seconds
                 elapsed_time: activity.duration_seconds,
                 // CORRECT: Use the right pace fields
                 avg_pace: workoutType === 'run' || workoutType === 'walk' ? 
@@ -346,7 +347,72 @@ export const useWorkouts = () => {
                 steps: workoutType === 'run' || workoutType === 'walk' ? activity.steps : undefined,
                 // Mark as Garmin-imported
                 isGarminImported: true,
-                garmin_activity_id: activity.garmin_activity_id
+                garmin_activity_id: activity.garmin_activity_id,
+                
+                // 🔧 FIX: Create metrics object that CompletedTab expects
+                metrics: {
+                  // Heart rate data
+                  avg_heart_rate: activity.avg_heart_rate,
+                  max_heart_rate: activity.max_heart_rate,
+                  
+                  // Power data
+                  avg_power: activity.avg_power,
+                  max_power: activity.max_power,
+                  
+                  // Speed and pace data
+                  avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined, // Convert m/s to km/h
+                  max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined, // Convert m/s to km/h
+                  avg_pace: workoutType === 'run' || workoutType === 'walk' ? 
+                    (activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined) : undefined,
+                  max_pace: workoutType === 'run' || workoutType === 'walk' ? 
+                    (activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined) : undefined,
+                  
+                  // Cadence data
+                  avg_cadence: activity.avg_bike_cadence || activity.avg_run_cadence,
+                  max_cadence: activity.max_bike_cadence || activity.max_run_cadence,
+                  
+                  // Elevation data
+                  elevation_gain: activity.elevation_gain_meters,
+                  elevation_loss: activity.elevation_loss_meters,
+                  
+                  // Calories and energy
+                  calories: activity.calories,
+                  
+                  // Temperature data
+                  avg_temperature: activity.avg_temperature,
+                  max_temperature: activity.max_temperature,
+                  
+                  // Time data - FIXED: Use correct field names
+                  total_timer_time: activity.duration_seconds, // Use duration_seconds as moving time
+                  total_elapsed_time: activity.duration_seconds,
+                  moving_time: activity.duration_seconds, // Use duration_seconds as moving time
+                  elapsed_time: activity.duration_seconds,
+                  
+                  // Steps for running/walking
+                  steps: workoutType === 'run' || workoutType === 'walk' ? activity.steps : undefined,
+                  
+                  // Training load metrics (if available)
+                  training_stress_score: activity.tss,
+                  intensity_factor: activity.intensity_factor,
+                  normalized_power: activity.normalized_power,
+                  
+                  // Additional metrics that might be available
+                  total_work: activity.total_work,
+                  avg_vam: activity.avg_vam,
+                  total_training_effect: activity.total_training_effect,
+                  total_anaerobic_effect: activity.total_anaerobic_effect,
+                  functional_threshold_power: activity.functional_threshold_power,
+                  threshold_heart_rate: activity.threshold_heart_rate,
+                  
+                  // Cycling-specific metrics
+                  avg_left_pedal_smoothness: activity.avg_left_pedal_smoothness,
+                  avg_left_torque_effectiveness: activity.avg_left_torque_effectiveness,
+                  left_right_balance: activity.left_right_balance,
+                  
+                  // Swim-specific metrics
+                  strokes: activity.strokes,
+                  pool_length: activity.pool_length
+                }
               };
             });
           }
@@ -665,38 +731,6 @@ export const useWorkouts = () => {
             if (type.includes('swim')) return 'swim';
             if (type.includes('strength') || type.includes('weight')) return 'strength';
             return 'run'; // Default to run for endurance activities
-          };
-
-          // Generate location-based title from GPS coordinates
-          const generateLocationTitle = (lat: number | null, lng: number | null, activityType: string) => {
-            if (!lat || !lng) return null;
-            
-            let location = '';
-            // Los Angeles area
-            if (lat >= 33.7 && lat <= 34.5 && lng >= -118.9 && lng <= -117.9) {
-              location = 'Los Angeles';
-            }
-            // Pasadena area (more specific)  
-            else if (lat >= 34.1 && lat <= 34.2 && lng >= -118.2 && lng <= -118.0) {
-              location = 'Pasadena';
-            }
-            // San Francisco Bay Area
-            else if (lat >= 37.4 && lat <= 37.8 && lng >= -122.5 && lng <= -122.0) {
-              location = 'San Francisco';
-            }
-            
-            if (location) {
-              const formattedType = activityType === 'ride' ? 'Cycling' : 
-                                 activityType === 'run' ? 'Running' :
-                                 activityType === 'walk' ? 'Walking' :
-                                 activityType === 'swim' ? 'Swimming' :
-                                 activityType === 'strength' ? 'Strength Training' :
-                                 activityType.charAt(0).toUpperCase() + activityType.slice(1);
-              
-              return `${location} ${formattedType}`;
-            }
-            
-            return null;
           };
 
           // Transform garmin_activities data to workout format
