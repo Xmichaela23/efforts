@@ -1158,6 +1158,62 @@ export const useWorkouts = () => {
   const getWorkoutsForDate = (date: string) => workouts.filter((w) => w.date === date);
   const getWorkoutsByType = (type: Workout["type"]) => workouts.filter((w) => w.type === type);
 
+  // 🔧 TEMPORARY FIX: Fix the date of the existing strength workout
+  const fixExistingWorkoutDate = async () => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      // Find the workout with the wrong date
+      const { data: workouts, error } = await supabase
+        .from("workouts")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("name", "Strength - 8/9/2025")
+        .eq("type", "strength");
+
+      if (error || !workouts || workouts.length === 0) {
+        console.log("No workout found to fix");
+        return;
+      }
+
+      const workout = workouts[0];
+      console.log("Found workout to fix:", workout);
+
+      // Update the date to today (2025-08-09)
+      const { error: updateError } = await supabase
+        .from("workouts")
+        .update({ date: "2025-08-09" })
+        .eq("id", workout.id);
+
+      if (updateError) {
+        console.error("Error fixing workout date:", updateError);
+      } else {
+        console.log("✅ Fixed workout date from 2025-08-10 to 2025-08-09");
+        // Refresh workouts
+        fetchWorkouts();
+      }
+    } catch (error) {
+      console.error("Error in fixExistingWorkoutDate:", error);
+    }
+  };
+
+  // 🔧 TEMPORARY: Call this function once to fix the existing workout
+  useEffect(() => {
+    if (authReady && workouts.length > 0) {
+      // Only run once when workouts are loaded
+      const hasWorkoutToFix = workouts.some(w => 
+        w.name === "Strength - 8/9/2025" && 
+        w.date === "2025-08-10"
+      );
+      
+      if (hasWorkoutToFix) {
+        console.log("🔧 Found workout with wrong date, fixing...");
+        fixExistingWorkoutDate();
+      }
+    }
+  }, [authReady, workouts.length]);
+
   return {
     workouts,
     loading,
