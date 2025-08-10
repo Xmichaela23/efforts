@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Map } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import ActivityMap from './ActivityMap';
 
 interface CompletedTabProps {
  workoutType: 'ride' | 'run' | 'swim' | 'strength' | 'walk';
@@ -988,25 +989,16 @@ const formatPace = (paceValue: any): string => {
            </div>
          ) : (
            /* GPS Route Map */
-           <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
-             <svg width="100%" height="100%" viewBox="0 0 800 300" className="absolute inset-0">
-               {/* Simple route visualization as placeholder */}
-               <path
-                 d="M50,150 Q200,100 300,120 T500,140 Q600,160 750,180"
-                 stroke="#ef4444"
-                 strokeWidth="3"
-                 fill="none"
-                 strokeLinecap="round"
-               />
-               <path
-                 d="M100,200 Q250,180 350,190 T550,200 Q650,210 700,220"
-                 stroke="#ef4444"
-                 strokeWidth="3"
-                 fill="none"
-                 strokeLinecap="round"
-               />
-               <circle cx="80" cy="200" r="6" fill="#ef4444" />
-             </svg>
+           <div className="absolute inset-0">
+             <ActivityMap
+               gpsTrack={workoutData.gps_track}
+               activityName={workoutData.name || generateTitle()}
+               activityType={workoutType}
+               startLocation={workoutData.starting_latitude && workoutData.starting_longitude ? {
+                 lat: workoutData.starting_latitude,
+                 lng: workoutData.starting_longitude
+               } : null}
+             />
            </div>
          )}
        </div>

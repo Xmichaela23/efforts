@@ -352,11 +352,11 @@ async function processActivityDetails(activityDetails) {
         max_power: maxPower || null,
         // 🔧 FIX: Use official Garmin total ascent from summary.totalElevationGainInMeters
         elevation_gain_meters: Number(activityDetail?.summary?.totalElevationGainInMeters) || null,
-        // 🔧 ADD: Advanced training metrics from Garmin
-        training_stress_score: activityDetail?.summary?.trainingStressScore || activityDetail?.trainingStressScore || null,
-        intensity_factor: activityDetail?.summary?.intensityFactor || activityDetail?.intensityFactor || null,
-        normalized_power: activityDetail?.summary?.normalizedPower || activityDetail?.normalizedPower || null,
-        avg_vam: activityDetail?.summary?.avgVam || activityDetail?.avgVam || null,
+        // 🔧 ADD: Advanced training metrics from Garmin - use summary object like elevation gain
+        training_stress_score: activityDetail?.summary?.trainingStressScore || null,
+        intensity_factor: activityDetail?.summary?.intensityFactor || null,
+        normalized_power: activityDetail?.summary?.normalizedPower || null,
+        avg_vam: activityDetail?.summary?.avgVam || null,
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
         starting_latitude: activity.startingLatitudeInDegree || null,
