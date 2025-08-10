@@ -1,9 +1,261 @@
 console.log('🚨 COMPLETEDTAB COMPONENT LOADED');
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 
 import { useAppContext } from '@/contexts/AppContext';
 import ActivityMap from './ActivityMap';
+
+// Custom styles for range sliders
+const sliderStyles = `
+  .slider::-webkit-slider-thumb {
+    appearance: none;
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .slider::-moz-range-thumb {
+    height: 16px;
+    width: 16px;
+    border-radius: 50%;
+    background: #3b82f6;
+    cursor: pointer;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+`;
+
+// Interactive Elevation Profile Component
+interface InteractiveElevationProfileProps {
+  gpsTrack: any[] | null;
+  workoutType: string;
+  selectedMetric: string;
+}
+
+const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = ({ 
+  gpsTrack, 
+  workoutType, 
+  selectedMetric 
+}) => {
+  const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
+  
+  if (!gpsTrack || gpsTrack.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        No GPS data available
+      </div>
+    );
+  }
+
+  const getMetricValue = (point: any) => {
+    switch (selectedMetric) {
+      case 'heartrate':
+        return point.heartRate;
+      case 'speed':
+        return point.speed;
+      case 'power':
+        return point.speed; // Use speed as proxy for power
+      case 'vam':
+        return point.elevation;
+      default:
+        return point.elevation;
+    }
+  };
+
+  // Process GPS data for chart
+  const chartData = gpsTrack.map((point, index) => {
+    const distance = index * 0.01; // Approximate distance in miles (simplified)
+    const metricValue = getMetricValue(point);
+    return {
+      distance: parseFloat(distance.toFixed(2)),
+      elevation: point.elevation || 0,
+      heartRate: point.heartRate || null,
+      speed: point.speed || null,
+      cadence: point.cadence || null,
+      timestamp: point.timestamp,
+      metricValue: metricValue
+    };
+  });
+
+  // Filter out null values for the selected metric
+  const validData = chartData.filter(point => {
+    switch (selectedMetric) {
+      case 'heartrate':
+        return point.heartRate !== null;
+      case 'speed':
+        return point.speed !== null;
+      case 'power':
+        return point.speed !== null; // Use speed as proxy for power
+      case 'vam':
+        return point.elevation !== null;
+      default:
+        return true;
+    }
+  });
+
+  const getMetricColor = () => {
+    switch (selectedMetric) {
+      case 'heartrate':
+        return '#ef4444'; // Red
+      case 'speed':
+        return '#3b82f6'; // Blue
+      case 'power':
+        return '#8b5cf6'; // Purple
+      case 'vam':
+        return '#10b981'; // Green
+      default:
+        return '#6b7280'; // Gray
+    }
+  };
+
+  const getMetricLabel = () => {
+    switch (selectedMetric) {
+      case 'heartrate':
+        return 'Heart Rate (BPM)';
+      case 'speed':
+        return 'Speed (mph)';
+      case 'power':
+        return 'Power (W)';
+      case 'vam':
+        return 'Elevation (ft)';
+      default:
+        return 'Elevation (ft)';
+    }
+  };
+
+  return (
+    <div className="h-full">
+      <style>{sliderStyles}</style>
+      <div className="text-sm font-medium text-gray-700 mb-2">
+        {getMetricLabel()} Overlay
+      </div>
+      <ResponsiveContainer width="100%" height="90%">
+        <ComposedChart data={validData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          
+          {/* X Axis - Distance */}
+          <XAxis 
+            dataKey="distance" 
+            type="number"
+            domain={['dataMin', 'dataMax']}
+            tickFormatter={(value) => `${value.toFixed(1)} mi`}
+            stroke="#6b7280"
+            fontSize={10}
+          />
+          
+          {/* Left Y Axis - Elevation */}
+          <YAxis 
+            yAxisId="left"
+            orientation="left"
+            tickFormatter={(value) => `${Math.round(value)} ft`}
+            stroke="#6b7280"
+            fontSize={10}
+          />
+          
+          {/* Right Y Axis - Performance Metric */}
+          <YAxis 
+            yAxisId="right"
+            orientation="right"
+            tickFormatter={(value) => {
+              if (selectedMetric === 'heartrate') return `${value} bpm`;
+              if (selectedMetric === 'speed') return `${value.toFixed(1)} mph`;
+              if (selectedMetric === 'power') return `${value.toFixed(0)} W`;
+              if (selectedMetric === 'vam') return `${value} ft`;
+              return value;
+            }}
+            stroke={getMetricColor()}
+            fontSize={10}
+          />
+          
+          {/* Elevation Area */}
+          <Area
+            yAxisId="left"
+            type="monotone"
+            dataKey="elevation"
+            stroke="#9ca3af"
+            strokeWidth={2}
+            fill="#d1d5db"
+            fillOpacity={0.3}
+          />
+          
+          {/* Performance Metric Line */}
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="metricValue"
+            stroke={getMetricColor()}
+            strokeWidth={2}
+            dot={false}
+            activeDot={{ r: 4, fill: getMetricColor() }}
+          />
+          
+          {/* Tooltip */}
+          <Tooltip
+            content={({ active, payload, label }) => {
+              if (active && payload && payload.length) {
+                const elevation = payload.find(p => p.dataKey === 'elevation')?.value;
+                const metricValue = payload.find(p => p.dataKey !== 'elevation')?.value;
+                
+                return (
+                  <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                    <p className="font-medium">Distance: {label} mi</p>
+                    <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} ft</p>
+                    <p className="text-gray-600" style={{ color: getMetricColor() }}>
+                      {getMetricLabel()}: {metricValue}
+                      {selectedMetric === 'heartrate' && ' bpm'}
+                      {selectedMetric === 'speed' && ' mph'}
+                      {selectedMetric === 'power' && ' W'}
+                      {selectedMetric === 'vam' && ' ft'}
+                    </p>
+                  </div>
+                );
+              }
+              return null;
+            }}
+          />
+        </ComposedChart>
+      </ResponsiveContainer>
+      
+      {/* Scroll Control Slider */}
+      <div className="mt-3 px-2">
+        <div className="text-xs text-gray-600 mb-2">Scroll through workout</div>
+        <div className="relative">
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={scrollRange[0]}
+            onChange={(e) => setScrollRange([parseInt(e.target.value), scrollRange[1]])}
+            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            style={{
+              background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${scrollRange[0]}%, #3b82f6 ${scrollRange[0]}%, #3b82f6 ${scrollRange[1]}%, #e5e7eb ${scrollRange[1]}%, #e5e7eb 100%)`
+            }}
+          />
+          <input
+            type="range"
+            min="0"
+            max="100"
+            value={scrollRange[1]}
+            onChange={(e) => setScrollRange([scrollRange[0], parseInt(e.target.value)])}
+            className="absolute top-0 w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer slider"
+            style={{
+              background: 'transparent'
+            }}
+          />
+        </div>
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
+          <span>{Math.round(scrollRange[0])}%</span>
+          <span>{Math.round(scrollRange[1])}%</span>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface CompletedTabProps {
  workoutType: 'ride' | 'run' | 'swim' | 'strength' | 'walk';
@@ -12,7 +264,7 @@ interface CompletedTabProps {
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
  const { useImperial } = useAppContext();
- const [selectedMetric, setSelectedMetric] = useState('hr');
+ const [selectedMetric, setSelectedMetric] = useState('heartrate');
  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
 
 
@@ -911,9 +1163,10 @@ const formatPace = (paceValue: any): string => {
          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
            <Button
              key={metric.toLowerCase().replace(' ', '')}
+             onClick={() => setSelectedMetric(metric.toLowerCase().replace(' ', ''))}
              className={`px-3 py-1 text-sm font-medium ${
                selectedMetric === metric.toLowerCase().replace(' ', '')
-                 ? 'bg-black text-white'
+                 ? 'bg-gray-200 text-black'
                  : 'bg-white text-black hover:bg-gray-100'
              }`}
            >
@@ -938,40 +1191,12 @@ const formatPace = (paceValue: any): string => {
          </div>
          
          {/* Elevation Profile - Right side */}
-         <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200 bg-white">
-           <svg width="100%" height="100%" viewBox="0 0 400 200" className="w-full h-full">
-             
-             {/* Y-axis labels */}
-             <text x="45" y="20" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,400 ft</text>
-             <text x="45" y="40" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,200 ft</text>
-             <text x="45" y="60" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,000 ft</text>
-             <text x="45" y="80" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>800 ft</text>
-             <text x="45" y="100" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>600 ft</text>
-             <text x="45" y="120" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>400 ft</text>
-             
-             {/* Elevation fill */}
-             <path
-               d="M50,100 L70,95 L90,90 L110,80 L130,70 L150,60 L170,50 L190,45 L210,47 L230,55 L250,62 L270,70 L290,77 L310,85 L330,90 L350,92 L370,90 L390,88 L390,140 L50,140 Z"
-               fill="#d1d5db"
-               fillOpacity="0.6"
-             />
-             
-             {/* Elevation line */}
-             <path
-               d="M50,100 L70,95 L90,90 L110,80 L130,70 L150,60 L170,50 L190,45 L210,47 L230,55 L250,62 L270,70 L290,77 L310,85 L330,90 L350,92 L370,90 L390,88"
-               stroke="#9ca3af"
-               strokeWidth="2"
-               fill="none"
-             />
-             
-             {/* X-axis labels */}
-             <text x="50" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>0 mi</text>
-             <text x="130" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>3.0 mi</text>
-             <text x="210" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>6.0 mi</text>
-             <text x="290" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>9.0 mi</text>
-             <text x="370" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>12.0 mi</text>
-             
-           </svg>
+         <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
+           <InteractiveElevationProfile 
+             gpsTrack={workoutData.gps_track}
+             workoutType={workoutType}
+             selectedMetric={selectedMetric}
+           />
          </div>
        </div>
      </div>
