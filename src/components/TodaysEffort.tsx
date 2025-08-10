@@ -99,8 +99,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             const exerciseName = ex.name || '';
             const sets = ex.sets?.length || 0;
             const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / sets || 0;
-            // Use the exercise's weight field, not the first set's weight
-            const weight = ex.weight || ex.sets?.[0]?.weight || 0;
+            
+            // Get weight range from all sets
+            let weightRange = '0lbs';
+            if (ex.sets && ex.sets.length > 0) {
+              const weights = ex.sets.map(set => set.weight || 0).filter(w => w > 0);
+              if (weights.length > 0) {
+                const minWeight = Math.min(...weights);
+                const maxWeight = Math.max(...weights);
+                if (minWeight === maxWeight) {
+                  weightRange = `${minWeight}lbs`;
+                } else {
+                  weightRange = `${minWeight}-${maxWeight}lbs`;
+                }
+              }
+            }
             
             // Create exercise abbreviation
             let abbreviation = '';
@@ -115,11 +128,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               abbreviation = exerciseName.split(' ').map(word => word[0]).join('').toUpperCase();
             }
             
-            return `${abbreviation} ${sets}s ${Math.round(avgReps)}r ${weight}lbs`;
+            return `${abbreviation} ${sets}s ${Math.round(avgReps)}r ${weightRange}`;
           });
           
           return exerciseSummaries.map((summary, index) => {
-            console.log('🔍 Creating metric for strength exercise:', { summary, icon: Dumbbell });
+            console.log('🔍 Creating metric for strength exercise:', { summary, icon: Dumbbell, iconName: 'Dumbbell' });
             return {
               icon: Dumbbell,
               value: summary
