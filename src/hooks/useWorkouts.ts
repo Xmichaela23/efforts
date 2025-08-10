@@ -141,6 +141,38 @@ export const useWorkouts = () => {
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
 
+  // Generate location-based title from GPS coordinates
+  const generateLocationTitle = (lat: number | null, lng: number | null, activityType: string) => {
+    if (!lat || !lng) return null;
+    
+    let location = '';
+    // Los Angeles area
+    if (lat >= 33.7 && lat <= 34.5 && lng >= -118.9 && lng <= -117.9) {
+      location = 'Los Angeles';
+    }
+    // Pasadena area (more specific)  
+    else if (lat >= 34.1 && lat <= 34.2 && lng >= -118.2 && lng <= -118.0) {
+      location = 'Pasadena';
+    }
+    // San Francisco Bay Area
+    else if (lat >= 37.4 && lat <= 37.8 && lng >= -122.5 && lng <= -122.0) {
+      location = 'San Francisco';
+    }
+    
+    if (location) {
+      const formattedType = activityType === 'ride' ? 'Cycling' : 
+                           activityType === 'run' ? 'Running' :
+                           activityType === 'walk' ? 'Walking' :
+                           activityType === 'swim' ? 'Swimming' :
+                           activityType === 'strength' ? 'Strength Training' :
+                           activityType.charAt(0).toUpperCase() + activityType.slice(1);
+      
+      return `${location} ${formattedType}`;
+    }
+    
+    return null;
+  };
+
   const getCurrentUser = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -261,10 +293,17 @@ export const useWorkouts = () => {
 
               const workoutType = getWorkoutType(activity.activity_type);
               const activityDate = activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0];
+              
+              // Generate location-based title using the existing function
+              const locationTitle = generateLocationTitle(
+                activity.starting_latitude, 
+                activity.starting_longitude, 
+                workoutType
+              );
 
               return {
                 id: `garmin_${activity.garmin_activity_id || activity.id}`,
-                name: activity.activity_name || `Garmin ${workoutType}`,
+                name: locationTitle || activity.activity_name || `Garmin ${workoutType}`,
                 type: workoutType,
                 duration: Math.round(activity.duration_seconds / 60) || 0,
                 date: activityDate,
@@ -276,28 +315,33 @@ export const useWorkouts = () => {
                 updated_at: activity.start_time,
                 intervals: [],
                 strength_exercises: [],
-                // Map Garmin metrics to workout fields
+                // Map Garmin metrics to workout fields - CORRECT FIELD MAPPING
                 avg_heart_rate: activity.avg_heart_rate,
                 max_heart_rate: activity.max_heart_rate,
                 avg_power: activity.avg_power,
                 max_power: activity.max_power,
-                avg_speed: activity.avg_speed,
-                max_speed: activity.max_speed,
-                avg_cadence: activity.avg_cadence,
-                max_cadence: activity.max_cadence,
+                // CORRECT: Use the actual field names from garmin_activities table
+                avg_speed: activity.avg_speed_mps ? activity.avg_speed_mps * 3.6 : undefined, // Convert m/s to km/h
+                max_speed: activity.max_speed_mps ? activity.max_speed_mps * 3.6 : undefined, // Convert m/s to km/h
+                // CORRECT: Use the right cadence fields
+                avg_cadence: activity.avg_bike_cadence || activity.avg_run_cadence,
+                max_cadence: activity.max_bike_cadence || activity.max_run_cadence,
+                // CORRECT: Elevation is already right
                 elevation_gain: activity.elevation_gain_meters,
                 elevation_loss: activity.elevation_loss_meters,
                 calories: activity.calories,
                 distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
                 timestamp: activity.start_time,
-                start_position_lat: activity.start_position_lat,
-                start_position_long: activity.start_position_long,
+                start_position_lat: activity.starting_latitude,
+                start_position_long: activity.starting_longitude,
                 friendly_name: `Garmin ${activity.garmin_activity_id}`,
                 moving_time: activity.moving_time_seconds,
                 elapsed_time: activity.duration_seconds,
-                // Add pace fields for running/walking
-                avg_pace: workoutType === 'run' || workoutType === 'walk' ? activity.avg_pace : undefined,
-                max_pace: workoutType === 'run' || workoutType === 'walk' ? activity.max_pace : undefined,
+                // CORRECT: Use the right pace fields
+                avg_pace: workoutType === 'run' || workoutType === 'walk' ? 
+                  (activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined) : undefined, // Convert min/km to seconds
+                max_pace: workoutType === 'run' || workoutType === 'walk' ? 
+                  (activity.max_pace_min_per_km ? activity.max_pace_min_per_km * 60 : undefined) : undefined, // Convert min/km to seconds
                 // Add steps for running/walking
                 steps: workoutType === 'run' || workoutType === 'walk' ? activity.steps : undefined,
                 // Mark as Garmin-imported
