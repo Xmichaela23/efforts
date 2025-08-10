@@ -198,6 +198,19 @@ export const useWorkouts = () => {
 
       console.log(`✅ Found ${manualWorkouts?.length || 0} manual/planned workouts`);
 
+      // 🔍 DEBUG: Log the first few manual workouts to see their structure
+      if (manualWorkouts && manualWorkouts.length > 0) {
+        console.log("🔍 DEBUG - First few manual workouts:", manualWorkouts.slice(0, 3).map(w => ({
+          id: w.id,
+          name: w.name,
+          type: w.type,
+          date: w.date,
+          dateType: typeof w.date,
+          strength_exercises: w.strength_exercises,
+          workout_status: w.workout_status
+        })));
+      }
+
       // Step 2: Fetch Garmin activities (if user has Garmin connection)
       let garminWorkouts: any[] = [];
       try {
@@ -701,6 +714,17 @@ export const useWorkouts = () => {
 
       console.log("Using user for save:", user.id);
 
+      // 🔍 DEBUG: Log the exact workout data being saved
+      console.log("🔍 DEBUG - Workout data to save:", {
+        name: workoutData.name,
+        type: workoutData.type,
+        date: workoutData.date,
+        dateType: typeof workoutData.date,
+        strength_exercises: workoutData.strength_exercises,
+        strength_exercisesType: typeof workoutData.strength_exercises,
+        workout_status: workoutData.workout_status
+      });
+
       const toSave = {
         name: workoutData.name,
         type: workoutData.type,
@@ -777,6 +801,18 @@ export const useWorkouts = () => {
         console.error("Error saving workout:", error);
         throw error;
       }
+
+      // 🔍 DEBUG: Log what the database returned
+      console.log("🔍 DEBUG - Database returned:", {
+        id: data.id,
+        name: data.name,
+        type: data.type,
+        date: data.date,
+        dateType: typeof data.date,
+        strength_exercises: data.strength_exercises,
+        strength_exercisesType: typeof data.strength_exercises,
+        workout_status: data.workout_status
+      });
 
       const newWorkout: Workout = {
         id: data.id,
