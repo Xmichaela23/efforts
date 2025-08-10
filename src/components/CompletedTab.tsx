@@ -628,9 +628,6 @@ const formatPace = (paceValue: any): string => {
          <span className="text-black">
            {formatTime(workoutData.timestamp)}
          </span>
-         <span className="text-black">
-           {formatTemperature(workoutData.avg_temperature)}
-         </span>
        </div>
      </div>
      
