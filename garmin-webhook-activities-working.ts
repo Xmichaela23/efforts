@@ -136,14 +136,7 @@ async function processActivities(activities) {
         garmin_user_id: activity.userId,
         activity_id: activity.activityId || null,
         activity_type: activity.activityType,
-        start_time: (() => {
-          const utcDate = new Date(activity.startTimeInSeconds * 1000);
-          // Convert UTC to PST (UTC-8) or PDT (UTC-7) automatically
-          const pstDate = new Date(utcDate.toLocaleString("en-US", {
-            timeZone: "America/Los_Angeles"
-          }));
-          return pstDate.toISOString();
-        })(),
+        start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
         start_time_offset_seconds: activity.startTimeOffsetInSeconds || 0,
         duration_seconds: activity.durationInSeconds,
         distance_meters: activity.distanceInMeters || null,
@@ -336,15 +329,8 @@ async function processActivityDetails(activityDetails) {
         garmin_user_id: activity.userId,
         activity_id: activity.activityId || null,
         activity_type: activity.activityType,
-        // 🔧 FIX: Convert UTC time to PST automatically
-        start_time: (() => {
-          const utcDate = new Date(activity.startTimeInSeconds * 1000);
-          // Convert UTC to PST (UTC-8) or PDT (UTC-7) automatically
-          const pstDate = new Date(utcDate.toLocaleString("en-US", {
-            timeZone: "America/Los_Angeles"
-          }));
-          return pstDate.toISOString();
-        })(),
+        // 🔧 FIX: Store UTC timestamp - let frontend handle timezone conversion
+        start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
         start_time_offset_seconds: activity.startTimeOffsetInSeconds || 0,
         duration_seconds: activity.durationInSeconds,
         distance_meters: activity.distanceInMeters || null,
@@ -366,6 +352,11 @@ async function processActivityDetails(activityDetails) {
         max_power: maxPower || null,
         // 🔧 FIX: Use official Garmin total ascent from summary.totalElevationGainInMeters
         elevation_gain_meters: Number(activityDetail?.summary?.totalElevationGainInMeters) || null,
+        // 🔧 ADD: Advanced training metrics from Garmin
+        training_stress_score: activityDetail?.summary?.trainingStressScore || activityDetail?.trainingStressScore || null,
+        intensity_factor: activityDetail?.summary?.intensityFactor || activityDetail?.intensityFactor || null,
+        normalized_power: activityDetail?.summary?.normalizedPower || activityDetail?.normalizedPower || null,
+        avg_vam: activityDetail?.summary?.avgVam || activityDetail?.avgVam || null,
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
         starting_latitude: activity.startingLatitudeInDegree || null,
