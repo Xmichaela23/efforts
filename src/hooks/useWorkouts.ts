@@ -345,16 +345,51 @@ export const useWorkouts = () => {
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
         strength_exercises: (() => {
-          // For strength workouts, read from description field since that's where the data is stored
+          // For strength workouts, read from strength_exercises field first, then fall back to description
           if (w.type === 'strength') {
             console.log(`🔍 DEBUG - Strength workout found: "${w.name}"`, {
               type: w.type,
               description: w.description,
-              hasDescription: !!w.description
+              hasDescription: !!w.description,
+              strength_exercises: w.strength_exercises,
+              hasStrengthExercises: !!w.strength_exercises
             });
             
+            // First, try to read from the actual strength_exercises field
+            if (w.strength_exercises) {
+              try {
+                const parsed = typeof w.strength_exercises === 'string' 
+                  ? JSON.parse(w.strength_exercises) 
+                  : w.strength_exercises;
+                
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  console.log(`🔍 Found strength_exercises data for "${w.name}":`, parsed);
+                  
+                  // Transform the logged exercise data to match our interface
+                  return parsed.map((exercise: any, index) => ({
+                    id: exercise.id || `temp-${index}`,
+                    name: exercise.name || '',
+                    sets: exercise.sets ? exercise.sets.map((set: any) => ({
+                      reps: set.reps || 0,
+                      weight: set.weight || 0,
+                      rir: set.rir,
+                      // Consider a set completed if it has valid data, regardless of the completed flag
+                      completed: (set.reps > 0 && set.weight > 0) || set.completed || false
+                    })) : [],
+                    reps: exercise.reps || 0,
+                    weight: exercise.weight || 0,
+                    notes: exercise.notes || '',
+                    weightMode: exercise.weightMode || 'same' as const
+                  }));
+                }
+              } catch (error) {
+                console.log(`⚠️ Error parsing strength_exercises for "${w.name}":`, error);
+              }
+            }
+            
+            // Fallback: parse from description field if strength_exercises is empty
             if (w.description) {
-              console.log(`🔍 Reading strength workout details from description for "${w.name}":`, w.description);
+              console.log(`🔍 Falling back to description parsing for "${w.name}":`, w.description);
               
               // Create a custom structure that will work with StrengthCompletedView
               // Transform the description into proper exercise format with sets array
@@ -380,7 +415,7 @@ export const useWorkouts = () => {
               
               return exercises;
             } else {
-              console.log(`⚠️ Strength workout "${w.name}" has no description field`);
+              console.log(`⚠️ Strength workout "${w.name}" has no strength_exercises or description field`);
             }
           }
           
