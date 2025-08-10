@@ -26,6 +26,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  console.log('🔍 COMPLETEDTAB DEBUG - total_timer_time:', workoutData.metrics?.total_timer_time);
  console.log('🔍 COMPLETEDTAB DEBUG - moving_time:', workoutData.moving_time);
  console.log('🔍 COMPLETEDTAB DEBUG - elapsed_time:', workoutData.elapsed_time);
+ console.log('🔍 COMPLETEDTAB DEBUG - gps_track:', workoutData.gps_track);
+ console.log('🔍 COMPLETEDTAB DEBUG - gps_track length:', workoutData.gps_track?.length);
 
  // Helper functions
  const safeNumber = (value: any): string => {
@@ -1014,9 +1016,9 @@ const formatPace = (paceValue: any): string => {
                gpsTrack={workoutData.gps_track}
                activityName={workoutData.name || generateTitle()}
                activityType={workoutType}
-               startLocation={workoutData.starting_latitude && workoutData.starting_longitude ? {
-                 lat: workoutData.starting_latitude,
-                 lng: workoutData.starting_longitude
+               startLocation={workoutData.start_position_lat && workoutData.start_position_long ? {
+                 lat: workoutData.start_position_lat,
+                 lng: workoutData.start_position_long
                } : null}
              />
            </div>
