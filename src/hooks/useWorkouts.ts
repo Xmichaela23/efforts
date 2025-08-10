@@ -350,6 +350,9 @@ export const useWorkouts = () => {
                 isGarminImported: true,
                 garmin_activity_id: activity.garmin_activity_id,
                 
+                // GPS track data
+                gps_track: activity.gps_track,
+                
                 // 🔧 FIX: Create metrics object that CompletedTab expects
                 metrics: {
                   // Heart rate data
