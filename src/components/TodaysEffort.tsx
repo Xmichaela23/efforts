@@ -118,14 +118,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           });
           
           return exerciseSummaries.map((summary, index) => ({
-            icon: null,
+            icon: Activity,
             value: summary
           }));
         }
 
         // Fallback if no exercises
         return [
-          { icon: null, value: 'No exercises' }
+          { icon: Activity, value: 'No exercises' }
         ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
