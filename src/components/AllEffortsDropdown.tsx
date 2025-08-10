@@ -7,7 +7,7 @@ DropdownMenuContent,
 DropdownMenuItem,
 DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ChevronDown, Activity, Bike, Waves, Dumbbell, Move } from 'lucide-react';
+import { ChevronDown, Activity, Bike, Waves, Dumbbell, Move, TrendingUp, Target, Zap } from 'lucide-react';
 
 interface AllEffortsDropdownProps {
 onSelectWorkout: (workout: any) => void;
@@ -21,14 +21,24 @@ workouts.filter((workout: any) =>
 workout.workout_status === 'completed' || workout.completedManually
 ), [workouts]);
 
+// Mock analytics data for preview
+const mockAnalytics = {
+  recoveryStatus: 'Ready',
+  milesRun: '42.3',
+  milesRidden: '156.8',
+  yardsSwam: '8,400',
+  weightLifted: '12,450',
+  feetClimbed: '3,240'
+};
+
 const getIcon = (type: string) => {
 switch (type) {
-case 'swim': return <Waves className="h-5 w-5 mr-3" />;
-case 'ride': return <Bike className="h-5 w-5 mr-3" />;
-case 'run': return <Activity className="h-5 w-5 mr-3" />;
-case 'strength': return <Dumbbell className="h-5 w-5 mr-3" />;
-case 'mobility': return <Move className="h-5 w-5 mr-3" />;
-default: return <Activity className="h-5 w-5 mr-3" />;
+case 'swim': return <Waves className="h-4 w-4 text-gray-500" />;
+case 'ride': return <Bike className="h-4 w-4 text-gray-500" />;
+case 'run': return <Activity className="h-4 w-4 text-gray-500" />;
+case 'strength': return <Dumbbell className="h-4 w-4 text-gray-500" />;
+case 'mobility': return <Move className="h-4 w-4 text-gray-500" />;
+default: return <Activity className="h-4 w-4 text-gray-500" />;
 }
 };
 
@@ -48,43 +58,108 @@ flex: 1,
 maxWidth: '140px'
 }}
 >
-Completed ({completedWorkouts.length})
+Insight
 <ChevronDown className="h-4 w-4" />
 </Button>
 </DropdownMenuTrigger>
 <DropdownMenuContent
 align="start"
 className="max-h-80 overflow-y-auto bg-white border border-gray-200 shadow-xl"
-style={{borderRadius: '12px', padding: '8px', minWidth: '280px'}}
+style={{borderRadius: '12px', padding: '8px', minWidth: '320px'}}
 >
-{completedWorkouts.length === 0 ? (
-<div className="px-4 py-6 text-sm text-gray-500 text-center">
-No completed efforts yet
+{/* Analytics Preview Section */}
+<div className="px-4 py-3 border-b border-gray-100">
+  <div className="flex items-center gap-2 mb-3">
+    <TrendingUp className="h-4 w-4 text-gray-600" />
+    <span className="font-medium text-sm text-gray-900">Training Overview</span>
+  </div>
+  
+  <div className="space-y-2 text-sm">
+    <div className="flex justify-between">
+      <span className="text-gray-600">Recovery Status</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.recoveryStatus}</span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Miles Run</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.milesRun}</span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Miles Ridden</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.milesRidden}</span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Yards Swam</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.yardsSwam}</span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Weight Lifted</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.weightLifted} lbs</span>
+    </div>
+    <div className="flex justify-between">
+      <span className="text-gray-600">Feet Climbed</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.feetClimbed}</span>
+    </div>
+  </div>
 </div>
-) : (
-completedWorkouts.map((workout) => (
-<DropdownMenuItem
-key={workout.id}
-onClick={() => onSelectWorkout(workout)}
-className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg flex items-start gap-3 cursor-pointer"
-style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '56px'}}
->
-{getIcon(workout.type)}
-<div className="flex-1 min-w-0">
-<div className="font-semibold text-sm truncate text-gray-900">
-{workout.name || `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}`}
+
+{/* Quick Actions */}
+<div className="px-4 py-3 border-b border-gray-100">
+  <div className="flex items-center gap-2 mb-3">
+    <Target className="h-4 w-4 text-gray-600" />
+    <span className="font-medium text-sm text-gray-900">Quick Actions</span>
+  </div>
+  <div className="space-y-2">
+    <button className="w-full text-left text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 py-2 px-2 rounded transition-colors">
+      View Trends
+    </button>
+    <button className="w-full text-left text-sm text-gray-700 hover:text-gray-900 hover:bg-gray-50 py-2 px-2 rounded transition-colors">
+      Recovery Check
+    </button>
+  </div>
 </div>
-<div className="text-xs text-gray-500 mt-1">
-{workout.date ? new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
-month: 'short',
-day: 'numeric'
-}) : 'No date'}
-{workout.duration && ` • ${Math.floor(workout.duration / 60)}:${(workout.duration % 60).toString().padStart(2, '0')}`}
+
+{/* Recent Efforts */}
+<div className="px-4 py-3">
+  <div className="flex items-center gap-2 mb-3">
+    <Zap className="h-4 w-4 text-gray-600" />
+    <span className="font-medium text-sm text-gray-900">Recent Efforts</span>
+  </div>
+  
+  {completedWorkouts.length === 0 ? (
+    <div className="text-sm text-gray-500 text-center py-4">
+      No completed efforts yet
+    </div>
+  ) : (
+    <div className="space-y-2 max-h-32 overflow-y-auto">
+      {completedWorkouts.slice(0, 3).map((workout) => (
+        <div
+          key={workout.id}
+          onClick={() => onSelectWorkout(workout)}
+          className="hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg flex items-start gap-3 cursor-pointer p-2"
+        >
+          {getIcon(workout.type)}
+          <div className="flex-1 min-w-0">
+            <div className="font-medium text-sm truncate text-gray-900">
+              {workout.name || `${workout.type.charAt(0).toUpperCase() + workout.type.slice(1)}`}
+            </div>
+            <div className="text-xs text-gray-500 mt-1">
+              {workout.date ? new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric'
+              }) : 'No date'}
+              {workout.duration && ` • ${Math.floor(workout.duration / 60)}:${(workout.duration % 60).toString().padStart(2, '0')}`}
+            </div>
+          </div>
+        </div>
+      ))}
+      {completedWorkouts.length > 3 && (
+        <div className="text-xs text-blue-600 text-center py-2 hover:bg-gray-50 rounded-lg cursor-pointer">
+          View all {completedWorkouts.length} efforts
+        </div>
+      )}
+    </div>
+  )}
 </div>
-</div>
-</DropdownMenuItem>
-))
-)}
 </DropdownMenuContent>
 </DropdownMenu>
 );
