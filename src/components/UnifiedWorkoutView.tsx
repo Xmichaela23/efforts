@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
 import CompletedTab from './CompletedTab';
 import WorkoutDetail from './WorkoutDetail';
+import StrengthCompletedView from './StrengthCompletedView';
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -284,8 +285,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 ) : workout.type === 'strength' ? (
                   <div className="p-4">
                     <h3 className="font-semibold mb-4">Strength Workout Completed</h3>
-                    {/* Add strength completed view here */}
-                    <p className="text-muted-foreground">Strength workout analytics coming soon...</p>
+                    {/* Use StrengthCompletedView for strength workouts */}
+                    <StrengthCompletedView workoutData={workout} />
                   </div>
                 ) : (
                   <div className="p-4">

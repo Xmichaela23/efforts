@@ -262,6 +262,9 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
 
           {activeTab === 'completed' && (
             <div className="space-y-4">
+              {/* 🔧 DEBUG: Log what's happening */}
+              {console.log('🔍 WorkoutDetail - activeTab:', activeTab, 'workout.type:', workout.type)}
+              
               {/* 🔧 FIXED: Support all endurance workout types (ride, run, swim) for CompletedTab */}
               {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim') ? (
                 <CompletedTab 
@@ -270,9 +273,12 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                 />
               ) : workout.type === 'strength' ? (
                 // 🔧 FIXED: Pass the workout data directly without overwriting strength_exercises
-                <StrengthCompletedView 
-                  workoutData={workout}
-                />
+                <div>
+                  {console.log('🔍 About to render StrengthCompletedView')}
+                  <StrengthCompletedView 
+                    workoutData={workout}
+                  />
+                </div>
               ) : (
                 // 🔧 FALLBACK: For unknown workout types
                 <div className="text-center py-8 text-gray-500">
