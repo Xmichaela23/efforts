@@ -932,6 +932,26 @@ const formatPace = (paceValue: any): string => {
          {showChart ? 'Elevation Profile' : 'GPS Route Map'}
        </h3>
        
+       {/* 🗺️ MAP/CHART TOGGLE - Switch between elevation and GPS map */}
+       <div className="flex gap-2 mb-3">
+         <Button
+           onClick={() => setShowChart(true)}
+           className={`px-3 py-1 text-sm font-medium ${
+             showChart ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
+           }`}
+         >
+           📊 Elevation Profile
+         </Button>
+         <Button
+           onClick={() => setShowChart(false)}
+           className={`px-3 py-1 text-sm font-medium ${
+             !showChart ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
+           }`}
+         >
+           🗺️ GPS Route Map
+         </Button>
+       </div>
+       
        {/* 🎛️ CHART TABS - Between heading and chart */}
        <div className="flex gap-1 flex-wrap mb-2">
          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
