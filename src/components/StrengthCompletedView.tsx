@@ -210,7 +210,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
               if (!exercise.name) return null;
               
               // Check if this is a workout with description details (from our fix)
-              if (exercise.notes && typeof exercise.sets === 'number') {
+              if (exercise.notes) {
                 return (
                   <div key={exercise.id || index} className="space-y-3">
                     <div className="flex items-center justify-between">
