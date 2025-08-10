@@ -326,10 +326,7 @@ async function processActivityDetails(activityDetails) {
         
         console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points`);
         
-        // 🔍 DEBUG: Check what Garmin is sending for elevation
-        console.log(`🔍 ELEVATION DEBUG: summaryDTO = ${JSON.stringify(activityDetail?.summaryDTO)}`);
-        console.log(`🔍 ELEVATION DEBUG: totalElevationGain = ${activityDetail?.summaryDTO?.totalElevationGain}`);
-        console.log(`🔍 ELEVATION DEBUG: Final value = ${Number(activityDetail?.summaryDTO?.totalElevationGain) || null}`);
+
       }
       
       // Convert Garmin activity to our format with ALL available fields
@@ -367,8 +364,8 @@ async function processActivityDetails(activityDetails) {
         max_push_cadence: activity.maxPushCadenceInPushesPerMinute || null,
         avg_power: avgPower || null,
         max_power: maxPower || null,
-        // 🔧 FIX: Use official Garmin total ascent from summaryDTO
-        elevation_gain_meters: Number(activityDetail?.summaryDTO?.totalElevationGain) || null,
+        // 🔧 FIX: Use official Garmin total ascent from summary.totalElevationGainInMeters
+        elevation_gain_meters: Number(activityDetail?.summary?.totalElevationGainInMeters) || null,
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
         starting_latitude: activity.startingLatitudeInDegree || null,

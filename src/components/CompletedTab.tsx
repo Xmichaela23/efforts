@@ -677,17 +677,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Power */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.avg_power ? safeNumber(workoutData.metrics.avg_power) : 'N/A'}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Average Power</div>
-         </div>
-       </div>
-       
-             {/* Dynamic Speed/Pace based on workout type */}
+       {/* Dynamic Speed/Pace based on workout type */}
       {workoutType === 'run' || workoutType === 'walk' ? (
         <div className="px-2 py-1">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -768,15 +758,17 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Max Power */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.max_power ? safeNumber(workoutData.metrics.max_power) : 'N/A'}
+       {/* Max Power - Only show for cycling */}
+       {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.max_power ? safeNumber(workoutData.metrics.max_power) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Max Power</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Max Power</div>
-         </div>
-       </div>
+       )}
        
        {/* Max Speed */}
        <div className="px-2 py-1">
@@ -798,55 +790,65 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* TSS */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'}
+       {/* TSS - Only show for cycling */}
+       {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">TSS</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">TSS</div>
-         </div>
-       </div>
+       )}
        
-       {/* Intensity Factor */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'}
+       {/* Intensity Factor - Only show for cycling */}
+       {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Intensity Factor</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Intensity Factor</div>
-         </div>
-       </div>
+       )}
        
-       {/* Normalized Power */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)}` : 'N/A'}
+       {/* Normalized Power - Only show for cycling */}
+       {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)}` : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Norm Power</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Norm Power</div>
-         </div>
-       </div>
+       )}
        
-       {/* Training Load */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'}
+       {/* Training Load - Only show for cycling */}
+       {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Training Load</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Training Load</div>
-         </div>
-       </div>
+       )}
        
-       {/* Total Work */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {calculateTotalWork()}
+       {/* Total Work - Only show for cycling */}
+       {workoutType === 'ride' && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {calculateTotalWork()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Total Work</div>
+           </div>
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Total Work</div>
-         </div>
-       </div>
+       )}
        
        {/* VAM */}
        <div className="px-2 py-1">
@@ -961,18 +963,24 @@ const formatPace = (paceValue: any): string => {
        
        {/* ANALYTICS TABS */}
        <div className="flex gap-6 text-sm">
-         <button 
-           onClick={() => setActiveAnalyticsTab('powercurve')}
-           className={`pb-1 ${activeAnalyticsTab === 'powercurve' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
-         >
-           Power Curve
-         </button>
-         <button 
-           onClick={() => setActiveAnalyticsTab('powerdetails')}
-           className={`pb-1 ${activeAnalyticsTab === 'powerdetails' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
-         >
-           Power Details
-         </button>
+         {/* Power Curve - Only show for cycling */}
+         {workoutType === 'ride' && (
+           <button 
+             onClick={() => setActiveAnalyticsTab('powercurve')}
+             className={`pb-1 ${activeAnalyticsTab === 'powercurve' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+           >
+             Power Curve
+           </button>
+         )}
+         {/* Power Details - Only show for cycling */}
+         {workoutType === 'ride' && (
+           <button 
+             onClick={() => setActiveAnalyticsTab('powerdetails')}
+             className={`pb-1 ${activeAnalyticsTab === 'powerdetails' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+           >
+             Power Details
+           </button>
+         )}
          <button 
            onClick={() => setActiveAnalyticsTab('zones')}
            className={`pb-1 ${activeAnalyticsTab === 'zones' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
@@ -1016,23 +1024,26 @@ const formatPace = (paceValue: any): string => {
                  </div>
                </div>
              </div>
-             <div>
-               <h4 className="font-medium text-black mb-4">Power Zones</h4>
-               <div className="space-y-2">
-                 <div className="flex justify-between">
-                   <span className="text-[#666666]">FTP:</span>
-                   <span className="text-black">{workoutData.metrics?.functional_threshold_power || workoutData.functional_threshold_power ? `${workoutData.metrics?.functional_threshold_power || workoutData.functional_threshold_power} W` : 'N/A'}</span>
-                 </div>
-                 <div className="flex justify-between">
-                   <span className="text-[#666666]">Threshold Power:</span>
-                   <span className="text-black">{workoutData.metrics?.threshold_power || workoutData.threshold_power ? `${workoutData.metrics?.threshold_power || workoutData.threshold_power} W` : 'N/A'}</span>
-                 </div>
-                 <div className="flex justify-between">
-                   <span className="text-[#666666]">Power Calc Type:</span>
-                   <span className="text-black">{workoutData.metrics?.pwr_calc_type || workoutData.pwr_calc_type || 'N/A'}</span>
+             {/* Power Zones - Only show for cycling */}
+             {workoutType === 'ride' && (
+               <div>
+                 <h4 className="font-medium text-black mb-4">Power Zones</h4>
+                 <div className="space-y-2">
+                   <div className="flex justify-between">
+                     <span className="text-[#666666]">FTP:</span>
+                     <span className="text-black">{workoutData.metrics?.functional_threshold_power || workoutData.functional_threshold_power ? `${workoutData.metrics?.functional_threshold_power || workoutData.functional_threshold_power} W` : 'N/A'}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span className="text-[#666666]">Threshold Power:</span>
+                     <span className="text-black">{workoutData.metrics?.threshold_power || workoutData.threshold_power ? `${workoutData.metrics?.threshold_power || workoutData.threshold_power} W` : 'N/A'}</span>
+                   </div>
+                   <div className="flex justify-between">
+                     <span className="text-[#666666]">Power Calc Type:</span>
+                     <span className="text-black">{workoutData.metrics?.pwr_calc_type || workoutData.pwr_calc_type || 'N/A'}</span>
+                   </div>
                  </div>
                </div>
-             </div>
+             )}
            </div>
          </div>
        )}
