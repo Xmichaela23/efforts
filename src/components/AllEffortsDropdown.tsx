@@ -24,11 +24,11 @@ workout.workout_status === 'completed' || workout.completedManually
 // Mock analytics data for preview
 const mockAnalytics = {
   recoveryStatus: 'Ready',
-  milesRun: '42.3',
-  milesRidden: '156.8',
-  yardsSwam: '8,400',
-  weightLifted: '12,450',
-  feetClimbed: '3,240'
+  fitnessLevel: '72',
+  fatigueLevel: '68',
+  readiness: '+4',
+  trainingStrain: '156',
+  personalBests: '3'
 };
 
 const getIcon = (type: string) => {
@@ -71,7 +71,7 @@ style={{borderRadius: '12px', padding: '8px', minWidth: '320px'}}
 <div className="px-4 py-3 border-b border-gray-100">
   <div className="flex items-center gap-2 mb-3">
     <TrendingUp className="h-4 w-4 text-gray-600" />
-    <span className="font-medium text-sm text-gray-900">Training Overview</span>
+    <span className="font-medium text-sm text-gray-900">Insight</span>
   </div>
   
   <div className="space-y-2 text-sm">
@@ -80,24 +80,24 @@ style={{borderRadius: '12px', padding: '8px', minWidth: '320px'}}
       <span className="font-medium text-gray-900">{mockAnalytics.recoveryStatus}</span>
     </div>
     <div className="flex justify-between">
-      <span className="text-gray-600">Miles Run</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.milesRun}</span>
+      <span className="text-gray-600">Fitness Level</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.fitnessLevel}</span>
     </div>
     <div className="flex justify-between">
-      <span className="text-gray-600">Miles Ridden</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.milesRidden}</span>
+      <span className="text-gray-600">Fatigue Level</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.fatigueLevel}</span>
     </div>
     <div className="flex justify-between">
-      <span className="text-gray-600">Yards Swam</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.yardsSwam}</span>
+      <span className="text-gray-600">Readiness</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.readiness}</span>
     </div>
     <div className="flex justify-between">
-      <span className="text-gray-600">Weight Lifted</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.weightLifted} lbs</span>
+      <span className="text-gray-600">Training Strain</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.trainingStrain}</span>
     </div>
     <div className="flex justify-between">
-      <span className="text-gray-600">Feet Climbed</span>
-      <span className="font-medium text-gray-900">{mockAnalytics.feetClimbed}</span>
+      <span className="text-gray-600">Personal Bests</span>
+      <span className="font-medium text-gray-900">{mockAnalytics.personalBests}</span>
     </div>
   </div>
 </div>
