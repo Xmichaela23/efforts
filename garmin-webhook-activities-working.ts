@@ -1,9 +1,13 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+
+
 Deno.serve(async (req) => {
   // Only handle POST requests
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', {
+      status: 405
+    });
   }
 
   try {
@@ -14,7 +18,9 @@ Deno.serve(async (req) => {
     console.log('Received webhook payload:', JSON.stringify(payload, null, 2));
     
     // Respond immediately with 200 OK (as required by Garmin)
-    const response = new Response('OK', { status: 200 });
+    const response = new Response('OK', {
+      status: 200
+    });
     
     // Process activities asynchronously after responding
     if (payload.activities) {
@@ -29,7 +35,9 @@ Deno.serve(async (req) => {
     return response;
   } catch (error) {
     console.error('Error processing webhook:', error);
-    return new Response('Internal server error', { status: 500 });
+    return new Response('Internal server error', {
+      status: 500
+    });
   }
 });
 
@@ -56,7 +64,7 @@ async function fetchActivityDetails(summaryId, userId) {
     
     // Calculate time range (last 24 hours)
     const now = Math.floor(Date.now() / 1000);
-    const oneDayAgo = now - (24 * 60 * 60);
+    const oneDayAgo = now - 24 * 60 * 60;
     
     // Call Garmin Activity Details API
     const response = await fetch(
@@ -78,9 +86,8 @@ async function fetchActivityDetails(summaryId, userId) {
     console.log(`Fetched ${activityDetails.length} activity details from Garmin API`);
     
     // Find the specific activity we're looking for
-    const targetActivity = activityDetails.find(detail => 
-      detail.summaryId === summaryId || 
-      detail.summary?.summaryId === summaryId
+    const targetActivity = activityDetails.find(
+      (detail) => detail.summaryId === summaryId || detail.summary?.summaryId === summaryId
     );
     
     return targetActivity || null;
@@ -129,7 +136,14 @@ async function processActivities(activities) {
         garmin_user_id: activity.userId,
         activity_id: activity.activityId || null,
         activity_type: activity.activityType,
-        start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
+        start_time: (() => {
+          const utcDate = new Date(activity.startTimeInSeconds * 1000);
+          // Convert UTC to PST (UTC-8) or PDT (UTC-7) automatically
+          const pstDate = new Date(utcDate.toLocaleString("en-US", {
+            timeZone: "America/Los_Angeles"
+          }));
+          return pstDate.toISOString();
+        })(),
         start_time_offset_seconds: activity.startTimeOffsetInSeconds || 0,
         duration_seconds: activity.durationInSeconds,
         distance_meters: activity.distanceInMeters || null,
@@ -168,7 +182,9 @@ async function processActivities(activities) {
       // Insert or update the basic activity
       const { error } = await supabase
         .from('garmin_activities')
-        .upsert(activityRecord, { onConflict: 'garmin_activity_id' });
+        .upsert(activityRecord, {
+          onConflict: 'garmin_activity_id'
+        });
       
       if (error) {
         console.error('Error saving activity:', error);
@@ -186,7 +202,6 @@ async function processActivities(activities) {
       } else {
         console.log(`❌ No rich details found for: ${activity.summaryId}`);
       }
-      
     } catch (error) {
       console.error('Error processing individual activity:', error);
     }
@@ -215,8 +230,8 @@ async function processActivityDetails(activityDetails) {
         userId: activityDetail.userId,
         activityId: activityDetail.activityId
       };
-      const samples = activityDetail.samples || [];
       
+      const samples = activityDetail.samples || [];
       console.log(`Processing activity detail: ${activity.summaryId} with ${samples.length} samples`);
       
       // Get user connection
@@ -286,12 +301,6 @@ async function processActivityDetails(activityDetails) {
               elevation: sample.elevationInMeters || null
             });
           }
-          
-          // GPS elevation tracking (for display only, not for calculations)
-          if (sample.elevationInMeters !== undefined && sample.elevationInMeters !== null) {
-            // Store elevation for GPS track display, but don't calculate totals
-            // We use Garmin's official elevation data instead
-          }
         }
         
         // Calculate averages and maximums
@@ -299,47 +308,28 @@ async function processActivityDetails(activityDetails) {
           avgPower = Math.round(powerValues.reduce((a, b) => a + b) / powerValues.length);
           maxPower = Math.max(...powerValues);
         }
+        
         if (heartRateValues.length > 0) {
           avgHeartRate = Math.round(heartRateValues.reduce((a, b) => a + b) / heartRateValues.length);
           maxHeartRate = Math.max(...heartRateValues);
         }
+        
         if (cadenceValues.length > 0) {
           avgCadence = Math.round(cadenceValues.reduce((a, b) => a + b) / cadenceValues.length);
           maxCadence = Math.max(...cadenceValues);
         }
+        
         if (tempValues.length > 0) {
           avgTemperature = tempValues.reduce((a, b) => a + b) / tempValues.length;
           maxTemperature = Math.max(...tempValues);
         }
         
-        // 🔧 FIX: Calculate elevation gain from GPS samples instead of trusting Garmin's field
-        let calculatedElevationGain = 0;
-        let calculatedElevationLoss = 0;
+        console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points`);
         
-        if (gpsTrack.length > 1) {
-          for (let i = 1; i < gpsTrack.length; i++) {
-            const prevElevation = gpsTrack[i - 1].elevation;
-            const currElevation = gpsTrack[i].elevation;
-            
-            if (prevElevation !== null && currElevation !== null) {
-              const elevationDiff = currElevation - prevElevation;
-              if (elevationDiff > 0) {
-                calculatedElevationGain += elevationDiff;
-              } else if (elevationDiff < 0) {
-                calculatedElevationLoss += Math.abs(elevationDiff);
-              }
-            }
-          }
-          
-          // Round to nearest meter
-          calculatedElevationGain = Math.round(calculatedElevationGain);
-          calculatedElevationLoss = Math.round(calculatedElevationLoss);
-          
-          console.log(`🔧 CALCULATED ELEVATION: Gain: ${calculatedElevationGain}m (${Math.round(calculatedElevationGain * 3.28084)}ft), Loss: ${calculatedElevationLoss}m (${Math.round(calculatedElevationLoss * 3.28084)}ft)`);
-          console.log(`🔧 GARMIN'S FIELD: totalElevationGainInMeters: ${activity.totalElevationGainInMeters}m (${Math.round((activity.totalElevationGainInMeters || 0) * 3.28084)}ft)`);
-        }
-        
-        console.log(`Extracted ALL sensor data: ${samples.length} samples Power: ${avgPower ? `${avgPower}W avg, ${maxPower}W max` : 'N/A'} HR: ${avgHeartRate ? `${avgHeartRate} avg, ${maxHeartRate} max` : 'N/A'} Cadence: ${avgCadence ? `${avgCadence} avg, ${maxCadence} max` : 'N/A'} GPS: ${gpsTrack.length} points Elevation: Using GPS-calculated data`);
+        // 🔍 DEBUG: Check what Garmin is sending for elevation
+        console.log(`🔍 ELEVATION DEBUG: summaryDTO = ${JSON.stringify(activityDetail?.summaryDTO)}`);
+        console.log(`🔍 ELEVATION DEBUG: totalElevationGain = ${activityDetail?.summaryDTO?.totalElevationGain}`);
+        console.log(`🔍 ELEVATION DEBUG: Final value = ${Number(activityDetail?.summaryDTO?.totalElevationGain) || null}`);
       }
       
       // Convert Garmin activity to our format with ALL available fields
@@ -349,7 +339,15 @@ async function processActivityDetails(activityDetails) {
         garmin_user_id: activity.userId,
         activity_id: activity.activityId || null,
         activity_type: activity.activityType,
-        start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
+        // 🔧 FIX: Convert UTC time to PST automatically
+        start_time: (() => {
+          const utcDate = new Date(activity.startTimeInSeconds * 1000);
+          // Convert UTC to PST (UTC-8) or PDT (UTC-7) automatically
+          const pstDate = new Date(utcDate.toLocaleString("en-US", {
+            timeZone: "America/Los_Angeles"
+          }));
+          return pstDate.toISOString();
+        })(),
         start_time_offset_seconds: activity.startTimeOffsetInSeconds || 0,
         duration_seconds: activity.durationInSeconds,
         distance_meters: activity.distanceInMeters || null,
@@ -369,12 +367,8 @@ async function processActivityDetails(activityDetails) {
         max_push_cadence: activity.maxPushCadenceInPushesPerMinute || null,
         avg_power: avgPower || null,
         max_power: maxPower || null,
-        avg_speed_mps: activity.averageSpeedInMetersPerSecond || null,
-        max_speed_mps: activity.maxSpeedInMetersPerSecond || null,
-        distance_meters: activity.distanceInMeters || null,
-        // 🔧 FIX: Use GPS-calculated elevation instead of Garmin's incorrect field
-        elevation_gain_meters: calculatedElevationGain > 0 ? calculatedElevationGain : (activity.totalElevationGainInMeters || null),
-        elevation_loss_meters: calculatedElevationLoss > 0 ? calculatedElevationLoss : (activity.totalElevationLossInMeters || null),
+        // 🔧 FIX: Use official Garmin total ascent from summaryDTO
+        elevation_gain_meters: Number(activityDetail?.summaryDTO?.totalElevationGain) || null,
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
         starting_latitude: activity.startingLatitudeInDegree || null,
@@ -397,14 +391,15 @@ async function processActivityDetails(activityDetails) {
       // Insert or update the activity
       const { error } = await supabase
         .from('garmin_activities')
-        .upsert(activityRecord, { onConflict: 'garmin_activity_id' });
+        .upsert(activityRecord, {
+          onConflict: 'garmin_activity_id'
+        });
       
       if (error) {
         console.error('Error saving activity:', error);
       } else {
         console.log(`✅ SAVED COMPLETE ACTIVITY: ${activity.activityType} - ${activity.summaryId} ${avgPower ? `Power: ${avgPower}W avg` : 'No power'} ${avgHeartRate ? `HR: ${avgHeartRate} avg` : 'No HR'} ${gpsTrack.length > 0 ? `GPS: ${gpsTrack.length} points` : 'No GPS'} ${allSensorData.length > 0 ? `Sensors: ${allSensorData.length} samples` : 'No sensors'}`);
       }
-      
     } catch (error) {
       console.error('Error processing individual activity detail:', error);
     }
