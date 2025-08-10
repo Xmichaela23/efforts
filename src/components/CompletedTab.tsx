@@ -845,17 +845,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
 
-       {/* Intensity Factor - Show for running too */}
-       {workoutType === 'run' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Intensity Factor</div>
-           </div>
-         </div>
-       )}
+
        
        {/* Normalized Power - Only show for cycling */}
        {workoutType === 'ride' && (
@@ -869,17 +859,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
 
-       {/* Normalized Power - Show for running too */}
-       {workoutType === 'run' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)}` : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Norm Power</div>
-           </div>
-         </div>
-       )}
+
        
        {/* Training Load - Only show for cycling */}
        {workoutType === 'ride' && (
