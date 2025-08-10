@@ -199,7 +199,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           </div>
         </div>
       ) : (
-        // Clean completed view (default)
+                // Clean completed view (default)
         <div className="space-y-6">
           {completedExercises.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
@@ -207,7 +207,27 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             </div>
           ) : (
             completedExercises.map((exercise: CompletedExercise, index: number) => {
-              if (!exercise.sets || !exercise.name) return null;
+              if (!exercise.name) return null;
+              
+              // Check if this is a workout with description details (from our fix)
+              if (exercise.notes && typeof exercise.sets === 'number') {
+                return (
+                  <div key={exercise.id || index} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{exercise.name}</h3>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4 bg-gray-50 rounded-lg">
+                      <p className="text-sm text-gray-700">{exercise.notes}</p>
+                    </div>
+                  </div>
+                );
+              }
+              
+              // Regular exercise with sets array
+              if (!exercise.sets || !Array.isArray(exercise.sets)) return null;
               
               const exerciseVolume = calculateExerciseVolume(exercise.sets);
 
@@ -225,7 +245,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
                   </div>
                   
                   <div className="space-y-2">
-                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 pb-1 border-b border-gray-100">
+                    <div className="grid grid-cols-4 gap-2 text-xs font-medium text-gray-500 pb-1 border-b border-gray-200">
                       <span>Set</span>
                       <span>Weight</span>
                       <span>Reps</span>

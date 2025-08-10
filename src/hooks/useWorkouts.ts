@@ -349,7 +349,8 @@ export const useWorkouts = () => {
           if (w.type === 'strength' && w.description) {
             console.log(`🔍 Reading strength workout details from description for "${w.name}":`, w.description);
             
-            // Create a basic structure based on the description
+            // Create a custom structure that will work with StrengthCompletedView
+            // We'll use the completed_sets field to store the display data
             return [{
               id: 'temp-1',
               name: 'Strength Workout',
@@ -358,7 +359,14 @@ export const useWorkouts = () => {
               weight: 0,
               notes: w.description,
               weightMode: 'same' as const,
-              completed_sets: []
+              completed_sets: [{
+                reps: 1,
+                weight: 0,
+                rir: undefined,
+                completed: true,
+                // Add the description as a custom field for display
+                description: w.description
+              }]
             }];
           }
           
