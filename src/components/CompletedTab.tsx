@@ -1,7 +1,7 @@
 console.log('🚨 COMPLETEDTAB COMPONENT LOADED');
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Map } from 'lucide-react';
+
 import { useAppContext } from '@/contexts/AppContext';
 import ActivityMap from './ActivityMap';
 
@@ -14,7 +14,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  const { useImperial } = useAppContext();
  const [selectedMetric, setSelectedMetric] = useState('hr');
  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
- const [showChart, setShowChart] = useState(true); // true = elevation chart, false = map
+
 
  // 🔍 DEBUG: Log what CompletedTab receives
  console.log('🔍 COMPLETEDTAB DEBUG - workoutData received:', workoutData);
@@ -665,13 +665,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       <Button 
-         onClick={() => setShowChart(!showChart)}
-         className="px-6 py-2 bg-white text-black hover:bg-gray-100 border text-sm font-medium flex items-center gap-2"
-       >
-         <Map className="h-4 w-4" />
-         {showChart ? 'Show Map' : 'Show Chart'}
-       </Button>
+
      </div>
      
      {/* 🏠 ALL METRICS - 3-column grid */}
@@ -908,38 +902,17 @@ const formatPace = (paceValue: any): string => {
        </div>
      </div>
 
-     {/* 🗺️ GPS ROUTE MAP / ELEVATION CHART SECTION */}
+     {/* 🗺️ GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
      <div>
        <h3 className="text-lg font-semibold mb-2 text-black">
-         {showChart ? 'Elevation Profile' : 'GPS Route Map'}
+         GPS Route Map & Elevation Profile
        </h3>
        
-       {/* 🗺️ MAP/CHART TOGGLE - Switch between elevation and GPS map */}
-       <div className="flex gap-2 mb-3">
-         <Button
-           onClick={() => setShowChart(true)}
-           className={`px-3 py-1 text-sm font-medium ${
-             showChart ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
-           }`}
-         >
-           📊 Elevation Profile
-         </Button>
-         <Button
-           onClick={() => setShowChart(false)}
-           className={`px-3 py-1 text-sm font-medium ${
-             !showChart ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-100'
-           }`}
-         >
-           🗺️ GPS Route Map
-         </Button>
-       </div>
-       
-       {/* 🎛️ CHART TABS - Between heading and chart */}
+       {/* 🎛️ CHART TABS - Above both visualizations */}
        <div className="flex gap-1 flex-wrap mb-2">
          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
            <Button
              key={metric.toLowerCase().replace(' ', '')}
-             onClick={() => setSelectedMetric(metric.toLowerCase().replace(' ', ''))}
              className={`px-3 py-1 text-sm font-medium ${
                selectedMetric === metric.toLowerCase().replace(' ', '')
                  ? 'bg-black text-white'
@@ -951,58 +924,57 @@ const formatPace = (paceValue: any): string => {
          ))}
        </div>
        
-       <div className="h-80 relative overflow-hidden -mx-4 md:-mx-6">
-         {showChart ? (
-           /* Elevation Chart - FIXED: No frame, edge-to-edge, proper label spacing */
-           <div className="absolute inset-0">
-             <svg width="100%" height="100%" viewBox="0 0 400 200" className="w-full h-full">
-               
-               {/* Y-axis labels - FIXED: Moved from x="35" to x="45" for full visibility */}
-               <text x="45" y="20" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,400 ft</text>
-               <text x="45" y="40" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,200 ft</text>
-               <text x="45" y="60" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,000 ft</text>
-               <text x="45" y="80" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>800 ft</text>
-               <text x="45" y="100" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>600 ft</text>
-               <text x="45" y="120" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>400 ft</text>
-               
-               {/* Elevation fill - FIXED: Adjusted to start at x="50" */}
-               <path
-                 d="M50,100 L70,95 L90,90 L110,80 L130,70 L150,60 L170,50 L190,45 L210,47 L230,55 L250,62 L270,70 L290,77 L310,85 L330,90 L350,92 L370,90 L390,88 L390,140 L50,140 Z"
-                 fill="#d1d5db"
-                 fillOpacity="0.6"
-               />
-               
-               {/* Elevation line - FIXED: Adjusted to start at x="50" */}
-               <path
-                 d="M50,100 L70,95 L90,90 L110,80 L130,70 L150,60 L170,50 L190,45 L210,47 L230,55 L250,62 L270,70 L290,77 L310,85 L330,90 L350,92 L370,90 L390,88"
-                 stroke="#9ca3af"
-                 strokeWidth="2"
-                 fill="none"
-               />
-               
-               {/* X-axis labels - FIXED: Better spacing to prevent crowding */}
-               <text x="50" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>0 mi</text>
-               <text x="130" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>3.0 mi</text>
-               <text x="210" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>6.0 mi</text>
-               <text x="290" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>9.0 mi</text>
-               <text x="370" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>12.0 mi</text>
-               
-             </svg>
-           </div>
-         ) : (
-           /* GPS Route Map */
-           <div className="absolute inset-0">
-             <ActivityMap
-               gpsTrack={workoutData.gps_track}
-               activityName={workoutData.name || generateTitle()}
-               activityType={workoutType}
-               startLocation={workoutData.start_position_lat && workoutData.start_position_long ? {
-                 lat: workoutData.start_position_lat,
-                 lng: workoutData.start_position_long
-               } : null}
+       {/* 🗺️ SIDE-BY-SIDE LAYOUT */}
+       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+         {/* GPS Route Map - Left side */}
+         <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200">
+           <ActivityMap
+             gpsTrack={workoutData.gps_track}
+             activityName={workoutData.name || generateTitle()}
+             activityType={workoutType}
+             startLocation={workoutData.start_position_lat && workoutData.start_position_long ? {
+               lat: workoutData.start_position_lat,
+               lng: workoutData.start_position_long
+             } : null}
+           />
+         </div>
+         
+         {/* Elevation Profile - Right side */}
+         <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200 bg-white">
+           <svg width="100%" height="100%" viewBox="0 0 400 200" className="w-full h-full">
+             
+             {/* Y-axis labels */}
+             <text x="45" y="20" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,400 ft</text>
+             <text x="45" y="40" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,200 ft</text>
+             <text x="45" y="60" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>1,000 ft</text>
+             <text x="45" y="80" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>800 ft</text>
+             <text x="45" y="100" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>600 ft</text>
+             <text x="45" y="120" textAnchor="end" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>400 ft</text>
+             
+             {/* Elevation fill */}
+             <path
+               d="M50,100 L70,95 L90,90 L110,80 L130,70 L150,60 L170,50 L190,45 L210,47 L230,55 L250,62 L270,70 L290,77 L310,85 L330,90 L350,92 L370,90 L390,88 L390,140 L50,140 Z"
+               fill="#d1d5db"
+               fillOpacity="0.6"
              />
-           </div>
-         )}
+             
+             {/* Elevation line */}
+             <path
+               d="M50,100 L70,95 L90,90 L110,80 L130,70 L150,60 L170,50 L190,45 L210,47 L230,55 L250,62 L270,70 L290,77 L310,85 L330,90 L350,92 L370,90 L390,88"
+               stroke="#9ca3af"
+               strokeWidth="2"
+               fill="none"
+             />
+             
+             {/* X-axis labels */}
+             <text x="50" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>0 mi</text>
+             <text x="130" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>3.0 mi</text>
+             <text x="210" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>6.0 mi</text>
+             <text x="290" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>9.0 mi</text>
+             <text x="370" y="165" textAnchor="middle" className="text-xs text-gray-600" style={{fontFamily: 'system-ui'}}>12.0 mi</text>
+             
+           </svg>
+         </div>
        </div>
      </div>
 
