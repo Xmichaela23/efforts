@@ -31,6 +31,12 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
+    console.log('🗺️ Initializing map with:', {
+      container: mapContainer.current,
+      startLocation,
+      defaultCenter: [-118.2437, 34.0522]
+    });
+    
     // Initialize map
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
@@ -78,6 +84,13 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       map.current.removeSource('route');
     }
 
+    console.log('🗺️ Processing GPS track:', {
+      trackLength: gpsTrack.length,
+      firstPoint: gpsTrack[0],
+      lastPoint: gpsTrack[gpsTrack.length - 1],
+      samplePoints: gpsTrack.slice(0, 3)
+    });
+    
     // Prepare coordinates for Mapbox
     const coordinates = gpsTrack.map(point => [point.lng, point.lat]);
 
