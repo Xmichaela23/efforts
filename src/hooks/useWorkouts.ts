@@ -215,11 +215,10 @@ export const useWorkouts = () => {
         // 🔍 EXTRA DEBUG: For strength workouts, show the full strength_exercises data
         const strengthWorkouts = manualWorkouts.filter(w => w.type === 'strength');
         if (strengthWorkouts.length > 0) {
-          console.log("🔍 EXTRA DEBUG - Strength workout details:", strengthWorkouts.map(w => ({
+          console.log("🔍 Strength workout data:", strengthWorkouts.map(w => ({
             id: w.id,
             name: w.name,
-            strength_exercises: w.strength_exercises,
-            strength_exercises_parsed: typeof w.strength_exercises === 'string' ? JSON.parse(w.strength_exercises) : w.strength_exercises
+            strength_exercises: w.strength_exercises
           })));
         }
       }
@@ -345,51 +344,7 @@ export const useWorkouts = () => {
         created_at: w.created_at,
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
-        strength_exercises: (() => {
-          // 🔍 DEBUG: Log the strength_exercises before parsing
-          if (w.type === 'strength') {
-            console.log("🔍 DEBUG - Parsing strength_exercises for workout:", w.name, {
-              raw_strength_exercises: w.strength_exercises,
-              type: typeof w.strength_exercises,
-              isString: typeof w.strength_exercises === 'string',
-              length: w.strength_exercises ? (Array.isArray(w.strength_exercises) ? w.strength_exercises.length : 'not array') : 'null/undefined'
-            });
-          }
-          
-          if (w.strength_exercises) {
-            if (typeof w.strength_exercises === 'string') {
-              try {
-                const parsed = JSON.parse(w.strength_exercises);
-                if (w.type === 'strength') {
-                  console.log("🔍 DEBUG - Successfully parsed strength_exercises:", {
-                    workout_name: w.name,
-                    parsed_data: parsed,
-                    parsed_type: typeof parsed,
-                    parsed_length: Array.isArray(parsed) ? parsed.length : 'not array'
-                  });
-                }
-                return parsed;
-              } catch (parseError) {
-                console.error("🔍 ERROR - Failed to parse strength_exercises for workout:", w.name, {
-                  raw_data: w.strength_exercises,
-                  error: parseError
-                });
-                return [];
-              }
-            } else {
-              if (w.type === 'strength') {
-                console.log("🔍 DEBUG - strength_exercises already parsed (not string):", {
-                  workout_name: w.name,
-                  data: w.strength_exercises,
-                  type: typeof w.strength_exercises,
-                  length: Array.isArray(w.strength_exercises) ? w.strength_exercises.length : 'not array'
-                });
-              }
-              return w.strength_exercises;
-            }
-          }
-          return [];
-        })(),
+        strength_exercises: w.strength_exercises ? (typeof w.strength_exercises === 'string' ? JSON.parse(w.strength_exercises) : w.strength_exercises) : [],
         avg_heart_rate: w.avg_heart_rate,
         max_heart_rate: w.max_heart_rate,
         avg_power: w.avg_power,

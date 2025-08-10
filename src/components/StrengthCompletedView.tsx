@@ -21,19 +21,7 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   const { workouts } = useAppContext();
   const [showComparison, setShowComparison] = useState(false);
 
-  // 🔍 DEBUG: Log the workout data being received
-  console.log("🔍 DEBUG - StrengthCompletedView received workoutData:", {
-    id: workoutData.id,
-    name: workoutData.name,
-    type: workoutData.type,
-    date: workoutData.date,
-    strength_exercises: workoutData.strength_exercises,
-    strength_exercises_type: typeof workoutData.strength_exercises,
-    strength_exercises_length: workoutData.strength_exercises ? (Array.isArray(workoutData.strength_exercises) ? workoutData.strength_exercises.length : 'not array') : 'null/undefined',
-    completed_exercises: workoutData.completed_exercises,
-    completed_exercises_type: typeof workoutData.completed_exercises,
-    completed_exercises_length: workoutData.completed_exercises ? (Array.isArray(workoutData.completed_exercises) ? workoutData.completed_exercises.length : 'not array') : 'null/undefined'
-  });
+
 
   // Normalize dates to YYYY-MM-DD format for comparison
   const normalizeDate = (dateString: string) => {
@@ -91,24 +79,14 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   // Determine which exercises array to use
   const getCompletedExercises = () => {
-    console.log("🔍 DEBUG - getCompletedExercises called with:", {
-      strength_exercises: workoutData.strength_exercises,
-      strength_exercises_length: workoutData.strength_exercises ? (Array.isArray(workoutData.strength_exercises) ? workoutData.strength_exercises.length : 'not array') : 'null/undefined',
-      completed_exercises: workoutData.completed_exercises,
-      completed_exercises_length: workoutData.completed_exercises ? (Array.isArray(workoutData.completed_exercises) ? workoutData.completed_exercises.length : 'not array') : 'null/undefined'
-    });
-    
     if (workoutData.strength_exercises && workoutData.strength_exercises.length > 0) {
-      console.log("🔍 DEBUG - Returning strength_exercises:", workoutData.strength_exercises);
       return workoutData.strength_exercises;
     }
     
     if (workoutData.completed_exercises && workoutData.completed_exercises.length > 0) {
-      console.log("🔍 DEBUG - Returning completed_exercises:", workoutData.completed_exercises);
       return workoutData.completed_exercises;
     }
     
-    console.log("🔍 DEBUG - No exercises found, returning empty array");
     return [];
   };
 
