@@ -157,9 +157,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // Get today's date string - FIXED: Use PST timezone to avoid date shifting
   const getTodayDateString = () => {
-    // Use PST timezone to avoid date shifting issues
-    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
-    return today;
+    // Use a more direct approach to get PST date
+    const now = new Date();
+    
+    // Get the current time in PST
+    const pstTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
+    
+    // Format as YYYY-MM-DD
+    const year = pstTime.getFullYear();
+    const month = String(pstTime.getMonth() + 1).padStart(2, '0');
+    const day = String(pstTime.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${day}`;
+    
+    // 🔍 DEBUG: Log what this function is returning
+    console.log('🔍 getTodayDateString() debug:');
+    console.log('  - new Date():', now);
+    console.log('  - pstTime:', pstTime);
+    console.log('  - year:', year, 'month:', month, 'day:', day);
+    console.log('  - Final return value:', dateString);
+    
+    return dateString;
   };
 
   // Calculate simple total volume for save button
@@ -404,6 +421,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     // FIXED: Use consistent PST timezone for date to avoid shifting to tomorrow
     const workoutDate = scheduledWorkout?.date || getTodayDateString();
+    
+    // 🔍 DEBUG: Log the exact date being used
+    console.log('🔍 DEBUG - Date details:');
+    console.log('  - getTodayDateString():', getTodayDateString());
+    console.log('  - scheduledWorkout?.date:', scheduledWorkout?.date);
+    console.log('  - Final workoutDate:', workoutDate);
+    console.log('  - Current local time:', new Date().toString());
+    console.log('  - Current PST time:', new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' }));
 
     // Prepare the workout data
     const completedWorkout = {
