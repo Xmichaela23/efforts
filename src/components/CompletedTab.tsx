@@ -967,7 +967,7 @@ const formatPace = (paceValue: any): string => {
          {workoutType === 'ride' && (
            <button 
              onClick={() => setActiveAnalyticsTab('powercurve')}
-             className={`pb-1 ${activeAnalyticsTab === 'powercurve' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+             className={`pb-1 ${activeAnalyticsTab === 'powercurve' ? 'text-black font-medium border-b-2 border-gray-400' : 'text-[#666666] hover:text-black'}`}
            >
              Power Curve
            </button>
@@ -976,26 +976,26 @@ const formatPace = (paceValue: any): string => {
          {workoutType === 'ride' && (
            <button 
              onClick={() => setActiveAnalyticsTab('powerdetails')}
-             className={`pb-1 ${activeAnalyticsTab === 'powerdetails' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+             className={`pb-1 ${activeAnalyticsTab === 'powerdetails' ? 'text-black font-medium border-b-2 border-gray-400' : 'text-[#666666] hover:text-black'}`}
            >
              Power Details
            </button>
          )}
          <button 
            onClick={() => setActiveAnalyticsTab('zones')}
-           className={`pb-1 ${activeAnalyticsTab === 'zones' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+           className={`pb-1 ${activeAnalyticsTab === 'zones' ? 'text-black font-medium border-b-2 border-gray-400' : 'text-[#666666] hover:text-black'}`}
          >
            Zones
          </button>
          <button 
            onClick={() => setActiveAnalyticsTab('userprofile')}
-           className={`pb-1 ${activeAnalyticsTab === 'userprofile' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+           className={`pb-1 ${activeAnalyticsTab === 'userprofile' ? 'text-black font-medium border-b-2 border-gray-400' : 'text-[#666666] hover:text-black'}`}
          >
            User Profile
          </button>
          <button 
            onClick={() => setActiveAnalyticsTab('norwegian')}
-           className={`pb-1 ${activeAnalyticsTab === 'norwegian' ? 'text-black font-medium border-b-2 border-black' : 'text-[#666666] hover:text-black'}`}
+           className={`pb-1 ${activeAnalyticsTab === 'norwegian' ? 'text-black font-medium border-b-2 border-gray-400' : 'text-[#666666] hover:text-black'}`}
          >
            Norwegian
          </button>
