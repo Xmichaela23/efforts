@@ -357,24 +357,28 @@ export const useWorkouts = () => {
               console.log(`🔍 Reading strength workout details from description for "${w.name}":`, w.description);
               
               // Create a custom structure that will work with StrengthCompletedView
-              // We'll use the completed_sets field to store the display data
-              return [{
-                id: 'temp-1',
-                name: 'Strength Workout',
-                sets: 1,
-                reps: 1,
-                weight: 0,
-                notes: w.description,
-                weightMode: 'same' as const,
-                completed_sets: [{
-                  reps: 1,
+              // Transform the description into proper exercise format with sets array
+              const exercises = w.description.split(',').map((exerciseStr, index) => {
+                const [name, setsInfo] = exerciseStr.trim().split(':');
+                const [sets, reps] = setsInfo?.split('/') || ['5', '5'];
+                
+                return {
+                  id: `temp-${index}`,
+                  name: name.trim(),
+                  sets: Array.from({ length: parseInt(sets) || 5 }, (_, i) => ({
+                    reps: parseInt(reps) || 5,
+                    weight: 0,
+                    rir: undefined,
+                    completed: true
+                  })),
+                  reps: parseInt(reps) || 5,
                   weight: 0,
-                  rir: undefined,
-                  completed: true,
-                  // Add the description as a custom field for display
-                  description: w.description
-                }]
-              }];
+                  notes: exerciseStr.trim(),
+                  weightMode: 'same' as const
+                };
+              });
+              
+              return exercises;
             } else {
               console.log(`⚠️ Strength workout "${w.name}" has no description field`);
             }

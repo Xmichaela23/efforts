@@ -269,25 +269,9 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
                   workoutData={workout}
                 />
               ) : workout.type === 'strength' ? (
-                // 🔧 FIXED: Always use StrengthCompletedView for strength workouts with safe defaults
+                // 🔧 FIXED: Pass the workout data directly without overwriting strength_exercises
                 <StrengthCompletedView 
-                  workoutData={{
-                    ...workout,
-                    comments: workout.comments || '',
-                    strength_exercises: workout.strength_exercises?.map((exercise: any) => ({
-                      ...exercise,
-                      // Transform builder format to completed format if needed
-                      sets: Array.isArray(exercise.sets) 
-                        ? exercise.sets  // Already in correct format
-                        : Array.from({ length: exercise.sets || 0 }, (_, i) => ({
-                            reps: exercise.reps || 0,
-                            weight: exercise.weight || 0,
-                            completed: true,
-                            rir: undefined
-                          }))
-                    })) || [],
-                    completed_exercises: workout.completed_exercises || []
-                  }}
+                  workoutData={workout}
                 />
               ) : (
                 // 🔧 FALLBACK: For unknown workout types

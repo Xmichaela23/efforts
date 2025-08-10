@@ -9,15 +9,24 @@ interface StrengthCompletedViewProps {
 interface CompletedExercise {
   id: string;
   name: string;
-  sets: Array<{
+  sets?: Array<{
     reps: number;
     weight: number;
     rir?: number;
     completed: boolean;
   }>;
+  notes?: string;
+  reps?: number;
+  weight?: number;
 }
 
 const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData }) => {
+  console.log('🔍 StrengthCompletedView received workoutData:', workoutData);
+  console.log('🔍 strength_exercises:', workoutData.strength_exercises);
+  console.log('🔍 completed_exercises:', workoutData.completed_exercises);
+  console.log('🔍 workoutData type:', typeof workoutData);
+  console.log('🔍 workoutData keys:', Object.keys(workoutData));
+  
   const { workouts } = useAppContext();
   const [showComparison, setShowComparison] = useState(false);
 
@@ -92,20 +101,25 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   const completedExercises = getCompletedExercises();
 
-  // FIXED: Calculate total workout statistics - count sets with data
+  // FIXED: Calculate total workout statistics - handle both array and single exercise formats
   const workoutStats = useMemo(() => {
     let totalSets = 0;
     let totalReps = 0;
     let totalVolume = 0;
     
     completedExercises.forEach((exercise: CompletedExercise) => {
-      if (!exercise.sets) return;
-      
-      // Changed: count sets with actual data instead of just completed sets
-      const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
-      totalSets += setsWithData.length;
-      totalReps += setsWithData.reduce((sum, set) => sum + (set.reps || 0), 0);
-      totalVolume += calculateExerciseVolume(exercise.sets);
+      if (exercise.sets && Array.isArray(exercise.sets)) {
+        // Exercise with sets array
+        const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
+        totalSets += setsWithData.length;
+        totalReps += setsWithData.reduce((sum, set) => sum + (set.reps || 0), 0);
+        totalVolume += calculateExerciseVolume(exercise.sets);
+      } else if (exercise.notes) {
+        // Exercise with notes (from our description parsing)
+        totalSets += 1;
+        totalReps += exercise.reps || 0;
+        totalVolume += 0; // No weight data from description
+      }
     });
 
     return {
