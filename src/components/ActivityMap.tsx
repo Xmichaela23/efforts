@@ -44,7 +44,13 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
 
     // Handle map load
     map.current.on('load', () => {
+      console.log('🗺️ Map loaded successfully');
       setMapLoaded(true);
+    });
+    
+    // Handle map errors
+    map.current.on('error', (e) => {
+      console.error('🗺️ Map error:', e);
     });
 
     return () => {
@@ -56,6 +62,14 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   }, [startLocation]);
 
   useEffect(() => {
+    console.log('🗺️ ActivityMap GPS Debug:', { 
+      hasMap: !!map.current, 
+      mapLoaded, 
+      gpsTrackLength: gpsTrack?.length,
+      gpsTrackSample: gpsTrack?.slice(0, 2),
+      startLocation 
+    });
+    
     if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) return;
 
     // Remove existing route if any
