@@ -346,28 +346,38 @@ export const useWorkouts = () => {
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
         strength_exercises: (() => {
           // For strength workouts, read from description field since that's where the data is stored
-          if (w.type === 'strength' && w.description) {
-            console.log(`🔍 Reading strength workout details from description for "${w.name}":`, w.description);
+          if (w.type === 'strength') {
+            console.log(`🔍 DEBUG - Strength workout found: "${w.name}"`, {
+              type: w.type,
+              description: w.description,
+              hasDescription: !!w.description
+            });
             
-            // Create a custom structure that will work with StrengthCompletedView
-            // We'll use the completed_sets field to store the display data
-            return [{
-              id: 'temp-1',
-              name: 'Strength Workout',
-              sets: 1,
-              reps: 1,
-              weight: 0,
-              notes: w.description,
-              weightMode: 'same' as const,
-              completed_sets: [{
+            if (w.description) {
+              console.log(`🔍 Reading strength workout details from description for "${w.name}":`, w.description);
+              
+              // Create a custom structure that will work with StrengthCompletedView
+              // We'll use the completed_sets field to store the display data
+              return [{
+                id: 'temp-1',
+                name: 'Strength Workout',
+                sets: 1,
                 reps: 1,
                 weight: 0,
-                rir: undefined,
-                completed: true,
-                // Add the description as a custom field for display
-                description: w.description
-              }]
-            }];
+                notes: w.description,
+                weightMode: 'same' as const,
+                completed_sets: [{
+                  reps: 1,
+                  weight: 0,
+                  rir: undefined,
+                  completed: true,
+                  // Add the description as a custom field for display
+                  description: w.description
+                }]
+              }];
+            } else {
+              console.log(`⚠️ Strength workout "${w.name}" has no description field`);
+            }
           }
           
           return [];
