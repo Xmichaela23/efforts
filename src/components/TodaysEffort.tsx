@@ -146,16 +146,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         ];
       } else {
         // Endurance: distance, pace/speed, heart rate, elevation
-        // Handle distance - could be in meters, miles, or other units
+        // 🔧 FIXED: Use consistent distance formatting like CompletedTab
         let distance = 'N/A';
         if (workout.distance) {
           const dist = Number(workout.distance);
-          if (dist > 1000) {
-            // Probably meters, convert to miles
-            distance = `${Math.round((dist / 1609.34) * 10) / 10} mi`;
-          } else {
-            // Probably already in miles or km
-            distance = `${Math.round(dist * 10) / 10} mi`;
+          if (dist && !isNaN(dist)) {
+            // Always treat as km (from useWorkouts transformation), convert to miles if imperial
+            if (useImperial) {
+              const miles = dist * 0.621371;
+              distance = `${miles.toFixed(1)} mi`;
+            } else {
+              distance = `${dist.toFixed(1)} km`;
+            }
           }
         }
         
