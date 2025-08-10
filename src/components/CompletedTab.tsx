@@ -35,12 +35,14 @@ interface InteractiveElevationProfileProps {
   gpsTrack: any[] | null;
   workoutType: string;
   selectedMetric: string;
+  useImperial: boolean;
 }
 
 const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = ({ 
   gpsTrack, 
   workoutType, 
-  selectedMetric 
+  selectedMetric,
+  useImperial
 }) => {
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
   
@@ -77,9 +79,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     }
     
     const metricValue = getMetricValue(point);
+    
+    // Convert elevation from meters to feet if imperial is enabled
+    const elevationMeters = point.elevation || point.altitude || 0;
+    const elevationImperial = useImperial ? elevationMeters * 3.28084 : elevationMeters;
+    
     return {
       distance: parseFloat(distance.toFixed(2)),
-      elevation: point.elevation || point.altitude || 0,
+      elevation: elevationImperial,
       heartRate: point.heartRate || point.heart_rate || point.hr || null,
       speed: point.speed || point.speedMetersPerSecond || null,
       cadence: point.cadence || point.bikeCadenceInRPM || null,
@@ -88,21 +95,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     };
   });
 
-  // Filter out null values for the selected metric
-  const validData = chartData.filter(point => {
-    switch (selectedMetric) {
-      case 'heartrate':
-        return point.heartRate !== null;
-      case 'speed':
-        return point.speed !== null;
-      case 'power':
-        return point.speed !== null; // Use speed as proxy for power
-      case 'vam':
-        return point.elevation !== null;
-      default:
-        return true;
-    }
-  });
+  // For now, always show elevation data since that's what we have
+  // TODO: When we get actual performance metrics from Garmin, filter by those
+  const validData = chartData;
 
   console.log('Chart data debug:', {
     totalPoints: gpsTrack.length,
@@ -146,7 +141,10 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     <div className="h-full">
       <style>{sliderStyles}</style>
       <div className="text-sm font-medium text-gray-700 mb-2">
-        {getMetricLabel()} Overlay
+        Elevation Profile
+        <span className="text-xs text-gray-500 ml-2">
+          (Performance metrics not yet available in GPS data)
+        </span>
       </div>
       <ResponsiveContainer width="100%" height="90%">
         <ComposedChart data={validData}>
@@ -166,7 +164,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           <YAxis 
             yAxisId="left"
             orientation="left"
-            tickFormatter={(value) => `${Math.round(value)} ft`}
+            tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
             stroke="#6b7280"
             fontSize={10}
           />
@@ -197,15 +195,15 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fillOpacity={0.3}
           />
           
-          {/* Performance Metric Line */}
+          {/* Elevation Line - Highlight the actual elevation data we have */}
           <Line
-            yAxisId="right"
+            yAxisId="left"
             type="monotone"
-            dataKey="metricValue"
-            stroke={getMetricColor()}
+            dataKey="elevation"
+            stroke="#1f2937"
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4, fill: getMetricColor() }}
+            activeDot={{ r: 4, fill: "#1f2937" }}
           />
           
           {/* Tooltip */}
@@ -213,18 +211,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 const elevation = payload.find(p => p.dataKey === 'elevation')?.value;
-                const metricValue = payload.find(p => p.dataKey !== 'elevation')?.value;
                 
                 return (
                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                     <p className="font-medium">Distance: {label} mi</p>
-                    <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} ft</p>
-                    <p className="text-gray-600" style={{ color: getMetricColor() }}>
-                      {getMetricLabel()}: {metricValue}
-                      {selectedMetric === 'heartrate' && ' bpm'}
-                      {selectedMetric === 'speed' && ' mph'}
-                      {selectedMetric === 'power' && ' W'}
-                      {selectedMetric === 'vam' && ' ft'}
+                    <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      GPS coordinates and elevation data available
                     </p>
                   </div>
                 );
@@ -1206,11 +1199,12 @@ const formatPace = (paceValue: any): string => {
          
          {/* Elevation Profile - Right side */}
          <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
-           <InteractiveElevationProfile 
-             gpsTrack={workoutData.gps_track}
-             workoutType={workoutType}
-             selectedMetric={selectedMetric}
-           />
+                       <InteractiveElevationProfile
+              gpsTrack={workoutData.gps_track}
+              workoutType={workoutType}
+              selectedMetric={selectedMetric}
+              useImperial={useImperial}
+            />
          </div>
        </div>
      </div>
