@@ -345,9 +345,21 @@ export const useWorkouts = () => {
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
         strength_exercises: (() => {
-          // Check if strength_exercises exists, otherwise try to parse from description
+          // Check if strength_exercises exists and parse it
           if (w.strength_exercises) {
-            return typeof w.strength_exercises === 'string' ? JSON.parse(w.strength_exercises) : w.strength_exercises;
+            try {
+              if (typeof w.strength_exercises === 'string') {
+                const parsed = JSON.parse(w.strength_exercises);
+                console.log("🔍 Successfully parsed strength_exercises:", parsed);
+                return parsed;
+              } else {
+                console.log("🔍 strength_exercises already parsed:", w.strength_exercises);
+                return w.strength_exercises;
+              }
+            } catch (parseError) {
+              console.error("🔍 Error parsing strength_exercises:", parseError);
+              return [];
+            }
           }
           
           // Fallback: try to parse from description field for strength workouts
