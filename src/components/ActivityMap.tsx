@@ -167,7 +167,6 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
         {activityType === 'run' && '🏃‍♂️'} 
         {activityType === 'ride' && '🚴‍♂️'} 
         {activityType === 'swim' && '🏊‍♂️'} 
-        GPS track from Garmin device
       </div>
     </div>
   );

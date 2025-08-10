@@ -902,7 +902,7 @@ const formatPace = (paceValue: any): string => {
        </div>
      </div>
 
-     {/* 🗺️ GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
+     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
      <div>
        <h3 className="text-lg font-semibold mb-2 text-black">
          GPS Route Map & Elevation Profile
