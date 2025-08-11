@@ -37,13 +37,18 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       defaultCenter: [-118.2437, 34.0522]
     });
     
-    // Initialize map
+    // Initialize map with style loading check
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/outdoors-v12',
       center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
       zoom: 12,
       failIfMajorPerformanceCaveat: false
+    });
+
+    // Wait for style to be fully loaded before proceeding
+    map.current.on('style.load', () => {
+      setMapLoaded(true);
     });
 
     // Add navigation controls
@@ -64,6 +69,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       if (map.current) {
         map.current.remove();
         map.current = null;
+        setMapLoaded(false);
       }
     };
   }, [startLocation]);
@@ -77,7 +83,15 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       startLocation 
     });
     
-    if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) return;
+    if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) {
+      console.log('🗺️ Skipping GPS processing:', { 
+        hasMap: !!map.current, 
+        mapLoaded, 
+        hasGpsTrack: !!gpsTrack,
+        gpsTrackLength: gpsTrack?.length 
+      });
+      return;
+    }
 
     // Remove existing route if any
     if (map.current.getSource('route')) {
