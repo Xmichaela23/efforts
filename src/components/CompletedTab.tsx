@@ -301,7 +301,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         Tap and drag to explore • Scroll to zoom
       </div>
              <ResponsiveContainer width="100%" height="75%">
-               <ComposedChart data={validData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+               <ComposedChart data={validData} margin={{ top: 10, right: 40, left: 30, bottom: 15 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -326,26 +326,15 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           
 
           
-          {/* Elevation Area */}
+          {/* Elevation Area - Single clean element */}
           <Area
             yAxisId="left"
             type="monotone"
             dataKey="elevation"
-            stroke="#9ca3af"
-            strokeWidth={2}
-            fill="#d1d5db"
-            fillOpacity={0.3}
-          />
-          
-          {/* Elevation Line - Make it subtle so it doesn't dominate */}
-          <Line
-            yAxisId="left"
-            type="monotone"
-            dataKey="elevation"
-            stroke="#9ca3af"
-            strokeWidth={1}
-            dot={false}
-            activeDot={{ r: 3, fill: "#9ca3af" }}
+            stroke="#6b7280"
+            strokeWidth={1.5}
+            fill="#e5e7eb"
+            fillOpacity={0.4}
           />
           
 
