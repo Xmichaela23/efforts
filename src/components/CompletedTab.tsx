@@ -446,29 +446,18 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
 
    // Simple check: what fields are actually in workoutData?
   useEffect(() => {
-    if (workoutData) {
+    if (workoutData && workoutData.gps_track) {
       console.log('📊 workoutData loaded:', workoutData.name, 'GPS:', workoutData.gps_track?.length, 'Sensors:', workoutData.sensor_data?.length);
+      setIsLoading(false);
+    } else if (workoutData) {
+      // We have workout data but no GPS track
       setIsLoading(false);
     } else {
       setIsLoading(true);
     }
-    
-    // Reset loading state when component unmounts
-    return () => {
-      setIsLoading(true);
-    };
   }, [workoutData]);
 
-  // Debounced effect to prevent excessive re-renders
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (workoutData && workoutData.gps_track) {
-        setIsLoading(false);
-      }
-    }, 100);
-    
-    return () => clearTimeout(timer);
-  }, [workoutData?.gps_track]);
+  // No debouncing needed - direct state management
 
  // Add error handling and loading states
    if (isLoading || !workoutData) {
