@@ -435,18 +435,23 @@ interface CompletedTabProps {
 }
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
- const { useImperial } = useAppContext();
- const [selectedMetric, setSelectedMetric] = useState('heartrate');
- const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
+  console.log('🚨 COMPLETEDTAB COMPONENT RENDERING - workoutType:', workoutType, 'workoutData:', workoutData);
+  
+  const { useImperial } = useAppContext();
+  const [selectedMetric, setSelectedMetric] = useState('heartrate');
+  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
 
  // Simple check: what fields are actually in workoutData?
  useEffect(() => {
+   console.log('🚨 COMPLETEDTAB COMPONENT LOADED - workoutData:', workoutData);
    if (workoutData) {
      console.log('📊 workoutData fields:', Object.keys(workoutData));
      console.log('📊 sensor_data exists?', !!workoutData.sensor_data);
      console.log('📊 sensor_data length:', workoutData.sensor_data?.length);
      console.log('📊 sensor_data sample:', workoutData.sensor_data?.[0]);
      console.log('📊 gps_track length:', workoutData.gps_track?.length);
+   } else {
+     console.log('❌ workoutData is null/undefined');
    }
  }, [workoutData]);
 
