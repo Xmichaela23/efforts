@@ -101,27 +101,41 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         if (index < 3) console.log(`🔍 Heart rate for point ${index}:`, hr);
         return hr;
       case 'speed':
-        // Calculate speed from GPS coordinates with more granularity
+        // Calculate speed from GPS coordinates - this should always work since we have lat/lng/timestamp
         if (index > 0) {
           const prevPoint = gpsTrack[index - 1];
           const distance = calculateDistance(
-            prevPoint.latitudeInDegree || prevPoint.lat,
-            prevPoint.longitudeInDegree || prevPoint.lng,
-            point.latitudeInDegree || point.lat,
-            point.longitudeInDegree || point.lng
+            prevPoint.lat || prevPoint.latitudeInDegree,
+            prevPoint.lng || prevPoint.longitudeInDegree,
+            point.lat || point.latitudeInDegree,
+            point.lng || point.longitudeInDegree
           );
           const timeDiff = (point.timestamp || point.startTimeInSeconds) - (prevPoint.timestamp || prevPoint.startTimeInSeconds);
-          if (timeDiff > 0 && distance > 0.001) { // Only calculate if significant movement
-            const speedMPS = (distance * 1609.34) / timeDiff; // Convert miles to meters
+          
+          if (timeDiff > 0 && distance > 0.001) {
+            const speedMPS = (distance * 1609.34) / timeDiff; // Convert miles to meters per second
+            
             if (useImperial) {
               if (workoutType === 'run') {
                 // Convert to pace (min/mi) for running
                 const paceMinutes = 60 / (speedMPS * 2.237); // Convert m/s to mph, then to min/mi
-                return Math.round(paceMinutes * 100) / 100; // Round to 2 decimal places
+                const result = Math.round(paceMinutes * 100) / 100;
+                if (index < 3) console.log(`🔍 Pace for point ${index}: ${result} min/mi`);
+                return result;
+              } else {
+                // Convert to mph for cycling
+                const mph = speedMPS * 2.237;
+                const result = Math.round(mph * 10) / 10;
+                if (index < 3) console.log(`🔍 Speed for point ${index}: ${result} mph`);
+                return result;
               }
-              return Math.round(speedMPS * 2.237); // Convert m/s to mph
+            } else {
+              // Metric: km/h
+              const kmh = speedMPS * 3.6;
+              const result = Math.round(kmh * 10) / 10;
+              if (index < 3) console.log(`🔍 Speed for point ${index}: ${result} km/h`);
+              return result;
             }
-            return Math.round(speedMPS);
           }
         }
         if (index < 3) console.log(`🔍 Speed for point ${index}: null (no movement or time data)`);
@@ -396,14 +410,17 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         <div className="flex flex-wrap gap-2">
           {['Heart Rate', workoutType === 'run' ? 'Pace' : 'Speed', 'Power', 'VAM'].map((metric) => {
             const metricKey = metric.toLowerCase().replace(' ', '');
+            const isSelected = localSelectedMetric === metricKey;
+            
             return (
               <button
                 key={metric}
                 onClick={() => {
+                  console.log(`🎯 Switching to metric: ${metric} (${metricKey})`);
                   setLocalSelectedMetric(metricKey);
                 }}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  localSelectedMetric === metricKey
+                  isSelected
                     ? 'bg-gray-200 text-black'
                     : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
                 }`}
