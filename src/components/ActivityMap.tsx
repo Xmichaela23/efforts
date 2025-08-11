@@ -37,59 +37,27 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       defaultCenter: [-118.2437, 34.0522]
     });
     
-    // Initialize map with better error handling and fallback styles
-    try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/streets-v12', // Fallback to streets style
-        center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
-        zoom: 12,
-        failIfMajorPerformanceCaveat: false, // Don't fail on performance issues
-        preserveDrawingBuffer: false, // Better performance
-        maxZoom: 18,
-        minZoom: 8
-      });
-      
-      // Try to load outdoors style after initialization
-      map.current.on('load', () => {
-        map.current?.setStyle('mapbox://styles/mapbox/outdoors-v12').catch(() => {
-          console.warn('🗺️ Failed to load outdoors style, keeping streets style');
-        });
-      });
-      
-    } catch (error) {
-      console.error('🗺️ Map initialization failed:', error);
-      return;
-    }
+    // Initialize map
+    map.current = new mapboxgl.Map({
+      container: mapContainer.current,
+      style: 'mapbox://styles/mapbox/outdoors-v12',
+      center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
+      zoom: 12,
+      failIfMajorPerformanceCaveat: false
+    });
 
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
-    // Handle map load with style loading check
+    // Handle map load
     map.current.on('load', () => {
       console.log('🗺️ Map loaded successfully');
       setMapLoaded(true);
     });
     
-    // Handle style loading specifically
-    map.current.on('styledata', () => {
-      console.log('🗺️ Map style loaded successfully');
-      setMapLoaded(true);
-    });
-    
-    // Handle map errors with better logging
+    // Handle map errors
     map.current.on('error', (e) => {
       console.error('🗺️ Map error:', e);
-      if (e.error && e.error.message) {
-        console.error('🗺️ Map error details:', e.error.message);
-      }
-    });
-    
-    // Handle style loading errors
-    map.current.on('sourcedata', (e) => {
-      if (e.isSourceLoaded === false) {
-        console.warn('🗺️ Map source still loading...');
-      }
     });
 
     return () => {
