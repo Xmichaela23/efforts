@@ -957,7 +957,7 @@ const formatPace = (paceValue: any): string => {
    return 'N/A';
  };
 
- // Enhanced VAM calculation for running with insights
+  // Enhanced VAM calculation for running with insights
  const calculateRunningVAM = () => {
    if (workoutType !== 'run') return null;
    
@@ -970,15 +970,34 @@ const formatPace = (paceValue: any): string => {
    const durationHours = (duration * 60) / 3600;
    const vam = Math.round(elevationM / durationHours);
    
-   // Running VAM insights
+   // Professional VAM insights with actionable feedback
    let insight = '';
-   if (vam >= 1000) insight = 'Mountain goat! 🐐';
-   else if (vam >= 800) insight = 'Strong climber 💪';
-   else if (vam >= 600) insight = 'Good climbing pace 🏃‍♂️';
-   else if (vam >= 400) insight = 'Steady climber 📈';
-   else insight = 'Endurance focus 🎯';
+   let trainingZone = '';
+   let racePacing = '';
    
-   return { vam, insight };
+   if (vam >= 1000) {
+     insight = 'Elite climbing performance';
+     trainingZone = 'VO2 Max / Anaerobic';
+     racePacing = 'Suitable for short, steep races';
+   } else if (vam >= 800) {
+     insight = 'Advanced climbing strength';
+     trainingZone = 'Threshold / Tempo';
+     racePacing = 'Good for hilly 10K-21K';
+   } else if (vam >= 600) {
+     insight = 'Strong climbing ability';
+     trainingZone = 'Aerobic / Endurance';
+     racePacing = 'Ideal for marathon training';
+   } else if (vam >= 400) {
+     insight = 'Good climbing endurance';
+     trainingZone = 'Aerobic Base';
+     racePacing = 'Ultra-distance ready';
+   } else {
+     insight = 'Endurance-focused climbing';
+     trainingZone = 'Recovery / Base';
+     racePacing = 'Build climbing strength';
+   }
+   
+   return { vam, insight, trainingZone, racePacing };
  };
 
  const formatMovingTime = () => {
@@ -1303,8 +1322,14 @@ const formatPace = (paceValue: any): string => {
            <div className="text-sm font-medium text-blue-800 mb-1">
              {calculateRunningVAM()?.insight}
            </div>
-           <div className="text-xs text-blue-600">
+           <div className="text-xs text-blue-600 mb-1">
              VAM: {calculateRunningVAM()?.vam} m/h
+           </div>
+           <div className="text-xs text-blue-700 font-medium">
+             Training Zone: {calculateRunningVAM()?.trainingZone}
+           </div>
+           <div className="text-xs text-blue-600">
+             {calculateRunningVAM()?.racePacing}
            </div>
          </div>
        )}
