@@ -104,11 +104,8 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       return;
     }
 
-    // Double-check that the map style is actually ready
-    if (!map.current.isStyleLoaded()) {
-      console.log('🗺️ Map style not ready yet, waiting...');
-      return;
-    }
+    // Skip the isStyleLoaded check - it seems unreliable
+    // Just proceed when mapLoaded is true
 
     // Remove existing route if any
     if (map.current.getSource('route')) {
