@@ -81,56 +81,36 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'heartrate':
         return sensorPoint?.heartRate || null;
       case 'speed':
-        // Calculate speed from GPS coordinates with segment-based approach
+        // Calculate speed from GPS coordinates with simple, reliable approach
         if (index > 0) {
-          // Use larger segments (5 points) to get more stable pace
-          const segmentSize = 5;
-          const startIdx = Math.max(0, index - segmentSize + 1);
+          const prevPoint = gpsTrack[index - 1];
+          const distance = calculateDistance(
+            prevPoint.lat || prevPoint.latitudeInDegree,
+            prevPoint.lng || prevPoint.longitudeInDegree,
+            point.lat || point.latitudeInDegree,
+            point.lng || point.longitudeInDegree
+          );
+          const timeDiff = (point.timestamp || point.startTimeInSeconds) - 
+                          (prevPoint.timestamp || prevPoint.startTimeInSeconds);
           
-          // Calculate total distance and time over the segment
-          let totalDistance = 0;
-          let totalTime = 0;
-          
-          for (let i = startIdx + 1; i <= index; i++) {
-            if (i < gpsTrack.length) {
-              const prevPoint = gpsTrack[i - 1];
-              const currPoint = gpsTrack[i];
-              
-              const distance = calculateDistance(
-                prevPoint.lat || prevPoint.latitudeInDegree,
-                prevPoint.lng || prevPoint.longitudeInDegree,
-                currPoint.lat || currPoint.latitudeInDegree,
-                currPoint.lng || currPoint.longitudeInDegree
-              );
-              
-              const timeDiff = (currPoint.timestamp || currPoint.startTimeInSeconds) - 
-                              (prevPoint.timestamp || prevPoint.startTimeInSeconds);
-              
-              if (timeDiff > 0 && distance > 0.001) { // 0.001 miles = ~1.6 meters
-                totalDistance += distance;
-                totalTime += timeDiff;
-              }
-            }
-          }
-          
-          // Calculate average speed if we have meaningful data
-          if (totalTime > 0 && totalDistance > 0.01) { // At least 0.01 miles total
-            const avgSpeedMph = (totalDistance / totalTime) * 3600;
+          // Only calculate if we have meaningful data
+          if (timeDiff > 0 && distance > 0.002) { // 0.002 miles = ~3.2 meters
+            const speedMph = (distance / timeDiff) * 3600;
             
             // Filter to realistic running/cycling speeds
-            if (avgSpeedMph >= 2 && avgSpeedMph <= 20) {
+            if (speedMph >= 2 && speedMph <= 25) {
               if (useImperial) {
                 if (workoutType === 'run') {
                   // Convert mph to pace (min/mi): 60 minutes / mph
-                  const paceMinutes = 60 / avgSpeedMph;
+                  const paceMinutes = 60 / speedMph;
                   return Math.round(paceMinutes * 100) / 100;
                 } else {
                   // Return mph for cycling
-                  return Math.round(avgSpeedMph * 10) / 10;
+                  return Math.round(speedMph * 10) / 10;
                 }
               } else {
                 // Convert mph to km/h
-                const kmh = avgSpeedMph * 1.60934;
+                const kmh = speedMph * 1.60934;
                 return Math.round(kmh * 10) / 10;
               }
             }
@@ -446,9 +426,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         </div>
       </div>
 
-      {/* Scroll Control Slider */}
+      {/* Scroll Control - Simple Scroll Bar */}
       <div className="mt-3 px-2">
-        <div className="text-xs text-gray-600 mb-2">Scroll workout</div>
+        <div className="text-xs text-gray-600 mb-2">Scroll through workout</div>
         <div className="relative">
           <input
             type="range"
@@ -458,24 +438,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             onChange={(e) => setScrollRange([parseInt(e.target.value), scrollRange[1]])}
             className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider touch-manipulation"
             style={{
-              background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${scrollRange[0]}%, #3b82f6 ${scrollRange[0]}%, #3b82f6 ${scrollRange[1]}%, #e5e7eb ${scrollRange[1]}%, #e5e7eb 100%)`
+              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${scrollRange[0]}%, #e5e7eb ${scrollRange[0]}%, #e5e7eb 100%)`
             }}
           />
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={scrollRange[1]}
-            onChange={(e) => setScrollRange([scrollRange[0], parseInt(e.target.value)])}
-            className="absolute top-0 w-full h-3 bg-transparent rounded-lg appearance-none cursor-pointer slider touch-manipulation"
-            style={{
-              background: 'transparent'
-            }}
-          />
-        </div>
-        <div className="flex justify-between text-xs text-gray-500 mt-1">
-          <span>{Math.round(scrollRange[0])}%</span>
-          <span>{Math.round(scrollRange[1])}%</span>
+          <div className="flex justify-between text-xs text-gray-500 mt-1">
+            <span>Start</span>
+            <span>{Math.round(scrollRange[0])}%</span>
+          </div>
         </div>
       </div>
     </div>
