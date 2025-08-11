@@ -348,15 +348,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             activeDot={{ r: 3, fill: "#9ca3af" }}
           />
           
-          {/* Cursor Line - Simple and stable */}
-          {scrollRange[0] > 0 && validData.length > 0 && (
-            <ReferenceLine
-              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-            />
-          )}
+
           
           {/* Tooltip */}
           <Tooltip
@@ -502,6 +494,22 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           <div className="mt-3 px-2">
             <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
               <div className="text-sm font-medium text-gray-700 mb-2">Current Position</div>
+              
+              {/* Visual Position Indicator */}
+              <div className="mb-3">
+                <div className="flex justify-between text-xs text-gray-500 mb-1">
+                  <span>Start</span>
+                  <span>{Math.round(scrollRange[0])}%</span>
+                  <span>End</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-red-500 h-2 rounded-full transition-all duration-200"
+                    style={{ width: `${scrollRange[0]}%` }}
+                  ></div>
+                </div>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-500">Distance:</span>
