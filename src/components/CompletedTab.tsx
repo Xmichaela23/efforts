@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
@@ -82,36 +81,60 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'heartrate':
         return sensorPoint?.heartRate || null;
       case 'speed':
-        // Calculate speed from GPS coordinates - this should always work since we have lat/lng/timestamp
+        // Calculate speed from GPS coordinates with rolling average for stability
         if (index > 0) {
-          const prevPoint = gpsTrack[index - 1];
-          const distance = calculateDistance(
-            prevPoint.lat || prevPoint.latitudeInDegree,
-            prevPoint.lng || prevPoint.longitudeInDegree,
-            point.lat || point.latitudeInDegree,
-            point.lng || point.longitudeInDegree
-          );
-          const timeDiff = (point.timestamp || point.startTimeInSeconds) - (prevPoint.timestamp || prevPoint.startTimeInSeconds);
+          // Use a 3-point rolling average for more stable pace calculation
+          const windowSize = 3;
+          const startIdx = Math.max(0, index - windowSize + 1);
+          const endIdx = index + 1;
           
-          // Use a more reasonable distance threshold (0.01 miles = ~16 meters)
-          if (timeDiff > 0 && distance > 0.01) {
-            // Calculate speed in mph directly: (miles / seconds) * 3600 seconds/hour
-            const speedMph = (distance / timeDiff) * 3600;
+          let totalDistance = 0;
+          let totalTime = 0;
+          let validSegments = 0;
+          
+          // Calculate cumulative distance and time over the window
+          for (let i = startIdx + 1; i < endIdx; i++) {
+            if (i < gpsTrack.length) {
+              const prevPoint = gpsTrack[i - 1];
+              const currPoint = gpsTrack[i];
+              
+              const distance = calculateDistance(
+                prevPoint.lat || prevPoint.latitudeInDegree,
+                prevPoint.lng || prevPoint.longitudeInDegree,
+                currPoint.lat || currPoint.latitudeInDegree,
+                currPoint.lng || currPoint.longitudeInDegree
+              );
+              
+              const timeDiff = (currPoint.timestamp || currPoint.startTimeInSeconds) - 
+                              (prevPoint.timestamp || prevPoint.startTimeInSeconds);
+              
+              // Only include segments with reasonable distance and time
+              if (timeDiff > 0 && distance > 0.005) { // 0.005 miles = ~8 meters
+                totalDistance += distance;
+                totalTime += timeDiff;
+                validSegments++;
+              }
+            }
+          }
+          
+          // Calculate average speed if we have valid segments
+          if (validSegments > 0 && totalTime > 0) {
+            const avgSpeedMph = (totalDistance / totalTime) * 3600;
             
-            // Filter out unrealistic speeds (0.5 mph to 25 mph for running/cycling)
-            if (speedMph >= 0.5 && speedMph <= 25) {
+            // Filter out unrealistic speeds
+            if (avgSpeedMph >= 0.5 && avgSpeedMph <= 25) {
               if (useImperial) {
                 if (workoutType === 'run') {
                   // Convert mph to pace (min/mi): 60 minutes / mph
-                  const paceMinutes = 60 / speedMph;
+                  const paceMinutes = 60 / avgSpeedMph;
                   return Math.round(paceMinutes * 100) / 100;
                 } else {
                   // Return mph for cycling
-                  return Math.round(speedMph * 10) / 10;
+                  return Math.round(avgSpeedMph * 10) / 10;
                 }
               } else {
                 // Convert mph to km/h
-                const kmh = speedMph * 1.60934;
+                const kmh = avgSpeedMph * 1.60934;
                 return Math.round(kmh * 10) / 10;
               }
             }
