@@ -348,16 +348,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             activeDot={{ r: 3, fill: "#9ca3af" }}
           />
           
-          {/* Simple Cursor Line - Moves with scroll bar */}
-          {scrollRange[0] > 0 && validData.length > 0 && (
-            <ReferenceLine
-              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-            />
-          )}
-          
           {/* Tooltip */}
           <Tooltip
             content={({ active, payload, label }) => {
@@ -379,7 +369,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       </ResponsiveContainer>
       
       {/* Data Card - Shows current position and metrics */}
-      {scrollRange[0] > 0 && validData.length > 0 && (() => {
+      {validData.length > 0 && (() => {
         const currentIndex = Math.floor((scrollRange[0] / 100) * (validData.length - 1));
         const currentPoint = validData[currentIndex];
         
@@ -495,6 +485,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                   <span className="text-gray-500">Position:</span>
                   <span className="ml-2 font-medium">{Math.round(scrollRange[0])}%</span>
                 </div>
+              </div>
+              {/* Debug info */}
+              <div className="mt-2 text-xs text-gray-400 border-t pt-2">
+                <div>GPS Points: {gpsTrack?.length || 0}</div>
+                <div>Sensor Data: {sensorData?.length || 0}</div>
+                <div>Current GPS Index: {gpsIndex}</div>
               </div>
             </div>
           </div>
