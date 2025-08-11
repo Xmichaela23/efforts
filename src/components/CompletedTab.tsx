@@ -348,6 +348,16 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             activeDot={{ r: 3, fill: "#9ca3af" }}
           />
           
+          {/* Cursor Line - Simple and stable */}
+          {scrollRange[0] > 0 && validData.length > 0 && (
+            <ReferenceLine
+              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+            />
+          )}
+          
           {/* Tooltip */}
           <Tooltip
             content={({ active, payload, label }) => {
@@ -377,57 +387,95 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         const gpsIndex = Math.floor((scrollRange[0] / 100) * (gpsTrack.length - 1));
         const gpsPoint = gpsTrack[gpsIndex];
         
-        // Calculate metrics at this position
-        const paceValue = getMetricValue(gpsPoint, gpsIndex);
-        
-        // Ensure we get a valid pace value
-        let finalPaceValue = paceValue;
-        if (!finalPaceValue && gpsIndex > 0) {
-          // Fallback: calculate pace directly from GPS points
+        // Calculate pace with better gap handling
+        let finalPaceValue = null;
+        if (gpsIndex > 0) {
+          // Try multiple approaches to get pace
           const prevPoint = gpsTrack[gpsIndex - 1];
           if (prevPoint) {
             const distance = calculateDistance(
               prevPoint.lat || prevPoint.latitudeInDegree,
               prevPoint.lng || prevPoint.longitudeInDegree,
               gpsPoint.lat || gpsPoint.latitudeInDegree,
-              gpsPoint.lng || gpsPoint.longitudeInDegree
+              gpsPoint.lng || prevPoint.longitudeInDegree
             );
             const timeDiff = (gpsPoint.timestamp || gpsPoint.startTimeInSeconds) - 
                             (prevPoint.timestamp || prevPoint.startTimeInSeconds);
             
-            if (timeDiff > 0 && distance > 0.002) {
+            if (timeDiff > 0 && distance > 0.001) { // Lower threshold for more data
               const speedMph = (distance / timeDiff) * 3600;
-              if (speedMph >= 2 && speedMph <= 25) {
+              if (speedMph >= 1 && speedMph <= 30) { // Wider range for more data
                 finalPaceValue = Math.round((60 / speedMph) * 100) / 100;
+              }
+            }
+          }
+          
+          // If still no pace, try looking at a wider window
+          if (!finalPaceValue && gpsIndex > 5) {
+            const windowStart = Math.max(0, gpsIndex - 5);
+            const windowEnd = Math.min(gpsTrack.length - 1, gpsIndex + 5);
+            
+            let totalDistance = 0;
+            let totalTime = 0;
+            
+            for (let i = windowStart; i < windowEnd; i++) {
+              if (i > 0) {
+                const p1 = gpsTrack[i - 1];
+                const p2 = gpsTrack[i];
+                const dist = calculateDistance(
+                  p1.lat || p1.latitudeInDegree,
+                  p1.lng || p1.longitudeInDegree,
+                  p2.lat || p2.latitudeInDegree,
+                  p2.lng || p2.longitudeInDegree
+                );
+                const time = (p2.timestamp || p2.startTimeInSeconds) - 
+                            (p1.timestamp || p1.startTimeInSeconds);
+                
+                if (time > 0) {
+                  totalDistance += dist;
+                  totalTime += time;
+                }
+              }
+            }
+            
+            if (totalTime > 0 && totalDistance > 0.005) {
+              const avgSpeedMph = (totalDistance / totalTime) * 3600;
+              if (avgSpeedMph >= 1 && avgSpeedMph <= 30) {
+                finalPaceValue = Math.round((60 / avgSpeedMph) * 100) / 100;
               }
             }
           }
         }
         
-        const heartRate = sensorData?.find(sensor => 
-          sensor.timestamp === gpsPoint?.timestamp || 
-          sensor.timestamp === gpsPoint?.startTimeInSeconds
-        )?.heartRate;
-        
-        // Alternative BPM lookup - try to find closest timestamp match
-        let bpmValue = heartRate;
-        if (!bpmValue && sensorData && sensorData.length > 0) {
-          // Find the closest timestamp match
+        // Better heart rate lookup with wider time window
+        let bpmValue = null;
+        if (sensorData && sensorData.length > 0) {
           const gpsTime = gpsPoint?.timestamp || gpsPoint?.startTimeInSeconds;
           if (gpsTime) {
-            const closestSensor = sensorData.reduce((closest, sensor) => {
-              const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
-              if (!sensorTime) return closest;
-              
-              const timeDiff = Math.abs(sensorTime - gpsTime);
-              if (!closest || timeDiff < Math.abs(closest.timestamp - gpsTime)) {
-                return { ...sensor, timeDiff };
-              }
-              return closest;
-            }, null);
+            // First try exact match
+            const exactMatch = sensorData.find(sensor => 
+              sensor.timestamp === gpsTime || 
+              sensor.startTimeInSeconds === gpsTime
+            );
             
-            if (closestSensor && closestSensor.timeDiff < 10) { // Within 10 seconds
-              bpmValue = closestSensor.heartRate;
+            if (exactMatch?.heartRate) {
+              bpmValue = exactMatch.heartRate;
+            } else {
+              // Find closest timestamp within 30 seconds
+              const closestSensor = sensorData.reduce((closest, sensor) => {
+                const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
+                if (!sensorTime) return closest;
+                
+                const timeDiff = Math.abs(sensorTime - gpsTime);
+                if (!closest || timeDiff < closest.timeDiff) {
+                  return { ...sensor, timeDiff };
+                }
+                return closest;
+              }, null);
+              
+              if (closestSensor && closestSensor.timeDiff < 30) { // Wider window
+                bpmValue = closestSensor.heartRate;
+              }
             }
           }
         }
