@@ -1,5 +1,5 @@
 console.log('🚨 COMPLETEDTAB COMPONENT LOADED');
-import React, { useState } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 
@@ -46,6 +46,11 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
 }) => {
   const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
+
+  // Debug: Log when metric changes
+  useEffect(() => {
+    console.log('🎯 Metric changed to:', localSelectedMetric);
+  }, [localSelectedMetric]);
   
   if (!gpsTrack || gpsTrack.length === 0) {
     return (
@@ -70,31 +75,68 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     }
   };
 
-  // Process GPS data for chart
-  const chartData = gpsTrack.map((point, index) => {
-    const distance = index * 0.01; // Approximate distance in miles (simplified)
+  // Helper function to calculate distance between two GPS points
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+    const R = 3959; // Earth's radius in miles
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  };
+
+  // Process GPS data for chart with real distance and relative elevation
+  const chartData = useMemo(() => {
+    if (!gpsTrack || gpsTrack.length === 0) return [];
     
-    // Debug: Log first few points to see actual data structure
-    if (index < 3) {
-      console.log(`GPS Point ${index}:`, point);
-    }
+    let cumulativeDistance = 0;
+    let baseElevation = null;
     
-    const metricValue = getMetricValue(point);
-    
-    // Convert elevation from meters to feet if imperial is enabled
-    const elevationMeters = point.elevation || point.altitude || 0;
-    const elevationImperial = useImperial ? elevationMeters * 3.28084 : elevationMeters;
-    
-    return {
-      distance: parseFloat(distance.toFixed(2)),
-      elevation: elevationImperial,
-      heartRate: point.heartRate || point.heart_rate || point.hr || null,
-      speed: point.speed || point.speedMetersPerSecond || null,
-      cadence: point.cadence || point.bikeCadenceInRPM || null,
-      timestamp: point.timestamp || point.startTimeInSeconds || null,
-      metricValue: metricValue
-    };
-  });
+    return gpsTrack.map((point, index) => {
+      // Calculate cumulative distance from GPS coordinates
+      if (index > 0) {
+        const prevPoint = gpsTrack[index - 1];
+        const lat1 = prevPoint.latitudeInDegree || prevPoint.lat;
+        const lon1 = prevPoint.longitudeInDegree || prevPoint.lng;
+        const lat2 = point.latitudeInDegree || point.lat;
+        const lon2 = point.longitudeInDegree || point.lng;
+        
+        if (lat1 && lon1 && lat2 && lon2) {
+          cumulativeDistance += calculateDistance(lat1, lon1, lat2, lon2);
+        }
+      }
+      
+      // Debug: Log first few points to see actual data structure
+      if (index < 3) {
+        console.log(`GPS Point ${index}:`, point);
+      }
+      
+      const metricValue = getMetricValue(point);
+      
+      // Convert elevation from meters to feet if imperial is enabled
+      const elevationMeters = point.elevation || point.altitude || 0;
+      const elevationImperial = useImperial ? elevationMeters * 3.28084 : elevationMeters;
+      
+      // Set base elevation to first point, then calculate relative elevation
+      if (baseElevation === null) {
+        baseElevation = elevationImperial;
+      }
+      const relativeElevation = elevationImperial - baseElevation;
+      
+      return {
+        distance: parseFloat(cumulativeDistance.toFixed(2)),
+        elevation: relativeElevation,
+        absoluteElevation: elevationImperial,
+        heartRate: point.heartRate || point.heart_rate || point.hr || null,
+        speed: point.speed || point.speedMetersPerSecond || null,
+        cadence: point.cadence || point.bikeCadenceInRPM || null,
+        timestamp: point.timestamp || point.startTimeInSeconds || null,
+        metricValue: metricValue
+      };
+    });
+  }, [gpsTrack, localSelectedMetric, useImperial]);
 
   // For now, always show elevation data since that's what we have
   // TODO: When we get actual performance metrics from Garmin, filter by those
@@ -104,8 +146,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     totalPoints: gpsTrack.length,
     chartDataPoints: chartData.length,
     validDataPoints: validData.length,
-    selectedMetric,
-    samplePoint: chartData[0]
+    localSelectedMetric,
+    totalDistance: chartData.length > 0 ? chartData[chartData.length - 1].distance : 0,
+    elevationRange: chartData.length > 0 ? {
+      min: Math.min(...chartData.map(d => d.elevation)),
+      max: Math.max(...chartData.map(d => d.elevation))
+    } : { min: 0, max: 0 },
+    samplePoint: chartData[0],
+    metricValues: chartData.slice(0, 3).map(d => ({ distance: d.distance, metricValue: d.metricValue }))
   });
 
   const getMetricColor = () => {
@@ -138,7 +186,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     <div className="h-full">
       <style>{sliderStyles}</style>
       <div className="text-sm font-medium text-gray-700 mb-2">
-        Elevation Profile
+        Elevation Profile (Relative to Start)
         <span className="text-xs text-gray-500 ml-2">
           (Performance metrics not yet available in GPS data)
         </span>
@@ -157,13 +205,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fontSize={10}
           />
           
-          {/* Left Y Axis - Elevation */}
+          {/* Left Y Axis - Elevation (Relative) */}
           <YAxis 
             yAxisId="left"
             orientation="left"
             tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
             stroke="#6b7280"
             fontSize={10}
+            label={{ value: 'Elevation Change', angle: -90, position: 'insideLeft' }}
           />
           
           {/* Right Y Axis - Performance Metric */}
@@ -226,7 +275,8 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                 return (
                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                     <p className="font-medium">Distance: {label} mi</p>
-                    <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
+                    <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
+                    <p className="text-xs text-gray-400">Relative to start point</p>
                     {metricValue && localSelectedMetric !== 'vam' && (
                       <p className="text-gray-600" style={{ color: getMetricColor() }}>
                         {getMetricLabel()}: {metricValue}
@@ -1206,24 +1256,6 @@ const formatPace = (paceValue: any): string => {
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
      <div>
 
-       
-       {/* 🎛️ CHART TABS - Above both visualizations */}
-       <div className="flex gap-1 flex-wrap mb-2">
-         {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
-           <Button
-             key={metric.toLowerCase().replace(' ', '')}
-             onClick={() => setSelectedMetric(metric.toLowerCase().replace(' ', ''))}
-             className={`px-3 py-1 text-sm font-medium ${
-               selectedMetric === metric.toLowerCase().replace(' ', '')
-                 ? 'bg-gray-200 text-black'
-                 : 'bg-white text-black hover:bg-gray-100'
-             }`}
-           >
-             {metric}
-           </Button>
-         ))}
-       </div>
-       
        {/* 🗺️ SIDE-BY-SIDE LAYOUT */}
        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
          {/* GPS Route Map - Left side */}
