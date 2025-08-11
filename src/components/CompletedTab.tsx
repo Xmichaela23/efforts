@@ -46,14 +46,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   selectedMetric,
   useImperial
 }) => {
-  console.log('🎯 InteractiveElevationProfile rendering with:', {
-    gpsTrackLength: gpsTrack?.length,
-    sensorDataLength: sensorData?.length,
-    workoutType,
-    selectedMetric,
-    useImperial
-  });
-  
   const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
   
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
@@ -70,38 +62,15 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   }
 
   const getMetricValue = (point: any, index: number) => {
-    // Debug: Log what we're working with for first few points
-    if (index < 3) {
-      console.log(`🔍 getMetricValue for point ${index}:`, {
-        pointKeys: Object.keys(point),
-        timestamp: point.timestamp || point.startTimeInSeconds,
-        elevation: point.elevation,
-        selectedMetric: localSelectedMetric
-      });
-    }
-    
     // Find corresponding sensor data by timestamp
     const sensorPoint = sensorData?.find(sensor => 
       sensor.timestamp === point.timestamp || 
       sensor.timestamp === point.startTimeInSeconds
     );
     
-    if (index < 3) {
-      console.log(`🔍 Sensor data for point ${index}:`, {
-        hasSensorData: !!sensorData,
-        sensorDataLength: sensorData?.length,
-        foundSensorPoint: !!sensorPoint,
-        sensorPointKeys: sensorPoint ? Object.keys(sensorPoint) : [],
-        sensorPointData: sensorPoint
-      });
-    }
-    
     switch (localSelectedMetric) {
       case 'heartrate':
-        // The heart rate data IS in sensorData - this should work now!
-        const hr = sensorPoint?.heartRate || null;
-        if (index < 3) console.log(`🔍 Heart rate for point ${index}:`, hr, 'from sensorPoint:', sensorPoint);
-        return hr;
+        return sensorPoint?.heartRate || null;
       case 'speed':
         // Calculate speed from GPS coordinates - this should always work since we have lat/lng/timestamp
         if (index > 0) {
@@ -122,31 +91,22 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                 // Convert to pace (min/mi) for running
                 const paceMinutes = 60 / (speedMPS * 2.237); // Convert m/s to mph, then to min/mi
                 const result = Math.round(paceMinutes * 100) / 100;
-                if (index < 3) console.log(`🔍 Pace for point ${index}: ${result} min/mi`);
-                return result;
-              } else {
-                // Convert to mph for cycling
-                const mph = speedMPS * 2.237;
-                const result = Math.round(mph * 10) / 10;
-                if (index < 3) console.log(`🔍 Speed for point ${index}: ${result} mph`);
-                return result;
-              }
-            } else {
-              // Metric: km/h
-              const kmh = speedMPS * 3.6;
-              const result = Math.round(kmh * 10) / 10;
-              if (index < 3) console.log(`🔍 Speed for point ${index}: ${result} km/h`);
-              return result;
-            }
-          }
-        }
-        if (index < 3) console.log(`🔍 Speed for point ${index}: null (no movement or time data)`);
-        return null;
+                        return result;
+      } else {
+        // Convert to mph for cycling
+        const mph = speedMPS * 2.237;
+        return Math.round(mph * 10) / 10;
+      }
+    } else {
+      // Metric: km/h
+      const kmh = speedMPS * 3.6;
+      return Math.round(kmh * 10) / 10;
+    }
+  }
+}
+return null;
       case 'power':
-        // Power data IS in sensorData - this should work now!
-        const power = sensorPoint?.power || null;
-        if (index < 3) console.log(`🔍 Power for point ${index}:`, power, 'from sensorPoint:', sensorPoint);
-        return power;
+        return sensorPoint?.power || null;
       case 'vam':
         // Calculate VAM (climbing rate) between this point and previous point
         if (index === 0) return 0; // First point has no VAM
@@ -234,14 +194,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   }, [gpsTrack, localSelectedMetric, useImperial]);
 
   const validData = chartData || [];
-  
-  // Debug: Log chart data to see what's happening
-  console.log('📊 Chart data debug:', {
-    totalPoints: validData.length,
-    samplePoint: validData[0],
-    metricValues: validData.slice(0, 3).map(d => ({ distance: d.distance, metricValue: d.metricValue })),
-    selectedMetric: localSelectedMetric
-  });
   
   // Additional safety check for chart data
   if (!validData || validData.length === 0) {
@@ -419,7 +371,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
               <button
                 key={metric}
                 onClick={() => {
-                  console.log(`🎯 Switching to metric: ${metric} (${metricKey})`);
                   setLocalSelectedMetric(metricKey);
                 }}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
@@ -481,23 +432,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  const [selectedMetric, setSelectedMetric] = useState('heartrate');
  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
 
- // Add useEffect to help with state persistence and debugging
+ // Simple check: what fields are actually in workoutData?
  useEffect(() => {
-   console.log('🔄 CompletedTab re-rendered with:', {
-     workoutType,
-     hasWorkoutData: !!workoutData,
-     gpsTrackLength: workoutData?.gps_track?.length,
-     workoutDataKeys: workoutData ? Object.keys(workoutData) : [],
-     hasSensorData: !!workoutData?.sensor_data,
-     sensorDataLength: workoutData?.sensor_data?.length,
-     sensorDataSample: workoutData?.sensor_data?.[0]
-   });
-   
-   // Reset selected metric when workout changes to ensure consistent state
-   if (workoutData && workoutData.gps_track) {
-     setSelectedMetric('heartrate');
+   if (workoutData) {
+     console.log('📊 workoutData fields:', Object.keys(workoutData));
+     console.log('📊 sensor_data exists?', !!workoutData.sensor_data);
+     console.log('📊 sensor_data length:', workoutData.sensor_data?.length);
    }
- }, [workoutType, workoutData]);
+ }, [workoutData]);
 
  // Add error handling and loading states
  if (!workoutData) {
