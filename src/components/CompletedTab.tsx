@@ -93,23 +93,27 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           );
           const timeDiff = (point.timestamp || point.startTimeInSeconds) - (prevPoint.timestamp || prevPoint.startTimeInSeconds);
           
-          if (timeDiff > 0 && distance > 0.001) {
-            const speedMPS = (distance * 1609.34) / timeDiff; // Convert miles to meters per second
+          // Use a more reasonable distance threshold (0.01 miles = ~16 meters)
+          if (timeDiff > 0 && distance > 0.01) {
+            // Calculate speed in mph directly: (miles / seconds) * 3600 seconds/hour
+            const speedMph = (distance / timeDiff) * 3600;
             
-            if (useImperial) {
-              if (workoutType === 'run') {
-                // Convert to pace (min/mi) for running
-                const paceMinutes = 60 / (speedMPS * 2.237); // Convert m/s to mph, then to min/mi
-                return Math.round(paceMinutes * 100) / 100;
+            // Filter out unrealistic speeds (0.5 mph to 25 mph for running/cycling)
+            if (speedMph >= 0.5 && speedMph <= 25) {
+              if (useImperial) {
+                if (workoutType === 'run') {
+                  // Convert mph to pace (min/mi): 60 minutes / mph
+                  const paceMinutes = 60 / speedMph;
+                  return Math.round(paceMinutes * 100) / 100;
+                } else {
+                  // Return mph for cycling
+                  return Math.round(speedMph * 10) / 10;
+                }
               } else {
-                // Convert to mph for cycling
-                const mph = speedMPS * 2.237;
-                return Math.round(mph * 10) / 10;
+                // Convert mph to km/h
+                const kmh = speedMph * 1.60934;
+                return Math.round(kmh * 10) / 10;
               }
-            } else {
-              // Metric: km/h
-              const kmh = speedMPS * 3.6;
-              return Math.round(kmh * 10) / 10;
             }
           }
         }
