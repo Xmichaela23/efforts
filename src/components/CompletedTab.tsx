@@ -235,6 +235,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
 
   const validData = chartData || [];
   
+  // Debug logging to see what's happening
+  console.log('🔍 Chart data debug:', {
+    chartDataLength: chartData?.length,
+    validDataLength: validData.length,
+    firstPoint: validData[0],
+    lastPoint: validData[validData.length - 1]
+  });
+  
   // Additional safety check for chart data
   if (!validData || validData.length === 0) {
     return (
@@ -292,14 +300,8 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <div className="text-xs text-gray-500 mb-3 md:hidden">
         Tap and drag to explore • Scroll to zoom
       </div>
-             <div 
-               className="touch-none select-none" 
-               style={{ touchAction: 'none' }}
-               onTouchStart={(e) => e.preventDefault()}
-               onTouchMove={(e) => e.preventDefault()}
-             >
-               <ResponsiveContainer width="100%" height="75%">
-                 <ComposedChart data={validData}>
+             <ResponsiveContainer width="100%" height="75%">
+               <ComposedChart data={validData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -410,7 +412,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           />
         </ComposedChart>
       </ResponsiveContainer>
-             </div>
       
       {/* Metric Selection Buttons */}
       <div className="mt-3 px-2">
