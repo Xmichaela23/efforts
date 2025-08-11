@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area, ReferenceLine } from 'recharts';
 
 import { useAppContext } from '@/contexts/AppContext';
 import ActivityMap from './ActivityMap';
@@ -216,17 +216,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
 
   const validData = chartData || [];
   
-  // Filter data based on scroll position for chart view
-  const visibleData = useMemo(() => {
-    if (validData.length === 0) return [];
-    
-    const scrollPercent = scrollRange[0] / 100;
-    const startIndex = Math.floor(scrollPercent * (validData.length - 1));
-    const endIndex = Math.min(startIndex + Math.floor(validData.length * 0.3), validData.length - 1); // Show 30% of data
-    
-    return validData.slice(startIndex, endIndex);
-  }, [validData, scrollRange]);
-  
   // Debug logging to see what's happening
   console.log('🔍 Chart data debug:', {
     chartDataLength: chartData?.length,
@@ -247,7 +236,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     );
   }
 
-
+  // Calculate cursor position based on scroll
+  const cursorPosition = useMemo(() => {
+    if (validData.length === 0) return null;
+    const scrollPercent = scrollRange[0] / 100;
+    const dataIndex = Math.floor(scrollPercent * (validData.length - 1));
+    return validData[dataIndex];
+  }, [validData, scrollRange]);
 
   const getMetricColor = () => {
     switch (localSelectedMetric) {
@@ -293,7 +288,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         Tap and drag to explore • Scroll to zoom
       </div>
              <ResponsiveContainer width="100%" height="75%">
-               <ComposedChart data={visibleData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+               <ComposedChart data={validData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -368,6 +363,22 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             dot={false}
             activeDot={{ r: 5, fill: getMetricColor() }}
           />
+          
+          {/* Cursor Line - Shows current scroll position */}
+          {cursorPosition && (
+            <ReferenceLine
+              x={cursorPosition.distance}
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+              label={{
+                value: `${cursorPosition.distance?.toFixed(1)} mi`,
+                position: 'top',
+                fill: '#ef4444',
+                fontSize: 10
+              }}
+            />
+          )}
           
           {/* Tooltip */}
           <Tooltip
@@ -472,9 +483,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             <span>End</span>
           </div>
           {/* Show current position in workout */}
-          {visibleData.length > 0 && (
+          {validData.length > 0 && (
             <div className="text-xs text-gray-600 mt-1 text-center">
-              {visibleData[0]?.distance?.toFixed(1)} mi → {visibleData[visibleData.length - 1]?.distance?.toFixed(1)} mi
+              {validData[0]?.distance?.toFixed(1)} mi → {validData[validData.length - 1]?.distance?.toFixed(1)} mi
             </div>
           )}
         </div>
