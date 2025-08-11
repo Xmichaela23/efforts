@@ -91,14 +91,16 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         hasSensorData: !!sensorData,
         sensorDataLength: sensorData?.length,
         foundSensorPoint: !!sensorPoint,
-        sensorPointKeys: sensorPoint ? Object.keys(sensorPoint) : []
+        sensorPointKeys: sensorPoint ? Object.keys(sensorPoint) : [],
+        sensorPointData: sensorPoint
       });
     }
     
     switch (localSelectedMetric) {
       case 'heartrate':
+        // The heart rate data IS in sensorData - this should work now!
         const hr = sensorPoint?.heartRate || null;
-        if (index < 3) console.log(`🔍 Heart rate for point ${index}:`, hr);
+        if (index < 3) console.log(`🔍 Heart rate for point ${index}:`, hr, 'from sensorPoint:', sensorPoint);
         return hr;
       case 'speed':
         // Calculate speed from GPS coordinates - this should always work since we have lat/lng/timestamp
@@ -141,8 +143,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         if (index < 3) console.log(`🔍 Speed for point ${index}: null (no movement or time data)`);
         return null;
       case 'power':
+        // Power data IS in sensorData - this should work now!
         const power = sensorPoint?.power || null;
-        if (index < 3) console.log(`🔍 Power for point ${index}:`, power);
+        if (index < 3) console.log(`🔍 Power for point ${index}:`, power, 'from sensorPoint:', sensorPoint);
         return power;
       case 'vam':
         // Calculate VAM (climbing rate) between this point and previous point
