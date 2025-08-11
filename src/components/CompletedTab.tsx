@@ -46,6 +46,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   selectedMetric,
   useImperial
 }) => {
+  console.log('🎯 InteractiveElevationProfile rendering with:', {
+    gpsTrackLength: gpsTrack?.length,
+    sensorDataLength: sensorData?.length,
+    workoutType,
+    selectedMetric,
+    useImperial
+  });
+  
   const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
   
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
@@ -62,15 +70,36 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   }
 
   const getMetricValue = (point: any, index: number) => {
+    // Debug: Log what we're working with for first few points
+    if (index < 3) {
+      console.log(`🔍 getMetricValue for point ${index}:`, {
+        pointKeys: Object.keys(point),
+        timestamp: point.timestamp || point.startTimeInSeconds,
+        elevation: point.elevation,
+        selectedMetric: localSelectedMetric
+      });
+    }
+    
     // Find corresponding sensor data by timestamp
     const sensorPoint = sensorData?.find(sensor => 
       sensor.timestamp === point.timestamp || 
       sensor.timestamp === point.startTimeInSeconds
     );
     
+    if (index < 3) {
+      console.log(`🔍 Sensor data for point ${index}:`, {
+        hasSensorData: !!sensorData,
+        sensorDataLength: sensorData?.length,
+        foundSensorPoint: !!sensorPoint,
+        sensorPointKeys: sensorPoint ? Object.keys(sensorPoint) : []
+      });
+    }
+    
     switch (localSelectedMetric) {
       case 'heartrate':
-        return sensorPoint?.heartRate || null;
+        const hr = sensorPoint?.heartRate || null;
+        if (index < 3) console.log(`🔍 Heart rate for point ${index}:`, hr);
+        return hr;
       case 'speed':
         // Calculate speed from GPS coordinates with more granularity
         if (index > 0) {
@@ -95,9 +124,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             return Math.round(speedMPS);
           }
         }
+        if (index < 3) console.log(`🔍 Speed for point ${index}: null (no movement or time data)`);
         return null;
       case 'power':
-        return sensorPoint?.power || null;
+        const power = sensorPoint?.power || null;
+        if (index < 3) console.log(`🔍 Power for point ${index}:`, power);
+        return power;
       case 'vam':
         // Calculate VAM (climbing rate) between this point and previous point
         if (index === 0) return 0; // First point has no VAM
@@ -185,6 +217,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   }, [gpsTrack, localSelectedMetric, useImperial]);
 
   const validData = chartData || [];
+  
+  // Debug: Log chart data to see what's happening
+  console.log('📊 Chart data debug:', {
+    totalPoints: validData.length,
+    samplePoint: validData[0],
+    metricValues: validData.slice(0, 3).map(d => ({ distance: d.distance, metricValue: d.metricValue })),
+    selectedMetric: localSelectedMetric
+  });
   
   // Additional safety check for chart data
   if (!validData || validData.length === 0) {
@@ -294,29 +334,27 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fillOpacity={0.3}
           />
           
-          {/* Elevation Line - Highlight the actual elevation data we have */}
+          {/* Elevation Line - Make it subtle so it doesn't dominate */}
           <Line
             yAxisId="left"
             type="monotone"
             dataKey="elevation"
-            stroke="#1f2937"
-            strokeWidth={2}
+            stroke="#9ca3af"
+            strokeWidth={1}
             dot={false}
-            activeDot={{ r: 4, fill: "#1f2937" }}
+            activeDot={{ r: 3, fill: "#9ca3af" }}
           />
 
-          {/* Performance Metric Line - Only show when metric data is available */}
-          {localSelectedMetric !== 'vam' && (
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="metricValue"
-              stroke={getMetricColor()}
-              strokeWidth={2}
-              dot={false}
-              activeDot={{ r: 4, fill: getMetricColor() }}
-            />
-          )}
+          {/* Performance Metric Line - Always show the selected metric */}
+          <Line
+            yAxisId="right"
+            type="monotone"
+            dataKey="metricValue"
+            stroke={getMetricColor()}
+            strokeWidth={3}
+            dot={false}
+            activeDot={{ r: 5, fill: getMetricColor() }}
+          />
           
           {/* Tooltip */}
           <Tooltip
