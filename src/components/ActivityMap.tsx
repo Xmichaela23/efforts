@@ -120,11 +120,27 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       trackLength: gpsTrack.length,
       firstPoint: gpsTrack[0],
       lastPoint: gpsTrack[gpsTrack.length - 1],
-      samplePoints: gpsTrack.slice(0, 3)
+      samplePoints: gpsTrack.slice(0, 3),
+      firstPointKeys: Object.keys(gpsTrack[0] || {}),
+      sampleCoordinates: gpsTrack.slice(0, 3).map(point => ({
+        lng: point.lng || point.longitudeInDegree || point.longitude,
+        lat: point.lat || point.latitudeInDegree || point.latitude
+      }))
     });
     
-    // Prepare coordinates for Mapbox
-    const coordinates = gpsTrack.map(point => [point.lng, point.lat]);
+    // Prepare coordinates for Mapbox - handle different GPS data field names
+    const coordinates = gpsTrack.map(point => {
+      // Garmin data might use different field names
+      const lng = point.lng || point.longitudeInDegree || point.longitude;
+      const lat = point.lat || point.latitudeInDegree || point.latitude;
+      
+      if (!lng || !lat) {
+        console.warn('🗺️ GPS point missing coordinates:', point);
+        return null;
+      }
+      
+      return [lng, lat];
+    }).filter(coord => coord !== null); // Remove any invalid coordinates
 
     // Add route source
     map.current.addSource('route', {
