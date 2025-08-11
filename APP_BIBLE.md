@@ -107,6 +107,35 @@ User Flow:
 4. Workout Execution → Logging & tracking
 ```
 
+## 🔗 GARMIN INTEGRATION ARCHITECTURE
+
+### **Data Flow:**
+```
+Garmin Connect → Webhook → Supabase Edge Function → Database → Frontend
+1. Garmin activity completed → Webhook triggers
+2. Edge Function processes: GPS tracks, sensor data, performance metrics  
+3. Data stored in: gps_track (JSONB), sensor_data (JSONB), summary fields
+4. Frontend queries via useWorkouts hook → Components display data
+```
+
+### **Key Components:**
+- **`garmin-webhook-activities-working.ts`**: Edge Function that receives and processes webhook data
+- **`useWorkouts.ts`**: Hook that fetches and merges manual + Garmin workouts
+- **`CompletedTab.tsx`**: Main analytics view with side-by-side map and elevation profile
+- **`ActivityMap.tsx`**: Mapbox integration for GPS route display
+- **`InteractiveElevationProfile`**: Recharts-based elevation chart with metric overlays
+
+### **Data Storage:**
+- **`gps_track`**: GPS coordinates, elevation, timestamps (JSONB)
+- **`sensor_data`**: Heart rate, power, cadence samples over time (JSONB)
+- **Performance metrics**: HR, power, speed/pace, VAM calculations
+
+### **Features:**
+- **Real-time sync**: Webhook-based automatic workout import
+- **GPS visualization**: Interactive Mapbox maps with workout routes
+- **Performance overlays**: Heart rate, power, speed on elevation charts
+- **Metric calculations**: VAM (climbing rate), pace from GPS, power zones
+
 ## 🎯 CURRENT FOCUS: 70.3 CLEAN 3-FILE ARCHITECTURE
 
 ### **Core System:**

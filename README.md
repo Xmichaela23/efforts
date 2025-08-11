@@ -1,27 +1,20 @@
-# Efforts - Proven 12‑Week Balanced Triathlon Training
+# Efforts - Fitness Tracking & Training Plans
 
-A React + TypeScript app that generates 12‑week triathlon plans using proven balanced methodology. Rule‑driven, no fallbacks, clean 3‑file engine.
+A React + TypeScript fitness app that integrates with Garmin Connect to display GPS routes, workout analytics, and generates training plans using proven methodology.
 
-## Core Philosophy
-- Periodization: Base (1–4), Build (5–8), Peak (9–11), Taper (12)
-- Weekly pattern:
-  - Swim 2/wk
-  - Bike 3/wk (Tue hard, mid‑week short Z2, Sat long) — Taper 2/wk
-  - Run 2/wk; hard run Fri (Build/Peak); never adjacent to hard bike
-  - Strength: Traditional 2/1–2/0–1 or Cowboy 3/2/1 with taper auto‑limit
-- Intensity distribution (endurance only): Base 70–85% Z2; Build 50–70%; Peak 40–60%; Taper 70–85%
-- Outcomes, not caps: weekly hours emerge from rules (target Base ~10–12h, Build ~11–13h, Peak ~12–14h, Taper ~6–8h)
+## Core Features
+- **Garmin Integration**: Automatic workout sync via webhooks, GPS route display with Mapbox maps
+- **Interactive Analytics**: Side-by-side GPS map and elevation profile with heart rate, power, and VAM overlays
+- **Training Plans**: 12-week triathlon plans using proven balanced methodology
+- **Workout Tracking**: Manual logging + Garmin auto-sync with detailed metrics
 
-## Engine (3 files)
-- `src/services/Seventy3Template.ts` – phase templates + detailed workouts (swim/bike/run); VO2/threshold caps applied
-- `src/services/StrengthTemplate.ts` – Traditional/Cowboy generation with spacing rules
-- `src/services/TrainingEngine.ts` – week generation, scaling, validation (phase‑aware minimums, recovery, intensity)
+## Garmin Integration Overview
+- **Webhook Sync**: Real-time workout data from Garmin Connect
+- **GPS Routes**: Interactive Mapbox maps showing workout paths
+- **Performance Metrics**: Heart rate, power, speed/pace overlays on elevation charts
+- **Data Storage**: Supabase backend with PostgreSQL for workout history
 
-## Deploy (Git → Netlify)
-- Netlify reads `netlify.toml` (build: `npm run build`, publish: `dist`, SPA redirects)
-- Push to `main` → auto build & deploy
-
-## Quick start
+## Quick Start
 ```bash
 git clone https://github.com/Xmichaela23/efforts.git
 cd efforts
@@ -29,4 +22,8 @@ npm install
 npm run dev
 ```
 
-See `APP_BIBLE.md` for design rules and `STRENGTH_TRAINING_DECISIONS.md` for strength specifics. 
+## Environment Variables
+- `VITE_MAPBOX_ACCESS_TOKEN` - For GPS route maps
+- Supabase credentials for database and auth
+
+See `APP_BIBLE.md` for architecture details and `GARMIN_INTEGRATION.md` for integration specifics. 
