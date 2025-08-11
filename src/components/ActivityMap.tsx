@@ -48,7 +48,17 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
 
     // Wait for style to be fully loaded before proceeding
     map.current.on('style.load', () => {
+      console.log('🗺️ Style loaded, setting mapLoaded to true');
       setMapLoaded(true);
+    });
+
+    // Also listen for the regular load event as backup
+    map.current.on('load', () => {
+      console.log('🗺️ Map loaded successfully');
+      // Only set mapLoaded if style is also ready
+      if (map.current?.isStyleLoaded()) {
+        setMapLoaded(true);
+      }
     });
 
     // Add navigation controls
@@ -83,6 +93,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       startLocation 
     });
     
+    // CRITICAL: Only process GPS when map AND style are fully loaded
     if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) {
       console.log('🗺️ Skipping GPS processing:', { 
         hasMap: !!map.current, 
@@ -90,6 +101,12 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
         hasGpsTrack: !!gpsTrack,
         gpsTrackLength: gpsTrack?.length 
       });
+      return;
+    }
+
+    // Double-check that the map style is actually ready
+    if (!map.current.isStyleLoaded()) {
+      console.log('🗺️ Map style not ready yet, waiting...');
       return;
     }
 
