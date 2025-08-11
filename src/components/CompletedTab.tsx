@@ -1,4 +1,4 @@
-console.log('🚨 COMPLETEDTAB COMPONENT LOADED');
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
@@ -33,6 +33,7 @@ const sliderStyles = `
 // Interactive Elevation Profile Component
 interface InteractiveElevationProfileProps {
   gpsTrack: any[] | null;
+  sensorData: any[] | null;
   workoutType: string;
   selectedMetric: string;
   useImperial: boolean;
@@ -40,22 +41,14 @@ interface InteractiveElevationProfileProps {
 
 const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = ({ 
   gpsTrack, 
+  sensorData,
   workoutType, 
   selectedMetric,
   useImperial
 }) => {
   const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
   
-  // Debug: Log when localSelectedMetric changes
-  useEffect(() => {
-    console.log(`🎯 localSelectedMetric changed to: ${localSelectedMetric}`);
-  }, [localSelectedMetric]);
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
-
-  // Debug: Log when metric changes
-  useEffect(() => {
-    console.log('🎯 Metric changed to:', localSelectedMetric);
-  }, [localSelectedMetric]);
   
   if (!gpsTrack || gpsTrack.length === 0) {
     return (
@@ -66,17 +59,37 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   }
 
   const getMetricValue = (point: any, index: number) => {
+    // Find corresponding sensor data by timestamp
+    const sensorPoint = sensorData?.find(sensor => 
+      sensor.timestamp === point.timestamp || 
+      sensor.timestamp === point.startTimeInSeconds
+    );
+    
     switch (localSelectedMetric) {
       case 'heartrate':
-        return point.heartRate || point.heart_rate || point.hr;
+        return sensorPoint?.heartRate || null;
       case 'speed':
-        const speedMPS = point.speedMetersPerSecond;
-        if (speedMPS && useImperial) {
-          return Math.round(speedMPS * 2.237); // Convert m/s to mph
+        // Calculate speed from GPS coordinates if no sensor data
+        if (index > 0) {
+          const prevPoint = gpsTrack[index - 1];
+          const distance = calculateDistance(
+            prevPoint.latitudeInDegree || prevPoint.lat,
+            prevPoint.longitudeInDegree || prevPoint.lng,
+            point.latitudeInDegree || point.lat,
+            point.longitudeInDegree || point.lng
+          );
+          const timeDiff = (point.timestamp || point.startTimeInSeconds) - (prevPoint.timestamp || prevPoint.startTimeInSeconds);
+          if (timeDiff > 0) {
+            const speedMPS = (distance * 1609.34) / timeDiff; // Convert miles to meters
+            if (useImperial) {
+              return Math.round(speedMPS * 2.237); // Convert m/s to mph
+            }
+            return Math.round(speedMPS);
+          }
         }
-        return speedMPS;
+        return null;
       case 'power':
-        return point.power || point.avgPower || point.maxPower;
+        return sensorPoint?.power || null;
       case 'vam':
         // Calculate VAM (climbing rate) between this point and previous point
         if (index === 0) return 0; // First point has no VAM
@@ -136,16 +149,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         }
       }
       
-      // Debug: Log first few points to see actual data structure
-      if (index < 3) {
-        console.log(`GPS Point ${index} keys:`, Object.keys(point));
-        console.log(`GPS Point ${index}:`, {
-          speedMPS: point.speedMetersPerSecond,
-          heartRate: point.heartRate,
-          power: point.power,
-          elevation: point.elevation
-        });
-      }
+
       
       const metricValue = getMetricValue(point, index);
       
@@ -1384,6 +1388,7 @@ const formatPace = (paceValue: any): string => {
          <div className="h-96 xl:col-span-2 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
+             sensorData={workoutData.sensor_data}
              workoutType={workoutType}
              selectedMetric={selectedMetric}
              useImperial={useImperial}
