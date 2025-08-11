@@ -224,7 +224,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                (VAM from GPS data)
              </span>
       </div>
-             <ResponsiveContainer width="100%" height="85%">
+             <ResponsiveContainer width="100%" height="75%">
         <ComposedChart data={validData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
@@ -1369,7 +1369,7 @@ const formatPace = (paceValue: any): string => {
          </div>
          
          {/* Elevation Profile - Right side (wider) */}
-         <div className="h-96 xl:col-span-3 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
+         <div className="h-80 xl:col-span-3 relative rounded-lg border border-gray-200 bg-white p-4">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
