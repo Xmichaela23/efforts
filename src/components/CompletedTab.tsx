@@ -191,7 +191,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           (Performance metrics not yet available in GPS data)
         </span>
       </div>
-      <ResponsiveContainer width="100%" height="90%">
+      <ResponsiveContainer width="100%" height="70%">
         <ComposedChart data={validData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
@@ -308,11 +308,11 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             <button
               key={metric}
               onClick={() => setLocalSelectedMetric(metric.toLowerCase().replace(' ', ''))}
-                              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                  localSelectedMetric === metric.toLowerCase().replace(' ', '')
-                    ? 'bg-gray-200 text-black'
-                    : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
-                }`}
+              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                localSelectedMetric === metric.toLowerCase().replace(' ', '')
+                  ? 'bg-gray-200 text-black'
+                  : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
+              }`}
             >
               {metric}
             </button>
@@ -1257,9 +1257,9 @@ const formatPace = (paceValue: any): string => {
      <div>
 
        {/* 🗺️ SIDE-BY-SIDE LAYOUT */}
-       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
          {/* GPS Route Map - Left side */}
-         <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200">
+         <div className="h-80 xl:col-span-1 relative overflow-hidden rounded-lg border border-gray-200">
            <ActivityMap
              gpsTrack={workoutData.gps_track}
              activityName={workoutData.name || generateTitle()}
@@ -1271,14 +1271,14 @@ const formatPace = (paceValue: any): string => {
            />
          </div>
          
-         {/* Elevation Profile - Right side */}
-         <div className="h-80 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
-                       <InteractiveElevationProfile
-              gpsTrack={workoutData.gps_track}
-              workoutType={workoutType}
-              selectedMetric={selectedMetric}
-              useImperial={useImperial}
-            />
+         {/* Elevation Profile - Right side (wider) */}
+         <div className="h-96 xl:col-span-2 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
+           <InteractiveElevationProfile
+             gpsTrack={workoutData.gps_track}
+             workoutType={workoutType}
+             selectedMetric={selectedMetric}
+             useImperial={useImperial}
+           />
          </div>
        </div>
      </div>
