@@ -35,11 +35,18 @@
   - `generateWorkoutTitle()`: Creates location-based titles from GPS
 
 ### **CompletedTab** (`src/components/CompletedTab.tsx`)
-- **Purpose**: Shows completed workout metrics and analytics
-- **Activity-specific logic**: Different metrics based on `workoutType`
-- **Walking**: Duration, Distance, Heart Rate, Calories, Elevation (simplified)
-- **Running/Cycling**: Full metrics including power, pace, cadence
-- **Key functions**: `getPrimaryMetrics()`, `getAdvancedMetrics()`
+- **Purpose**: Main analytics view with side-by-side GPS map and elevation profile
+- **Layout**: Grid layout with map (25%) and elevation chart (75%)
+- **Features**: 
+  - Interactive elevation profile with metric overlays (HR, power, speed, VAM)
+  - Metric selection buttons (Heart Rate, Pace/Speed, Power, VAM)
+  - Scroll control slider for large datasets
+  - Performance optimization with data sampling (max 1000 points)
+- **Key functions**: 
+  - `InteractiveElevationProfile` sub-component for chart rendering
+  - `getMetricValue()` for extracting sensor data by timestamp
+  - Speed/pace calculation from GPS coordinates
+  - VAM (climbing rate) calculation
 
 ## 📱 Bottom Navigation System
 
@@ -67,7 +74,55 @@
 - **Purpose**: View completed workouts and analytics
 - **Options**: Today's Efforts, History, Analytics
 
+## 🔗 Garmin Integration Components
+
+### **ActivityMap** (`src/components/ActivityMap.tsx`)
+- **Purpose**: Renders interactive Mapbox maps with GPS routes
+- **Features**: 
+  - GPS track visualization with workout paths
+  - Start/finish location markers
+  - Responsive design with proper aspect ratios
+- **Integration**: Uses `VITE_MAPBOX_ACCESS_TOKEN` environment variable
+- **Data**: Receives `gpsTrack` prop from parent components
+
+### **useWorkouts Hook** (`src/hooks/useWorkouts.ts`)
+- **Purpose**: Central data management for workouts (manual + Garmin)
+- **Features**:
+  - Fetches workouts from Supabase database
+  - Merges manual and Garmin-imported workouts
+  - Maps database fields to `Workout` interface
+  - Handles authentication and user sessions
+- **Key Data Fields**:
+  - `gps_track`: GPS coordinates and elevation data
+  - `sensor_data`: Heart rate, power, cadence samples over time
+  - `isGarminImported`: Flag for Garmin vs manual workouts
+
+### **InteractiveElevationProfile** (Sub-component of CompletedTab)
+- **Purpose**: Renders interactive elevation charts with performance overlays
+- **Chart Library**: Recharts with `ComposedChart`, `Area`, `Line` components
+- **Features**:
+  - Elevation area chart (relative to start point)
+  - Performance metric line overlays (HR, power, speed, VAM)
+  - Interactive tooltips with distance, elevation, and metric values
+  - Metric selection buttons with light grey selected state
+  - Scroll control slider for large datasets
+- **Performance**: Data sampling for large GPS tracks (max 1000 points)
+- **Calculations**: 
+  - Haversine formula for accurate distance calculation
+  - Speed/pace from GPS coordinates
+  - VAM (Velocità Ascensionale Media) for climbing rate
+
 ## 📊 Data Flow & Mapping
+
+### **Garmin Data Flow**
+```
+Garmin Connect → Webhook → Supabase Edge Function → Database → Frontend
+1. Activity completed → Webhook triggers
+2. Edge Function processes GPS tracks and sensor data
+3. Data stored in JSONB fields: gps_track, sensor_data
+4. useWorkouts hook queries and maps data
+5. Components receive gpsTrack and sensorData props
+```
 
 ### **Activity Type Mapping**
 ```
@@ -78,6 +133,14 @@ CYCLING → ride → blue
 SWIMMING → swim → cyan
 STRENGTH_TRAINING → strength → orange
 ```
+
+### **Current Tab Structure** (`UnifiedWorkoutView.tsx`)
+- **Summary Tab**: Shows workout metrics, comments, and basic data
+- **Completed Tab**: Professional analytics with side-by-side map and elevation profile
+  - GPS route visualization with Mapbox
+  - Interactive elevation chart with performance overlays
+  - Metric selection (HR, power, speed, VAM)
+  - Scroll controls for large datasets
 
 ### **Smart Tab Routing Logic** (`AppLayout.tsx`)
 ```
@@ -92,6 +155,77 @@ else if (workout_status === 'completed') {
 - **GPS coordinates** → City detection (Los Angeles, Pasadena, San Francisco)
 - **Format**: "City + Activity Type" (e.g., "Los Angeles Walking")
 - **Fallback**: Uses original workout name or generic type
+
+## 🚀 Current Implementation Status
+
+### **✅ Working Features**
+- **Garmin Webhook Integration**: Real-time workout sync via Supabase Edge Functions
+- **GPS Route Visualization**: Interactive Mapbox maps with workout paths
+- **Interactive Elevation Profile**: Recharts-based charts with performance overlays
+- **Data Processing**: GPS track and sensor data correlation by timestamp
+- **Performance Optimization**: Data sampling for large datasets (max 1000 points)
+- **Metric Calculations**: VAM, speed/pace from GPS, heart rate overlays
+
+### **🔧 Recent Fixes**
+- **Workout Interface**: Added `sensor_data` field to prevent data loss
+- **Data Mapping**: Ensured `sensor_data` flows from database to frontend components
+- **Layout**: Side-by-side map and chart layout (25% map, 75% chart)
+- **Performance**: Implemented data sampling for large GPS tracks
+
+### **📱 User Experience**
+- **Side-by-side Layout**: Map and elevation profile visible simultaneously
+- **Metric Selection**: Buttons for HR, power, speed, VAM overlays
+- **Scroll Controls**: Slider for navigating large workout datasets
+- **Responsive Design**: Mobile-optimized with proper aspect ratios
+
+## 🏗️ Data Interfaces & Structures
+
+### **Workout Interface** (`useWorkouts.ts`)
+```typescript
+export interface Workout {
+  // Core fields
+  id: string;
+  name: string;
+  type: string;
+  date: string;
+  
+  // Garmin-specific fields
+  isGarminImported?: boolean;
+  garmin_activity_id?: string;
+  gps_track?: any; // GPS track data from Garmin
+  sensor_data?: any; // Heart rate, power data over time from Garmin
+  
+  // Performance metrics
+  duration: number;
+  distance: number;
+  avg_heart_rate?: number;
+  max_heart_rate?: number;
+  avg_power?: number;
+  max_power?: number;
+}
+```
+
+### **GPS Track Data Structure**
+```typescript
+interface GPSTrackPoint {
+  lat: number;
+  lng: number;
+  elevation: number;
+  timestamp: number;
+  startTimeInSeconds?: number;
+}
+```
+
+### **Sensor Data Structure**
+```typescript
+interface SensorDataPoint {
+  startTimeInSeconds: number;
+  heartRate?: number;
+  power?: number;
+  cadence?: number;
+  speed?: number;
+}
+```
 
 ## 🏃‍♂️ Pace & Speed Calculations
 
