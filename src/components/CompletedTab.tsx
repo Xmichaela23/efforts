@@ -69,7 +69,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'heartrate':
         return sensorPoint?.heartRate || null;
       case 'speed':
-        // Calculate speed from GPS coordinates if no sensor data
+        // Calculate speed from GPS coordinates with more granularity
         if (index > 0) {
           const prevPoint = gpsTrack[index - 1];
           const distance = calculateDistance(
@@ -79,9 +79,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             point.longitudeInDegree || point.lng
           );
           const timeDiff = (point.timestamp || point.startTimeInSeconds) - (prevPoint.timestamp || prevPoint.startTimeInSeconds);
-          if (timeDiff > 0) {
+          if (timeDiff > 0 && distance > 0.001) { // Only calculate if significant movement
             const speedMPS = (distance * 1609.34) / timeDiff; // Convert miles to meters
             if (useImperial) {
+              if (workoutType === 'run') {
+                // Convert to pace (min/mi) for running
+                const paceMinutes = 60 / (speedMPS * 2.237); // Convert m/s to mph, then to min/mi
+                return Math.round(paceMinutes * 100) / 100; // Round to 2 decimal places
+              }
               return Math.round(speedMPS * 2.237); // Convert m/s to mph
             }
             return Math.round(speedMPS);
@@ -176,23 +181,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     });
   }, [gpsTrack, localSelectedMetric, useImperial]);
 
-  // For now, always show elevation data since that's what we have
-  // TODO: When we get actual performance metrics from Garmin, filter by those
   const validData = chartData;
 
-  console.log('Chart data debug:', {
-    totalPoints: gpsTrack.length,
-    chartDataPoints: chartData.length,
-    validDataPoints: validData.length,
-    localSelectedMetric,
-    totalDistance: chartData.length > 0 ? chartData[chartData.length - 1].distance : 0,
-    elevationRange: chartData.length > 0 ? {
-      min: Math.min(...chartData.map(d => d.elevation)),
-      max: Math.max(...chartData.map(d => d.elevation))
-    } : { min: 0, max: 0 },
-    samplePoint: chartData[0],
-    metricValues: chartData.slice(0, 3).map(d => ({ distance: d.distance, metricValue: d.metricValue }))
-  });
+
 
   const getMetricColor = () => {
     switch (localSelectedMetric) {
@@ -214,7 +205,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'heartrate':
         return 'Heart Rate (BPM)';
       case 'speed':
-        return 'Speed (mph)';
+        return workoutType === 'run' ? 'Pace (min/mi)' : 'Speed (mph)';
       case 'power':
         return 'Power (W)';
       case 'vam':
@@ -233,7 +224,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                (VAM from GPS data)
              </span>
       </div>
-      <ResponsiveContainer width="100%" height="70%">
+             <ResponsiveContainer width="100%" height="85%">
         <ComposedChart data={validData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
@@ -263,7 +254,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             orientation="right"
             tickFormatter={(value) => {
               if (localSelectedMetric === 'heartrate') return `${value} bpm`;
-              if (localSelectedMetric === 'speed') return `${value.toFixed(1)} mph`;
+              if (localSelectedMetric === 'speed') {
+                if (workoutType === 'run') {
+                  return `${value.toFixed(2)} min/mi`;
+                }
+                return `${value.toFixed(1)} mph`;
+              }
               if (localSelectedMetric === 'power') return `${value.toFixed(0)} W`;
               if (localSelectedMetric === 'vam') return `${value} m/h`;
               return value;
@@ -322,10 +318,10 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                                            {metricValue !== null && metricValue !== undefined && (localSelectedMetric !== 'vam' || Number(metricValue) > 0) ? (
                          <p className="text-gray-600" style={{ color: getMetricColor() }}>
                            {getMetricLabel()}: {metricValue}
-                           {localSelectedMetric === 'heartrate' && ' bpm'}
-                           {localSelectedMetric === 'speed' && ' mph'}
-                           {localSelectedMetric === 'power' && ' W'}
-                           {localSelectedMetric === 'vam' && ' m/h'}
+                                                        {localSelectedMetric === 'heartrate' && ' bpm'}
+                             {localSelectedMetric === 'speed' && (workoutType === 'run' ? ' min/mi' : ' mph')}
+                             {localSelectedMetric === 'power' && ' W'}
+                             {localSelectedMetric === 'vam' && ' m/h'}
                          </p>
                        ) : (
                          <p className="text-gray-500 text-xs">
@@ -345,13 +341,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <div className="mt-3 px-2">
         <div className="text-xs text-gray-600 mb-2">Metric overlay:</div>
         <div className="flex flex-wrap gap-2">
-          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => {
+          {['Heart Rate', workoutType === 'run' ? 'Pace' : 'Speed', 'Power', 'VAM'].map((metric) => {
             const metricKey = metric.toLowerCase().replace(' ', '');
             return (
               <button
                 key={metric}
                 onClick={() => {
-                  console.log(`🎯 Button clicked: ${metric} -> ${metricKey}`);
                   setLocalSelectedMetric(metricKey);
                 }}
                 className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
@@ -414,18 +409,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
 
 
- // 🔍 DEBUG: Log what CompletedTab receives
- console.log('🔍 COMPLETEDTAB DEBUG - workoutData received:', workoutData);
- console.log('🔍 COMPLETEDTAB DEBUG - friendly_name:', workoutData.friendly_name);
- console.log('🔍 COMPLETEDTAB DEBUG - timestamp:', workoutData.timestamp);
- console.log('🔍 COMPLETEDTAB DEBUG - start_position_lat:', workoutData.start_position_lat);
- console.log('🔍 COMPLETEDTAB DEBUG - start_position_long:', workoutData.start_position_long);
- console.log('🔍 COMPLETEDTAB DEBUG - avg_temperature:', workoutData.metrics?.avg_temperature);
- console.log('🔍 COMPLETEDTAB DEBUG - total_timer_time:', workoutData.metrics?.total_timer_time);
- console.log('🔍 COMPLETEDTAB DEBUG - moving_time:', workoutData.moving_time);
- console.log('🔍 COMPLETEDTAB DEBUG - elapsed_time:', workoutData.elapsed_time);
- console.log('🔍 COMPLETEDTAB DEBUG - gps_track:', workoutData.gps_track);
- console.log('🔍 COMPLETEDTAB DEBUG - gps_track length:', workoutData.gps_track?.length);
+
 
  // Helper functions
  const safeNumber = (value: any): string => {
@@ -1370,7 +1354,7 @@ const formatPace = (paceValue: any): string => {
      <div>
 
        {/* 🗺️ SIDE-BY-SIDE LAYOUT */}
-       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+       <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
          {/* GPS Route Map - Left side */}
          <div className="h-80 xl:col-span-1 relative overflow-hidden rounded-lg border border-gray-200">
            <ActivityMap
@@ -1385,7 +1369,7 @@ const formatPace = (paceValue: any): string => {
          </div>
          
          {/* Elevation Profile - Right side (wider) */}
-         <div className="h-96 xl:col-span-2 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
+         <div className="h-96 xl:col-span-3 relative overflow-hidden rounded-lg border border-gray-200 bg-white p-4">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
