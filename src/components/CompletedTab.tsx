@@ -442,6 +442,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const { useImperial } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState('heartrate');
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
+  const [isLoading, setIsLoading] = useState(true);
 
    // Simple check: what fields are actually in workoutData?
   useEffect(() => {
