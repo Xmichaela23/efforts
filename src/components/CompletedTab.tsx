@@ -347,46 +347,18 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             dot={false}
             activeDot={{ r: 3, fill: "#9ca3af" }}
           />
-
-
-          
-          {/* Cursor Line - Moves with scroll bar */}
-          {scrollRange[0] > 0 && validData.length > 0 && (
-            <ReferenceLine
-              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-            />
-          )}
           
           {/* Tooltip */}
           <Tooltip
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 const elevation = payload.find(p => p.dataKey === 'elevation')?.value;
-                const metricValue = payload.find(p => p.dataKey === 'metricValue')?.value;
                 
                 return (
                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                     <p className="text-xs text-gray-400">Relative to start point</p>
-                    
-                    {/* Show the selected metric value */}
-                    {metricValue !== null && metricValue !== undefined ? (
-                      <p className="text-gray-600" style={{ color: getMetricColor() }}>
-                        {getMetricLabel()}: {metricValue}
-                        {localSelectedMetric === 'heartrate' && ' bpm'}
-                        {localSelectedMetric === 'speed' && (workoutType === 'run' ? ' min/mi' : ' mph')}
-                        {localSelectedMetric === 'power' && ' W'}
-                        {localSelectedMetric === 'vam' && ' m/h'}
-                      </p>
-                    ) : (
-                      <p className="text-gray-500 text-xs">
-                        {localSelectedMetric === 'vam' ? 'Flat section' : 'No data'}
-                      </p>
-                    )}
                   </div>
                 );
               }
@@ -400,7 +372,35 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       {scrollRange[0] > 0 && validData.length > 0 && (() => {
         const currentIndex = Math.floor((scrollRange[0] / 100) * (validData.length - 1));
         const currentPoint = validData[currentIndex];
-        const paceValue = getMetricValue(gpsTrack[currentIndex * Math.ceil(gpsTrack.length / validData.length)], currentIndex * Math.ceil(gpsTrack.length / validData.length));
+        
+        // Get the corresponding GPS track point for accurate metric calculation
+        const gpsIndex = Math.floor((scrollRange[0] / 100) * (gpsTrack.length - 1));
+        const gpsPoint = gpsTrack[gpsIndex];
+        
+        // Calculate metrics at this position
+        const paceValue = getMetricValue(gpsPoint, gpsIndex);
+        const heartRate = sensorData?.find(sensor => 
+          sensor.timestamp === gpsPoint?.timestamp || 
+          sensor.timestamp === gpsPoint?.startTimeInSeconds
+        )?.heartRate;
+        
+        // Calculate VAM at this position
+        let vamValue = null;
+        if (gpsIndex > 0) {
+          const prevPoint = gpsTrack[gpsIndex - 1];
+          const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
+          const currentElevation = gpsPoint.elevation || gpsPoint.altitude || 0;
+          const elevationGain = Math.max(0, currentElevation - prevElevation);
+          
+          const prevTime = prevPoint.timestamp || prevPoint.startTimeInSeconds || 0;
+          const currentTime = gpsPoint.timestamp || gpsPoint.startTimeInSeconds || 0;
+          const timeDiff = currentTime - prevTime;
+          
+          if (timeDiff > 0 && elevationGain > 0) {
+            const timeHours = timeDiff / 3600;
+            vamValue = Math.round(elevationGain / timeHours);
+          }
+        }
         
         return (
           <div className="mt-3 px-2">
@@ -417,8 +417,20 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                 </div>
                 <div>
                   <span className="text-gray-500">Pace:</span>
-                  <span className="ml-2 font-medium" style={{ color: getMetricColor() }}>
+                  <span className="ml-2 font-medium" style={{ color: '#3b82f6' }}>
                     {paceValue ? `${paceValue} min/mi` : 'No data'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Heart Rate:</span>
+                  <span className="ml-2 font-medium" style={{ color: '#ef4444' }}>
+                    {heartRate ? `${heartRate} bpm` : 'No data'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">VAM:</span>
+                  <span className="ml-2 font-medium" style={{ color: '#10b981' }}>
+                    {vamValue ? `${vamValue} m/h` : 'No data'}
                   </span>
                 </div>
                 <div>
@@ -431,38 +443,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         );
       })()}
       
-      {/* Metric Selection Buttons */}
-      <div className="mt-3 px-2">
-        <div className="text-xs text-gray-600 mb-2">Metric overlay:</div>
-        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-          {['Heart Rate', workoutType === 'run' ? 'Pace' : 'Speed', 'Power', 'VAM'].map((metric) => {
-            // Map the display text to the correct metric key for getMetricValue
-            let metricKey;
-            if (metric === 'Pace') {
-              metricKey = 'speed'; // Pace button maps to 'speed' case in getMetricValue
-            } else {
-              metricKey = metric.toLowerCase().replace(' ', '');
-            }
-            const isSelected = localSelectedMetric === metricKey;
-            
-            return (
-              <button
-                key={metric}
-                onClick={() => {
-                  setLocalSelectedMetric(metricKey);
-                }}
-                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
-                  isSelected
-                    ? 'bg-gray-200 text-black'
-                    : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
-                }`}
-              >
-                {metric}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+
 
       {/* Scroll Control - Simple Scroll Bar */}
       <div className="mt-3 px-2">
