@@ -81,19 +81,17 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'heartrate':
         return sensorPoint?.heartRate || null;
       case 'speed':
-        // Calculate speed from GPS coordinates with rolling average for stability
+        // Calculate speed from GPS coordinates with segment-based approach
         if (index > 0) {
-          // Use a 3-point rolling average for more stable pace calculation
-          const windowSize = 3;
-          const startIdx = Math.max(0, index - windowSize + 1);
-          const endIdx = index + 1;
+          // Use larger segments (5 points) to get more stable pace
+          const segmentSize = 5;
+          const startIdx = Math.max(0, index - segmentSize + 1);
           
+          // Calculate total distance and time over the segment
           let totalDistance = 0;
           let totalTime = 0;
-          let validSegments = 0;
           
-          // Calculate cumulative distance and time over the window
-          for (let i = startIdx + 1; i < endIdx; i++) {
+          for (let i = startIdx + 1; i <= index; i++) {
             if (i < gpsTrack.length) {
               const prevPoint = gpsTrack[i - 1];
               const currPoint = gpsTrack[i];
@@ -108,21 +106,19 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
               const timeDiff = (currPoint.timestamp || currPoint.startTimeInSeconds) - 
                               (prevPoint.timestamp || prevPoint.startTimeInSeconds);
               
-              // Only include segments with reasonable distance and time
-              if (timeDiff > 0 && distance > 0.005) { // 0.005 miles = ~8 meters
+              if (timeDiff > 0 && distance > 0.001) { // 0.001 miles = ~1.6 meters
                 totalDistance += distance;
                 totalTime += timeDiff;
-                validSegments++;
               }
             }
           }
           
-          // Calculate average speed if we have valid segments
-          if (validSegments > 0 && totalTime > 0) {
+          // Calculate average speed if we have meaningful data
+          if (totalTime > 0 && totalDistance > 0.01) { // At least 0.01 miles total
             const avgSpeedMph = (totalDistance / totalTime) * 3600;
             
-            // Filter out unrealistic speeds
-            if (avgSpeedMph >= 0.5 && avgSpeedMph <= 25) {
+            // Filter to realistic running/cycling speeds
+            if (avgSpeedMph >= 2 && avgSpeedMph <= 20) {
               if (useImperial) {
                 if (workoutType === 'run') {
                   // Convert mph to pace (min/mi): 60 minutes / mph
@@ -288,12 +284,22 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <style>{sliderStyles}</style>
       <div className="text-sm font-medium text-gray-700 mb-2">
         Elevation Profile (Relative to Start)
-                     <span className="text-xs text-gray-500 ml-2">
-               (VAM from GPS data)
-             </span>
+        <span className="text-xs text-gray-500 ml-2">
+          (VAM from GPS data)
+        </span>
       </div>
-             <ResponsiveContainer width="100%" height="75%">
-        <ComposedChart data={validData}>
+      {/* Mobile-friendly subtitle */}
+      <div className="text-xs text-gray-500 mb-3 md:hidden">
+        Tap and drag to explore • Scroll to zoom
+      </div>
+             <div 
+               className="touch-none select-none" 
+               style={{ touchAction: 'none' }}
+               onTouchStart={(e) => e.preventDefault()}
+               onTouchMove={(e) => e.preventDefault()}
+             >
+               <ResponsiveContainer width="100%" height="75%">
+                 <ComposedChart data={validData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -404,11 +410,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           />
         </ComposedChart>
       </ResponsiveContainer>
+             </div>
       
       {/* Metric Selection Buttons */}
       <div className="mt-3 px-2">
         <div className="text-xs text-gray-600 mb-2">Metric overlay:</div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
           {['Heart Rate', workoutType === 'run' ? 'Pace' : 'Speed', 'Power', 'VAM'].map((metric) => {
             // Map the display text to the correct metric key for getMetricValue
             let metricKey;
@@ -425,7 +432,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                 onClick={() => {
                   setLocalSelectedMetric(metricKey);
                 }}
-                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                className={`px-3 py-2 text-sm font-medium rounded-md transition-colors touch-manipulation ${
                   isSelected
                     ? 'bg-gray-200 text-black'
                     : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
@@ -448,7 +455,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             max="100"
             value={scrollRange[0]}
             onChange={(e) => setScrollRange([parseInt(e.target.value), scrollRange[1]])}
-            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider touch-manipulation"
             style={{
               background: `linear-gradient(to right, #e5e7eb 0%, #e5e7eb ${scrollRange[0]}%, #3b82f6 ${scrollRange[0]}%, #3b82f6 ${scrollRange[1]}%, #e5e7eb ${scrollRange[1]}%, #e5e7eb 100%)`
             }}
@@ -459,13 +466,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             max="100"
             value={scrollRange[1]}
             onChange={(e) => setScrollRange([scrollRange[0], parseInt(e.target.value)])}
-            className="absolute top-0 w-full h-2 bg-transparent rounded-lg appearance-none cursor-pointer slider"
+            className="absolute top-0 w-full h-3 bg-transparent rounded-lg appearance-none cursor-pointer slider touch-manipulation"
             style={{
               background: 'transparent'
             }}
           />
         </div>
-        <div className="flex justify-between text-xs text-xs text-gray-500 mt-1">
+        <div className="flex justify-between text-xs text-gray-500 mt-1">
           <span>{Math.round(scrollRange[0])}%</span>
           <span>{Math.round(scrollRange[1])}%</span>
         </div>
