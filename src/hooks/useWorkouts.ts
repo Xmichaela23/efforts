@@ -180,10 +180,8 @@ export const useWorkouts = () => {
       const { data: { user } } = await supabase.auth.getUser();
 
       if (user) {
-        console.log("✅ Using authenticated user:", user.id);
         return user;
       } else {
-        console.log("❌ No authenticated user found");
         return null;
       }
     } catch (error) {
@@ -202,19 +200,15 @@ export const useWorkouts = () => {
         user = await getCurrentUser();
         if (!user && i < 4) {
           const delay = Math.min(100 * Math.pow(2, i), 1000); // Exponential backoff, max 1s
-          console.log(`⏳ Auth retry ${i + 1}/5, waiting ${delay}ms...`);
           await new Promise(resolve => setTimeout(resolve, delay));
         }
       }
 
       if (!user) {
-        console.log("❌ No user authenticated after retries, showing no workouts");
         setWorkouts([]);
         setLoading(false);
         return;
       }
-
-      console.log("🔍 Fetching workouts for user:", user.id);
 
       // 🔧 FIXED: Fetch BOTH workouts table AND Garmin activities to show all workouts
       
@@ -230,32 +224,7 @@ export const useWorkouts = () => {
         throw manualError;
       }
 
-      console.log(`✅ Found ${manualWorkouts?.length || 0} manual/planned workouts`);
-
-      // 🔍 DEBUG: Log the first few manual workouts to see their structure
-      if (manualWorkouts && manualWorkouts.length > 0) {
-        console.log("🔍 DEBUG - First few manual workouts:", manualWorkouts.slice(0, 3).map(w => ({
-          id: w.id,
-          name: w.name,
-          type: w.type,
-          date: w.date,
-          dateType: typeof w.date,
-          strength_exercises: w.strength_exercises,
-          strength_exercises_type: typeof w.strength_exercises,
-          strength_exercises_length: w.strength_exercises ? (Array.isArray(w.strength_exercises) ? w.strength_exercises.length : 'not array') : 'null/undefined',
-          workout_status: w.workout_status
-        })));
-        
-        // 🔍 EXTRA DEBUG: For strength workouts, show the full strength_exercises data
-        const strengthWorkouts = manualWorkouts.filter(w => w.type === 'strength');
-        if (strengthWorkouts.length > 0) {
-          console.log("🔍 Strength workout data:", strengthWorkouts.map(w => ({
-            id: w.id,
-            name: w.name,
-            strength_exercises: w.strength_exercises
-          })));
-        }
-      }
+      // Manual workouts found
 
       // Step 2: Fetch Garmin activities (if user has Garmin connection)
       let garminWorkouts: any[] = [];
@@ -613,17 +582,13 @@ export const useWorkouts = () => {
     let mounted = true;
 
     const initializeAuth = async () => {
-      console.log("🚀 Initializing useWorkouts auth...");
-      
       // Check initial session
       const { data: { session } } = await supabase.auth.getSession();
       
       if (mounted) {
         if (session?.user) {
-          console.log("✅ Initial session found, setting auth ready");
           setAuthReady(true);
         } else {
-          console.log("❌ No initial session found");
           setLoading(false);
         }
       }
@@ -636,8 +601,6 @@ export const useWorkouts = () => {
       async (event, session) => {
         if (!mounted) return;
 
-        console.log("🔄 Auth state changed:", event, !!session?.user);
-        
         if (session?.user) {
           setAuthReady(true);
         } else {
@@ -657,7 +620,6 @@ export const useWorkouts = () => {
   // 🔄 Fetch workouts when auth is ready
   useEffect(() => {
     if (authReady) {
-      console.log("🔄 Auth ready, fetching workouts...");
       fetchWorkouts();
     }
   }, [authReady]);
