@@ -63,11 +63,16 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   const getMetricValue = (point: any, index: number) => {
     switch (localSelectedMetric) {
       case 'heartrate':
-        return point.heartRate;
+        return point.heartRate || point.heart_rate || point.hr;
       case 'speed':
-        return point.speed;
+        // Convert m/s to mph for imperial display
+        const speedMPS = point.speed || point.speedMetersPerSecond;
+        if (speedMPS && useImperial) {
+          return Math.round(speedMPS * 2.237); // Convert m/s to mph
+        }
+        return speedMPS;
       case 'power':
-        return point.speed; // Use speed as proxy for power
+        return point.power || point.avgPower || point.maxPower;
       case 'vam':
         // Calculate VAM (climbing rate) between this point and previous point
         if (index === 0) return 0; // First point has no VAM
@@ -129,10 +134,22 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       
       // Debug: Log first few points to see actual data structure
       if (index < 3) {
-        console.log(`GPS Point ${index}:`, point);
+        console.log(`GPS Point ${index}:`, {
+          speed: point.speed,
+          speedMPS: point.speedMetersPerSecond,
+          heartRate: point.heartRate,
+          power: point.power,
+          elevation: point.elevation,
+          altitude: point.altitude
+        });
       }
       
       const metricValue = getMetricValue(point, index);
+      
+      // Debug: Log metric value calculation
+      if (index < 3) {
+        console.log(`Metric ${localSelectedMetric} for point ${index}:`, metricValue);
+      }
       
       // Convert elevation from meters to feet if imperial is enabled
       const elevationMeters = point.elevation || point.altitude || 0;
