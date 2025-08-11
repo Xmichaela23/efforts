@@ -208,12 +208,24 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           speed: point.speed || point.speedMetersPerSecond || null,
           cadence: point.cadence || point.bikeCadenceInRPM || null,
           timestamp: point.timestamp || point.startTimeInSeconds || null,
-          metricValue: metricValue
+          metricValue: metricValue,
+          originalIndex: index // Keep track of original position for scrolling
         };
       });
   }, [gpsTrack, localSelectedMetric, useImperial]);
 
   const validData = chartData || [];
+  
+  // Filter data based on scroll position for chart view
+  const visibleData = useMemo(() => {
+    if (validData.length === 0) return [];
+    
+    const scrollPercent = scrollRange[0] / 100;
+    const startIndex = Math.floor(scrollPercent * (validData.length - 1));
+    const endIndex = Math.min(startIndex + Math.floor(validData.length * 0.3), validData.length - 1); // Show 30% of data
+    
+    return validData.slice(startIndex, endIndex);
+  }, [validData, scrollRange]);
   
   // Debug logging to see what's happening
   console.log('🔍 Chart data debug:', {
@@ -281,7 +293,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         Tap and drag to explore • Scroll to zoom
       </div>
              <ResponsiveContainer width="100%" height="75%">
-               <ComposedChart data={validData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+               <ComposedChart data={visibleData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -435,7 +447,20 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             min="0"
             max="100"
             value={scrollRange[0]}
-            onChange={(e) => setScrollRange([parseInt(e.target.value), scrollRange[1]])}
+            onChange={(e) => {
+              const newValue = parseInt(e.target.value);
+              setScrollRange([newValue, scrollRange[1]]);
+              
+              // Update chart view based on scroll position
+              if (validData.length > 0) {
+                const dataIndex = Math.floor((newValue / 100) * (validData.length - 1));
+                const dataPoint = validData[dataIndex];
+                if (dataPoint) {
+                  // Force chart to update by triggering a re-render
+                  setScrollRange([newValue, scrollRange[1]]);
+                }
+              }
+            }}
             className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider touch-manipulation"
             style={{
               background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${scrollRange[0]}%, #e5e7eb ${scrollRange[0]}%, #e5e7eb 100%)`
@@ -444,7 +469,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           <div className="flex justify-between text-xs text-gray-500 mt-1">
             <span>Start</span>
             <span>{Math.round(scrollRange[0])}%</span>
+            <span>End</span>
           </div>
+          {/* Show current position in workout */}
+          {visibleData.length > 0 && (
+            <div className="text-xs text-gray-600 mt-1 text-center">
+              {visibleData[0]?.distance?.toFixed(1)} mi → {visibleData[visibleData.length - 1]?.distance?.toFixed(1)} mi
+            </div>
+          )}
         </div>
       </div>
     </div>
