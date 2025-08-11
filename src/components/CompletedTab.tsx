@@ -53,7 +53,10 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   if (!gpsTrack || gpsTrack.length === 0) {
     return (
       <div className="flex items-center justify-center h-full text-gray-500">
-        No GPS data available
+        <div className="text-center">
+          <div className="text-gray-500 text-lg mb-2">No GPS data available</div>
+          <div className="text-gray-400 text-sm">This workout doesn't have GPS tracking data</div>
+        </div>
       </div>
     );
   }
@@ -181,7 +184,19 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     });
   }, [gpsTrack, localSelectedMetric, useImperial]);
 
-  const validData = chartData;
+  const validData = chartData || [];
+  
+  // Additional safety check for chart data
+  if (!validData || validData.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="text-center">
+          <div className="text-gray-500 text-lg mb-2">Chart data processing failed</div>
+          <div className="text-gray-400 text-sm">Unable to generate elevation profile</div>
+        </div>
+      </div>
+    );
+  }
 
 
 
@@ -407,6 +422,44 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  const { useImperial } = useAppContext();
  const [selectedMetric, setSelectedMetric] = useState('heartrate');
  const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
+
+ // Add useEffect to help with state persistence and debugging
+ useEffect(() => {
+   console.log('🔄 CompletedTab re-rendered with:', {
+     workoutType,
+     hasWorkoutData: !!workoutData,
+     gpsTrackLength: workoutData?.gps_track?.length,
+     workoutDataKeys: workoutData ? Object.keys(workoutData) : []
+   });
+   
+   // Reset selected metric when workout changes to ensure consistent state
+   if (workoutData && workoutData.gps_track) {
+     setSelectedMetric('heartrate');
+   }
+ }, [workoutType, workoutData]);
+
+ // Add error handling and loading states
+ if (!workoutData) {
+   return (
+     <div className="flex items-center justify-center h-64">
+       <div className="text-center">
+         <div className="text-gray-500 text-lg mb-2">No workout data available</div>
+         <div className="text-gray-400 text-sm">Please select a workout or try refreshing the page</div>
+       </div>
+     </div>
+   );
+ }
+
+ if (!workoutData.gps_track || workoutData.gps_track.length === 0) {
+   return (
+     <div className="flex items-center justify-center h-64">
+       <div className="text-center">
+         <div className="text-gray-500 text-lg mb-2">No GPS data available</div>
+         <div className="text-gray-400 text-sm">This workout doesn't have GPS tracking data</div>
+       </div>
+     </div>
+   );
+ }
 
 
 
