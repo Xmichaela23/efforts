@@ -60,7 +60,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     );
   }
 
-  const getMetricValue = (point: any) => {
+  const getMetricValue = (point: any, index: number) => {
     switch (localSelectedMetric) {
       case 'heartrate':
         return point.heartRate;
@@ -69,10 +69,26 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'power':
         return point.speed; // Use speed as proxy for power
       case 'vam':
-        // For VAM, we need to calculate climbing rate over time
-        // This would require more complex calculation with timestamps
-        // For now, return elevation as proxy
-        return point.elevation;
+        // Calculate VAM (climbing rate) between this point and previous point
+        if (index === 0) return 0; // First point has no VAM
+        
+        const prevPoint = gpsTrack[index - 1];
+        const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
+        const currentElevation = point.elevation || point.altitude || 0;
+        const elevationGain = Math.max(0, currentElevation - prevElevation); // Only positive gains
+        
+        // Get time difference between points
+        const prevTime = prevPoint.timestamp || prevPoint.startTimeInSeconds || 0;
+        const currentTime = point.timestamp || point.startTimeInSeconds || 0;
+        const timeDiff = currentTime - prevTime;
+        
+        if (timeDiff <= 0 || elevationGain === 0) return 0;
+        
+        // Calculate VAM: elevation gain (m) / time (hours)
+        const timeHours = timeDiff / 3600;
+        const vam = elevationGain / timeHours;
+        
+        return Math.round(vam);
       default:
         return point.elevation;
     }
@@ -116,7 +132,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         console.log(`GPS Point ${index}:`, point);
       }
       
-      const metricValue = getMetricValue(point);
+      const metricValue = getMetricValue(point, index);
       
       // Convert elevation from meters to feet if imperial is enabled
       const elevationMeters = point.elevation || point.altitude || 0;
@@ -180,6 +196,10 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         return 'Heart Rate (BPM)';
       case 'speed':
         return 'Speed (mph)';
+      case 'power':
+        return 'Power (W)';
+      case 'vam':
+        return 'VAM (m/h)';
       default:
         return 'Elevation (ft)';
     }
@@ -191,7 +211,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <div className="text-sm font-medium text-gray-700 mb-2">
         Elevation Profile (Relative to Start)
                      <span className="text-xs text-gray-500 ml-2">
-               (Performance metrics not available in this GPS track)
+               (VAM calculated from elevation and time data)
              </span>
       </div>
       <ResponsiveContainer width="100%" height="70%">
@@ -226,7 +246,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
               if (localSelectedMetric === 'heartrate') return `${value} bpm`;
               if (localSelectedMetric === 'speed') return `${value.toFixed(1)} mph`;
               if (localSelectedMetric === 'power') return `${value.toFixed(0)} W`;
-              if (localSelectedMetric === 'vam') return `${value} ft`;
+              if (localSelectedMetric === 'vam') return `${value} m/h`;
               return value;
             }}
             stroke={getMetricColor()}
@@ -280,12 +300,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                     <p className="text-xs text-gray-400">Relative to start point</p>
-                                           {metricValue && localSelectedMetric !== 'vam' ? (
+                                           {metricValue !== null && metricValue !== undefined ? (
                          <p className="text-gray-600" style={{ color: getMetricColor() }}>
                            {getMetricLabel()}: {metricValue}
                            {localSelectedMetric === 'heartrate' && ' bpm'}
                            {localSelectedMetric === 'speed' && ' mph'}
                            {localSelectedMetric === 'power' && ' W'}
+                           {localSelectedMetric === 'vam' && ' m/h'}
                          </p>
                        ) : (
                          <p className="text-gray-500 text-xs">
@@ -294,7 +315,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                        )}
                                            <p className="text-xs text-gray-500 mt-1">
                          {localSelectedMetric === 'vam'
-                           ? 'GPS coordinates and elevation data available'
+                           ? 'VAM calculated from elevation changes over time'
                            : 'Performance data not available in this GPS track'
                          }
                        </p>
