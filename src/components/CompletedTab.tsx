@@ -50,6 +50,15 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   const [isLoading, setIsLoading] = useState(true);
   
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
+
+  // Initialize localSelectedMetric with the correct key for the selected metric
+  useEffect(() => {
+    if (selectedMetric === 'pace') {
+      setLocalSelectedMetric('speed'); // Map 'pace' to 'speed' for getMetricValue
+    } else {
+      setLocalSelectedMetric(selectedMetric);
+    }
+  }, [selectedMetric]);
   
   if (!gpsTrack || gpsTrack.length === 0) {
     return (
@@ -449,14 +458,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
   const [isLoading, setIsLoading] = useState(true);
   
-  // Initialize localSelectedMetric with the correct key for the selected metric
-  useEffect(() => {
-    if (selectedMetric === 'pace') {
-      setLocalSelectedMetric('speed'); // Map 'pace' to 'speed' for getMetricValue
-    } else {
-      setLocalSelectedMetric(selectedMetric);
-    }
-  }, [selectedMetric]);
+  // No need to initialize localSelectedMetric here - it's handled in the sub-component
 
    // Simple check: what fields are actually in workoutData?
   useEffect(() => {
