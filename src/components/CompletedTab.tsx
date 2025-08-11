@@ -70,8 +70,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'heartrate':
         return point.heartRate || point.heart_rate || point.hr;
       case 'speed':
-        // Convert m/s to mph for imperial display
-        const speedMPS = point.speed || point.speedMetersPerSecond;
+        const speedMPS = point.speedMetersPerSecond;
         if (speedMPS && useImperial) {
           return Math.round(speedMPS * 2.237); // Convert m/s to mph
         }
@@ -139,32 +138,15 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       
       // Debug: Log first few points to see actual data structure
       if (index < 3) {
-        console.log(`GPS Point ${index} FULL DATA:`, point);
-        console.log(`GPS Point ${index} SPECIFIC FIELDS:`, {
-          speed: point.speed,
+        console.log(`GPS Point ${index}:`, {
           speedMPS: point.speedMetersPerSecond,
-          speedMPS_type: typeof point.speedMetersPerSecond,
           heartRate: point.heartRate,
-          heart_rate: point.heart_rate,
-          hr: point.hr,
           power: point.power,
-          elevation: point.elevation,
-          altitude: point.altitude,
-          // Check for other possible speed fields
-          totalDistanceInMeters: point.totalDistanceInMeters,
-          clockDurationInSeconds: point.clockDurationInSeconds,
-          timerDurationInSeconds: point.timerDurationInSeconds
+          elevation: point.elevation
         });
       }
       
       const metricValue = getMetricValue(point, index);
-      
-      // Debug: Log metric value calculation
-      if (index < 3) {
-        console.log(`Metric ${localSelectedMetric} for point ${index}:`, metricValue);
-        console.log(`localSelectedMetric value:`, localSelectedMetric);
-        console.log(`localSelectedMetric type:`, typeof localSelectedMetric);
-      }
       
       // Convert elevation from meters to feet if imperial is enabled
       const elevationMeters = point.elevation || point.altitude || 0;
