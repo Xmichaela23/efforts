@@ -138,6 +138,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       
       // Debug: Log first few points to see actual data structure
       if (index < 3) {
+        console.log(`GPS Point ${index} keys:`, Object.keys(point));
         console.log(`GPS Point ${index}:`, {
           speedMPS: point.speedMetersPerSecond,
           heartRate: point.heartRate,
