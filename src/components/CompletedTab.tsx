@@ -47,6 +47,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   useImperial
 }) => {
   const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
+  const [isLoading, setIsLoading] = useState(true);
   
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
   
@@ -150,28 +151,31 @@ return null;
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
     // Performance optimization: Sample data if too many points
-    const maxPoints = 1000; // Limit to 1000 points for performance
+    const maxPoints = 500; // Reduced from 1000 for better performance
     const shouldSample = gpsTrack.length > maxPoints;
     const sampleInterval = shouldSample ? Math.ceil(gpsTrack.length / maxPoints) : 1;
     
     let cumulativeDistance = 0;
     let baseElevation = null;
     
-    return gpsTrack
-      .filter((_, index) => !shouldSample || index % sampleInterval === 0) // Sample every Nth point
-      .map((point, index) => {
-        // Calculate cumulative distance from GPS coordinates
-        if (index > 0) {
-          const prevPoint = gpsTrack[Math.max(0, (index * sampleInterval) - 1)];
-          const lat1 = prevPoint.latitudeInDegree || prevPoint.lat;
-          const lon1 = prevPoint.longitudeInDegree || prevPoint.lng;
-          const lat2 = point.latitudeInDegree || point.lat;
-          const lon2 = point.longitudeInDegree || point.lng;
-          
-          if (lat1 && lon1 && lat2 && lon2) {
-            cumulativeDistance += calculateDistance(lat1, lon1, lat2, lon2);
-          }
+    // Pre-sample the data to avoid repeated array access
+    const sampledData = shouldSample 
+      ? gpsTrack.filter((_, index) => index % sampleInterval === 0)
+      : gpsTrack;
+    
+    return sampledData.map((point, index) => {
+      // Calculate cumulative distance from GPS coordinates
+      if (index > 0) {
+        const prevPoint = sampledData[index - 1];
+        const lat1 = prevPoint.latitudeInDegree || prevPoint.lat;
+        const lon1 = prevPoint.longitudeInDegree || prevPoint.lng;
+        const lat2 = point.latitudeInDegree || point.lat;
+        const lon2 = point.longitudeInDegree || point.lng;
+        
+        if (lat1 && lon1 && lat2 && lon2) {
+          cumulativeDistance += calculateDistance(lat1, lon1, lat2, lon2);
         }
+      }
         
         const metricValue = getMetricValue(point, index);
         
@@ -435,37 +439,59 @@ interface CompletedTabProps {
 }
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
-  console.log('🚨 COMPLETEDTAB COMPONENT RENDERING - workoutType:', workoutType, 'workoutData:', workoutData);
-  
   const { useImperial } = useAppContext();
   const [selectedMetric, setSelectedMetric] = useState('heartrate');
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
 
- // Simple check: what fields are actually in workoutData?
- useEffect(() => {
-   console.log('🚨 COMPLETEDTAB COMPONENT LOADED - workoutData:', workoutData);
-   if (workoutData) {
-     console.log('📊 workoutData fields:', Object.keys(workoutData));
-     console.log('📊 sensor_data exists?', !!workoutData.sensor_data);
-     console.log('📊 sensor_data length:', workoutData.sensor_data?.length);
-     console.log('📊 sensor_data sample:', workoutData.sensor_data?.[0]);
-     console.log('📊 gps_track length:', workoutData.gps_track?.length);
-   } else {
-     console.log('❌ workoutData is null/undefined');
-   }
- }, [workoutData]);
+   // Simple check: what fields are actually in workoutData?
+  useEffect(() => {
+    if (workoutData) {
+      console.log('📊 workoutData loaded:', workoutData.name, 'GPS:', workoutData.gps_track?.length, 'Sensors:', workoutData.sensor_data?.length);
+      setIsLoading(false);
+    } else {
+      setIsLoading(true);
+    }
+    
+    // Reset loading state when component unmounts
+    return () => {
+      setIsLoading(true);
+    };
+  }, [workoutData]);
+
+  // Debounced effect to prevent excessive re-renders
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (workoutData && workoutData.gps_track) {
+        setIsLoading(false);
+      }
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [workoutData?.gps_track]);
 
  // Add error handling and loading states
- if (!workoutData) {
-   return (
-     <div className="flex items-center justify-center h-64">
-       <div className="text-center">
-         <div className="text-gray-500 text-lg mb-2">No workout data available</div>
-         <div className="text-gray-400 text-sm">Please select a workout or try refreshing the page</div>
-       </div>
-     </div>
-   );
- }
+   if (isLoading || !workoutData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          {isLoading ? (
+            <>
+              <div className="animate-pulse">
+                <div className="h-4 bg-gray-200 rounded w-3/4 mx-auto mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-1/2 mx-auto"></div>
+              </div>
+              <div className="text-gray-500 text-lg mb-2">Loading workout data...</div>
+            </>
+          ) : (
+            <>
+              <div className="text-gray-500 text-lg mb-2">No workout data available</div>
+              <div className="text-gray-400 text-sm">Please select a workout or try refreshing the page</div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  }
 
  if (!workoutData.gps_track || workoutData.gps_track.length === 0) {
    return (
