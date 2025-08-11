@@ -91,21 +91,20 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
               if (workoutType === 'run') {
                 // Convert to pace (min/mi) for running
                 const paceMinutes = 60 / (speedMPS * 2.237); // Convert m/s to mph, then to min/mi
-                const result = Math.round(paceMinutes * 100) / 100;
-                        return result;
-      } else {
-        // Convert to mph for cycling
-        const mph = speedMPS * 2.237;
-        return Math.round(mph * 10) / 10;
-      }
-    } else {
-      // Metric: km/h
-      const kmh = speedMPS * 3.6;
-      return Math.round(kmh * 10) / 10;
-    }
-  }
-}
-return null;
+                return Math.round(paceMinutes * 100) / 100;
+              } else {
+                // Convert to mph for cycling
+                const mph = speedMPS * 2.237;
+                return Math.round(mph * 10) / 10;
+              }
+            } else {
+              // Metric: km/h
+              const kmh = speedMPS * 3.6;
+              return Math.round(kmh * 10) / 10;
+            }
+          }
+        }
+        return null;
       case 'power':
         return sensorPoint?.power || null;
       case 'vam':
@@ -375,7 +374,13 @@ return null;
         <div className="text-xs text-gray-600 mb-2">Metric overlay:</div>
         <div className="flex flex-wrap gap-2">
           {['Heart Rate', workoutType === 'run' ? 'Pace' : 'Speed', 'Power', 'VAM'].map((metric) => {
-            const metricKey = metric.toLowerCase().replace(' ', '');
+            // Map the display text to the correct metric key for getMetricValue
+            let metricKey;
+            if (metric === 'Pace') {
+              metricKey = 'speed'; // Pace button maps to 'speed' case in getMetricValue
+            } else {
+              metricKey = metric.toLowerCase().replace(' ', '');
+            }
             const isSelected = localSelectedMetric === metricKey;
             
             return (
@@ -443,6 +448,15 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [selectedMetric, setSelectedMetric] = useState('heartrate');
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Initialize localSelectedMetric with the correct key for the selected metric
+  useEffect(() => {
+    if (selectedMetric === 'pace') {
+      setLocalSelectedMetric('speed'); // Map 'pace' to 'speed' for getMetricValue
+    } else {
+      setLocalSelectedMetric(selectedMetric);
+    }
+  }, [selectedMetric]);
 
    // Simple check: what fields are actually in workoutData?
   useEffect(() => {
