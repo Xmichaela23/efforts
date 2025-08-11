@@ -149,48 +149,53 @@ return null;
   const chartData = useMemo(() => {
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
+    // Performance optimization: Sample data if too many points
+    const maxPoints = 1000; // Limit to 1000 points for performance
+    const shouldSample = gpsTrack.length > maxPoints;
+    const sampleInterval = shouldSample ? Math.ceil(gpsTrack.length / maxPoints) : 1;
+    
     let cumulativeDistance = 0;
     let baseElevation = null;
     
-    return gpsTrack.map((point, index) => {
-      // Calculate cumulative distance from GPS coordinates
-      if (index > 0) {
-        const prevPoint = gpsTrack[index - 1];
-        const lat1 = prevPoint.latitudeInDegree || prevPoint.lat;
-        const lon1 = prevPoint.longitudeInDegree || prevPoint.lng;
-        const lat2 = point.latitudeInDegree || point.lat;
-        const lon2 = point.longitudeInDegree || point.lng;
-        
-        if (lat1 && lon1 && lat2 && lon2) {
-          cumulativeDistance += calculateDistance(lat1, lon1, lat2, lon2);
+    return gpsTrack
+      .filter((_, index) => !shouldSample || index % sampleInterval === 0) // Sample every Nth point
+      .map((point, index) => {
+        // Calculate cumulative distance from GPS coordinates
+        if (index > 0) {
+          const prevPoint = gpsTrack[Math.max(0, (index * sampleInterval) - 1)];
+          const lat1 = prevPoint.latitudeInDegree || prevPoint.lat;
+          const lon1 = prevPoint.longitudeInDegree || prevPoint.lng;
+          const lat2 = point.latitudeInDegree || point.lat;
+          const lon2 = point.longitudeInDegree || point.lng;
+          
+          if (lat1 && lon1 && lat2 && lon2) {
+            cumulativeDistance += calculateDistance(lat1, lon1, lat2, lon2);
+          }
         }
-      }
-      
-
-      
-      const metricValue = getMetricValue(point, index);
-      
-      // Convert elevation from meters to feet if imperial is enabled
-      const elevationMeters = point.elevation || point.altitude || 0;
-      const elevationImperial = useImperial ? elevationMeters * 3.28084 : elevationMeters;
-      
-      // Set base elevation to first point, then calculate relative elevation
-      if (baseElevation === null) {
-        baseElevation = elevationImperial;
-      }
-      const relativeElevation = elevationImperial - baseElevation;
-      
-      return {
-        distance: parseFloat(cumulativeDistance.toFixed(2)),
-        elevation: relativeElevation,
-        absoluteElevation: elevationImperial,
-        heartRate: point.heartRate || point.heart_rate || point.hr || null,
-        speed: point.speed || point.speedMetersPerSecond || null,
-        cadence: point.cadence || point.bikeCadenceInRPM || null,
-        timestamp: point.timestamp || point.startTimeInSeconds || null,
-        metricValue: metricValue
-      };
-    });
+        
+        const metricValue = getMetricValue(point, index);
+        
+        // Convert elevation from meters to feet if imperial is enabled
+        const elevationMeters = point.elevation || point.altitude || 0;
+        const elevationImperial = useImperial ? elevationMeters * 3.28084 : elevationMeters;
+        
+        // Set base elevation to first point, then calculate relative elevation
+        if (baseElevation === null) {
+          baseElevation = elevationImperial;
+        }
+        const relativeElevation = elevationImperial - baseElevation;
+        
+        return {
+          distance: parseFloat(cumulativeDistance.toFixed(2)),
+          elevation: relativeElevation,
+          absoluteElevation: elevationImperial,
+          heartRate: point.heartRate || point.heart_rate || point.hr || null,
+          speed: point.speed || point.speedMetersPerSecond || null,
+          cadence: point.cadence || point.bikeCadenceInRPM || null,
+          timestamp: point.timestamp || point.startTimeInSeconds || null,
+          metricValue: metricValue
+        };
+      });
   }, [gpsTrack, localSelectedMetric, useImperial]);
 
   const validData = chartData || [];
@@ -337,19 +342,21 @@ return null;
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                     <p className="text-xs text-gray-400">Relative to start point</p>
-                                           {metricValue !== null && metricValue !== undefined && (localSelectedMetric !== 'vam' || Number(metricValue) > 0) ? (
-                         <p className="text-gray-600" style={{ color: getMetricColor() }}>
-                           {getMetricLabel()}: {metricValue}
-                                                        {localSelectedMetric === 'heartrate' && ' bpm'}
-                             {localSelectedMetric === 'speed' && (workoutType === 'run' ? ' min/mi' : ' mph')}
-                             {localSelectedMetric === 'power' && ' W'}
-                             {localSelectedMetric === 'vam' && ' m/h'}
-                         </p>
-                       ) : (
-                         <p className="text-gray-500 text-xs">
-                           {localSelectedMetric === 'vam' ? 'Flat section' : 'No data'}
-                         </p>
-                       )}
+                    
+                    {/* Show the selected metric value */}
+                    {metricValue !== null && metricValue !== undefined ? (
+                      <p className="text-gray-600" style={{ color: getMetricColor() }}>
+                        {getMetricLabel()}: {metricValue}
+                        {localSelectedMetric === 'heartrate' && ' bpm'}
+                        {localSelectedMetric === 'speed' && (workoutType === 'run' ? ' min/mi' : ' mph')}
+                        {localSelectedMetric === 'power' && ' W'}
+                        {localSelectedMetric === 'vam' && ' m/h'}
+                      </p>
+                    ) : (
+                      <p className="text-gray-500 text-xs">
+                        {localSelectedMetric === 'vam' ? 'Flat section' : 'No data'}
+                      </p>
+                    )}
                   </div>
                 );
               }
