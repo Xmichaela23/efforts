@@ -324,25 +324,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             label={{ value: 'Elevation Change', angle: -90, position: 'insideLeft' }}
           />
           
-          {/* Right Y Axis - Performance Metric */}
-          <YAxis 
-            yAxisId="right"
-            orientation="right"
-            tickFormatter={(value) => {
-              if (localSelectedMetric === 'heartrate') return `${value} bpm`;
-              if (localSelectedMetric === 'speed') {
-                if (workoutType === 'run') {
-                  return `${value.toFixed(2)} min/mi`;
-                }
-                return `${value.toFixed(1)} mph`;
-              }
-              if (localSelectedMetric === 'power') return `${value.toFixed(0)} W`;
-              if (localSelectedMetric === 'vam') return `${value} m/h`;
-              return value;
-            }}
-            stroke={getMetricColor()}
-            fontSize={10}
-          />
+
           
           {/* Elevation Area */}
           <Area
@@ -366,16 +348,17 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             activeDot={{ r: 3, fill: "#9ca3af" }}
           />
 
-          {/* Performance Metric Line - Always show the selected metric */}
-          <Line
-            yAxisId="right"
-            type="monotone"
-            dataKey="metricValue"
-            stroke={getMetricColor()}
-            strokeWidth={3}
-            dot={false}
-            activeDot={{ r: 5, fill: getMetricColor() }}
-          />
+
+          
+          {/* Cursor Line - Moves with scroll bar */}
+          {scrollRange[0] > 0 && validData.length > 0 && (
+            <ReferenceLine
+              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+            />
+          )}
           
           {/* Tooltip */}
           <Tooltip
@@ -412,6 +395,41 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           />
         </ComposedChart>
       </ResponsiveContainer>
+      
+      {/* Data Card - Shows current position and metrics */}
+      {scrollRange[0] > 0 && validData.length > 0 && (() => {
+        const currentIndex = Math.floor((scrollRange[0] / 100) * (validData.length - 1));
+        const currentPoint = validData[currentIndex];
+        const paceValue = getMetricValue(gpsTrack[currentIndex * Math.ceil(gpsTrack.length / validData.length)], currentIndex * Math.ceil(gpsTrack.length / validData.length));
+        
+        return (
+          <div className="mt-3 px-2">
+            <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-sm">
+              <div className="text-sm font-medium text-gray-700 mb-2">Current Position</div>
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-500">Distance:</span>
+                  <span className="ml-2 font-medium">{currentPoint?.distance?.toFixed(1)} mi</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Elevation:</span>
+                  <span className="ml-2 font-medium">{Math.round(currentPoint?.elevation || 0)} {useImperial ? 'ft' : 'm'}</span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Pace:</span>
+                  <span className="ml-2 font-medium" style={{ color: getMetricColor() }}>
+                    {paceValue ? `${paceValue} min/mi` : 'No data'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-gray-500">Position:</span>
+                  <span className="ml-2 font-medium">{Math.round(scrollRange[0])}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       
       {/* Metric Selection Buttons */}
       <div className="mt-3 px-2">
