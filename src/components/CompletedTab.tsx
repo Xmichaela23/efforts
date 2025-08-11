@@ -69,6 +69,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       case 'power':
         return point.speed; // Use speed as proxy for power
       case 'vam':
+        // For VAM, we need to calculate climbing rate over time
+        // This would require more complex calculation with timestamps
+        // For now, return elevation as proxy
         return point.elevation;
       default:
         return point.elevation;
@@ -933,6 +936,30 @@ const formatPace = (paceValue: any): string => {
    return 'N/A';
  };
 
+ // Enhanced VAM calculation for running with insights
+ const calculateRunningVAM = () => {
+   if (workoutType !== 'run') return null;
+   
+   const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
+   const duration = workoutData.duration;
+   
+   if (!elevationGain || !duration) return null;
+   
+   const elevationM = Number(elevationGain);
+   const durationHours = (duration * 60) / 3600;
+   const vam = Math.round(elevationM / durationHours);
+   
+   // Running VAM insights
+   let insight = '';
+   if (vam >= 1000) insight = 'Mountain goat! 🐐';
+   else if (vam >= 800) insight = 'Strong climber 💪';
+   else if (vam >= 600) insight = 'Good climbing pace 🏃‍♂️';
+   else if (vam >= 400) insight = 'Steady climber 📈';
+   else insight = 'Endurance focus 🎯';
+   
+   return { vam, insight };
+ };
+
  const formatMovingTime = () => {
    console.log('🔍 formatMovingTime checking:', {
      total_timer_time: workoutData.metrics?.total_timer_time,
@@ -1234,15 +1261,32 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
        
-       {/* VAM */}
+       {/* VAM - Enhanced for running */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {calculateVAM()}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">VAM</div>
+           {workoutType === 'run' && (
+             <div className="text-xs text-gray-500 mt-1">
+               Climbing speed
+             </div>
+           )}
          </div>
        </div>
+       
+       {/* Running VAM Insight */}
+       {workoutType === 'run' && calculateRunningVAM() && (
+         <div className="px-2 py-1 bg-blue-50 rounded-lg border border-blue-200">
+           <div className="text-sm font-medium text-blue-800 mb-1">
+             {calculateRunningVAM()?.insight}
+           </div>
+           <div className="text-xs text-blue-600">
+             VAM: {calculateRunningVAM()?.vam} m/h
+           </div>
+         </div>
+       )}
 
 
        
