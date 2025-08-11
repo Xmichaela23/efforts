@@ -45,6 +45,11 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   useImperial
 }) => {
   const [localSelectedMetric, setLocalSelectedMetric] = useState(selectedMetric);
+  
+  // Debug: Log when localSelectedMetric changes
+  useEffect(() => {
+    console.log(`🎯 localSelectedMetric changed to: ${localSelectedMetric}`);
+  }, [localSelectedMetric]);
   const [scrollRange, setScrollRange] = useState<[number, number]>([0, 100]);
 
   // Debug: Log when metric changes
@@ -134,13 +139,21 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       
       // Debug: Log first few points to see actual data structure
       if (index < 3) {
-        console.log(`GPS Point ${index}:`, {
+        console.log(`GPS Point ${index} FULL DATA:`, point);
+        console.log(`GPS Point ${index} SPECIFIC FIELDS:`, {
           speed: point.speed,
           speedMPS: point.speedMetersPerSecond,
+          speedMPS_type: typeof point.speedMetersPerSecond,
           heartRate: point.heartRate,
+          heart_rate: point.heart_rate,
+          hr: point.hr,
           power: point.power,
           elevation: point.elevation,
-          altitude: point.altitude
+          altitude: point.altitude,
+          // Check for other possible speed fields
+          totalDistanceInMeters: point.totalDistanceInMeters,
+          clockDurationInSeconds: point.clockDurationInSeconds,
+          timerDurationInSeconds: point.timerDurationInSeconds
         });
       }
       
@@ -149,6 +162,8 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       // Debug: Log metric value calculation
       if (index < 3) {
         console.log(`Metric ${localSelectedMetric} for point ${index}:`, metricValue);
+        console.log(`localSelectedMetric value:`, localSelectedMetric);
+        console.log(`localSelectedMetric type:`, typeof localSelectedMetric);
       }
       
       // Convert elevation from meters to feet if imperial is enabled
@@ -343,19 +358,25 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <div className="mt-3 px-2">
         <div className="text-xs text-gray-600 mb-2">Metric overlay:</div>
         <div className="flex flex-wrap gap-2">
-          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
-            <button
-              key={metric}
-              onClick={() => setLocalSelectedMetric(metric.toLowerCase().replace(' ', ''))}
-              className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
-                localSelectedMetric === metric.toLowerCase().replace(' ', '')
-                  ? 'bg-gray-200 text-black'
-                  : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
-              }`}
-            >
-              {metric}
-            </button>
-          ))}
+          {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => {
+            const metricKey = metric.toLowerCase().replace(' ', '');
+            return (
+              <button
+                key={metric}
+                onClick={() => {
+                  console.log(`🎯 Button clicked: ${metric} -> ${metricKey}`);
+                  setLocalSelectedMetric(metricKey);
+                }}
+                className={`px-3 py-1 text-sm font-medium rounded-md transition-colors ${
+                  localSelectedMetric === metricKey
+                    ? 'bg-gray-200 text-black'
+                    : 'bg-white text-black hover:bg-gray-100 border border-gray-300'
+                }`}
+              >
+                {metric}
+              </button>
+            );
+          })}
         </div>
       </div>
 
