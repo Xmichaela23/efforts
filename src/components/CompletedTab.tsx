@@ -487,7 +487,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
      workoutType,
      hasWorkoutData: !!workoutData,
      gpsTrackLength: workoutData?.gps_track?.length,
-     workoutDataKeys: workoutData ? Object.keys(workoutData) : []
+     workoutDataKeys: workoutData ? Object.keys(workoutData) : [],
+     hasSensorData: !!workoutData?.sensor_data,
+     sensorDataLength: workoutData?.sensor_data?.length,
+     sensorDataSample: workoutData?.sensor_data?.[0]
    });
    
    // Reset selected metric when workout changes to ensure consistent state
