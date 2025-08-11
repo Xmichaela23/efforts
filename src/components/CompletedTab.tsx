@@ -236,13 +236,26 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     );
   }
 
-  // Calculate cursor position based on scroll
-  const cursorPosition = useMemo(() => {
-    if (validData.length === 0) return null;
-    const scrollPercent = scrollRange[0] / 100;
-    const dataIndex = Math.floor(scrollPercent * (validData.length - 1));
-    return validData[dataIndex];
-  }, [validData, scrollRange]);
+  // Ensure we have valid distance data
+  const hasValidDistance = validData.some(point => 
+    point.distance !== undefined && 
+    point.distance !== null && 
+    !isNaN(point.distance) && 
+    point.distance >= 0
+  );
+
+  if (!hasValidDistance) {
+    return (
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <div className="text-center">
+          <div className="text-gray-500 text-lg mb-2">Invalid distance data</div>
+          <div className="text-gray-400 text-sm">GPS data doesn't contain valid distance information</div>
+        </div>
+      </div>
+    );
+  }
+
+
 
   const getMetricColor = () => {
     switch (localSelectedMetric) {
@@ -363,22 +376,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             dot={false}
             activeDot={{ r: 5, fill: getMetricColor() }}
           />
-          
-          {/* Cursor Line - Shows current scroll position */}
-          {cursorPosition && (
-            <ReferenceLine
-              x={cursorPosition.distance}
-              stroke="#ef4444"
-              strokeWidth={2}
-              strokeDasharray="5 5"
-              label={{
-                value: `${cursorPosition.distance?.toFixed(1)} mi`,
-                position: 'top',
-                fill: '#ef4444',
-                fontSize: 10
-              }}
-            />
-          )}
           
           {/* Tooltip */}
           <Tooltip
