@@ -187,9 +187,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <style>{sliderStyles}</style>
       <div className="text-sm font-medium text-gray-700 mb-2">
         Elevation Profile (Relative to Start)
-        <span className="text-xs text-gray-500 ml-2">
-          (Performance metrics not yet available in GPS data)
-        </span>
+                     <span className="text-xs text-gray-500 ml-2">
+               (Performance metrics not available in this GPS track)
+             </span>
       </div>
       <ResponsiveContainer width="100%" height="70%">
         <ComposedChart data={validData}>
@@ -277,20 +277,24 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                     <p className="text-xs text-gray-400">Relative to start point</p>
-                    {metricValue && localSelectedMetric !== 'vam' && (
-                      <p className="text-gray-600" style={{ color: getMetricColor() }}>
-                        {getMetricLabel()}: {metricValue}
-                        {localSelectedMetric === 'heartrate' && ' bpm'}
-                        {localSelectedMetric === 'speed' && ' mph'}
-                        {localSelectedMetric === 'power' && ' W'}
-                      </p>
-                    )}
-                    <p className="text-xs text-gray-500 mt-1">
-                      {localSelectedMetric === 'vam' 
-                        ? 'GPS coordinates and elevation data available'
-                        : 'GPS coordinates, elevation, and performance data available'
-                      }
-                    </p>
+                                           {metricValue && localSelectedMetric !== 'vam' ? (
+                         <p className="text-gray-600" style={{ color: getMetricColor() }}>
+                           {getMetricLabel()}: {metricValue}
+                           {localSelectedMetric === 'heartrate' && ' bpm'}
+                           {localSelectedMetric === 'speed' && ' mph'}
+                           {localSelectedMetric === 'power' && ' W'}
+                         </p>
+                       ) : (
+                         <p className="text-gray-500 text-xs">
+                           {localSelectedMetric === 'vam' ? 'VAM data not available' : 'No performance data at this point'}
+                         </p>
+                       )}
+                                           <p className="text-xs text-gray-500 mt-1">
+                         {localSelectedMetric === 'vam'
+                           ? 'GPS coordinates and elevation data available'
+                           : 'Performance data not available in this GPS track'
+                         }
+                       </p>
                   </div>
                 );
               }
