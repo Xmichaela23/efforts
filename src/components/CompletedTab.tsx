@@ -348,6 +348,16 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             activeDot={{ r: 3, fill: "#9ca3af" }}
           />
           
+          {/* Simple Cursor Line - Moves with scroll bar */}
+          {scrollRange[0] > 0 && validData.length > 0 && (
+            <ReferenceLine
+              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
+              stroke="#ef4444"
+              strokeWidth={2}
+              strokeDasharray="5 5"
+            />
+          )}
+          
           {/* Tooltip */}
           <Tooltip
             content={({ active, payload, label }) => {
@@ -379,10 +389,58 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
         
         // Calculate metrics at this position
         const paceValue = getMetricValue(gpsPoint, gpsIndex);
+        
+        // Ensure we get a valid pace value
+        let finalPaceValue = paceValue;
+        if (!finalPaceValue && gpsIndex > 0) {
+          // Fallback: calculate pace directly from GPS points
+          const prevPoint = gpsTrack[gpsIndex - 1];
+          if (prevPoint) {
+            const distance = calculateDistance(
+              prevPoint.lat || prevPoint.latitudeInDegree,
+              prevPoint.lng || prevPoint.longitudeInDegree,
+              gpsPoint.lat || gpsPoint.latitudeInDegree,
+              gpsPoint.lng || gpsPoint.longitudeInDegree
+            );
+            const timeDiff = (gpsPoint.timestamp || gpsPoint.startTimeInSeconds) - 
+                            (prevPoint.timestamp || prevPoint.startTimeInSeconds);
+            
+            if (timeDiff > 0 && distance > 0.002) {
+              const speedMph = (distance / timeDiff) * 3600;
+              if (speedMph >= 2 && speedMph <= 25) {
+                finalPaceValue = Math.round((60 / speedMph) * 100) / 100;
+              }
+            }
+          }
+        }
+        
         const heartRate = sensorData?.find(sensor => 
           sensor.timestamp === gpsPoint?.timestamp || 
           sensor.timestamp === gpsPoint?.startTimeInSeconds
         )?.heartRate;
+        
+        // Alternative BPM lookup - try to find closest timestamp match
+        let bpmValue = heartRate;
+        if (!bpmValue && sensorData && sensorData.length > 0) {
+          // Find the closest timestamp match
+          const gpsTime = gpsPoint?.timestamp || gpsPoint?.startTimeInSeconds;
+          if (gpsTime) {
+            const closestSensor = sensorData.reduce((closest, sensor) => {
+              const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
+              if (!sensorTime) return closest;
+              
+              const timeDiff = Math.abs(sensorTime - gpsTime);
+              if (!closest || timeDiff < Math.abs(closest.timestamp - gpsTime)) {
+                return { ...sensor, timeDiff };
+              }
+              return closest;
+            }, null);
+            
+            if (closestSensor && closestSensor.timeDiff < 10) { // Within 10 seconds
+              bpmValue = closestSensor.heartRate;
+            }
+          }
+        }
         
         // Calculate VAM at this position
         let vamValue = null;
@@ -418,13 +476,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                 <div>
                   <span className="text-gray-500">Pace:</span>
                   <span className="ml-2 font-medium" style={{ color: '#3b82f6' }}>
-                    {paceValue ? `${paceValue} min/mi` : 'No data'}
+                    {finalPaceValue ? `${finalPaceValue} min/mi` : 'No data'}
                   </span>
                 </div>
                 <div>
                   <span className="text-gray-500">Heart Rate:</span>
                   <span className="ml-2 font-medium" style={{ color: '#ef4444' }}>
-                    {heartRate ? `${heartRate} bpm` : 'No data'}
+                    {bpmValue ? `${bpmValue} bpm` : 'No data'}
                   </span>
                 </div>
                 <div>
