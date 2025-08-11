@@ -211,7 +211,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <div className="text-sm font-medium text-gray-700 mb-2">
         Elevation Profile (Relative to Start)
                      <span className="text-xs text-gray-500 ml-2">
-               (VAM calculated from elevation and time data)
+               (VAM from GPS data)
              </span>
       </div>
       <ResponsiveContainer width="100%" height="70%">
@@ -300,7 +300,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                     <p className="text-xs text-gray-400">Relative to start point</p>
-                                           {metricValue !== null && metricValue !== undefined ? (
+                                           {metricValue !== null && metricValue !== undefined && (localSelectedMetric !== 'vam' || Number(metricValue) > 0) ? (
                          <p className="text-gray-600" style={{ color: getMetricColor() }}>
                            {getMetricLabel()}: {metricValue}
                            {localSelectedMetric === 'heartrate' && ' bpm'}
@@ -310,15 +310,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
                          </p>
                        ) : (
                          <p className="text-gray-500 text-xs">
-                           {localSelectedMetric === 'vam' ? 'VAM data not available' : 'No performance data at this point'}
+                           {localSelectedMetric === 'vam' ? 'Flat section' : 'No data'}
                          </p>
                        )}
-                                           <p className="text-xs text-gray-500 mt-1">
-                         {localSelectedMetric === 'vam'
-                           ? 'VAM calculated from elevation changes over time'
-                           : 'Performance data not available in this GPS track'
-                         }
-                       </p>
                   </div>
                 );
               }
@@ -330,7 +324,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       
       {/* Metric Selection Buttons */}
       <div className="mt-3 px-2">
-        <div className="text-xs text-gray-600 mb-2">Select metric to overlay:</div>
+        <div className="text-xs text-gray-600 mb-2">Metric overlay:</div>
         <div className="flex flex-wrap gap-2">
           {['Heart Rate', 'Speed', 'Power', 'VAM'].map((metric) => (
             <button
@@ -350,7 +344,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
 
       {/* Scroll Control Slider */}
       <div className="mt-3 px-2">
-        <div className="text-xs text-gray-600 mb-2">Scroll through workout</div>
+        <div className="text-xs text-gray-600 mb-2">Scroll workout</div>
         <div className="relative">
           <input
             type="range"
