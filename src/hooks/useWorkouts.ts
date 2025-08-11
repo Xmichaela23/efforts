@@ -131,10 +131,11 @@ export interface Workout {
   avg_pace?: number;
   max_pace?: number;
   steps?: number;
-  // Garmin-specific fields
-  isGarminImported?: boolean;
-  garmin_activity_id?: string;
-  gps_track?: any; // GPS track data from Garmin
+          // Garmin-specific fields
+        isGarminImported?: boolean;
+        garmin_activity_id?: string;
+        gps_track?: any; // GPS track data from Garmin
+        sensor_data?: any; // Heart rate, power data over time from Garmin
 }
 
 export const useWorkouts = () => {
@@ -593,7 +594,8 @@ export const useWorkouts = () => {
         // Garmin-specific fields
         isGarminImported: w.isGarminImported,
         garmin_activity_id: w.garmin_activity_id,
-        gps_track: w.gps_track
+        gps_track: w.gps_track,
+        sensor_data: w.sensor_data
       }));
 
       console.log(`✅ Final mapped workouts: ${mapped.length}`);
