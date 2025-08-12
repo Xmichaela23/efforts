@@ -154,7 +154,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
         setMapLoaded(false);
       }
     };
-  }, [startLocation]);
+  }, [startLocation, gpsTrack]);
 
   useEffect(() => {
     console.log('🗺️ ActivityMap GPS Debug:', { 
