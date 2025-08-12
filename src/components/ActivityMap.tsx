@@ -32,8 +32,22 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [containerReady, setContainerReady] = useState(false);
+
+  // Ref callback to detect when container is ready
+  const setContainerRef = (element: HTMLDivElement | null) => {
+    if (element && !containerReady) {
+      mapContainer.current = element;
+      setContainerReady(true);
+    }
+  };
 
   useEffect(() => {
+    if (!containerReady || !mapContainer.current) {
+      console.log('🗺️ Container not ready yet, waiting...');
+      return;
+    }
+
     console.log('🗺️ Map creation useEffect triggered with:', {
       hasContainer: !!mapContainer.current,
       hasGpsTrack: !!gpsTrack,
@@ -164,7 +178,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
         setMapLoaded(false);
       }
     };
-  }, [startLocation]); // Only depend on startLocation, not gpsTrack
+  }, [startLocation, containerReady]); // Wait for container to be ready
 
   useEffect(() => {
     console.log('🗺️ ActivityMap GPS Debug:', { 
@@ -337,7 +351,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   return (
     <div className="w-full h-full">
       <div 
-        ref={mapContainer} 
+        ref={setContainerRef} 
         className="w-full h-full"
         style={{ minHeight: '256px' }}
       />
