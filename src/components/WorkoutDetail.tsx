@@ -168,7 +168,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               onClick={() => onTabChange?.('summary')}
               className={`py-2 px-1 text-sm font-medium transition-colors ${
                 activeTab === 'summary'
-                  ? 'text-black border-b-2 border-black'
+                  ? 'text-black underline'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               style={{ fontFamily: 'Inter, sans-serif' }}
@@ -179,7 +179,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
               onClick={() => onTabChange?.('completed')}
               className={`py-2 px-1 text-sm font-medium transition-colors ${
                 activeTab === 'completed'
-                  ? 'text-black border-b-2 border-black'
+                  ? 'text-black underline'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
               style={{ fontFamily: 'Inter, sans-serif' }}
