@@ -932,6 +932,10 @@ export const useWorkouts = () => {
         threshold_power: workoutData.threshold_power,
         total_cycles: workoutData.total_cycles,
         device_info: workoutData.deviceInfo,
+        
+        // GPS and sensor data for charts
+        gps_track: workoutData.gps_track ? JSON.stringify(workoutData.gps_track) : null,
+        sensor_data: workoutData.sensor_data ? JSON.stringify(workoutData.sensor_data) : null,
       };
 
       console.log("Saving workout with ALL FIT data:", toSave);
@@ -1068,6 +1072,14 @@ export const useWorkouts = () => {
           total_cycles: data.total_cycles,
         }
       };
+
+      // Add GPS and sensor data to the workout object
+      if (data.gps_track) {
+        newWorkout.gps_track = JSON.parse(data.gps_track);
+      }
+      if (data.sensor_data) {
+        newWorkout.sensor_data = JSON.parse(data.sensor_data);
+      }
 
       setWorkouts((prev) => [newWorkout, ...prev]);
       return newWorkout;
