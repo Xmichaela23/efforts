@@ -46,6 +46,17 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   useEffect(() => {
     if (workoutData && workoutData.gps_track) {
       console.log('📊 workoutData loaded:', workoutData.name, 'GPS:', workoutData.gps_track?.length, 'Sensors:', workoutData.sensor_data?.length);
+      
+      // Debug: Check what data we have
+      console.log('🔍 CompletedTab workoutData debug:', {
+        hasGpsTrack: !!workoutData.gps_track,
+        gpsTrackLength: workoutData.gps_track?.length,
+        hasSensorData: !!workoutData.sensor_data,
+        sensorDataLength: workoutData.sensor_data?.length,
+        sensorDataKeys: workoutData.sensor_data ? Object.keys(workoutData.sensor_data[0] || {}) : [],
+        workoutDataKeys: Object.keys(workoutData || {})
+      });
+      
       setIsLoading(false);
     } else if (workoutData) {
       // We have workout data but no GPS track

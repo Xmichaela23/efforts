@@ -134,35 +134,48 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
           break;
           
         case 'heartrate':
-          // Find corresponding sensor data with wider time window
-          let sensorPoint = sensorData?.find(sensor => 
-            sensor.timestamp === point.timestamp || 
-            sensor.startTimeInSeconds === point.startTimeInSeconds
-          );
+          // Try multiple sources for heart rate data
+          let hrValue = null;
           
-          // If no exact match, find closest within 30 seconds
-          if (!sensorPoint && sensorData && sensorData.length > 0) {
-            const gpsTime = point.timestamp || point.startTimeInSeconds;
-            if (gpsTime) {
-              sensorPoint = sensorData.reduce((closest, sensor) => {
-                const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
-                if (!sensorTime) return closest;
+          // First, check if heart rate is embedded in GPS track
+          if (point.heartRate || point.heart_rate || point.hr) {
+            hrValue = point.heartRate || point.heart_rate || point.hr;
+          }
+          // Then try sensor data with wider time window
+          else if (sensorData && sensorData.length > 0) {
+            let sensorPoint = sensorData.find(sensor => 
+              sensor.timestamp === point.timestamp || 
+              sensor.startTimeInSeconds === point.startTimeInSeconds ||
+              sensor.timestamp === point.startTimeInSeconds
+            );
+            
+            // If no exact match, find closest within 60 seconds (wider window)
+            if (!sensorPoint) {
+              const gpsTime = point.timestamp || point.startTimeInSeconds;
+              if (gpsTime) {
+                sensorPoint = sensorData.reduce((closest, sensor) => {
+                  const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
+                  if (!sensorTime) return closest;
+                  
+                  const timeDiff = Math.abs(sensorTime - gpsTime);
+                  if (!closest || timeDiff < closest.timeDiff) {
+                    return { ...sensor, timeDiff };
+                  }
+                  return closest;
+                }, null);
                 
-                const timeDiff = Math.abs(sensorTime - gpsTime);
-                if (!closest || timeDiff < closest.timeDiff) {
-                  return { ...sensor, timeDiff };
+                // Only use if within 60 seconds (wider window)
+                if (sensorPoint && sensorPoint.timeDiff <= 60) {
+                  hrValue = sensorPoint.heartRate || sensorPoint.heart_rate || sensorPoint.hr;
                 }
-                return closest;
-              }, null);
-              
-              // Only use if within 30 seconds
-              if (sensorPoint && sensorPoint.timeDiff > 30) {
-                sensorPoint = null;
               }
+            } else {
+              hrValue = sensorPoint.heartRate || sensorPoint.heart_rate || sensorPoint.hr;
             }
           }
           
-          metricValue = sensorPoint?.heartRate || null;
+          metricValue = hrValue;
+          
           break;
           
         case 'vam':
@@ -226,7 +239,21 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       distance: point.distance,
       elevation: point.elevation,
       metricValue: point.metricValue
-    }))
+    })),
+    // Debug heart rate data specifically
+    heartRateDebug: selectedMetric === 'heartrate' ? {
+      firstGpsPoint: gpsTrack?.[0] ? {
+        heartRate: gpsTrack[0].heartRate,
+        heart_rate: gpsTrack[0].heart_rate,
+        hr: gpsTrack[0].hr
+      } : null,
+      firstSensorPoint: sensorData?.[0] ? {
+        heartRate: sensorData[0].heartRate,
+        heart_rate: sensorData[0].heart_rate,
+        hr: sensorData[0].hr,
+        timestamp: sensorData[0].timestamp
+      } : null
+    } : null
   });
 
   // Get metric label and unit
