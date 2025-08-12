@@ -37,7 +37,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       defaultCenter: [-118.2437, 34.0522]
     });
     
-    // Initialize map with style loading check
+    // Initialize map with proper style loading handling
     map.current = new mapboxgl.Map({
       container: mapContainer.current,
       style: 'mapbox://styles/mapbox/outdoors-v12',
@@ -46,37 +46,47 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       failIfMajorPerformanceCaveat: false
     });
 
-    // Wait for style to be fully loaded before proceeding
-    map.current.on('style.load', () => {
+    // SMART FIX: Single event listener for style loading
+    const handleStyleLoad = () => {
       console.log('🗺️ Style loaded, setting mapLoaded to true');
       setMapLoaded(true);
-    });
+    };
 
-    // Also listen for the regular load event as backup
-    map.current.on('load', () => {
+    // SMART FIX: Single event listener for map load
+    const handleMapLoad = () => {
       console.log('🗺️ Map loaded successfully');
-      // Only set mapLoaded if style is also ready
+      // Double-check style is ready before setting mapLoaded
       if (map.current?.isStyleLoaded()) {
         setMapLoaded(true);
       }
-    });
+    };
 
-    // Add navigation controls
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // SMART FIX: Add controls only after style is loaded
+    const handleStyleReady = () => {
+      if (map.current && !map.current.getControl('navigation')) {
+        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      }
+    };
 
-    // Handle map load
-    map.current.on('load', () => {
-      console.log('🗺️ Map loaded successfully');
-      setMapLoaded(true);
-    });
-    
-    // Handle map errors
+    // SMART FIX: Attach event listeners
+    map.current.on('style.load', handleStyleLoad);
+    map.current.on('load', handleMapLoad);
+    map.current.on('style.load', handleStyleReady);
+
+    // Handle map errors gracefully
     map.current.on('error', (e) => {
       console.error('🗺️ Map error:', e);
+      // Don't crash the app on map errors
     });
 
+    // SMART FIX: Proper cleanup with event removal
     return () => {
       if (map.current) {
+        // Remove event listeners before destroying map
+        map.current.off('style.load', handleStyleLoad);
+        map.current.off('load', handleMapLoad);
+        map.current.off('style.load', handleStyleReady);
+        
         map.current.remove();
         map.current = null;
         setMapLoaded(false);
@@ -93,7 +103,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       startLocation 
     });
     
-    // CRITICAL: Only process GPS when map AND style are fully loaded
+    // SMART FIX: Only process GPS when map AND style are fully loaded
     if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) {
       console.log('🗺️ Skipping GPS processing:', { 
         hasMap: !!map.current, 
@@ -104,8 +114,11 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       return;
     }
 
-    // Skip the isStyleLoaded check - it seems unreliable
-    // Just proceed when mapLoaded is true
+    // SMART FIX: Double-check style is ready before accessing map sources
+    if (!map.current.isStyleLoaded()) {
+      console.log('🗺️ Style not ready yet, waiting...');
+      return;
+    }
 
     // Remove existing route if any
     if (map.current.getSource('route')) {
