@@ -261,7 +261,7 @@ const WorkoutDetail: React.FC<WorkoutDetailProps> = ({
           )}
 
           {activeTab === 'completed' && (
-            <div className="space-y-4">
+            <div className="space-y-0">
               {/* 🔧 DEBUG: Log what's happening */}
               {console.log('🔍 WorkoutDetail - activeTab:', activeTab, 'workout.type:', workout.type)}
               

@@ -274,7 +274,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Completed Tab */}
-          <TabsContent value="completed" className="flex-1">
+          <TabsContent value="completed" className="flex-1 -mt-8 !mt-0">
             {isCompleted ? (
               <div className="h-full">
                 {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
