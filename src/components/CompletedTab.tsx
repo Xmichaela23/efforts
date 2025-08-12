@@ -1078,7 +1078,7 @@ const formatPace = (paceValue: any): string => {
          
          {/* Metric selection is now handled inside CleanElevationChart */}
          
-         <div className="h-96">
+         <div className="h-[500px]">
            <CleanElevationChart
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
