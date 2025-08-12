@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 
 // Custom styles for range slider
@@ -29,6 +29,7 @@ interface CleanElevationChartProps {
   gpsTrack: any[] | null;
   sensorData: any[] | null;
   workoutType: string;
+  selectedMetric: string;
   useImperial: boolean;
 }
 
@@ -36,9 +37,21 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   gpsTrack, 
   sensorData,
   workoutType, 
+  selectedMetric: externalSelectedMetric,
   useImperial
 }) => {
   const [selectedMetric, setSelectedMetric] = useState<'pace' | 'heartrate' | 'vam'>('pace');
+  
+  // Sync with external selectedMetric prop
+  React.useEffect(() => {
+    if (externalSelectedMetric === 'speed') {
+      setSelectedMetric('pace');
+    } else if (externalSelectedMetric === 'heartrate') {
+      setSelectedMetric('heartrate');
+    } else if (externalSelectedMetric === 'vam') {
+      setSelectedMetric('vam');
+    }
+  }, [externalSelectedMetric]);
   const [scrollPosition, setScrollPosition] = useState(0);
 
   // Early return if no GPS data
@@ -157,6 +170,16 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     });
   }, [gpsTrack, sensorData, selectedMetric, useImperial]);
 
+  // Debug logging
+  console.log('🔍 CleanElevationChart debug:', {
+    gpsTrackLength: gpsTrack?.length,
+    sensorDataLength: sensorData?.length,
+    selectedMetric,
+    chartDataLength: chartData?.length,
+    firstPoint: chartData[0],
+    lastPoint: chartData[chartData.length - 1]
+  });
+
   // Get metric label and unit
   const getMetricInfo = () => {
     switch (selectedMetric) {
@@ -240,7 +263,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       </div>
 
       {/* Chart Container */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-4" style={{ minHeight: '300px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />

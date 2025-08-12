@@ -1057,45 +1057,14 @@ const formatPace = (paceValue: any): string => {
            <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
          </div>
          
-         {/* Metric Selection Buttons - Simple text with underlines */}
-         <div className="flex gap-6 px-4 py-3 border-b border-gray-100">
-           <button
-             onClick={() => setSelectedMetric('speed')}
-             className={`text-sm font-medium transition-all ${
-               selectedMetric === 'speed' 
-                 ? 'text-black border-b-2 border-black pb-1' 
-                 : 'text-gray-500 hover:text-gray-700'
-             }`}
-           >
-             Pace
-           </button>
-           <button
-             onClick={() => setSelectedMetric('heartrate')}
-             className={`text-sm font-medium transition-all ${
-               selectedMetric === 'heartrate' 
-                 ? 'text-black border-b-2 border-black pb-1' 
-                 : 'text-gray-500 hover:text-gray-700'
-             }`}
-           >
-             BPM
-           </button>
-           <button
-             onClick={() => setSelectedMetric('vam')}
-             className={`text-sm font-medium transition-all ${
-               selectedMetric === 'vam' 
-                 ? 'text-black border-b-2 border-black pb-1' 
-                 : 'text-gray-500 hover:text-gray-700'
-             }`}
-           >
-             VAM
-           </button>
-         </div>
+         {/* Metric selection is now handled inside CleanElevationChart */}
          
-         <div className="h-80">
+         <div className="h-96">
            <CleanElevationChart
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
              workoutType={workoutType}
+             selectedMetric={selectedMetric}
              useImperial={useImperial}
            />
          </div>
