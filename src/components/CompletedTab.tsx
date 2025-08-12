@@ -157,22 +157,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     return R * c;
   };
 
-  // Calculate adaptive chart height based on elevation range
-  const getChartHeight = (gpsTrack: any[]) => {
-    if (!gpsTrack || gpsTrack.length === 0) return 'h-96'; // Default height
-    
-    const elevations = gpsTrack.map(point => point.elevation || point.altitude || 0);
-    const minElevation = Math.min(...elevations);
-    const maxElevation = Math.max(...elevations);
-    const elevationRange = maxElevation - minElevation;
-    
-    // Smart height adjustment based on elevation range
-    if (elevationRange <= 200) return 'h-64';      // Small changes: 256px
-    if (elevationRange <= 500) return 'h-80';      // Medium changes: 320px  
-    if (elevationRange <= 1000) return 'h-96';     // Large changes: 384px
-    if (elevationRange <= 2000) return 'h-[28rem]'; // Big changes: 448px
-    if (elevationRange <= 5000) return 'h-[32rem]'; // Huge changes: 512px
-    return 'h-[36rem]';                            // Extreme changes: 576px
+  // Strava-style: Fixed aspect ratio height, not dynamically scaled
+  // This ensures consistent visual proportions regardless of elevation range
+  const getChartHeight = () => {
+    // Fixed height that maintains aspect ratio - Strava uses shallow vertical scale
+    // This prevents the chart from overwhelming the layout
+    return 'h-72'; // 288px - Strava-like shallow height
   };
 
   // Process GPS data for chart with real distance and relative elevation
@@ -308,23 +298,8 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     return Math.round(totalClimb);
   };
 
-  // Calculate adaptive chart height based on elevation range
-  const getAdaptiveChartHeight = () => {
-    if (!validData || validData.length === 0) return 'h-96'; // Default height
-    
-    const elevations = validData.map(point => point.absoluteElevation || 0);
-    const minElevation = Math.min(...elevations);
-    const maxElevation = Math.max(...elevations);
-    const elevationRange = maxElevation - minElevation;
-    
-    // Smart height adjustment based on elevation range
-    if (elevationRange <= 200) return 'h-64';      // Small changes: 256px
-    if (elevationRange <= 500) return 'h-80';      // Medium changes: 320px  
-    if (elevationRange <= 1000) return 'h-96';     // Large changes: 384px
-    if (elevationRange <= 2000) return 'h-[28rem]'; // Big changes: 448px
-    if (elevationRange <= 5000) return 'h-[32rem]'; // Huge changes: 512px
-    return 'h-[36rem]';                            // Extreme changes: 576px
-  };
+  // Strava-style: Fixed height for consistent layout
+  // The chart height is now fixed, but Y-axis auto-scales within that height
 
   const getMetricLabel = () => {
     switch (localSelectedMetric) {
@@ -359,15 +334,17 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fontSize={10}
           />
           
-          {/* Left Y Axis - True Elevation */}
-                                   <YAxis 
-                           yAxisId="left"
-                           orientation="left"
-                           tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
-                           stroke="#6b7280"
-                           fontSize={10}
-                           width={40}
-                         />
+          {/* Left Y Axis - True Elevation with Strava-style auto-scaling */}
+          <YAxis 
+            yAxisId="left"
+            orientation="left"
+            domain={['dataMin - 50', 'dataMax + 50']} // Add small padding for better visibility
+            tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
+            stroke="#6b7280"
+            fontSize={10}
+            width={40}
+            allowDataOverflow={false} // Ensures all data fits within the fixed height
+          />
           
 
           
@@ -1673,7 +1650,7 @@ const formatPace = (paceValue: any): string => {
            <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
            <p className="text-sm text-gray-500">Scroll through your workout to see real-time metrics</p>
          </div>
-         <div className="h-80">
+         <div className="h-72">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
