@@ -370,7 +370,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           
 
           
-          {/* Elevation Area - True altitude */}
+                    {/* Elevation Area - True altitude */}
           <Area
             yAxisId="left"
             type="monotone"
@@ -381,7 +381,15 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fillOpacity={0.4}
           />
           
-
+          {/* Visual Cursor Line - Moves with scroll bar position */}
+          {scrollRange[0] > 0 && validData.length > 0 && (
+            <ReferenceLine
+              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
+              stroke="#ef4444"
+              strokeWidth={3}
+              strokeDasharray="0"
+            />
+          )}
           
           {/* Tooltip */}
           <Tooltip
