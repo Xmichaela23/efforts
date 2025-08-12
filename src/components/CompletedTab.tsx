@@ -157,6 +157,24 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     return R * c;
   };
 
+  // Calculate adaptive chart height based on elevation range
+  const getChartHeight = (gpsTrack: any[]) => {
+    if (!gpsTrack || gpsTrack.length === 0) return 'h-96'; // Default height
+    
+    const elevations = gpsTrack.map(point => point.elevation || point.altitude || 0);
+    const minElevation = Math.min(...elevations);
+    const maxElevation = Math.max(...elevations);
+    const elevationRange = maxElevation - minElevation;
+    
+    // Smart height adjustment based on elevation range
+    if (elevationRange <= 200) return 'h-64';      // Small changes: 256px
+    if (elevationRange <= 500) return 'h-80';      // Medium changes: 320px  
+    if (elevationRange <= 1000) return 'h-96';     // Large changes: 384px
+    if (elevationRange <= 2000) return 'h-[28rem]'; // Big changes: 448px
+    if (elevationRange <= 5000) return 'h-[32rem]'; // Huge changes: 512px
+    return 'h-[36rem]';                            // Extreme changes: 576px
+  };
+
   // Process GPS data for chart with real distance and relative elevation
   const chartData = useMemo(() => {
     if (!gpsTrack || gpsTrack.length === 0) return [];
@@ -288,6 +306,24 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     }
     
     return Math.round(totalClimb);
+  };
+
+  // Calculate adaptive chart height based on elevation range
+  const getAdaptiveChartHeight = () => {
+    if (!validData || validData.length === 0) return 'h-96'; // Default height
+    
+    const elevations = validData.map(point => point.absoluteElevation || 0);
+    const minElevation = Math.min(...elevations);
+    const maxElevation = Math.max(...elevations);
+    const elevationRange = maxElevation - minElevation;
+    
+    // Smart height adjustment based on elevation range
+    if (elevationRange <= 200) return 'h-64';      // Small changes: 256px
+    if (elevationRange <= 500) return 'h-80';      // Medium changes: 320px  
+    if (elevationRange <= 1000) return 'h-96';     // Large changes: 384px
+    if (elevationRange <= 2000) return 'h-[28rem]'; // Big changes: 448px
+    if (elevationRange <= 5000) return 'h-[32rem]'; // Huge changes: 512px
+    return 'h-[36rem]';                            // Extreme changes: 576px
   };
 
   const getMetricLabel = () => {
@@ -1620,8 +1656,8 @@ const formatPace = (paceValue: any): string => {
            />
          </div>
          
-         {/* Elevation Profile - Full width below for maximum horizontal space */}
-         <div className="h-96 relative bg-white">
+         {/* Elevation Profile - Adaptive height based on elevation range */}
+         <div className="relative bg-white h-96">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
