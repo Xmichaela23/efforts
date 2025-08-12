@@ -290,18 +290,18 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   return (
     <div className="h-full">
       <style>{sliderStyles}</style>
-      <div className="text-sm font-medium text-gray-700 mb-2">
+      <div className="text-sm font-medium text-gray-700 mb-1">
         Elevation Profile (Relative to Start)
         <span className="text-xs text-gray-500 ml-2">
           (VAM from GPS data)
         </span>
       </div>
       {/* Mobile-friendly subtitle */}
-      <div className="text-xs text-gray-500 mb-3 md:hidden">
+      <div className="text-xs text-gray-500 mb-2 md:hidden">
         Tap and drag to explore • Scroll to zoom
       </div>
-             <ResponsiveContainer width="100%" height="75%">
-               <ComposedChart data={validData} margin={{ top: 10, right: 40, left: 30, bottom: 15 }}>
+             <ResponsiveContainer width="100%" height="85%">
+               <ComposedChart data={validData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -1597,7 +1597,7 @@ const formatPace = (paceValue: any): string => {
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
      <div>
 
-       {/* 🗺️ SIDE-BY-SIDE LAYOUT */}
+       {/* 🗺️ SIDE-BY-SIDE LAYOUT - TRULY EDGE-TO-EDGE */}
        <div className="grid grid-cols-1 xl:grid-cols-4 gap-0">
          {/* GPS Route Map - Left side */}
          <div className="h-80 xl:col-span-1 relative overflow-hidden">
@@ -1612,7 +1612,7 @@ const formatPace = (paceValue: any): string => {
            />
          </div>
          
-         {/* Elevation Profile - Right side (wider) */}
+         {/* Elevation Profile - Right side (wider) - Edge-to-edge */}
          <div className="h-80 xl:col-span-3 relative bg-white">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
