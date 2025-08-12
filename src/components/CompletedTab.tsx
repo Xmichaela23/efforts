@@ -327,8 +327,21 @@ const formatPace = (paceValue: any): string => {
    const dateValue = dateStr || workoutData.date || workoutData.start_date;
    if (!dateValue) return 'N/A';
    
-   // Create proper Date object and convert to local timezone
+   console.log('🔍 formatDate debugging:', {
+     input: dateStr,
+     dateValue,
+     type: typeof dateValue
+   });
+   
+   // Create Date object - handle UTC timestamps properly
    const date = new Date(dateValue);
+   
+   console.log('🔍 Date object created:', {
+     date: date.toString(),
+     utc: date.toUTCString(),
+     local: date.toLocaleString(),
+     timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+   });
    
    // Format date in local timezone (same as calendar)
    const options: Intl.DateTimeFormatOptions = {
@@ -337,7 +350,10 @@ const formatPace = (paceValue: any): string => {
      day: 'numeric'
    };
    
-   return date.toLocaleDateString('en-US', options);
+   const result = date.toLocaleDateString('en-US', options);
+   console.log('🔍 formatDate result:', result);
+   
+   return result;
  };
 
  const getCityFromCoordinates = (lat: any, lng: any): string => {
