@@ -345,8 +345,8 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     <div className="h-full">
       <style>{sliderStyles}</style>
 
-                            <ResponsiveContainer width="100%" height="90%">
-                 <ComposedChart data={validData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                            <ResponsiveContainer width="100%" height="95%">
+                 <ComposedChart data={validData} margin={{ top: 2, right: 5, left: 5, bottom: 2 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -1665,7 +1665,8 @@ const formatPace = (paceValue: any): string => {
          </div>
          
          {/* Elevation Profile - Adaptive height based on elevation range */}
-         <div className="relative bg-white h-96">
+         {/* Elevation Profile - Strava-style: fixed height, full width, smart scaling */}
+         <div className="relative bg-white h-72">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
