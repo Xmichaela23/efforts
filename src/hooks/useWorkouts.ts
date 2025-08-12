@@ -323,6 +323,9 @@ export const useWorkouts = () => {
                 // GPS track data
                 gps_track: activity.gps_track,
                 
+                // Sensor data for charts
+                sensor_data: activity.sensor_data,
+                
                 // 🔧 FIX: Create metrics object that CompletedTab expects
                 metrics: {
                   // Heart rate data
