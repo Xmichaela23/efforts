@@ -1670,7 +1670,7 @@ const formatPace = (paceValue: any): string => {
          
          {/* Elevation Profile - Adaptive height based on elevation range */}
          {/* Elevation Profile - Strava-style: fixed height, full width, smart scaling */}
-         <div className="relative bg-white h-72">
+         <div className="relative bg-white h-72 mt-4 border-t border-gray-100">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
