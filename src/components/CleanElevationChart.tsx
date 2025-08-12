@@ -431,7 +431,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       </div>
 
       {/* Metric Selection Buttons - Underneath Chart */}
-      <div className="flex gap-6 px-4 py-3 border-t border-gray-100 bg-white shadow-sm">
+      <div className="flex gap-6 px-4 py-3 border-t border-gray-100">
         <button
           onClick={() => setSelectedMetric('pace')}
           className={`text-sm font-medium transition-all px-3 py-1 rounded ${
