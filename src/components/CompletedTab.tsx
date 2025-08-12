@@ -1053,10 +1053,10 @@ const formatPace = (paceValue: any): string => {
        </div>
      </div>
 
-     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
-     <div className="space-y-8 relative">
-       {/* 🗺️ MAP SECTION - Fixed positioning to prevent overlap */}
-       <div className="bg-white rounded-lg overflow-hidden relative z-10">
+     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - COMPLETELY SEPARATED */}
+     <div className="flex flex-col space-y-12">
+       {/* 🗺️ MAP SECTION - Isolated container */}
+       <div className="bg-white rounded-lg overflow-hidden isolate" style={{ zIndex: 1 }}>
          <div className="h-64 relative">
            <ActivityMap
              gpsTrack={workoutData.gps_track}
@@ -1070,10 +1070,10 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* 📊 ELEVATION PROFILE SECTION - Clean and minimal with proper positioning */}
-       <div className="overflow-hidden relative z-20 mt-8">
-         {/* Chart container - ensure it's above the map and has proper spacing */}
-         <div className="h-[500px] relative pt-4">
+       {/* 📊 ELEVATION PROFILE SECTION - Completely separate with isolation */}
+       <div className="overflow-hidden isolate chart-section" style={{ zIndex: 2, position: 'relative' }}>
+         {/* Chart container - ensure complete separation */}
+         <div className="h-[500px] relative">
            <CleanElevationChart
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}

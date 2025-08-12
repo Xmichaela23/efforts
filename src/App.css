@@ -77,6 +77,20 @@ body {
   overscroll-behavior: none;
 }
 
+/* Chart section isolation - ensure complete separation from map */
+.chart-section {
+  isolation: isolate;
+  position: relative;
+  z-index: 2;
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+.chart-section * {
+  position: relative;
+  z-index: inherit;
+}
+
 /* Stabilize sliding container */
 .sliding-container {
   overflow: hidden;
