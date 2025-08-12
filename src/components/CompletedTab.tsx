@@ -272,6 +272,24 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     }
   };
 
+  // Calculate total elevation gain (climbing)
+  const calculateTotalClimb = () => {
+    if (!validData || validData.length < 2) return 0;
+    
+    let totalClimb = 0;
+    for (let i = 1; i < validData.length; i++) {
+      const prevElevation = validData[i - 1].absoluteElevation || 0;
+      const currentElevation = validData[i].absoluteElevation || 0;
+      const elevationGain = currentElevation - prevElevation;
+      
+      if (elevationGain > 0) {
+        totalClimb += elevationGain;
+      }
+    }
+    
+    return Math.round(totalClimb);
+  };
+
   const getMetricLabel = () => {
     switch (localSelectedMetric) {
       case 'heartrate':
@@ -290,18 +308,9 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
   return (
     <div className="h-full">
       <style>{sliderStyles}</style>
-      <div className="text-sm font-medium text-gray-700 mb-1">
-        Elevation Profile (Relative to Start)
-        <span className="text-xs text-gray-500 ml-2">
-          (VAM from GPS data)
-        </span>
-      </div>
-      {/* Mobile-friendly subtitle */}
-      <div className="text-xs text-gray-500 mb-2 md:hidden">
-        Tap and drag to explore • Scroll to zoom
-      </div>
-             <ResponsiveContainer width="100%" height="85%">
-               <ComposedChart data={validData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+
+                            <ResponsiveContainer width="100%" height="90%">
+                 <ComposedChart data={validData} margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -314,23 +323,22 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fontSize={10}
           />
           
-          {/* Left Y Axis - Elevation (Relative) */}
+          {/* Left Y Axis - True Elevation */}
           <YAxis 
             yAxisId="left"
             orientation="left"
             tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
             stroke="#6b7280"
             fontSize={10}
-            label={{ value: 'Elevation Change', angle: -90, position: 'insideLeft' }}
           />
           
 
           
-          {/* Elevation Area - Single clean element */}
+          {/* Elevation Area - True altitude */}
           <Area
             yAxisId="left"
             type="monotone"
-            dataKey="elevation"
+            dataKey="absoluteElevation"
             stroke="#6b7280"
             strokeWidth={1.5}
             fill="#e5e7eb"
@@ -343,13 +351,13 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           <Tooltip
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
-                const elevation = payload.find(p => p.dataKey === 'elevation')?.value;
+                const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
                 
                 return (
                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                     <p className="font-medium">Distance: {label} mi</p>
-                    <p className="text-gray-600">Elevation Change: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
-                    <p className="text-xs text-gray-400">Relative to start point</p>
+                    <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
+                    <p className="text-xs text-gray-400">Above sea level</p>
                   </div>
                 );
               }
