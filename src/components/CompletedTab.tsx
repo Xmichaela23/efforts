@@ -346,7 +346,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
       <style>{sliderStyles}</style>
 
                             <ResponsiveContainer width="100%" height="95%">
-                 <ComposedChart data={validData} margin={{ top: 2, right: 5, left: 5, bottom: 2 }}>
+                 <ComposedChart data={validData} margin={{ top: 2, right: 5, left: 2, bottom: 2 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -360,13 +360,14 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
           />
           
           {/* Left Y Axis - True Elevation */}
-          <YAxis 
-            yAxisId="left"
-            orientation="left"
-            tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
-            stroke="#6b7280"
-            fontSize={10}
-          />
+                                   <YAxis 
+                           yAxisId="left"
+                           orientation="left"
+                           tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
+                           stroke="#6b7280"
+                           fontSize={10}
+                           width={40}
+                         />
           
 
           
