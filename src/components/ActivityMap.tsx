@@ -34,7 +34,8 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     console.log('🗺️ Initializing map with:', {
       container: mapContainer.current,
       startLocation,
-      defaultCenter: [-118.2437, 34.0522]
+      defaultCenter: [-118.2437, 34.0522],
+      gpsTrackLength: gpsTrack?.length
     });
     
     try {
@@ -85,6 +86,12 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     map.current.on('style.load', handleStyleLoad);
     map.current.on('load', handleMapLoad);
     map.current.on('style.load', handleStyleReady);
+    
+    // Also listen for the style.load event to ensure style is ready
+    map.current.on('style.load', () => {
+      console.log('🗺️ Style loaded, map should be ready now');
+      setMapLoaded(true);
+    });
 
     // Handle map errors gracefully
     map.current.on('error', (e) => {
@@ -132,6 +139,12 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       console.log('🗺️ Style not ready yet, waiting...');
       return;
     }
+    
+    // Additional safety check - ensure map is fully ready
+    if (!map.current.isStyleLoaded()) {
+      console.log('🗺️ Map not fully ready yet, waiting...');
+      return;
+    }
 
     // Remove existing route if any
     if (map.current.getSource('route')) {
@@ -148,7 +161,12 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       sampleCoordinates: gpsTrack.slice(0, 3).map(point => ({
         lng: point.lng || point.longitudeInDegree || point.longitude,
         lat: point.lat || point.latitudeInDegree || point.latitude
-      }))
+      })),
+      hasValidCoordinates: gpsTrack.some(point => {
+        const lng = point.lng || point.longitudeInDegree || point.longitude;
+        const lat = point.lat || point.latitudeInDegree || point.latitude;
+        return lng && lat;
+      })
     });
     
     // Prepare coordinates for Mapbox - handle different GPS data field names
@@ -208,6 +226,18 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     map.current.fitBounds(bounds, { padding: 50 });
 
   }, [gpsTrack, mapLoaded, startLocation, activityName]);
+
+  // Retry GPS processing if map takes too long to load
+  useEffect(() => {
+    if (gpsTrack && gpsTrack.length > 0 && !mapLoaded) {
+      const timer = setTimeout(() => {
+        console.log('🗺️ Retrying GPS processing after timeout');
+        setMapLoaded(true); // Force retry
+      }, 3000); // Wait 3 seconds
+      
+      return () => clearTimeout(timer);
+    }
+  }, [gpsTrack, mapLoaded]);
 
   if (!gpsTrack || gpsTrack.length === 0) {
     return (

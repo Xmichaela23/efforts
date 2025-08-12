@@ -177,7 +177,12 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     selectedMetric,
     chartDataLength: chartData?.length,
     firstPoint: chartData[0],
-    lastPoint: chartData[chartData.length - 1]
+    lastPoint: chartData[chartData.length - 1],
+    sampleMetricValues: chartData.slice(0, 5).map(point => ({
+      distance: point.distance,
+      elevation: point.elevation,
+      metricValue: point.metricValue
+    }))
   });
 
   // Get metric label and unit
@@ -224,38 +229,44 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
 
   const currentData = getCurrentPositionData();
 
+  console.log('🔍 CleanElevationChart rendering with:', {
+    selectedMetric,
+    chartDataLength: chartData?.length,
+    currentData
+  });
+
   return (
     <div className="h-full flex flex-col">
       <style>{sliderStyles}</style>
       
       {/* Metric Selection Buttons */}
-      <div className="flex gap-6 px-4 py-3 border-b border-gray-100">
+      <div className="flex gap-6 px-4 py-3 border-b border-gray-100 bg-white shadow-sm">
         <button
           onClick={() => setSelectedMetric('pace')}
-          className={`text-sm font-medium transition-all ${
+          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
             selectedMetric === 'pace' 
-              ? 'text-black border-b-2 border-black pb-1' 
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-black border-b-2 border-black pb-1 bg-blue-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
           Pace
         </button>
         <button
           onClick={() => setSelectedMetric('heartrate')}
-          className={`text-sm font-medium transition-all ${
+          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
             selectedMetric === 'heartrate' 
-              ? 'text-black border-b-2 border-black pb-1' 
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-black border-b-2 border-black pb-1 bg-red-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
           BPM
         </button>
         <button
           onClick={() => setSelectedMetric('vam')}
-          className={`text-sm font-medium transition-all ${
+          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
             selectedMetric === 'vam' 
-              ? 'text-black border-b-2 border-black pb-1' 
-              : 'text-gray-500 hover:text-gray-700'
+              ? 'text-black border-b-2 border-black pb-1 bg-green-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
           }`}
         >
           VAM
@@ -263,9 +274,10 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       </div>
 
       {/* Chart Container */}
-      <div className="flex-1 p-4" style={{ minHeight: '300px' }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+      <div className="flex-1 p-4" style={{ minHeight: '400px', height: '400px' }}>
+        {chartData && chartData.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             
             {/* X Axis - Distance */}
@@ -300,17 +312,24 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               fillOpacity={0.4}
             />
             
-            {/* Tooltip */}
+            {/* Tooltip - Shows selected metric data */}
             <Tooltip
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
                   
+                  // Find the data point for this distance to get metric value
+                  const dataPoint = chartData.find(point => Math.abs(point.distance - Number(label)) < 0.1);
+                  const metricValue = dataPoint?.metricValue;
+                  
                   return (
                     <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                       <p className="font-medium">Distance: {label} mi</p>
                       <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
-                      <p className="text-xs text-gray-400">Above sea level</p>
+                      {metricValue && (
+                        <p className="text-gray-600">{metricInfo.label}: {metricValue} {metricInfo.unit}</p>
+                      )}
+                      <p className="text-xs text-gray-400">At this position</p>
                     </div>
                   );
                 }
@@ -319,6 +338,14 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             />
           </ComposedChart>
         </ResponsiveContainer>
+        ) : (
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="text-center">
+              <div className="text-gray-500 text-lg mb-2">No chart data available</div>
+              <div className="text-gray-400 text-sm">Unable to generate elevation profile</div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Scroll Control */}
