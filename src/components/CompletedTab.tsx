@@ -1072,13 +1072,13 @@ const formatPace = (paceValue: any): string => {
        
        {/* 📊 ELEVATION PROFILE SECTION - Clean and minimal */}
        <div className="bg-white overflow-hidden">
+         {/* Title moved above chart container */}
          <div className="px-4 py-3 border-b border-gray-100">
            <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
          </div>
          
-         {/* Metric selection is now handled inside CleanElevationChart */}
-         
-         <div className="h-[500px]">
+         {/* Chart container with proper spacing */}
+         <div className="h-[500px] pt-0">
            <CleanElevationChart
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
