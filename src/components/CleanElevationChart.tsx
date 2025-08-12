@@ -78,17 +78,35 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     return R * c;
   };
 
+  // Sample data to 1000 points for smooth, Strava-quality charts
+  const sampleData = (data: any[], targetSamples: number = 1000) => {
+    if (data.length <= targetSamples) return data;
+    
+    const step = data.length / targetSamples;
+    const sampled = [];
+    
+    for (let i = 0; i < targetSamples; i++) {
+      const index = Math.floor(i * step);
+      sampled.push(data[index]);
+    }
+    
+    return sampled;
+  };
+
   // Process GPS data for chart
   const chartData = useMemo(() => {
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
+    // Sample GPS track to 1000 points for smooth charts
+    const sampledGpsTrack = sampleData(gpsTrack, 1000);
+    
     let cumulativeDistance = 0;
     let baseElevation = null;
     
-    return gpsTrack.map((point, index) => {
+    return sampledGpsTrack.map((point, index) => {
       // Calculate cumulative distance
       if (index > 0) {
-        const prevPoint = gpsTrack[index - 1];
+        const prevPoint = sampledGpsTrack[index - 1];
         const lat1 = prevPoint.lat || prevPoint.latitudeInDegree;
         const lon1 = prevPoint.lng || prevPoint.longitudeInDegree;
         const lat2 = point.lat || point.latitudeInDegree;
@@ -113,7 +131,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       switch (selectedMetric) {
         case 'pace':
           if (index > 0) {
-            const prevPoint = gpsTrack[index - 1];
+            const prevPoint = sampledGpsTrack[index - 1];
             const distance = calculateDistance(
               prevPoint.lat || prevPoint.latitudeInDegree,
               prevPoint.lng || prevPoint.longitudeInDegree,
@@ -143,15 +161,25 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
           }
           // Then try sensor data with wider time window
           else if (sensorData && sensorData.length > 0) {
+            const gpsTime = point.timestamp || point.startTimeInSeconds;
+            
+            // Debug: Log the first few sensor points to see the structure
+            if (index === 0) {
+              console.log('🔍 Heart Rate Debug - First GPS point:', {
+                gpsTime,
+                gpsPoint: point
+              });
+              console.log('🔍 Heart Rate Debug - First 3 sensor points:', sensorData.slice(0, 3));
+            }
+            
             let sensorPoint = sensorData.find(sensor => 
-              sensor.timestamp === point.timestamp || 
-              sensor.startTimeInSeconds === point.startTimeInSeconds ||
+              sensor.timestamp === gpsTime || 
+              sensor.startTimeInSeconds === gpsTime ||
               sensor.timestamp === point.startTimeInSeconds
             );
             
             // If no exact match, find closest within 60 seconds (wider window)
             if (!sensorPoint) {
-              const gpsTime = point.timestamp || point.startTimeInSeconds;
               if (gpsTime) {
                 sensorPoint = sensorData.reduce((closest, sensor) => {
                   const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
@@ -172,6 +200,16 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             } else {
               hrValue = sensorPoint.heartRate || sensorPoint.heart_rate || sensorPoint.hr;
             }
+            
+            // Debug: Log what we found for this point
+            if (index < 5) {
+              console.log(`🔍 Heart Rate Debug - Point ${index}:`, {
+                gpsTime,
+                foundSensorPoint: sensorPoint,
+                hrValue,
+                sensorDataLength: sensorData.length
+              });
+            }
           }
           
           metricValue = hrValue;
@@ -188,8 +226,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             let totalTime = 0;
             
             for (let i = startIndex + 1; i <= index; i++) {
-              const prevPoint = gpsTrack[i - 1];
-              const currentPoint = gpsTrack[i];
+              const prevPoint = sampledGpsTrack[i - 1];
+              const currentPoint = sampledGpsTrack[i];
               
               const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
               const currentElevation = currentPoint.elevation || currentPoint.altitude || 0;
@@ -230,6 +268,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   // Debug logging
   console.log('🔍 CleanElevationChart debug:', {
     gpsTrackLength: gpsTrack?.length,
+    sampledGpsLength: gpsTrack ? sampleData(gpsTrack, 1000).length : 0,
     sensorDataLength: sensorData?.length,
     selectedMetric,
     chartDataLength: chartData?.length,
