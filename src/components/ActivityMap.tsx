@@ -130,7 +130,10 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       if (startLocation) {
         new mapboxgl.Marker({ color: '#10b981' })
           .setLngLat([startLocation.lng, startLocation.lat])
-          .setPopup(new mapboxgl.Popup().setHTML(`<strong>Start</strong><br>${activityName}`))
+          .setPopup(new mapboxgl.Popup({ 
+            className: 'mapbox-popup-above-all',
+            maxWidth: '300px'
+          }).setHTML(`<strong>Start</strong><br>${activityName}`))
           .addTo(map.current);
       }
 

@@ -91,6 +91,15 @@ body {
   z-index: inherit;
 }
 
+/* Mapbox popup above all map elements */
+.mapbox-popup-above-all {
+  z-index: 9999 !important;
+}
+
+.mapbox-popup-above-all .mapboxgl-popup-content {
+  z-index: 9999 !important;
+}
+
 /* Stabilize sliding container */
 .sliding-container {
   overflow: hidden;
