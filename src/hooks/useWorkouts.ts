@@ -816,6 +816,9 @@ export const useWorkouts = () => {
           
           // GPS track data
           gps_track: activity.gps_track,
+          
+          // Sensor data for charts
+          sensor_data: activity.sensor_data,
         };
 
           // Use existing addWorkout function to save the data
