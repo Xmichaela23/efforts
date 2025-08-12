@@ -320,40 +320,6 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     <div className="h-full">
       <style>{sliderStyles}</style>
 
-      {/* Metric Selection Buttons - Simple text with underlines */}
-      <div className="flex gap-6 mb-4 px-4">
-        <button
-          onClick={() => setLocalSelectedMetric('speed')}
-          className={`text-sm font-medium transition-all ${
-            localSelectedMetric === 'speed' 
-              ? 'text-black border-b-2 border-black pb-1' 
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          Pace
-        </button>
-        <button
-          onClick={() => setLocalSelectedMetric('heartrate')}
-          className={`text-sm font-medium transition-all ${
-            localSelectedMetric === 'heartrate' 
-              ? 'text-black border-b-2 border-black pb-1' 
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          BPM
-        </button>
-        <button
-          onClick={() => setLocalSelectedMetric('vam')}
-          className={`text-sm font-medium transition-all ${
-            localSelectedMetric === 'vam' 
-              ? 'text-black border-b-2 border-black pb-1' 
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          VAM
-        </button>
-      </div>
-
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={validData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -393,6 +359,19 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fillOpacity={0.4}
           />
           
+          {/* Selected Metric Line - Overlay on elevation chart */}
+          {localSelectedMetric !== 'elevation' && (
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="metricValue"
+              stroke={getMetricColor()}
+              strokeWidth={2}
+              dot={false}
+              connectNulls={false}
+            />
+          )}
+          
           
           
                      {/* CSS-based Cursor - Moves with scroll bar, never crashes */}
@@ -406,17 +385,59 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
              />
            )}
            
-           {/* Tooltip */}
+           {/* Tooltip - Shows selected metric data */}
            <Tooltip
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
                 
+                // Get the selected metric value for this position
+                const currentIndex = Math.floor((scrollRange[0] / 100) * (validData.length - 1));
+                const currentPoint = validData[currentIndex];
+                const metricValue = currentPoint?.metricValue;
+                
+                // Format the metric label and value
+                let metricLabel = '';
+                let metricValueDisplay = '';
+                
+                switch (localSelectedMetric) {
+                  case 'speed':
+                    metricLabel = 'Pace';
+                    metricValueDisplay = metricValue ? `${metricValue} min/mi` : 'No data';
+                    break;
+                  case 'heartrate':
+                    metricLabel = 'Heart Rate';
+                    metricValueDisplay = metricValue ? `${metricValue} bpm` : 'No data';
+                    break;
+                  case 'vam':
+                    metricLabel = 'VAM';
+                    metricValueDisplay = metricValue ? `${metricValue} m/h` : 'No data';
+                    break;
+                  default:
+                    metricLabel = 'Elevation';
+                    metricValueDisplay = `${Math.round(Number(elevation) || 0)} ${useImperial ? 'ft' : 'm'}`;
+                }
+                
                 return (
                   <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                     <p className="font-medium">Distance: {label} mi</p>
                     <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
-                    <p className="text-xs text-gray-400">Above sea level</p>
+                    <p className="text-gray-600">{metricLabel}: {metricValueDisplay}</p>
+                    
+                    {/* Show climb data if available */}
+                    {currentIndex > 0 && (
+                      <p className="text-gray-600">
+                        Climb: {(() => {
+                          const prevPoint = validData[currentIndex - 1];
+                          const climb = (currentPoint?.absoluteElevation || 0) - (prevPoint?.absoluteElevation || 0);
+                          return climb > 0 ? `+${Math.round(climb)} ft` : `${Math.round(climb)} ft`;
+                        })()}
+                      </p>
+                    )}
+                    
+                    <p className="text-xs text-gray-400">
+                      {localSelectedMetric === 'elevation' ? 'Above sea level' : 'At this position'}
+                    </p>
                   </div>
                 );
               }
