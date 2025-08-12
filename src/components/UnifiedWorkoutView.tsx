@@ -145,7 +145,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex items-center justify-between p-3 border-b">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-lg bg-gray-100">
             <Calendar className="h-4 w-4" />
