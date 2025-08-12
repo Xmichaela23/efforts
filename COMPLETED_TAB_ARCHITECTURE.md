@@ -5,10 +5,24 @@ The Completed Tab is a complex component that displays detailed workout analytic
 
 ## 🏗️ Component Architecture
 
-### Main Components
-- **`CompletedTab.tsx`** - Main container component
+### Main Components (3 Total)
+- **`CompletedTab.tsx`** - Main container component that orchestrates everything
 - **`ActivityMap.tsx`** - Mapbox GL JS map with GPS route display
 - **`CleanElevationChart.tsx`** - Interactive elevation chart with tooltips
+
+### Component Breakdown
+```
+CompletedTab.tsx (Main Orchestrator)
+├── ActivityMap.tsx (GPS Route Map)
+├── CleanElevationChart.tsx (Elevation Chart)
+└── Built-in UI (Metrics Grid, Layout, Calculations)
+```
+
+### Why This Structure?
+- **CompletedTab** - Handles data flow, layout, and business logic
+- **ActivityMap** - Specializes in GPS route visualization
+- **CleanElevationChart** - Specializes in elevation data visualization
+- **Separation of concerns** - Each component has a specific, focused responsibility
 
 ### Data Flow
 ```
