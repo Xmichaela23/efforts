@@ -465,7 +465,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       </div>
 
       {/* Elevation Profile Title - Below Buttons */}
-      <div className="px-4 py-3 border-t border-gray-100 bg-white">
+      <div className="px-4 py-3 border-t border-gray-100">
         <h3 className="text-lg font-semibold text-gray-900 text-center">Elevation Profile</h3>
       </div>
 
