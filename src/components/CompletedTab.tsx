@@ -1053,27 +1053,29 @@ const formatPace = (paceValue: any): string => {
        </div>
      </div>
 
-     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - COMPLETELY SEPARATED */}
-     <div className="flex flex-col space-y-12">
-       {/* 🗺️ MAP SECTION - Isolated container */}
-       <div className="bg-white rounded-lg overflow-hidden isolate" style={{ zIndex: 1 }}>
-         <div className="h-64 relative">
-           <ActivityMap
-             gpsTrack={workoutData.gps_track}
-             activityName={workoutData.name || generateTitle()}
-             activityType={workoutType}
-             startLocation={workoutData.start_position_lat && workoutData.start_position_long ? {
-               lat: workoutData.start_position_lat,
-               lng: workoutData.start_position_long
-             } : null}
-           />
+     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
+     <div className="w-full">
+       {/* 🗺️ MAP SECTION - Fixed height container */}
+       <div className="w-full mb-16">
+         <div className="bg-white rounded-lg overflow-hidden">
+           <div className="h-64 relative">
+             <ActivityMap
+               gpsTrack={workoutData.gps_track}
+               activityName={workoutData.name || generateTitle()}
+               activityType={workoutType}
+               startLocation={workoutData.start_position_lat && workoutData.start_position_long ? {
+                 lat: workoutData.start_position_lat,
+                 lng: workoutData.start_position_long
+               } : null}
+             />
+           </div>
          </div>
        </div>
        
-       {/* 📊 ELEVATION PROFILE SECTION - Completely separate with isolation */}
-       <div className="overflow-hidden isolate chart-section" style={{ zIndex: 2, position: 'relative' }}>
-         {/* Chart container - ensure complete separation */}
-         <div className="h-[500px] relative">
+       {/* 📊 ELEVATION PROFILE SECTION - Starts below map with clear boundary */}
+       <div className="w-full">
+         {/* Chart container - clear separation from map */}
+         <div className="h-[500px] w-full">
            <CleanElevationChart
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}

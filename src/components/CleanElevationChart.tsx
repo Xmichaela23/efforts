@@ -351,11 +351,11 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   });
 
   return (
-    <div className="h-full flex flex-col isolate" style={{ zIndex: 3 }}>
+    <div className="h-full flex flex-col">
       <style>{sliderStyles}</style>
       
-      {/* Chart Container - Edge to Edge with complete isolation */}
-      <div className="flex-1 isolate" style={{ minHeight: '400px', height: '400px', zIndex: 4 }}>
+      {/* Chart Container - Simple and clean */}
+      <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
         {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
@@ -393,9 +393,9 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               fillOpacity={0.4}
             />
             
-            {/* Tooltip - Shows selected metric data with maximum isolation */}
+            {/* Tooltip - Simple and clean */}
             <Tooltip
-              position={{ x: 0, y: -120 }} // Position much higher to avoid covering buttons
+              position={{ x: 0, y: -120 }}
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
@@ -405,7 +405,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                   const metricValue = dataPoint?.metricValue;
                   
                   return (
-                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg isolate" style={{ zIndex: 999 }}>
+                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                       <p className="font-medium">Distance: {label} mi</p>
                       <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                       {metricValue && (
