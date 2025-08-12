@@ -34,7 +34,17 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
-    if (!mapContainer.current) return;
+    console.log('🗺️ Map creation useEffect triggered with:', {
+      hasContainer: !!mapContainer.current,
+      hasGpsTrack: !!gpsTrack,
+      gpsTrackLength: gpsTrack?.length,
+      startLocation
+    });
+    
+    if (!mapContainer.current) {
+      console.log('🗺️ No map container, returning early');
+      return;
+    }
 
     console.log('🗺️ Initializing map with:', {
       container: mapContainer.current,
@@ -154,7 +164,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
         setMapLoaded(false);
       }
     };
-  }, [startLocation, gpsTrack]);
+  }, [startLocation]); // Only depend on startLocation, not gpsTrack
 
   useEffect(() => {
     console.log('🗺️ ActivityMap GPS Debug:', { 
