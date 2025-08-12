@@ -354,42 +354,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     <div className="h-full flex flex-col">
       <style>{sliderStyles}</style>
       
-      {/* Metric Selection Buttons */}
-      <div className="flex gap-6 px-4 py-3 border-b border-gray-100 bg-white shadow-sm">
-        <button
-          onClick={() => setSelectedMetric('pace')}
-          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
-            selectedMetric === 'pace' 
-              ? 'text-black border-b-2 border-black pb-1 bg-blue-50' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Pace
-        </button>
-        <button
-          onClick={() => setSelectedMetric('heartrate')}
-          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
-            selectedMetric === 'heartrate' 
-              ? 'text-black border-b-2 border-black pb-1 bg-red-50' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          BPM
-        </button>
-        <button
-          onClick={() => setSelectedMetric('vam')}
-          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
-            selectedMetric === 'vam' 
-              ? 'text-black border-b-2 border-black pb-1 bg-green-50' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          VAM
-        </button>
-      </div>
-
-      {/* Chart Container */}
-      <div className="flex-1 p-4" style={{ minHeight: '400px', height: '400px' }}>
+      {/* Chart Container - Edge to Edge */}
+      <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
         {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
@@ -462,6 +428,40 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* Metric Selection Buttons - Underneath Chart */}
+      <div className="flex gap-6 px-4 py-3 border-t border-gray-100 bg-white shadow-sm">
+        <button
+          onClick={() => setSelectedMetric('pace')}
+          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
+            selectedMetric === 'pace' 
+              ? 'text-black border-b-2 border-black pb-1 bg-blue-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          Pace
+        </button>
+        <button
+          onClick={() => setSelectedMetric('heartrate')}
+          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
+            selectedMetric === 'heartrate' 
+              ? 'text-black border-b-2 border-black pb-1 bg-red-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          BPM
+        </button>
+        <button
+          onClick={() => setSelectedMetric('vam')}
+          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
+            selectedMetric === 'vam' 
+              ? 'text-black border-b-2 border-black pb-1 bg-green-50' 
+              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+          }`}
+        >
+          VAM
+        </button>
       </div>
 
       {/* Scroll Control */}
