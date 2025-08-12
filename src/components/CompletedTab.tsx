@@ -1597,10 +1597,10 @@ const formatPace = (paceValue: any): string => {
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
      <div>
 
-       {/* 🗺️ SIDE-BY-SIDE LAYOUT - TRULY EDGE-TO-EDGE */}
-       <div className="grid grid-cols-1 xl:grid-cols-4 gap-0">
-         {/* GPS Route Map - Left side */}
-         <div className="h-80 xl:col-span-1 relative overflow-hidden">
+       {/* 🗺️ STACKED LAYOUT - MAP ON TOP, ELEVATION BELOW FOR MAXIMUM HORIZONTAL SPACE */}
+       <div className="space-y-0">
+         {/* GPS Route Map - Full width on top */}
+         <div className="h-64 relative overflow-hidden bg-white">
            <ActivityMap
              gpsTrack={workoutData.gps_track}
              activityName={workoutData.name || generateTitle()}
@@ -1612,8 +1612,8 @@ const formatPace = (paceValue: any): string => {
            />
          </div>
          
-         {/* Elevation Profile - Right side (wider) - Edge-to-edge */}
-         <div className="h-80 xl:col-span-3 relative bg-white">
+         {/* Elevation Profile - Full width below for maximum horizontal space */}
+         <div className="h-96 relative bg-white">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
