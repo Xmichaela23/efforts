@@ -1,10 +1,45 @@
-# Efforts – Quick Start
+# Efforts – Quick Start for New Chat
 
-- Methodology: Proven 12‑week balanced system
-  - Base (1–4), Build (5–8), Peak (9–11), Taper (12)
-  - Swim 2, Bike 3 (Taper 2), Run 2; strength phase‑aware
-  - Intensity targets: Base 70–85% Z2; Build 50–70%; Peak 40–60%; Taper 70–85%
-- Files: `Seventy3Template.ts`, `StrengthTemplate.ts`, `TrainingEngine.ts`
-- VO2/Threshold caps: Bike 24–30min VO2 (3–5min reps), 30–40min threshold; Run 18–24min VO2 (3min reps), 20–30min threshold
-- Deploy: Git→Netlify (`netlify.toml`), push to `main`
-- No fallbacks: Requires real FTP, paces, swim pace, 1RM (if strength) 
+## 🚀 **Current Status: LIVE & WORKING**
+
+The app is **fully functional** and deployed. We're currently enhancing the **Completed Tab elevation chart experience**.
+
+## 🎯 **What We're Working On**
+
+**Elevation Chart Enhancement** in the Completed Tab:
+- Interactive elevation profile with metric selection (Pace, BPM, VAM)
+- Smart cursor showing selected metric data
+- Strava-style fixed height, responsive width
+- Clean, minimal UI design
+
+## 🏗️ **Key Components**
+
+- **`CompletedTab.tsx`** - Main workout detail view (map + elevation chart)
+- **`CleanElevationChart.tsx`** - Interactive elevation profile component
+- **`ActivityMap.tsx`** - Mapbox GPS route display
+- **`useWorkouts.ts`** - Data fetching and transformation
+
+## 🚀 **Deployment**
+
+- **GitHub**: Push to `main` branch
+- **Auto-deploy**: Netlify automatically deploys from GitHub
+- **No manual steps needed** - just commit and push
+
+## 📚 **Essential Files**
+
+- **`README.md`** - Current project status and plan
+- **`APP_BIBLE.md`** - Complete development philosophy and architecture
+- **`src/components/`** - Main React components
+- **`src/services/`** - Training plan generation and data services
+
+## ⚠️ **Important Notes**
+
+- **Don't break working features** - Mapbox, GPS routes, workout data are all working
+- **Focus on elevation chart** - That's our current priority
+- **Test thoroughly** - The app is production-ready, don't introduce regressions
+- **Clean code** - Follow the minimal Scandinavian design principles
+
+---
+
+**Status**: ✅ **Production Ready** - Enhancing UX, not fixing broken features
+**Focus**: Perfect the interactive elevation chart experience 

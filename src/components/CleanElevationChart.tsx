@@ -125,7 +125,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             
             if (timeDiff > 0 && distance > 0.001) {
               const speedMph = (distance / timeDiff) * 3600;
-              if (speedMph >= 2 && speedMph <= 25) {
+              // Much wider speed range and lower distance threshold for more data
+              if (speedMph >= 0.5 && speedMph <= 50) {
                 metricValue = Math.round((60 / speedMph) * 100) / 100; // Convert to pace
               }
             }
@@ -133,11 +134,34 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
           break;
           
         case 'heartrate':
-          // Find corresponding sensor data
-          const sensorPoint = sensorData?.find(sensor => 
+          // Find corresponding sensor data with wider time window
+          let sensorPoint = sensorData?.find(sensor => 
             sensor.timestamp === point.timestamp || 
-            sensor.timestamp === point.startTimeInSeconds
+            sensor.startTimeInSeconds === point.startTimeInSeconds
           );
+          
+          // If no exact match, find closest within 30 seconds
+          if (!sensorPoint && sensorData && sensorData.length > 0) {
+            const gpsTime = point.timestamp || point.startTimeInSeconds;
+            if (gpsTime) {
+              sensorPoint = sensorData.reduce((closest, sensor) => {
+                const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
+                if (!sensorTime) return closest;
+                
+                const timeDiff = Math.abs(sensorTime - gpsTime);
+                if (!closest || timeDiff < closest.timeDiff) {
+                  return { ...sensor, timeDiff };
+                }
+                return closest;
+              }, null);
+              
+              // Only use if within 30 seconds
+              if (sensorPoint && sensorPoint.timeDiff > 30) {
+                sensorPoint = null;
+              }
+            }
+          }
+          
           metricValue = sensorPoint?.heartRate || null;
           break;
           
@@ -146,15 +170,19 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             const prevPoint = gpsTrack[index - 1];
             const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
             const currentElevation = point.elevation || point.altitude || 0;
-            const elevationGain = Math.max(0, currentElevation - prevElevation);
+            const elevationGain = currentElevation - prevElevation; // Allow negative for descents
             
             const prevTime = prevPoint.timestamp || prevPoint.startTimeInSeconds || 0;
             const currentTime = point.timestamp || point.startTimeInSeconds || 0;
             const timeDiff = currentTime - prevTime;
             
-            if (timeDiff > 0 && elevationGain > 0) {
+            if (timeDiff > 0) {
               const timeHours = timeDiff / 3600;
-              metricValue = Math.round(elevationGain / timeHours);
+              const vam = elevationGain / timeHours;
+              // Only show meaningful VAM values (filter out noise)
+              if (Math.abs(vam) > 10) { // 10 m/h threshold
+                metricValue = Math.round(vam);
+              }
             }
           }
           break;
@@ -314,6 +342,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             
             {/* Tooltip - Shows selected metric data */}
             <Tooltip
+              position={{ x: 0, y: -50 }} // Position above the cursor to avoid thumb
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
@@ -323,7 +352,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                   const metricValue = dataPoint?.metricValue;
                   
                   return (
-                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
+                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg z-50">
                       <p className="font-medium">Distance: {label} mi</p>
                       <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                       {metricValue && (
