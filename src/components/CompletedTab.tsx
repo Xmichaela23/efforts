@@ -821,40 +821,18 @@ const formatPace = (paceValue: any): string => {
  return (
   <div className="space-y-6 px-4 py-2" style={{fontFamily: 'Inter, sans-serif'}}>
      
-     {/* 🏠 TITLE AND WEATHER HEADER */}
-     <div className="flex items-center justify-between">
-       <h1 className="text-2xl font-semibold text-black">
-         {workoutData.name || generateTitle()}
-       </h1>
-       {/* Debug: Show generated title for comparison */}
-       <div className="text-sm text-gray-500">
-         Generated: {generateTitle()}
-       </div>
-       <div className="flex items-center gap-4 text-lg">
+     {/* 🏠 WEATHER HEADER - Simplified, no redundant title */}
+     <div className="flex items-center justify-end gap-4 text-lg">
+       {workoutData.avg_temperature && (
          <span className="text-black">
-           {formatTime(workoutData.timestamp)}
+           {formatTemperature(workoutData.avg_temperature)}
          </span>
-         {workoutData.avg_temperature && (
-           <span className="text-black">
-             {formatTemperature(workoutData.avg_temperature)}
-           </span>
-         )}
-       </div>
+       )}
      </div>
      
-     {/* 🏠 DISTANCE + SHOW MAP ROW */}
-     <div className="flex items-center gap-4 mb-6">
-       <div className="px-1 py-0.5">
-         <div className="text-xl font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {formatDistance(workoutData.distance)}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="text-xs text-[#666666]">mi</div>
-           <div className="font-medium">Distance</div>
-         </div>
-       </div>
-       
-
+     {/* 🏠 SHOW MAP ROW - Distance removed since it's in metrics grid */}
+     <div className="flex items-center justify-end mb-6">
+       {/* Map toggle could go here if needed */}
      </div>
      
      {/* 🏠 ALL METRICS - 3-column grid */}
