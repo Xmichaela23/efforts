@@ -9,6 +9,11 @@ interface GPSPoint {
   lat: number;
   lng: number;
   elevation: number | null;
+  // Additional Garmin field names
+  latitudeInDegree?: number;
+  longitudeInDegree?: number;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface ActivityMapProps {
@@ -35,8 +40,16 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       container: mapContainer.current,
       startLocation,
       defaultCenter: [-118.2437, 34.0522],
-      gpsTrackLength: gpsTrack?.length
+      gpsTrackLength: gpsTrack?.length,
+      mapboxToken: mapboxgl.accessToken ? 'Present' : 'Missing'
     });
+    
+    // Check if Mapbox token is available
+    if (!mapboxgl.accessToken || mapboxgl.accessToken === 'YOUR_MAPBOX_ACCESS_TOKEN_HERE') {
+      console.error('🗺️ Mapbox access token is missing or invalid');
+      setMapLoaded(true); // Set to true to show fallback
+      return;
+    }
     
     try {
       // Initialize map with proper style loading handling
@@ -47,8 +60,11 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
         zoom: 12,
         failIfMajorPerformanceCaveat: false
       });
+      
+      console.log('🗺️ Map object created successfully:', !!map.current);
     } catch (error) {
       console.error('🗺️ Failed to initialize map:', error);
+      setMapLoaded(true); // Set to true to show fallback
       return;
     }
 
@@ -255,6 +271,28 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       <div className="bg-gray-50 rounded-lg p-8 text-center">
         <div className="text-gray-500 text-sm">
           Loading map...
+        </div>
+      </div>
+    );
+  }
+
+  // Show fallback if map failed to load
+  if (!map.current && mapLoaded) {
+    return (
+      <div className="bg-gray-50 rounded-lg p-8 text-center">
+        <div className="text-gray-500 text-sm mb-2">
+          Map unavailable
+        </div>
+        <div className="text-gray-400 text-xs">
+          {gpsTrack && gpsTrack.length > 0 ? (
+            <>
+              GPS route available ({gpsTrack.length} points)
+              <br />
+              Check Mapbox configuration
+            </>
+          ) : (
+            'No GPS data available'
+          )}
         </div>
       </div>
     );
