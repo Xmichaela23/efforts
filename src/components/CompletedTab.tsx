@@ -835,11 +835,11 @@ const formatPace = (paceValue: any): string => {
        {/* Map toggle could go here if needed */}
      </div>
      
-     {/* 🏠 ALL METRICS - 3-column grid */}
-     <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
-       {/* Duration */}
-       <div className="px-3 py-2">
-         <div className="text-lg font-semibold text-black mb-1" style={{fontFeatureSettings: '"tnum"'}}>
+     {/* 🏠 ALL METRICS - 3-column grid with proper row alignment */}
+     <div className="grid grid-cols-3 gap-3">
+       {/* Row 1: Duration, Avg HR, Avg Pace */}
+       <div className="px-2 py-1">
+         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {formatDuration(workoutData.duration)}
          </div>
          <div className="text-xs text-[#666666] font-normal">
@@ -847,7 +847,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Heart Rate */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {workoutData.metrics?.avg_heart_rate ? safeNumber(workoutData.metrics.avg_heart_rate) : 'N/A'}
@@ -857,37 +856,36 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Dynamic Speed/Pace based on workout type */}
-      {workoutType === 'run' || workoutType === 'walk' ? (
-        <div className="px-2 py-1">
-          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
-          </div>
-          <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Avg Pace</div>
-          </div>
-        </div>
-      ) : workoutType === 'swim' ? (
-        <div className="px-2 py-1">
-          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
-          </div>
-          <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Avg Pace</div>
-          </div>
-        </div>
-      ) : (
-        <div className="px-2 py-1">
-          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-            {formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed)}
-          </div>
-          <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Avg Speed</div>
-          </div>
-        </div>
-      )}
+       {workoutType === 'run' || workoutType === 'walk' ? (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Pace</div>
+           </div>
+         </div>
+       ) : workoutType === 'swim' ? (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Pace</div>
+           </div>
+         </div>
+       ) : (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed)}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">Avg Speed</div>
+           </div>
+         </div>
+       )}
 
-       {/* GAP - Grade Adjusted Pace for running */}
+       {/* Row 2: GAP, Max Speed, Avg Cadence */}
        {workoutType === 'run' && calculateGradeAdjustedPace() && (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -899,7 +897,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
 
-       {/* Max Speed - Moved to be next to GAP */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A'}
@@ -909,7 +906,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Dynamic Power/Cadence based on workout type */}
        {workoutType === 'ride' ? (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -930,7 +926,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
        
-       {/* Elevation */}
+       {/* Row 3: Elevation, Calories, Max HR */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
@@ -940,7 +936,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Calories */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {workoutData.metrics?.calories ? safeNumber(workoutData.metrics.calories) : 'N/A'}
@@ -950,7 +945,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Max HR */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {workoutData.metrics?.max_heart_rate ? safeNumber(workoutData.metrics.max_heart_rate) : 'N/A'}
@@ -959,22 +953,8 @@ const formatPace = (paceValue: any): string => {
            <div className="font-medium">Max HR</div>
          </div>
        </div>
-       
-       {/* Max Power - Only show for cycling */}
-       {workoutType === 'ride' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.max_power ? safeNumber(workoutData.metrics.max_power) : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Max Power</div>
-           </div>
-         </div>
-       )}
-       
 
-       
-       {/* Max Cadence */}
+       {/* Row 4: Max Cadence, TSS, VAM */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {workoutData.metrics?.max_cadence ? safeNumber(workoutData.metrics.max_cadence) : 'N/A'}
@@ -984,19 +964,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* TSS - Only show for cycling */}
-       {workoutType === 'ride' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">TSS</div>
-           </div>
-         </div>
-       )}
-
-       {/* TSS - Show for running too */}
        {workoutType === 'run' && (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1008,59 +975,6 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
        
-       {/* Intensity Factor - Only show for cycling */}
-       {workoutType === 'ride' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.intensity_factor ? `${safeNumber(workoutData.metrics.intensity_factor)}%` : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Intensity Factor</div>
-           </div>
-         </div>
-       )}
-
-
-       
-       {/* Normalized Power - Only show for cycling */}
-       {workoutType === 'ride' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.normalized_power ? `${safeNumber(workoutData.metrics.normalized_power)}` : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Norm Power</div>
-           </div>
-         </div>
-       )}
-
-
-       
-       {/* Training Load - Only show for cycling */}
-       {workoutType === 'ride' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score)) : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Training Load</div>
-           </div>
-         </div>
-       )}
-       
-       {/* Total Work - Only show for cycling */}
-       {workoutType === 'ride' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {calculateTotalWork()}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Total Work</div>
-           </div>
-         </div>
-       )}
-       
-       {/* VAM - Enhanced for running */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {calculateVAM()}
@@ -1075,11 +989,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-
-
-
-       
-       {/* Moving Time */}
+       {/* Moving Time - Final metric */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {formatMovingTime()}
