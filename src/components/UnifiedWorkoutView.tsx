@@ -153,7 +153,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <div>
             <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
             <p className="text-sm text-muted-foreground">
-              {new Date(workout.date).toLocaleDateString('en-US', {
+              {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
                 weekday: 'long',
                 month: 'long',
                 day: 'numeric'

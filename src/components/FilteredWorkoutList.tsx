@@ -191,7 +191,7 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                  <span>{new Date(workout.date).toLocaleDateString()}</span>
+                  <span>{new Date(workout.date + 'T00:00:00').toLocaleDateString()}</span>
                   <span>{workout.duration} minutes</span>
                 </div>
                 

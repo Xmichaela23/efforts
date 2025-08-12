@@ -64,7 +64,7 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ onWorkoutSelect }) => {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>{new Date(workout.date).toLocaleDateString()}</span>
+                              <span>{new Date(workout.date + 'T00:00:00').toLocaleDateString()}</span>
               <span>{workout.duration} minutes</span>
               {workout.type === 'endurance' && workout.distance && (
                 <span>{workout.distance.toFixed(1)} km</span>

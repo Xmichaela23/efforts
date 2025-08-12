@@ -826,6 +826,10 @@ const formatPace = (paceValue: any): string => {
        <h1 className="text-2xl font-semibold text-black">
          {workoutData.name || generateTitle()}
        </h1>
+       {/* Debug: Show generated title for comparison */}
+       <div className="text-sm text-gray-500">
+         Generated: {generateTitle()}
+       </div>
        <div className="flex items-center gap-4 text-lg">
          <span className="text-black">
            {formatTime(workoutData.timestamp)}
