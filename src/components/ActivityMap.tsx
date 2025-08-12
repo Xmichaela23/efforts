@@ -194,25 +194,12 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-gray-900">Route Map</h3>
-        <div className="text-sm text-gray-500">
-          {gpsTrack.length} GPS points
-        </div>
-      </div>
-      
+    <div className="w-full h-full">
       <div 
         ref={mapContainer} 
-        className="w-full h-64 rounded-lg border border-gray-200 overflow-hidden"
+        className="w-full h-full"
         style={{ minHeight: '256px' }}
       />
-      
-      <div className="text-xs text-gray-500 text-center">
-        {activityType === 'run' && '🏃‍♂️'} 
-        {activityType === 'ride' && '🚴‍♂️'} 
-        {activityType === 'swim' && '🏊‍♂️'} 
-      </div>
     </div>
   );
 };

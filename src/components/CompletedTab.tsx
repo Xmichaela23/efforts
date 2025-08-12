@@ -1651,12 +1651,10 @@ const formatPace = (paceValue: any): string => {
      </div>
 
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - BOTH VISIBLE */}
-     <div>
-
-       {/* 🗺️ STACKED LAYOUT - MAP ON TOP, ELEVATION BELOW FOR MAXIMUM HORIZONTAL SPACE */}
-       <div className="space-y-0">
-         {/* GPS Route Map - Full width on top */}
-         <div className="h-64 relative overflow-hidden bg-white">
+     <div className="space-y-8">
+       {/* 🗺️ MAP SECTION - Give it proper spacing */}
+       <div className="bg-white rounded-lg overflow-hidden">
+         <div className="h-64 relative">
            <ActivityMap
              gpsTrack={workoutData.gps_track}
              activityName={workoutData.name || generateTitle()}
@@ -1667,10 +1665,15 @@ const formatPace = (paceValue: any): string => {
              } : null}
            />
          </div>
-         
-         {/* Elevation Profile - Adaptive height based on elevation range */}
-         {/* Elevation Profile - Strava-style: fixed height, full width, smart scaling */}
-         <div className="relative bg-white h-72 mt-4 border-t border-gray-100">
+       </div>
+       
+       {/* 📊 ELEVATION PROFILE SECTION - Standalone with proper spacing */}
+       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+         <div className="px-4 py-3 border-b border-gray-100">
+           <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
+           <p className="text-sm text-gray-500">Scroll through your workout to see real-time metrics</p>
+         </div>
+         <div className="h-80 p-4">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
