@@ -831,7 +831,7 @@ const formatPace = (paceValue: any): string => {
      </div>
      
      {/* 🏠 SHOW MAP ROW - Distance removed since it's in metrics grid */}
-     <div className="flex items-center justify-end mb-6">
+     <div className="flex items-center justify-end mb-3">
        {/* Map toggle could go here if needed */}
      </div>
      
