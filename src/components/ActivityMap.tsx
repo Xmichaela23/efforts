@@ -47,7 +47,8 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
             container: element,
             style: 'mapbox://styles/mapbox/outdoors-v12',
             center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
-            zoom: 12
+            zoom: 12,
+            logoPosition: 'bottom-right'
           });
 
           map.current.on('load', () => {
