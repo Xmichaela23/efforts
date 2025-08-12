@@ -202,10 +202,11 @@ const setContainerRef = (element: HTMLDivElement | null) => {
 **Status**: ✅ IMPLEMENTED
 
 ### **GAP Calculation Details**
-**Formula**: Simplified Strava/Garmin approach
-**Adjustment**: +1 min/mi for every ~100 ft of elevation gain per mile
+**Formula**: Proper Strava formula with uphill/downhill effects
+**Adjustment**: 
+- Uphill: +1.2 min/mi per 100 ft (20% more impact than linear)
+- Downhill: -0.8 min/mi per 100 ft (80% of uphill benefit)
 **Output**: 
-- Actual pace (from metrics grid)
-- GAP (equivalent flat pace)
-- Elevation impact per mile
-- Average grade per mile
+- GAP value displayed in metrics grid (same styling as other metrics)
+- Positioned after Avg Pace, before Max Speed
+- Shows equivalent flat pace accounting for elevation

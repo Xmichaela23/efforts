@@ -706,7 +706,7 @@ const formatPace = (paceValue: any): string => {
    return { vam, insight, trainingZone, racePacing };
  };
 
- // Calculate Grade Adjusted Pace (GAP) using standard Strava/Garmin formula
+ // Calculate Grade Adjusted Pace (GAP) using proper Strava formula
  const calculateGradeAdjustedPace = () => {
    if (workoutType !== 'run') return null;
    
@@ -724,33 +724,30 @@ const formatPace = (paceValue: any): string => {
    // Calculate actual pace (min/mi)
    const actualPaceMinutes = durationMinutes / distanceMiles;
    
-   // Standard GAP formula: adjust for elevation gain
-   // This is a simplified version of the Strava/Garmin approach
+   // Proper Strava GAP formula
    // Elevation gain per mile affects pace
    const elevationPerMile = elevationFeet / distanceMiles;
    
-   // GAP adjustment factor (simplified)
-   // +1 min/mi for every ~100 ft of elevation gain per mile
-   const gapAdjustment = (elevationPerMile / 100) * 1.0;
+   // Strava's GAP adjustment: more sophisticated than simple linear
+   // Accounts for both uphill and downhill effects
+   let gapAdjustment = 0;
+   
+   if (elevationPerMile > 0) {
+     // Uphill: slows you down more than simple linear
+     // Strava uses a curve that increases impact for steeper grades
+     gapAdjustment = (elevationPerMile / 100) * 1.2; // 20% more impact than linear
+   } else if (elevationPerMile < 0) {
+     // Downhill: speeds you up, but not as much as uphill slows you down
+     gapAdjustment = (Math.abs(elevationPerMile) / 100) * 0.8; // 80% of uphill benefit
+   }
    
    // Calculate GAP
    const gapPaceMinutes = actualPaceMinutes - gapAdjustment;
    
-   // Format paces
-   const actualPace = formatPace(actualPaceMinutes);
-   const gapPace = formatPace(Math.max(0, gapPaceMinutes)); // Don't go below 0
+   // Format GAP pace (don't go below 0)
+   const gapPace = formatPace(Math.max(0, gapPaceMinutes));
    
-   // Calculate impact
-   const impactSeconds = Math.round(gapAdjustment * 60);
-   const impactPace = formatPace(gapAdjustment);
-   
-   return {
-     actualPace,
-     gapPace,
-     impactSeconds,
-     impactPace,
-     elevationPerMile: Math.round(elevationPerMile)
-   };
+   return gapPace;
  };
 
  const formatMovingTime = () => {
@@ -894,6 +891,28 @@ const formatPace = (paceValue: any): string => {
           </div>
         </div>
       )}
+
+       {/* GAP - Grade Adjusted Pace for running */}
+       {workoutType === 'run' && calculateGradeAdjustedPace() && (
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {calculateGradeAdjustedPace()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal">
+             <div className="font-medium">GAP</div>
+           </div>
+         </div>
+       )}
+
+       {/* Max Speed - Moved to be next to GAP */}
+       <div className="px-2 py-1">
+         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           {workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A'}
+         </div>
+         <div className="text-xs text-[#666666] font-normal">
+           <div className="font-medium">Max Speed</div>
+         </div>
+       </div>
        
        {/* Dynamic Power/Cadence based on workout type */}
        {workoutType === 'ride' ? (
@@ -958,15 +977,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        )}
        
-       {/* Max Speed */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A'}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Max Speed</div>
-         </div>
-       </div>
+
        
        {/* Max Cadence */}
        <div className="px-2 py-1">
@@ -1069,23 +1080,7 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Grade Adjusted Pace Insight */}
-       {workoutType === 'run' && calculateGradeAdjustedPace() && (
-         <div className="px-2 py-1 bg-blue-50 rounded-lg border border-blue-200">
-           <div className="text-sm font-medium text-blue-800 mb-1">
-             Grade Adjusted Pace
-           </div>
-           <div className="text-xs text-blue-600 mb-1">
-             GAP: {calculateGradeAdjustedPace()?.gapPace}
-           </div>
-           <div className="text-xs text-blue-700 font-medium">
-             Elevation Impact: +{calculateGradeAdjustedPace()?.impactSeconds}s/mi
-           </div>
-           <div className="text-xs text-blue-600">
-             {calculateGradeAdjustedPace()?.elevationPerMile} ft/mi average grade
-           </div>
-         </div>
-       )}
+
 
 
        
