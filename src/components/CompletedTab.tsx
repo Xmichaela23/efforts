@@ -162,7 +162,7 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
     // Performance optimization: Sample data if too many points
-    const maxPoints = 500; // Reduced from 1000 for better performance
+            const maxPoints = 1000; // Increased for better pace stability
     const shouldSample = gpsTrack.length > maxPoints;
     const sampleInterval = shouldSample ? Math.ceil(gpsTrack.length / maxPoints) : 1;
     
@@ -391,10 +391,10 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             }
           }
           
-          // If still no pace, try looking at a wider window
-          if (!finalPaceValue && gpsIndex > 5) {
-            const windowStart = Math.max(0, gpsIndex - 5);
-            const windowEnd = Math.min(gpsTrack.length - 1, gpsIndex + 5);
+          // If still no pace, try looking at a wider window for smoother results
+          if (!finalPaceValue && gpsIndex > 10) {
+            const windowStart = Math.max(0, gpsIndex - 10);
+            const windowEnd = Math.min(gpsTrack.length - 1, gpsIndex + 10);
             
             let totalDistance = 0;
             let totalTime = 0;
