@@ -381,18 +381,21 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
             fillOpacity={0.4}
           />
           
-          {/* Visual Cursor Line - Moves with scroll bar position */}
-          {scrollRange[0] > 0 && validData.length > 0 && (
-            <ReferenceLine
-              x={validData[Math.floor((scrollRange[0] / 100) * (validData.length - 1))]?.distance || 0}
-              stroke="#ef4444"
-              strokeWidth={3}
-              strokeDasharray="0"
-            />
-          )}
           
-          {/* Tooltip */}
-          <Tooltip
+          
+                     {/* CSS-based Cursor - Moves with scroll bar, never crashes */}
+           {scrollRange[0] > 0 && validData.length > 0 && (
+             <div 
+               className="absolute w-0.5 bg-red-500 h-full pointer-events-none z-10"
+               style={{ 
+                 left: `${(scrollRange[0] / 100) * 100}%`,
+                 transition: 'left 0.1s ease-out'
+               }} 
+             />
+           )}
+           
+           {/* Tooltip */}
+           <Tooltip
             content={({ active, payload, label }) => {
               if (active && payload && payload.length) {
                 const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
