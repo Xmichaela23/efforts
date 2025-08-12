@@ -351,14 +351,14 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   });
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <style>{sliderStyles}</style>
       
-      {/* Chart Container - Edge to Edge */}
-      <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
+      {/* Chart Container - Edge to Edge with proper positioning */}
+      <div className="flex-1 relative z-30" style={{ minHeight: '400px', height: '400px' }}>
         {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+            <ComposedChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             
             {/* X Axis - Distance */}
@@ -393,7 +393,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               fillOpacity={0.4}
             />
             
-            {/* Tooltip - Shows selected metric data */}
+            {/* Tooltip - Shows selected metric data with higher z-index */}
             <Tooltip
               position={{ x: 0, y: -120 }} // Position much higher to avoid covering buttons
               content={({ active, payload, label }) => {
@@ -405,7 +405,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                   const metricValue = dataPoint?.metricValue;
                   
                   return (
-                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg z-50">
+                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg relative z-50">
                       <p className="font-medium">Distance: {label} mi</p>
                       <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
                       {metricValue && (
