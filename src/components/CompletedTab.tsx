@@ -341,12 +341,12 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     }
   };
 
-  return (
+    return (
     <div className="h-full">
       <style>{sliderStyles}</style>
 
-                            <ResponsiveContainer width="100%" height="95%">
-                 <ComposedChart data={validData} margin={{ top: 2, right: 5, left: 2, bottom: 2 }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <ComposedChart data={validData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           
           {/* X Axis - Distance */}
@@ -1667,13 +1667,13 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* 📊 ELEVATION PROFILE SECTION - Standalone with proper spacing */}
-       <div className="bg-white rounded-lg border border-gray-100 overflow-hidden">
+       {/* 📊 ELEVATION PROFILE SECTION - Edge-to-edge immersive */}
+       <div className="bg-white overflow-hidden">
          <div className="px-4 py-3 border-b border-gray-100">
            <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
            <p className="text-sm text-gray-500">Scroll through your workout to see real-time metrics</p>
          </div>
-         <div className="h-80 p-4">
+         <div className="h-80">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
