@@ -663,7 +663,7 @@ interface CompletedTabProps {
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
   const { useImperial } = useAppContext();
-  const [selectedMetric, setSelectedMetric] = useState('heartrate');
+  const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
   const [isLoading, setIsLoading] = useState(true);
   
@@ -1683,7 +1683,42 @@ const formatPace = (paceValue: any): string => {
          <div className="px-4 py-3 border-b border-gray-100">
            <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
          </div>
-         <div className="h-72">
+         
+         {/* Metric Selection Buttons - Simple text with underlines */}
+         <div className="flex gap-6 px-4 py-3 border-b border-gray-100">
+           <button
+             onClick={() => setSelectedMetric('speed')}
+             className={`text-sm font-medium transition-all ${
+               selectedMetric === 'speed' 
+                 ? 'text-black border-b-2 border-black pb-1' 
+                 : 'text-gray-500 hover:text-gray-700'
+             }`}
+           >
+             Pace
+           </button>
+           <button
+             onClick={() => setSelectedMetric('heartrate')}
+             className={`text-sm font-medium transition-all ${
+               selectedMetric === 'heartrate' 
+                 ? 'text-black border-b-2 border-black pb-1' 
+                 : 'text-gray-500 hover:text-gray-700'
+             }`}
+           >
+             BPM
+           </button>
+           <button
+             onClick={() => setSelectedMetric('vam')}
+             className={`text-sm font-medium transition-all ${
+               selectedMetric === 'vam' 
+                 ? 'text-black border-b-2 border-black pb-1' 
+                 : 'text-gray-500 hover:text-gray-700'
+             }`}
+           >
+             VAM
+           </button>
+         </div>
+         
+         <div className="h-80">
            <InteractiveElevationProfile
              gpsTrack={workoutData.gps_track}
              sensorData={workoutData.sensor_data}
