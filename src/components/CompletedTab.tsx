@@ -327,20 +327,17 @@ const formatPace = (paceValue: any): string => {
    const dateValue = dateStr || workoutData.date || workoutData.start_date;
    if (!dateValue) return 'N/A';
    
-   // Handle ISO timestamp format (e.g., "2025-07-04T15:30:00Z")
-   if (typeof dateValue === 'string' && dateValue.includes('T')) {
-     const datePart = dateValue.split('T')[0]; // Extract "2025-07-04" part
-     const dateParts = datePart.split('-'); // ["2025", "07", "04"]
-     return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`; // "7/4"
-   }
+   // Create proper Date object and convert to local timezone
+   const date = new Date(dateValue);
    
-   // Handle date-only format (e.g., "2025-07-04")
-   if (typeof dateValue === 'string' && dateValue.includes('-')) {
-     const dateParts = dateValue.split('-'); // ["2025", "07", "04"]
-     return `${parseInt(dateParts[1])}/${parseInt(dateParts[2])}`; // "7/4"
-   }
+   // Format date in local timezone (same as calendar)
+   const options: Intl.DateTimeFormatOptions = {
+     weekday: 'long',
+     month: 'long',
+     day: 'numeric'
+   };
    
-   return 'N/A';
+   return date.toLocaleDateString('en-US', options);
  };
 
  const getCityFromCoordinates = (lat: any, lng: any): string => {
