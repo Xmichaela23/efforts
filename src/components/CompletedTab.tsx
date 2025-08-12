@@ -1071,7 +1071,7 @@ const formatPace = (paceValue: any): string => {
        </div>
        
        {/* 📊 ELEVATION PROFILE SECTION - Clean and minimal */}
-       <div className="bg-white overflow-hidden">
+       <div className="overflow-hidden">
          {/* Chart container - no title overlap */}
          <div className="h-[500px]">
            <CleanElevationChart
