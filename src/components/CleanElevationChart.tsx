@@ -167,20 +167,36 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
           
         case 'vam':
           if (index > 0) {
-            const prevPoint = gpsTrack[index - 1];
-            const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
-            const currentElevation = point.elevation || point.altitude || 0;
-            const elevationGain = currentElevation - prevElevation; // Allow negative for descents
+            // Use a wider window for more stable VAM calculation
+            const windowSize = Math.min(15, index); // Look back up to 15 points
+            const startIndex = Math.max(0, index - windowSize);
             
-            const prevTime = prevPoint.timestamp || prevPoint.startTimeInSeconds || 0;
-            const currentTime = point.timestamp || point.startTimeInSeconds || 0;
-            const timeDiff = currentTime - prevTime;
+            let totalElevationGain = 0;
+            let totalTime = 0;
             
-            if (timeDiff > 0) {
-              const timeHours = timeDiff / 3600;
-              const vam = elevationGain / timeHours;
+            for (let i = startIndex + 1; i <= index; i++) {
+              const prevPoint = gpsTrack[i - 1];
+              const currentPoint = gpsTrack[i];
+              
+              const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
+              const currentElevation = currentPoint.elevation || currentPoint.altitude || 0;
+              const elevationGain = currentElevation - prevElevation; // Allow negative for descents
+              
+              const prevTime = prevPoint.timestamp || prevPoint.startTimeInSeconds || 0;
+              const currentTime = currentPoint.timestamp || currentPoint.startTimeInSeconds || 0;
+              const timeDiff = currentTime - prevTime;
+              
+              if (timeDiff > 0) {
+                totalElevationGain += elevationGain;
+                totalTime += timeDiff;
+              }
+            }
+            
+            if (totalTime > 0) {
+              const timeHours = totalTime / 3600;
+              const vam = totalElevationGain / timeHours;
               // Only show meaningful VAM values (filter out noise)
-              if (Math.abs(vam) > 10) { // 10 m/h threshold
+              if (Math.abs(vam) > 5) { // Lower threshold for more data
                 metricValue = Math.round(vam);
               }
             }
@@ -342,7 +358,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             
             {/* Tooltip - Shows selected metric data */}
             <Tooltip
-              position={{ x: 0, y: -50 }} // Position above the cursor to avoid thumb
+              position={{ x: 0, y: -120 }} // Position much higher to avoid covering buttons
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
