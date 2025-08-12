@@ -706,6 +706,53 @@ const formatPace = (paceValue: any): string => {
    return { vam, insight, trainingZone, racePacing };
  };
 
+ // Calculate Grade Adjusted Pace (GAP) using standard Strava/Garmin formula
+ const calculateGradeAdjustedPace = () => {
+   if (workoutType !== 'run') return null;
+   
+   const distance = workoutData.distance;
+   const duration = workoutData.duration;
+   const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
+   
+   if (!distance || !duration || !elevationGain) return null;
+   
+   // Convert to standard units
+   const distanceMiles = Number(distance);
+   const durationMinutes = Number(duration);
+   const elevationFeet = Number(elevationGain);
+   
+   // Calculate actual pace (min/mi)
+   const actualPaceMinutes = durationMinutes / distanceMiles;
+   
+   // Standard GAP formula: adjust for elevation gain
+   // This is a simplified version of the Strava/Garmin approach
+   // Elevation gain per mile affects pace
+   const elevationPerMile = elevationFeet / distanceMiles;
+   
+   // GAP adjustment factor (simplified)
+   // +1 min/mi for every ~100 ft of elevation gain per mile
+   const gapAdjustment = (elevationPerMile / 100) * 1.0;
+   
+   // Calculate GAP
+   const gapPaceMinutes = actualPaceMinutes - gapAdjustment;
+   
+   // Format paces
+   const actualPace = formatPace(actualPaceMinutes);
+   const gapPace = formatPace(Math.max(0, gapPaceMinutes)); // Don't go below 0
+   
+   // Calculate impact
+   const impactSeconds = Math.round(gapAdjustment * 60);
+   const impactPace = formatPace(gapAdjustment);
+   
+   return {
+     actualPace,
+     gapPace,
+     impactSeconds,
+     impactPace,
+     elevationPerMile: Math.round(elevationPerMile)
+   };
+ };
+
  const formatMovingTime = () => {
    console.log('🔍 formatMovingTime checking:', {
      total_timer_time: workoutData.metrics?.total_timer_time,
@@ -1022,20 +1069,20 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* Running VAM Insight */}
-       {workoutType === 'run' && calculateRunningVAM() && (
+       {/* Grade Adjusted Pace Insight */}
+       {workoutType === 'run' && calculateGradeAdjustedPace() && (
          <div className="px-2 py-1 bg-blue-50 rounded-lg border border-blue-200">
            <div className="text-sm font-medium text-blue-800 mb-1">
-             {calculateRunningVAM()?.insight}
+             Grade Adjusted Pace
            </div>
            <div className="text-xs text-blue-600 mb-1">
-             VAM: {calculateRunningVAM()?.vam} m/h
+             GAP: {calculateGradeAdjustedPace()?.gapPace}
            </div>
            <div className="text-xs text-blue-700 font-medium">
-             Training Zone: {calculateRunningVAM()?.trainingZone}
+             Elevation Impact: +{calculateGradeAdjustedPace()?.impactSeconds}s/mi
            </div>
            <div className="text-xs text-blue-600">
-             {calculateRunningVAM()?.racePacing}
+             {calculateGradeAdjustedPace()?.elevationPerMile} ft/mi average grade
            </div>
          </div>
        )}
