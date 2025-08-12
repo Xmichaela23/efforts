@@ -320,6 +320,40 @@ const InteractiveElevationProfile: React.FC<InteractiveElevationProfileProps> = 
     <div className="h-full">
       <style>{sliderStyles}</style>
 
+      {/* Metric Selection Buttons - Simple text with underlines */}
+      <div className="flex gap-6 mb-4 px-4">
+        <button
+          onClick={() => setLocalSelectedMetric('speed')}
+          className={`text-sm font-medium transition-all ${
+            localSelectedMetric === 'speed' 
+              ? 'text-black border-b-2 border-black pb-1' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          Pace
+        </button>
+        <button
+          onClick={() => setLocalSelectedMetric('heartrate')}
+          className={`text-sm font-medium transition-all ${
+            localSelectedMetric === 'heartrate' 
+              ? 'text-black border-b-2 border-black pb-1' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          BPM
+        </button>
+        <button
+          onClick={() => setLocalSelectedMetric('vam')}
+          className={`text-sm font-medium transition-all ${
+            localSelectedMetric === 'vam' 
+              ? 'text-black border-b-2 border-black pb-1' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          VAM
+        </button>
+      </div>
+
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={validData} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
