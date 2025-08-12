@@ -33,39 +33,48 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   const map = useRef<mapboxgl.Map | null>(null);
   const [mapLoaded, setMapLoaded] = useState(false);
 
-  useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+  // Ref callback to detect when container is ready
+  const setContainerRef = (element: HTMLDivElement | null) => {
+    if (element && !mapContainer.current) {
+      mapContainer.current = element;
+      
+      // Create map immediately when container is ready
+      if (!map.current) {
+        console.log('🗺️ Container ready, creating Mapbox map...');
+        
+        try {
+          map.current = new mapboxgl.Map({
+            container: element,
+            style: 'mapbox://styles/mapbox/outdoors-v12',
+            center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
+            zoom: 12
+          });
 
-    console.log('🗺️ Creating Mapbox map...');
-    
-    try {
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/outdoors-v12',
-        center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
-        zoom: 12
-      });
+          map.current.on('load', () => {
+            console.log('🗺️ Map loaded successfully');
+            setMapLoaded(true);
+          });
 
-      map.current.on('load', () => {
-        console.log('🗺️ Map loaded successfully');
-        setMapLoaded(true);
-      });
+          map.current.on('error', (e) => {
+            console.error('🗺️ Map error:', e);
+          });
 
-      map.current.on('error', (e) => {
-        console.error('🗺️ Map error:', e);
-      });
-
-    } catch (error) {
-      console.error('🗺️ Failed to create map:', error);
+        } catch (error) {
+          console.error('🗺️ Failed to create map:', error);
+        }
+      }
     }
+  };
 
+  // Cleanup when component unmounts
+  useEffect(() => {
     return () => {
       if (map.current) {
         map.current.remove();
         map.current = null;
       }
     };
-  }, [startLocation]);
+  }, []);
 
   useEffect(() => {
     if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) return;
@@ -193,7 +202,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   return (
     <div className="w-full h-full">
       <div 
-        ref={mapContainer} 
+        ref={setContainerRef} 
         className="w-full h-full"
         style={{ minHeight: '256px' }}
       />
