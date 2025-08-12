@@ -1,29 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ComposedChart, Area } from 'recharts';
 
-// Custom styles for range slider
-const sliderStyles = `
-  .slider::-webkit-slider-thumb {
-    appearance: none;
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #3b82f6;
-    cursor: pointer;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-  
-  .slider::-moz-range-thumb {
-    height: 16px;
-    width: 16px;
-    border-radius: 50%;
-    background: #3b82f6;
-    cursor: pointer;
-    border: 2px solid white;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-  }
-`;
+
 
 interface CleanElevationChartProps {
   gpsTrack: any[] | null;
@@ -52,7 +30,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       setSelectedMetric('vam');
     }
   }, [externalSelectedMetric]);
-  const [scrollPosition, setScrollPosition] = useState(0);
+
 
   // Early return if no GPS data
   if (!gpsTrack || gpsTrack.length === 0) {
@@ -316,43 +294,16 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
 
   const metricInfo = getMetricInfo();
 
-  // Get current position data for cursor
-  const getCurrentPositionData = () => {
-    if (!chartData || chartData.length === 0) return null;
-    
-    const currentIndex = Math.floor((scrollPosition / 100) * (chartData.length - 1));
-    const currentPoint = chartData[currentIndex];
-    
-    if (!currentPoint) return null;
-    
-    // Calculate climb from previous point
-    let climb = 0;
-    if (currentIndex > 0) {
-      const prevPoint = chartData[currentIndex - 1];
-      climb = (currentPoint.absoluteElevation || 0) - (prevPoint.absoluteElevation || 0);
-    }
-    
-    return {
-      distance: currentPoint.distance,
-      elevation: currentPoint.absoluteElevation,
-      climb: climb,
-      metricValue: currentPoint.metricValue,
-      metricLabel: metricInfo.label,
-      metricUnit: metricInfo.unit
-    };
-  };
 
-  const currentData = getCurrentPositionData();
 
   console.log('🔍 CleanElevationChart rendering with:', {
     selectedMetric,
-    chartDataLength: chartData?.length,
-    currentData
+    chartDataLength: chartData?.length
   });
 
   return (
     <div className="h-full flex flex-col">
-      <style>{sliderStyles}</style>
+
       
       {/* Chart Container - Simple and clean */}
       <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
@@ -469,57 +420,9 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
         <h3 className="text-lg font-semibold text-gray-900 text-center">Elevation Profile</h3>
       </div>
 
-      {/* Scroll Control */}
-      <div className="px-4 py-3 border-t border-gray-100">
-        <div className="text-xs text-gray-600 mb-2">Scroll through workout</div>
-        <div className="relative">
-          <input
-            type="range"
-            min="0"
-            max="100"
-            value={scrollPosition}
-            onChange={(e) => setScrollPosition(parseInt(e.target.value))}
-            className="w-full h-3 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-            style={{
-              background: `linear-gradient(to right, #3b82f6 0%, #3b82f6 ${scrollPosition}%, #e5e7eb ${scrollPosition}%, #e5e7eb 100%)`
-            }}
-          />
-          <div className="flex justify-between text-xs text-gray-500 mt-1">
-            <span>Start</span>
-            <span>{Math.round(scrollPosition)}%</span>
-            <span>End</span>
-          </div>
-        </div>
-      </div>
 
-      {/* Current Position Data */}
-      {currentData && (
-        <div className="px-4 py-3 border-t border-gray-100">
-          <div className="text-sm font-medium text-gray-700 mb-2">Current Position</div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-500">Distance:</span>
-              <span className="ml-2 font-medium">{currentData.distance?.toFixed(1)} mi</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Elevation:</span>
-              <span className="ml-2 font-medium">{Math.round(currentData.elevation || 0)} {useImperial ? 'ft' : 'm'}</span>
-            </div>
-            <div>
-              <span className="text-gray-500">Climb:</span>
-              <span className="ml-2 font-medium">
-                {currentData.climb > 0 ? `+${Math.round(currentData.climb)}` : Math.round(currentData.climb)} {useImperial ? 'ft' : 'm'}
-              </span>
-            </div>
-            <div>
-              <span className="text-gray-500">{currentData.metricLabel}:</span>
-              <span className="ml-2 font-medium" style={{ color: metricInfo.color }}>
-                {currentData.metricValue ? `${currentData.metricValue} ${currentData.metricUnit}` : 'No data'}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
+
+
     </div>
   );
 };
