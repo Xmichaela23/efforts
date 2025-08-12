@@ -34,14 +34,16 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
   const [mapLoaded, setMapLoaded] = useState(false);
 
   useEffect(() => {
-    if (!mapContainer.current || map.current) return;
+    if (!mapContainer.current) return;
 
     console.log('🗺️ Initializing map with:', {
       container: mapContainer.current,
       startLocation,
       defaultCenter: [-118.2437, 34.0522],
       gpsTrackLength: gpsTrack?.length,
-      mapboxToken: mapboxgl.accessToken ? 'Present' : 'Missing'
+      mapboxToken: mapboxgl.accessToken ? 'Present' : 'Missing',
+      mapboxTokenLength: mapboxgl.accessToken?.length || 0,
+      mapboxTokenStart: mapboxgl.accessToken?.substring(0, 10) || 'N/A'
     });
     
     // Check if Mapbox token is available
@@ -52,6 +54,8 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     }
     
     try {
+      console.log('🗺️ Attempting to create Mapbox map...');
+      
       // Initialize map with proper style loading handling
       map.current = new mapboxgl.Map({
         container: mapContainer.current,
@@ -62,8 +66,15 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       });
       
       console.log('🗺️ Map object created successfully:', !!map.current);
+      console.log('🗺️ Map container:', map.current?.getContainer());
+      console.log('🗺️ Map style loaded:', map.current?.isStyleLoaded());
     } catch (error) {
       console.error('🗺️ Failed to initialize map:', error);
+      console.error('🗺️ Error details:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      });
       setMapLoaded(true); // Set to true to show fallback
       return;
     }
@@ -112,7 +123,22 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     // Handle map errors gracefully
     map.current.on('error', (e) => {
       console.error('🗺️ Map error:', e);
+      console.error('🗺️ Map error details:', {
+        type: e.type,
+        error: e.error,
+        target: e.target
+      });
       // Don't crash the app on map errors
+    });
+
+    // Handle network errors
+    map.current.on('error', (e) => {
+      if (e.error && e.error.message) {
+        console.error('🗺️ Mapbox service error:', e.error.message);
+        if (e.error.message.includes('token') || e.error.message.includes('unauthorized')) {
+          console.error('🗺️ Token authentication failed - check Mapbox access token');
+        }
+      }
     });
 
     // SMART FIX: Proper cleanup with event removal
