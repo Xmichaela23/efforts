@@ -97,8 +97,13 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   const chartData = useMemo(() => {
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
-    // Sample GPS track to 1000 points for smooth charts
-    const sampledGpsTrack = sampleData(gpsTrack, 1000);
+    // Sample GPS track based on selected metric for optimal smoothness
+    let targetSamples = 1000; // Default for heart rate and VAM
+    if (selectedMetric === 'pace') {
+      targetSamples = 500; // Super smooth for pace
+    }
+    
+    const sampledGpsTrack = sampleData(gpsTrack, targetSamples);
     
     let cumulativeDistance = 0;
     let baseElevation = null;
