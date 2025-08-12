@@ -819,7 +819,7 @@ const formatPace = (paceValue: any): string => {
  ];
 
  return (
-  <div className="space-y-6 px-4 py-2" style={{fontFamily: 'Inter, sans-serif'}}>
+  <div className="space-y-6 px-4 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
      
      {/* 🏠 WEATHER HEADER - Simplified, no redundant title */}
      <div className="flex items-center justify-end gap-4 text-lg">
