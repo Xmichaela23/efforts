@@ -37,14 +37,19 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       defaultCenter: [-118.2437, 34.0522]
     });
     
-    // Initialize map with proper style loading handling
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/outdoors-v12',
-      center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
-      zoom: 12,
-      failIfMajorPerformanceCaveat: false
-    });
+    try {
+      // Initialize map with proper style loading handling
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/outdoors-v12',
+        center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
+        zoom: 12,
+        failIfMajorPerformanceCaveat: false
+      });
+    } catch (error) {
+      console.error('🗺️ Failed to initialize map:', error);
+      return;
+    }
 
     // SMART FIX: Single event listener for style loading
     const handleStyleLoad = () => {
@@ -63,8 +68,16 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
 
     // SMART FIX: Add controls only after style is loaded
     const handleStyleReady = () => {
-      if (map.current && !map.current.getControl('navigation')) {
-        map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+      if (map.current) {
+        try {
+          // Check if navigation control already exists before adding
+          const existingControls = map.current.getContainer().querySelector('.mapboxgl-ctrl-top-right');
+          if (!existingControls || !existingControls.querySelector('.mapboxgl-ctrl-group')) {
+            map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
+          }
+        } catch (error) {
+          console.log('🗺️ Control already exists or error adding control:', error);
+        }
       }
     };
 
@@ -201,6 +214,17 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       <div className="bg-gray-50 rounded-lg p-8 text-center">
         <div className="text-gray-500 text-sm">
           No GPS data available for this {activityType}
+        </div>
+      </div>
+    );
+  }
+
+  // Add error boundary for map rendering
+  if (!mapContainer.current) {
+    return (
+      <div className="bg-gray-50 rounded-lg p-8 text-center">
+        <div className="text-gray-500 text-sm">
+          Map container not ready
         </div>
       </div>
     );
