@@ -166,16 +166,7 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     );
   }
 
-  // Wait for container to be ready
-  if (!mapContainer.current) {
-    return (
-      <div className="bg-gray-50 rounded-lg p-8 text-center">
-        <div className="text-gray-500 text-sm">
-          Loading map...
-        </div>
-      </div>
-    );
-  }
+
 
   // Show fallback if map failed to load
   if (!map.current && mapLoaded) {
