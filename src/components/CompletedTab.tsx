@@ -57,6 +57,14 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
         workoutDataKeys: Object.keys(workoutData || {})
       });
       
+      // Additional debug: Check what we're about to pass to CleanElevationChart
+      console.log('🔍 DEBUG - About to pass to CleanElevationChart:', {
+        gpsTrack: workoutData.gps_track?.length,
+        sensorData: workoutData.sensor_data?.length,
+        sensorDataType: typeof workoutData.sensor_data,
+        workoutDataKeys: Object.keys(workoutData || {})
+      });
+      
       setIsLoading(false);
     } else if (workoutData) {
       // We have workout data but no GPS track
