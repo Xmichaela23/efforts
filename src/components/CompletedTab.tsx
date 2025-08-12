@@ -1644,11 +1644,10 @@ const formatPace = (paceValue: any): string => {
          </div>
        </div>
        
-       {/* 📊 ELEVATION PROFILE SECTION - Edge-to-edge immersive */}
+       {/* 📊 ELEVATION PROFILE SECTION - Clean and minimal */}
        <div className="bg-white overflow-hidden">
          <div className="px-4 py-3 border-b border-gray-100">
            <h3 className="text-lg font-semibold text-gray-900">Elevation Profile</h3>
-           <p className="text-sm text-gray-500">Scroll through your workout to see real-time metrics</p>
          </div>
          <div className="h-72">
            <InteractiveElevationProfile
