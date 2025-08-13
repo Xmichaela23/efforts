@@ -1,0 +1,393 @@
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+// Strava webhook verification and processing
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('SUPABASE_ANON_KEY')!
+);
+
+Deno.serve(async (req) => {
+  // Handle webhook verification (Strava sends GET request first)
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const mode = url.searchParams.get('hub.mode');
+    const token = url.searchParams.get('hub.verify_token');
+    const challenge = url.searchParams.get('hub.challenge');
+    
+    // Verify the webhook subscription
+    if (mode === 'subscribe' && token === Deno.env.get('STRAVA_WEBHOOK_VERIFY_TOKEN')) {
+      console.log('✅ Strava webhook verified successfully');
+      return new Response(JSON.stringify({ 'hub.challenge': challenge }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    } else {
+      console.log('❌ Strava webhook verification failed');
+      return new Response('Verification failed', { status: 403 });
+    }
+  }
+
+  // Handle webhook events (POST requests)
+  if (req.method === 'POST') {
+    try {
+      const payload = await req.json();
+      console.log('📥 Received Strava webhook:', JSON.stringify(payload, null, 2));
+      
+      // Respond immediately with 200 OK (as required by Strava)
+      const response = new Response('OK', { status: 200 });
+      
+      // Process the webhook asynchronously
+      processStravaWebhook(payload).catch(console.error);
+      
+      return response;
+    } catch (error) {
+      console.error('❌ Error processing Strava webhook:', error);
+      return new Response('Internal server error', { status: 500 });
+    }
+  }
+
+  return new Response('Method not allowed', { status: 405 });
+});
+
+async function processStravaWebhook(payload: any) {
+  try {
+    const { object_type, object_id, aspect_type, updates, owner_id } = payload;
+    
+    // Only process activity-related events
+    if (object_type !== 'activity') {
+      console.log('⏭️ Skipping non-activity webhook:', object_type);
+      return;
+    }
+
+    console.log(`🔄 Processing ${aspect_type} for activity ${object_id} (owner: ${owner_id})`);
+
+    switch (aspect_type) {
+      case 'create':
+        await handleActivityCreated(object_id, owner_id);
+        break;
+      case 'update':
+        await handleActivityUpdated(object_id, owner_id, updates);
+        break;
+      case 'delete':
+        await handleActivityDeleted(object_id, owner_id);
+        break;
+      default:
+        console.log(`⚠️ Unknown aspect type: ${aspect_type}`);
+    }
+  } catch (error) {
+    console.error('❌ Error in processStravaWebhook:', error);
+  }
+}
+
+async function handleActivityCreated(activityId: number, ownerId: number) {
+  try {
+    console.log(`🆕 New activity created: ${activityId} by user ${ownerId}`);
+    
+    // Find the user in our system by Strava ID
+    const { data: userConnection, error: connectionError } = await supabase
+      .from('user_connections')
+      .select('user_id, connection_data')
+      .eq('provider', 'strava')
+      .eq('provider_user_id', ownerId.toString())
+      .single();
+
+    if (connectionError || !userConnection) {
+      console.log(`⚠️ No user connection found for Strava user ${ownerId}`);
+      return;
+    }
+
+    const userId = userConnection.user_id;
+    const connectionData = userConnection.connection_data || {};
+    const accessToken = connectionData.access_token;
+
+    if (!accessToken) {
+      console.log(`⚠️ No access token for user ${userId}`);
+      return;
+    }
+
+    // Fetch detailed activity data from Strava
+    const activityData = await fetchStravaActivity(activityId, accessToken);
+    if (!activityData) {
+      console.log(`⚠️ Could not fetch activity ${activityId} from Strava`);
+      return;
+    }
+
+    // Store the activity in our system
+    await storeStravaActivity(activityId, userId, activityData);
+    
+    // Create workout entry if it's a supported sport
+    await createWorkoutFromStravaActivity(userId, activityData);
+    
+    console.log(`✅ Activity ${activityId} processed successfully for user ${userId}`);
+  } catch (error) {
+    console.error(`❌ Error handling activity creation for ${activityId}:`, error);
+  }
+}
+
+async function handleActivityUpdated(activityId: number, ownerId: number, updates: any) {
+  try {
+    console.log(`🔄 Activity updated: ${activityId} by user ${ownerId}`, updates);
+    
+    // Find the user connection
+    const { data: userConnection, error: connectionError } = await supabase
+      .from('user_connections')
+      .select('user_id, connection_data')
+      .eq('provider', 'strava')
+      .eq('provider_user_id', ownerId.toString())
+      .single();
+
+    if (connectionError || !userConnection) {
+      console.log(`⚠️ No user connection found for Strava user ${ownerId}`);
+      return;
+    }
+
+    const userId = userConnection.user_id;
+    const connectionData = userConnection.connection_data || {};
+    const accessToken = connectionData.access_token;
+
+    if (!accessToken) {
+      console.log(`⚠️ No access token for user ${userId}`);
+      return;
+    }
+
+    // Fetch updated activity data
+    const activityData = await fetchStravaActivity(activityId, accessToken);
+    if (!activityData) {
+      console.log(`⚠️ Could not fetch updated activity ${activityId} from Strava`);
+      return;
+    }
+
+    // Update the stored activity
+    await updateStravaActivity(activityId, userId, activityData);
+    
+    // Update workout entry if it exists
+    await updateWorkoutFromStravaActivity(userId, activityData);
+    
+    console.log(`✅ Activity ${activityId} updated successfully for user ${userId}`);
+  } catch (error) {
+    console.error(`❌ Error handling activity update for ${activityId}:`, error);
+  }
+}
+
+async function handleActivityDeleted(activityId: number, ownerId: number) {
+  try {
+    console.log(`🗑️ Activity deleted: ${activityId} by user ${ownerId}`);
+    
+    // Find the user connection
+    const { data: userConnection, error: connectionError } = await supabase
+      .from('user_connections')
+      .select('user_id')
+      .eq('provider', 'strava')
+      .eq('provider_user_id', ownerId.toString())
+      .single();
+
+    if (connectionError || !userConnection) {
+      console.log(`⚠️ No user connection found for Strava user ${ownerId}`);
+      return;
+    }
+
+    const userId = userConnection.user_id;
+
+    // Mark activity as deleted in our system
+    await markStravaActivityDeleted(activityId, userId);
+    
+    // Remove associated workout if it exists
+    await removeWorkoutFromStravaActivity(userId, activityId);
+    
+    console.log(`✅ Activity ${activityId} marked as deleted for user ${userId}`);
+  } catch (error) {
+    console.error(`❌ Error handling activity deletion for ${activityId}:`, error);
+  }
+}
+
+async function fetchStravaActivity(activityId: number, accessToken: string) {
+  try {
+    const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}`, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      console.warn(`⚠️ Strava API error for activity ${activityId}: ${response.status}`);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error(`❌ Error fetching Strava activity ${activityId}:`, error);
+    return null;
+  }
+}
+
+async function storeStravaActivity(activityId: number, userId: string, activityData: any) {
+  try {
+    const { error } = await supabase
+      .from('strava_activities')
+      .upsert({
+        strava_id: activityId,
+        user_id: userId,
+        activity_data: activityData,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        deleted_at: null
+      });
+
+    if (error) {
+      console.error(`❌ Error storing Strava activity ${activityId}:`, error);
+    }
+  } catch (error) {
+    console.error(`❌ Error in storeStravaActivity for ${activityId}:`, error);
+  }
+}
+
+async function updateStravaActivity(activityId: number, userId: string, activityData: any) {
+  try {
+    const { error } = await supabase
+      .from('strava_activities')
+      .update({
+        activity_data: activityData,
+        updated_at: new Date().toISOString()
+      })
+      .eq('strava_id', activityId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error(`❌ Error updating Strava activity ${activityId}:`, error);
+    }
+  } catch (error) {
+    console.error(`❌ Error in updateStravaActivity for ${activityId}:`, error);
+  }
+}
+
+async function markStravaActivityDeleted(activityId: number, userId: string) {
+  try {
+    const { error } = await supabase
+      .from('strava_activities')
+      .update({
+        deleted_at: new Date().toISOString()
+      })
+      .eq('strava_id', activityId)
+      .eq('user_id', userId);
+
+    if (error) {
+      console.error(`❌ Error marking Strava activity ${activityId} as deleted:`, error);
+    }
+  } catch (error) {
+    console.error(`❌ Error in markStravaActivityDeleted for ${activityId}:`, error);
+  }
+}
+
+async function createWorkoutFromStravaActivity(userId: string, activityData: any) {
+  try {
+    // Map Strava sport type to our workout types
+    const sportType = activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase();
+    let workoutType = 'other';
+    
+    if (sportType?.includes('run')) workoutType = 'running';
+    else if (sportType?.includes('ride') || sportType?.includes('bike')) workoutType = 'cycling';
+    else if (sportType?.includes('swim')) workoutType = 'swimming';
+    else if (sportType?.includes('weight') || sportType?.includes('strength')) workoutType = 'strength';
+
+    // Only create workouts for supported sports
+    if (!['running', 'cycling', 'swimming', 'strength'].includes(workoutType)) {
+      console.log(`⏭️ Skipping workout creation for unsupported sport: ${sportType}`);
+      return;
+    }
+
+    // Check if workout already exists for this Strava activity
+    const { data: existingWorkout } = await supabase
+      .from('workouts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('strava_activity_id', activityData.id)
+      .single();
+
+    if (existingWorkout) {
+      console.log(`⏭️ Workout already exists for Strava activity ${activityData.id}`);
+      return;
+    }
+
+    // Create workout data
+    const workoutData = {
+      user_id: userId,
+      workout_type: workoutType,
+      date: new Date(activityData.start_date).toISOString(),
+      duration: Math.round(activityData.moving_time / 60), // Convert to minutes
+      distance: activityData.distance ? Math.round(activityData.distance) : null, // Convert to meters
+      notes: `Imported from Strava: ${activityData.name}`,
+      strava_activity_id: activityData.id,
+      source: 'strava_webhook',
+      created_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('workouts')
+      .insert(workoutData);
+
+    if (error) {
+      console.error(`❌ Error creating workout for Strava activity ${activityData.id}:`, error);
+    } else {
+      console.log(`✅ Created workout for Strava activity ${activityData.id}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error in createWorkoutFromStravaActivity:`, error);
+  }
+}
+
+async function updateWorkoutFromStravaActivity(userId: string, activityData: any) {
+  try {
+    // Find existing workout
+    const { data: existingWorkout } = await supabase
+      .from('workouts')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('strava_activity_id', activityData.id)
+      .single();
+
+    if (!existingWorkout) {
+      console.log(`⏭️ No workout found for Strava activity ${activityData.id}, creating new one`);
+      await createWorkoutFromStravaActivity(userId, activityData);
+      return;
+    }
+
+    // Update workout data
+    const workoutData = {
+      duration: Math.round(activityData.moving_time / 60),
+      distance: activityData.distance ? Math.round(activityData.distance) : null,
+      notes: `Updated from Strava: ${activityData.name}`,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error } = await supabase
+      .from('workouts')
+      .update(workoutData)
+      .eq('id', existingWorkout.id);
+
+    if (error) {
+      console.error(`❌ Error updating workout for Strava activity ${activityData.id}:`, error);
+    } else {
+      console.log(`✅ Updated workout for Strava activity ${activityData.id}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error in updateWorkoutFromStravaActivity:`, error);
+  }
+}
+
+async function removeWorkoutFromStravaActivity(userId: string, activityId: number) {
+  try {
+    const { error } = await supabase
+      .from('workouts')
+      .delete()
+      .eq('user_id', userId)
+      .eq('strava_activity_id', activityId);
+
+    if (error) {
+      console.error(`❌ Error removing workout for Strava activity ${activityId}:`, error);
+    } else {
+      console.log(`✅ Removed workout for Strava activity ${activityId}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error in removeWorkoutFromStravaActivity:`, error);
+  }
+}

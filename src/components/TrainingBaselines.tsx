@@ -200,13 +200,32 @@ const handleSave = async () => {
 };
 
 // NEW: Strava connection functions
+// Debug: Check environment variables on component load
+useEffect(() => {
+  console.log('=== ENVIRONMENT VARIABLES CHECK ===');
+  console.log('VITE_STRAVA_CLIENT_ID:', import.meta.env.VITE_STRAVA_CLIENT_ID);
+  console.log('VITE_STRAVA_CLIENT_SECRET exists:', !!import.meta.env.VITE_STRAVA_CLIENT_SECRET);
+  console.log('All VITE variables:', Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
+}, []);
+
 const connectStrava = () => {
-  const clientId = (import.meta as any).env.VITE_STRAVA_CLIENT_ID;
+  const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
   const redirectUri = `${window.location.origin}/strava/callback`;
   const scope = 'read,activity:read_all';
   
+  // Debug: Check all environment variables
+  console.log('=== STRAVA DEBUG ===');
   console.log('Client ID:', clientId);
+  console.log('Client ID type:', typeof clientId);
+  console.log('Client ID length:', clientId ? clientId.length : 'undefined');
+  console.log('All VITE env vars:', Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
   console.log('Redirect URI:', redirectUri);
+  
+  if (!clientId || clientId === 'undefined') {
+    console.error('❌ STRAVA CLIENT ID IS UNDEFINED!');
+    setStravaMessage('Error: Strava client ID not configured. Please check environment variables.');
+    return;
+  }
   
   const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
   
