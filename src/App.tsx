@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound";
 import Privacy from "./pages/Privacy";
 import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
+import Connections from "./components/Connections";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
 <Route path="/privacy" element={<Privacy />} />
 <Route path="/strava/callback" element={<StravaCallback />} /> {/* ✅ UNCOMMENTED */}
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
+<Route path="/connections" element={<Connections />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>

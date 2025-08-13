@@ -125,6 +125,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowTrainingBaselines(true);
   };
 
+  // NEW: Connections handler
+  const handleConnectionsClick = () => {
+    // Navigate to connections page
+    window.location.href = '/connections';
+  };
+
   // NEW: Import handlers
   const handleImportClick = () => {
     setShowImportPage(true);
@@ -500,9 +506,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     <User className="mr-2 h-4 w-4" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="mr-2 h-4 w-4" />
-                    Connect Devices
+                  <DropdownMenuItem onClick={handleConnectionsClick}>
+                    <Link className="mr-2 h-4 w-4" />
+                    Connections
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleImportClick}>
                     <Upload className="mr-2 h-4 w-4" />

@@ -12,11 +12,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, userId, accessToken } = await req.json();
+    const { action, userId, accessToken, athleteId } = await req.json();
     
     switch (action) {
       case 'subscribe':
-        return await handleWebhookSubscription(userId, accessToken);
+        return await handleWebhookSubscription(userId, accessToken, athleteId);
       case 'unsubscribe':
         return await handleWebhookUnsubscription(userId, accessToken);
       case 'status':
@@ -30,24 +30,33 @@ Deno.serve(async (req) => {
   }
 });
 
-async function handleWebhookSubscription(userId: string, accessToken: string) {
+async function handleWebhookSubscription(userId: string, accessToken: string, athleteId?: string) {
   try {
     console.log(`🔄 Setting up Strava webhook for user ${userId}`);
     
-    // First, get the user's Strava profile to get their Strava ID
-    const athleteResponse = await fetch('https://www.strava.com/api/v3/athlete', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    });
+    // Use provided athleteId or fetch from Strava API
+    let stravaUserId: string;
+    
+    if (athleteId) {
+      stravaUserId = athleteId;
+      console.log(`📱 Using provided Strava user ID: ${stravaUserId}`);
+    } else {
+      // Fallback: get the user's Strava profile to get their Strava ID
+      const athleteResponse = await fetch('https://www.strava.com/api/v3/athlete', {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+        },
+      });
 
-    if (!athleteResponse.ok) {
-      console.error(`❌ Failed to get Strava athlete profile: ${athleteResponse.status}`);
-      return new Response('Failed to get Strava profile', { status: 400 });
+      if (!athleteResponse.ok) {
+        console.error(`❌ Failed to get Strava athlete profile: ${athleteResponse.status}`);
+        return new Response('Failed to get Strava profile', { status: 400 });
+      }
+
+      const athleteData = await athleteResponse.json();
+      stravaUserId = athleteData.id;
+      console.log(`📱 Fetched Strava user ID: ${stravaUserId}`);
     }
-
-    const athleteData = await athleteResponse.json();
-    const stravaUserId = athleteData.id;
     
     console.log(`📱 Strava user ID: ${stravaUserId}`);
 
