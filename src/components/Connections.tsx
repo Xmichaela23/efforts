@@ -15,7 +15,7 @@ import {
   Clock,
   Zap,
   Settings,
-  Link,
+  Link2,
   Unlink
 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
@@ -376,7 +376,7 @@ const Connections: React.FC = () => {
       case 'garmin':
         return <Settings className="h-5 w-5" />;
       default:
-        return <Link className="h-5 w-5" />;
+        return <Link2 className="h-5 w-5" />;
     }
   };
 
@@ -514,7 +514,7 @@ const Connections: React.FC = () => {
                     disabled={loading}
                     className="w-full"
                   >
-                    <Link className="h-4 w-4 mr-2" />
+                    <Link2 className="h-4 w-4 mr-2" />
                     Connect {getProviderName(connection.provider)}
                   </Button>
                 </div>

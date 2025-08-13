@@ -210,7 +210,7 @@ useEffect(() => {
 
 const connectStrava = () => {
   const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-  const redirectUri = `${window.location.origin}/strava/callback`;
+  const redirectUri = 'https://efforts.work/strava/callback';
   const scope = 'read,activity:read_all';
   
   // Debug: Check all environment variables
