@@ -58,6 +58,7 @@ const StravaCallback: React.FC = () => {
           throw new Error('No access token received from Strava');
         }
 
+        // ✅ SUCCESS: Only show after getting real tokens
         setMessage('Successfully connected to Strava!');
         setStatus('success');
 
