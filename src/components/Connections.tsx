@@ -16,7 +16,8 @@ import {
   Zap,
   Settings,
   Link2,
-  Unlink
+  Unlink,
+  Calendar
 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
 import { supabase } from '../lib/supabase';
@@ -47,6 +48,12 @@ const Connections: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const { user } = useAppContext();
+  const [stravaStartDate, setStravaStartDate] = useState<string>('');
+  const [stravaEndDate, setStravaEndDate] = useState<string>('');
+
+  const goToDashboard = () => {
+    window.location.href = '/';
+  };
 
   useEffect(() => {
     if (user) {
@@ -258,14 +265,14 @@ const Connections: React.FC = () => {
     }
   };
 
-  const importHistoricalData = async (provider: string) => {
+  const importHistoricalData = async (provider: string, startDate?: string, endDate?: string) => {
     try {
       setLoading(true);
       
       if (provider === 'strava') {
         // Get user's Strava connection
         const { data: connection } = await supabase
-          .from('user_connections')
+          .from('device_connections')
           .select('*')
           .eq('user_id', user?.id)
           .eq('provider', 'strava')
@@ -285,7 +292,9 @@ const Connections: React.FC = () => {
         body: JSON.stringify({
           userId: user?.id,
           accessToken: connection.access_token,
-          importType: 'historical'
+          importType: 'historical',
+          startDate,
+          endDate
         })
         });
 
@@ -293,9 +302,11 @@ const Connections: React.FC = () => {
           throw new Error('Failed to import historical data');
         }
 
+        const result = await response.json();
+        
         toast({
           title: "Historical Import Started",
-          description: "Importing your Strava activity history. This may take a few minutes.",
+          description: `Importing Strava activities${startDate && endDate ? ` from ${startDate} to ${endDate}` : ''}. This may take a few minutes.`,
         });
       }
       
@@ -405,6 +416,16 @@ const Connections: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 p-6">
+      {/* Dashboard Link */}
+      <div className="flex justify-start">
+        <button
+          onClick={goToDashboard}
+          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+        >
+          Dashboard
+        </button>
+      </div>
+      
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">Connections</h1>
         <p className="text-gray-600">
@@ -487,10 +508,77 @@ const Connections: React.FC = () => {
                   )}
 
                   <div className="flex items-center space-x-2">
+                    {/* Strava Date Range Picker */}
+                    {connection.provider === 'strava' && (
+                      <div className="flex flex-col space-y-2 w-full">
+                        {/* Quick Preset Buttons */}
+                        <div className="flex items-center space-x-2 text-xs">
+                          <button
+                            onClick={() => {
+                              const end = new Date();
+                              const start = new Date();
+                              start.setDate(start.getDate() - 7);
+                              setStravaStartDate(start.toISOString().split('T')[0]);
+                              setStravaEndDate(end.toISOString().split('T')[0]);
+                            }}
+                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          >
+                            Last 7 days
+                          </button>
+                          <button
+                            onClick={() => {
+                              const end = new Date();
+                              const start = new Date();
+                              start.setDate(start.getDate() - 30);
+                              setStravaStartDate(start.toISOString().split('T')[0]);
+                              setStravaEndDate(end.toISOString().split('T')[0]);
+                            }}
+                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          >
+                            Last 30 days
+                          </button>
+                          <button
+                            onClick={() => {
+                              const end = new Date();
+                              const start = new Date();
+                              start.setDate(start.getDate() - 60);
+                              setStravaStartDate(start.toISOString().split('T')[0]);
+                              setStravaEndDate(end.toISOString().split('T')[0]);
+                            }}
+                            className="px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200"
+                          >
+                            Last 60 days
+                          </button>
+                        </div>
+                        
+                        {/* Custom Date Range */}
+                        <div className="flex items-center space-x-2 text-sm">
+                          <input
+                            type="date"
+                            value={stravaStartDate}
+                            onChange={(e) => setStravaStartDate(e.target.value)}
+                            className="px-2 py-1 border rounded text-xs"
+                            placeholder="Start Date"
+                          />
+                          <span className="text-gray-500">to</span>
+                          <input
+                            type="date"
+                            value={stravaEndDate}
+                            onChange={(e) => setStravaEndDate(e.target.value)}
+                            className="px-2 py-1 border rounded text-xs"
+                            placeholder="End Date"
+                          />
+                        </div>
+                      </div>
+                    )}
+                    
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => importHistoricalData(connection.provider)}
+                      onClick={() => connection.provider === 'strava' ? 
+                        importHistoricalData(connection.provider, stravaStartDate, stravaEndDate) : 
+                        importHistoricalData(connection.provider)
+                      }
                       disabled={loading}
                     >
                       <Zap className="h-4 w-4 mr-2" />

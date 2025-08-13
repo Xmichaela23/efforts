@@ -84,6 +84,8 @@ interface ImportRequest {
   accessToken: string;
   importType: 'historical' | 'recent';
   maxActivities?: number;
+  startDate?: string;
+  endDate?: string;
 }
 
 Deno.serve(async (req) => {
@@ -92,13 +94,13 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { userId, accessToken, importType, maxActivities = 200 }: ImportRequest = await req.json();
+    const { userId, accessToken, importType, maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
 
     if (!userId || !accessToken) {
       return new Response('Missing required fields', { status: 400 });
     }
 
-    console.log(`🚀 Starting Strava import for user ${userId}, type: ${importType}`);
+    console.log(`🚀 Starting Strava import for user ${userId}, type: ${importType}${startDate && endDate ? `, date range: ${startDate} to ${endDate}` : ''}`);
 
     // Get user's existing workouts to avoid duplicates
     const { data: existingWorkouts } = await supabase
@@ -118,16 +120,28 @@ Deno.serve(async (req) => {
     while (true) {
       console.log(`📄 Fetching page ${page} from Strava API...`);
       
+      // Build Strava API URL with date filtering
+      let stravaUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
+      
+      if (startDate) {
+        const afterTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
+        stravaUrl += `&after=${afterTimestamp}`;
+        console.log(`📅 Filtering activities after: ${startDate} (${afterTimestamp})`);
+      }
+      
+      if (endDate) {
+        const beforeTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
+        stravaUrl += `&before=${beforeTimestamp}`;
+        console.log(`📅 Filtering activities before: ${endDate} (${beforeTimestamp})`);
+      }
+      
       // Fetch activities from Strava
-      const stravaResponse = await fetch(
-        `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-            'Content-Type': 'application/json'
-          }
+      const stravaResponse = await fetch(stravaUrl, {
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
         }
-      );
+      });
 
       if (!stravaResponse.ok) {
         const errorText = await stravaResponse.text();
