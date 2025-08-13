@@ -29,6 +29,8 @@ interface ConnectionStatus {
   lastSync?: string;
   webhookActive?: boolean;
   syncStatus: 'idle' | 'syncing' | 'error' | 'success';
+  connectionData?: any;
+  providerUserId?: string;
 }
 
 const Connections: React.FC = () => {
@@ -78,10 +80,14 @@ const Connections: React.FC = () => {
             ...conn,
             connected: !!existing,
             lastSync: existing?.last_sync,
-            webhookActive: existing?.webhook_active || false
+            webhookActive: existing?.webhook_active || false,
+            // Add connection details for display
+            connectionData: existing?.connection_data || null,
+            providerUserId: existing?.provider_user_id || null
           };
         });
         
+        console.log('🔄 Updated connections:', updatedConnections);
         setConnections(updatedConnections);
       }
     } catch (error) {
@@ -415,16 +421,14 @@ const Connections: React.FC = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 p-6">
-      {/* Dashboard Link */}
-      <div className="flex justify-start">
-        <button
-          onClick={goToDashboard}
-          className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
-        >
-          Dashboard
-        </button>
-      </div>
+    <div className="max-w-4xl mx-auto p-6">
+      {/* Dashboard Navigation */}
+      <button
+        onClick={goToDashboard}
+        className="text-gray-700 hover:text-gray-900 text-sm flex items-center gap-1 mb-6"
+      >
+        Dashboard
+      </button>
       
       <div className="text-center space-y-2">
         <h1 className="text-3xl font-bold">Connections</h1>
