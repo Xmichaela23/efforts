@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
 
     // Update user connection with last sync time
     await supabase
-      .from('user_connections')
+      .from('device_connections')
       .update({ 
         last_sync: new Date().toISOString(),
         connection_data: { 

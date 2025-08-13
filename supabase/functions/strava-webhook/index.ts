@@ -85,7 +85,7 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     
     // Find the user in our system by Strava ID
     const { data: userConnection, error: connectionError } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .select('user_id, connection_data')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
@@ -130,7 +130,7 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     
     // Find the user connection
     const { data: userConnection, error: connectionError } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .select('user_id, connection_data')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
@@ -175,7 +175,7 @@ async function handleActivityDeleted(activityId: number, ownerId: number) {
     
     // Find the user connection
     const { data: userConnection, error: connectionError } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .select('user_id')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())

@@ -51,9 +51,12 @@ export default function StravaWebhookManager({ onWebhookChange }: StravaWebhookM
     try {
       setIsLoading(true);
       
-      const response = await fetch('/api/strava-webhook-manager', {
+      const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-webhook-manager', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
         body: JSON.stringify({
           action: 'status',
           userId: user.id
@@ -124,9 +127,12 @@ export default function StravaWebhookManager({ onWebhookChange }: StravaWebhookM
 
       const accessToken = userConnection.connection_data.access_token;
 
-      const response = await fetch('/api/strava-webhook-manager', {
+      const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-webhook-manager', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
         body: JSON.stringify({
           action: 'subscribe',
           userId: user.id,
@@ -165,9 +171,12 @@ export default function StravaWebhookManager({ onWebhookChange }: StravaWebhookM
     try {
       setIsLoading(true);
       
-      const response = await fetch('/api/strava-webhook-manager', {
+      const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-webhook-manager', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        },
         body: JSON.stringify({
           action: 'unsubscribe',
           userId: user.id,

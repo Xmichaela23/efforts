@@ -60,7 +60,7 @@ const Connections: React.FC = () => {
       
       // Load existing connections from database
       const { data: userConnections } = await supabase
-        .from('user_connections')
+        .from('device_connections')
         .select('*')
         .eq('user_id', user?.id);
 
@@ -119,10 +119,11 @@ const Connections: React.FC = () => {
           
           // Store connection in database
           const { error } = await supabase
-            .from('user_connections')
+            .from('device_connections')
             .upsert({
               user_id: user?.id,
               provider: 'strava',
+              provider_user_id: athlete.id.toString(),
               access_token,
               refresh_token,
               expires_at: new Date(expires_at * 1000).toISOString(),
@@ -179,7 +180,7 @@ const Connections: React.FC = () => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`
         },
         body: JSON.stringify({
           action: 'subscribe',
@@ -195,7 +196,7 @@ const Connections: React.FC = () => {
 
       // Update connection status
       const { error } = await supabase
-        .from('user_connections')
+        .from('device_connections')
         .update({ webhook_active: true })
         .eq('user_id', user?.id)
         .eq('provider', 'strava');
@@ -221,7 +222,7 @@ const Connections: React.FC = () => {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabase.supabaseKey}`
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`
         },
         body: JSON.stringify({
           action: 'unsubscribe',
@@ -277,15 +278,15 @@ const Connections: React.FC = () => {
         // Call your existing StravaDataService to import historical data
         const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/import-strava-history', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabase.supabaseKey}`
-          },
-          body: JSON.stringify({
-            userId: user?.id,
-            accessToken: connection.access_token,
-            importType: 'historical'
-          })
+                  headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`
+        },
+        body: JSON.stringify({
+          userId: user?.id,
+          accessToken: connection.access_token,
+          importType: 'historical'
+        })
         });
 
         if (!response.ok) {
@@ -317,7 +318,7 @@ const Connections: React.FC = () => {
       if (enabled) {
         // Get existing connection data to re-enable webhook
         const { data: connection } = await supabase
-          .from('user_connections')
+          .from('device_connections')
           .select('*')
           .eq('user_id', user?.id)
           .eq('provider', provider)
@@ -330,20 +331,20 @@ const Connections: React.FC = () => {
         // Disable webhook
         const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-webhook-manager', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${supabase.supabaseKey}`
-          },
-          body: JSON.stringify({
-            action: 'unsubscribe',
-            userId: user?.id
-          })
+                  headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`
+        },
+        body: JSON.stringify({
+          action: 'unsubscribe',
+          userId: user?.id
+        })
         });
       }
 
       // Update connection status
       const { error } = await supabase
-        .from('user_connections')
+        .from('device_connections')
         .update({ webhook_active: enabled })
         .eq('user_id', user?.id)
         .eq('provider', provider);

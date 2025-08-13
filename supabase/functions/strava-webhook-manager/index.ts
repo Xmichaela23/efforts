@@ -129,7 +129,7 @@ async function handleWebhookUnsubscription(userId: string, accessToken: string) 
     
     // Get the user connection to find the webhook ID
     const { data: userConnection, error: connectionError } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .select('connection_data, provider_user_id')
       .eq('user_id', userId)
       .eq('provider', 'strava')
@@ -254,7 +254,7 @@ async function checkExistingWebhook(stravaUserId: number) {
 async function updateUserConnection(userId: string, stravaUserId: number, accessToken: string, webhookId: number) {
   try {
     const { error } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .upsert({
         user_id: userId,
         provider: 'strava',
@@ -284,7 +284,7 @@ async function updateUserConnection(userId: string, stravaUserId: number, access
 async function removeWebhookFromConnection(userId: string) {
   try {
     const { error } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .update({
         connection_data: {
           webhook_id: null,
