@@ -99,6 +99,13 @@ const Connections: React.FC = () => {
     try {
       setLoading(true);
       
+      // Get user ID from Supabase auth
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) {
+        console.log('No authenticated user found');
+        return;
+      }
+      
       // Check localStorage for Strava connection (like Garmin does)
       const stravaConnected = localStorage.getItem('strava_connected') === 'true';
       const stravaToken = localStorage.getItem('strava_access_token');
@@ -107,7 +114,7 @@ const Connections: React.FC = () => {
       const { data: userConnections } = await supabase
         .from('device_connections')
         .select('*')
-        .eq('user_id', user?.id);
+        .eq('user_id', authUser.id);
 
       if (userConnections) {
         const updatedConnections = connections.map(conn => {
