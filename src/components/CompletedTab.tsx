@@ -234,6 +234,26 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    return num.toFixed(1);
  };
 
+ // Format average speed specifically
+const formatAvgSpeed = (speedValue: any): string => {
+  const speedKmh = Number(speedValue);
+  if (speedKmh && speedKmh > 0) {
+    const speedMph = speedKmh * 0.621371;
+    return `${speedMph.toFixed(1)} mph`;
+  }
+  return 'N/A';
+};
+
+// Format max speed specifically  
+const formatMaxSpeed = (speedValue: any): string => {
+  const speedKmh = Number(speedValue);
+  if (speedKmh && speedKmh > 0) {
+    const speedMph = speedKmh * 0.621371;
+    return `${speedMph.toFixed(1)} mph`;
+  }
+  return 'N/A';
+};
+
  const formatSpeed = (speedValue: any): string => {
   // 🚨 TESTING: This is the UPDATED formatSpeed function - if you see this log, the fix is loaded!
   console.log('🚨 UPDATED formatSpeed function is running!');
@@ -567,7 +587,7 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Speed',
-          value: formatSpeed(workoutData.avg_speed),
+          value: formatAvgSpeed(workoutData.avg_speed),
           unit: useImperial ? 'mph' : 'mph'
         },
         {
@@ -630,7 +650,7 @@ const formatPace = (paceValue: any): string => {
      },
      {
        label: 'Max Speed',
-       value: workoutData.max_speed ? formatSpeed(workoutData.max_speed) : 'N/A',
+       value: workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A',
        unit: useImperial ? 'mph' : 'mph'
      },
      {
@@ -954,7 +974,7 @@ const formatPace = (paceValue: any): string => {
        ) : (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {formatSpeed(workoutData.avg_speed)}
+             {formatAvgSpeed(workoutData.avg_speed)}
            </div>
            <div className="text-xs text-[#666666] font-normal">
              <div className="font-medium">Avg Speed</div>
@@ -976,7 +996,7 @@ const formatPace = (paceValue: any): string => {
 
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.max_speed ? formatSpeed(workoutData.max_speed) : 'N/A'}
+           {workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Max Speed</div>
