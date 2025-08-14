@@ -121,11 +121,20 @@ const Connections: React.FC = () => {
       console.log('Final OAuth URL:', authUrl);
       console.log('URL Length:', authUrl.length);
       
-      const popup = window.open(
-        authUrl,
-        '_blank', // Use new tab instead of popup for Safari compatibility
-        'width=600,height=700,scrollbars=yes,resizable=yes'
-      );
+      // For Safari compatibility, redirect in same tab instead of popup
+      let popup: Window | null = null;
+      
+      if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+        // Safari - redirect in same tab
+        window.location.href = authUrl;
+      } else {
+        // Chrome/Firefox - use popup
+        popup = window.open(
+          authUrl,
+          '_blank',
+          'width=600,height=700,scrollbars=yes,resizable=yes'
+        );
+      }
 
       if (!popup) {
         toast({
