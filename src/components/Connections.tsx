@@ -48,6 +48,11 @@ const Connections: React.FC = () => {
   ]);
   
   const [loading, setLoading] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ importing: boolean; progress: number; total: number }>({
+    importing: false,
+    progress: 0,
+    total: 0
+  });
   const { toast } = useToast();
   const { user } = useAppContext();
   const [stravaStartDate, setStravaStartDate] = useState<string>('');
@@ -256,6 +261,7 @@ const Connections: React.FC = () => {
   const importHistoricalData = async (provider: string, startDate?: string, endDate?: string) => {
     try {
       setLoading(true);
+      setImportProgress({ importing: true, progress: 0, total: 0 });
       
       if (provider === 'strava') {
         // Get user ID from Supabase auth
@@ -302,10 +308,16 @@ const Connections: React.FC = () => {
           if (result.tokens.expires_at) localStorage.setItem('strava_expires_at', String(result.tokens.expires_at));
         }
         
+        // Show success message
         toast({
-          title: "Historical Import Started",
-          description: `Importing Strava activities${startDate && endDate ? ` from ${startDate} to ${endDate}` : ''}. This may take a few minutes.`,
+          title: "Import Complete!",
+          description: `Successfully imported ${result.imported} activities${result.skipped > 0 ? ` (${result.skipped} skipped)` : ''}. Redirecting to dashboard...`,
         });
+
+        // Redirect to dashboard after a short delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
       }
       
     } catch (error) {
@@ -317,6 +329,7 @@ const Connections: React.FC = () => {
       });
     } finally {
       setLoading(false);
+      setImportProgress({ importing: false, progress: 0, total: 0 });
     }
   };
 
@@ -583,6 +596,22 @@ const Connections: React.FC = () => {
                       Import History
                     </Button>
                     
+                    {/* Progress Bar for Import */}
+                    {importProgress.importing && connection.provider === 'strava' && (
+                      <div className="w-full mt-2">
+                        <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <span>Importing activities...</span>
+                          <span>{importProgress.progress}/{importProgress.total}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${importProgress.total > 0 ? (importProgress.progress / importProgress.total) * 100 : 0}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                    
                     <Button
                       variant="outline"
                       size="sm"
@@ -613,9 +642,9 @@ const Connections: React.FC = () => {
 
       <div className="text-center text-sm text-gray-500">
         <p>
-          Real-time sync uses webhooks to automatically import new activities as they happen.
+          <strong>New activities will automatically sync</strong> via webhooks when you complete them.
           <br />
-          Manual sync is also available for historical data.
+          Historical import is for bringing in your past activities. This may take a few minutes.
         </p>
       </div>
     </div>

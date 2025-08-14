@@ -71,25 +71,46 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
 
 function convertStravaToWorkout(a: StravaActivity, userId: string) {
   const type = mapStravaTypeToWorkoutType(a);
+  
+  // Debug logging for ride detection
+  console.log(`🏃‍♂️ Activity: ${a.name}, Type: ${a.type}, Sport: ${a.sport_type}, Trainer: ${a.trainer}, Mapped to: ${type}`);
 
   const duration = Math.max(0, Math.round((a.moving_time ?? 0) / 60));
   const elapsed = Math.max(0, Math.round((a.elapsed_time ?? 0) / 60));
   // Convert meters to kilometers with 2 decimals
   const distance = Math.max(0, Math.round(((a.distance ?? 0) / 1000) * 100) / 100);
-  // Convert m/s to km/h
+  
+  // Speed calculations (m/s to km/h)
   const avgSpeed = a.average_speed != null ? Math.round(a.average_speed * 3.6 * 100) / 100 : null;
   const maxSpeed = a.max_speed != null ? Math.round(a.max_speed * 3.6 * 100) / 100 : null;
-  // pace in min/km derived from m/s
-  const paceMin = a.average_speed && a.average_speed > 0 ? Math.round((1000 / a.average_speed / 60) * 100) / 100 : null;
+  
+  // Pace calculations (min/km from m/s) - only calculate if speed > 0
+  const avgPace = a.average_speed && a.average_speed > 0 ? Math.round((1000 / a.average_speed / 60) * 100) / 100 : null;
+  const maxPace = a.max_speed && a.max_speed > 0 ? Math.round((1000 / a.max_speed / 60) * 100) / 100 : null;
 
+  // Heart rate (BPM)
   const avgHr = a.average_heartrate != null ? Math.round(a.average_heartrate) : null;
   const maxHr = a.max_heartrate != null ? Math.round(a.max_heartrate) : null;
+  
+  // Power (Watts)
   const avgPwr = a.average_watts != null ? Math.round(a.average_watts) : null;
   const maxPwr = a.max_watts != null ? Math.round(a.max_watts) : null;
+  
+  // Cadence (RPM for bikes, steps/min for runs)
   const avgCad = a.average_cadence != null ? Math.round(a.average_cadence) : null;
   const maxCad = a.max_cadence != null ? Math.round(a.max_cadence) : null;
+  
+  // Elevation and calories
   const elev = a.total_elevation_gain != null ? Math.round(a.total_elevation_gain) : null;
   const cals = a.calories != null ? Math.round(a.calories) : null;
+
+  // Process GPS data for Mapbox rendering
+  let gpsTrack: string | null = null;
+  if (a.map?.summary_polyline || a.map?.polyline) {
+    // Store the polyline string for Mapbox to decode
+    gpsTrack = (a.map.summary_polyline || a.map.polyline) || null;
+    console.log(`🗺️ GPS data found: ${gpsTrack ? gpsTrack.substring(0, 50) + '...' : 'null'}`);
+  }
 
   return {
     name: a.name || 'Strava Activity',
@@ -105,7 +126,8 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
     distance,
     avg_speed: avgSpeed,
     max_speed: maxSpeed,
-    avg_pace: paceMin,
+    avg_pace: avgPace,
+    max_pace: maxPace, // Add missing max_pace field
     avg_heart_rate: avgHr,
     max_heart_rate: maxHr,
     avg_power: avgPwr,
@@ -121,9 +143,9 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
     is_strava_imported: true,
     strava_activity_id: a.id,
 
-    // Provide both fields for existing UI expectations
-    gps_track: a.map?.summary_polyline ?? a.map?.polyline ?? null,
-    gps_trackpoints: a.map?.polyline ?? null,
+    // GPS data for Mapbox rendering
+    gps_track: gpsTrack, // This is what the UI expects for maps
+    gps_trackpoints: a.map?.polyline ?? null, // Keep polyline string as backup
     start_position_lat: null,
     start_position_long: null,
 
@@ -211,7 +233,22 @@ Deno.serve(async (req) => {
       for (const a of activities) {
         if (existing.has(a.id)) { skipped++; continue; }
 
-        const row = convertStravaToWorkout(a, userId);
+        // Fetch detailed activity data to get HR, calories, etc.
+        let detailedActivity = a;
+        try {
+          const detailRes = await fetch(`https://www.strava.com/api/v3/activities/${a.id}`, {
+            headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
+          });
+          
+          if (detailRes.ok) {
+            detailedActivity = await detailRes.json();
+            console.log(`📊 Detailed data for ${a.name}: HR=${detailedActivity.average_heartrate}, Calories=${detailedActivity.calories}`);
+          }
+        } catch (err) {
+          console.log(`⚠️ Could not fetch detailed data for activity ${a.id}: ${err}`);
+        }
+
+        const row = convertStravaToWorkout(detailedActivity, userId);
         if (!row.user_id || !row.name || !row.type) { skipped++; continue; }
 
         const { error } = await supabase.from('workouts').insert(row);
@@ -221,6 +258,9 @@ Deno.serve(async (req) => {
         imported++;
 
         if (maxActivities && imported >= maxActivities) break;
+        
+        // Rate limiting - Strava allows 100 requests per 15 minutes
+        await new Promise(r => setTimeout(r, 200));
       }
 
       if (activities.length < perPage || (maxActivities && imported >= maxActivities)) break;
