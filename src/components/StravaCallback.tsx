@@ -79,9 +79,19 @@ const StravaCallback: React.FC = () => {
             window.close();
           }, 1000);
         } else {
-          // Fallback: store in localStorage and redirect
+          // PWA mode: store tokens and redirect back to main app
           localStorage.setItem('strava_access_token', tokenData.access_token);
-          setMessage('Connected! You can close this window.');
+          localStorage.setItem('strava_refresh_token', tokenData.refresh_token);
+          localStorage.setItem('strava_expires_at', tokenData.expires_at);
+          localStorage.setItem('strava_athlete', JSON.stringify(tokenData.athlete));
+          localStorage.setItem('strava_connected', 'true');
+          
+          setMessage('Connected! Redirecting back to app...');
+          
+          // Redirect back to main app after short delay
+          setTimeout(() => {
+            window.location.href = 'https://efforts.work';
+          }, 2000);
         }
 
       } catch (error) {
