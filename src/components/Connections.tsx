@@ -123,7 +123,7 @@ const Connections: React.FC = () => {
       
       const popup = window.open(
         authUrl,
-        'strava-auth',
+        '_blank', // Use new tab instead of popup for Safari compatibility
         'width=600,height=700,scrollbars=yes,resizable=yes'
       );
 
