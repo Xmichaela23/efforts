@@ -106,10 +106,20 @@ const Connections: React.FC = () => {
       const redirectUri = 'https://efforts.work/strava/callback';
       const scope = 'read,activity:read_all';
       
+      // Debug each variable individually
+      console.log('Strava Variables:', { 
+        clientId, 
+        redirectUri, 
+        scope,
+        scopeLength: scope?.length,
+        scopeType: typeof scope
+      });
+      
       const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
       
-      // Debug log to see what's happening
-      console.log('Strava OAuth Debug:', { clientId, authUrl });
+      // Debug the final URL
+      console.log('Final OAuth URL:', authUrl);
+      console.log('URL Length:', authUrl.length);
       
       const popup = window.open(
         authUrl,
