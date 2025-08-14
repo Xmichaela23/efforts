@@ -72,8 +72,8 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
 function convertStravaToWorkout(a: StravaActivity, userId: string) {
   const type = mapStravaTypeToWorkoutType(a);
 
-  const duration = Math.max(0, Math.round(a.moving_time ?? 0));
-  const elapsed = Math.max(0, Math.round(a.elapsed_time ?? 0));
+  const duration = Math.max(0, Math.round((a.moving_time ?? 0) / 60));
+  const elapsed = Math.max(0, Math.round((a.elapsed_time ?? 0) / 60));
   // Convert meters to kilometers with 2 decimals
   const distance = Math.max(0, Math.round(((a.distance ?? 0) / 1000) * 100) / 100);
   // Convert m/s to km/h
@@ -121,6 +121,8 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
     is_strava_imported: true,
     strava_activity_id: a.id,
 
+    // Provide both fields for existing UI expectations
+    gps_track: a.map?.summary_polyline ?? a.map?.polyline ?? null,
     gps_trackpoints: a.map?.polyline ?? null,
     start_position_lat: null,
     start_position_long: null,
