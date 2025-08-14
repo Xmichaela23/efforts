@@ -1,9 +1,9 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_ANON_KEY')!
-);
+// Use service role when available to bypass RLS for server-side imports
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface StravaActivity {
   id: number;
@@ -89,15 +89,38 @@ interface ImportRequest {
 }
 
 Deno.serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { 
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS'
+      }
+    });
+  }
+
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { status: 405 });
+    return new Response('Method not allowed', { 
+      status: 405,
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+      }
+    });
   }
 
   try {
     const { userId, accessToken, importType, maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
 
     if (!userId || !accessToken) {
-      return new Response('Missing required fields', { status: 400 });
+      return new Response('Missing required fields', { 
+        status: 400,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+        }
+      });
     }
 
     console.log(`🚀 Starting Strava import for user ${userId}, type: ${importType}${startDate && endDate ? `, date range: ${startDate} to ${endDate}` : ''}`);
@@ -146,7 +169,7 @@ Deno.serve(async (req) => {
       if (!stravaResponse.ok) {
         const errorText = await stravaResponse.text();
         console.error(`❌ Strava API error: ${stravaResponse.status} - ${errorText}`);
-        throw new Error(`Strava API error: ${stravaResponse.status}`);
+        throw new Error(`Strava API error: ${stravaResponse.status} - ${errorText}`);
       }
 
       const activities: StravaActivity[] = await stravaResponse.json();
@@ -176,6 +199,10 @@ Deno.serve(async (req) => {
 
         if (insertError) {
           console.error(`❌ Failed to insert workout ${activity.id}:`, insertError);
+          // Bubble up on permission errors to surface RLS issues clearly
+          if ((insertError as any)?.code === 'PGRST301' || (insertError as any)?.message?.toLowerCase?.().includes('permission')) {
+            throw new Error(`Database permission error while inserting workouts. Ensure Edge Function uses SERVICE_ROLE and RLS allows inserts.`);
+          }
           continue;
         }
 
@@ -228,7 +255,11 @@ Deno.serve(async (req) => {
       skipped: skippedCount,
       message: `Successfully imported ${importedCount} activities from Strava`
     }), {
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+      }
     });
 
   } catch (error) {
@@ -238,7 +269,11 @@ Deno.serve(async (req) => {
       error: error instanceof Error ? error.message : 'Unknown error'
     }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+      }
     });
   }
 });
