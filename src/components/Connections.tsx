@@ -67,7 +67,11 @@ const Connections: React.FC = () => {
     try {
       setLoading(true);
       
-      // Load existing connections from database
+      // Check localStorage for Strava connection (like Garmin does)
+      const stravaConnected = localStorage.getItem('strava_connected') === 'true';
+      const stravaToken = localStorage.getItem('strava_access_token');
+      
+      // Load existing connections from database (for Garmin)
       const { data: userConnections } = await supabase
         .from('device_connections')
         .select('*')
@@ -75,16 +79,26 @@ const Connections: React.FC = () => {
 
       if (userConnections) {
         const updatedConnections = connections.map(conn => {
-          const existing = userConnections.find(uc => uc.provider === conn.provider);
-          return {
-            ...conn,
-            connected: !!existing,
-            lastSync: existing?.last_sync,
-            webhookActive: existing?.webhook_active || false,
-            // Add connection details for display
-            connectionData: existing?.connection_data || null,
-            providerUserId: existing?.provider_user_id || null
-          };
+          if (conn.provider === 'strava') {
+            // Strava: check localStorage
+            return {
+              ...conn,
+              connected: stravaConnected && !!stravaToken,
+              lastSync: stravaConnected ? new Date().toISOString() : undefined,
+              webhookActive: false
+            };
+          } else {
+            // Garmin: check database
+            const existing = userConnections.find(uc => uc.provider === conn.provider);
+            return {
+              ...conn,
+              connected: !!existing,
+              lastSync: existing?.last_sync,
+              webhookActive: existing?.webhook_active || false,
+              connectionData: existing?.connection_data || null,
+              providerUserId: existing?.provider_user_id || null
+            };
+          }
         });
         
         console.log('🔄 Updated connections:', updatedConnections);
@@ -152,33 +166,25 @@ const Connections: React.FC = () => {
         if (event.data.type === 'STRAVA_AUTH_SUCCESS') {
           const { access_token, refresh_token, expires_at, athlete } = event.data.data;
           
-          // Store connection in database
-          const { error } = await supabase
-            .from('device_connections')
-            .upsert({
-              user_id: user?.id,
-              provider: 'strava',
-              provider_user_id: athlete.id.toString(),
-              access_token,
-              refresh_token,
-              expires_at: new Date(expires_at * 1000).toISOString(),
-              connection_data: { athlete },
-              webhook_active: false
-            });
-
-          if (error) {
-            throw error;
-          }
-
-          // Setup webhook subscription
-          await setupStravaWebhook(athlete.id, access_token);
+          // Store tokens in localStorage (like Garmin does)
+          localStorage.setItem('strava_access_token', access_token);
+          localStorage.setItem('strava_refresh_token', refresh_token);
+          localStorage.setItem('strava_expires_at', expires_at);
+          localStorage.setItem('strava_athlete', JSON.stringify(athlete));
+          localStorage.setItem('strava_connected', 'true');
           
           toast({
             title: "Strava Connected!",
-            description: "Your Strava account is now connected and webhook is active.",
+            description: "Your Strava account is now connected.",
           });
 
-          loadConnectionStatus();
+          // Update connection status to show connected
+          setConnections(prev => prev.map(conn => 
+            conn.provider === 'strava' 
+              ? { ...conn, connected: true }
+              : conn
+          ));
+          
           popup.close();
           window.removeEventListener('message', handleMessage);
         }
