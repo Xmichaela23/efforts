@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const STRAVA_CLIENT_ID = Deno.env.get('STRAVA_CLIENT_ID');
 const STRAVA_CLIENT_SECRET = Deno.env.get('STRAVA_CLIENT_SECRET');
 
-type FourTypes = 'run' | 'ride' | 'swim' | 'strength';
+type FourTypes = 'run' | 'ride' | 'swim' | 'strength' | 'walk';
 
 interface StravaActivity {
   id: number;
@@ -58,6 +58,8 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   const s = (a.sport_type || a.type || '').toLowerCase();
 
   if (['run', 'trailrun', 'virtualrun', 'treadmillrun'].some(x => s.includes(x))) return 'run';
+
+  if (s.includes('walk')) return 'walk';
 
   if (
     ['ride', 'virtualride', 'ebikeride', 'indoorcycling', 'mountainbikeride', 'gravelride'].some(x => s.includes(x)) ||
