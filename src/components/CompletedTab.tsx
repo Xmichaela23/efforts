@@ -562,12 +562,12 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
           label: 'Power',
-          value: workoutData.metrics?.avg_power || workoutData.avg_power ? safeNumber(workoutData.metrics?.avg_power || workoutData.avg_power) : 'N/A',
+          value: workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A',
           unit: 'W'
         },
         {
           label: 'Speed',
-          value: formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed),
+          value: formatSpeed(workoutData.avg_speed),
           unit: useImperial ? 'mph' : 'mph'
         },
         {
@@ -582,7 +582,7 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
           label: 'Pace',
-          value: formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace),
+          value: formatSwimPace(workoutData.avg_pace),
           unit: '/100m'
         },
         {
@@ -611,12 +611,12 @@ const formatPace = (paceValue: any): string => {
      return [
        {
          label: 'Avg Pace',
-         value: formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace),
+         value: formatPace(workoutData.avg_pace),
          unit: '/mi'
        },
        {
          label: 'Max Pace',
-         value: formatPace(workoutData.metrics?.max_pace || workoutData.max_pace),
+         value: formatPace(workoutData.max_pace),
          unit: '/mi'
        }
      ];
@@ -625,12 +625,12 @@ const formatPace = (paceValue: any): string => {
    const baseMetrics = [
      {
        label: 'Max HR',
-       value: workoutData.metrics?.max_heart_rate || workoutData.max_heart_rate ? safeNumber(workoutData.metrics?.max_heart_rate || workoutData.max_heart_rate) : 'N/A',
+       value: workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A',
        unit: 'bpm'
      },
      {
        label: 'Max Speed',
-       value: workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A',
+       value: workoutData.max_speed ? formatSpeed(workoutData.max_speed) : 'N/A',
        unit: useImperial ? 'mph' : 'mph'
      },
      {
@@ -651,11 +651,11 @@ const formatPace = (paceValue: any): string => {
        },
        {
          label: 'Steps',
-         value: workoutData.metrics?.steps || workoutData.steps ? safeNumber(workoutData.metrics?.steps || workoutData.steps) : 'N/A'
+         value: workoutData.steps ? safeNumber(workoutData.steps) : 'N/A'
        },
        {
          label: 'TSS',
-         value: workoutData.metrics?.training_stress_score || workoutData.tss ? safeNumber(Math.round((workoutData.metrics?.training_stress_score || workoutData.tss) * 10) / 10) : 'N/A'
+         value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
        }
      ];
    } else if (isBike) {
@@ -663,16 +663,16 @@ const formatPace = (paceValue: any): string => {
        ...baseMetrics,
        {
          label: 'Max Power',
-         value: workoutData.metrics?.max_power || workoutData.max_power ? safeNumber(workoutData.metrics?.max_power || workoutData.max_power) : 'N/A',
+         value: workoutData.max_power ? safeNumber(workoutData.max_power) : 'N/A',
          unit: 'W'
        },
        {
          label: 'TSS',
-         value: workoutData.metrics?.training_stress_score || workoutData.tss ? safeNumber(Math.round((workoutData.metrics?.training_stress_score || workoutData.tss) * 10) / 10) : 'N/A'
+         value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
        },
        {
          label: 'Intensity Factor',
-         value: workoutData.metrics?.intensity_factor || workoutData.intensity_factor ? `${safeNumber(workoutData.metrics?.intensity_factor || workoutData.intensity_factor)}%` : 'N/A'
+         value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
        }
      ];
    } else if (isSwim) {
@@ -685,11 +685,11 @@ const formatPace = (paceValue: any): string => {
        },
        {
          label: 'TSS',
-         value: workoutData.metrics?.training_stress_score || workoutData.tss ? safeNumber(Math.round((workoutData.metrics?.training_stress_score || workoutData.tss) * 10) / 10) : 'N/A'
+         value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
        },
        {
          label: 'Intensity Factor',
-         value: workoutData.metrics?.intensity_factor || workoutData.intensity_factor ? `${safeNumber(workoutData.metrics?.intensity_factor || workoutData.intensity_factor)}%` : 'N/A'
+         value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
        }
      ];
    }
@@ -945,7 +945,7 @@ const formatPace = (paceValue: any): string => {
        ) : workoutType === 'swim' ? (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {formatSwimPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
+             {formatSwimPace(workoutData.avg_pace)}
            </div>
            <div className="text-xs text-[#666666] font-normal">
              <div className="font-medium">Avg Pace</div>
@@ -954,7 +954,7 @@ const formatPace = (paceValue: any): string => {
        ) : (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {formatSpeed(workoutData.metrics?.avg_speed || workoutData.avg_speed)}
+             {formatSpeed(workoutData.avg_speed)}
            </div>
            <div className="text-xs text-[#666666] font-normal">
              <div className="font-medium">Avg Speed</div>
@@ -976,7 +976,7 @@ const formatPace = (paceValue: any): string => {
 
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.max_speed || workoutData.max_speed ? formatSpeed(workoutData.metrics?.max_speed || workoutData.max_speed) : 'N/A'}
+           {workoutData.max_speed ? formatSpeed(workoutData.max_speed) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Max Speed</div>
@@ -986,7 +986,7 @@ const formatPace = (paceValue: any): string => {
        {workoutType === 'ride' ? (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.avg_power || workoutData.avg_power ? safeNumber(workoutData.metrics?.avg_power || workoutData.avg_power) : 'N/A'}
+             {workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A'}
            </div>
            <div className="text-xs text-[#666666] font-normal">
              <div className="font-medium">Avg Power</div>
@@ -1015,7 +1015,7 @@ const formatPace = (paceValue: any): string => {
        
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.calories ? safeNumber(workoutData.metrics.calories) : 'N/A'}
+           {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Calories</div>
@@ -1024,7 +1024,7 @@ const formatPace = (paceValue: any): string => {
        
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.max_heart_rate ? safeNumber(workoutData.metrics.max_heart_rate) : 'N/A'}
+           {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Max HR</div>
@@ -1034,7 +1034,7 @@ const formatPace = (paceValue: any): string => {
        {/* Row 4: Max Cadence, TSS, VAM */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.max_cadence ? safeNumber(workoutData.metrics.max_cadence) : 'N/A'}
+           {workoutData.max_cadence ? safeNumber(workoutData.max_cadence) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Max Cadence</div>

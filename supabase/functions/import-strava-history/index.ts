@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const STRAVA_CLIENT_ID = Deno.env.get('STRAVA_CLIENT_ID');
 const STRAVA_CLIENT_SECRET = Deno.env.get('STRAVA_CLIENT_SECRET');
 
-type FourTypes = 'run' | 'ride' | 'swim' | 'strength';
+type FourTypes = 'run' | 'ride' | 'swim' | 'strength' | 'walk';
 
 interface StravaActivity {
   id: number;
@@ -84,8 +84,8 @@ function decodePolyline(polyline: string): [number, number][] {
     let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
     lng += dlng;
 
-    // Mapbox expects [lat, lng] format
-    coordinates.push([lat / 1e5, lng / 1e5]);
+    // Mapbox expects [lng, lat] format (longitude first, then latitude)
+    coordinates.push([lng / 1e5, lat / 1e5]);
   }
 
   return coordinates;
@@ -96,7 +96,7 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
 
   if (['run', 'trailrun', 'virtualrun', 'treadmillrun'].some(x => s.includes(x))) return 'run';
 
-  if (s.includes('walk')) return 'strength';
+  if (s.includes('walk')) return 'walk';
 
   if (
     ['ride', 'virtualride', 'ebikeride', 'indoorcycling', 'mountainbikeride', 'gravelride'].some(x => s.includes(x)) ||
@@ -130,7 +130,12 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
     convertedAvgSpeed: avgSpeed,
     convertedMaxSpeed: maxSpeed,
     distance: a.distance,
-    duration: a.moving_time
+    duration: a.moving_time,
+    // Add unit conversion details
+    avgSpeedMs: a.average_speed,
+    avgSpeedKmh: a.average_speed ? (a.average_speed * 3.6) : null,
+    maxSpeedMs: a.max_speed,
+    maxSpeedKmh: a.max_speed ? (a.max_speed * 3.6) : null
   });
 
   // Pace calculations (min/km from m/s) - only calculate if speed > 0
@@ -161,22 +166,38 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
     cadence: a.average_cadence,
     maxCadence: a.max_cadence,
     power: a.average_watts,
-    maxPower: a.max_watts
+    maxPower: a.max_watts,
+    // Add cadence debugging
+    rawCadence: a.average_cadence,
+    rawMaxCadence: a.max_cadence,
+    processedCadence: avgCad,
+    processedMaxCadence: maxCad
   });
 
   // Process GPS data for Mapbox rendering
-  let gpsTrack: [number, number][] | null = null;
+  let gpsTrack: any[] | null = null;
   if (a.map?.summary_polyline || a.map?.polyline) {
     const polyline = a.map.summary_polyline || a.map.polyline;
+    console.log(`🗺️ Raw polyline for ${a.name}:`, polyline?.substring(0, 100) + '...');
+    
     if (polyline) {
       try {
-        gpsTrack = decodePolyline(polyline);
-        console.log(`🗺️ GPS data decoded: ${gpsTrack.length} coordinates`);
+        const coordinates = decodePolyline(polyline);
+        // Convert to GPSPoint format that ActivityMap expects
+        gpsTrack = coordinates.map((coord, index) => ({
+          lat: coord[1], // coord[1] is latitude
+          lng: coord[0], // coord[0] is longitude
+          timestamp: Date.now() + (index * 1000), // Approximate timestamps
+          elevation: null // Strava polyline doesn't include elevation
+        }));
+        console.log(`🗺️ GPS data converted: ${gpsTrack.length} GPSPoints, first: {lat: ${gpsTrack[0].lat}, lng: ${gpsTrack[0].lng}}`);
       } catch (err) {
         console.log(`⚠️ Failed to decode polyline: ${err}`);
         gpsTrack = null;
       }
     }
+  } else {
+    console.log(`🗺️ No GPS data found for ${a.name}`);
   }
 
   return {
