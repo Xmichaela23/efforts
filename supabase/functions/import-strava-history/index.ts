@@ -1,22 +1,32 @@
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-// Use service role when available to bypass RLS for server-side imports
-const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
+const SUPABASE_KEY =
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')!;
+const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const STRAVA_CLIENT_ID = Deno.env.get('STRAVA_CLIENT_ID');
+const STRAVA_CLIENT_SECRET = Deno.env.get('STRAVA_CLIENT_SECRET');
+
+type FourTypes = 'run' | 'ride' | 'swim' | 'strength';
 
 interface StravaActivity {
   id: number;
   name: string;
-  distance: number;
-  moving_time: number;
-  elapsed_time: number;
-  total_elevation_gain: number;
-  type: string;
+  type?: string;
+  sport_type?: string;
+  trainer?: boolean | number;
+
+  distance?: number;
+  moving_time?: number;
+  elapsed_time?: number;
+  total_elevation_gain?: number;
+
   start_date: string;
   start_date_local: string;
-  average_speed: number;
-  max_speed: number;
+
+  average_speed?: number;
+  max_speed?: number;
   average_heartrate?: number;
   max_heartrate?: number;
   average_watts?: number;
@@ -24,392 +34,219 @@ interface StravaActivity {
   average_cadence?: number;
   max_cadence?: number;
   calories?: number;
-  map?: {
-    polyline: string;
-    summary_polyline: string;
-  };
-  splits_metric?: Array<{
-    distance: number;
-    elapsed_time: number;
-    elevation_difference: number;
-    moving_time: number;
-    split: number;
-    average_speed: number;
-    pace_zone: number;
-  }>;
-  best_efforts?: Array<{
-    id: number;
-    name: string;
-    elapsed_time: number;
-    moving_time: number;
-    start_date: string;
-    start_date_local: string;
-    distance: number;
-    start_index: number;
-    end_index: number;
-  }>;
-  segment_efforts?: Array<{
-    id: number;
-    name: string;
-    elapsed_time: number;
-    moving_time: number;
-    start_date: string;
-    start_date_local: string;
-    distance: number;
-    start_index: number;
-    end_index: number;
-    average_cadence?: number;
-    average_watts?: number;
-    average_heartrate?: number;
-    max_heartrate?: number;
-    segment: {
-      id: number;
-      name: string;
-      distance: number;
-      average_grade: number;
-      maximum_grade: number;
-      elevation_high: number;
-      elevation_low: number;
-      total_elevation_gain: number;
-      map: {
-        polyline: string;
-        summary_polyline: string;
-      };
-    };
-  }>;
+
+  map?: { polyline?: string; summary_polyline?: string };
 }
 
 interface ImportRequest {
   userId: string;
   accessToken: string;
+  refreshToken?: string;
   importType: 'historical' | 'recent';
   maxActivities?: number;
   startDate?: string;
   endDate?: string;
 }
 
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { 
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      }
-    });
-  }
+const cors = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-      }
-    });
-  }
+function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
+  const s = (a.sport_type || a.type || '').toLowerCase();
+
+  if (['run', 'trailrun', 'virtualrun', 'treadmillrun'].some(x => s.includes(x))) return 'run';
+
+  if (
+    ['ride', 'virtualride', 'ebikeride', 'indoorcycling', 'mountainbikeride', 'gravelride'].some(x => s.includes(x)) ||
+    !!a.trainer
+  ) return 'ride';
+
+  if (s.includes('swim')) return 'swim';
+
+  return 'strength';
+}
+
+function convertStravaToWorkout(a: StravaActivity, userId: string) {
+  const type = mapStravaTypeToWorkoutType(a);
+
+  const duration = Math.max(0, Math.round(a.moving_time ?? 0));
+  const elapsed = Math.max(0, Math.round(a.elapsed_time ?? 0));
+  // Convert meters to kilometers with 2 decimals
+  const distance = Math.max(0, Math.round(((a.distance ?? 0) / 1000) * 100) / 100);
+  // Convert m/s to km/h
+  const avgSpeed = a.average_speed != null ? Math.round(a.average_speed * 3.6 * 100) / 100 : null;
+  const maxSpeed = a.max_speed != null ? Math.round(a.max_speed * 3.6 * 100) / 100 : null;
+  // pace in min/km derived from m/s
+  const paceMin = a.average_speed && a.average_speed > 0 ? Math.round((1000 / a.average_speed / 60) * 100) / 100 : null;
+
+  const avgHr = a.average_heartrate != null ? Math.round(a.average_heartrate) : null;
+  const maxHr = a.max_heartrate != null ? Math.round(a.max_heartrate) : null;
+  const avgPwr = a.average_watts != null ? Math.round(a.average_watts) : null;
+  const maxPwr = a.max_watts != null ? Math.round(a.max_watts) : null;
+  const avgCad = a.average_cadence != null ? Math.round(a.average_cadence) : null;
+  const maxCad = a.max_cadence != null ? Math.round(a.max_cadence) : null;
+  const elev = a.total_elevation_gain != null ? Math.round(a.total_elevation_gain) : null;
+  const cals = a.calories != null ? Math.round(a.calories) : null;
+
+  return {
+    name: a.name || 'Strava Activity',
+    type,
+    user_id: userId,
+
+    date: new Date(a.start_date_local || a.start_date).toISOString().split('T')[0],
+    timestamp: new Date(a.start_date).toISOString(),
+
+    duration,
+    elapsed_time: elapsed,
+    moving_time: duration,
+    distance,
+    avg_speed: avgSpeed,
+    max_speed: maxSpeed,
+    avg_pace: paceMin,
+    avg_heart_rate: avgHr,
+    max_heart_rate: maxHr,
+    avg_power: avgPwr,
+    max_power: maxPwr,
+    avg_cadence: avgCad,
+    max_cadence: maxCad,
+    elevation_gain: elev,
+    calories: cals,
+
+    workout_status: 'completed',
+    completedmanually: false,
+    source: 'strava',
+    is_strava_imported: true,
+    strava_activity_id: a.id,
+
+    gps_trackpoints: a.map?.polyline ?? null,
+    start_position_lat: null,
+    start_position_long: null,
+
+    strava_data: {
+      original_activity: a,
+      import_date: new Date().toISOString(),
+    },
+    intervals: [],
+
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+async function refreshStravaAccessToken(refreshToken: string | undefined) {
+  if (!refreshToken || !STRAVA_CLIENT_ID || !STRAVA_CLIENT_SECRET) return null;
+  const resp = await fetch('https://www.strava.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: STRAVA_CLIENT_ID,
+      client_secret: STRAVA_CLIENT_SECRET,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    }),
+  });
+  if (!resp.ok) return null;
+  return await resp.json();
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
-    const { userId, accessToken, importType, maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
-
+    const { userId, accessToken, refreshToken, maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
     if (!userId || !accessToken) {
-      return new Response('Missing required fields', { 
-        status: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-        }
-      });
+      return new Response('Missing required fields', { status: 400, headers: cors });
     }
 
-    console.log(`🚀 Starting Strava import for user ${userId}, type: ${importType}${startDate && endDate ? `, date range: ${startDate} to ${endDate}` : ''}`);
+    let currentAccessToken = accessToken;
 
-    // Get user's existing workouts to avoid duplicates
-    const { data: existingWorkouts } = await supabase
+    const existingRes = await supabase
       .from('workouts')
       .select('strava_activity_id')
       .eq('user_id', userId)
       .not('strava_activity_id', 'is', null);
 
-    const existingStravaIds = new Set(existingWorkouts?.map(w => w.strava_activity_id) || []);
-    console.log(`📊 Found ${existingStravaIds.size} existing Strava activities`);
+    const existing = new Set<number>((existingRes.data || []).map((w: any) => w.strava_activity_id));
 
-    let importedCount = 0;
-    let skippedCount = 0;
+    let imported = 0;
+    let skipped = 0;
     let page = 1;
-    const perPage = 200; // Strava's max per request
+    const perPage = 200;
+    let updatedTokens: any = null;
 
     while (true) {
-      console.log(`📄 Fetching page ${page} from Strava API...`);
-      
-      // Build Strava API URL with date filtering
-      let stravaUrl = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
-      
-      if (startDate) {
-        const afterTimestamp = Math.floor(new Date(startDate).getTime() / 1000);
-        stravaUrl += `&after=${afterTimestamp}`;
-        console.log(`📅 Filtering activities after: ${startDate} (${afterTimestamp})`);
-      }
-      
-      if (endDate) {
-        const beforeTimestamp = Math.floor(new Date(endDate).getTime() / 1000);
-        stravaUrl += `&before=${beforeTimestamp}`;
-        console.log(`📅 Filtering activities before: ${endDate} (${beforeTimestamp})`);
-      }
-      
-      // Fetch activities from Strava
-      const stravaResponse = await fetch(stravaUrl, {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json'
-        }
+      let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
+      if (startDate) url += `&after=${Math.floor(new Date(startDate).getTime() / 1000)}`;
+      if (endDate) url += `&before=${Math.floor(new Date(endDate).getTime() / 1000)}`;
+
+      let res = await fetch(url, {
+        headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
       });
 
-      if (!stravaResponse.ok) {
-        const errorText = await stravaResponse.text();
-        console.error(`❌ Strava API error: ${stravaResponse.status} - ${errorText}`);
-        throw new Error(`Strava API error: ${stravaResponse.status} - ${errorText}`);
-      }
-
-      const activities: StravaActivity[] = await stravaResponse.json();
-      
-      if (activities.length === 0) {
-        console.log(`✅ No more activities to import (page ${page})`);
-        break;
-      }
-
-      console.log(`📥 Received ${activities.length} activities from Strava`);
-
-      // Process each activity
-      for (const activity of activities) {
-        // Skip if already imported
-        if (existingStravaIds.has(activity.id)) {
-          skippedCount++;
-          continue;
-        }
-
-        // Convert Strava activity to workout format
-        const workout = convertStravaToWorkout(activity, userId);
-        
-        // Insert into workouts table
-        const { error: insertError } = await supabase
-          .from('workouts')
-          .insert(workout);
-
-        if (insertError) {
-          console.error(`❌ Failed to insert workout ${activity.id}:`, insertError);
-          // Bubble up on permission errors to surface RLS issues clearly
-          if ((insertError as any)?.code === 'PGRST301' || (insertError as any)?.message?.toLowerCase?.().includes('permission')) {
-            throw new Error(`Database permission error while inserting workouts. Ensure Edge Function uses SERVICE_ROLE and RLS allows inserts.`);
-          }
-          continue;
-        }
-
-        importedCount++;
-        console.log(`✅ Imported activity: ${activity.name} (${activity.id})`);
-
-        // Check if we've reached the max limit
-        if (maxActivities && importedCount >= maxActivities) {
-          console.log(`🛑 Reached max activities limit: ${maxActivities}`);
-          break;
+      if (res.status === 401) {
+        const refreshed = await refreshStravaAccessToken(refreshToken);
+        if (refreshed?.access_token) {
+          currentAccessToken = refreshed.access_token;
+          updatedTokens = refreshed;
+          res = await fetch(url, {
+            headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
+          });
         }
       }
 
-      // Check if we've reached the max limit
-      if (maxActivities && importedCount >= maxActivities) {
-        break;
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(`Strava API error ${res.status}: ${txt}`);
       }
 
-      // If we got fewer activities than requested, we're done
-      if (activities.length < perPage) {
-        break;
+      const activities: StravaActivity[] = await res.json();
+      if (!activities.length) break;
+
+      for (const a of activities) {
+        if (existing.has(a.id)) { skipped++; continue; }
+
+        const row = convertStravaToWorkout(a, userId);
+        if (!row.user_id || !row.name || !row.type) { skipped++; continue; }
+
+        const { error } = await supabase.from('workouts').insert(row);
+        if (error) { console.error('Insert error:', error); skipped++; continue; }
+
+        existing.add(a.id);
+        imported++;
+
+        if (maxActivities && imported >= maxActivities) break;
       }
 
-      page++;
-      
-      // Rate limiting: Strava allows 1000 requests per 15 minutes
-      // We're being conservative with a small delay
-      await new Promise(resolve => setTimeout(resolve, 100));
+      if (activities.length < perPage || (maxActivities && imported >= maxActivities)) break;
+      page += 1;
+      await new Promise(r => setTimeout(r, 100));
     }
 
-    // Update user connection with last sync time
     await supabase
       .from('device_connections')
-      .update({ 
+      .update({
         last_sync: new Date().toISOString(),
-        connection_data: { 
+        connection_data: {
           last_import: new Date().toISOString(),
-          total_imported: importedCount,
-          total_skipped: skippedCount
-        }
+          total_imported: imported,
+          total_skipped: skipped,
+        },
       })
       .eq('user_id', userId)
       .eq('provider', 'strava');
 
-    console.log(`🎉 Import completed! Imported: ${importedCount}, Skipped: ${skippedCount}`);
-
-    return new Response(JSON.stringify({
-      success: true,
-      imported: importedCount,
-      skipped: skippedCount,
-      message: `Successfully imported ${importedCount} activities from Strava`
-    }), {
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-      }
+    return new Response(JSON.stringify({ success: true, imported, skipped, tokens: updatedTokens }), {
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
-
-  } catch (error) {
-    console.error('❌ Import error:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }), {
+  } catch (err) {
+    console.error('❌ Import error:', err);
+    return new Response(JSON.stringify({ success: false, error: `${err}` }), {
       status: 500,
-      headers: { 
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-      }
+      headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
 });
-
-function convertStravaToWorkout(activity: StravaActivity, userId: string) {
-  // Convert Strava activity type to your workout types
-  const workoutType = mapStravaTypeToWorkoutType(activity.type);
-  
-  // Calculate pace in minutes per mile/km
-  const paceMinutes = activity.average_speed > 0 ? (1000 / activity.average_speed) / 60 : null;
-  
-  // Extract GPS data if available
-  let gpsTrackpoints = null;
-  let startLat = null;
-  let startLong = null;
-  
-  if (activity.map?.polyline) {
-    // You might want to decode the polyline here for more detailed GPS data
-    gpsTrackpoints = activity.map.polyline;
-  }
-
-  // Extract splits data
-  const splits = activity.splits_metric?.map(split => ({
-    distance: split.distance,
-    elapsed_time: split.elapsed_time,
-    moving_time: split.moving_time,
-    average_speed: split.average_speed,
-    pace_zone: split.pace_zone
-  })) || [];
-
-  // Extract best efforts
-  const bestEfforts = activity.best_efforts?.map(effort => ({
-    name: effort.name,
-    elapsed_time: effort.elapsed_time,
-    moving_time: effort.moving_time,
-    distance: effort.distance,
-    start_index: effort.start_index,
-    end_index: effort.end_index
-  })) || [];
-
-  // Extract segment efforts
-  const segmentEfforts = activity.segment_efforts?.map(segment => ({
-    name: segment.name,
-    elapsed_time: segment.elapsed_time,
-    moving_time: segment.moving_time,
-    distance: segment.distance,
-    average_cadence: segment.average_cadence,
-    average_watts: segment.average_watts,
-    average_heartrate: segment.average_heartrate,
-    max_heartrate: segment.max_heartrate,
-    segment: segment.segment
-  })) || [];
-
-  return {
-    name: activity.name,
-    type: workoutType,
-    duration: Math.round(activity.moving_time),
-    date: new Date(activity.start_date_local).toISOString().split('T')[0],
-    description: `Imported from Strava - ${activity.type}`,
-    distance: Math.round(activity.distance),
-    elapsed_time: Math.round(activity.elapsed_time),
-    moving_time: Math.round(activity.moving_time),
-    avg_speed: Math.round(activity.average_speed * 100) / 100, // Round to 2 decimal places
-    max_speed: Math.round(activity.max_speed * 100) / 100,
-    avg_pace: paceMinutes ? Math.round(paceMinutes * 100) / 100 : null,
-    avg_heart_rate: activity.average_heartrate ? Math.round(activity.average_heartrate) : null,
-    max_heart_rate: activity.max_heartrate ? Math.round(activity.max_heartrate) : null,
-    avg_power: activity.average_watts ? Math.round(activity.average_watts) : null,
-    max_power: activity.max_watts ? Math.round(activity.max_watts) : null,
-    avg_cadence: activity.average_cadence ? Math.round(activity.average_cadence) : null,
-    max_cadence: activity.max_cadence ? Math.round(activity.max_cadence) : null,
-    elevation_gain: activity.total_elevation_gain ? Math.round(activity.total_elevation_gain) : null,
-    calories: activity.calories ? Math.round(activity.calories) : null,
-    gps_trackpoints: gpsTrackpoints,
-    start_position_lat: startLat,
-    start_position_long: startLong,
-    timestamp: new Date(activity.start_date).toISOString(),
-    total_timer_time: Math.round(activity.moving_time),
-    total_elapsed_time: Math.round(activity.elapsed_time),
-    workout_status: 'completed',
-    completedmanually: false,
-    user_id: userId,
-    strava_activity_id: activity.id,
-    source: 'strava',
-    is_strava_imported: true,
-    strava_data: {
-      original_activity: activity,
-      splits,
-      best_efforts: bestEfforts,
-      segment_efforts: segmentEfforts,
-      import_date: new Date().toISOString()
-    },
-    intervals: [], // You might want to populate this with splits data
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
-}
-
-function mapStravaTypeToWorkoutType(stravaType: string): string {
-  const typeMap: Record<string, string> = {
-    'Run': 'run',
-    'TrailRun': 'run',
-    'VirtualRun': 'run',
-    'Ride': 'bike',
-    'VirtualRide': 'bike',
-    'EBikeRide': 'bike',
-    'Swim': 'swim',
-    'Walk': 'walk',
-    'Hike': 'hike',
-    'AlpineSki': 'ski',
-    'BackcountrySki': 'ski',
-    'Canoeing': 'paddle',
-    'Crossfit': 'strength',
-    'Elliptical': 'cardio',
-    'Golf': 'golf',
-    'Handcycle': 'bike',
-    'IceSkate': 'skate',
-    'InlineSkate': 'skate',
-    'Kayaking': 'paddle',
-    'Kitesurf': 'water',
-    'NordicSki': 'ski',
-    'RockClimbing': 'climb',
-    'RollerSki': 'ski',
-    'Rowing': 'row',
-    'Snowboard': 'snowboard',
-    'Snowshoe': 'hike',
-    'StairStepper': 'cardio',
-    'StandUpPaddling': 'paddle',
-    'Surfing': 'water',
-    'Velomobile': 'bike',
-    'WeightTraining': 'strength',
-    'Wheelchair': 'wheelchair',
-    'Windsurf': 'water',
-    'Workout': 'workout',
-    'Yoga': 'yoga'
-  };
-
-  return typeMap[stravaType] || 'workout';
-}
