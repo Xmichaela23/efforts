@@ -215,33 +215,23 @@ const Connections: React.FC = () => {
     try {
       setLoading(true);
       
-      // Remove webhook subscription
-      const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-webhook-manager', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`
-        },
-        body: JSON.stringify({
-          action: 'unsubscribe',
-          userId: user?.id
-        })
-      });
-
-      // Remove connection from database
-      const { error } = await supabase
-        .from('user_connections')
-        .delete()
-        .eq('user_id', user?.id)
-        .eq('provider', 'strava');
-
-      if (error) throw error;
+      // Clear localStorage tokens (we use client-side storage for Strava)
+      localStorage.removeItem('strava_access_token');
+      localStorage.removeItem('strava_refresh_token');
+      localStorage.removeItem('strava_expires_at');
+      localStorage.removeItem('strava_athlete');
+      localStorage.removeItem('strava_connected');
 
       toast({
         title: "Strava Disconnected",
         description: "Your Strava account has been disconnected.",
       });
 
+      // Update UI state
+      setConnections(prev => prev.map(conn =>
+        conn.provider === 'strava' ? { ...conn, connected: false, webhookActive: false } : conn
+      ));
+      
       loadConnectionStatus();
       
     } catch (error) {
@@ -261,16 +251,11 @@ const Connections: React.FC = () => {
       setLoading(true);
       
       if (provider === 'strava') {
-        // Get user's Strava connection
-        const { data: connection } = await supabase
-          .from('device_connections')
-          .select('*')
-          .eq('user_id', user?.id)
-          .eq('provider', 'strava')
-          .single();
-
-        if (!connection) {
-          throw new Error('No Strava connection found');
+        // Use localStorage token for Strava imports
+        const accessToken = localStorage.getItem('strava_access_token');
+        const isConnected = localStorage.getItem('strava_connected') === 'true';
+        if (!isConnected || !accessToken) {
+          throw new Error('Strava is not connected on this device');
         }
 
         // Call your existing StravaDataService to import historical data
@@ -282,7 +267,7 @@ const Connections: React.FC = () => {
         },
         body: JSON.stringify({
           userId: user?.id,
-          accessToken: connection.access_token,
+          accessToken,
           importType: 'historical',
           startDate,
           endDate
@@ -447,17 +432,19 @@ const Connections: React.FC = () => {
                 
                 {connection.connected && (
                   <div className="flex items-center space-x-4">
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor={`webhook-${connection.provider}`} className="text-sm">
-                        Real-time Sync
-                      </Label>
-                      <Switch
-                        id={`webhook-${connection.provider}`}
-                        checked={connection.webhookActive}
-                        onCheckedChange={(enabled) => toggleWebhook(connection.provider, enabled)}
-                        disabled={loading}
-                      />
-                    </div>
+                    {connection.provider !== 'strava' && (
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor={`webhook-${connection.provider}`} className="text-sm">
+                          Real-time Sync
+                        </Label>
+                        <Switch
+                          id={`webhook-${connection.provider}`}
+                          checked={connection.webhookActive}
+                          onCheckedChange={(enabled) => toggleWebhook(connection.provider, enabled)}
+                          disabled={loading}
+                        />
+                      </div>
+                    )}
                     
                     <Button
                       variant="outline"
