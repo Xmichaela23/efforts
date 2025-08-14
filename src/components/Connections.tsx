@@ -58,10 +58,42 @@ const Connections: React.FC = () => {
   };
 
   useEffect(() => {
-    if (user) {
-      loadConnectionStatus();
+    // Check localStorage for Strava connection status
+    const stravaConnected = localStorage.getItem('strava_connected') === 'true';
+    const stravaToken = localStorage.getItem('strava_access_token');
+    
+    if (stravaConnected && stravaToken) {
+      setConnections(prev => prev.map(conn => 
+        conn.provider === 'strava' 
+          ? { ...conn, connected: true }
+          : conn
+      ));
     }
-  }, [user]);
+    
+    loadConnectionStatus();
+    
+    // Listen for when user returns from OAuth redirect
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        const currentStravaConnected = localStorage.getItem('strava_connected') === 'true';
+        const currentStravaToken = localStorage.getItem('strava_access_token');
+        
+        if (currentStravaConnected && currentStravaToken) {
+          setConnections(prev => prev.map(conn => 
+            conn.provider === 'strava' 
+              ? { ...conn, connected: true }
+              : conn
+          ));
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   const loadConnectionStatus = async () => {
     try {
