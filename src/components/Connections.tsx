@@ -108,6 +108,9 @@ const Connections: React.FC = () => {
       
       const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
       
+      // Debug log to see what's happening
+      console.log('Strava OAuth Debug:', { clientId, authUrl });
+      
       const popup = window.open(
         authUrl,
         'strava-auth',
