@@ -111,106 +111,31 @@ const Connections: React.FC = () => {
     }
   };
 
-  const connectStrava = async () => {
-    try {
-      setLoading(true);
+  const connectStrava = () => {
+    const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
+    const redirectUri = `${window.location.origin}/strava/callback`;
+    const scope = 'read,activity:read_all';
+    
+    const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
+    
+    console.log('Strava OAuth Debug:', { authUrl, clientId });
+    
+    // Safari: redirect in same tab (like Garmin does)
+    if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
+      // Safari - redirect in same tab
+      window.location.href = authUrl;
+    } else {
+      // Chrome/Firefox - use popup
+      const popup = window.open(
+        authUrl,
+        '_blank',
+        'width=600,height=700,scrollbars=yes,resizable=yes'
+      );
       
-      // Open Strava OAuth popup
-      const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-      const redirectUri = 'https://efforts.work/strava/callback';
-      const scope = 'read,activity:read_all';
-      
-      // Debug each variable individually
-      console.log('Strava Variables:', { 
-        clientId, 
-        redirectUri, 
-        scope,
-        scopeLength: scope?.length,
-        scopeType: typeof scope
-      });
-      
-      const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
-      
-      // Debug the final URL
-      console.log('Final OAuth URL:', authUrl);
-      console.log('URL Length:', authUrl.length);
-      
-      // For Safari compatibility, redirect in same tab instead of popup
-      let popup: Window | null = null;
-      
-      if (navigator.userAgent.includes('Safari') && !navigator.userAgent.includes('Chrome')) {
-        // Safari - redirect in same tab
-        window.location.href = authUrl;
-      } else {
-        // Chrome/Firefox - use popup
-        popup = window.open(
-          authUrl,
-          '_blank',
-          'width=600,height=700,scrollbars=yes,resizable=yes'
-        );
-      }
-
       if (!popup) {
-        toast({
-          title: "Popup blocked",
-          description: "Please allow popups and try again.",
-          variant: "destructive"
-        });
-        return;
+        // Fallback to same tab if popup blocked
+        window.location.href = authUrl;
       }
-
-      // Listen for OAuth completion
-      const handleMessage = async (event: MessageEvent) => {
-        if (event.origin !== window.location.origin) return;
-        
-        if (event.data.type === 'STRAVA_AUTH_SUCCESS') {
-          const { access_token, refresh_token, expires_at, athlete } = event.data.data;
-          
-          // Store tokens in localStorage (like Garmin does)
-          localStorage.setItem('strava_access_token', access_token);
-          localStorage.setItem('strava_refresh_token', refresh_token);
-          localStorage.setItem('strava_expires_at', expires_at);
-          localStorage.setItem('strava_athlete', JSON.stringify(athlete));
-          localStorage.setItem('strava_connected', 'true');
-          
-          toast({
-            title: "Strava Connected!",
-            description: "Your Strava account is now connected.",
-          });
-
-          // Update connection status to show connected
-          setConnections(prev => prev.map(conn => 
-            conn.provider === 'strava' 
-              ? { ...conn, connected: true }
-              : conn
-          ));
-          
-          popup.close();
-          window.removeEventListener('message', handleMessage);
-        }
-        
-        if (event.data.type === 'STRAVA_AUTH_ERROR') {
-          toast({
-            title: "Connection Failed",
-            description: event.data.error,
-            variant: "destructive"
-          });
-          popup.close();
-          window.removeEventListener('message', handleMessage);
-        }
-      };
-
-      window.addEventListener('message', handleMessage);
-      
-    } catch (error) {
-      console.error('Error connecting Strava:', error);
-      toast({
-        title: "Connection Failed",
-        description: "Failed to connect to Strava. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
     }
   };
 

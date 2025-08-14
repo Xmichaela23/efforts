@@ -1,115 +1,69 @@
 import React, { useEffect, useState } from 'react';
 
 const StravaCallback: React.FC = () => {
-  const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
+  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing Strava authorization...');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const handleStravaCallback = async () => {
       try {
-        // Get URL parameters
+        setLoading(true);
+        setStatus('loading');
+        setMessage('Processing Strava authorization...');
+
         const urlParams = new URLSearchParams(window.location.search);
         const code = urlParams.get('code');
         const error = urlParams.get('error');
 
         if (error) {
-          throw new Error(`Strava authorization denied: ${error}`);
+          setStatus('error');
+          setMessage(`Authorization failed: ${error}`);
+          return;
         }
 
         if (!code) {
-          throw new Error('No authorization code received from Strava');
+          setStatus('error');
+          setMessage('No authorization code received');
+          return;
         }
 
-        setMessage('Exchanging authorization code for access token...');
-
-        // Exchange code for access token
-        const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-        const clientSecret = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
-
-        console.log('Client ID:', clientId); // Debug log
-        console.log('Client Secret exists:', !!clientSecret); // Debug log (don't log actual secret)
-
-        if (!clientId || !clientSecret) {
-          throw new Error('Strava client credentials not configured');
-        }
-
-        const tokenResponse = await fetch('https://www.strava.com/oauth/token', {
+        // Exchange code for tokens
+        const response = await fetch('/api/strava-token-exchange', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            client_id: clientId,
-            client_secret: clientSecret,
-            code: code,
-            grant_type: 'authorization_code',
-          }),
+          body: JSON.stringify({ code }),
         });
 
-        if (!tokenResponse.ok) {
-          const errorText = await tokenResponse.text();
-          throw new Error(`Token exchange failed: ${tokenResponse.status} - ${errorText}`);
+        if (!response.ok) {
+          throw new Error(`Token exchange failed: ${response.statusText}`);
         }
 
-        const tokenData = await tokenResponse.json();
-        console.log('Token response:', tokenData); // Debug log
+        const tokenData = await response.json();
 
-        if (!tokenData.access_token) {
-          throw new Error('No access token received from Strava');
-        }
+        // Store tokens in localStorage (like Garmin)
+        localStorage.setItem('strava_access_token', tokenData.access_token);
+        localStorage.setItem('strava_refresh_token', tokenData.refresh_token);
+        localStorage.setItem('strava_expires_at', tokenData.expires_at);
+        localStorage.setItem('strava_athlete', JSON.stringify(tokenData.athlete));
+        localStorage.setItem('strava_connected', 'true');
 
-        // ✅ SUCCESS: Only show after getting real tokens
-        setMessage('Successfully connected to Strava!');
         setStatus('success');
+        setMessage('Successfully connected to Strava!');
 
-        // Send token data back to parent window
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'STRAVA_AUTH_SUCCESS',
-            data: {
-              access_token: tokenData.access_token,
-              refresh_token: tokenData.refresh_token,
-              expires_at: tokenData.expires_at,
-              athlete: tokenData.athlete
-            }
-          }, window.location.origin);
-
-          // Close popup after short delay
-          setTimeout(() => {
-            window.close();
-          }, 1000);
-        } else {
-          // PWA mode: store tokens and redirect back to main app
-          localStorage.setItem('strava_access_token', tokenData.access_token);
-          localStorage.setItem('strava_refresh_token', tokenData.refresh_token);
-          localStorage.setItem('strava_expires_at', tokenData.expires_at);
-          localStorage.setItem('strava_athlete', JSON.stringify(tokenData.athlete));
-          localStorage.setItem('strava_connected', 'true');
-          
-          setMessage('Connected! Redirecting back to app...');
-          
-          // Redirect back to main app after short delay
-          setTimeout(() => {
-            window.location.href = 'https://efforts.work';
-          }, 2000);
-        }
+        // Redirect back to main app after a short delay
+        setTimeout(() => {
+          window.location.href = '/';
+        }, 2000);
 
       } catch (error) {
-        console.error('Strava callback error:', error);
+        console.error('Error handling Strava callback:', error);
         setStatus('error');
-        setMessage(error instanceof Error ? error.message : 'Unknown error occurred');
-
-        // Send error back to parent window
-        if (window.opener) {
-          window.opener.postMessage({
-            type: 'STRAVA_AUTH_ERROR',
-            error: error instanceof Error ? error.message : 'Unknown error'
-          }, window.location.origin);
-
-          setTimeout(() => {
-            window.close();
-          }, 2000);
-        }
+        setMessage(`Connection failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -124,7 +78,7 @@ const StravaCallback: React.FC = () => {
         </div>
 
         <div className="space-y-4">
-          {status === 'processing' && (
+          {loading && (
             <div className="space-y-2">
               <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
               <p className="text-sm text-gray-600">{message}</p>
