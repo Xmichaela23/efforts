@@ -8,7 +8,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 const STRAVA_CLIENT_ID = Deno.env.get('STRAVA_CLIENT_ID');
 const STRAVA_CLIENT_SECRET = Deno.env.get('STRAVA_CLIENT_SECRET');
 
-type FourTypes = 'run' | 'ride' | 'swim' | 'strength' | 'walk';
+type FourTypes = 'run' | 'ride' | 'swim' | 'strength';
 
 interface StravaActivity {
   id: number;
@@ -54,12 +54,49 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Polyline decoder function
+function decodePolyline(polyline: string): [number, number][] {
+  const coordinates: [number, number][] = [];
+  let index = 0, len = polyline.length;
+  let lat = 0, lng = 0;
+
+  while (index < len) {
+    let shift = 0, result = 0;
+
+    do {
+      let b = polyline.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (result >= 0x20);
+
+    let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+
+    do {
+      let b = polyline.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (result >= 0x20);
+
+    let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+
+    // Mapbox expects [lat, lng] format
+    coordinates.push([lat / 1e5, lng / 1e5]);
+  }
+
+  return coordinates;
+}
+
 function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   const s = (a.sport_type || a.type || '').toLowerCase();
 
   if (['run', 'trailrun', 'virtualrun', 'treadmillrun'].some(x => s.includes(x))) return 'run';
 
-  if (s.includes('walk')) return 'walk';
+  if (s.includes('walk')) return 'strength';
 
   if (
     ['ride', 'virtualride', 'ebikeride', 'indoorcycling', 'mountainbikeride', 'gravelride'].some(x => s.includes(x)) ||
@@ -86,6 +123,16 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
   const avgSpeed = a.average_speed != null ? Math.round(a.average_speed * 3.6 * 100) / 100 : null;
   const maxSpeed = a.max_speed != null ? Math.round(a.max_speed * 3.6 * 100) / 100 : null;
   
+  // Debug speed calculations
+  console.log(`🚴 Speed debug for ${a.name}:`, {
+    rawAvgSpeed: a.average_speed,
+    rawMaxSpeed: a.max_speed,
+    convertedAvgSpeed: avgSpeed,
+    convertedMaxSpeed: maxSpeed,
+    distance: a.distance,
+    duration: a.moving_time
+  });
+
   // Pace calculations (min/km from m/s) - only calculate if speed > 0
   const avgPace = a.average_speed && a.average_speed > 0 ? Math.round((1000 / a.average_speed / 60) * 100) / 100 : null;
   const maxPace = a.max_speed && a.max_speed > 0 ? Math.round((1000 / a.max_speed / 60) * 100) / 100 : null;
@@ -106,12 +153,30 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
   const elev = a.total_elevation_gain != null ? Math.round(a.total_elevation_gain) : null;
   const cals = a.calories != null ? Math.round(a.calories) : null;
 
+  // Debug basic metrics
+  console.log(`📊 Basic metrics for ${a.name}:`, {
+    hr: a.average_heartrate,
+    maxHr: a.max_heartrate,
+    calories: a.calories,
+    cadence: a.average_cadence,
+    maxCadence: a.max_cadence,
+    power: a.average_watts,
+    maxPower: a.max_watts
+  });
+
   // Process GPS data for Mapbox rendering
-  let gpsTrack: string | null = null;
+  let gpsTrack: [number, number][] | null = null;
   if (a.map?.summary_polyline || a.map?.polyline) {
-    // Store the polyline string for Mapbox to decode
-    gpsTrack = (a.map.summary_polyline || a.map.polyline) || null;
-    console.log(`🗺️ GPS data found: ${gpsTrack ? gpsTrack.substring(0, 50) + '...' : 'null'}`);
+    const polyline = a.map.summary_polyline || a.map.polyline;
+    if (polyline) {
+      try {
+        gpsTrack = decodePolyline(polyline);
+        console.log(`🗺️ GPS data decoded: ${gpsTrack.length} coordinates`);
+      } catch (err) {
+        console.log(`⚠️ Failed to decode polyline: ${err}`);
+        gpsTrack = null;
+      }
+    }
   }
 
   return {
@@ -244,7 +309,7 @@ Deno.serve(async (req) => {
           
           if (detailRes.ok) {
             detailedActivity = await detailRes.json();
-            console.log(`📊 Detailed data for ${a.name}: HR=${detailedActivity.average_heartrate}, Calories=${detailedActivity.calories}`);
+            console.log(`📊 Detailed data for ${a.name}: HR=${detailedActivity.average_heartrate}, Calories=${detailedActivity.calories}, Cadence=${detailedActivity.average_cadence}`);
           }
         } catch (err) {
           console.log(`⚠️ Could not fetch detailed data for activity ${a.id}: ${err}`);

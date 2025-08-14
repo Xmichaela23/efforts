@@ -498,7 +498,7 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Heart Rate',
-          value: workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate ? safeNumber(workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate) : 'N/A',
+          value: workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A',
           unit: 'bpm'
         },
         {
@@ -526,7 +526,7 @@ const formatPace = (paceValue: any): string => {
       },
       {
         label: 'Heart Rate',
-        value: workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate ? safeNumber(workoutData.metrics?.avg_heart_rate || workoutData.avg_heart_rate) : 'N/A',
+        value: workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A',
         unit: 'bpm'
       },
       {
@@ -552,7 +552,7 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Cadence',
-          value: workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A',
+          value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
           unit: 'spm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -572,7 +572,7 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Cadence',
-          value: workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A',
+          value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
           unit: 'rpm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -587,7 +587,7 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Cadence',
-          value: workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A',
+          value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
           unit: 'spm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -635,7 +635,7 @@ const formatPace = (paceValue: any): string => {
      },
      {
        label: 'Max Cadence',
-       value: workoutData.metrics?.max_cadence || workoutData.max_cadence ? safeNumber(workoutData.metrics?.max_cadence || workoutData.max_cadence) : 'N/A',
+       value: workoutData.max_cadence ? safeNumber(workoutData.max_cadence) : 'N/A',
        unit: isRun ? 'spm' : 'rpm'
      }
    ];
@@ -926,7 +926,7 @@ const formatPace = (paceValue: any): string => {
        
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.metrics?.avg_heart_rate ? safeNumber(workoutData.metrics.avg_heart_rate) : 'N/A'}
+           {workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A'}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Avg HR</div>
@@ -995,7 +995,7 @@ const formatPace = (paceValue: any): string => {
        ) : (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.avg_cadence || workoutData.avg_cadence ? safeNumber(workoutData.metrics?.avg_cadence || workoutData.avg_cadence) : 'N/A'}
+             {workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A'}
            </div>
            <div className="text-xs text-[#666666] font-normal">
              <div className="font-medium">Avg Cadence</div>
