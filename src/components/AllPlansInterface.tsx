@@ -1037,10 +1037,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   onDelete={async () => {
                     if (confirm('Delete this planned workout? This action cannot be undone.')) {
                       try {
-                        // TODO: Import and use deletePlannedWorkout function
-                        console.log('Delete planned workout:', workout.id);
-                        // Refresh the planned workouts list
-                        // await deletePlannedWorkout(workout.id);
+                        await deletePlannedWorkout(workout.id);
+                        // The hook will automatically update the local state
                       } catch (error) {
                         console.error('Error deleting planned workout:', error);
                       }
