@@ -293,8 +293,8 @@ export const useWorkouts = () => {
                 calories: activity.calories,
                 distance: activity.distance_meters ? activity.distance_meters / 1000 : undefined,
                 timestamp: activity.start_time,
-                start_position_lat: activity.start_position_lat,
-                start_position_long: activity.start_position_long,
+                start_position_lat: activity.start_position_lat || (activity.gps_track?.[0]?.latitude || null),
+                start_position_long: activity.start_position_long || (activity.gps_track?.[0]?.longitude || null),
                 friendly_name: `Garmin ${activity.garmin_activity_id}`,
                 moving_time: activity.duration_seconds, // FIXED: Use duration_seconds
                 elapsed_time: activity.duration_seconds,
