@@ -471,13 +471,8 @@ const formatPace = (paceValue: any): string => {
      return 'Unknown';
    }
    
-   // Los Angeles area - FIXED BOUNDS
-   if (latNum >= 33.7 && latNum <= 34.5 && lngNum >= -118.9 && lngNum <= -117.9) {
-     console.log('🔍 getCityFromCoordinates returning Los Angeles');
-     return 'Los Angeles';
-   }
-   
-   console.log('🔍 getCityFromCoordinates returning Unknown - coords not in LA area');
+   // Location detection - coordinates will show actual location
+   console.log('🔍 getCityFromCoordinates returning Unknown - no location detection implemented');
    return 'Unknown';
  };
 

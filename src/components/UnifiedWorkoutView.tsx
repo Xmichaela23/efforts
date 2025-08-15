@@ -106,22 +106,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       const latNum = Number(lat);
       const lngNum = Number(lng);
       
-      // Los Angeles area
-      if (latNum >= 33.7 && latNum <= 34.5 && lngNum >= -118.9 && lngNum <= -117.9) {
-        location = 'Los Angeles';
-      }
-      // Pasadena area (more specific)  
-      else if (latNum >= 34.1 && latNum <= 34.2 && lngNum >= -118.2 && lngNum <= -118.0) {
-        location = 'Pasadena';
-      }
-      // San Francisco Bay Area
-      else if (latNum >= 37.4 && latNum <= 37.8 && lngNum >= -122.5 && lngNum <= -122.0) {
-        location = 'San Francisco';
-      }
-      // Add more locations as needed
-      else {
-        location = 'Unknown Location';
-      }
+      // Location detection removed - coordinates will show actual location
+      location = 'Unknown Location';
     }
     
     // Format activity type nicely - use actual detected type, not stored type

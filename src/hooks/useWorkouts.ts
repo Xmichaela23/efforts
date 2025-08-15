@@ -148,18 +148,7 @@ export const useWorkouts = () => {
     if (!lat || !lng) return null;
     
     let location = '';
-    // Los Angeles area
-    if (lat >= 33.7 && lat <= 34.5 && lng >= -118.9 && lng <= -117.9) {
-      location = 'Los Angeles';
-    }
-    // Pasadena area (more specific)  
-    else if (lat >= 34.1 && lat <= 34.2 && lng >= -118.2 && lng <= -118.0) {
-      location = 'Pasadena';
-    }
-    // San Francisco Bay Area
-    else if (lat >= 37.4 && lat <= 37.8 && lng >= -122.5 && lng <= -122.0) {
-      location = 'San Francisco';
-    }
+    // Location detection removed - coordinates will show actual location
     
     if (location) {
       const formattedType = activityType === 'ride' ? 'Cycling' : 

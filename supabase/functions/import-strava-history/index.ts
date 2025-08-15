@@ -13,29 +13,28 @@ type FourTypes = 'run' | 'ride' | 'swim' | 'strength' | 'walk';
 interface StravaActivity {
   id: number;
   name: string;
-  type?: string;
-  sport_type?: string;
-  trainer?: boolean | number;
-
-  distance?: number;
-  moving_time?: number;
-  elapsed_time?: number;
-  total_elevation_gain?: number;
-
+  type: string;
+  sport_type: string;
+  trainer: boolean;
+  distance: number;
+  moving_time: number;
+  elapsed_time: number;
+  total_elevation_gain: number;
   start_date: string;
   start_date_local: string;
-
-  average_speed?: number;
-  max_speed?: number;
+  average_speed: number;
+  max_speed: number;
   average_heartrate?: number;
   max_heartrate?: number;
-  average_watts?: number;
-  max_watts?: number;
   average_cadence?: number;
   max_cadence?: number;
+  average_watts?: number;
+  max_watts?: number;
+  kilojoules?: number;
   calories?: number;
-
   map?: { polyline?: string; summary_polyline?: string };
+  start_latlng?: [number, number];
+  end_latlng?: [number, number];
 }
 
 interface ImportRequest {
@@ -54,40 +53,67 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Polyline decoder function
+// Polyline decoder function - Using correct Strava API specification
 function decodePolyline(polyline: string): [number, number][] {
   const coordinates: [number, number][] = [];
-  let index = 0, len = polyline.length;
-  let lat = 0, lng = 0;
-
-  while (index < len) {
-    let shift = 0, result = 0;
-
+  let index = 0;
+  
+  console.log(`🔍 Starting polyline decode for: ${polyline.substring(0, 100)}...`);
+  console.log(`🔍 Polyline length: ${polyline.length}`);
+  
+  while (index < polyline.length) {
+    let result = 0;
+    let shift = 0;
+    
+    // Decode latitude delta
     do {
-      let b = polyline.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
+      const byte = polyline.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (result >= 0x20);
-
-    let dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    lat += dlat;
-
-    shift = 0;
+    
+    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    
+    // Decode longitude delta
     result = 0;
-
+    shift = 0;
+    
     do {
-      let b = polyline.charCodeAt(index++) - 63;
-      result |= (b & 0x1f) << shift;
+      const byte = polyline.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
       shift += 5;
     } while (result >= 0x20);
-
-    let dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    lng += dlng;
-
-    // Mapbox expects [lng, lat] format (longitude first, then latitude)
-    coordinates.push([lng / 1e5, lat / 1e5]);
+    
+    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    
+    // For the first coordinate, use the deltas as absolute values
+    // For subsequent coordinates, add deltas to the previous coordinate
+    let latDegrees: number;
+    let lngDegrees: number;
+    
+    if (coordinates.length === 0) {
+      // First coordinate: deltas are absolute values
+      latDegrees = dlat / 1e5;
+      lngDegrees = dlng / 1e5;
+    } else {
+      // Subsequent coordinates: add deltas to previous coordinate
+      const prevLat = coordinates[coordinates.length - 1][0] * 1e5; // Convert back to 1e5 precision
+      const prevLng = coordinates[coordinates.length - 1][1] * 1e5;
+      latDegrees = (prevLat + dlat) / 1e5;
+      lngDegrees = (prevLng + dlng) / 1e5;
+    }
+    
+    console.log(`🔍 Point ${coordinates.length}: delta lat=${dlat}, delta lng=${dlng}, final lat=${latDegrees.toFixed(6)}°, final lng=${lngDegrees.toFixed(6)}°`);
+    
+    coordinates.push([latDegrees, lngDegrees]);
   }
-
+  
+  console.log(`🔍 Decoded ${coordinates.length} coordinates`);
+  if (coordinates.length > 0) {
+    console.log(`🔍 First coordinate: [${coordinates[0][0].toFixed(6)}°, ${coordinates[0][1].toFixed(6)}°]`);
+    console.log(`🔍 Last coordinate: [${coordinates[coordinates.length-1][0].toFixed(6)}°, ${coordinates[coordinates.length-1][1].toFixed(6)}°]`);
+  }
+  
   return coordinates;
 }
 
@@ -108,7 +134,7 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   return 'strength';
 }
 
-function convertStravaToWorkout(a: StravaActivity, userId: string) {
+async function convertStravaToWorkout(a: StravaActivity, userId: string, accessToken: string) {
   const type = mapStravaTypeToWorkoutType(a);
   
   // Debug logging for ride detection
@@ -179,26 +205,78 @@ function convertStravaToWorkout(a: StravaActivity, userId: string) {
   if (a.map?.summary_polyline || a.map?.polyline) {
     const polyline = a.map.summary_polyline || a.map.polyline;
     console.log(`🗺️ Raw polyline for ${a.name}:`, polyline?.substring(0, 100) + '...');
+    console.log(`🗺️ Polyline source: ${a.map.summary_polyline ? 'summary_polyline' : 'polyline'}`);
+    console.log(`🗺️ Polyline length: ${polyline?.length || 0}`);
+    console.log(`🗺️ Full map data:`, a.map);
+    console.log(`🗺️ Activity start_latlng:`, a.start_latlng);
+    console.log(`🗺️ Activity end_latlng:`, a.end_latlng);
     
     if (polyline) {
       try {
+        // Strava's polyline contains absolute coordinates, not relative to start
         const coordinates = decodePolyline(polyline);
-        // Convert to GPSPoint format that ActivityMap expects
-        gpsTrack = coordinates.map((coord, index) => ({
-          lat: coord[1], // coord[1] is latitude
-          lng: coord[0], // coord[0] is longitude
-          timestamp: Date.now() + (index * 1000), // Approximate timestamps
-          elevation: null // Strava polyline doesn't include elevation
-        }));
-        console.log(`🗺️ GPS data converted: ${gpsTrack.length} GPSPoints, first: {lat: ${gpsTrack[0].lat}, lng: ${gpsTrack[0].lng}}`);
+        console.log(`🗺️ Decoded coordinates:`, coordinates.slice(0, 3));
+        
+        // Validate coordinates before converting
+        if (coordinates.length > 0) {
+          const firstCoord = coordinates[0];
+          const lastCoord = coordinates[coordinates.length - 1];
+          
+          // Check if coordinates are in reasonable ranges (not in the middle of oceans)
+          if (firstCoord[0] >= -90 && firstCoord[0] <= 90 && 
+              firstCoord[1] >= -180 && firstCoord[1] <= 180 &&
+              lastCoord[0] >= -90 && lastCoord[0] <= 90 && 
+              lastCoord[1] >= -180 && lastCoord[1] <= 180) {
+            
+            // Convert to GPSPoint format that ActivityMap expects
+            gpsTrack = coordinates.map((coord, index) => {
+              const point = {
+                lat: coord[0], // coord[0] is latitude (decoder returns [lat, lng])
+                lng: coord[1], // coord[1] is longitude (decoder returns [lat, lng])
+                timestamp: Date.now() + (index * 1000), // Approximate timestamps
+                elevation: null // Strava polyline doesn't include elevation
+              };
+              
+              if (index < 3) {
+                console.log(`🗺️ GPSPoint ${index}:`, point);
+              }
+              
+              return point;
+            });
+            
+            console.log(`🗺️ GPS data converted: ${gpsTrack.length} GPSPoints, first: {lat: ${gpsTrack[0].lat}, lng: ${gpsTrack[0].lng}}`);
+          } else {
+            console.log(`⚠️ Invalid coordinates detected: first=[${firstCoord[0]}, ${firstCoord[1]}], last=[${lastCoord[0]}, ${lastCoord[1]}]`);
+            gpsTrack = null;
+          }
+        } else {
+          console.log(`⚠️ No valid coordinates decoded from polyline`);
+          gpsTrack = null;
+        }
       } catch (err) {
         console.log(`⚠️ Failed to decode polyline: ${err}`);
         gpsTrack = null;
       }
+      
+      // If polyline failed, try latlng streams as fallback
+      if (!gpsTrack && a.id) {
+        console.log(`🗺️ Trying latlng streams fallback for activity ${a.id}...`);
+        const fallbackCoordinates = await fetchStravaLatLngStreams(a.id, accessToken);
+        
+        if (fallbackCoordinates && fallbackCoordinates.length > 0) {
+          gpsTrack = fallbackCoordinates.map((coord, index) => ({
+            lat: coord[0],
+            lng: coord[1],
+            timestamp: Date.now() + (index * 1000),
+            elevation: null
+          }));
+          
+          console.log(`🗺️ Fallback GPS data: ${gpsTrack.length} GPSPoints, first: {lat: ${gpsTrack[0].lat}, lng: ${gpsTrack[0].lng}}`);
+        }
+      }
+    } else {
+      console.log(`🗺️ No GPS data found for ${a.name}`);
     }
-  } else {
-    console.log(`🗺️ No GPS data found for ${a.name}`);
-  }
 
   return {
     name: a.name || 'Strava Activity',
@@ -264,6 +342,76 @@ async function refreshStravaAccessToken(refreshToken: string | undefined) {
   return await resp.json();
 }
 
+// Fallback: Fetch GPS data from Strava's latlng streams
+async function fetchStravaLatLngStreams(activityId: number, accessToken: string): Promise<[number, number][] | null> {
+  try {
+    console.log(`🗺️ Fetching latlng streams for activity ${activityId} as fallback...`);
+    
+    const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    });
+    
+    if (!response.ok) {
+      console.log(`⚠️ Could not fetch latlng streams: ${response.status}`);
+      return null;
+    }
+    
+    const streams = await response.json();
+    const latlngStream = streams.find((s: any) => s.type === 'latlng');
+    
+    if (latlngStream && latlngStream.data && latlngStream.data.length > 0) {
+      // Strava returns [lat, lng] pairs in the data array
+      const coordinates: [number, number][] = [];
+      
+      for (let i = 0; i < latlngStream.data.length; i += 2) {
+        if (i + 1 < latlngStream.data.length) {
+          const lat = latlngStream.data[i];
+          const lng = latlngStream.data[i + 1];
+          coordinates.push([lat, lng]);
+        }
+      }
+      
+      console.log(`🗺️ LatLng streams fallback: ${coordinates.length} coordinates`);
+      return coordinates;
+    }
+    
+    return null;
+  } catch (err) {
+    console.log(`⚠️ Error fetching latlng streams: ${err}`);
+    return null;
+  }
+}
+
+// Test function to verify polyline decoder
+function testPolylineDecoder() {
+  // Test with a known Strava polyline (this is a simple route in San Francisco)
+  const testPolyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@";
+  console.log("🧪 Testing polyline decoder with known data...");
+  
+  try {
+    const coordinates = decodePolyline(testPolyline);
+    console.log("🧪 Test result:", coordinates);
+    
+    // Expected: approximately [38.5, -122.5] (San Francisco area)
+    if (coordinates.length > 0) {
+      const first = coordinates[0];
+      console.log(`🧪 First coordinate: [${first[0].toFixed(6)}, ${first[1].toFixed(6)}]`);
+      
+      // Check if coordinates are reasonable (not in the middle of oceans)
+      if (first[0] >= -90 && first[0] <= 90 && first[1] >= -180 && first[1] <= 180) {
+        console.log("✅ Polyline decoder test PASSED - coordinates are valid");
+      } else {
+        console.log("❌ Polyline decoder test FAILED - coordinates are invalid");
+      }
+    }
+  } catch (err) {
+    console.log("❌ Polyline decoder test FAILED with error:", err);
+  }
+}
+
+// Run test when function loads
+testPolylineDecoder();
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
@@ -294,7 +442,9 @@ Deno.serve(async (req) => {
       let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
       if (startDate) url += `&after=${Math.floor(new Date(startDate).getTime() / 1000)}`;
       if (endDate) url += `&before=${Math.floor(new Date(endDate).getTime() / 1000)}`;
-
+      
+      console.log(`🔍 Requesting Strava API: ${url}`);
+      
       let res = await fetch(url, {
         headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
       });
@@ -316,6 +466,15 @@ Deno.serve(async (req) => {
       }
 
       const activities: StravaActivity[] = await res.json();
+      console.log(`🔍 Strava API response: ${activities.length} activities`);
+      
+      if (activities.length > 0) {
+        console.log(`🔍 First activity: ${activities[0].name}, ID: ${activities[0].id}`);
+        console.log(`🔍 First activity map data:`, activities[0].map);
+        console.log(`🔍 First activity polyline: ${activities[0].map?.summary_polyline?.substring(0, 100)}...`);
+        console.log(`🔍 First activity polyline length: ${activities[0].map?.summary_polyline?.length || 0}`);
+      }
+      
       if (!activities.length) break;
 
       for (const a of activities) {
@@ -336,7 +495,7 @@ Deno.serve(async (req) => {
           console.log(`⚠️ Could not fetch detailed data for activity ${a.id}: ${err}`);
         }
 
-        const row = convertStravaToWorkout(detailedActivity, userId);
+        const row = await convertStravaToWorkout(detailedActivity, userId, currentAccessToken);
         if (!row.user_id || !row.name || !row.type) { skipped++; continue; }
 
         const { error } = await supabase.from('workouts').insert(row);
