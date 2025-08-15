@@ -143,12 +143,72 @@ export const useWorkouts = () => {
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
 
+  // Cache for reverse geocoding results to avoid repeated API calls
+  const geocodingCache = new Map<string, string>();
+  
+  // Rate limiting for reverse geocoding (max 1 request per second)
+  let lastGeocodingRequest = 0;
+
   // Generate location-based title from GPS coordinates
-  const generateLocationTitle = (lat: number | null, lng: number | null, activityType: string) => {
+  const generateLocationTitle = async (lat: number | null, lng: number | null, activityType: string) => {
     if (!lat || !lng) return null;
     
-    // For now, use coordinates as location until we implement reverse geocoding
-    const location = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    // Create cache key from coordinates (rounded to 3 decimal places for nearby locations)
+    const cacheKey = `${lat.toFixed(3)},${lng.toFixed(3)}`;
+    
+    // Check cache first
+    if (geocodingCache.has(cacheKey)) {
+      const cachedLocation = geocodingCache.get(cacheKey);
+      const formattedType = activityType === 'ride' ? 'Cycling' : 
+                           activityType === 'run' ? 'Running' :
+                           activityType === 'walk' ? 'Walking' :
+                           activityType === 'swim' ? 'Swimming' :
+                           activityType === 'strength' ? 'Strength Training' :
+                           activityType.charAt(0).toUpperCase() + activityType.slice(1);
+      return `${cachedLocation} ${formattedType}`;
+    }
+    
+    // Try to get city name from coordinates using reverse geocoding
+    let location = 'Unknown Location';
+    try {
+      // Rate limiting: wait if we made a request too recently
+      const now = Date.now();
+      if (now - lastGeocodingRequest < 1000) { // 1 second delay
+        await new Promise(resolve => setTimeout(resolve, 1000 - (now - lastGeocodingRequest)));
+      }
+      lastGeocodingRequest = Date.now();
+      
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=10&addressdetails=1`
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Extract city name from address components
+        const address = data.address;
+        if (address) {
+          // Try different address components in order of preference
+          location = address.city || 
+                    address.town || 
+                    address.village || 
+                    address.county || 
+                    address.state || 
+                    address.country ||
+                    'Unknown Location';
+        }
+      }
+      
+      // Cache the result
+      geocodingCache.set(cacheKey, location);
+      
+    } catch (error) {
+      console.log('⚠️ Reverse geocoding failed, using coordinates:', error);
+      // Fallback to coordinates if geocoding fails
+      location = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+      // Cache the fallback result too
+      geocodingCache.set(cacheKey, location);
+    }
     
     const formattedType = activityType === 'ride' ? 'Cycling' : 
                          activityType === 'run' ? 'Running' :
@@ -235,7 +295,7 @@ export const useWorkouts = () => {
             console.log(`✅ Found ${garminActivities.length} Garmin activities`);
             
             // Transform Garmin activities to workout format
-            garminWorkouts = garminActivities.map(activity => {
+            garminWorkouts = await Promise.all(garminActivities.map(async (activity) => {
               // Map activity type from Garmin to our workout types
               const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" | "walk" => {
                 const type = activityType?.toLowerCase() || '';
@@ -251,7 +311,7 @@ export const useWorkouts = () => {
               const activityDate = activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0];
               
               // Generate location-based title using the existing function
-              const locationTitle = generateLocationTitle(
+              const locationTitle = await generateLocationTitle(
                 activity.starting_latitude, 
                 activity.starting_longitude, 
                 workoutType
@@ -376,7 +436,7 @@ export const useWorkouts = () => {
                   pool_length: activity.pool_length
                 }
               };
-            });
+            }));
           }
         }
       } catch (garminError) {
@@ -681,7 +741,7 @@ export const useWorkouts = () => {
 
           // Transform garmin_activities data to workout format
           const workoutType = getWorkoutType(activity.activity_type);
-          const locationTitle = generateLocationTitle(
+          const locationTitle = await generateLocationTitle(
             activity.starting_latitude, 
             activity.starting_longitude, 
             workoutType
