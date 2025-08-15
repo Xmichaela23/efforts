@@ -74,12 +74,12 @@ function decodePolyline(encoded: string, precision = 5): [number, number][] {
   let lat = 0;
   let lng = 0;
   const factor = Math.pow(10, precision);
-
+  
   while (index < encoded.length) {
     let result = 0;
     let shift = 0;
     let byte: number;
-
+    
     // latitude
     do {
       byte = encoded.charCodeAt(index++) - 63;
@@ -88,7 +88,7 @@ function decodePolyline(encoded: string, precision = 5): [number, number][] {
     } while (byte >= 0x20);
     const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
     lat += deltaLat;
-
+    
     // longitude
     result = 0;
     shift = 0;
@@ -102,7 +102,7 @@ function decodePolyline(encoded: string, precision = 5): [number, number][] {
 
     coordinates.push([lat / factor, lng / factor]);
   }
-
+  
   return coordinates;
 }
 
@@ -198,7 +198,7 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   return 'strength';
 }
 
-async function convertStravaToWorkout(a: StravaActivity, userId: string, accessToken: string) {
+async function convertStravaToWorkout(a: StravaActivity, userId: string, accessToken: string, importMode: 'historical' | 'recent') {
   const type = mapStravaTypeToWorkoutType(a);
   
   // Debug logging for ride detection
@@ -295,7 +295,7 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     }
   }
 
-  // Fallback to streams or enrich with altitude/time
+  // Fallback to streams or enrich with altitude/time (enabled for all imports)
   if (!gpsTrack && a.id) {
     const streams = await fetchStravaStreams(a.id, accessToken);
     if (streams?.latlng && streams.latlng.length > 0) {
@@ -421,7 +421,6 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     elapsed_time: elapsed,
     moving_time: duration,
     distance,
-    distance_meters: a.distance ?? null,
     avg_speed: avgSpeed,
     max_speed: maxSpeed,
     avg_pace: avgPace,
@@ -481,12 +480,49 @@ Deno.serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
 
   try {
-    const { userId, accessToken, refreshToken, maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
-    if (!userId || !accessToken) {
-      return new Response('Missing required fields', { status: 400, headers: cors });
+    const { userId, accessToken, refreshToken, importType = 'historical', maxActivities = 200, startDate, endDate }: ImportRequest = await req.json();
+    if (!userId) {
+      return new Response('Missing required userId', { status: 400, headers: cors });
     }
 
-    let currentAccessToken = accessToken;
+    // Fetch stored connection tokens so the client doesn't need to pass them
+    const { data: conn } = await supabase
+      .from('device_connections')
+      .select('access_token, refresh_token, expires_at')
+      .eq('user_id', userId)
+      .eq('provider', 'strava')
+      .single();
+
+    let currentAccessToken = accessToken || conn?.access_token || '';
+    let currentRefreshToken = refreshToken || conn?.refresh_token || '';
+    
+    if (!currentAccessToken && !currentRefreshToken) {
+      return new Response('Missing tokens', { status: 400, headers: cors });
+    }
+
+    // If token is near expiry, refresh proactively
+    const expiresAtMs = conn?.expires_at ? new Date(conn.expires_at).getTime() : 0;
+    if (!currentAccessToken || (expiresAtMs && Date.now() > (expiresAtMs - 60_000))) {
+      const refreshed = await refreshStravaAccessToken(currentRefreshToken);
+      if (refreshed?.access_token) {
+        currentAccessToken = refreshed.access_token;
+        currentRefreshToken = refreshed.refresh_token ?? currentRefreshToken;
+        try {
+          await supabase
+            .from('device_connections')
+            .update({
+              access_token: refreshed.access_token,
+              refresh_token: currentRefreshToken,
+              expires_at: refreshed.expires_at ? new Date(refreshed.expires_at * 1000).toISOString() : null,
+              last_sync: new Date().toISOString(),
+            })
+            .eq('user_id', userId)
+            .eq('provider', 'strava');
+        } catch (_) {}
+      }
+    }
+
+    const mode = importType || 'historical';
 
     const existingRes = await supabase
       .from('workouts')
@@ -514,10 +550,26 @@ Deno.serve(async (req) => {
       });
 
       if (res.status === 401) {
-        const refreshed = await refreshStravaAccessToken(refreshToken);
+        const refreshed = await refreshStravaAccessToken(currentRefreshToken);
         if (refreshed?.access_token) {
           currentAccessToken = refreshed.access_token;
+          currentRefreshToken = refreshed.refresh_token ?? currentRefreshToken;
           updatedTokens = refreshed;
+          // Persist rotated tokens immediately
+          try {
+            await supabase
+              .from('device_connections')
+              .update({
+                access_token: refreshed.access_token,
+                refresh_token: currentRefreshToken ?? null,
+                expires_at: refreshed.expires_at ? new Date(refreshed.expires_at * 1000).toISOString() : null,
+                last_sync: new Date().toISOString(),
+              })
+              .eq('user_id', userId)
+              .eq('provider', 'strava');
+          } catch (_) {
+            // best-effort; continue
+          }
           res = await fetch(url, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
@@ -559,7 +611,7 @@ Deno.serve(async (req) => {
           console.log(`⚠️ Could not fetch detailed data for activity ${a.id}: ${err}`);
         }
 
-        const row = await convertStravaToWorkout(detailedActivity, userId, currentAccessToken);
+        const row = await convertStravaToWorkout(detailedActivity, userId, currentAccessToken, mode);
         if (!row.user_id || !row.name || !row.type) { skipped++; continue; }
 
         const { error } = await supabase.from('workouts').insert(row);
@@ -570,8 +622,8 @@ Deno.serve(async (req) => {
 
         if (maxActivities && imported >= maxActivities) break;
         
-        // Rate limiting - Strava allows 100 requests per 15 minutes
-        await new Promise(r => setTimeout(r, 200));
+        // Rate limiting - gentle delay to reduce 429s
+        await new Promise(r => setTimeout(r, 450));
       }
 
       if (activities.length < perPage || (maxActivities && imported >= maxActivities)) break;
