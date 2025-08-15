@@ -270,7 +270,15 @@ const Connections: React.FC = () => {
           throw new Error('User not authenticated');
         }
         
-        // Call Supabase Edge Function to import historical data (backend will load tokens)
+        // Use localStorage token for Strava imports
+        const accessToken = localStorage.getItem('strava_access_token');
+        const refreshToken = localStorage.getItem('strava_refresh_token');
+        const isConnected = localStorage.getItem('strava_connected') === 'true';
+        if (!isConnected || !accessToken) {
+          throw new Error('Strava is not connected on this device');
+        }
+
+        // Call Supabase Edge Function to import historical data
         const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/import-strava-history', {
           method: 'POST',
                   headers: { 
@@ -279,9 +287,8 @@ const Connections: React.FC = () => {
         },
         body: JSON.stringify({
           userId: authUser.id,
-          // Pass tokens if present (backend also falls back to DB)
-          accessToken: localStorage.getItem('strava_access_token') || undefined,
-          refreshToken: localStorage.getItem('strava_refresh_token') || undefined,
+          accessToken,
+          refreshToken,
           importType: 'historical',
           startDate,
           endDate
