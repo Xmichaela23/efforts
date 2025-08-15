@@ -1,7 +1,8 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
-import { ChevronDown, ArrowRight } from 'lucide-react';
+import { ChevronDown, ArrowRight, Calendar } from 'lucide-react';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface Plan {
   id: string;
@@ -22,6 +23,8 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
   currentPlans = [],
   completedPlans = []
 }) => {
+  const { plannedWorkouts } = usePlannedWorkouts();
+  
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -65,6 +68,29 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         className="bg-white border border-gray-200 shadow-xl"
         style={{borderRadius: '12px', padding: '8px', minWidth: '200px'}}
       >
+        {/* Planned Workouts */}
+        {plannedWorkouts.length > 0 && (
+          <>
+            <DropdownMenuItem
+              onClick={handleAllPlans}
+              className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+              style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+            >
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-blue-600" />
+                <span>Planned Workouts</span>
+              </div>
+              <span className="text-xs text-gray-500 bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                {plannedWorkouts.length}
+              </span>
+            </DropdownMenuItem>
+            
+            {(currentPlans.length > 0 || completedPlans.length > 0) && (
+              <DropdownMenuSeparator className="my-2" />
+            )}
+          </>
+        )}
+
         {/* Current Plans */}
         {currentPlans.length > 0 && (
           <>

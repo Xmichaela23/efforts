@@ -5,6 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import PlannedWorkoutView from './PlannedWorkoutView';
 
 interface Plan {
   id: string;
@@ -33,6 +35,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   completedPlans = [],
   detailedPlans = {}
 }) => {
+  const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>('list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
@@ -961,6 +964,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           <ArrowLeft className="h-4 w-4" />
           Dashboard
         </button>
+        
+        {/* Quick Actions */}
+        <div className="flex gap-2">
+          {plannedWorkouts.length > 0 && (
+            <>
+              <Button
+                onClick={() => onBuildWorkout('run', 'plans')}
+                variant="outline"
+                size="sm"
+                className="text-xs"
+              >
+                + Add Workout
+              </Button>
+              <Button
+                onClick={() => window.location.href = '/demo'}
+                variant="outline"
+                size="sm"
+                className="text-xs"
+              >
+                View All ({plannedWorkouts.length})
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       {currentPlans.length > 0 && (
@@ -996,10 +1023,35 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
       )}
 
-      {currentPlans.length === 0 && completedPlans.length === 0 && (
+      {/* Planned Workouts Section */}
+      {plannedWorkouts.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-medium text-gray-900">Planned Workouts</h2>
+          <div className="space-y-2">
+            {plannedWorkouts.slice(0, 5).map((workout) => (
+              <div key={workout.id} className="border-l-2 border-blue-200 pl-4 py-2">
+                <PlannedWorkoutView 
+                  workout={workout}
+                  compact={true}
+                  showHeader={false}
+                />
+              </div>
+            ))}
+            {plannedWorkouts.length > 5 && (
+              <div className="text-center py-2">
+                <span className="text-sm text-gray-500">
+                  +{plannedWorkouts.length - 5} more planned workouts
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {currentPlans.length === 0 && completedPlans.length === 0 && plannedWorkouts.length === 0 && (
         <div className="text-center py-8">
           <h2 className="text-lg font-medium text-gray-900 mb-2">No Plans Yet</h2>
-          <p className="text-gray-600 mb-4">Use "Build me a plan" in the Builder tab to create your first training plan</p>
+          <p className="text-gray-600 mb-4">Use "Build me a plan" in the Builder tab to create your first training plan, or create individual workouts in the Builder tab</p>
         </div>
       )}
     </div>

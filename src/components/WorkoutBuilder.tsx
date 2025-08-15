@@ -10,6 +10,8 @@ import RideIntervalBuilder, { RideInterval } from './RideIntervalBuilder';
 import SwimIntervalBuilder, { SwimInterval } from './SwimIntervalBuilder';
 import StrengthExerciseBuilder, { StrengthExercise } from './StrengthExerciseBuilder';
 import { useAppContext } from '@/contexts/AppContext';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { PlannedWorkout } from '@/components/PlannedWorkoutView';
 
 interface WorkoutBuilderProps {
   onClose: () => void;
@@ -22,7 +24,8 @@ interface WorkoutBuilderProps {
 }
 
 export default function WorkoutBuilder({ onClose, initialType, existingWorkout, initialDate, sourceContext, onNavigateToPlans, onOpenPlanBuilder }: WorkoutBuilderProps) {
-  const { addWorkout, updateWorkout, deleteWorkout, useImperial, toggleUnits } = useAppContext();
+  const { useImperial, toggleUnits } = useAppContext();
+  const { addPlannedWorkout, updatePlannedWorkout, deletePlannedWorkout } = usePlannedWorkouts();
   const [showSaveOptions, setShowSaveOptions] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
   
@@ -184,6 +187,22 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     e.preventDefault();
     e.stopPropagation();
 
+    // If we have an existing workout, ask if they want to delete it
+    if (currentWorkout && currentWorkout.id) {
+      if (!confirm('Delete this planned workout? This action cannot be undone.')) return;
+      
+      try {
+        await deletePlannedWorkout(currentWorkout.id);
+        onClose(); // Close the builder after deletion
+        return;
+      } catch (error) {
+        console.error('Error deleting workout:', error);
+        alert('Error deleting workout. Please try again.');
+        return;
+      }
+    }
+
+    // Otherwise, just clear the form
     if (!confirm('Clear all workout data and start fresh?')) return;
 
     setFormData({
@@ -308,23 +327,36 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         `${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} - ${formData.date}`;
 
       const workoutData = {
-        ...formData,
         name: workoutTitle,
+        type: formData.type as 'run' | 'ride' | 'swim' | 'strength' | 'walk',
+        date: formData.date,
         description: formData.description || generateWorkoutDescription(),
         duration: calculateTotalTime(),
         intervals: formData.type === 'run' ? runIntervals :
                   formData.type === 'ride' ? rideIntervals :
-                  formData.type === 'swim' ? swimIntervals : undefined,
-        strength_exercises: formData.type === 'strength' ? strengthExercises : undefined,
-        workout_status: 'planned'
+                  formData.type === 'swim' ? swimIntervals : [],
+        strength_exercises: formData.type === 'strength' ? strengthExercises : [],
+        workout_status: 'planned' as const,
+        source: 'manual' as const
       };
 
-      let savedWorkout;
+      let savedWorkout: PlannedWorkout;
 
       if (currentWorkout && currentWorkout.id) {
-        savedWorkout = await updateWorkout(currentWorkout.id, workoutData);
+        // For updates, we need to handle the existing workout data structure
+        const updateData = {
+          name: workoutData.name,
+          type: workoutData.type,
+          date: workoutData.date,
+          description: workoutData.description,
+          duration: workoutData.duration,
+          intervals: workoutData.intervals,
+          strength_exercises: workoutData.strength_exercises,
+          workout_status: workoutData.workout_status
+        };
+        savedWorkout = await updatePlannedWorkout(currentWorkout.id, updateData);
       } else {
-        savedWorkout = await addWorkout(workoutData);
+        savedWorkout = await addPlannedWorkout(workoutData);
       }
 
       setCurrentWorkout(savedWorkout);
@@ -345,7 +377,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
       {showSaveOptions && (
         <div className="fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-100 text-gray-700 px-6 py-3 z-50 flex items-center gap-4">
           <Check className="h-5 w-5" />
-          <span>{currentWorkout ? 'effort Updated' : 'effort saved'}</span>
+          <span>{currentWorkout ? 'Planned workout updated' : 'Planned workout saved'}</span>
         </div>
       )}
 
@@ -514,7 +546,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               fontSize: '15px'
             }}
           >
-            Save
+            Save Planned Workout
           </Button>
         </div>
         

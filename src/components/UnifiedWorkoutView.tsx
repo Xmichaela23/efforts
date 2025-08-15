@@ -5,6 +5,7 @@ import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
 import CompletedTab from './CompletedTab';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
+import PlannedWorkoutView from './PlannedWorkoutView';
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -177,51 +178,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex-1 overflow-auto">
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-4">
-            <div className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">Planned Workout</h3>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-medium">Type:</span> {workout.type}
-                  </div>
-                  {workout.duration && (
-                    <div>
-                      <span className="font-medium">Duration:</span> {workout.duration} minutes
-                    </div>
-                  )}
-                  {workout.description && (
-                    <div>
-                      <span className="font-medium">Description:</span>
-                      <p className="text-sm text-gray-600 mt-1">{workout.description}</p>
-                    </div>
-                  )}
-                  {workout.intervals && workout.intervals.length > 0 && (
-                    <div>
-                      <span className="font-medium">Intervals:</span>
-                      <div className="mt-2 space-y-2">
-                        {workout.intervals.map((interval: any, index: number) => (
-                          <div key={index} className="text-sm bg-white p-2 rounded border">
-                            {interval.name || `Interval ${index + 1}`}: {interval.time} @ {interval.effortLabel}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {workout.strength_exercises && workout.strength_exercises.length > 0 && (
-                    <div>
-                      <span className="font-medium">Exercises:</span>
-                      <div className="mt-2 space-y-2">
-                        {workout.strength_exercises.map((exercise: any, index: number) => (
-                          <div key={index} className="text-sm bg-white p-2 rounded border">
-                            {exercise.name}: {exercise.sets} sets × {exercise.reps} reps @ {exercise.weight} lbs
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <PlannedWorkoutView 
+              workout={workout}
+              showHeader={false}
+              onEdit={() => {
+                // TODO: Implement edit functionality
+                console.log('Edit planned workout:', workout.id);
+              }}
+              onComplete={() => {
+                // TODO: Implement complete functionality
+                console.log('Mark workout as completed:', workout.id);
+              }}
+            />
           </TabsContent>
 
           {/* Summary Tab */}

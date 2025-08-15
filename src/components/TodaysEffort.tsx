@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, MapPin, Zap, Heart, Mountain, Clock, Activity, Bike, Waves, Dumbbell, Weight } from 'lucide-react';
 
 interface TodaysEffortProps {
@@ -16,6 +17,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   onEditEffort 
 }) => {
   const { useImperial, workouts, loading } = useAppContext();
+  const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
 
   // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
@@ -23,35 +25,14 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const activeDate = selectedDate || today;
 
   const loadWorkoutsForDate = () => {
-    if (workouts && workouts.length > 0) {
-      console.log('🔍 All workouts for', activeDate, ':', workouts.filter((w: any) => w.date === activeDate));
+    // Combine completed workouts and planned workouts
+    const allWorkouts = [...(workouts || []), ...(plannedWorkouts || [])];
+    
+    if (allWorkouts.length > 0) {
+      console.log('🔍 All workouts for', activeDate, ':', allWorkouts.filter((w: any) => w.date === activeDate));
       
-      // 🚨 DEBUG: Check actual date formats
-      console.log('🔍 DEBUG - First few workout dates:', workouts.slice(0, 3).map(w => ({
-        name: w.name,
-        date: w.date,
-        dateType: typeof w.date,
-        activeDate: activeDate,
-        matches: w.date === activeDate
-      })));
-      
-      // 🔧 FIXED: Filter by both date AND status
-      const dateWorkouts = workouts.filter((w: any) => {
-        const isCorrectDate = w.date === activeDate;
-        
-        // For today and future dates: show both planned AND completed workouts
-        if (activeDate >= today) {
-          const isPlanned = w.workout_status === 'planned' || !w.workout_status; // Handle missing status as planned
-          const isCompleted = w.workout_status === 'completed';
-          console.log(`Workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}, IsPlanned: ${isPlanned}, IsCompleted: ${isCompleted}`);
-          return isCorrectDate && (isPlanned || isCompleted); // ✅ FIXED: Show both planned AND completed
-        } 
-        // For past dates: show both planned and completed for reference
-        else {
-          console.log(`Past date workout "${w.name}" - Date: ${isCorrectDate}, Status: ${w.workout_status}`);
-          return isCorrectDate;
-        }
-      });
+      // Filter by date
+      const dateWorkouts = allWorkouts.filter((w: any) => w.date === activeDate);
       
       console.log('✅ Filtered workouts to display:', dateWorkouts);
       setDisplayWorkouts(dateWorkouts);
@@ -64,7 +45,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   useEffect(() => {
     console.log('🔄 TodaysEffort useEffect triggered - selectedDate:', selectedDate, 'activeDate:', activeDate);
     loadWorkoutsForDate();
-  }, [workouts, selectedDate]); // Changed from activeDate to selectedDate
+  }, [workouts, plannedWorkouts, selectedDate]); // Watch both completed and planned workouts
 
   // Icons removed - using text-only interface
 
@@ -309,7 +290,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
 
 
-  if (loading) {
+  if (loading || plannedLoading) {
     return (
       <div className="w-full h-24 flex items-center justify-center" style={{fontFamily: 'Inter, sans-serif'}}>
         <p className="text-muted-foreground text-sm">Loading...</p>
@@ -364,6 +345,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   className={`w-full text-left p-1.5 rounded-md transition-colors hover:bg-gray-50 ${
                     workout.workout_status === 'completed' 
                       ? 'bg-green-50' 
+                      : workout.workout_status === 'planned'
+                      ? 'bg-blue-50 border border-blue-200'
                       : 'bg-white border border-gray-200'
                   }`}
                 >
@@ -372,15 +355,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-sm">
                         {workout.name || getDisciplineName(workout.type)}
-                        {workout.workout_status !== 'completed' && (
+                        {workout.workout_status === 'planned' && (
                           <span className="text-xs text-orange-600 ml-2">(Planned)</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs">
                         {workout.workout_status === 'completed' ? (
                           <span className="text-green-600 font-medium">✓</span>
-                        ) : (
+                        ) : workout.workout_status === 'planned' ? (
                           <span className="text-orange-600 font-medium">📋</span>
+                        ) : (
+                          <span className="text-gray-600 font-medium">•</span>
                         )}
                         <span className="text-muted-foreground">
                           {formatRichWorkoutDisplay(workout).duration}
