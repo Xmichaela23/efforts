@@ -24,6 +24,7 @@ interface PlannedWorkoutViewProps {
   compact?: boolean;
   onEdit?: () => void;
   onComplete?: () => void;
+  onDelete?: () => void;
 }
 
 const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
@@ -31,7 +32,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   showHeader = true,
   compact = false,
   onEdit,
-  onComplete
+  onComplete,
+  onDelete
 }) => {
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -295,7 +297,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         )}
 
         {/* Action Buttons */}
-        {(onEdit || onComplete) && (
+        {(onEdit || onComplete || onDelete) && (
           <div className="flex gap-2 pt-2">
             {onEdit && (
               <button
@@ -311,6 +313,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 className="px-3 py-1.5 text-sm text-green-600 hover:text-green-700 transition-colors border border-green-200 rounded hover:bg-green-50"
               >
                 Mark Complete
+              </button>
+            )}
+            {onDelete && (
+              <button
+                onClick={onDelete}
+                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 transition-colors border border-red-200 rounded hover:bg-red-50"
+              >
+                Delete
               </button>
             )}
           </div>

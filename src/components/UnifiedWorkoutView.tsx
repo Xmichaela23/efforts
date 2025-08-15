@@ -189,6 +189,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 // TODO: Implement complete functionality
                 console.log('Mark workout as completed:', workout.id);
               }}
+              onDelete={() => {
+                if (confirm('Delete this planned workout? This action cannot be undone.')) {
+                  // TODO: Implement delete functionality
+                  console.log('Delete planned workout:', workout.id);
+                  // Close the workout view after deletion
+                  onClose();
+                }
+              }}
             />
           </TabsContent>
 
