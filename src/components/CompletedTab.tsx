@@ -644,9 +644,11 @@ const formatPace = (paceValue: any): string => {
        unit: 'bpm'
      },
      {
-       label: 'Max Speed',
-       value: workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A',
-       unit: useImperial ? 'mph' : 'mph'
+       label: isRun ? 'Max Pace' : 'Max Speed',
+       value: isRun
+         ? formatPace(workoutData.metrics?.max_pace || workoutData.max_pace)
+         : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'),
+       unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
      },
      {
        label: 'Max Cadence',
@@ -659,11 +661,6 @@ const formatPace = (paceValue: any): string => {
    if (isRun) {
      return [
        ...baseMetrics,
-       {
-         label: 'Max Pace',
-         value: formatPace(workoutData.metrics?.max_pace || workoutData.max_pace),
-         unit: useImperial ? '/mi' : '/km'
-       },
        {
          label: 'Steps',
          value: workoutData.steps ? safeNumber(workoutData.steps) : 'N/A'
