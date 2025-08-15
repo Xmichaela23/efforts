@@ -127,7 +127,7 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
   try {
     console.log(`🗺️ Fetching latlng streams for activity ${activityId}...`);
 
-    const response = await fetchWithRateLimit(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
+    const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     });
 
@@ -172,7 +172,7 @@ async function fetchStravaStreams(
 } | null> {
   try {
     const url = `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,velocity_smooth,cadence,watts,distance&key_by_type=true`;
-    const res = await fetchWithRateLimit(url, {
+    const res = await fetch(url, {
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     });
     if (!res.ok) {
@@ -542,7 +542,7 @@ Deno.serve(async (req) => {
       
       console.log(`🔍 Requesting Strava API: ${url}`);
       
-      let res = await fetchWithRateLimit(url, {
+      let res = await fetch(url, {
         headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
       });
 
@@ -567,7 +567,7 @@ Deno.serve(async (req) => {
           } catch (_) {
             // best-effort; continue
           }
-          res = await fetchWithRateLimit(url, {
+          res = await fetch(url, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
         }
@@ -596,7 +596,7 @@ Deno.serve(async (req) => {
         // Fetch detailed activity data to get HR, calories, etc.
         let detailedActivity = a;
         try {
-          const detailRes = await fetchWithRateLimit(`https://www.strava.com/api/v3/activities/${a.id}`, {
+          const detailRes = await fetch(`https://www.strava.com/api/v3/activities/${a.id}`, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
           

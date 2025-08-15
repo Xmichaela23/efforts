@@ -279,6 +279,9 @@ const Connections: React.FC = () => {
         },
         body: JSON.stringify({
           userId: authUser.id,
+          // Pass tokens if present (backend also falls back to DB)
+          accessToken: localStorage.getItem('strava_access_token') || undefined,
+          refreshToken: localStorage.getItem('strava_refresh_token') || undefined,
           importType: 'historical',
           startDate,
           endDate
