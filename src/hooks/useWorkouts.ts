@@ -147,21 +147,17 @@ export const useWorkouts = () => {
   const generateLocationTitle = (lat: number | null, lng: number | null, activityType: string) => {
     if (!lat || !lng) return null;
     
-    let location = '';
-    // Location detection removed - coordinates will show actual location
+    // For now, use coordinates as location until we implement reverse geocoding
+    const location = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     
-    if (location) {
-      const formattedType = activityType === 'ride' ? 'Cycling' : 
-                           activityType === 'run' ? 'Running' :
-                           activityType === 'walk' ? 'Walking' :
-                           activityType === 'swim' ? 'Swimming' :
-                           activityType === 'strength' ? 'Strength Training' :
-                           activityType.charAt(0).toUpperCase() + activityType.slice(1);
-      
-      return `${location} ${formattedType}`;
-    }
+    const formattedType = activityType === 'ride' ? 'Cycling' : 
+                         activityType === 'run' ? 'Running' :
+                         activityType === 'walk' ? 'Walking' :
+                         activityType === 'swim' ? 'Swimming' :
+                         activityType === 'strength' ? 'Strength Training' :
+                         activityType.charAt(0).toUpperCase() + activityType.slice(1);
     
-    return null;
+    return `${location} ${formattedType}`;
   };
 
   const getCurrentUser = async () => {
