@@ -318,6 +318,8 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       notes: `Imported from Strava: ${activityData.name}`,
       strava_activity_id: activityData.id,
       source: 'strava_webhook',
+      start_position_lat: activityData.start_latlng?.[0] || null,
+      start_position_long: activityData.start_latlng?.[1] || null,
       created_at: new Date().toISOString()
     };
 
