@@ -53,68 +53,91 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Polyline decoder function - Using correct Strava API specification
-function decodePolyline(polyline: string): [number, number][] {
+// Small utilities for GPS validation
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const R = 6371; // km
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a = Math.sin(dLat / 2) ** 2 +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+function isValidCoord(lat: number, lng: number): boolean {
+  return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+}
+
+// Decode Google/Strava encoded polylines (precision 1e5)
+function decodePolyline(encoded: string, precision = 5): [number, number][] {
   const coordinates: [number, number][] = [];
   let index = 0;
-  
-  console.log(`🔍 Starting polyline decode for: ${polyline.substring(0, 100)}...`);
-  console.log(`🔍 Polyline length: ${polyline.length}`);
-  
-  while (index < polyline.length) {
+  let lat = 0;
+  let lng = 0;
+  const factor = Math.pow(10, precision);
+
+  while (index < encoded.length) {
     let result = 0;
     let shift = 0;
-    
-    // Decode latitude delta
+    let byte: number;
+
+    // latitude
     do {
-      const byte = polyline.charCodeAt(index++) - 63;
+      byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
-    } while (result >= 0x20);
-    
-    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    
-    // Decode longitude delta
+    } while (byte >= 0x20);
+    const deltaLat = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lat += deltaLat;
+
+    // longitude
     result = 0;
     shift = 0;
-    
     do {
-      const byte = polyline.charCodeAt(index++) - 63;
+      byte = encoded.charCodeAt(index++) - 63;
       result |= (byte & 0x1f) << shift;
       shift += 5;
-    } while (result >= 0x20);
-    
-    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-    
-    // For the first coordinate, use the deltas as absolute values
-    // For subsequent coordinates, add deltas to the previous coordinate
-    let latDegrees: number;
-    let lngDegrees: number;
-    
-    if (coordinates.length === 0) {
-      // First coordinate: deltas are absolute values
-      latDegrees = dlat / 1e5;
-      lngDegrees = dlng / 1e5;
-    } else {
-      // Subsequent coordinates: add deltas to previous coordinate
-      const prevLat = coordinates[coordinates.length - 1][0] * 1e5; // Convert back to 1e5 precision
-      const prevLng = coordinates[coordinates.length - 1][1] * 1e5;
-      latDegrees = (prevLat + dlat) / 1e5;
-      lngDegrees = (prevLng + dlng) / 1e5;
-    }
-    
-    console.log(`🔍 Point ${coordinates.length}: delta lat=${dlat}, delta lng=${dlng}, final lat=${latDegrees.toFixed(6)}°, final lng=${lngDegrees.toFixed(6)}°`);
-    
-    coordinates.push([latDegrees, lngDegrees]);
+    } while (byte >= 0x20);
+    const deltaLng = (result & 1) ? ~(result >> 1) : (result >> 1);
+    lng += deltaLng;
+
+    coordinates.push([lat / factor, lng / factor]);
   }
-  
-  console.log(`🔍 Decoded ${coordinates.length} coordinates`);
-  if (coordinates.length > 0) {
-    console.log(`🔍 First coordinate: [${coordinates[0][0].toFixed(6)}°, ${coordinates[0][1].toFixed(6)}°]`);
-    console.log(`🔍 Last coordinate: [${coordinates[coordinates.length-1][0].toFixed(6)}°, ${coordinates[coordinates.length-1][1].toFixed(6)}°]`);
-  }
-  
+
   return coordinates;
+}
+
+// GPS data fetching function - uses Strava's latlng streams API
+async function fetchStravaLatLngStreams(activityId: number, accessToken: string): Promise<[number, number][] | null> {
+  try {
+    console.log(`🗺️ Fetching latlng streams for activity ${activityId}...`);
+
+    const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    });
+
+    if (!response.ok) {
+      console.log(`⚠️ Could not fetch latlng streams: ${response.status}`);
+      return null;
+    }
+
+    const streams = await response.json();
+    const latlngStream = streams.find((s: any) => s.type === 'latlng');
+
+    if (latlngStream && Array.isArray(latlngStream.data) && latlngStream.data.length > 0) {
+      // Strava returns [[lat, lng], ...]
+      const coordinates: [number, number][] = latlngStream.data
+        .filter((p: any) => Array.isArray(p) && p.length === 2)
+        .map((p: [number, number]) => [p[0], p[1]]);
+
+      console.log(`🗺️ LatLng streams: ${coordinates.length} coordinates`);
+      return coordinates;
+    }
+
+    return null;
+  } catch (err) {
+    console.log(`⚠️ Error fetching latlng streams: ${err}`);
+    return null;
+  }
 }
 
 function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
@@ -202,81 +225,43 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
 
   // Process GPS data for Mapbox rendering
   let gpsTrack: any[] | null = null;
-  if (a.map?.summary_polyline || a.map?.polyline) {
-    const polyline = a.map.summary_polyline || a.map.polyline;
-    console.log(`🗺️ Raw polyline for ${a.name}:`, polyline?.substring(0, 100) + '...');
-    console.log(`🗺️ Polyline source: ${a.map.summary_polyline ? 'summary_polyline' : 'polyline'}`);
-    console.log(`🗺️ Polyline length: ${polyline?.length || 0}`);
-    console.log(`🗺️ Full map data:`, a.map);
-    console.log(`🗺️ Activity start_latlng:`, a.start_latlng);
-    console.log(`🗺️ Activity end_latlng:`, a.end_latlng);
-    
-    if (polyline) {
-      try {
-        // Strava's polyline contains absolute coordinates, not relative to start
-        const coordinates = decodePolyline(polyline);
-        console.log(`🗺️ Decoded coordinates:`, coordinates.slice(0, 3));
-        
-        // Validate coordinates before converting
-        if (coordinates.length > 0) {
-          const firstCoord = coordinates[0];
-          const lastCoord = coordinates[coordinates.length - 1];
-          
-          // Check if coordinates are in reasonable ranges (not in the middle of oceans)
-          if (firstCoord[0] >= -90 && firstCoord[0] <= 90 && 
-              firstCoord[1] >= -180 && firstCoord[1] <= 180 &&
-              lastCoord[0] >= -90 && lastCoord[0] <= 90 && 
-              lastCoord[1] >= -180 && lastCoord[1] <= 180) {
-            
-            // Convert to GPSPoint format that ActivityMap expects
-            gpsTrack = coordinates.map((coord, index) => {
-              const point = {
-                lat: coord[0], // coord[0] is latitude (decoder returns [lat, lng])
-                lng: coord[1], // coord[1] is longitude (decoder returns [lat, lng])
-                timestamp: Date.now() + (index * 1000), // Approximate timestamps
-                elevation: null // Strava polyline doesn't include elevation
-              };
-              
-              if (index < 3) {
-                console.log(`🗺️ GPSPoint ${index}:`, point);
-              }
-              
-              return point;
-            });
-            
-            console.log(`🗺️ GPS data converted: ${gpsTrack.length} GPSPoints, first: {lat: ${gpsTrack[0].lat}, lng: ${gpsTrack[0].lng}}`);
-          } else {
-            console.log(`⚠️ Invalid coordinates detected: first=[${firstCoord[0]}, ${firstCoord[1]}], last=[${lastCoord[0]}, ${lastCoord[1]}]`);
-            gpsTrack = null;
-          }
-        } else {
-          console.log(`⚠️ No valid coordinates decoded from polyline`);
-          gpsTrack = null;
-        }
-      } catch (err) {
-        console.log(`⚠️ Failed to decode polyline: ${err}`);
-        gpsTrack = null;
-      }
-      
-      // If polyline failed, try latlng streams as fallback
-      if (!gpsTrack && a.id) {
-        console.log(`🗺️ Trying latlng streams fallback for activity ${a.id}...`);
-        const fallbackCoordinates = await fetchStravaLatLngStreams(a.id, accessToken);
-        
-        if (fallbackCoordinates && fallbackCoordinates.length > 0) {
-          gpsTrack = fallbackCoordinates.map((coord, index) => ({
-            lat: coord[0],
-            lng: coord[1],
-            timestamp: Date.now() + (index * 1000),
-            elevation: null
-          }));
-          
-          console.log(`🗺️ Fallback GPS data: ${gpsTrack.length} GPSPoints, first: {lat: ${gpsTrack[0].lat}, lng: ${gpsTrack[0].lng}}`);
+
+  const useTrack = (coords: [number, number][]) => {
+    const filtered = coords.filter(([lat, lng]) => isValidCoord(lat, lng));
+    if (filtered.length === 0) return null;
+    return filtered.map(([lat, lng], i) => ({ lat, lng, timestamp: Date.now() + i * 1000, elevation: null }));
+  };
+
+  // Prefer detailed polyline; fallback to summary; then to streams
+  const encoded = a.map?.polyline || a.map?.summary_polyline || null;
+  if (encoded) {
+    try {
+      const decoded = decodePolyline(encoded); // [[lat,lng],...]
+      let candidate = useTrack(decoded);
+      // Sanity: if start_latlng exists, ensure first point isn't wildly far away
+      if (candidate && a.start_latlng && isValidCoord(a.start_latlng[0], a.start_latlng[1])) {
+        const first = candidate[0];
+        const distKm = haversineKm(a.start_latlng[0], a.start_latlng[1], first.lat, first.lng);
+        if (distKm > 100) {
+          console.warn(`Rejecting polyline track: first point ${distKm.toFixed(1)} km from start_latlng`);
+          candidate = null;
         }
       }
-    } else {
-      console.log(`🗺️ No GPS data found for ${a.name}`);
+      gpsTrack = candidate;
+      if (gpsTrack) console.log(`🗺️ Polyline decoded: ${gpsTrack.length} points. First:`, gpsTrack[0]);
+    } catch (e) {
+      console.log('⚠️ Polyline decode failed, will try streams:', e);
     }
+  }
+
+  if (!gpsTrack && a.id) {
+    const coordinates = await fetchStravaLatLngStreams(a.id, accessToken);
+    const candidate = coordinates ? useTrack(coordinates) : null;
+    if (candidate) {
+      gpsTrack = candidate;
+      console.log(`🗺️ Streams used: ${gpsTrack.length} points. First:`, gpsTrack[0]);
+    }
+  }
 
   return {
     name: a.name || 'Strava Activity',
@@ -340,46 +325,6 @@ async function refreshStravaAccessToken(refreshToken: string | undefined) {
   });
   if (!resp.ok) return null;
   return await resp.json();
-}
-
-// Fallback: Fetch GPS data from Strava's latlng streams
-async function fetchStravaLatLngStreams(activityId: number, accessToken: string): Promise<[number, number][] | null> {
-  try {
-    console.log(`🗺️ Fetching latlng streams for activity ${activityId} as fallback...`);
-    
-    const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
-      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    });
-    
-    if (!response.ok) {
-      console.log(`⚠️ Could not fetch latlng streams: ${response.status}`);
-      return null;
-    }
-    
-    const streams = await response.json();
-    const latlngStream = streams.find((s: any) => s.type === 'latlng');
-    
-    if (latlngStream && latlngStream.data && latlngStream.data.length > 0) {
-      // Strava returns [lat, lng] pairs in the data array
-      const coordinates: [number, number][] = [];
-      
-      for (let i = 0; i < latlngStream.data.length; i += 2) {
-        if (i + 1 < latlngStream.data.length) {
-          const lat = latlngStream.data[i];
-          const lng = latlngStream.data[i + 1];
-          coordinates.push([lat, lng]);
-        }
-      }
-      
-      console.log(`🗺️ LatLng streams fallback: ${coordinates.length} coordinates`);
-      return coordinates;
-    }
-    
-    return null;
-  } catch (err) {
-    console.log(`⚠️ Error fetching latlng streams: ${err}`);
-    return null;
-  }
 }
 
 Deno.serve(async (req) => {
@@ -509,4 +454,3 @@ Deno.serve(async (req) => {
     });
   }
 });
-}
