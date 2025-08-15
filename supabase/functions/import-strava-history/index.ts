@@ -115,6 +115,16 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     });
 
+    // Log rate headers for the streams endpoint as well
+    try {
+      const limit = response.headers.get('X-RateLimit-Limit');
+      const usage = response.headers.get('X-RateLimit-Usage');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      if (limit || usage || reset) {
+        console.log(`📈 Strava rate headers (streams ${activityId}): usage=${usage} limit=${limit} reset=${reset} status=${response.status}`);
+      }
+    } catch (_) {}
+
     if (!response.ok) {
       console.log(`⚠️ Could not fetch latlng streams: ${response.status}`);
       return null;
@@ -364,6 +374,16 @@ Deno.serve(async (req) => {
         headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
       });
 
+      // Log Strava rate limit headers so we can see current window usage
+      try {
+        const limit = res.headers.get('X-RateLimit-Limit');
+        const usage = res.headers.get('X-RateLimit-Usage');
+        const reset = res.headers.get('X-RateLimit-Reset');
+        if (limit || usage || reset) {
+          console.log(`📈 Strava rate headers (list p${page}): usage=${usage} limit=${limit} reset=${reset}`);
+        }
+      } catch (_) {}
+
       if (res.status === 401) {
         const refreshed = await refreshStravaAccessToken(refreshToken);
         if (refreshed?.access_token) {
@@ -372,6 +392,14 @@ Deno.serve(async (req) => {
           res = await fetch(url, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
+          try {
+            const limit2 = res.headers.get('X-RateLimit-Limit');
+            const usage2 = res.headers.get('X-RateLimit-Usage');
+            const reset2 = res.headers.get('X-RateLimit-Reset');
+            if (limit2 || usage2 || reset2) {
+              console.log(`📈 Strava rate headers (after refresh p${page}): usage=${usage2} limit=${limit2} reset=${reset2}`);
+            }
+          } catch (_) {}
         }
       }
 
@@ -401,6 +429,16 @@ Deno.serve(async (req) => {
           const detailRes = await fetch(`https://www.strava.com/api/v3/activities/${a.id}`, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
+
+          // Log rate headers for detail endpoint
+          try {
+            const dLimit = detailRes.headers.get('X-RateLimit-Limit');
+            const dUsage = detailRes.headers.get('X-RateLimit-Usage');
+            const dReset = detailRes.headers.get('X-RateLimit-Reset');
+            if (dLimit || dUsage || dReset) {
+              console.log(`📈 Strava rate headers (detail ${a.id}): usage=${dUsage} limit=${dLimit} reset=${dReset} status=${detailRes.status}`);
+            }
+          } catch (_) {}
           
           if (detailRes.ok) {
             detailedActivity = await detailRes.json();

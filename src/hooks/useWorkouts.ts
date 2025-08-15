@@ -390,19 +390,8 @@ export const useWorkouts = () => {
       // Step 3: Merge both workout sources and remove duplicates
       const allWorkouts = [...(manualWorkouts || []), ...garminWorkouts];
       
-      // Remove duplicate Garmin activities (keep manual workouts if they exist for same date/type)
-      const uniqueWorkouts = allWorkouts.filter((workout, index, self) => {
-        if (workout.isGarminImported) {
-          // For Garmin workouts, check if there's a manual workout for the same date/type
-          const hasManualDuplicate = self.some(w => 
-            !w.isGarminImported && 
-            w.date === workout.date && 
-            w.type === workout.type
-          );
-          return !hasManualDuplicate;
-        }
-        return true; // Keep all manual workouts
-      });
+      // Show all workouts including Garmin (removed duplicate filter)
+      const uniqueWorkouts = allWorkouts;
 
       console.log(`✅ Total unique workouts after merge: ${uniqueWorkouts.length}`);
 
