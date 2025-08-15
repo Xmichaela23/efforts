@@ -331,7 +331,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         type: formData.type as 'run' | 'ride' | 'swim' | 'strength' | 'walk',
         date: formData.date,
         description: formData.description || generateWorkoutDescription(),
-        duration: calculateTotalTime(),
+        duration: Math.round(calculateTotalTime() / 60), // Convert seconds to minutes
         intervals: formData.type === 'run' ? runIntervals :
                   formData.type === 'ride' ? rideIntervals :
                   formData.type === 'swim' ? swimIntervals : [],
@@ -349,7 +349,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           type: workoutData.type,
           date: workoutData.date,
           description: workoutData.description,
-          duration: workoutData.duration,
+          duration: Math.round(calculateTotalTime() / 60), // Convert seconds to minutes
           intervals: workoutData.intervals,
           strength_exercises: workoutData.strength_exercises,
           workout_status: workoutData.workout_status

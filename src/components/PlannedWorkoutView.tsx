@@ -53,6 +53,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     }
   };
 
+  const getWorkoutTypeColor = (type: string) => {
+    switch (type) {
+      case 'run': return 'bg-green-100 text-green-800 border-green-200';
+      case 'ride': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'swim': return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'strength': return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'walk': return 'bg-green-100 text-green-800 border-green-200';
+      default: return 'bg-green-100 text-green-800 border-green-200';
+    }
+  };
+
   const getWorkoutTypeLabel = (type: string) => {
     switch (type) {
       case 'run': return 'Running';
@@ -68,7 +79,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     switch (status) {
       case 'planned': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'completed': return 'bg-gray-100 text-gray-800 border-gray-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -85,11 +96,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
-        <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">{getWorkoutTypeIcon(workout.type)}</div>
+        <div className={`text-xs font-bold px-2 py-1 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm truncate text-gray-900">{workout.name}</h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
-            <Calendar className="h-3 w-3" />
             <span>{formatDate(workout.date)}</span>
             {workout.duration && (
               <>
@@ -112,11 +122,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <div className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded border border-blue-200">{getWorkoutTypeIcon(workout.type)}</div>
+              <div className={`text-sm font-bold px-3 py-2 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
               <div>
                 <h3 className="text-lg font-semibold">{workout.name}</h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Calendar className="h-4 w-4" />
                   <span>{formatDate(workout.date)}</span>
                   {workout.duration && (
                     <>
