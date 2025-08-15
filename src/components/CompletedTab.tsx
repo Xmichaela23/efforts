@@ -827,17 +827,39 @@ const formatPace = (paceValue: any): string => {
      return null;
    }
    
-   // Convert to standard units
-   const distanceMiles = Number(distance);
-   const durationMinutes = Number(duration);
-   const elevationFeet = Number(elevationGain);
+   // Convert to standard units - handle both km and miles
+   let distanceMiles = Number(distance);
+   let durationMinutes = Number(duration);
+   let elevationFeet = Number(elevationGain);
+   
+   // If distance is in km, convert to miles
+   if (distanceMiles > 10) { // Likely in km if > 10
+     distanceMiles = distanceMiles * 0.621371; // km to miles
+     console.log('🔍 Converted distance from km to miles:', distanceMiles);
+   }
+   
+   // If duration is in seconds, convert to minutes
+   if (durationMinutes > 60) { // Likely in seconds if > 60
+     durationMinutes = durationMinutes / 60; // seconds to minutes
+     console.log('🔍 Converted duration from seconds to minutes:', durationMinutes);
+   }
+   
+   // If elevation is in meters, convert to feet
+   if (elevationFeet > 1000) { // Likely in meters if > 1000
+     elevationFeet = elevationFeet * 3.28084; // meters to feet
+     console.log('🔍 Converted elevation from meters to feet:', elevationFeet);
+   }
+   
+   console.log('🔍 GAP calculation - converted units:', { distanceMiles, durationMinutes, elevationFeet });
    
    // Calculate actual pace (min/mi)
    const actualPaceMinutes = durationMinutes / distanceMiles;
+   console.log('🔍 Actual pace (min/mi):', actualPaceMinutes);
    
    // Proper Strava GAP formula
    // Elevation gain per mile affects pace
    const elevationPerMile = elevationFeet / distanceMiles;
+   console.log('🔍 Elevation per mile:', elevationPerMile);
    
    // Strava's GAP adjustment: more sophisticated than simple linear
    // Accounts for both uphill and downhill effects
@@ -847,17 +869,21 @@ const formatPace = (paceValue: any): string => {
      // Uphill: slows you down more than simple linear
      // Strava uses a curve that increases impact for steeper grades
      gapAdjustment = (elevationPerMile / 100) * 1.2; // 20% more impact than linear
+     console.log('🔍 Uphill adjustment:', gapAdjustment);
    } else if (elevationPerMile < 0) {
      // Downhill: speeds you up, but not as much as uphill slows you down
      gapAdjustment = (Math.abs(elevationPerMile) / 100) * 0.8; // 80% of uphill benefit
+     console.log('🔍 Downhill adjustment:', gapAdjustment);
    }
    
    // Calculate GAP
    // Uphill: add penalty (slower pace), Downhill: subtract benefit (faster pace)
    const gapPaceMinutes = actualPaceMinutes + gapAdjustment;
+   console.log('🔍 GAP pace (min/mi):', gapPaceMinutes);
    
    // Format GAP pace (don't go below 0)
    const gapPace = formatPace(Math.max(0, gapPaceMinutes));
+   console.log('🔍 Final GAP pace:', gapPace);
    
    return gapPace;
  };
