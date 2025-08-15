@@ -71,6 +71,15 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     return sampled;
   };
 
+  // Normalize timestamps to seconds
+  const getTimeSeconds = (p: any): number | null => {
+    const raw = p?.timestamp ?? p?.startTimeInSeconds ?? null;
+    if (raw == null) return null;
+    const n = Number(raw);
+    // If ms epoch, convert to seconds
+    return n > 1e12 ? n / 1000 : n;
+  };
+
   // Process GPS data for chart
   const chartData = useMemo(() => {
     if (!gpsTrack || gpsTrack.length === 0) return [];
@@ -121,11 +130,12 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               point.lat || point.latitudeInDegree,
               point.lng || point.longitudeInDegree
             );
-            const timeDiff = (point.timestamp || point.startTimeInSeconds) - 
-                            (prevPoint.timestamp || prevPoint.startTimeInSeconds);
+            const tCurr = getTimeSeconds(point);
+            const tPrev = getTimeSeconds(prevPoint);
+            const timeDiff = tCurr != null && tPrev != null ? (tCurr - tPrev) : null;
             
-            if (timeDiff > 0 && distance > 0.001) {
-              const speedMph = (distance / timeDiff) * 3600;
+            if (timeDiff != null && timeDiff > 0 && distance > 0.001) {
+              const speedMph = (distance / timeDiff) * 3600; // distance in miles, time in seconds
               // Much wider speed range and lower distance threshold for more data
               if (speedMph >= 0.5 && speedMph <= 50) {
                 metricValue = Math.round((60 / speedMph) * 100) / 100; // Convert to pace
@@ -216,9 +226,9 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               const currentElevation = currentPoint.elevation || currentPoint.altitude || 0;
               const elevationGain = currentElevation - prevElevation; // Allow negative for descents
               
-              const prevTime = prevPoint.timestamp || prevPoint.startTimeInSeconds || 0;
-              const currentTime = currentPoint.timestamp || currentPoint.startTimeInSeconds || 0;
-              const timeDiff = currentTime - prevTime;
+              const prevTime = getTimeSeconds(prevPoint) ?? 0;
+              const currentTime = getTimeSeconds(currentPoint) ?? 0;
+              const timeDiff = currentTime - prevTime; // seconds
               
               if (timeDiff > 0) {
                 totalElevationGain += elevationGain;
@@ -227,7 +237,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             }
             
             if (totalTime > 0) {
-              const timeHours = totalTime / 3600;
+              const timeHours = totalTime / 3600; // seconds → hours
               const vam = totalElevationGain / timeHours;
               // Only show meaningful VAM values (filter out noise)
               if (Math.abs(vam) > 5) { // Lower threshold for more data
@@ -359,7 +369,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                     <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
                       <p className="font-medium">Distance: {label} mi</p>
                       <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
-                      {metricValue && (
+                      {metricValue !== null && metricValue !== undefined && (
                         <p className="text-gray-600">{metricInfo.label}: {metricValue} {metricInfo.unit}</p>
                       )}
                       <p className="text-xs text-gray-400">At this position</p>

@@ -140,6 +140,47 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
   }
 }
 
+// Fetch multiple Strava streams (latlng, altitude, time) using key_by_type for easy parsing
+async function fetchStravaStreams(
+  activityId: number,
+  accessToken: string
+): Promise<{
+  latlng?: [number, number][],
+  altitude?: number[],
+  time?: number[],
+  heartrate?: number[],
+  velocity_smooth?: number[],
+  cadence?: number[],
+  watts?: number[],
+  distance?: number[]
+} | null> {
+  try {
+    const url = `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,velocity_smooth,cadence,watts,distance&key_by_type=true`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) {
+      console.log(`⚠️ Streams (key_by_type) fetch failed: ${res.status}`);
+      return null;
+    }
+    const obj = await res.json();
+    const pick = (k: string) => (Array.isArray(obj?.[k]?.data) ? obj[k].data : undefined);
+    return {
+      latlng: pick('latlng'),
+      altitude: pick('altitude'),
+      time: pick('time'),
+      heartrate: pick('heartrate'),
+      velocity_smooth: pick('velocity_smooth'),
+      cadence: pick('cadence'),
+      watts: pick('watts'),
+      distance: pick('distance'),
+    } as any;
+  } catch (e) {
+    console.log('⚠️ Error fetching streams (key_by_type):', e);
+    return null;
+  }
+}
+
 function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   const s = (a.sport_type || a.type || '').toLowerCase();
 
@@ -254,12 +295,117 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     }
   }
 
+  // Fallback to streams or enrich with altitude/time
   if (!gpsTrack && a.id) {
-    const coordinates = await fetchStravaLatLngStreams(a.id, accessToken);
-    const candidate = coordinates ? useTrack(coordinates) : null;
-    if (candidate) {
-      gpsTrack = candidate;
-      console.log(`🗺️ Streams used: ${gpsTrack.length} points. First:`, gpsTrack[0]);
+    const streams = await fetchStravaStreams(a.id, accessToken);
+    if (streams?.latlng && streams.latlng.length > 0) {
+      const n = streams.latlng.length;
+      const startMs = a.start_date ? new Date(a.start_date).getTime() : Date.now();
+      const hasAlt = Array.isArray(streams.altitude) && streams.altitude.length === n;
+      const hasTime = Array.isArray(streams.time) && streams.time.length === n;
+      const hasHr = Array.isArray(streams.heartrate) && streams.heartrate.length === n;
+      const hasSpeed = Array.isArray(streams.velocity_smooth) && streams.velocity_smooth.length === n;
+      const hasCad = Array.isArray(streams.cadence) && streams.cadence.length === n;
+      const hasPwr = Array.isArray(streams.watts) && streams.watts.length === n;
+      const hasDist = Array.isArray(streams.distance) && streams.distance.length === n;
+
+      const built: any[] = [];
+      for (let i = 0; i < n; i++) {
+        const pair = streams.latlng[i];
+        if (!pair || pair.length !== 2) continue;
+        const lat = pair[0];
+        const lng = pair[1];
+        if (!isValidCoord(lat, lng)) continue;
+        built.push({
+          lat,
+          lng,
+          timestamp: hasTime ? startMs + streams.time![i] * 1000 : startMs + i * 1000,
+          elevation: hasAlt ? streams.altitude![i] : null,
+          hr: hasHr ? streams.heartrate![i] : null,
+          speed_mps: hasSpeed ? streams.velocity_smooth![i] : null,
+          cadence: hasCad ? streams.cadence![i] : null,
+          power: hasPwr ? streams.watts![i] : null,
+          distance_m: hasDist ? streams.distance![i] : null,
+        });
+      }
+      gpsTrack = built.length ? built : null;
+      if (gpsTrack) console.log(`🗺️ Streams used (enriched): ${gpsTrack.length} points. First:`, gpsTrack[0]);
+    }
+  } else if (gpsTrack && a.id) {
+    // We have polyline positions; try to enrich with streams (alt/time + metrics) if available
+    const streams = await fetchStravaStreams(a.id, accessToken);
+    if (streams) {
+      const n = gpsTrack.length;
+      const startMs = a.start_date ? new Date(a.start_date).getTime() : null;
+      const len = (arr?: any[]) => (Array.isArray(arr) ? arr.length : 0);
+      const idx = (i: number, arrLen: number) => {
+        if (arrLen <= 1 || n <= 1) return 0;
+        const j = Math.round((i * (arrLen - 1)) / (n - 1));
+        return Math.min(Math.max(j, 0), arrLen - 1);
+      };
+
+      gpsTrack = gpsTrack.map((p, i) => {
+        const iTime = idx(i, len(streams.time));
+        const iAlt = idx(i, len(streams.altitude));
+        const iHr = idx(i, len(streams.heartrate));
+        const iSpd = idx(i, len(streams.velocity_smooth));
+        const iCad = idx(i, len(streams.cadence));
+        const iPwr = idx(i, len(streams.watts));
+        const iDst = idx(i, len(streams.distance));
+
+        return {
+          ...p,
+          timestamp:
+            startMs && len(streams.time)
+              ? startMs + (streams.time as number[])[iTime] * 1000
+              : p.timestamp,
+          elevation:
+            len(streams.altitude)
+              ? (streams.altitude as number[])[iAlt]
+              : p.elevation,
+          hr:
+            len(streams.heartrate)
+              ? (streams.heartrate as number[])[iHr]
+              : (p as any).hr,
+          speed_mps:
+            len(streams.velocity_smooth)
+              ? (streams.velocity_smooth as number[])[iSpd]
+              : (p as any).speed_mps,
+          cadence:
+            len(streams.cadence)
+              ? (streams.cadence as number[])[iCad]
+              : (p as any).cadence,
+          power:
+            len(streams.watts)
+              ? (streams.watts as number[])[iPwr]
+              : (p as any).power,
+          distance_m:
+            len(streams.distance)
+              ? (streams.distance as number[])[iDst]
+              : (p as any).distance_m,
+        };
+      });
+      console.log('🗺️ Polyline enriched with streams (alt/time/metrics) using index scaling');
+    }
+  }
+
+  // Post-process: derive distance and speed if missing
+  if (gpsTrack && gpsTrack.length > 1) {
+    // Ensure first distance is initialized
+    if ((gpsTrack[0] as any).distance_m == null) (gpsTrack[0] as any).distance_m = 0;
+    for (let i = 1; i < gpsTrack.length; i++) {
+      const prev = gpsTrack[i - 1];
+      const curr = gpsTrack[i];
+      // Fix non-monotonic timestamps by enforcing +1s minimum step
+      let dtSec = (curr.timestamp - prev.timestamp) / 1000;
+      if (!Number.isFinite(dtSec) || dtSec <= 0) dtSec = 1;
+      const dMeters = haversineKm(prev.lat, prev.lng, curr.lat, curr.lng) * 1000;
+      if ((curr as any).distance_m == null) {
+        (curr as any).distance_m = ((prev as any).distance_m ?? 0) + (Number.isFinite(dMeters) ? dMeters : 0);
+      }
+      if ((curr as any).speed_mps == null && Number.isFinite(dMeters)) {
+        (curr as any).speed_mps = dMeters / dtSec;
+      }
     }
   }
 
@@ -275,6 +421,7 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     elapsed_time: elapsed,
     moving_time: duration,
     distance,
+    distance_meters: a.distance ?? null,
     avg_speed: avgSpeed,
     max_speed: maxSpeed,
     avg_pace: avgPace,
@@ -286,6 +433,8 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     avg_cadence: avgCad,
     max_cadence: maxCad,
     elevation_gain: elev,
+    // Store avg_vam in km/h to match existing UI expectation
+    avg_vam: (elev && a.moving_time && a.moving_time > 0) ? ((elev / 1000) / (a.moving_time / 3600)) : null,
     calories: cals,
 
     workout_status: 'completed',
