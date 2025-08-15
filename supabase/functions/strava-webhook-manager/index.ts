@@ -2,7 +2,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_ANON_KEY')!
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 );
 
 Deno.serve(async (req) => {
@@ -228,7 +228,7 @@ async function checkExistingWebhook(stravaUserId: number) {
     // Get all webhooks for our app
     const webhooksResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions', {
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('STRAVA_CLIENT_SECRET')}`,
+        'Authorization': `Bearer ${accessToken}`,
       },
     });
 
