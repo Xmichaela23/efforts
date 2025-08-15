@@ -309,7 +309,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handleEditEffort = (workout: any) => {
     if (workout.workout_status === 'completed') {
       setSelectedWorkout(workout);
+    } else if (workout.workout_status === 'planned') {
+      // For planned workouts, open in UnifiedWorkoutView with Planned tab
+      setSelectedWorkout(workout);
     } else {
+      // For other workout types, show in summary
       setDateWorkouts([workout]);
       setCurrentWorkoutIndex(0);
       setShowSummary(true);

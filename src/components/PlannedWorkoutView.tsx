@@ -44,12 +44,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 
   const getWorkoutTypeIcon = (type: string) => {
     switch (type) {
-      case 'run': return '🏃‍♂️';
-      case 'ride': return '🚴‍♂️';
-      case 'swim': return '🏊‍♂️';
-      case 'strength': return '💪';
-      case 'walk': return '🚶‍♂️';
-      default: return '🏃‍♂️';
+      case 'run': return 'RUN';
+      case 'ride': return 'RIDE';
+      case 'swim': return 'SWIM';
+      case 'strength': return 'STR';
+      case 'walk': return 'WALK';
+      default: return 'RUN';
     }
   };
 
@@ -85,7 +85,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
-        <div className="text-2xl">{getWorkoutTypeIcon(workout.type)}</div>
+        <div className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200">{getWorkoutTypeIcon(workout.type)}</div>
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm truncate text-gray-900">{workout.name}</h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -112,7 +112,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <div className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-3xl">{getWorkoutTypeIcon(workout.type)}</div>
+              <div className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded border border-blue-200">{getWorkoutTypeIcon(workout.type)}</div>
               <div>
                 <h3 className="text-lg font-semibold">{workout.name}</h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -142,6 +142,32 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       )}
 
       <div className="space-y-4">
+        {/* Workout Structure Display */}
+        {workout.intervals && workout.intervals.length > 0 && (
+          <div className="border-l-2 border-blue-200 pl-4 py-2">
+            <h4 className="font-medium text-sm text-gray-700 mb-2">Workout Structure:</h4>
+            <div className="space-y-1">
+              {workout.intervals.map((interval: any, index: number) => (
+                <div key={index} className="text-xs text-gray-600">
+                  {interval.name || `Interval ${index + 1}`}: {interval.time} @ {interval.effortLabel}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {workout.strength_exercises && workout.strength_exercises.length > 0 && (
+          <div className="border-l-2 border-blue-200 pl-4 py-2">
+            <h4 className="font-medium text-sm text-gray-700 mb-2">Exercises:</h4>
+            <div className="space-y-1">
+              {workout.strength_exercises.map((exercise: any, index: number) => (
+                <div key={index} className="text-xs text-gray-600">
+                  {exercise.name}: {exercise.sets}s × {exercise.reps}r @ {exercise.weight} lbs
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         {/* Workout Type & Details */}
         <div className="flex items-center gap-2 text-sm">
           <Target className="h-4 w-4 text-blue-600" />
