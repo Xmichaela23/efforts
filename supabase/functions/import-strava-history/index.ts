@@ -53,6 +53,22 @@ const cors = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+// Simple helpers
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Fetch with automatic 429 backoff. Keeps streams ON but pauses instead of failing.
+async function fetchWithRateLimit(url: string, init?: RequestInit): Promise<Response> {
+  while (true) {
+    const res = await fetch(url, init);
+    if (res.status !== 429) return res;
+    const resetHeader = res.headers.get('X-RateLimit-Reset');
+    // If Strava provided a reset epoch (seconds), wait until then; otherwise wait 60s
+    const waitMs = resetHeader ? Math.max(0, Number(resetHeader) * 1000 - Date.now()) : 60_000;
+    console.log(`⏳ Strava 429 Rate Limit – waiting ${Math.ceil(waitMs/1000)}s before retry...`);
+    await sleep(waitMs || 60_000);
+  }
+}
+
 // Small utilities for GPS validation
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -111,7 +127,7 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
   try {
     console.log(`🗺️ Fetching latlng streams for activity ${activityId}...`);
 
-    const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
+    const response = await fetchWithRateLimit(`https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng`, {
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     });
 
@@ -156,7 +172,7 @@ async function fetchStravaStreams(
 } | null> {
   try {
     const url = `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,velocity_smooth,cadence,watts,distance&key_by_type=true`;
-    const res = await fetch(url, {
+    const res = await fetchWithRateLimit(url, {
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     });
     if (!res.ok) {
@@ -270,7 +286,8 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
   const useTrack = (coords: [number, number][]) => {
     const filtered = coords.filter(([lat, lng]) => isValidCoord(lat, lng));
     if (filtered.length === 0) return null;
-    return filtered.map(([lat, lng], i) => ({ lat, lng, timestamp: Date.now() + i * 1000, elevation: null }));
+    const startMs = a.start_date ? new Date(a.start_date).getTime() : Date.now();
+    return filtered.map(([lat, lng], i) => ({ lat, lng, timestamp: startMs + i * 1000, elevation: null }));
   };
 
   // Prefer detailed polyline; fallback to summary; then to streams
@@ -419,7 +436,7 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
 
     duration,
     elapsed_time: elapsed,
-    moving_time: duration,
+    moving_time: a.moving_time ?? null,
     distance,
     avg_speed: avgSpeed,
     max_speed: maxSpeed,
@@ -500,27 +517,7 @@ Deno.serve(async (req) => {
       return new Response('Missing tokens', { status: 400, headers: cors });
     }
 
-    // If token is near expiry, refresh proactively
-    const expiresAtMs = conn?.expires_at ? new Date(conn.expires_at).getTime() : 0;
-    if (!currentAccessToken || (expiresAtMs && Date.now() > (expiresAtMs - 60_000))) {
-      const refreshed = await refreshStravaAccessToken(currentRefreshToken);
-      if (refreshed?.access_token) {
-        currentAccessToken = refreshed.access_token;
-        currentRefreshToken = refreshed.refresh_token ?? currentRefreshToken;
-        try {
-          await supabase
-            .from('device_connections')
-            .update({
-              access_token: refreshed.access_token,
-              refresh_token: currentRefreshToken,
-              expires_at: refreshed.expires_at ? new Date(refreshed.expires_at * 1000).toISOString() : null,
-              last_sync: new Date().toISOString(),
-            })
-            .eq('user_id', userId)
-            .eq('provider', 'strava');
-        } catch (_) {}
-      }
-    }
+    // Use current tokens as-is. We refresh only on 401 below.
 
     const mode = importType || 'historical';
 
@@ -545,7 +542,7 @@ Deno.serve(async (req) => {
       
       console.log(`🔍 Requesting Strava API: ${url}`);
       
-      let res = await fetch(url, {
+      let res = await fetchWithRateLimit(url, {
         headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
       });
 
@@ -570,7 +567,7 @@ Deno.serve(async (req) => {
           } catch (_) {
             // best-effort; continue
           }
-          res = await fetch(url, {
+          res = await fetchWithRateLimit(url, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
         }
@@ -599,7 +596,7 @@ Deno.serve(async (req) => {
         // Fetch detailed activity data to get HR, calories, etc.
         let detailedActivity = a;
         try {
-          const detailRes = await fetch(`https://www.strava.com/api/v3/activities/${a.id}`, {
+          const detailRes = await fetchWithRateLimit(`https://www.strava.com/api/v3/activities/${a.id}`, {
             headers: { Authorization: `Bearer ${currentAccessToken}`, 'Content-Type': 'application/json' },
           });
           
