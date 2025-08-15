@@ -46,8 +46,8 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
           map.current = new mapboxgl.Map({
             container: element,
             style: 'mapbox://styles/mapbox/outdoors-v12',
-            center: startLocation ? [startLocation.lng, startLocation.lat] : [-118.2437, 34.0522],
-            zoom: 12,
+            center: [0, 0], // Start at world center
+            zoom: 1, // Start with world view
             logoPosition: 'bottom-right'
           });
 
@@ -81,6 +81,8 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
     if (!map.current || !mapLoaded || !gpsTrack || gpsTrack.length === 0) return;
 
     console.log('🗺️ Adding GPS route to map...');
+    console.log('🗺️ GPS Track data:', gpsTrack.slice(0, 3)); // Show first 3 points
+    console.log('🗺️ Raw coordinate values:', gpsTrack.slice(0, 3).map(p => ({ lng: p.lng, lat: p.lat })));
     
     try {
       // Remove existing route if any
@@ -93,8 +95,20 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
       const coordinates = gpsTrack.map(point => {
         const lng = point.lng || point.longitudeInDegree || point.longitude;
         const lat = point.lat || point.latitudeInDegree || point.latitude;
-        return lng && lat ? [lng, lat] : null;
+        
+        // Validate coordinate ranges (longitude: -180 to 180, latitude: -90 to 90)
+        if (lng && lat && 
+            lng >= -180 && lng <= 180 && 
+            lat >= -90 && lat <= 90) {
+          return [lng, lat];
+        }
+        
+        console.warn('🗺️ Invalid coordinates:', { lng, lat, point });
+        return null;
       }).filter(coord => coord !== null);
+
+      console.log('🗺️ Processed coordinates:', coordinates.slice(0, 3)); // Show first 3 coordinates
+      console.log('🗺️ Total coordinates:', coordinates.length);
 
       if (coordinates.length === 0) return;
 
@@ -138,9 +152,20 @@ const ActivityMap: React.FC<ActivityMapProps> = ({
           .addTo(map.current);
       }
 
-      // Fit map to route bounds
+      // Center map on the route instead of default location
+      if (coordinates.length > 0) {
+        const centerLng = coordinates[0][0];
+        const centerLat = coordinates[0][1];
+        console.log('🗺️ Centering map on route coordinates:', centerLng, centerLat);
+        map.current.setCenter([centerLng, centerLat]);
+        map.current.setZoom(13); // Zoom in to show the route properly
+      }
+      
+      // Fit map to route bounds with padding
       const bounds = new mapboxgl.LngLatBounds();
       coordinates.forEach(coord => bounds.extend(coord as [number, number]));
+      
+      console.log('🗺️ Map bounds:', bounds.toArray());
       map.current.fitBounds(bounds, { padding: 50 });
 
     } catch (error) {
