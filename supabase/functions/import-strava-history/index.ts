@@ -382,36 +382,6 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
   }
 }
 
-// Test function to verify polyline decoder
-function testPolylineDecoder() {
-  // Test with a known Strava polyline (this is a simple route in San Francisco)
-  const testPolyline = "_p~iF~ps|U_ulLnnqC_mqNvxq`@";
-  console.log("🧪 Testing polyline decoder with known data...");
-  
-  try {
-    const coordinates = decodePolyline(testPolyline);
-    console.log("🧪 Test result:", coordinates);
-    
-    // Expected: approximately [38.5, -122.5] (San Francisco area)
-    if (coordinates.length > 0) {
-      const first = coordinates[0];
-      console.log(`🧪 First coordinate: [${first[0].toFixed(6)}, ${first[1].toFixed(6)}]`);
-      
-      // Check if coordinates are reasonable (not in the middle of oceans)
-      if (first[0] >= -90 && first[0] <= 90 && first[1] >= -180 && first[1] <= 180) {
-        console.log("✅ Polyline decoder test PASSED - coordinates are valid");
-      } else {
-        console.log("❌ Polyline decoder test FAILED - coordinates are invalid");
-      }
-    }
-  } catch (err) {
-    console.log("❌ Polyline decoder test FAILED with error:", err);
-  }
-}
-
-// Run test when function loads
-testPolylineDecoder();
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors });
@@ -539,3 +509,4 @@ Deno.serve(async (req) => {
     });
   }
 });
+}
