@@ -810,13 +810,22 @@ const formatPace = (paceValue: any): string => {
 
  // Calculate Grade Adjusted Pace (GAP) using proper Strava formula
  const calculateGradeAdjustedPace = () => {
-   if (workoutType !== 'run') return null;
+   console.log('🔍 GAP calculation - workoutType:', workoutType);
+   if (workoutType !== 'run' && workoutType !== 'walk') {
+     console.log('❌ GAP calculation skipped - not a run/walk:', workoutType);
+     return null;
+   }
    
    const distance = workoutData.distance;
    const duration = workoutData.duration;
    const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
    
-   if (!distance || !duration || !elevationGain) return null;
+   console.log('🔍 GAP calculation - data:', { distance, duration, elevationGain });
+   
+   if (!distance || !duration || !elevationGain) {
+     console.log('❌ GAP calculation skipped - missing data');
+     return null;
+   }
    
    // Convert to standard units
    const distanceMiles = Number(distance);

@@ -32,6 +32,23 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ onWorkoutSelect }) => {
     }
   };
 
+  // Format start time
+  const formatStartTime = (workout: any): string => {
+    const startTime = workout.start_time || workout.timestamp;
+    if (!startTime) return '';
+    
+    try {
+      const date = new Date(startTime);
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } catch {
+      return '';
+    }
+  };
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Are you sure you want to delete this workout?')) {
@@ -84,7 +101,10 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ onWorkoutSelect }) => {
           </CardHeader>
           <CardContent>
             <div className="flex items-center justify-between text-sm text-muted-foreground">
-                              <span>{new Date(workout.date + 'T00:00:00').toLocaleDateString()}</span>
+              <span>
+                {new Date(workout.date + 'T00:00:00').toLocaleDateString()}
+                {formatStartTime(workout) && ` • ${formatStartTime(workout)}`}
+              </span>
               <span>{workout.duration ? formatDuration(workout.duration) : 'N/A'}</span>
               {workout.type === 'endurance' && workout.distance && (
                 <span>{workout.distance.toFixed(1)} km</span>

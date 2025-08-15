@@ -32,6 +32,23 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
       }
     }
   };
+
+  // Format start time
+  const formatStartTime = (workout: any): string => {
+    const startTime = workout.start_time || workout.timestamp;
+    if (!startTime) return '';
+    
+    try {
+      const date = new Date(startTime);
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } catch {
+      return '';
+    }
+  };
   const [selectedType, setSelectedType] = useState('all');
 
   const filteredWorkouts = selectedType === 'all' 
@@ -211,7 +228,10 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
-                  <span>{new Date(workout.date + 'T00:00:00').toLocaleDateString()}</span>
+                  <span>
+                    {new Date(workout.date + 'T00:00:00').toLocaleDateString()}
+                    {formatStartTime(workout) && ` • ${formatStartTime(workout)}`}
+                  </span>
                   <span>{workout.duration ? formatDuration(workout.duration) : 'N/A'}</span>
                 </div>
                 
