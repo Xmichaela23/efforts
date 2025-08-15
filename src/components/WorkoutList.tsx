@@ -12,6 +12,26 @@ interface WorkoutListProps {
 const WorkoutList: React.FC<WorkoutListProps> = ({ onWorkoutSelect }) => {
   const { workouts, deleteWorkout } = useAppContext();
 
+  // Format duration
+  const formatDuration = (duration: any): string => {
+    if (!duration) return '';
+    
+    const minutes = typeof duration === 'number' ? duration : parseInt(duration);
+    if (isNaN(minutes)) return '';
+    
+    if (minutes < 60) {
+      return `${minutes}min`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      if (remainingMinutes === 0) {
+        return `${hours}h`;
+      } else {
+        return `${hours}h ${remainingMinutes}min`;
+      }
+    }
+  };
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (confirm('Are you sure you want to delete this workout?')) {
@@ -65,7 +85,7 @@ const WorkoutList: React.FC<WorkoutListProps> = ({ onWorkoutSelect }) => {
           <CardContent>
             <div className="flex items-center justify-between text-sm text-muted-foreground">
                               <span>{new Date(workout.date + 'T00:00:00').toLocaleDateString()}</span>
-              <span>{workout.duration} minutes</span>
+              <span>{workout.duration ? formatDuration(workout.duration) : 'N/A'}</span>
               {workout.type === 'endurance' && workout.distance && (
                 <span>{workout.distance.toFixed(1)} km</span>
               )}

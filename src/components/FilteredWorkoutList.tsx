@@ -12,6 +12,26 @@ interface FilteredWorkoutListProps {
 
 const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSelect }) => {
   const { workouts, deleteWorkout } = useWorkouts();
+
+  // Format duration
+  const formatDuration = (duration: any): string => {
+    if (!duration) return '';
+    
+    const minutes = typeof duration === 'number' ? duration : parseInt(duration);
+    if (isNaN(minutes)) return '';
+    
+    if (minutes < 60) {
+      return `${minutes}min`;
+    } else {
+      const hours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      if (remainingMinutes === 0) {
+        return `${hours}h`;
+      } else {
+        return `${hours}h ${remainingMinutes}min`;
+      }
+    }
+  };
   const [selectedType, setSelectedType] = useState('all');
 
   const filteredWorkouts = selectedType === 'all' 
@@ -192,7 +212,7 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
               <CardContent>
                 <div className="flex items-center justify-between text-sm text-muted-foreground mb-2">
                   <span>{new Date(workout.date + 'T00:00:00').toLocaleDateString()}</span>
-                  <span>{workout.duration} minutes</span>
+                  <span>{workout.duration ? formatDuration(workout.duration) : 'N/A'}</span>
                 </div>
                 
                 {/* Enhanced metrics display */}
