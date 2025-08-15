@@ -6,6 +6,7 @@ import CompletedTab from './CompletedTab';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import PlannedWorkoutView from './PlannedWorkoutView';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -28,6 +29,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
   }
 
+  const { deletePlannedWorkout } = usePlannedWorkouts();
   const isCompleted = workout.workout_status === 'completed';
   const [activeTab, setActiveTab] = useState(isCompleted ? 'completed' : 'planned');
 
