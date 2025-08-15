@@ -160,7 +160,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             <div className="space-y-1">
               {workout.intervals.map((interval: any, index: number) => (
                 <div key={index} className="text-xs text-gray-600">
-                  {interval.name || `Interval ${index + 1}`}: {interval.time} @ {interval.effortLabel}
+                  {interval.effortLabel || `Segment ${index + 1}`}: {interval.time}
                 </div>
               ))}
             </div>
@@ -210,7 +210,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 <div key={index} className="p-3 border-l-2 border-gray-200 pl-4">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-sm text-gray-900">
-                      {interval.name || `Interval ${index + 1}`}
+                      {interval.effortLabel || `Segment ${index + 1}`}
                     </span>
                     {interval.time && (
                       <span className="text-xs text-gray-500 font-medium">
@@ -218,11 +218,6 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                       </span>
                     )}
                   </div>
-                  {interval.effortLabel && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      {interval.effortLabel}
-                    </div>
-                  )}
                   {interval.bpmTarget && (
                     <div className="text-xs text-gray-500 mt-1">
                       HR: {interval.bpmTarget}
