@@ -121,28 +121,62 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       // Calculate metric value based on selection
       let metricValue = null;
       switch (selectedMetric) {
-        case 'pace':
-          if (index > 0) {
-            const prevPoint = sampledGpsTrack[index - 1];
-            const distance = calculateDistance(
-              prevPoint.lat || prevPoint.latitudeInDegree,
-              prevPoint.lng || prevPoint.longitudeInDegree,
-              point.lat || point.latitudeInDegree,
-              point.lng || point.longitudeInDegree
-            );
-            const tCurr = getTimeSeconds(point);
-            const tPrev = getTimeSeconds(prevPoint);
-            const timeDiff = tCurr != null && tPrev != null ? (tCurr - tPrev) : null;
-            
-            if (timeDiff != null && timeDiff > 0 && distance > 0.001) {
-              const speedMph = (distance / timeDiff) * 3600; // distance in miles, time in seconds
-              // Much wider speed range and lower distance threshold for more data
-              if (speedMph >= 0.5 && speedMph <= 50) {
-                metricValue = Math.round((60 / speedMph) * 100) / 100; // Convert to pace
+        case 'pace': {
+          // Use Strava-like smoothing: prefer smoothed speed (speed_mps) with a short rolling window
+          const windowSec = 12; // ~10–15s smoothing
+          const tCurr = getTimeSeconds(point);
+          if (tCurr != null && index > 0) {
+            // Find the earliest index within the time window
+            let j = index - 1;
+            while (j > 0) {
+              const tPrev = getTimeSeconds(sampledGpsTrack[j]);
+              if (tPrev != null && (tCurr - tPrev) >= windowSec) break;
+              j--;
+            }
+            // Try averaging speed_mps if available
+            let hasSpeed = false;
+            let sumSpeedMps = 0;
+            let countSpeed = 0;
+            for (let k = j; k <= index; k++) {
+              const s = sampledGpsTrack[k]?.speed_mps;
+              if (Number.isFinite(s)) {
+                hasSpeed = true;
+                sumSpeedMps += s;
+                countSpeed++;
               }
+            }
+            let speedMpsAvg: number | null = null;
+            if (hasSpeed && countSpeed > 0) speedMpsAvg = sumSpeedMps / countSpeed;
+            // Fallback: compute distance/time over window
+            if (!Number.isFinite(speedMpsAvg as number)) {
+              let distMiles = 0;
+              for (let k = j + 1; k <= index; k++) {
+                const a = sampledGpsTrack[k - 1];
+                const b = sampledGpsTrack[k];
+                const d = calculateDistance(
+                  a.lat || a.latitudeInDegree, a.lng || a.longitudeInDegree,
+                  b.lat || b.latitudeInDegree, b.lng || b.longitudeInDegree
+                );
+                distMiles += d || 0;
+              }
+              const tStart = getTimeSeconds(sampledGpsTrack[j]);
+              if (tStart != null) {
+                const dt = tCurr - tStart; // seconds
+                if (dt > 0 && distMiles > 0.02) {
+                  const speedMph = (distMiles / dt) * 3600;
+                  speedMpsAvg = speedMph * 0.44704; // mph → m/s
+                }
+              }
+            }
+            if (Number.isFinite(speedMpsAvg as number) && (speedMpsAvg as number) > 0) {
+              // Convert to pace (min/mi)
+              const speedMph = (speedMpsAvg as number) * 2.23694;
+              const paceMinPerMile = 60 / speedMph;
+              metricValue = Math.round(paceMinPerMile * 100) / 100;
             }
           }
           break;
+        }
           
         case 'heartrate':
           // Try multiple sources for heart rate data
@@ -209,43 +243,41 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
           
           break;
           
-        case 'vam':
+        case 'vam': {
           if (index > 0) {
-            // Use a wider window for more stable VAM calculation
-            const windowSize = Math.min(15, index); // Look back up to 15 points
-            const startIndex = Math.max(0, index - windowSize);
-            
-            let totalElevationGain = 0;
-            let totalTime = 0;
-            
-            for (let i = startIndex + 1; i <= index; i++) {
-              const prevPoint = sampledGpsTrack[i - 1];
-              const currentPoint = sampledGpsTrack[i];
-              
-              const prevElevation = prevPoint.elevation || prevPoint.altitude || 0;
-              const currentElevation = currentPoint.elevation || currentPoint.altitude || 0;
-              const elevationGain = currentElevation - prevElevation; // Allow negative for descents
-              
-              const prevTime = getTimeSeconds(prevPoint) ?? 0;
-              const currentTime = getTimeSeconds(currentPoint) ?? 0;
-              const timeDiff = currentTime - prevTime; // seconds
-              
-              if (timeDiff > 0) {
-                totalElevationGain += elevationGain;
-                totalTime += timeDiff;
+            // Time-based window for stability (≈ 30s)
+            const windowSec = 30;
+            const tCurr = getTimeSeconds(point);
+            if (tCurr != null) {
+              let j = index - 1;
+              while (j > 0) {
+                const tPrev = getTimeSeconds(sampledGpsTrack[j]);
+                if (tPrev != null && (tCurr - tPrev) >= windowSec) break;
+                j--;
               }
-            }
-            
-            if (totalTime > 0) {
-              const timeHours = totalTime / 3600; // seconds → hours
-              const vam = totalElevationGain / timeHours;
-              // Only show meaningful VAM values (filter out noise)
-              if (Math.abs(vam) > 5) { // Lower threshold for more data
-                metricValue = Math.round(vam);
+              let gain = 0;
+              let totalSec = 0;
+              for (let k = j + 1; k <= index; k++) {
+                const a = sampledGpsTrack[k - 1];
+                const b = sampledGpsTrack[k];
+                const elevA = a.elevation || a.altitude || 0;
+                const elevB = b.elevation || b.altitude || 0;
+                const tA = getTimeSeconds(a) ?? 0;
+                const tB = getTimeSeconds(b) ?? 0;
+                const dt = tB - tA;
+                if (dt > 0) {
+                  gain += (elevB - elevA);
+                  totalSec += dt;
+                }
+              }
+              if (totalSec > 0) {
+                const vam = gain / (totalSec / 3600); // m per hour
+                if (Math.abs(vam) > 5) metricValue = Math.round(vam);
               }
             }
           }
           break;
+        }
       }
       
       return {
