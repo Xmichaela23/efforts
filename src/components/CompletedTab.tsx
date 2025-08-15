@@ -844,7 +844,8 @@ const formatPace = (paceValue: any): string => {
    }
    
    // Calculate GAP
-   const gapPaceMinutes = actualPaceMinutes - gapAdjustment;
+   // Uphill: add penalty (slower pace), Downhill: subtract benefit (faster pace)
+   const gapPaceMinutes = actualPaceMinutes + gapAdjustment;
    
    // Format GAP pace (don't go below 0)
    const gapPace = formatPace(Math.max(0, gapPaceMinutes));
