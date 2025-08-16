@@ -137,43 +137,31 @@ export default function GetStrongerFasterBuilder() {
 
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium mb-1">Include strength</div>
-            <div className="flex gap-2">
-              {([true,false] as const).map(v => (
-                <button key={String(v)} onClick={() => setCfg(prev=>({...prev, includeStrength: v, strengthDaysPerWeek: v ? prev.strengthDaysPerWeek : 0 }))}
-                  className={`px-3 py-1 border rounded ${cfg.includeStrength===v? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{v? 'Yes':'No'}</button>
-              ))}
-            </div>
-          </div>
-
-          <div aria-disabled={!cfg.includeStrength}>
             <div className="text-sm font-medium mb-1">Strength focus</div>
             <div className="flex gap-2">
               {(['power','endurance','hybrid'] as StrengthTrack[]).map(t => (
-                <button key={t} onClick={() => cfg.includeStrength && setCfg(prev=>({...prev, strengthTrack: t }))}
-                  disabled={!cfg.includeStrength}
-                  className={`px-3 py-1 border rounded ${cfg.strengthTrack===t? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{t}</button>
+                <button key={t} onClick={() => setCfg(prev=>({...prev, strengthTrack: t }))}
+                  className={`px-3 py-1 border rounded ${cfg.strengthTrack===t? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{t}</button>
               ))}
             </div>
           </div>
 
-          <div aria-disabled={!cfg.includeStrength}>
+          <div>
             <div className="text-sm font-medium mb-1">Strength days/week</div>
             <div className="flex gap-2">
-              {[0,1,2,3].map(n => (
-                <button key={n} onClick={() => cfg.includeStrength && setCfg(prev=>({...prev, strengthDaysPerWeek: n as 0|1|2|3 }))}
-                  disabled={!cfg.includeStrength}
-                  className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
+              {[2,3].map(n => (
+                <button key={n} onClick={() => setCfg(prev=>({...prev, strengthDaysPerWeek: n as 0|1|2|3 }))}
+                  className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{n}</button>
               ))}
             </div>
           </div>
 
-          <div aria-disabled={!cfg.includeStrength}>
+          <div>
             <div className="text-sm font-medium mb-1">Preferred strength days</div>
             <div className="flex flex-wrap gap-2">
               {(['Mon','Wed','Fri'] as Day[]).map(d => (
-                <button key={d} onClick={() => cfg.includeStrength && onStrengthPrefToggle(d)} disabled={!cfg.includeStrength}
-                  className={`px-2 py-1 border rounded text-sm ${(cfg.strengthDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
+                <button key={d} onClick={() => onStrengthPrefToggle(d)}
+                  className={`px-2 py-1 border rounded text-sm ${(cfg.strengthDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
               ))}
             </div>
           </div>
