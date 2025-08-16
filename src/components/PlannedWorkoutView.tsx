@@ -1,5 +1,6 @@
 import React from 'react';
-import { Calendar, Clock, Target, Dumbbell, MapPin, Info } from 'lucide-react';
+import { Clock, Target, Dumbbell, MapPin, Info } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 
 export interface PlannedWorkout {
@@ -11,7 +12,7 @@ export interface PlannedWorkout {
   duration?: number;
   intervals?: any[];
   strength_exercises?: any[];
-  workout_status: 'planned' | 'in_progress' | 'completed';
+  workout_status: 'planned' | 'in_progress' | 'completed' | 'sent_to_garmin';
   source?: 'manual' | 'plan_template' | 'training_plan';
   training_plan_id?: string;
   week_number?: number;
@@ -82,6 +83,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       case 'planned': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'completed': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'sent_to_garmin': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -292,8 +294,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         )}
 
         {/* Action Buttons */}
-        {(onEdit || onComplete || onDelete) && (
+        {(onEdit || onComplete || onDelete || true) && (
           <div className="flex gap-2 pt-2">
+            {/* Send to Garmin */}
+            {['run','ride','swim','strength'].includes(workout.type) && (
+              <SendToGarminButton workoutId={workout.id} disabled={workout.workout_status === 'sent_to_garmin'} />
+            )}
             {onEdit && (
               <button
                 onClick={onEdit}
@@ -322,6 +328,45 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         )}
       </div>
     </div>
+  );
+};
+
+const SendToGarminButton: React.FC<{ workoutId: string; disabled?: boolean }> = ({ workoutId, disabled }) => {
+  const [isSending, setIsSending] = React.useState(false);
+
+  const handleSend = async () => {
+    try {
+      setIsSending(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Please sign in');
+        return;
+      }
+      const { error } = await supabase.functions.invoke('send-workout-to-garmin', {
+        body: { workoutId, userId: user.id }
+      });
+      if (error) throw error;
+      alert('Sent to Garmin');
+    } catch (e: any) {
+      console.error(e);
+      alert(`Failed to send: ${e?.message || 'Unknown error'}`);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
+  return (
+    <button
+      disabled={disabled || isSending}
+      onClick={handleSend}
+      className={`px-3 py-1.5 text-sm border rounded transition-colors ${
+        disabled || isSending
+          ? 'text-gray-400 border-gray-200 cursor-not-allowed'
+          : 'text-indigo-600 hover:text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+      }`}
+    >
+      {isSending ? 'Sending…' : 'Send to Garmin'}
+    </button>
   );
 };
 
