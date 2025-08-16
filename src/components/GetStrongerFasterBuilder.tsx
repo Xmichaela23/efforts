@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { buildGetStrongerFaster8w } from '@/services/plans/skeletons/get_stronger_faster_8w';
 import { composeWeek } from '@/services/plans/compose';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
@@ -57,6 +57,14 @@ export default function GetStrongerFasterBuilder() {
     return { total: '5–6', strength: '2–3' };
   }, [cfg.timeLevel]);
 
+  // Auto-set quality days based on level (science-backed defaults)
+  useEffect(() => {
+    const wanted: 1 | 2 = cfg.timeLevel === 'beginner' ? 1 : 2;
+    if (cfg.runQualityDays !== wanted) {
+      setCfg(prev => ({ ...prev, runQualityDays: wanted }));
+    }
+  }, [cfg.timeLevel]);
+
   const onChipToggle = (d: Day) => {
     setCfg(prev => ({
       ...prev,
@@ -103,6 +111,7 @@ export default function GetStrongerFasterBuilder() {
             </div>
           </div>
           <p className="text-xs text-gray-500">Recommended: {rec.total} days/week (including {rec.strength} strength)</p>
+          <p className="text-xs text-gray-500">Quality run days/week: {cfg.timeLevel === 'beginner' ? '1' : '2'}</p>
 
           <div>
             <div className="text-sm font-medium mb-1">Available days</div>
@@ -124,15 +133,7 @@ export default function GetStrongerFasterBuilder() {
             </div>
           </div>
 
-          <div>
-            <div className="text-sm font-medium mb-1">Run quality days</div>
-            <div className="flex gap-2">
-              {[1,2].map(n => (
-                <button key={n} onClick={() => setCfg(prev=>({...prev, runQualityDays: n as 1|2 }))}
-                  className={`px-3 py-1 border rounded ${cfg.runQualityDays===n? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{n}</button>
-              ))}
-            </div>
-          </div>
+          {/* Quality run days are auto-determined by experience level */}
         </div>
 
         <div className="space-y-3">
