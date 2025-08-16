@@ -1,12 +1,12 @@
 import React from 'react';
-import SimplePlanBuilder from './SimplePlanBuilder';
+import GetStrongerFasterBuilder from './GetStrongerFasterBuilder';
 
 export default function PlanBuilder() {
   console.log('🎯 PlanBuilder component rendering');
 
   return (
     <div className="w-full">
-      <SimplePlanBuilder />
+      <GetStrongerFasterBuilder />
     </div>
   );
 }
