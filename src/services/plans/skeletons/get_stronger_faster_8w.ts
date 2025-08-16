@@ -33,10 +33,10 @@ export function buildGetStrongerFaster8w(cfg: PlanConfig): { weeks: SkeletonWeek
       slots.push({ day, poolId });
     });
 
-    // Strength (only if included)
-    if (cfg.includeStrength && cfg.strengthDaysPerWeek > 0 && strengthPoolId) {
+    // Strength (mandatory for this plan when days/week > 0)
+    if ((cfg.strengthDaysPerWeek ?? 0) > 0 && strengthPoolId) {
       strengthDays.forEach(d => {
-        if (isAvail(d)) slots.push({ day: d, poolId: strengthPoolId, optional: true });
+        if (isAvail(d)) slots.push({ day: d, poolId: strengthPoolId });
       });
     }
 
