@@ -40,6 +40,12 @@ export function buildGetStrongerFaster8w(cfg: PlanConfig): { weeks: SkeletonWeek
       });
     }
 
+    // Mobility slots (optional, stackable, not hard)
+    const existingDays = slots.map(s => s.day);
+    deriveMobilityDays(cfg, existingDays).forEach(d => {
+      slots.push({ day: d, poolId: 'mobility_pool', optional: true });
+    });
+
     // Easy runs: add only up to target per time level (do not fill every available day)
     const remaining = order.filter(d => isAvail(d) && !slots.find(s => s.day === d));
     const easyTarget = targetEasyDays(cfg);
@@ -104,6 +110,22 @@ function deriveRunQualityDays(cfg: PlanConfig): Day[] {
     }
   }
   return out.slice(0, want);
+}
+
+function deriveMobilityDays(cfg: PlanConfig, already: Day[]): Day[] {
+  const want = Math.max(0, Math.min(cfg.mobilityDaysPerWeek ?? 2, 5));
+  if (!cfg.includeMobility || want === 0) return [];
+  const prefs = (cfg.mobilityDaysPreferred ?? []).filter(d => cfg.availableDays.includes(d));
+  const order: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const used = new Set(already);
+  const menu = [...prefs, ...order].filter((d, i, self) => self.indexOf(d) === i);
+  const out: Day[] = [];
+  for (const d of menu) {
+    if (!cfg.availableDays.includes(d)) continue;
+    out.push(d);
+    if (out.length >= want) break;
+  }
+  return out;
 }
 
 function targetEasyDays(cfg: PlanConfig): number {

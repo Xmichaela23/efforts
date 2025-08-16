@@ -2,13 +2,14 @@ import { SkeletonWeek, Baselines, Template } from './types';
 import { poolsById, selectTemplateId } from './pools';
 import { runTemplates } from './templates/run';
 import { strengthTemplates } from './templates/strength';
+import { mobilityTemplates } from './templates/mobility';
 import type { SessionTemplate } from '../Seventy3Template';
 
 const templateIndex: Record<string, { name: string; discipline: 'run'|'ride'|'swim'|'strength'; hardness: 'easy'|'moderate'|'hard'; baseDurationMin?: number }> = {};
 const templateFullIndex: Record<string, Template> = {};
 
 function registerTemplates() {
-  [...runTemplates, ...strengthTemplates].forEach(t => {
+  [...runTemplates, ...strengthTemplates, ...mobilityTemplates].forEach(t => {
     templateIndex[t.id] = {
       name: t.name,
       discipline: t.discipline as any,

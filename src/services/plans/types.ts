@@ -95,6 +95,10 @@ export interface PlanConfig {
   strengthDaysPreferred?: Day[];
   strengthTrack?: StrengthTrack;
   includeStrength: boolean;
+  // Mobility options
+  includeMobility?: boolean;
+  mobilityDaysPerWeek?: 0|1|2|3|4|5;
+  mobilityDaysPreferred?: Day[];
 }
 
 export const HardCaps = {

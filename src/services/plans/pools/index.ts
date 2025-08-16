@@ -1,4 +1,5 @@
 import { Pool } from '../types';
+import { mobility_reset_10_v1 } from '../templates/mobility';
 
 export const run_speed_vo2_pool: Pool = {
   id: 'run_speed_vo2_pool',
@@ -60,6 +61,16 @@ export const strength_full_pool: Pool = {
 Object.assign(poolsById, {
   [run_easy_pool.id]: run_easy_pool,
   [strength_full_pool.id]: strength_full_pool
+});
+// Mobility pool
+export const mobility_pool: Pool = {
+  id: 'mobility_pool',
+  templateIds: ['mobility_reset_10_v1','mobility_hips_ankles_15_v1','mobility_tspine_shoulders_12_v1'],
+  selection: { mode: 'roundRobin' }
+};
+
+Object.assign(poolsById, {
+  [mobility_pool.id]: mobility_pool
 });
 
 // Strength track pools (map to specific templates; can diversify later)

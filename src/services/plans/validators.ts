@@ -17,7 +17,10 @@ export function countHard(slots: SkeletonWeek['slots']): number {
   return slots.filter(s =>
     s.poolId === 'run_speed_vo2_pool' ||
     s.poolId === 'run_threshold_pool' ||
-    s.poolId === 'strength_full_pool'
+    s.poolId === 'strength_full_pool' ||
+    s.poolId === 'strength_power_pool' ||
+    s.poolId === 'strength_endurance_pool' ||
+    s.poolId === 'strength_hybrid_pool'
   ).length;
 }
 
@@ -44,7 +47,7 @@ export function enforceHardCap(week: SkeletonWeek): ValidationResult {
 export function enforceSpacing(week: SkeletonWeek): ValidationResult {
   const notes: ValidationNote[] = [];
   const order: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-  const isHard = (pId: string) => pId === 'run_speed_vo2_pool' || pId === 'run_threshold_pool' || pId === 'strength_full_pool';
+  const isHard = (pId: string) => pId === 'run_speed_vo2_pool' || pId === 'run_threshold_pool' || pId.startsWith('strength_');
   for (let i=0; i<order.length-1; i++) {
     const d = order[i], n = order[i+1];
     const a = week.slots.find(s=>s.day===d);
