@@ -66,7 +66,9 @@ export default function GetStrongerFasterBuilder() {
   };
 
   const weekSessions = sessionsByWeek.get(currentWeek) || [];
-  const totalMinutes = weekSessions.reduce((t, s) => t + (s.duration || 0), 0);
+  const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const sortedSessions = [...weekSessions].sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
+  const totalMinutes = sortedSessions.reduce((t, s) => t + (s.duration || 0), 0);
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
@@ -171,7 +173,7 @@ export default function GetStrongerFasterBuilder() {
         </div>
 
         <div className="space-y-3">
-          {weekSessions.map((s, idx) => (
+          {sortedSessions.map((s, idx) => (
             <div key={idx} className="border border-gray-200 rounded p-3">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium">{s.day}</div>

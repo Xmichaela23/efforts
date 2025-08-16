@@ -13,7 +13,7 @@ export default function PlanBuilder() {
     return (
       <div className="max-w-3xl mx-auto p-4">
         <h2 className="text-2xl font-semibold mb-4">Plans</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="flex flex-col gap-2">
           {([
             { id: 'run', label: 'Run' },
             { id: 'ride', label: 'Ride' },
@@ -21,9 +21,12 @@ export default function PlanBuilder() {
             { id: 'swim', label: 'Swim' },
             { id: 'hybrid', label: 'Hybrid' },
           ] as {id: Discipline; label: string}[]).map(d => (
-            <button key={d.id} onClick={() => setDiscipline(d.id)}
-              className="p-4 border border-gray-300 rounded hover:border-gray-400 text-left">
-              <div className="font-medium">{d.label}</div>
+            <button
+              key={d.id}
+              onClick={() => setDiscipline(d.id)}
+              className="w-full py-3 text-left text-lg hover:bg-gray-50 focus:bg-gray-50 border-none outline-none ring-0 focus:outline-none focus:ring-0"
+            >
+              {d.label}
             </button>
           ))}
         </div>
@@ -40,9 +43,11 @@ export default function PlanBuilder() {
           <h2 className="text-xl font-semibold">Run Plans</h2>
           <div />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          <button onClick={() => setPlanId('get_stronger_faster_8w')}
-            className="p-4 border border-gray-300 rounded hover:border-gray-400 text-left">
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => setPlanId('get_stronger_faster_8w')}
+            className="w-full py-3 text-left hover:bg-gray-50 focus:bg-gray-50 border-none outline-none ring-0 focus:outline-none focus:ring-0"
+          >
             <div className="font-medium">Get Stronger Faster</div>
             <div className="text-sm text-gray-600">8 weeks • VO2 + Threshold • Optional strength</div>
           </button>
