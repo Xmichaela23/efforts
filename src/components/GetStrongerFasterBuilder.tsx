@@ -51,6 +51,12 @@ export default function GetStrongerFasterBuilder() {
     return { weeks: built.weeks, sessionsByWeek: sessions };
   }, [cfg]);
 
+  const rec = useMemo(() => {
+    if (cfg.timeLevel === 'beginner') return { total: '3–4', strength: '2' };
+    if (cfg.timeLevel === 'advanced') return { total: '6–7', strength: '3' };
+    return { total: '5–6', strength: '2–3' };
+  }, [cfg.timeLevel]);
+
   const onChipToggle = (d: Day) => {
     setCfg(prev => ({
       ...prev,
@@ -96,6 +102,7 @@ export default function GetStrongerFasterBuilder() {
               ))}
             </div>
           </div>
+          <p className="text-xs text-gray-500">Recommended: {rec.total} days/week (including {rec.strength} strength)</p>
 
           <div>
             <div className="text-sm font-medium mb-1">Available days</div>
