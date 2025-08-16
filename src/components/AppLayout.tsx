@@ -671,6 +671,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onSelectRoutine={handleSelectRoutine}
                 currentPlans={currentPlans}
                 completedPlans={completedPlans}
+                onOpenPlanBuilder={handleOpenPlanBuilder}
               />
               <AllEffortsDropdown onSelectWorkout={handleEditEffort} />
             </div>

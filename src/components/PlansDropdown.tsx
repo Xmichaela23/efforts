@@ -138,7 +138,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
-          <span>Build a plan</span>
+          <span>Select a plan</span>
         </DropdownMenuItem>
 
         {/* Show All Plans if there are any plans or as fallback */}
