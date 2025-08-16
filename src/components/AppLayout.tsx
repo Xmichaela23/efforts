@@ -617,6 +617,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 initialDate={selectedDate}
                 sourceContext={builderSourceContext}
                 onNavigateToPlans={handleNavigateToPlans}
+                onOpenPlanBuilder={handleOpenPlanBuilder}
               />
             </div>
           ) : selectedWorkout ? (
