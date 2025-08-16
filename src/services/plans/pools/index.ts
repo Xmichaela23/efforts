@@ -65,19 +65,19 @@ Object.assign(poolsById, {
 // Strength track pools (map to specific templates; can diversify later)
 export const strength_power_pool: Pool = {
   id: 'strength_power_pool',
-  templateIds: ['strength_full_A_v1'],
+  templateIds: ['strength_power_A_v1'],
   selection: { mode: 'roundRobin' }
 };
 
 export const strength_endurance_pool: Pool = {
   id: 'strength_endurance_pool',
-  templateIds: ['strength_full_A_v1'],
+  templateIds: ['strength_endurance_A_v1'],
   selection: { mode: 'roundRobin' }
 };
 
 export const strength_hybrid_pool: Pool = {
   id: 'strength_hybrid_pool',
-  templateIds: ['strength_full_A_v1'],
+  templateIds: ['strength_hybrid_A_v1'],
   selection: { mode: 'roundRobin' }
 };
 

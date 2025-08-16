@@ -177,16 +177,21 @@ export default function GetStrongerFasterBuilder() {
         </div>
 
         <div className="space-y-3">
-          {sortedSessions.map((s, idx) => (
+          {sortedSessions.map((s, idx) => {
+            const detail = s.discipline === 'strength'
+              ? (/(Neural)/i.test(s.description) ? 'neural' : 'strength')
+              : `${s.type} • ${s.intensity}`;
+            return (
             <div key={idx} className="border border-gray-200 rounded p-3">
               <div className="flex items-center justify-between">
                 <div className="text-sm font-medium">{s.day}</div>
                 <div className="text-xs text-gray-500">{s.duration} min</div>
               </div>
-              <div className="text-sm text-gray-700">{s.discipline} • {s.type} • {s.intensity}</div>
+              <div className="text-sm text-gray-700">{s.discipline} • {detail}</div>
               <div className="text-sm text-gray-600">{s.description}</div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

@@ -1,10 +1,11 @@
-import { SkeletonWeek, Baselines } from './types';
+import { SkeletonWeek, Baselines, Template } from './types';
 import { poolsById, selectTemplateId } from './pools';
 import { runTemplates } from './templates/run';
 import { strengthTemplates } from './templates/strength';
 import type { SessionTemplate } from '../Seventy3Template';
 
 const templateIndex: Record<string, { name: string; discipline: 'run'|'ride'|'swim'|'strength'; hardness: 'easy'|'moderate'|'hard'; baseDurationMin?: number }> = {};
+const templateFullIndex: Record<string, Template> = {};
 
 function registerTemplates() {
   [...runTemplates, ...strengthTemplates].forEach(t => {
@@ -14,6 +15,7 @@ function registerTemplates() {
       hardness: t.hardness,
       baseDurationMin: t.baseDurationMin
     };
+    templateFullIndex[t.id] = t as Template;
   });
 }
 registerTemplates();
@@ -59,7 +61,21 @@ export function composeWeek(params: {
 
     const type = hardnessToType(meta.hardness);
     const intensity = hardnessToIntensity(meta.hardness);
-    const duration = Math.max(1, Math.round((meta.baseDurationMin ?? 45))); // minutes
+
+    // Progressive overload scaling
+    let baseMin = (meta.baseDurationMin ?? 45);
+    let scale = 1;
+    const full = templateFullIndex[templateId];
+    const weekRule = full?.progressionRule?.weeks?.[params.weekNum];
+    const phaseRule = full?.progressionRule?.byPhase?.[params.skeletonWeek.phase];
+    const applied = { ...(phaseRule || {}), ...(weekRule || {}) } as any;
+    if (applied?.duration_scale != null) {
+      scale *= applied.duration_scale;
+    }
+    if (params.skeletonWeek.policies?.taperMultiplier && params.skeletonWeek.phase === 'taper') {
+      scale *= params.skeletonWeek.policies.taperMultiplier;
+    }
+    const duration = Math.max(1, Math.round(baseMin * scale));
 
     sessions.push({
       day: dayMap[slot.day] || slot.day,
