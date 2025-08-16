@@ -73,6 +73,9 @@ export default function GetStrongerFasterBuilder() {
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-6">
       <h2 className="text-2xl font-semibold">Get Stronger Faster (8 weeks)</h2>
+      <p className="text-sm text-gray-700">
+        8 weeks to get faster and stronger. For runners who want sharper 5K–10K times and the durability strength brings.
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-3">
