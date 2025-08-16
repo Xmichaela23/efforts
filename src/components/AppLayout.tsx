@@ -581,6 +581,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 completedPlans={completedPlans}
                 detailedPlans={detailedPlans}
                 onDeletePlan={handlePlanDeleted}
+                onSelectWorkout={(w) => {
+                  setSelectedWorkout(w);
+                }}
               />
             </div>
           ) : showStrengthLogger ? (

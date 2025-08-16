@@ -24,6 +24,7 @@ interface AllPlansInterfaceProps {
   currentPlans?: Plan[];
   completedPlans?: Plan[];
   detailedPlans?: any;
+  onSelectWorkout?: (workout: any) => void;
 }
 
 const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ 
@@ -33,7 +34,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   onDeletePlan,
   currentPlans = [],
   completedPlans = [],
-  detailedPlans = {}
+  detailedPlans = {},
+  onSelectWorkout
 }) => {
   const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>('list');
@@ -1029,7 +1031,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           <h2 className="text-lg font-medium text-gray-900">Planned Workouts</h2>
           <div className="space-y-2">
             {plannedWorkouts.slice(0, 5).map((workout) => (
-              <div key={workout.id} className="border-l-2 border-blue-200 pl-4 py-2">
+              <div 
+                key={workout.id} 
+                className="border-l-2 border-blue-200 pl-4 py-2 cursor-pointer hover:bg-gray-50 rounded"
+                onClick={() => {
+                  if (onSelectWorkout) onSelectWorkout(workout);
+                }}
+              >
                 <PlannedWorkoutView 
                   workout={workout}
                   compact={true}

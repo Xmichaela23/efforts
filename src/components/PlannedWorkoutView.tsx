@@ -107,7 +107,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
         <div className={`text-xs font-bold px-2 py-1 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm truncate text-gray-900">{workout.name}</h4>
+          <h4 className="font-medium text-sm truncate text-gray-900">{workout.name || (workout as any).focus || 'Planned Workout'}</h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span>{formatDate(workout.date)}</span>
             {workout.duration && (
@@ -133,7 +133,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             <div className="flex items-center gap-3">
               <div className={`text-sm font-bold px-3 py-2 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
               <div>
-                <h3 className="text-lg font-semibold">{workout.name}</h3>
+                <h3 className="text-lg font-semibold">{workout.name || (workout as any).focus || 'Planned Workout'}</h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <span>{formatDate(workout.date)}</span>
                   {workout.duration && (
@@ -161,19 +161,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 
       <div className="space-y-4">
         {/* Workout Structure Display */}
-        {workout.intervals && workout.intervals.length > 0 && (
-          <div className="border-l-2 border-blue-200 pl-4 py-2">
-            <h4 className="font-semibold text-sm text-gray-900 mb-2">{workout.name}</h4>
-            <div className="space-y-1">
-              {workout.intervals.map((interval: any, index: number) => (
-                <div key={index} className="text-sm">
-                  <span className="font-medium text-gray-900">{interval.effortLabel || `Segment ${index + 1}`}</span>
-                  <span className="text-gray-600"> — {interval.time}{getTargetSuffix(interval)}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Removed legacy top summary block per design request */}
         
         {workout.strength_exercises && workout.strength_exercises.length > 0 && (
           <div className="border-l-2 border-blue-200 pl-4 py-2">
