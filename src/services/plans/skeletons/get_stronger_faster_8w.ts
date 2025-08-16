@@ -40,10 +40,10 @@ export function buildGetStrongerFaster8w(cfg: PlanConfig): { weeks: SkeletonWeek
       });
     }
 
-    // Easy runs fill rest
-    order
-      .filter(d => isAvail(d) && !slots.find(s => s.day === d))
-      .forEach(d => slots.push({ day: d, poolId: 'run_easy_pool', optional: true }));
+    // Easy runs: add only up to target per time level (do not fill every available day)
+    const remaining = order.filter(d => isAvail(d) && !slots.find(s => s.day === d));
+    const easyTarget = targetEasyDays(cfg);
+    remaining.slice(0, easyTarget).forEach(d => slots.push({ day: d, poolId: 'run_easy_pool', optional: true }));
 
     const week: SkeletonWeek = {
       weekNumber: w,
@@ -104,6 +104,20 @@ function deriveRunQualityDays(cfg: PlanConfig): Day[] {
     }
   }
   return out.slice(0, want);
+}
+
+function targetEasyDays(cfg: PlanConfig): number {
+  // Simple rule by time availability; can later factor in weeklyHoursTarget
+  switch (cfg.timeLevel) {
+    case 'beginner':
+      return 1; // long run + 1–2 quality already set; add 1 easy
+    case 'intermediate':
+      return 2;
+    case 'advanced':
+      return 3;
+    default:
+      return 2;
+  }
 }
 
 

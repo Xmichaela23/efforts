@@ -77,11 +77,15 @@ export default function GetStrongerFasterBuilder() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium mb-1">Time level</div>
+            <div className="text-sm font-medium mb-1">Experience</div>
             <div className="flex gap-2">
-              {(['beginner','intermediate','advanced'] as const).map(t => (
-                <button key={t} onClick={() => setCfg(prev=>({...prev, timeLevel: t }))}
-                  className={`px-3 py-1 border rounded ${cfg.timeLevel===t? 'border-gray-900':'border-gray-300'}`}>{t}</button>
+              {([
+                { key: 'beginner', label: 'New to running' },
+                { key: 'intermediate', label: 'Experienced' },
+                { key: 'advanced', label: 'Very experienced' }
+              ] as const).map(l => (
+                <button key={l.key} onClick={() => setCfg(prev=>({...prev, timeLevel: l.key }))}
+                  className={`px-3 py-1 border rounded ${cfg.timeLevel===l.key? 'border-gray-900':'border-gray-300'}`}>{l.label}</button>
               ))}
             </div>
           </div>
