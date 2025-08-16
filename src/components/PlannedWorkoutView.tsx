@@ -163,11 +163,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         {/* Workout Structure Display */}
         {workout.intervals && workout.intervals.length > 0 && (
           <div className="border-l-2 border-blue-200 pl-4 py-2">
-            <h4 className="font-medium text-sm text-gray-700 mb-2">Workout Structure:</h4>
+            <h4 className="font-semibold text-sm text-gray-900 mb-2">{workout.name}</h4>
             <div className="space-y-1">
               {workout.intervals.map((interval: any, index: number) => (
-                <div key={index} className="text-sm text-gray-600">
-                  {interval.effortLabel} {interval.time}{getTargetSuffix(interval)}
+                <div key={index} className="text-sm">
+                  <span className="font-medium text-gray-900">{interval.effortLabel || `Segment ${index + 1}`}</span>
+                  <span className="text-gray-600"> — {interval.time}{getTargetSuffix(interval)}</span>
                 </div>
               ))}
             </div>

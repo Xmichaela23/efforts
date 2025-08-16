@@ -80,20 +80,31 @@ serve(async (req) => {
     // Fetch user's Garmin tokens
     const { data: conn, error: connErr } = await supabase
       .from('user_connections')
-      .select('garmin_access_token, garmin_refresh_token')
+      .select('access_token, refresh_token, expires_at')
       .eq('user_id', userId)
       .eq('provider', 'garmin')
       .single()
 
-    if (connErr || !conn?.garmin_access_token) {
+    if (connErr || !conn?.access_token) {
       return json({ error: 'Garmin connection not found' }, 400)
     }
 
     const garminPayload = convertWorkoutToGarmin(workout)
 
-    const sendResult = await sendToGarmin(garminPayload, conn.garmin_access_token)
+    const sendResult = await sendToGarmin(garminPayload, conn.access_token)
     if (!sendResult.success) {
       return json({ error: 'Failed to send to Garmin', details: sendResult.error }, 502)
+    }
+
+    // Try to schedule to user's Garmin Calendar on the workout date (best-effort)
+    let scheduleResult: { success: boolean; scheduleId?: string; error?: string } | null = null
+    if (workout.date) {
+      scheduleResult = await scheduleWorkoutOnDate({
+        garminWorkoutId: sendResult.workoutId!,
+        date: workout.date,
+        sport: mapWorkoutType(workout.type),
+        accessToken: conn.access_token
+      })
     }
 
     // Mark as sent
@@ -102,7 +113,7 @@ serve(async (req) => {
       .update({ workout_status: 'sent_to_garmin', updated_at: new Date().toISOString() })
       .eq('id', workoutId)
 
-    return json({ success: true, garminWorkoutId: sendResult.workoutId })
+    return json({ success: true, garminWorkoutId: sendResult.workoutId, scheduled: scheduleResult?.success ?? false, scheduleError: scheduleResult?.error })
   } catch (err: any) {
     return json({ error: 'Internal error', details: err?.message ?? String(err) }, 500)
   }
@@ -112,7 +123,8 @@ function corsHeaders(): HeadersInit {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    // Allow headers used by supabase-js when invoking functions
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, X-Client-Info, x-client-info, X-Supabase-Authorization'
   }
 }
 
@@ -131,9 +143,32 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const intervals = Array.isArray(workout.intervals) ? workout.intervals : []
 
   for (const interval of intervals) {
+    // Handle repeat blocks with child segments
+    if (Array.isArray(interval?.segments) && interval?.repeatCount && interval.repeatCount > 0) {
+      for (let r = 0; r < Number(interval.repeatCount); r += 1) {
+        for (const seg of interval.segments) {
+          const sIntensity = mapEffortToIntensity(String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim())
+          const sSeconds = parseTimeToSeconds(String(seg?.time ?? '0'))
+          const step: GarminStep = {
+            type: 'WorkoutStep',
+            stepId,
+            stepOrder: stepId,
+            intensity: sIntensity,
+            description: String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim() || undefined,
+            durationType: 'TIME',
+            durationValue: sSeconds > 0 ? sSeconds : 0
+          }
+          applyTargets(step, seg, interval)
+          steps.push(step)
+          stepId += 1
+        }
+      }
+      continue
+    }
+
+    // Simple single step
     const intensity = mapEffortToIntensity(String(interval?.effortLabel ?? '').trim())
     const seconds = parseTimeToSeconds(String(interval?.time ?? '0'))
-
     const step: GarminStep = {
       type: 'WorkoutStep',
       stepId,
@@ -143,69 +178,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       durationType: 'TIME',
       durationValue: seconds > 0 ? seconds : 0
     }
-
-    // Targets (one primary; support low/high if range)
-    // Order of precedence: pace, power, heart rate, cadence
-    if (interval?.paceTarget) {
-      const pace = String(interval.paceTarget)
-      const paceParsed = parsePaceToMetersPerSecond(pace)
-      if (paceParsed && (paceParsed.value || (paceParsed.low && paceParsed.high))) {
-        step.targetType = 'PACE'
-        step.targetValueType = 'PACE'
-        if (paceParsed.low && paceParsed.high) {
-          step.targetValueLow = paceParsed.low
-          step.targetValueHigh = paceParsed.high
-        } else if (paceParsed.value) {
-          step.targetValue = paceParsed.value
-        }
-      }
-    } else if (interval?.powerTarget) {
-      const pow = parseRangeNumber(String(interval.powerTarget))
-      step.targetType = 'POWER'
-      step.targetValueType = 'POWER'
-      if (pow.low != null && pow.high != null) {
-        step.targetValueLow = pow.low
-        step.targetValueHigh = pow.high
-      } else if (pow.value != null) {
-        step.targetValue = pow.value
-      }
-    } else if (interval?.bpmTarget) {
-      const hr = parseRangeNumber(String(interval.bpmTarget))
-      step.targetType = 'HEART_RATE'
-      step.targetValueType = 'HEART_RATE'
-      if (hr.low != null && hr.high != null) {
-        step.targetValueLow = hr.low
-        step.targetValueHigh = hr.high
-      } else if (hr.value != null) {
-        step.targetValue = hr.value
-      }
-    } else if (interval?.cadenceTarget) {
-      const cad = parseRangeNumber(String(interval.cadenceTarget))
-      step.targetType = 'CADENCE'
-      step.targetValueType = 'CADENCE'
-      if (cad.low != null && cad.high != null) {
-        step.targetValueLow = cad.low
-        step.targetValueHigh = cad.high
-      } else if (cad.value != null) {
-        step.targetValue = cad.value
-      }
-    }
-
+    applyTargets(step, interval)
     steps.push(step)
     stepId += 1
   }
 
-  const estimatedSecs = estimateWorkoutSeconds(workout, steps)
-
   return {
     workoutName: workout.name,
     sport,
-    estimatedDurationInSecs: estimatedSecs,
     segments: [
       {
         segmentOrder: 1,
         sport,
-        estimatedDurationInSecs: estimatedSecs,
         steps
       }
     ]
@@ -296,12 +280,64 @@ function parseRangeNumber(text: string): { value?: number; low?: number; high?: 
   return { value }
 }
 
+function applyTargets(step: GarminStep, primary: any, fallback?: any) {
+  const src = primary ?? fallback ?? {}
+  if (src?.paceTarget) {
+    const pace = String(src.paceTarget)
+    const parsed = parsePaceToMetersPerSecond(pace)
+    if (parsed) {
+      step.targetType = 'PACE'
+      step.targetValueType = 'PACE'
+      if (parsed.low != null && parsed.high != null) {
+        step.targetValueLow = parsed.low
+        step.targetValueHigh = parsed.high
+      } else if (parsed.value != null) {
+        step.targetValue = parsed.value
+      }
+    }
+    return
+  }
+  if (src?.powerTarget) {
+    const pow = parseRangeNumber(String(src.powerTarget))
+    step.targetType = 'POWER'
+    step.targetValueType = 'POWER'
+    if (pow.low != null && pow.high != null) {
+      step.targetValueLow = pow.low
+      step.targetValueHigh = pow.high
+    } else if (pow.value != null) {
+      step.targetValue = pow.value
+    }
+    return
+  }
+  if (src?.bpmTarget) {
+    const hr = parseRangeNumber(String(src.bpmTarget))
+    step.targetType = 'HEART_RATE'
+    step.targetValueType = 'HEART_RATE'
+    if (hr.low != null && hr.high != null) {
+      step.targetValueLow = hr.low
+      step.targetValueHigh = hr.high
+    } else if (hr.value != null) {
+      step.targetValue = hr.value
+    }
+    return
+  }
+  if (src?.cadenceTarget) {
+    const cad = parseRangeNumber(String(src.cadenceTarget))
+    step.targetType = 'CADENCE'
+    step.targetValueType = 'CADENCE'
+    if (cad.low != null && cad.high != null) {
+      step.targetValueLow = cad.low
+      step.targetValueHigh = cad.high
+    } else if (cad.value != null) {
+      step.targetValue = cad.value
+    }
+  }
+}
+
 function estimateWorkoutSeconds(workout: PlannedWorkout, steps: GarminStep[]): number {
-  // Prefer explicit step durations if present; otherwise fallback to workout.duration (minutes)
+  // Always compute from steps to avoid inflated durations from stale workout.duration
   const sum = steps.reduce((acc, s) => acc + (s.durationType === 'TIME' ? (s.durationValue || 0) : 0), 0)
-  if (sum > 0) return sum
-  if (workout.duration && workout.duration > 0) return Math.round(workout.duration * 60)
-  return 0
+  return sum > 0 ? sum : 0
 }
 
 async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promise<{ success: boolean; workoutId?: string; error?: string }> {
@@ -322,6 +358,34 @@ async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promis
     }
     const json = await res.json()
     return { success: true, workoutId: json?.workoutId ?? json?.id }
+  } catch (e: any) {
+    return { success: false, error: e?.message ?? String(e) }
+  }
+}
+
+async function scheduleWorkoutOnDate(params: { garminWorkoutId: string; date: string; sport: string; accessToken: string }): Promise<{ success: boolean; scheduleId?: string; error?: string }> {
+  try {
+    // Expect date as YYYY-MM-DD
+    const body = {
+      workoutId: params.garminWorkoutId,
+      date: params.date,
+      sport: params.sport
+    }
+    const url = 'https://apis.garmin.com/training-api/schedule/'
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${params.accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    })
+    if (!res.ok) {
+      const text = await res.text()
+      return { success: false, error: `Schedule API ${res.status}: ${text}` }
+    }
+    const json = await res.json()
+    return { success: true, scheduleId: json?.workoutScheduleId ?? json?.id }
   } catch (e: any) {
     return { success: false, error: e?.message ?? String(e) }
   }
