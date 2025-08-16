@@ -98,6 +98,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Generate a nice title from GPS location + activity type
   const generateWorkoutTitle = () => {
+    // Planned workouts should always use Focus as the title
+    if (workout.workout_status === 'planned') {
+      return workout.name || (workout as any).focus || 'Planned Workout';
+    }
+
     const activityType = getWorkoutType();
     
     // Get location from coordinates if available
