@@ -22,8 +22,8 @@ interface PlansDropdownProps {
 const PlansDropdown: React.FC<PlansDropdownProps> = ({
   onSelectRoutine,
   currentPlans = [],
-  completedPlans = []
-  onOpenPlanBuilder
+  completedPlans = [],
+  onOpenPlanBuilder,
 }) => {
   const { plannedWorkouts } = usePlannedWorkouts();
   
