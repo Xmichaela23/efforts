@@ -206,21 +206,17 @@ function distributeStrengthSessionsScientifically(availableDays: string[], longS
 export function generateStrengthWorkout(session: SessionTemplate, userPerformance: UserBaselines, phase: string, userEquipment?: any, weekNumber?: number): string {
   const { strengthType } = session;
   
-  if (!userPerformance.squat || !userPerformance.deadlift || !userPerformance.bench) {
-    throw new Error('Strength 1RM values required for strength workouts');
-  }
-  
-  const squat1RM = userPerformance.squat;
-  const deadlift1RM = userPerformance.deadlift;
-  const bench1RM = userPerformance.bench;
+  const squat1RM = userPerformance.squat || 0;
+  const deadlift1RM = userPerformance.deadlift || 0;
+  const bench1RM = userPerformance.bench || 0;
   
   // Calculate actual weights based on percentages - Endurance strength research (Lauersen et al., 2014)
   // Endurance athletes should use 60-75% 1RM for strength maintenance, not heavy lifting
-  const squatWeight = Math.round(squat1RM * 0.65); // 65% of 1RM (endurance strength)
-  const deadliftWeight = Math.round(deadlift1RM * 0.60); // 60% of 1RM (endurance maintenance)
-  const benchWeight = Math.round(bench1RM * 0.65); // 65% of 1RM (endurance strength)
-  const overheadWeight = Math.round(bench1RM * 0.60); // 60% of 1RM for overhead press
-  const rowWeight = Math.round(bench1RM * 0.60); // 60% of 1RM for rows
+  const squatWeight = Math.round(squat1RM * 0.65);
+  const deadliftWeight = Math.round(deadlift1RM * 0.60);
+  const benchWeight = Math.round(bench1RM * 0.65);
+  const overheadWeight = Math.round(bench1RM * 0.60);
+  const rowWeight = Math.round(bench1RM * 0.60);
   const powerCleanWeight = Math.round(deadlift1RM * 0.60); // 60% of 1RM for power cleans
   
   // Progressive overload: Increase weight by 2.5-5% every 3-4 weeks
@@ -264,7 +260,7 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const traditionalLowerReps = isTaperPhase ? 6 : (isBasePhase ? 12 : 10);
       
       if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps} @ ${adjustedSquatWeight}lbs (2min rest), ${deadliftVariation} ${traditionalLowerSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps} @ ${adjustedSquatWeight}lbs (2min rest), ${deadliftVariation} ${traditionalLowerSets}x6 @ ${adjustedDeadliftWeight}lbs (3min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching\n(based on your 1RMs: squat ${squat1RM}lb, deadlift ${deadlift1RM}lb)`;
       } else if (hasDumbbells) {
         return `Warm-up: 5min dynamic stretching\nMain Set: ${squatVariation} ${traditionalLowerSets}x${traditionalLowerReps} @ ${Math.round(adjustedSquatWeight * 0.5)}lbs each (2min rest), ${deadliftVariation} ${traditionalLowerSets}x6 @ ${Math.round(adjustedDeadliftWeight * 0.5)}lbs each (3min rest), ${lungeVariation} ${traditionalLowerSets}x8 each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {
@@ -283,7 +279,7 @@ export function generateStrengthWorkout(session: SessionTemplate, userPerformanc
       const traditionalUpperReps = isTaperPhase ? 6 : (isBasePhase ? 12 : 10);
       
       if (hasFullGym || hasBarbell) {
-        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedBenchWeight}lbs (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedRowWeight}lbs (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedOverheadWeight}lbs (2min rest)\nCool-down: 5min static stretching`;
+        return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedBenchWeight}lbs (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedRowWeight}lbs (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${adjustedOverheadWeight}lbs (2min rest)\nCool-down: 5min static stretching\n(based on your 1RMs: bench ${bench1RM}lb)`;
       } else if (hasDumbbells) {
         return `Warm-up: 5min dynamic stretching\nMain Set: ${pushVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedBenchWeight * 0.5)}lbs each (2min rest), ${rowVariation} ${traditionalUpperSets}x${traditionalUpperReps} each @ ${Math.round(adjustedRowWeight * 0.5)}lbs each (2min rest), ${coreVariation} ${traditionalUpperSets}x${traditionalUpperReps} @ ${Math.round(adjustedOverheadWeight * 0.5)}lbs each (2min rest)\nCool-down: 5min static stretching`;
       } else if (hasKettlebells) {

@@ -397,8 +397,25 @@ function generateRunWorkout(session: SessionTemplate, userPerformance: UserBasel
   if (!userPerformance.fiveK && !userPerformance.easyPace) {
     throw new Error('Running pace (5K time or easy pace) required for run workouts');
   }
-  const fiveKPace = userPerformance.fiveK || userPerformance.easyPace;
-  const easyPace = userPerformance.easyPace || userPerformance.fiveK;
+  const fiveKPace = userPerformance.fiveK || userPerformance.easyPace!;
+  const easyPace = userPerformance.easyPace || userPerformance.fiveK!;
+
+  // helpers: parse/format pace
+  const parsePace = (p: string) => {
+    const m = p.match(/(\d+):(\d+)(?:\/(mi|mile|km))?/i);
+    if (!m) throw new Error(`Invalid run pace format: ${p}`);
+    const total = parseInt(m[1]) * 60 + parseInt(m[2]);
+    const unit = m[3] ? (m[3].toLowerCase().startsWith('k') ? '/km' : '/mi') : '/mi';
+    return { seconds: total, unit };
+  };
+  const fmt = (secs: number, unit: string) => {
+    const s = Math.max(0, Math.round(secs));
+    const mm = Math.floor(s / 60);
+    const ss = (s % 60).toString().padStart(2, '0');
+    return `${mm}:${ss}${unit}`;
+  };
+  const fivek = parsePace(fiveKPace);
+  const easy = parsePace(easyPace);
   
   // 80/20 Triathlon: Default to outdoor running (most natural and common)
   const hasTreadmill = false;  // Default to outdoor running
@@ -417,26 +434,31 @@ function generateRunWorkout(session: SessionTemplate, userPerformance: UserBasel
   switch (type) {
     case 'endurance': {
       const zone2Time = Math.floor((adjustedDuration * 0.75) * focusMultiplier);
-      return `Warm-up: 10min easy jog\nMain Set: ${zone2Time}min steady @ ${easyPace}/mile\nCool-down: 10min easy jog`;
+      const pace = fmt(easy.seconds, easy.unit);
+      return `Warm-up: 10min easy jog\nMain Set: ${zone2Time}min steady @ ${pace}\nCool-down: 10min easy jog\n(based on your easy pace of ${fmt(easy.seconds, easy.unit)})`;
     }
     case 'tempo': {
       const total = Math.min(35, Math.floor(adjustedDuration * 0.6));
       const repLen = 10;
       const reps = Math.max(2, Math.min(3, Math.floor(total / repLen)));
-      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ tempo pace (${fiveKPace}/mile ±), 5min easy between\nCool-down: 10min easy`;
+      // map to ~108% of 5K pace (slower than 5K)
+      const tempoSecs = fivek.seconds * 1.08;
+      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ ${fmt(tempoSecs, fivek.unit)}, 5min easy between\nCool-down: 10min easy\n(based on your 5K pace of ${fmt(fivek.seconds, fivek.unit)})`;
     }
     case 'threshold': {
       const total = Math.min(30, Math.floor(adjustedDuration * 0.7));
       const repLen = 10;
       const reps = Math.max(2, Math.min(3, Math.floor(total / repLen)));
-      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ threshold pace, 5min easy between\nCool-down: 10min easy`;
+      const thrSecs = fivek.seconds * 1.10; // midpoint of 108–112%
+      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ ${fmt(thrSecs, fivek.unit)}, 5min easy between\nCool-down: 10min easy\n(based on your 5K pace of ${fmt(fivek.seconds, fivek.unit)})`;
     }
     case 'vo2max': {
       const maxTotal = 24; // cap run VO2 18–24min
       const available = Math.min(maxTotal, Math.floor(adjustedDuration * 0.6));
       const repLen = 3;
       const reps = Math.max(4, Math.min(8, Math.floor(available / repLen)));
-      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ VO2 pace, ${repLen}min easy between\nCool-down: 10min easy`;
+      const vo2Secs = fivek.seconds * 0.97; // midpoint of 95–100%
+      return `Warm-up: 10min easy\nMain Set: ${reps}x${repLen}min @ ${fmt(vo2Secs, fivek.unit)}, ${repLen}min easy between\nCool-down: 10min easy\n(based on your 5K pace of ${fmt(fivek.seconds, fivek.unit)})`;
     }
     default:
       return session.description;
