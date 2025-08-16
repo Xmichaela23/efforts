@@ -80,4 +80,57 @@ export interface Baselines {
   meta?: { timeLevel: 'beginner'|'intermediate'|'advanced'; longRunDay?: 'Sat'|'Sun'; longBikeDay?: 'Sat'|'Sun' };
 }
 
+// ---- Plan configuration & caps ----
+export type Day = 'Mon'|'Tue'|'Wed'|'Thu'|'Fri'|'Sat'|'Sun';
+export type StrengthTrack = 'power'|'endurance'|'hybrid';
+
+export interface PlanConfig {
+  durationWeeks: 8|12|16;
+  timeLevel: 'beginner'|'intermediate'|'advanced';
+  weeklyHoursTarget?: number;
+  availableDays: Day[];
+  longRunDay: 'Sat'|'Sun';
+  runQualityDays: 1|2;
+  strengthDaysPerWeek: 0|1|2|3;
+  strengthDaysPreferred?: Day[];
+  strengthTrack?: StrengthTrack;
+  includeStrength: boolean;
+}
+
+export const HardCaps = {
+  weeklyHoursByLevel: {
+    beginner:     { min: 3,  max: 6  },
+    intermediate: { min: 5,  max: 9  },
+    advanced:     { min: 7,  max: 12 },
+  },
+  absoluteWeeklyHoursMax: 14,
+  maxHardSessionsPerWeek: 3,
+  vo2PerSportPerWeek: 1,
+  longRun: {
+    maxByLevelMin: {
+      beginner:     { minMin: 90,  maxMin: 120 },
+      intermediate: { minMin: 120, maxMin: 150 },
+      advanced:     { minMin: 150, maxMin: 180 }
+    },
+    maxIncreasePctPerWeek: 10
+  },
+  strength: {
+    maxDays: 3,
+    peakTaperPct1RMMax: 0.80,
+    peakTaperSetsDrop: { min: 0.4, max: 0.6 }
+  },
+  spacing: {
+    minRestGapHours: 24
+  }
+} as const;
+
+export interface ValidationNote {
+  code: string;
+  message: string;
+}
+
+export interface ValidationResult {
+  notes: ValidationNote[];
+}
+
 

@@ -44,4 +44,47 @@ export const poolsById: Record<string, Pool> = {
   [run_long_pool.id]: run_long_pool
 };
 
+// Single-template convenience pools for composer
+export const run_easy_pool: Pool = {
+  id: 'run_easy_pool',
+  templateIds: ['run_easy_strides_v1'],
+  selection: { mode: 'roundRobin' }
+};
+
+export const strength_full_pool: Pool = {
+  id: 'strength_full_pool',
+  templateIds: ['strength_full_A_v1'],
+  selection: { mode: 'roundRobin' }
+};
+
+Object.assign(poolsById, {
+  [run_easy_pool.id]: run_easy_pool,
+  [strength_full_pool.id]: strength_full_pool
+});
+
+// Strength track pools (map to specific templates; can diversify later)
+export const strength_power_pool: Pool = {
+  id: 'strength_power_pool',
+  templateIds: ['strength_full_A_v1'],
+  selection: { mode: 'roundRobin' }
+};
+
+export const strength_endurance_pool: Pool = {
+  id: 'strength_endurance_pool',
+  templateIds: ['strength_full_A_v1'],
+  selection: { mode: 'roundRobin' }
+};
+
+export const strength_hybrid_pool: Pool = {
+  id: 'strength_hybrid_pool',
+  templateIds: ['strength_full_A_v1'],
+  selection: { mode: 'roundRobin' }
+};
+
+Object.assign(poolsById, {
+  [strength_power_pool.id]: strength_power_pool,
+  [strength_endurance_pool.id]: strength_endurance_pool,
+  [strength_hybrid_pool.id]: strength_hybrid_pool
+});
+
 
