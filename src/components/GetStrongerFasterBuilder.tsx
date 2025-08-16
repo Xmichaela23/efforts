@@ -190,31 +190,13 @@ export default function GetStrongerFasterBuilder() {
               </div>
             </div>
 
-            <div aria-disabled={!cfg.standaloneMobility}>
-              <div className="text-sm font-medium mb-1">Mobility days/week</div>
-              <div className="flex gap-2">
-                {[0,1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => cfg.standaloneMobility && setCfg(prev=>({...prev, mobilityDaysPerWeek: n as 0|1|2|3|4|5 }))}
-                    disabled={!cfg.standaloneMobility}
-                    className={`px-3 py-1 border rounded ${cfg.mobilityDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
-                ))}
-              </div>
-            </div>
+            {/* Removed mobility count selection; day chips below control scheduling */}
           </div>
 
-          <div aria-disabled={!cfg.includeMobility}>
-            <div className="text-sm font-medium mb-1">Mobility days/week</div>
-            <div className="flex gap-2">
-              {[0,1,2,3,4,5].map(n => (
-                <button key={n} onClick={() => cfg.includeMobility && setCfg(prev=>({...prev, mobilityDaysPerWeek: n as 0|1|2|3|4|5 }))}
-                  disabled={!cfg.includeMobility}
-                  className={`px-3 py-1 border rounded ${cfg.mobilityDaysPerWeek===n? 'border-gray-900':'border-gray-300'} ${!cfg.includeMobility? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
-              ))}
-            </div>
-          </div>
+          {/* Removed duplicate mobility count block */}
 
           <div aria-disabled={!cfg.standaloneMobility}>
-            <div className="text-sm font-medium mb-1">Preferred mobility days</div>
+            <div className="text-sm font-medium mb-1">Mobility days</div>
             <div className="flex flex-wrap gap-2">
               {dayChips.map(d => (
                 <button key={d} onClick={() => cfg.standaloneMobility && setCfg(prev=>({
