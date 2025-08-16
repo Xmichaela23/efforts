@@ -74,14 +74,7 @@ export default function GetStrongerFasterBuilder() {
     }));
   };
 
-  const onStrengthPrefToggle = (d: Day) => {
-    setCfg(prev => ({
-      ...prev,
-      strengthDaysPreferred: (prev.strengthDaysPreferred ?? []).includes(d)
-        ? (prev.strengthDaysPreferred ?? []).filter(x => x !== d)
-        : ([...(prev.strengthDaysPreferred ?? []), d] as Day[])
-    }));
-  };
+  // Preferred strength days removed; scheduler places deterministically
 
   const weekSessions = sessionsByWeek.get(currentWeek) || [];
   const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -157,15 +150,7 @@ export default function GetStrongerFasterBuilder() {
             </div>
           </div>
 
-          <div>
-            <div className="text-sm font-medium mb-1">Preferred strength days</div>
-            <div className="flex flex-wrap gap-2">
-              {(['Mon','Wed','Fri'] as Day[]).map(d => (
-                <button key={d} onClick={() => onStrengthPrefToggle(d)}
-                  className={`px-2 py-1 border rounded text-sm ${(cfg.strengthDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
-              ))}
-            </div>
-          </div>
+          {/* Preferred strength days removed; scheduler will place Mon/Fri/Wed with safe stacking */}
 
           {/* Mobility controls */}
           <div className="flex items-center gap-4 flex-wrap">
