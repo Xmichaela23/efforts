@@ -40,7 +40,14 @@ export function buildGetStrongerFaster8w(cfg: PlanConfig): { weeks: SkeletonWeek
       });
     }
 
-    // Mobility is integrated into session warm-up/cool-down; no separate mobility slots
+    // Mobility is integrated into session warm-up/cool-down by default
+    // Standalone mobility resets only if requested
+    if (cfg.standaloneMobility) {
+      const existingDays = slots.map(s => s.day);
+      deriveMobilityDays(cfg, existingDays).forEach(d => {
+        slots.push({ day: d, poolId: 'mobility_pool', optional: true });
+      });
+    }
 
     // Easy runs: add only up to target per time level (do not fill every available day)
     const remaining = order.filter(d => isAvail(d) && !slots.find(s => s.day === d));

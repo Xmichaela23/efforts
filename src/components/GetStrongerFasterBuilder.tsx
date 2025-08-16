@@ -29,6 +29,7 @@ export default function GetStrongerFasterBuilder() {
     includeMobility: true,
     mobilityDaysPerWeek: 2,
     mobilityDaysPreferred: [],
+    standaloneMobility: false,
   });
   const [currentWeek, setCurrentWeek] = useState(1);
 
@@ -171,13 +172,26 @@ export default function GetStrongerFasterBuilder() {
           </div>
 
           {/* Mobility controls */}
-          <div>
-            <div className="text-sm font-medium mb-1">Include mobility</div>
-            <div className="flex gap-2">
-              {([true,false] as const).map(v => (
-                <button key={String(v)} onClick={() => setCfg(prev=>({...prev, includeMobility: v, mobilityDaysPerWeek: v ? (prev.mobilityDaysPerWeek ?? 2) : 0 }))}
-                  className={`px-3 py-1 border rounded ${cfg.includeMobility===v? 'border-gray-900':'border-gray-300'}`}>{v? 'Yes':'No'}</button>
-              ))}
+          <div className="flex items-center gap-4 flex-wrap">
+            <div>
+              <div className="text-sm font-medium mb-1">Add standalone mobility work</div>
+              <div className="flex gap-2">
+                {([true,false] as const).map(v => (
+                  <button key={String(v)} onClick={() => setCfg(prev=>({...prev, standaloneMobility: v }))}
+                    className={`px-3 py-1 border rounded ${cfg.standaloneMobility===v? 'bg-gray-100 border-gray-400':'border-gray-200'}`}>{v? 'Yes':'No'}</button>
+                ))}
+              </div>
+            </div>
+
+            <div aria-disabled={!cfg.standaloneMobility}>
+              <div className="text-sm font-medium mb-1">Mobility days/week</div>
+              <div className="flex gap-2">
+                {[0,1,2,3,4,5].map(n => (
+                  <button key={n} onClick={() => cfg.standaloneMobility && setCfg(prev=>({...prev, mobilityDaysPerWeek: n as 0|1|2|3|4|5 }))}
+                    disabled={!cfg.standaloneMobility}
+                    className={`px-3 py-1 border rounded ${cfg.mobilityDaysPerWeek===n? 'bg-gray-100 border-gray-400':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -192,17 +206,17 @@ export default function GetStrongerFasterBuilder() {
             </div>
           </div>
 
-          <div aria-disabled={!cfg.includeMobility}>
+          <div aria-disabled={!cfg.standaloneMobility}>
             <div className="text-sm font-medium mb-1">Preferred mobility days</div>
             <div className="flex flex-wrap gap-2">
               {dayChips.map(d => (
-                <button key={d} onClick={() => cfg.includeMobility && setCfg(prev=>({
+                <button key={d} onClick={() => cfg.standaloneMobility && setCfg(prev=>({
                   ...prev,
                   mobilityDaysPreferred: (prev.mobilityDaysPreferred ?? []).includes(d)
                     ? (prev.mobilityDaysPreferred ?? []).filter(x=>x!==d)
                     : ([...(prev.mobilityDaysPreferred ?? []), d] as Day[])
-                }))} disabled={!cfg.includeMobility}
-                  className={`px-2 py-1 border rounded text-sm ${(cfg.mobilityDaysPreferred ?? []).includes(d)? 'border-gray-900':'border-gray-300'} ${!cfg.includeMobility? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
+                }))} disabled={!cfg.standaloneMobility}
+                  className={`px-2 py-1 border rounded text-sm ${(cfg.mobilityDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-400':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-1">Short 10–15 min mobility resets to improve range of motion and recovery. Doesn’t count as hard and can stack with any session.</p>
