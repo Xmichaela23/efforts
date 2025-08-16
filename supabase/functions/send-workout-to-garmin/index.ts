@@ -148,7 +148,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       for (let r = 0; r < Number(interval.repeatCount); r += 1) {
         for (const seg of interval.segments) {
           const sIntensity = mapEffortToIntensity(String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim())
-          const sSeconds = parseTimeToSeconds(String(seg?.time ?? '0'))
+          const sSeconds = Number(seg?.duration)
+          if (!Number.isFinite(sSeconds) || sSeconds <= 0) {
+            throw new Error('Invalid segment duration: must be seconds')
+          }
           const step: GarminStep = {
             type: 'WorkoutStep',
             stepId,
@@ -168,7 +171,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
 
     // Simple single step
     const intensity = mapEffortToIntensity(String(interval?.effortLabel ?? '').trim())
-    const seconds = parseTimeToSeconds(String(interval?.time ?? '0'))
+    const seconds = Number(interval?.duration)
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new Error('Invalid interval duration: must be seconds')
+    }
     const step: GarminStep = {
       type: 'WorkoutStep',
       stepId,
@@ -176,7 +182,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       intensity,
       description: String(interval?.effortLabel ?? '').trim() || undefined,
       durationType: 'TIME',
-      durationValue: seconds > 0 ? seconds : 0
+      durationValue: Math.floor(seconds)
     }
     applyTargets(step, interval)
     steps.push(step)

@@ -102,6 +102,23 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     return target ? ` at ${target}` : '';
   };
 
+  const formatRepeatSummary = (segments: any[]) => {
+    if (!Array.isArray(segments) || segments.length === 0) return '';
+    return segments
+      .map((seg: any) => `${seg.time || ''} ${seg.effortLabel || ''}${getTargetSuffix(seg)}`.trim())
+      .join(' + ');
+  };
+
+  const formatIntervalLine = (interval: any, index: number) => {
+    if (Array.isArray(interval?.segments) && interval?.repeatCount) {
+      const inner = formatRepeatSummary(interval.segments);
+      return `${interval.repeatCount}x — (${inner})`;
+    }
+    const label = interval.effortLabel || `Segment ${index + 1}`;
+    const time = interval.time || '';
+    return `${label} — ${time}${getTargetSuffix(interval)}`.trim();
+  };
+
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
@@ -204,38 +221,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             <div className="space-y-2">
               {workout.intervals.map((interval: any, index: number) => (
                 <div key={index} className="p-3 border-l-2 border-gray-200 pl-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm text-gray-900">
-                      {interval.effortLabel || `Segment ${index + 1}`}
-                    </span>
-                    <span className="text-xs text-gray-500 font-medium">
-                      {interval.time}{getTargetSuffix(interval)}
-                    </span>
+                  <div className="text-sm text-gray-900">
+                    {formatIntervalLine(interval, index)}
                   </div>
-                  {interval.bpmTarget && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      HR: {interval.bpmTarget}
-                    </div>
-                  )}
-                  {interval.rpeTarget && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      RPE: {interval.rpeTarget}
-                    </div>
-                  )}
-                  {interval.repeatCount && (
-                    <div className="text-xs text-gray-500 mt-1">
-                      {interval.repeatCount}×
-                    </div>
-                  )}
-                  {interval.segments && interval.segments.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      {interval.segments.map((segment: any, segIndex: number) => (
-                        <div key={segIndex} className="text-xs text-gray-600 pl-2 border-l border-gray-100">
-                          {segment.time} @ {segment.effortLabel}
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </div>
               ))}
             </div>
