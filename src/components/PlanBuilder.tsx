@@ -50,6 +50,7 @@ export default function PlanBuilder() {
           >
             <div className="font-medium">Get Stronger Faster</div>
             <div className="text-sm text-gray-600">8 weeks • VO2 + Threshold • Optional strength</div>
+            <div className="text-sm text-gray-700 mt-1">8 weeks to get faster and stronger. For runners who want sharper 5K–10K times and the durability strength brings.</div>
           </button>
           {/* Future plans can be added here */}
         </div>
