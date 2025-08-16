@@ -97,6 +97,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     }
   };
 
+  const getTargetSuffix = (interval: any) => {
+    const target = interval?.paceTarget || interval?.powerTarget || interval?.bpmTarget || interval?.cadenceTarget;
+    return target ? ` at ${target}` : '';
+  };
+
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
@@ -162,7 +167,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             <div className="space-y-1">
               {workout.intervals.map((interval: any, index: number) => (
                 <div key={index} className="text-sm text-gray-600">
-                  {interval.effortLabel} {interval.time} at {interval.paceTarget}
+                  {interval.effortLabel} {interval.time}{getTargetSuffix(interval)}
                 </div>
               ))}
             </div>
@@ -214,11 +219,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                     <span className="font-medium text-sm text-gray-900">
                       {interval.effortLabel || `Segment ${index + 1}`}
                     </span>
-                    {interval.time && (
-                      <span className="text-xs text-gray-500 font-medium">
-                        {interval.time}
-                      </span>
-                    )}
+                    <span className="text-xs text-gray-500 font-medium">
+                      {interval.time}{getTargetSuffix(interval)}
+                    </span>
                   </div>
                   {interval.bpmTarget && (
                     <div className="text-xs text-gray-500 mt-1">
