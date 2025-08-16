@@ -98,7 +98,7 @@ export default function GetStrongerFasterBuilder() {
                 { key: 'advanced', label: 'Very experienced' }
               ] as const).map(l => (
                 <button key={l.key} onClick={() => setCfg(prev=>({...prev, timeLevel: l.key }))}
-                  className={`px-3 py-1 border rounded ${cfg.timeLevel===l.key? 'border-gray-900':'border-gray-300'}`}>{l.label}</button>
+                  className={`px-3 py-1 border rounded ${cfg.timeLevel===l.key? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{l.label}</button>
               ))}
             </div>
           </div>
@@ -109,7 +109,7 @@ export default function GetStrongerFasterBuilder() {
             <div className="flex flex-wrap gap-2">
               {dayChips.map(d => (
                 <button key={d} onClick={() => onChipToggle(d)}
-                  className={`px-2 py-1 border rounded text-sm ${cfg.availableDays.includes(d)? 'border-gray-900':'border-gray-300'}`}>{d}</button>
+                  className={`px-2 py-1 border rounded text-sm ${cfg.availableDays.includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
               ))}
             </div>
           </div>
@@ -119,7 +119,7 @@ export default function GetStrongerFasterBuilder() {
             <div className="flex gap-2">
               {(['Sat','Sun'] as const).map(d => (
                 <button key={d} onClick={() => setCfg(prev=>({...prev, longRunDay: d }))}
-                  className={`px-3 py-1 border rounded ${cfg.longRunDay===d? 'border-gray-900':'border-gray-300'}`}>{d}</button>
+                  className={`px-3 py-1 border rounded ${cfg.longRunDay===d? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
               ))}
             </div>
           </div>
@@ -129,7 +129,7 @@ export default function GetStrongerFasterBuilder() {
             <div className="flex gap-2">
               {[1,2].map(n => (
                 <button key={n} onClick={() => setCfg(prev=>({...prev, runQualityDays: n as 1|2 }))}
-                  className={`px-3 py-1 border rounded ${cfg.runQualityDays===n? 'border-gray-900':'border-gray-300'}`}>{n}</button>
+                  className={`px-3 py-1 border rounded ${cfg.runQualityDays===n? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{n}</button>
               ))}
             </div>
           </div>
@@ -141,7 +141,7 @@ export default function GetStrongerFasterBuilder() {
             <div className="flex gap-2">
               {([true,false] as const).map(v => (
                 <button key={String(v)} onClick={() => setCfg(prev=>({...prev, includeStrength: v, strengthDaysPerWeek: v ? prev.strengthDaysPerWeek : 0 }))}
-                  className={`px-3 py-1 border rounded ${cfg.includeStrength===v? 'border-gray-900':'border-gray-300'}`}>{v? 'Yes':'No'}</button>
+                  className={`px-3 py-1 border rounded ${cfg.includeStrength===v? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{v? 'Yes':'No'}</button>
               ))}
             </div>
           </div>
@@ -152,7 +152,7 @@ export default function GetStrongerFasterBuilder() {
               {(['power','endurance','hybrid'] as StrengthTrack[]).map(t => (
                 <button key={t} onClick={() => cfg.includeStrength && setCfg(prev=>({...prev, strengthTrack: t }))}
                   disabled={!cfg.includeStrength}
-                  className={`px-3 py-1 border rounded ${cfg.strengthTrack===t? 'border-gray-900':'border-gray-300'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{t}</button>
+                  className={`px-3 py-1 border rounded ${cfg.strengthTrack===t? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{t}</button>
               ))}
             </div>
           </div>
@@ -163,7 +163,7 @@ export default function GetStrongerFasterBuilder() {
               {[0,1,2,3].map(n => (
                 <button key={n} onClick={() => cfg.includeStrength && setCfg(prev=>({...prev, strengthDaysPerWeek: n as 0|1|2|3 }))}
                   disabled={!cfg.includeStrength}
-                  className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'border-gray-900':'border-gray-300'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
+                  className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
               ))}
             </div>
           </div>
@@ -173,7 +173,7 @@ export default function GetStrongerFasterBuilder() {
             <div className="flex flex-wrap gap-2">
               {(['Mon','Wed','Fri'] as Day[]).map(d => (
                 <button key={d} onClick={() => cfg.includeStrength && onStrengthPrefToggle(d)} disabled={!cfg.includeStrength}
-                  className={`px-2 py-1 border rounded text-sm ${(cfg.strengthDaysPreferred ?? []).includes(d)? 'border-gray-900':'border-gray-300'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
+                  className={`px-2 py-1 border rounded text-sm ${(cfg.strengthDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.includeStrength? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
               ))}
             </div>
           </div>
@@ -196,7 +196,7 @@ export default function GetStrongerFasterBuilder() {
                 {[0,1,2,3,4,5].map(n => (
                   <button key={n} onClick={() => cfg.standaloneMobility && setCfg(prev=>({...prev, mobilityDaysPerWeek: n as 0|1|2|3|4|5 }))}
                     disabled={!cfg.standaloneMobility}
-                    className={`px-3 py-1 border rounded ${cfg.mobilityDaysPerWeek===n? 'bg-gray-100 border-gray-400':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
+                    className={`px-3 py-1 border rounded ${cfg.mobilityDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{n}</button>
                 ))}
               </div>
             </div>
@@ -223,7 +223,7 @@ export default function GetStrongerFasterBuilder() {
                     ? (prev.mobilityDaysPreferred ?? []).filter(x=>x!==d)
                     : ([...(prev.mobilityDaysPreferred ?? []), d] as Day[])
                 }))} disabled={!cfg.standaloneMobility}
-                  className={`px-2 py-1 border rounded text-sm ${(cfg.mobilityDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-400':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
+                  className={`px-2 py-1 border rounded text-sm ${(cfg.mobilityDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
               ))}
             </div>
             <p className="text-xs text-gray-500 mt-1">Short 10–15 min mobility resets to improve range of motion and recovery. Doesn’t count as hard and can stack with any session.</p>
