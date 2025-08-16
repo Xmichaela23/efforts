@@ -4,6 +4,8 @@
 // No fallbacks, no complexity - just clean, science-based personalization
 
 import { getSeventy3Template, generateDetailedWorkout, SessionTemplate, UserBaselines } from './Seventy3Template';
+import { hybrid_8w } from './plans/skeletons/hybrid_8w';
+import { composeWeek } from './plans/compose';
 import { getStrengthTemplate, generateStrengthWorkout } from './StrengthTemplate';
 
 export interface TrainingPlan {
@@ -264,9 +266,12 @@ export class TrainingEngine {
     const benchmarkRecency = userBaselines.benchmarkRecency;
     const equipment = userBaselines.equipment;
     
-    // Get base 70.3 template with phase-specific sessions
-    const baseTemplate = getSeventy3Template(5, phase); // 5 days with phase-specific intensity
-    
+    const USE_NEW_COMPOSER = true;
+
+    const baseTemplate: SessionTemplate[] = USE_NEW_COMPOSER
+      ? composeWeek({ weekNum, skeletonWeek: hybrid_8w.find(w => w.weekNumber === weekNum)!, baselines: undefined })
+      : getSeventy3Template(5, phase);
+
     // Scale volumes based on time level and phase
     const scaledSessions = this.scaleVolumes(baseTemplate, userBaselines, phase, weekNum, timeLevel);
     
