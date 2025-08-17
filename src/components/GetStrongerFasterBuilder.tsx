@@ -154,7 +154,7 @@ export default function GetStrongerFasterBuilder() {
             <div>
               <div className="text-sm font-medium mb-1">Long run day</div>
               <select
-                className="border border-gray-300 rounded px-2 py-1 text-sm"
+                className="border border-gray-300 rounded px-2 py-1 text-sm w-20"
                 value={cfg.longRunDay}
                 onChange={(e)=> setCfg(prev=>({ ...prev, longRunDay: e.target.value as Day }))}
               >
@@ -171,7 +171,7 @@ export default function GetStrongerFasterBuilder() {
                 return (
                   <div className="flex flex-col gap-1">
                     <select
-                      className="border border-gray-300 rounded px-2 py-1 text-sm"
+                      className="border border-gray-300 rounded px-2 py-1 text-sm w-16"
                       value={cfg.strengthDaysPerWeek}
                       onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
                     >
