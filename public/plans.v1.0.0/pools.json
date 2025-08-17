@@ -17,7 +17,7 @@
       "id": "strength_nonhard",
       "discipline": "strength",
       "hardness": "nonhard_strength",
-      "stackableWith": ["run_quality", "bike_quality", "swim_quality"]
+      "stackableWith": ["run_quality"]
     }
   ]
 }
