@@ -150,7 +150,7 @@ export default function GetStrongerFasterBuilder() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-start gap-6">
+          <div className="grid grid-cols-2 gap-4 items-start">
             <div>
               <div className="text-sm font-medium mb-1">Long run day</div>
               <select
@@ -165,7 +165,7 @@ export default function GetStrongerFasterBuilder() {
             </div>
 
             <div>
-              <div className="text-sm font-medium mb-1">Strength days/week</div>
+              <div className="text-sm font-medium mb-1">Strength / wk</div>
               {(() => {
                 const canThree = (cfg.timeLevel === 'advanced') && (cfg.availableDays.length >= 6);
                 return (
