@@ -187,6 +187,16 @@ export default function GetStrongerFasterBuilder() {
           </div>
         </div>
 
+        {/* Week-level Notes */}
+        {notesByWeek?.get(currentWeek)?.length ? (
+          <div className="mb-3 text-xs text-gray-600">
+            <div className="font-medium text-gray-700">Notes</div>
+            <ul className="list-disc pl-5 space-y-1">
+              {notesByWeek.get(currentWeek)!.map((n, i) => (<li key={i}>{n}</li>))}
+            </ul>
+          </div>
+        ) : null}
+
         <div className="space-y-3">
           {(() => {
             const grouped: Record<string, Session[]> = {};
