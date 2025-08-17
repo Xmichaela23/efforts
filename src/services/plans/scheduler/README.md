@@ -1,4 +1,52 @@
 ### Deterministic Week Scheduler
+### Plan-Specific Scheduling Rules: Get Stronger Faster (8 weeks)
+
+#### Experience → Base Run Volume
+- New to running → 4 total run days
+  - Long run (1)
+  - 1 quality (VO₂ or tempo, alternates by week)
+  - 2 easy runs
+- Experienced → 5 total run days
+  - Long run (1)
+  - 2 quality (VO₂ + threshold/tempo)
+  - 2 easy runs
+- Very experienced → 6 total run days
+  - Long run (1)
+  - 2 quality (VO₂ + threshold/tempo)
+  - 3 easy runs
+
+(Do not exceed these counts even if 7 available days are selected. Extra days can only add optional mobility or recovery.)
+
+#### Strength Integration
+- Default: 2×/week (lower/core emphasis).
+- If 3× selected:
+  - Endurance track → 3rd = supplemental upper/core, flagged `optional: true`, dropped first if cap/spacing conflict.
+  - Hybrid/Power → full-body but still flagged lowest priority when 3rd is requested.
+- Never place strength on long-run day.
+- Stacking: allowed only on quality days (max 2 stacks/week) with AM/PM note.
+
+#### Available Days Gating
+- If user selects fewer days than base volume:
+  - Drop easy runs first.
+  - Then drop supplemental strength.
+  - Never drop long run or both quality sessions.
+- If user selects more days than base volume:
+  - Add optional mobility or recovery filler.
+  - Never add more quality runs.
+
+#### Invariants
+- Long run = sacred (no strength or other hard sessions same day).
+- Long run and quality runs ≥48h apart when possible.
+- Max hard days = 3/week (long + 2 quality, or long + quality + brick).
+- Strength = “hard” only if lower-body; upper-only supplemental day doesn’t count toward hard cap.
+- Mobility is always easy and never counts toward caps.
+
+#### Notes
+Emit clear deterministic notes for:
+- Dropped supplemental strength.
+- Dropped easy runs due to availability.
+- Stacked days with priority-specific AM/PM guidance.
+- Strength reductions due to cap/spacing enforcement.
 
 This module builds a deterministic, rules-driven weekly schedule for a run-focused plan with integrated strength and optional mobility.
 

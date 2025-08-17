@@ -1,0 +1,24 @@
+{
+  "name": "Case A: Mon–Fri availability, Experienced, Strength 3× (Endurance)",
+  "input": {
+    "availableDays": ["Mon","Tue","Wed","Thu","Fri"],
+    "longRunDay": "Fri",
+    "level": "experienced",
+    "strengthTrack": "endurance",
+    "strengthDays": 3,
+    "preferredStrengthDays": ["Mon","Wed","Fri"],
+    "priority": "endurance_first"
+  },
+  "expect": {
+    "noStrengthOnLong": true,
+    "maxStackedDays": 2,
+    "reduceTo2IfNeeded": true,
+    "notesIncludes": [
+      "Run/Bike AM, Strength PM.",
+      "Endurance track: the 3rd strength day is supplemental (upper/core emphasis) and will be dropped first if needed.",
+      "Reduced strength to 2× due to weekly hard-day cap and spacing limits."
+    ]
+  }
+}
+
+

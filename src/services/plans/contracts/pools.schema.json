@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["pools"],
+  "properties": {
+    "pools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "discipline", "hardness"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "discipline": { "type": "string", "enum": ["run", "bike", "swim", "strength", "mobility", "brick"] },
+          "hardness": { "type": "string", "enum": ["hard", "easy", "nonhard_strength"] },
+          "stackableWith": { "type": "array", "items": { "type": "string" }, "default": [] },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}
+
+

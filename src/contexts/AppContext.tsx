@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import { supabase } from '@/lib/supabase';
+import { loadPlansBundle } from '@/services/plans/BundleLoader';
 
 export interface WorkoutInterval {
   id: string;
@@ -125,6 +126,8 @@ interface AppContextType {
   saveUserBaselines: (data: BaselineData) => Promise<void>;
   loadUserBaselines: () => Promise<BaselineData | null>;
   hasUserBaselines: () => Promise<boolean>;
+  plansBundleReady?: boolean;
+  plansBundleError?: string | null;
 }
 
 const defaultAppContext: AppContextType = {
@@ -172,9 +175,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [detailedPlans, setDetailedPlans] = useState<any>({});
   const [plansLoading, setPlansLoading] = useState(true);
   const [plansAuthReady, setPlansAuthReady] = useState(false);
+  const [plansBundleReady, setPlansBundleReady] = useState<boolean>(false);
+  const [plansBundleError, setPlansBundleError] = useState<string | null>(null);
 
   // ✅ FIXED: Plans get their own auth management similar to useWorkouts
   useEffect(() => {
+    // Load plans data bundle (science data) at boot; fail hard if invalid
+    (async () => {
+      try {
+        const active = (import.meta as any).env?.VITE_PLANS_ACTIVE_BUNDLE || (import.meta as any).env?.PLANS_ACTIVE_BUNDLE || 'plans.v1.0.0';
+        if (!active) throw new Error('PLANS_ACTIVE_BUNDLE not set');
+        await loadPlansBundle(active);
+        setPlansBundleReady(true);
+        setPlansBundleError(null);
+      } catch (err: any) {
+        console.error('Plan data bundle failed validation:', err);
+        setPlansBundleReady(false);
+        setPlansBundleError('Plan data bundle failed validation. Contact support.');
+      }
+    })();
+
     let mounted = true;
 
     const initializePlansAuth = async () => {
@@ -449,6 +469,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         saveUserBaselines,
         loadUserBaselines,
         hasUserBaselines,
+        plansBundleReady,
+        plansBundleError,
       }}
     >
       {children}

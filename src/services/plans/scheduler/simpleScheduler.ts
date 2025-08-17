@@ -58,12 +58,17 @@ function firstWithBuffers(avail: Day[], blocked: Day[]): Day | null {
 function add(slots: Slot[], poolId: PoolId, day: Day, optional=false) { slots.push({ day, poolId, optional }); }
 
 function countHardDays(slots: Slot[]): number {
-  const hardDays = new Set(slots.filter(s => isHardPool(s.poolId)).map(s => s.day));
+  // Treat optional third (upper-only supplemental) strength as not hard
+  const hardDays = new Set(slots
+    .filter(s => isHardPool(s.poolId) && !(s.poolId.startsWith('strength_') && s.optional === true))
+    .map(s => s.day));
   return hardDays.size;
 }
 
 function hasAdjacentHard(slots: Slot[]): [boolean, Day?] {
-  const hard = new Set(slots.filter(s => isHardPool(s.poolId)).map(s => s.day));
+  const hard = new Set(slots
+    .filter(s => isHardPool(s.poolId) && !(s.poolId.startsWith('strength_') && s.optional === true))
+    .map(s => s.day));
   for (const d of ORDER) if (hard.has(d) && hard.has(next(d))) return [true, d];
   return [false, undefined];
 }
@@ -229,10 +234,16 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   // Mark supplemental third on endurance track
   markSupplementalThirdIfNeeded(slots, strengthTrack, strengthDays, notes);
 
-  // Easy runs fill on remaining available days
+  // Easy runs: cap by experience-based base volume
+  let baseTotal: number = 4;
+  if (level === 'experienced') baseTotal = 5;
+  if (level === 'veryExperienced') baseTotal = 6;
+  const targetEasy = Math.max(0, baseTotal - (1 + wantQual));
+  let easyPlaced = 0;
   for (const d of ORDER) {
+    if (easyPlaced >= targetEasy) break;
     if (!isAvail(d)) continue;
-    if (!slots.some(s => s.day===d)) add(slots, 'run_easy_pool', d, true);
+    if (!slots.some(s => s.day===d)) { add(slots, 'run_easy_pool', d, true); easyPlaced++; }
   }
 
   // Mobility optional

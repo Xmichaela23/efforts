@@ -1,0 +1,32 @@
+{
+  "templates": [
+    {
+      "id": "run_quality_A",
+      "poolId": "run_quality",
+      "variant": "A",
+      "phase": "build",
+      "baseDurationMin": 60,
+      "progressionRule": "2w up, 1w deload; +5–10% volume ceiling",
+      "constraints": ["no-consecutive-hard-days"],
+      "userNote": "Threshold/tempo focus."
+    },
+    {
+      "id": "run_long_A",
+      "poolId": "run_long",
+      "variant": "A",
+      "phase": "build",
+      "baseDurationMin": 80,
+      "progressionRule": "+10 min every other week; deload week −20%"
+    },
+    {
+      "id": "strength_fullbody_A",
+      "poolId": "strength_nonhard",
+      "variant": "A",
+      "phase": "build",
+      "baseDurationMin": 45,
+      "userNote": "Neural bias (low-rep, long rest)."
+    }
+  ]
+}
+
+

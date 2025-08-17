@@ -3,6 +3,8 @@ import { composeWeek } from '@/services/plans/compose';
 import { buildWeekFromDropdowns } from '@/services/plans/scheduler/buildWeekFromDropdowns';
 import type { SimpleSchedulerParams } from '@/services/plans/scheduler/types';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
+import { useAppContext } from '@/contexts/AppContext';
+import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS, HELP_STRENGTH, HELP_LONG_RUN } from './planBuilder/strings';
 
 type Session = {
   day: string;
@@ -16,6 +18,7 @@ type Session = {
 const dayChips: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 export default function GetStrongerFasterBuilder() {
+  const { plansBundleReady, plansBundleError } = useAppContext();
   const [cfg, setCfg] = useState<PlanConfig>({
     durationWeeks: 8,
     timeLevel: 'intermediate',
@@ -34,6 +37,7 @@ export default function GetStrongerFasterBuilder() {
   const [currentWeek, setCurrentWeek] = useState(1);
 
   const { weeks, sessionsByWeek, notesByWeek } = useMemo(() => {
+    if (!plansBundleReady) return { weeks: [], sessionsByWeek: new Map(), notesByWeek: new Map() };
     const sessions = new Map<number, Session[]>();
     const notes = new Map<number, string[]>();
     const weeksOut: SkeletonWeek[] = [];
@@ -111,6 +115,11 @@ export default function GetStrongerFasterBuilder() {
 
   return (
     <div className="max-w-3xl mx-auto p-3 space-y-6">
+      {!plansBundleReady && (
+        <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded text-sm">
+          {plansBundleError || 'Plan data bundle is not ready.'}
+        </div>
+      )}
       <h2 className="text-2xl font-semibold">Get Stronger Faster (8 weeks)</h2>
       <p className="text-sm text-gray-700">
         8 weeks to get faster and stronger. For runners who want sharper 5K–10K times and the durability strength brings.
@@ -119,15 +128,16 @@ export default function GetStrongerFasterBuilder() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="space-y-3">
           <div>
-            <div className="text-sm font-medium mb-1">Experience</div>
+            <div className="text-sm font-medium mb-1">{LABEL_RUN_VOLUME}</div>
+            <p className="text-xs text-gray-600 mb-2">{HELP_RUN_VOLUME}</p>
             <div className="flex gap-2">
-              {([
-                { key: 'beginner', label: 'New to running' },
-                { key: 'intermediate', label: 'Experienced' },
-                { key: 'advanced', label: 'Very experienced' }
-              ] as const).map(l => (
-                <button key={l.key} onClick={() => setCfg(prev=>({...prev, timeLevel: l.key }))}
-                  className={`px-3 py-1 border rounded ${cfg.timeLevel===l.key? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{l.label}</button>
+              {RUN_VOLUME_OPTIONS.map(opt => (
+                <button key={opt.value} onClick={() => setCfg(prev=>({...prev, timeLevel: opt.value === 'new' ? 'beginner' : opt.value === 'veryExperienced' ? 'advanced' : 'intermediate' }))}
+                  className={`px-3 py-1 border rounded ${(
+                    (opt.value==='new' && cfg.timeLevel==='beginner') ||
+                    (opt.value==='experienced' && cfg.timeLevel==='intermediate') ||
+                    (opt.value==='veryExperienced' && cfg.timeLevel==='advanced')
+                  )? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{opt.label}</button>
               ))}
             </div>
           </div>
@@ -162,6 +172,7 @@ export default function GetStrongerFasterBuilder() {
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
+              <p className="mt-1 text-xs text-gray-500">{HELP_LONG_RUN}</p>
             </div>
 
             {/* Inline hint spanning between the two controls for tighter UI */}
@@ -184,6 +195,8 @@ export default function GetStrongerFasterBuilder() {
                 <option value={2}>2</option>
                 <option value={3} disabled={!(cfg.availableDays.length >= 6)}>3</option>
               </select>
+              <p className="mt-1 text-xs text-gray-500">{HELP_STRENGTH}</p>
+              <p className="text-xs text-gray-500">3 strength days require ≥6 available days.</p>
             </div>
           </div>
 

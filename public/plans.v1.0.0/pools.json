@@ -1,0 +1,25 @@
+{
+  "pools": [
+    {
+      "id": "run_quality",
+      "discipline": "run",
+      "hardness": "hard",
+      "stackableWith": ["strength_nonhard"],
+      "notes": "Quality run (intervals/tempo/threshold)."
+    },
+    {
+      "id": "run_long",
+      "discipline": "run",
+      "hardness": "hard",
+      "stackableWith": []
+    },
+    {
+      "id": "strength_nonhard",
+      "discipline": "strength",
+      "hardness": "nonhard_strength",
+      "stackableWith": ["run_quality", "bike_quality", "swim_quality"]
+    }
+  ]
+}
+
+

@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "run": {
+      "type": "object",
+      "properties": {
+        "zones": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "bike": { "type": "object", "additionalProperties": true },
+    "swim": { "type": "object", "additionalProperties": true },
+    "strength": { "type": "object", "additionalProperties": true },
+    "rounding": { "type": "object", "additionalProperties": true }
+  }
+}
+
+

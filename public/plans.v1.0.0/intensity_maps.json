@@ -1,0 +1,17 @@
+{
+  "run": {
+    "zones": {
+      "Z2": { "paceFrom": "LT_pace +12% to +25%" },
+      "T":  { "paceFrom": "LT_pace −3% to +3%" }
+    }
+  },
+  "bike": { "zones": { "Z4": { "ftpPct": [95, 105] } } },
+  "swim": { "zones": { "EN2": { "thresholdPct": [92, 97] } } },
+  "strength": {
+    "main": { "percent1RM": { "neural": [80, 90], "hybrid": [70, 80] } },
+    "rounding": { "weightStepLb": 5, "timeStepMin": 5 }
+  },
+  "rounding": { "durationMinStep": 5, "paceSecStep": 5 }
+}
+
+
