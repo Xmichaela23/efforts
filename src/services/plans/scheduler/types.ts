@@ -7,9 +7,19 @@ export type PoolId =
   | 'run_speed_vo2_pool'
   | 'run_threshold_pool'
   | 'run_easy_pool'
+  // Bike pools (for future cross-discipline scheduling)
+  | 'bike_long_pool'
+  | 'bike_vo2_pool'
+  | 'bike_threshold_pool'
+  | 'bike_endurance_pool'
+  // Swim pools (for future cross-discipline scheduling)
+  | 'swim_technique_pool'
   | 'strength_power_pool'
   | 'strength_endurance_pool'
   | 'strength_hybrid_pool'
+  // Brick pools (first-class citizens)
+  | 'brick_bike_run_threshold'
+  | 'brick_bike_run_endurance'
   | 'mobility_pool';
 
 export type Level = 'new'|'experienced'|'veryExperienced';

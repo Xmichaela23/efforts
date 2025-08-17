@@ -54,6 +54,7 @@ export function composeWeek(params: {
     if (!templateId) {
       const pool = poolsById[slot.poolId];
       if (!pool) return; // unknown pool; skip optional
+      // Deterministic rotation per pool: week-based round robin / weighted
       templateId = selectTemplateId(pool, params.weekNum);
     }
 

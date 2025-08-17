@@ -1,7 +1,9 @@
 import { Day, PoolId, SimpleSchedulerParams, Slot, PlaceResult } from './types';
 
 const ORDER: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+// Global constants (cross-discipline)
 const MAX_HARD_PER_WEEK = 3;
+const MIN_REST_GAP_HOURS = 24;
 
 const idx = (d: Day) => ORDER.indexOf(d);
 const next = (d: Day) => ORDER[(idx(d)+1)%7] as Day;
@@ -10,7 +12,18 @@ const neighbors = (d: Day) => [prev(d), next(d)];
 const includesDay = (arr: Day[], d: Day) => arr.indexOf(d) !== -1;
 
 const isHardPool = (p: PoolId) =>
-  p === 'run_speed_vo2_pool' || p === 'run_threshold_pool' || p === 'run_long_pool' || p.startsWith('strength_');
+  // Run hard
+  p === 'run_speed_vo2_pool' ||
+  p === 'run_threshold_pool' ||
+  p === 'run_long_pool' ||
+  // Bike hard
+  p === 'bike_vo2_pool' ||
+  p === 'bike_threshold_pool' ||
+  p === 'bike_long_pool' ||
+  // Strength
+  p.startsWith('strength_') ||
+  // Bricks are always hard and count as one hard day
+  p.startsWith('brick_');
 
 const strengthPoolFor = (t: 'power'|'endurance'|'hybrid'): PoolId =>
   t === 'power' ? 'strength_power_pool' : t === 'endurance' ? 'strength_endurance_pool' : 'strength_hybrid_pool';
