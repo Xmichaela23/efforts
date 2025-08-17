@@ -136,19 +136,19 @@ export default function GetStrongerFasterBuilder() {
 
           <div>
             <div className="text-sm font-medium mb-1">Available days</div>
-            <select
-              multiple
-              value={cfg.availableDays}
-              onChange={(e) => {
-                const selected = Array.from(e.target.selectedOptions).map(o => o.value as Day);
-                setCfg(prev => ({ ...prev, availableDays: selected }));
-              }}
-              className="w-full max-w-xs border border-gray-300 rounded p-2 text-sm"
-            >
+            <div className="flex flex-wrap gap-2">
               {dayChips.map(d => (
-                <option key={d} value={d}>{d}</option>
+                <label key={d} className={`px-2 py-1 border rounded text-sm cursor-pointer ${cfg.availableDays.includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>
+                  <input
+                    type="checkbox"
+                    className="mr-1 align-middle"
+                    checked={cfg.availableDays.includes(d)}
+                    onChange={() => onChipToggle(d)}
+                  />
+                  {d}
+                </label>
               ))}
-            </select>
+            </div>
           </div>
 
           <div className="flex flex-wrap items-start gap-6">
