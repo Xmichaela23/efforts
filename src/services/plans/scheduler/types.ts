@@ -9,7 +9,8 @@ export type PoolId =
   | 'run_easy_pool'
   | 'strength_power_pool'
   | 'strength_endurance_pool'
-  | 'strength_hybrid_pool';
+  | 'strength_hybrid_pool'
+  | 'mobility_pool';
 
 export type Level = 'new'|'experienced'|'veryExperienced';
 export type StrengthTrack = 'power'|'endurance'|'hybrid';

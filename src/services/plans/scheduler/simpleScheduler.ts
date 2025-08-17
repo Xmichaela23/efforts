@@ -64,14 +64,17 @@ function moveEasyOff(slots: Slot[], day: Day, avail: Day[]): boolean {
   return false;
 }
 
-function moveStrength(slots: Slot[], day: Day, avail: Day[], blocked: Day[]): boolean {
+function moveStrength(slots: Slot[], day: Day, avail: Day[], protectedDays: Day[]): boolean {
+  const protectedRing = uniq<Day>(protectedDays.flatMap(d => [d, ...neighbors(d)]));
   const i = slots.findIndex(s => s.day===day && s.poolId.startsWith('strength_'));
   if (i === -1) return false;
-  const bad = new Set<Day>(blocked.flatMap(neighbors).concat(blocked));
   for (const d of ORDER) {
     if (!includesDay(avail, d)) continue;
-    if (bad.has(d)) continue;
-    if (!slots.some(s => s.day===d && isHardPool(s.poolId))) { slots[i].day = d; return true; }
+    if (protectedRing.includes(d)) continue;
+    const hardHere = slots.some(s => s.day===d && isHardPool(s.poolId));
+    const hardPrev = slots.some(s => s.day===prev(d) && isHardPool(s.poolId));
+    const hardNext = slots.some(s => s.day===next(d) && isHardPool(s.poolId));
+    if (!hardHere && !hardPrev && !hardNext) { slots[i].day = d; return true; }
   }
   return false;
 }
@@ -79,7 +82,7 @@ function moveStrength(slots: Slot[], day: Day, avail: Day[], blocked: Day[]): bo
 function stackStrengthWithNote(slots: Slot[], hardDay: Day, notes: string[]) {
   const strIdx = slots.findIndex(s => s.poolId.startsWith('strength_') && s.day!==hardDay);
   if (strIdx !== -1) slots[strIdx].day = hardDay;
-  notes.push(`Stacked day on ${hardDay} — Notes: If running is the goal, do run first and strength second. If strength is the goal, do strength first; expect the run to feel sluggish.`);
+  notes.push(`Stacked day on ${hardDay} — Run AM, Strength PM. If running is the priority, run first; if strength is the priority, lift first (run will feel sluggish).`);
 }
 
 export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
@@ -107,43 +110,33 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     if (!cand) break; add(slots, qualDays.length===0 ? 'run_speed_vo2_pool' : 'run_threshold_pool', cand); qualDays.push(cand);
   }
 
-  // Strength
-  const blockedForStrength = uniq<Day>([ longRunDay, ...neighbors(longRunDay), ...qualDays, ...qualDays.flatMap(neighbors) ]);
+  // --- Strength placement (respect prefs; stacking last resort) ---
   const strengthPool = strengthPoolFor(strengthTrack);
+  const protectedDays = uniq<Day>([longRunDay, ...qualDays]);
+  const protectedRing = uniq<Day>(protectedDays.flatMap(d => [d, ...neighbors(d)]));
+
   const chosen: Day[] = [];
+  // 1) preferred valid days
   for (const d of preferredStrengthDays) {
     if (chosen.length >= strengthDays) break;
-    if (isAvail(d) && !blockedForStrength.includes(d)) chosen.push(d);
+    if (isAvail(d) && !protectedRing.includes(d)) chosen.push(d);
   }
-  if (chosen.length < strengthDays) {
-    for (const d of ORDER) {
-      if (chosen.length >= strengthDays) break;
-      if (isAvail(d) && !blockedForStrength.includes(d) && !chosen.includes(d)) chosen.push(d);
-    }
+  // 2) any safe standalone days
+  for (const d of ORDER) {
+    if (chosen.length >= strengthDays) break;
+    if (!isAvail(d)) continue;
+    if (protectedRing.includes(d)) continue;
+    if (!chosen.includes(d)) chosen.push(d);
   }
-  if (chosen.length < strengthDays) {
-    for (const d of ORDER) { if (chosen.length >= strengthDays) break; if (isAvail(d) && !chosen.includes(d)) chosen.push(d); }
+  // 3) final fallback: stack onto hard days (quality first, then long)
+  const stackTargets: Day[] = [...qualDays, longRunDay];
+  for (const d of stackTargets) {
+    if (chosen.length >= strengthDays) break;
+    if (!isAvail(d)) continue;
+    if (!chosen.includes(d)) chosen.push(d);
   }
+  // place
   chosen.slice(0, strengthDays).forEach(d => add(slots, strengthPool, d));
-
-  // If we still owe strength sessions, stack on quality days (preferred) to honor counts
-  let placedStrength = slots.filter(s => s.poolId.startsWith('strength_')).length;
-  if (placedStrength < strengthDays) {
-    for (const qd of qualDays) {
-      if (placedStrength >= strengthDays) break;
-      add(slots, strengthPool, qd);
-      placedStrength++;
-    }
-  }
-  // As a final fallback (rare), place on any available day to reach the target
-  if (placedStrength < strengthDays) {
-    for (const d of ORDER) {
-      if (placedStrength >= strengthDays) break;
-      if (!isAvail(d)) continue;
-      add(slots, strengthPool, d);
-      placedStrength++;
-    }
-  }
 
   // Easy runs fill on remaining available days
   for (const d of ORDER) {
@@ -159,25 +152,34 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     for (const d of ORDER) { if (picked.length >= mobilityDays) break; if (isAvail(d) && !picked.includes(d)) { add(slots, 'mobility_pool', d, true); picked.push(d); } }
   }
 
-  // Gating: cap hard days
+  // Gating: cap hard days (prefer dropping non-preferred, non-stacked)
   while (countHardDays(slots) > MAX_HARD_PER_WEEK) {
-    const i = slots.findIndex(s => s.poolId.startsWith('strength_'));
-    if (i !== -1) { slots.splice(i,1); }
-    else break;
+    const removableIdx = slots.findIndex(s =>
+      s.poolId.startsWith('strength_') &&
+      !preferredStrengthDays.includes(s.day as Day) &&
+      ![...qualDays, longRunDay].includes(s.day as Day)
+    );
+    const idxToDrop = removableIdx !== -1 ? removableIdx : slots.findIndex(s => s.poolId.startsWith('strength_'));
+    if (idxToDrop !== -1) {
+      slots.splice(idxToDrop, 1);
+      notes.push('Reduced hard-day count by removing one strength day due to cap.');
+    } else break;
   }
 
   // Gating: no adjacent hard — move easy, move strength, or stack with note
   let guard = 0;
+  const protectedForMove = [longRunDay, ...qualDays];
   while (guard < 10) {
     const [adj, day] = hasAdjacentHard(slots);
     if (!adj || !day) break;
     const nextDay = next(day);
     if (moveEasyOff(slots, nextDay, availableDays)) { guard++; continue; }
-    if (moveStrength(slots, nextDay, availableDays, [longRunDay, ...qualDays])) { guard++; continue; }
+    if (moveStrength(slots, nextDay, availableDays, protectedForMove)) { guard++; continue; }
     stackStrengthWithNote(slots, day, notes); break;
   }
 
   return { slots, notes };
 }
+
 
 
