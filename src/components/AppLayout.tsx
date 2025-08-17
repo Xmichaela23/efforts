@@ -533,7 +533,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
               <h1 className="text-2xl font-bold text-primary">efforts</h1>
               {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={() => history.back()}
+                    variant="ghost"
+                    className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  >
+                    ← Back
+                  </Button>
                   <Button
                     onClick={handleBackToDashboard}
                     variant="ghost"
@@ -541,14 +549,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                     style={{fontFamily: 'Inter, sans-serif'}}
                   >
                     Dashboard
-                  </Button>
-                  <Button
-                    onClick={() => history.back()}
-                    variant="ghost"
-                    className="text-sm font-medium text-gray-700 hover:bg-gray-50"
-                    style={{fontFamily: 'Inter, sans-serif'}}
-                  >
-                    Back
                   </Button>
                 </div>
               )}
