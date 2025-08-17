@@ -107,7 +107,7 @@ function stackStrengthWithNote(
   if (priority === 'strength_first') {
     guidance = 'Strength AM, Endurance PM.';
   } else if (priority === 'balanced') {
-    guidance = 'Quality session AM, Strength PM. If the endurance session is easy, reverse is acceptable.';
+    guidance = 'Quality session AM, Strength PM; reverse is OK on easy endurance days.';
   } else {
     guidance = 'Run/Bike AM, Strength PM.';
   }
@@ -187,6 +187,7 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   const chosen: Day[] = [];
   const stackTargets: Day[] = [...qualDays]; // never include long run here
 
+  let addedBudgetReductionNote = false;
   if (budget <= 0) {
     // Case A: no budget → only stack on quality
     for (const d of stackTargets) {
@@ -196,11 +197,10 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       if (uniq(chosen.filter(x => stackTargets.includes(x))).length >= MAX_STACKED_DAYS) break;
     }
     if (chosen.length < strengthDays) {
-      // last resort: try to place on long run day (warn) else reduce
-      if (includesDay(availableDays, longRunDay) && !chosen.includes(longRunDay)) {
-        chosen.push(longRunDay);
-        notes.push(`Stacked on long run day (${longRunDay}). Not recommended—used only because no other valid slots were available.`);
-      }
+      // Reduce to 2× with a single consolidated note; do not place on long day in no-budget cases
+      const msg = 'Reduced strength to 2× due to weekly hard-day cap and spacing limits.';
+      if (!notes.includes(msg)) notes.push(msg);
+      addedBudgetReductionNote = true;
     }
   } else {
     // Case B: positive budget → place up to budget standalone first (safe), then stack remainder on quality
@@ -217,15 +217,11 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       if (stackedCount >= MAX_STACKED_DAYS) break;
       if (!chosen.includes(d)) chosen.push(d);
     }
-    // if still short: absolute last resort = long run day with warning
-    if (chosen.length < strengthDays && includesDay(availableDays, longRunDay) && !chosen.includes(longRunDay)) {
-      chosen.push(longRunDay);
-      notes.push(`Stacked on long run day (${longRunDay}). Not recommended—used only because no other valid slots were available.`);
-    }
+    // if still short: do not use long day; allow reduction to be handled below
   }
 
   const finalStrengthDays = Math.min(strengthDays, chosen.length);
-  if (finalStrengthDays < strengthDays) {
+  if (finalStrengthDays < strengthDays && !addedBudgetReductionNote) {
     notes.push(`Reduced strength to ${finalStrengthDays}× due to weekly hard-day cap and spacing limits.`);
   }
   chosen.slice(0, finalStrengthDays).forEach(d => add(slots, strengthPool, d));
@@ -293,14 +289,37 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     const nextDay = next(day);
     if (moveEasyOff(slots, nextDay, availableDays)) { guard++; continue; }
     if (moveStrength(slots, nextDay, availableDays, protectedForMove)) { guard++; continue; }
-    // enforce stacked-day limit
+    // enforce stacked-day limit and never stack onto long day
+    const pair: Day[] = [day, nextDay];
+    const involvesLong = pair.includes(longRunDay);
     const stackedSoFar = new Set(slots
       .filter(s => s.poolId.startsWith('strength_') && qualDays.includes(s.day as Day))
       .map(s => s.day)).size;
-    if (stackedSoFar < MAX_STACKED_DAYS) {
-      stackStrengthWithNote(slots, day, notes, params.priority ?? 'endurance_first');
+    if (involvesLong) {
+      const other = pair.find(d => d !== longRunDay)!;
+      if (qualDays.includes(other) && stackedSoFar < MAX_STACKED_DAYS) {
+        stackStrengthWithNote(slots, other, notes, params.priority ?? 'endurance_first');
+        break;
+      } else {
+        // Drop one strength using removal order and add exact note
+        let idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && s.optional === true);
+        if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && !preferredStrengthDays.includes(s.day as Day) && !qualDays.includes(s.day as Day) && s.day !== longRunDay);
+        if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && !qualDays.includes(s.day as Day) && s.day !== longRunDay);
+        if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && qualDays.includes(s.day as Day));
+        if (idxToDrop !== -1) {
+          slots.splice(idxToDrop, 1);
+          const msg = 'Reduced strength to maintain spacing and weekly hard-day cap.';
+          if (!notes.includes(msg)) notes.push(msg);
+        }
+        break;
+      }
+    } else {
+      if (stackedSoFar < MAX_STACKED_DAYS) {
+        // stack onto the first day of the pair (a quality day)
+        stackStrengthWithNote(slots, day, notes, params.priority ?? 'endurance_first');
+      }
+      break;
     }
-    break;
   }
 
   // Final assert: ensure we do not exceed cap (safety pass)
@@ -315,6 +334,14 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       slots.splice(idxToDrop, 1);
     } else break;
     guardCap++;
+  }
+
+  // Invariant: do not schedule strength on long-run day when week is fully available
+  if (availableDays.length >= 7) {
+    const strengthOnLong = slots.some(s => s.poolId.startsWith('strength_') && s.day === longRunDay);
+    if (strengthOnLong) {
+      throw new Error('Invariant violated: strength on long-run day with ample availability.');
+    }
   }
 
   return { slots, notes };

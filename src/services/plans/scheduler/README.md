@@ -196,6 +196,10 @@ These apply across all disciplines combined (run, bike, swim, strength, bricks).
 - Protected ring for placement = (all long + quality days) ±1 day.
 - Strength placement order: preferred → safe standalone → stack on QUALITY → (last resort) stack on LONG with note.
 
+#### Hard invariant (strength vs. long run)
+- Strength is never scheduled on the long-run day.
+- Exception: only when no other legal slot exists (e.g., ≤3 available days or every other day is illegal due to protected ring/adjacency). If used, emit a warning note.
+
 
 #### Tri/Hybrid anchors (spec-only params)
 Extend the scheduler inputs to support multi-discipline anchoring and brick requests:
