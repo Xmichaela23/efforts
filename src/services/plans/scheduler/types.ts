@@ -17,6 +17,7 @@ export type PoolId =
   | 'strength_power_pool'
   | 'strength_endurance_pool'
   | 'strength_hybrid_pool'
+  | 'strength_upper'
   // Brick pools (first-class citizens)
   | 'brick_bike_run_threshold'
   | 'brick_bike_run_endurance'

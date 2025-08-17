@@ -10,7 +10,7 @@ export const RUN_VOLUME_OPTIONS = [
 ];
 
 export const HELP_STRENGTH =
-  '2×/wk recommended. If 3× on Endurance track, the 3rd is supplemental (upper/core), optional, and dropped first if the week is tight. Never placed on your long-run day.';
+  '2×/wk recommended. If 3× on Endurance track, the 3rd is supplemental (upper/core), optional, and dropped first if the week is tight. Never placed on your long-run day.\nCowboy option: choose a 3rd upper body focus strength day for aesthetics and balance';
 
 export const HELP_LONG_RUN =
   'Long run is protected. Strength is never scheduled on the long-run day.';
