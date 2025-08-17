@@ -24,6 +24,7 @@ export type PoolId =
 
 export type Level = 'new'|'experienced'|'veryExperienced';
 export type StrengthTrack = 'power'|'endurance'|'hybrid';
+export type PlanPriority = 'endurance_first'|'balanced'|'strength_first';
 
 export interface SimpleSchedulerParams {
   availableDays: Day[];
@@ -35,6 +36,8 @@ export interface SimpleSchedulerParams {
   includeMobility?: boolean;
   mobilityDays?: 0|1|2|3|4|5;
   preferredMobilityDays?: Day[];
+  // optional, used only for AM/PM note guidance; defaults to 'endurance_first'
+  priority?: PlanPriority;
 }
 
 export interface Slot {

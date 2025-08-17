@@ -260,6 +260,26 @@ export interface TriHybridSchedulerParams /* extends SimpleSchedulerParams */ {
 - Deterministic rotations (composer):
   - With A/B/C variants defined, Week 1..5 → A,B,C,A,B for VO2/Threshold/Strength; taper behavior per README.
 
+#### Endurance track, 3× strength, open week
+- Input: 7 available; `longRun=Sun`; run VO₂ `Tue`; run Threshold `Thu`; `strengthTrack='endurance'`; `strengthDays=3`; `priority='endurance_first'`.
+- Expect: 2 stacked (Tue/Thu) + 1 standalone on a safe day marked `optional: true`; note: “the 3rd strength day is supplemental (upper/core…).”
+- If budget blocks standalone, a single consolidated reduction note; no strength on Sun unless last resort (with warning).
+
+#### Priority-aware AM/PM notes
+- On stacked days, wording is exact:
+  - `endurance_first` → “Run/Bike AM, Strength PM.”
+  - `strength_first` → “Strength AM, Endurance PM.”
+  - `balanced` → “Quality session AM, Strength PM; reverse is OK on easy endurance days.”
+
+#### Stack limit
+- Never more than 2 stacked days/week.
+
+#### Cap enforcement
+- When over cap, removal order: `optional` → `standalone non-preferred` → `standalone preferred` → `stacked`. Notes de‑duplicated.
+
+#### Protected ring consistency
+- Same ring used for selecting standalone strength and for `moveStrength(...)`; never relocate into the ring.
+
 
 ### Tri / Hybrid Extensions (Spec Only)
 

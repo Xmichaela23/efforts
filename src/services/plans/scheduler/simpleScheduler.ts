@@ -4,6 +4,7 @@ const ORDER: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 // Global constants (cross-discipline)
 const MAX_HARD_PER_WEEK = 3;
 const MIN_REST_GAP_HOURS = 24;
+const MAX_STACKED_DAYS = 2; // never create >2 stacked days/week
 
 const idx = (d: Day) => ORDER.indexOf(d);
 const next = (d: Day) => ORDER[(idx(d)+1)%7] as Day;
@@ -92,10 +93,46 @@ function moveStrength(slots: Slot[], day: Day, avail: Day[], protectedDays: Day[
   return false;
 }
 
-function stackStrengthWithNote(slots: Slot[], hardDay: Day, notes: string[]) {
-  const strIdx = slots.findIndex(s => s.poolId.startsWith('strength_') && s.day!==hardDay);
-  if (strIdx !== -1) slots[strIdx].day = hardDay;
-  notes.push(`Stacked day on ${hardDay} — Run AM, Strength PM. If running is the priority, run first; if strength is the priority, lift first (run will feel sluggish).`);
+function stackStrengthWithNote(
+  slots: Slot[],
+  hardDay: Day,
+  notes: string[],
+  priority: 'endurance_first'|'balanced'|'strength_first' = 'endurance_first'
+) {
+  const strIdxNearby = slots.findIndex(s => s.poolId.startsWith('strength_') && s.day!==hardDay);
+  if (strIdxNearby !== -1) {
+    slots[strIdxNearby].day = hardDay;
+  }
+  let guidance = '';
+  if (priority === 'strength_first') {
+    guidance = 'Strength AM, Endurance PM.';
+  } else if (priority === 'balanced') {
+    guidance = 'Quality session AM, Strength PM. If the endurance session is easy, reverse is acceptable.';
+  } else {
+    guidance = 'Run/Bike AM, Strength PM.';
+  }
+  notes.push(`Stacked day on ${hardDay} — ${guidance}`);
+}
+
+function markSupplementalThirdIfNeeded(
+  slots: Slot[],
+  strengthTrack: 'power'|'endurance'|'hybrid',
+  strengthDaysRequested: 2|3,
+  notes: string[]
+) {
+  if (strengthTrack !== 'endurance' || strengthDaysRequested !== 3) return;
+  const strengthIdxs = slots
+    .map((s, i) => ({ i, s }))
+    .filter(x => x.s.poolId.startsWith('strength_'))
+    .map(x => x.i);
+  if (strengthIdxs.length < 3) return;
+  const isStacked = (d: Day) => slots.some(s => isHardPool(s.poolId) && s.day === d && !s.poolId.startsWith('strength_'));
+  // prefer standalone
+  let supplementalIndex = strengthIdxs.find(i => !isStacked(slots[i].day));
+  if (supplementalIndex === undefined) supplementalIndex = strengthIdxs[strengthIdxs.length - 1];
+  slots[supplementalIndex].optional = true;
+  const msg = 'Endurance track: the 3rd strength day is supplemental (upper/core emphasis) and will be dropped first if needed.';
+  if (!notes.includes(msg)) notes.push(msg);
 }
 
 export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
@@ -125,49 +162,76 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     qualDays.push(cand);
   }
 
-  // --- Strength placement per spec ---
+  // --- Strength placement (budget-aware, deterministic) ---
   const strengthPool = strengthPoolFor(strengthTrack);
   const protectedDays = uniq<Day>([longRunDay, ...qualDays]);
   const protectedRing = uniq<Day>(protectedDays.flatMap(d => [d, ...neighbors(d)]));
 
-  const chosen: Day[] = [];
-  // 1) Use preferred strength days that are available and NOT in the protected ring and NOT the long-run day
-  for (const d of preferredStrengthDays) {
-    if (chosen.length >= strengthDays) break;
-    if (isAvail(d) && !protectedRing.includes(d) && d !== longRunDay) {
-      chosen.push(d);
-    }
-  }
-  // 2) Fill from safe standalone days (available, not in protected ring, not the long-run day)
-  for (const d of ORDER) {
-    if (chosen.length >= strengthDays) break;
-    if (!isAvail(d)) continue;
+  // anchors = distinct hard-day anchors already placed
+  const anchorHard = uniq<Day>([longRunDay, ...qualDays]);
+  let budget = MAX_HARD_PER_WEEK - anchorHard.length;  // how many standalone hard days we can add
+
+  // helper: find safe standalone strength days
+  const safeStandalone: Day[] = [];
+  for (const d of [...preferredStrengthDays, ...ORDER]) {
+    if (safeStandalone.includes(d)) continue;
+    if (!includesDay(availableDays, d)) continue;
     if (protectedRing.includes(d)) continue;
     if (d === longRunDay) continue;
-    if (!chosen.includes(d)) chosen.push(d);
+    const hardHere = slots.some(s => s.day===d && isHardPool(s.poolId));
+    const hardPrev = slots.some(s => s.day===prev(d) && isHardPool(s.poolId));
+    const hardNext = slots.some(s => s.day===next(d) && isHardPool(s.poolId));
+    if (!hardHere && !hardPrev && !hardNext) safeStandalone.push(d);
   }
-  // 3) Fallback: stack onto QUALITY days only (not the long-run day)
-  for (const d of qualDays) {
-    if (chosen.length >= strengthDays) break;
-    if (!isAvail(d)) continue;
-    if (!chosen.includes(d)) chosen.push(d);
+
+  const chosen: Day[] = [];
+  const stackTargets: Day[] = [...qualDays]; // never include long run here
+
+  if (budget <= 0) {
+    // Case A: no budget → only stack on quality
+    for (const d of stackTargets) {
+      if (chosen.length >= strengthDays) break;
+      if (!includesDay(availableDays, d)) continue;
+      if (!chosen.includes(d)) chosen.push(d);
+      if (uniq(chosen.filter(x => stackTargets.includes(x))).length >= MAX_STACKED_DAYS) break;
+    }
+    if (chosen.length < strengthDays) {
+      // last resort: try to place on long run day (warn) else reduce
+      if (includesDay(availableDays, longRunDay) && !chosen.includes(longRunDay)) {
+        chosen.push(longRunDay);
+        notes.push(`Stacked on long run day (${longRunDay}). Not recommended—used only because no other valid slots were available.`);
+      }
+    }
+  } else {
+    // Case B: positive budget → place up to budget standalone first (safe), then stack remainder on quality
+    for (const d of safeStandalone) {
+      if (chosen.length >= strengthDays) break;
+      if (budget <= 0) break;
+      chosen.push(d);
+      budget--;
+    }
+    for (const d of stackTargets) {
+      if (chosen.length >= strengthDays) break;
+      if (!includesDay(availableDays, d)) continue;
+      const stackedCount = uniq(chosen.filter(x => stackTargets.includes(x))).length;
+      if (stackedCount >= MAX_STACKED_DAYS) break;
+      if (!chosen.includes(d)) chosen.push(d);
+    }
+    // if still short: absolute last resort = long run day with warning
+    if (chosen.length < strengthDays && includesDay(availableDays, longRunDay) && !chosen.includes(longRunDay)) {
+      chosen.push(longRunDay);
+      notes.push(`Stacked on long run day (${longRunDay}). Not recommended—used only because no other valid slots were available.`);
+    }
   }
-  // 4) Fallback B: neighbors of QUALITY (avoid long run & its neighbors)
-  const qualityNeighbors = uniq<Day>(qualDays.flatMap(neighbors));
-  const avoidLongRunNeighborhood = new Set<Day>([longRunDay, ...neighbors(longRunDay)]);
-  for (const d of qualityNeighbors) {
-    if (chosen.length >= strengthDays) break;
-    if (!isAvail(d)) continue;
-    if (avoidLongRunNeighborhood.has(d)) continue;
-    if (!chosen.includes(d)) chosen.push(d);
+
+  const finalStrengthDays = Math.min(strengthDays, chosen.length);
+  if (finalStrengthDays < strengthDays) {
+    notes.push(`Reduced strength to ${finalStrengthDays}× due to weekly hard-day cap and spacing limits.`);
   }
-  // 4) Absolute last resort: stack on the LONG RUN day IF still short
-  if (chosen.length < strengthDays && isAvail(longRunDay) && !chosen.includes(longRunDay)) {
-    chosen.push(longRunDay);
-    notes.push(`Stacked on long run day (${longRunDay}). This is not recommended—used only because no other valid slots were available.`);
-  }
-  // Place them
-  chosen.slice(0, strengthDays).forEach(d => add(slots, strengthPool, d));
+  chosen.slice(0, finalStrengthDays).forEach(d => add(slots, strengthPool, d));
+
+  // Mark supplemental third on endurance track
+  markSupplementalThirdIfNeeded(slots, strengthTrack, strengthDays, notes);
 
   // Easy runs fill on remaining available days
   for (const d of ORDER) {
@@ -183,18 +247,41 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     for (const d of ORDER) { if (picked.length >= mobilityDays) break; if (isAvail(d) && !picked.includes(d)) { add(slots, 'mobility_pool', d, true); picked.push(d); } }
   }
 
-  // Gating: cap hard days (prefer dropping non-preferred, non-stacked)
+  // Gating: cap hard days (preserve stacked when possible; optional first; de-dupe notes)
+  function isStackedOnQuality(s: Slot): boolean {
+    return s.poolId.startsWith('strength_') && qualDays.includes(s.day as Day);
+  }
+
   while (countHardDays(slots) > MAX_HARD_PER_WEEK) {
-    const removableIdx = slots.findIndex(s =>
+    // 1) optional first
+    let idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && s.optional === true);
+    // 2) standalone non-preferred
+    if (idxToDrop === -1) idxToDrop = slots.findIndex(s =>
       s.poolId.startsWith('strength_') &&
       !preferredStrengthDays.includes(s.day as Day) &&
-      ![...qualDays, longRunDay].includes(s.day as Day)
+      !isStackedOnQuality(s) &&
+      s.day !== longRunDay
     );
-    const idxToDrop = removableIdx !== -1 ? removableIdx : slots.findIndex(s => s.poolId.startsWith('strength_'));
+    // 3) standalone preferred
+    if (idxToDrop === -1) idxToDrop = slots.findIndex(s =>
+      s.poolId.startsWith('strength_') &&
+      !isStackedOnQuality(s) &&
+      s.day !== longRunDay
+    );
+    // 4) stacked last
+    if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && isStackedOnQuality(s));
+
     if (idxToDrop !== -1) {
       slots.splice(idxToDrop, 1);
-      notes.push('Reduced hard-day count by removing one strength day due to cap.');
+      const msg = 'Reduced hard-day count by removing strength due to weekly cap.';
+      if (!notes.includes(msg)) notes.push(msg);
     } else break;
+  }
+  // de-dupe any repeated reduction messages
+  if (notes.filter(n => n.startsWith('Reduced hard-day count')).length > 1) {
+    const kept = notes.filter(n => !n.startsWith('Reduced hard-day count'));
+    kept.push('Reduced hard-day count by removing strength due to weekly cap.');
+    notes.length = 0; notes.push(...kept);
   }
 
   // Gating: no adjacent hard — move easy, move strength, or stack with note
@@ -206,7 +293,28 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     const nextDay = next(day);
     if (moveEasyOff(slots, nextDay, availableDays)) { guard++; continue; }
     if (moveStrength(slots, nextDay, availableDays, protectedForMove)) { guard++; continue; }
-    stackStrengthWithNote(slots, day, notes); break;
+    // enforce stacked-day limit
+    const stackedSoFar = new Set(slots
+      .filter(s => s.poolId.startsWith('strength_') && qualDays.includes(s.day as Day))
+      .map(s => s.day)).size;
+    if (stackedSoFar < MAX_STACKED_DAYS) {
+      stackStrengthWithNote(slots, day, notes, params.priority ?? 'endurance_first');
+    }
+    break;
+  }
+
+  // Final assert: ensure we do not exceed cap (safety pass)
+  let guardCap = 0;
+  while (countHardDays(slots) > MAX_HARD_PER_WEEK && guardCap < 5) {
+    // reuse the same order as above
+    let idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && s.optional === true);
+    if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && !preferredStrengthDays.includes(s.day as Day) && !qualDays.includes(s.day as Day) && s.day !== longRunDay);
+    if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && !qualDays.includes(s.day as Day) && s.day !== longRunDay);
+    if (idxToDrop === -1) idxToDrop = slots.findIndex(s => s.poolId.startsWith('strength_') && qualDays.includes(s.day as Day));
+    if (idxToDrop !== -1) {
+      slots.splice(idxToDrop, 1);
+    } else break;
+    guardCap++;
   }
 
   return { slots, notes };
