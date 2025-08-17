@@ -252,15 +252,6 @@ export default function GetStrongerFasterBuilder() {
                     <div className="text-sm font-medium">{day}</div>
                     <div className="text-xs text-gray-500">{dayTotal} min</div>
                   </div>
-                  {/* Notes for this week/day */}
-                  {notesByWeek.get(currentWeek)?.length ? (
-                    <div className="mb-2 text-xs text-gray-600">
-                      <div className="font-medium text-gray-700">Notes</div>
-                      <ul className="list-disc pl-5">
-                        {notesByWeek.get(currentWeek)!.map((n, i) => (<li key={i}>{n}</li>))}
-                      </ul>
-                    </div>
-                  ) : null}
                   <div className="space-y-2">
                     {list.map((s, idx) => {
                       const detail = s.discipline === 'strength'

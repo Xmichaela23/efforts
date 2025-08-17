@@ -126,8 +126,11 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   }
   chosen.slice(0, strengthDays).forEach(d => add(slots, strengthPool, d));
 
-  // Easy runs fill
-  for (const d of ORDER) if (isAvail(d) && !slots.some(s => s.day===d)) add(slots, 'run_easy_pool', d, true);
+  // Easy runs fill on remaining available days
+  for (const d of ORDER) {
+    if (!isAvail(d)) continue;
+    if (!slots.some(s => s.day===d)) add(slots, 'run_easy_pool', d, true);
+  }
 
   // Mobility optional
   if (includeMobility && mobilityDays > 0) {
@@ -140,7 +143,7 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   // Gating: cap hard days
   while (countHardDays(slots) > MAX_HARD_PER_WEEK) {
     const i = slots.findIndex(s => s.poolId.startsWith('strength_'));
-    if (i !== -1) { slots.splice(i,1); notes.push('Reduced hard-day count by removing one strength day due to cap.'); }
+    if (i !== -1) { slots.splice(i,1); }
     else break;
   }
 
