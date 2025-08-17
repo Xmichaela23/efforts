@@ -18,7 +18,11 @@
           "baseDurationMin": { "type": "number", "minimum": 1 },
           "progressionRule": { "type": "string" },
           "constraints": { "type": "array", "items": { "type": "string" } },
-          "userNote": { "type": "string" }
+          "userNote": { "type": "string" },
+          "track": { "type": "string", "enum": ["power", "endurance", "hybrid" ] },
+          "tierOrder": { "type": "number", "minimum": 1 },
+          "requires": { "type": "array", "items": { "type": "string" } },
+          "fallback": { "type": "boolean" }
         }
       }
     }
