@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { buildGetStrongerFaster8w } from '@/services/plans/skeletons/get_stronger_faster_8w';
 import { composeWeek } from '@/services/plans/compose';
+import { buildWeekFromDropdowns } from '@/services/plans/scheduler/buildWeekFromDropdowns';
+import type { SimpleSchedulerParams } from '@/services/plans/scheduler/types';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
 
 type Session = {
@@ -32,11 +33,30 @@ export default function GetStrongerFasterBuilder() {
   });
   const [currentWeek, setCurrentWeek] = useState(1);
 
-  const { weeks, sessionsByWeek } = useMemo(() => {
-    const built = buildGetStrongerFaster8w(cfg);
+  const { weeks, sessionsByWeek, notesByWeek } = useMemo(() => {
     const sessions = new Map<number, Session[]>();
-    built.weeks.forEach((w: SkeletonWeek) => {
-      const composed = composeWeek({ weekNum: w.weekNumber, skeletonWeek: w, baselines: undefined }) as any[];
+    const notes = new Map<number, string[]>();
+    const weeksOut: SkeletonWeek[] = [];
+
+    const level = cfg.timeLevel === 'beginner' ? 'new' : cfg.timeLevel === 'advanced' ? 'veryExperienced' : 'experienced';
+    const preferredStrengthDays: Day[] = ['Mon','Fri','Wed'];
+
+    for (let w = 1; w <= cfg.durationWeeks; w++) {
+      const phase: SkeletonWeek['phase'] = w <= 2 ? 'base' : w <= 6 ? 'build' : w === 7 ? 'peak' : 'taper';
+      const params: SimpleSchedulerParams = {
+        availableDays: cfg.availableDays,
+        longRunDay: cfg.longRunDay,
+        level: level as any,
+        strengthTrack: cfg.strengthTrack ?? 'hybrid',
+        strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3,
+        preferredStrengthDays,
+        includeMobility: false,
+        mobilityDays: 0,
+        preferredMobilityDays: []
+      };
+      const { week, notes: weekNotes } = buildWeekFromDropdowns(w, phase, params);
+      weeksOut.push(week);
+      const composed = composeWeek({ weekNum: w, skeletonWeek: week, baselines: undefined }) as any[];
       const mapped: Session[] = composed.map(s => ({
         day: s.day,
         discipline: s.discipline,
@@ -45,9 +65,10 @@ export default function GetStrongerFasterBuilder() {
         intensity: s.intensity,
         description: s.description,
       }));
-      sessions.set(w.weekNumber, mapped);
-    });
-    return { weeks: built.weeks, sessionsByWeek: sessions };
+      sessions.set(w, mapped);
+      notes.set(w, weekNotes);
+    }
+    return { weeks: weeksOut, sessionsByWeek: sessions, notesByWeek: notes };
   }, [cfg]);
 
   const rec = useMemo(() => {
@@ -182,6 +203,15 @@ export default function GetStrongerFasterBuilder() {
                     <div className="text-sm font-medium">{day}</div>
                     <div className="text-xs text-gray-500">{dayTotal} min</div>
                   </div>
+                  {/* Notes for this week/day */}
+                  {notesByWeek.get(currentWeek)?.length ? (
+                    <div className="mb-2 text-xs text-gray-600">
+                      <div className="font-medium text-gray-700">Notes</div>
+                      <ul className="list-disc pl-5">
+                        {notesByWeek.get(currentWeek)!.map((n, i) => (<li key={i}>{n}</li>))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <div className="space-y-2">
                     {list.map((s, idx) => {
                       const detail = s.discipline === 'strength'
