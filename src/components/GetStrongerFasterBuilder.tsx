@@ -29,7 +29,6 @@ export default function GetStrongerFasterBuilder() {
     includeMobility: true,
     mobilityDaysPerWeek: 2,
     mobilityDaysPreferred: [],
-    standaloneMobility: false,
   });
   const [currentWeek, setCurrentWeek] = useState(1);
 
@@ -116,13 +115,25 @@ export default function GetStrongerFasterBuilder() {
             </div>
           </div>
 
-          <div>
-            <div className="text-sm font-medium mb-1">Long run day</div>
-            <div className="flex gap-2">
-              {(['Sat','Sun'] as const).map(d => (
-                <button key={d} onClick={() => setCfg(prev=>({...prev, longRunDay: d }))}
-                  className={`px-3 py-1 border rounded ${cfg.longRunDay===d? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
-              ))}
+          <div className="flex flex-wrap items-start gap-6">
+            <div>
+              <div className="text-sm font-medium mb-1">Long run day</div>
+              <div className="flex gap-2">
+                {(['Sat','Sun'] as const).map(d => (
+                  <button key={d} onClick={() => setCfg(prev=>({...prev, longRunDay: d }))}
+                    className={`px-3 py-1 border rounded ${cfg.longRunDay===d? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <div className="text-sm font-medium mb-1">Strength days/week</div>
+              <div className="flex gap-2">
+                {[2,3].map(n => (
+                  <button key={n} onClick={() => setCfg(prev=>({...prev, strengthDaysPerWeek: n as 0|1|2|3 }))}
+                    className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{n}</button>
+                ))}
+              </div>
             </div>
           </div>
 
@@ -139,51 +150,9 @@ export default function GetStrongerFasterBuilder() {
               ))}
             </div>
           </div>
-
-          <div>
-            <div className="text-sm font-medium mb-1">Strength days/week</div>
-            <div className="flex gap-2">
-              {[2,3].map(n => (
-                <button key={n} onClick={() => setCfg(prev=>({...prev, strengthDaysPerWeek: n as 0|1|2|3 }))}
-                  className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{n}</button>
-              ))}
-            </div>
-          </div>
-
           {/* Preferred strength days removed; scheduler will place Mon/Fri/Wed with safe stacking */}
 
-          {/* Mobility controls */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <div>
-              <div className="text-sm font-medium mb-1">Add standalone mobility work</div>
-              <div className="flex gap-2">
-                {([true,false] as const).map(v => (
-                  <button key={String(v)} onClick={() => setCfg(prev=>({...prev, standaloneMobility: v }))}
-                    className={`px-3 py-1 border rounded ${cfg.standaloneMobility===v? 'bg-gray-100 border-gray-400':'border-gray-200'}`}>{v? 'Yes':'No'}</button>
-                ))}
-              </div>
-            </div>
-
-            {/* Removed mobility count selection; day chips below control scheduling */}
-          </div>
-
-          {/* Removed duplicate mobility count block */}
-
-          <div aria-disabled={!cfg.standaloneMobility}>
-            <div className="text-sm font-medium mb-1">Mobility days</div>
-            <div className="flex flex-wrap gap-2">
-              {dayChips.map(d => (
-                <button key={d} onClick={() => cfg.standaloneMobility && setCfg(prev=>({
-                  ...prev,
-                  mobilityDaysPreferred: (prev.mobilityDaysPreferred ?? []).includes(d)
-                    ? (prev.mobilityDaysPreferred ?? []).filter(x=>x!==d)
-                    : ([...(prev.mobilityDaysPreferred ?? []), d] as Day[])
-                }))} disabled={!cfg.standaloneMobility}
-                  className={`px-2 py-1 border rounded text-sm ${(cfg.mobilityDaysPreferred ?? []).includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'} ${!cfg.standaloneMobility? 'opacity-50 cursor-not-allowed':''}`}>{d}</button>
-              ))}
-            </div>
-            <p className="text-xs text-gray-500 mt-1">Short 10–15 min mobility resets to improve range of motion and recovery. Doesn’t count as hard and can stack with any session.</p>
-          </div>
+          {/* Standalone mobility removed for now; integrated mobility remains inside sessions */}
         </div>
       </div>
 
