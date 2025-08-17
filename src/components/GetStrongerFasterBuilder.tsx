@@ -138,15 +138,14 @@ export default function GetStrongerFasterBuilder() {
             <div className="text-sm font-medium mb-1">Available days</div>
             <div className="flex flex-wrap gap-2">
               {dayChips.map(d => (
-                <label key={d} className={`px-2 py-1 border rounded text-sm cursor-pointer ${cfg.availableDays.includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>
-                  <input
-                    type="checkbox"
-                    className="mr-1 align-middle"
-                    checked={cfg.availableDays.includes(d)}
-                    onChange={() => onChipToggle(d)}
-                  />
+                <button
+                  key={d}
+                  type="button"
+                  onClick={() => onChipToggle(d)}
+                  className={`px-2 py-1 border rounded text-sm ${cfg.availableDays.includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}
+                >
                   {d}
-                </label>
+                </button>
               ))}
             </div>
           </div>
@@ -170,14 +169,19 @@ export default function GetStrongerFasterBuilder() {
               {(() => {
                 const canThree = (cfg.timeLevel === 'advanced') && (cfg.availableDays.length >= 6);
                 return (
-                  <select
-                    className="border border-gray-300 rounded px-2 py-1 text-sm"
-                    value={cfg.strengthDaysPerWeek}
-                    onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
-                  >
-                    <option value={2}>2</option>
-                    <option value={3} disabled={!canThree}>3</option>
-                  </select>
+                  <div className="flex flex-col gap-1">
+                    <select
+                      className="border border-gray-300 rounded px-2 py-1 text-sm"
+                      value={cfg.strengthDaysPerWeek}
+                      onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
+                    >
+                      <option value={2}>2</option>
+                      <option value={3} disabled={!canThree}>3</option>
+                    </select>
+                    {!canThree && (
+                      <span className="text-xs text-gray-500">3 strength days require Very experienced and ≥6 available days.</span>
+                    )}
+                  </div>
                 );
               })()}
             </div>
@@ -195,6 +199,16 @@ export default function GetStrongerFasterBuilder() {
                   className={`px-3 py-1 border rounded ${cfg.strengthTrack===t? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{t}</button>
               ))}
             </div>
+            {/* inline description – no frame */}
+            {cfg.strengthTrack === 'power' && (
+              <p className="mt-1 text-xs text-gray-600">Heavy, low-rep lifting to build raw strength and neural drive.</p>
+            )}
+            {cfg.strengthTrack === 'endurance' && (
+              <p className="mt-1 text-xs text-gray-600">Higher-rep, lighter weights to support stamina and muscular durability.</p>
+            )}
+            {cfg.strengthTrack === 'hybrid' && (
+              <p className="mt-1 text-xs text-gray-600">A mix of heavy and endurance work — balanced strength for all-around performance.</p>
+            )}
           </div>
           {/* Preferred strength days removed; scheduler will place Mon/Fri/Wed with safe stacking */}
 
