@@ -9,8 +9,7 @@ export type PoolId =
   | 'run_easy_pool'
   | 'strength_power_pool'
   | 'strength_endurance_pool'
-  | 'strength_hybrid_pool'
-  | 'mobility_pool';
+  | 'strength_hybrid_pool';
 
 export type Level = 'new'|'experienced'|'veryExperienced';
 export type StrengthTrack = 'power'|'endurance'|'hybrid';
@@ -36,6 +35,16 @@ export interface Slot {
 export interface PlaceResult {
   slots: Slot[];
   notes: string[];
+}
+
+// ---------- UI-facing form (no business logic in UI) ----------
+export interface PlanUIForm {
+  longRunDay: Day;                   // single-select
+  preferredStrengthDays: Day[];      // multi-select, must be 2 or 3
+  availableDays: Day[];              // multi-select
+  experience: Level;                 // new | experienced | veryExperienced
+  strengthTrack: StrengthTrack;      // power | endurance | hybrid
+  strengthDaysPerWeek: 2 | 3;        // UI limits to 2 or 3
 }
 
 

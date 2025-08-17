@@ -85,6 +85,14 @@ export default function GetStrongerFasterBuilder() {
     }
   }, [cfg.timeLevel]);
 
+  // Keep long run day valid within available days
+  useEffect(() => {
+    if (!cfg.availableDays.includes(cfg.longRunDay)) {
+      const next = cfg.availableDays[0] ?? 'Sun';
+      setCfg(prev => ({ ...prev, longRunDay: next as Day }));
+    }
+  }, [cfg.availableDays]);
+
   const onChipToggle = (d: Day) => {
     setCfg(prev => ({
       ...prev,
@@ -128,33 +136,50 @@ export default function GetStrongerFasterBuilder() {
 
           <div>
             <div className="text-sm font-medium mb-1">Available days</div>
-            <div className="flex flex-wrap gap-2">
+            <select
+              multiple
+              value={cfg.availableDays}
+              onChange={(e) => {
+                const selected = Array.from(e.target.selectedOptions).map(o => o.value as Day);
+                setCfg(prev => ({ ...prev, availableDays: selected }));
+              }}
+              className="w-full max-w-xs border border-gray-300 rounded p-2 text-sm"
+            >
               {dayChips.map(d => (
-                <button key={d} onClick={() => onChipToggle(d)}
-                  className={`px-2 py-1 border rounded text-sm ${cfg.availableDays.includes(d)? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
+                <option key={d} value={d}>{d}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           <div className="flex flex-wrap items-start gap-6">
             <div>
               <div className="text-sm font-medium mb-1">Long run day</div>
-              <div className="flex gap-2">
-                {(['Sat','Sun'] as const).map(d => (
-                  <button key={d} onClick={() => setCfg(prev=>({...prev, longRunDay: d }))}
-                    className={`px-3 py-1 border rounded ${cfg.longRunDay===d? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{d}</button>
+              <select
+                className="border border-gray-300 rounded px-2 py-1 text-sm"
+                value={cfg.longRunDay}
+                onChange={(e)=> setCfg(prev=>({ ...prev, longRunDay: e.target.value as Day }))}
+              >
+                {cfg.availableDays.map(d => (
+                  <option key={d} value={d}>{d}</option>
                 ))}
-              </div>
+              </select>
             </div>
 
             <div>
               <div className="text-sm font-medium mb-1">Strength days/week</div>
-              <div className="flex gap-2">
-                {[2,3].map(n => (
-                  <button key={n} onClick={() => setCfg(prev=>({...prev, strengthDaysPerWeek: n as 0|1|2|3 }))}
-                    className={`px-3 py-1 border rounded ${cfg.strengthDaysPerWeek===n? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{n}</button>
-                ))}
-              </div>
+              {(() => {
+                const canThree = (cfg.timeLevel === 'advanced') && (cfg.availableDays.length >= 6);
+                return (
+                  <select
+                    className="border border-gray-300 rounded px-2 py-1 text-sm"
+                    value={cfg.strengthDaysPerWeek}
+                    onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
+                  >
+                    <option value={2}>2</option>
+                    <option value={3} disabled={!canThree}>3</option>
+                  </select>
+                );
+              })()}
             </div>
           </div>
 
