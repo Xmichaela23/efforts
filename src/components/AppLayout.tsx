@@ -120,6 +120,27 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setCurrentWorkoutIndex(0);
   };
 
+  const handleHeaderBack = () => {
+    // Prefer navigating back to Plans when in any plan-related view
+    if (showPlanBuilder) {
+      setShowPlanBuilder(false);
+      setShowAllPlans(true);
+      return;
+    }
+    if (showStrengthPlans) {
+      setShowStrengthPlans(false);
+      setShowAllPlans(true);
+      return;
+    }
+    if (showAllPlans) {
+      // From plans, go back to dashboard
+      handleBackToDashboard();
+      return;
+    }
+    // Fallback: browser history
+    history.back();
+  };
+
   // NEW: Training Baselines handler
   const handleTrainingBaselinesClick = () => {
     setShowTrainingBaselines(true);
@@ -535,7 +556,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
                 <div className="flex items-center gap-3">
                   <Button
-                    onClick={() => history.back()}
+                    onClick={handleHeaderBack}
                     variant="ghost"
                     className="text-sm font-medium text-gray-700 hover:bg-gray-50"
                     style={{fontFamily: 'Inter, sans-serif'}}

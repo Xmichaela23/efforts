@@ -166,10 +166,10 @@ export default function GetStrongerFasterBuilder() {
 
             {/* Inline hint spanning between the two controls for tighter UI */}
             {(() => {
-              const canThree = (cfg.timeLevel === 'advanced') && (cfg.availableDays.length >= 6);
+              const canThree = (cfg.availableDays.length >= 6);
               return (
                 <div className="col-span-2 text-xs text-gray-500 -mt-1">
-                  {!canThree && '3 strength days require Very experienced and ≥6 available days.'}
+                  {!canThree && '3 strength days require ≥6 available days.'}
                 </div>
               );
             })()}
@@ -182,7 +182,7 @@ export default function GetStrongerFasterBuilder() {
                 onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
               >
                 <option value={2}>2</option>
-                <option value={3} disabled={!((cfg.timeLevel === 'advanced') && (cfg.availableDays.length >= 6))}>3</option>
+                <option value={3} disabled={!(cfg.availableDays.length >= 6)}>3</option>
               </select>
             </div>
           </div>
