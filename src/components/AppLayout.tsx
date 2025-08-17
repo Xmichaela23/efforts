@@ -531,18 +531,19 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <h1 className="text-2xl font-bold text-primary">efforts</h1>
-
-              {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
-                <Button
-                  onClick={handleBackToDashboard}
-                  variant="ghost"
-                  className="text-sm font-medium hover:bg-gray-50"
-                  style={{fontFamily: 'Inter, sans-serif'}}
-                >
-                  Dashboard
-                </Button>
-              )}
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-primary">efforts</h1>
+                {(selectedWorkout || showStrengthLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder) && !showSummary && (
+                  <Button
+                    onClick={handleBackToDashboard}
+                    variant="ghost"
+                    className="text-sm font-medium text-gray-700 hover:bg-gray-50"
+                    style={{fontFamily: 'Inter, sans-serif'}}
+                  >
+                    Back
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center">
@@ -558,7 +559,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       <main className="mobile-main-content pb-24">
         <div className="w-full px-2">
           {showPlanBuilder ? (
-            <div className="pt-4">
+            <div className="pt-1">
               <PlanBuilder
                 onClose={handleBackToDashboard}
                 onPlanGenerated={handlePlanGenerated}
