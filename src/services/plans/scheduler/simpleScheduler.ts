@@ -110,32 +110,39 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
     if (!cand) break; add(slots, qualDays.length===0 ? 'run_speed_vo2_pool' : 'run_threshold_pool', cand); qualDays.push(cand);
   }
 
-  // --- Strength placement (respect prefs; stacking last resort) ---
+  // --- Strength placement per spec ---
   const strengthPool = strengthPoolFor(strengthTrack);
   const protectedDays = uniq<Day>([longRunDay, ...qualDays]);
   const protectedRing = uniq<Day>(protectedDays.flatMap(d => [d, ...neighbors(d)]));
 
   const chosen: Day[] = [];
-  // 1) preferred valid days
+  // 1) Use preferred strength days that are available and NOT in the protected ring and NOT the long-run day
   for (const d of preferredStrengthDays) {
     if (chosen.length >= strengthDays) break;
-    if (isAvail(d) && !protectedRing.includes(d)) chosen.push(d);
+    if (isAvail(d) && !protectedRing.includes(d) && d !== longRunDay) {
+      chosen.push(d);
+    }
   }
-  // 2) any safe standalone days
+  // 2) Fill from safe standalone days (available, not in protected ring, not the long-run day)
   for (const d of ORDER) {
     if (chosen.length >= strengthDays) break;
     if (!isAvail(d)) continue;
     if (protectedRing.includes(d)) continue;
+    if (d === longRunDay) continue;
     if (!chosen.includes(d)) chosen.push(d);
   }
-  // 3) final fallback: stack onto hard days (quality first, then long)
-  const stackTargets: Day[] = [...qualDays, longRunDay];
-  for (const d of stackTargets) {
+  // 3) Fallback: stack onto QUALITY days only (not the long-run day)
+  for (const d of qualDays) {
     if (chosen.length >= strengthDays) break;
     if (!isAvail(d)) continue;
     if (!chosen.includes(d)) chosen.push(d);
   }
-  // place
+  // 4) Absolute last resort: stack on the LONG RUN day IF still short
+  if (chosen.length < strengthDays && isAvail(longRunDay) && !chosen.includes(longRunDay)) {
+    chosen.push(longRunDay);
+    notes.push(`Stacked on long run day (${longRunDay}). This is not recommended—used only because no other valid slots were available.`);
+  }
+  // Place them
   chosen.slice(0, strengthDays).forEach(d => add(slots, strengthPool, d));
 
   // Easy runs fill on remaining available days
