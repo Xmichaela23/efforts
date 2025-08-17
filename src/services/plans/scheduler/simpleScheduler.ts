@@ -126,6 +126,25 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   }
   chosen.slice(0, strengthDays).forEach(d => add(slots, strengthPool, d));
 
+  // If we still owe strength sessions, stack on quality days (preferred) to honor counts
+  let placedStrength = slots.filter(s => s.poolId.startsWith('strength_')).length;
+  if (placedStrength < strengthDays) {
+    for (const qd of qualDays) {
+      if (placedStrength >= strengthDays) break;
+      add(slots, strengthPool, qd);
+      placedStrength++;
+    }
+  }
+  // As a final fallback (rare), place on any available day to reach the target
+  if (placedStrength < strengthDays) {
+    for (const d of ORDER) {
+      if (placedStrength >= strengthDays) break;
+      if (!isAvail(d)) continue;
+      add(slots, strengthPool, d);
+      placedStrength++;
+    }
+  }
+
   // Easy runs fill on remaining available days
   for (const d of ORDER) {
     if (!isAvail(d)) continue;
