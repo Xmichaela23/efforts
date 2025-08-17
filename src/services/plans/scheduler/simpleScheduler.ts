@@ -107,7 +107,9 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   }
   while (qualDays.length < wantQual) {
     const cand = firstWithBuffers(availableDays, [longRunDay, ...qualDays]);
-    if (!cand) break; add(slots, qualDays.length===0 ? 'run_speed_vo2_pool' : 'run_threshold_pool', cand); qualDays.push(cand);
+    if (!cand) break;
+    add(slots, qualDays.length===0 ? 'run_speed_vo2_pool' : 'run_threshold_pool', cand);
+    qualDays.push(cand);
   }
 
   // --- Strength placement per spec ---
@@ -135,6 +137,15 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   for (const d of qualDays) {
     if (chosen.length >= strengthDays) break;
     if (!isAvail(d)) continue;
+    if (!chosen.includes(d)) chosen.push(d);
+  }
+  // 4) Fallback B: neighbors of QUALITY (avoid long run & its neighbors)
+  const qualityNeighbors = uniq<Day>(qualDays.flatMap(neighbors));
+  const avoidLongRunNeighborhood = new Set<Day>([longRunDay, ...neighbors(longRunDay)]);
+  for (const d of qualityNeighbors) {
+    if (chosen.length >= strengthDays) break;
+    if (!isAvail(d)) continue;
+    if (avoidLongRunNeighborhood.has(d)) continue;
     if (!chosen.includes(d)) chosen.push(d);
   }
   // 4) Absolute last resort: stack on the LONG RUN day IF still short
