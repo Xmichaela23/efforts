@@ -62,9 +62,7 @@ export default function PlanBuilder() {
   if (planId === 'get_stronger_faster_8w') {
     return (
       <div className="w-full">
-        <div className="max-w-3xl mx-auto p-4">
-          <button onClick={() => setPlanId(null)} className="text-sm text-blue-600">← Back</button>
-        </div>
+        <div className="max-w-3xl mx-auto p-2"></div>
         <GetStrongerFasterBuilder />
       </div>
     );
