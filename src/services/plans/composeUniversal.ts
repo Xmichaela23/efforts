@@ -167,6 +167,12 @@ function getCowboyUpperSession(planData: UniversalPlanData): string[] {
   return planData.strength?.cowboy_upper || [];
 }
 
+function getTrackUpperSession(planData: UniversalPlanData, track: string): string[] {
+  const key = track === 'power' ? 'upper_power' : track === 'endurance' ? 'upper_endurance' : 'upper_hybrid';
+  // @ts-ignore
+  return planData.strength?.[key] || getCowboyUpperSession(planData);
+}
+
 /**
  * Universal plan composition - works with any JSON plan file
  */
@@ -238,6 +244,9 @@ export async function composeUniversalWeek(params: {
   function applyRunBaselines(desc: string, type: string | undefined): string {
     if (!params.baselines) return desc;
     const pn = params.baselines?.performanceNumbers || {};
+    if (type === 'endurance' && pn.easyPace) {
+      return `${desc} (target ${pn.easyPace})`;
+    }
     if (/Zone\s*2/i.test(desc) && pn.easyPace) {
       return `${desc} (target ${pn.easyPace})`;
     }
@@ -379,7 +388,7 @@ export async function composeUniversalWeek(params: {
 
   // Add cowboy upper session if 3 strength days requested
   if (params.strengthDays === 3 && params.weekNum >= 3 && params.strengthTrack) {
-    const cowboyExercises = getCowboyUpperSession(planData);
+    const cowboyExercises = getTrackUpperSession(planData, params.strengthTrack);
     if (cowboyExercises.length > 0) {
       // Find a day that doesn't have strength already
       const strengthDays = sessions.filter(s => s.discipline === 'strength').map(s => s.day);

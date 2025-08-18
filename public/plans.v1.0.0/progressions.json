@@ -179,6 +179,24 @@
       "3x10 Barbell Row",
       "3x12 Curls + 3x12 Triceps Pushdowns"
     ]
+    ,
+    "upper_power": [
+      "5x5 Overhead Press @75% 1RM",
+      "4x6 Weighted Pull Ups",
+      "4x6 Barbell Row @70% 1RM"
+    ],
+    "upper_endurance": [
+      "3x12 Dumbbell Shoulder Press",
+      "3x12 Pull Ups (bodyweight)",
+      "3x15 Barbell Row @60% 1RM",
+      "3x15 Curls + 3x15 Triceps Pushdowns"
+    ],
+    "upper_hybrid": [
+      "4x6 Overhead Press @70% 1RM",
+      "3x10 Pull Ups",
+      "4x8 Barbell Row @65% 1RM",
+      "3x12 Curls + 3x12 Triceps Pushdowns"
+    ]
   },
   "phases": {
     "base": {
