@@ -239,7 +239,7 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   markSupplementalThirdIfNeeded(slots, strengthTrack, strengthDays, notes);
 
   // VE special rule: add non-hard supplemental on day after long run, unstacked
-  if (isVECandidate) {
+  if (isVECandidate && availableDays.length >= 6) {
     const start = next(longRunDay);
     let pick: Day | null = null;
     // find next legal easy day: available, not long, not a quality day, no existing slot on that day
@@ -251,9 +251,9 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       cur = next(cur);
     }
     if (pick) {
-      // Honor chosen strength track; mark optional so it is non-hard
-      const trackPool: PoolId = strengthTrack === 'power' ? 'strength_power_pool' : strengthTrack === 'hybrid' ? 'strength_hybrid_pool' : 'strength_endurance_pool';
-      add(slots, trackPool, pick, true);
+      // Honor chosen strength track, select the upper/core pool
+      const upperPool: PoolId = strengthTrack === 'power' ? 'strength_upper_power' : strengthTrack === 'hybrid' ? 'strength_upper_hybrid' : 'strength_upper_endurance';
+      add(slots, upperPool, pick, true);
       const info = 'Upper/Core day is scheduled the day after your long run. It does not count as a hard day and is dropped first if the week is tight.';
       if (!notes.includes(info)) notes.push(info);
     }

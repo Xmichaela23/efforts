@@ -25,12 +25,9 @@
       "hardness": "hard",
       "stackableWith": []
     },
-    {
-      "id": "strength_upper",
-      "discipline": "strength",
-      "hardness": "nonhard_strength",
-      "stackableWith": ["run_quality"]
-    }
+    { "id": "strength_upper_power",     "discipline": "strength", "hardness": "nonhard_strength", "stackableWith": [] },
+    { "id": "strength_upper_endurance", "discipline": "strength", "hardness": "nonhard_strength", "stackableWith": [] },
+    { "id": "strength_upper_hybrid",    "discipline": "strength", "hardness": "nonhard_strength", "stackableWith": [] }
   ]
 }
 
