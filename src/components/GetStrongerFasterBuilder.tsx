@@ -401,7 +401,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-gray-700">Week {currentWeek} • {formatHM(totalMinutes)} • {weekSessions.length} sessions</div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 self-end mt-2 md:mt-3">
                 {Array.from({ length: cfg.durationWeeks }, (_, i) => i+1).map(w => (
                   <button key={w} onClick={() => setCurrentWeek(w)} className={`w-6 h-6 text-xs border rounded ${currentWeek===w? 'border-gray-900':'border-gray-300'}`}>{w}</button>
                 ))}
