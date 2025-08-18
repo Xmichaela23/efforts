@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { buildWeekFromDropdowns } from '@/services/plans/scheduler/buildWeekFromDropdowns';
-import { composeGetStrongerFasterWeek } from '@/services/plans/composeGetStrongerFaster';
+import { composeUniversalWeek } from '@/services/plans/composeUniversal';
 import type { SimpleSchedulerParams } from '@/services/plans/scheduler/types';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
 import { useAppContext } from '@/contexts/AppContext';
@@ -72,7 +72,7 @@ export default function GetStrongerFasterBuilder() {
     return weeksOut;
   }, [cfg, plansBundleReady]);
 
-  // Compose sessions for each week
+  // Compose sessions for each week using universal system
   useEffect(() => {
     if (!skeletonWeeks.length) return;
     
@@ -81,9 +81,10 @@ export default function GetStrongerFasterBuilder() {
       
       for (let w = 1; w <= cfg.durationWeeks; w++) {
         try {
-          const composed = await composeGetStrongerFasterWeek({
+          const composed = await composeUniversalWeek({
             weekNum: w,
             skeletonWeek: skeletonWeeks[w - 1],
+            planPath: '/plans.v1.0.0/progressions.json',
             strengthTrack: cfg.strengthTrack ?? 'hybrid',
             strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3
           });

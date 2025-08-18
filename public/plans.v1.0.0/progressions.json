@@ -1,33 +1,111 @@
 {
-  "run": {
-    "quality": {
-      "base": [
-        { "week": 1, "type": "VO2", "session": "8x200m @ 3K pace, jog equal rest" },
-        { "week": 2, "type": "Tempo", "session": "2x8min @ threshold, 3min jog" }
-      ],
-      "build": [
-        { "week": 3, "type": "VO2", "session": "6x400m @ 5K pace, 200m jog" },
-        { "week": 4, "type": "Tempo", "session": "3x10min @ threshold, 2min jog" },
-        { "week": 5, "type": "VO2", "session": "8x400m @ 3K–5K pace, 200m jog" },
-        { "week": 6, "type": "Tempo", "session": "20min continuous @ threshold" }
-      ],
-      "peak": [
-        { "week": 7, "type": "VO2", "session": "12x400m @ 3K pace, 200m jog" },
-        { "week": 7, "type": "Tempo", "session": "25min @ threshold" }
-      ],
-      "taper": [
-        { "week": 8, "type": "VO2", "session": "6x200m fast, full recovery" },
-        { "week": 8, "type": "Tempo", "session": "12min @ threshold" }
-      ]
+  "name": "Get Stronger Faster",
+  "description": "8-week plan to improve 5K-10K times with strength training",
+  "duration_weeks": 8,
+  "sports": {
+    "run": {
+      "quality": {
+        "base": [
+          { "week": 1, "type": "VO2", "session": "8x200m @ 3K pace, jog equal rest" },
+          { "week": 2, "type": "Tempo", "session": "2x8min @ threshold, 3min jog" }
+        ],
+        "build": [
+          { "week": 3, "type": "VO2", "session": "6x400m @ 5K pace, 200m jog" },
+          { "week": 4, "type": "Tempo", "session": "3x10min @ threshold, 2min jog" },
+          { "week": 5, "type": "VO2", "session": "8x400m @ 3K–5K pace, 200m jog" },
+          { "week": 6, "type": "Tempo", "session": "20min continuous @ threshold" }
+        ],
+        "peak": [
+          { "week": 7, "type": "VO2", "session": "12x400m @ 3K pace, 200m jog" },
+          { "week": 7, "type": "Tempo", "session": "25min @ threshold" }
+        ],
+        "taper": [
+          { "week": 8, "type": "VO2", "session": "6x200m fast, full recovery" },
+          { "week": 8, "type": "Tempo", "session": "12min @ threshold" }
+        ]
+      },
+      "long": {
+        "base": { "start": 60, "progression": "+10min every 2 weeks", "deload": "week 4 -20%" },
+        "build": { "start": 80, "progression": "+10min each week", "deload": "week 6 -20%" },
+        "peak": { "week7": 100 },
+        "taper": { "week8": 60 }
+      },
+      "easy": {
+        "base": { "duration": 45, "description": "Easy recovery run. Focus on form and breathing." },
+        "build": { "duration": 45, "description": "Easy recovery run. Maintain good form." },
+        "peak": { "duration": 40, "description": "Easy recovery run. Keep it light." },
+        "taper": { "duration": 30, "description": "Easy recovery run. Feel fresh." }
+      }
     },
-    "long": {
-      "base": { "start": 60, "progression": "+10min every 2 weeks", "deload": "week 4 -20%" },
-      "build": { "start": 80, "progression": "+10min each week", "deload": "week 6 -20%" },
-      "peak": { "week7": 100 },
-      "taper": { "week8": 60 }
+    "bike": {
+      "quality": {
+        "base": [
+          { "week": 1, "type": "VO2", "session": "6x3min @ FTP, 3min easy" },
+          { "week": 2, "type": "Tempo", "session": "2x10min @ 85% FTP, 5min easy" }
+        ],
+        "build": [
+          { "week": 3, "type": "VO2", "session": "8x3min @ FTP, 2min easy" },
+          { "week": 4, "type": "Tempo", "session": "3x12min @ 85% FTP, 3min easy" },
+          { "week": 5, "type": "VO2", "session": "10x3min @ FTP, 2min easy" },
+          { "week": 6, "type": "Tempo", "session": "25min @ 85% FTP" }
+        ],
+        "peak": [
+          { "week": 7, "type": "VO2", "session": "12x3min @ FTP, 2min easy" },
+          { "week": 7, "type": "Tempo", "session": "30min @ 85% FTP" }
+        ],
+        "taper": [
+          { "week": 8, "type": "VO2", "session": "6x2min @ FTP, full recovery" },
+          { "week": 8, "type": "Tempo", "session": "15min @ 85% FTP" }
+        ]
+      },
+      "long": {
+        "base": { "start": 90, "progression": "+15min every 2 weeks", "deload": "week 4 -20%" },
+        "build": { "start": 120, "progression": "+15min each week", "deload": "week 6 -20%" },
+        "peak": { "week7": 150 },
+        "taper": { "week8": 90 }
+      },
+      "easy": {
+        "base": { "duration": 60, "description": "Easy endurance ride. Zone 2 effort." },
+        "build": { "duration": 60, "description": "Easy endurance ride. Maintain cadence." },
+        "peak": { "duration": 50, "description": "Easy endurance ride. Keep it light." },
+        "taper": { "duration": 40, "description": "Easy endurance ride. Feel fresh." }
+      }
+    },
+    "swim": {
+      "quality": {
+        "base": [
+          { "week": 1, "type": "VO2", "session": "8x100m @ 400m pace, 30s rest" },
+          { "week": 2, "type": "Tempo", "session": "4x200m @ 1500m pace, 45s rest" }
+        ],
+        "build": [
+          { "week": 3, "type": "VO2", "session": "10x100m @ 400m pace, 25s rest" },
+          { "week": 4, "type": "Tempo", "session": "6x200m @ 1500m pace, 40s rest" },
+          { "week": 5, "type": "VO2", "session": "12x100m @ 400m pace, 20s rest" },
+          { "week": 6, "type": "Tempo", "session": "8x200m @ 1500m pace, 35s rest" }
+        ],
+        "peak": [
+          { "week": 7, "type": "VO2", "session": "16x100m @ 400m pace, 20s rest" },
+          { "week": 7, "type": "Tempo", "session": "10x200m @ 1500m pace, 30s rest" }
+        ],
+        "taper": [
+          { "week": 8, "type": "VO2", "session": "8x100m @ 400m pace, full recovery" },
+          { "week": 8, "type": "Tempo", "session": "4x200m @ 1500m pace, 45s rest" }
+        ]
+      },
+      "long": {
+        "base": { "start": 45, "progression": "+10min every 2 weeks", "deload": "week 4 -20%" },
+        "build": { "start": 60, "progression": "+10min each week", "deload": "week 6 -20%" },
+        "peak": { "week7": 75 },
+        "taper": { "week8": 45 }
+      },
+      "easy": {
+        "base": { "duration": 30, "description": "Easy technique swim. Focus on form." },
+        "build": { "duration": 30, "description": "Easy technique swim. Maintain stroke." },
+        "peak": { "duration": 25, "description": "Easy technique swim. Keep it light." },
+        "taper": { "duration": 20, "description": "Easy technique swim. Feel fresh." }
+      }
     }
   },
-
   "strength": {
     "power": {
       "base": [
@@ -101,5 +179,23 @@
       "3x10 Barbell Row",
       "3x12 Curls + 3x12 Triceps Pushdowns"
     ]
+  },
+  "phases": {
+    "base": {
+      "weeks": [1, 2],
+      "description": "Base building - establish routine and form"
+    },
+    "build": {
+      "weeks": [3, 4, 5, 6],
+      "description": "Build phase - increase intensity and volume"
+    },
+    "peak": {
+      "weeks": [7],
+      "description": "Peak week - highest training load"
+    },
+    "taper": {
+      "weeks": [8],
+      "description": "Taper - reduce volume, maintain intensity"
+    }
   }
 }
