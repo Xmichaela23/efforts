@@ -93,7 +93,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
 
       // sessions_by_week → weeks[].workouts[] expected by this view
-      if ((!pd.weeks || pd.weeks.length === 0) && pd.sessions_by_week) {
+      if (pd.sessions_by_week) {
         try {
           const weeksOut: any[] = [];
           const sessionsByWeek = pd.sessions_by_week;

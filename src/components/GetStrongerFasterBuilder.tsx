@@ -51,6 +51,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
   const [weeks, setWeeks] = useState<SkeletonWeek[]>([]);
   const [sessionsByWeek, setSessionsByWeek] = useState<Map<number, Session[]>>(new Map());
   const [notesByWeek, setNotesByWeek] = useState<Map<number, string[]>>(new Map());
+  const [isComposing, setIsComposing] = useState(false);
 
   // Check if progressions.json is accessible
   useEffect(() => {
@@ -121,6 +122,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     }
     
     const composeAllWeeks = async () => {
+      setIsComposing(true);
       const newSessions = new Map<number, Session[]>();
       
       for (let w = 1; w <= cfg.durationWeeks; w++) {
@@ -156,6 +158,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
       }
       
       setSessionsByWeek(newSessions);
+      setIsComposing(false);
     };
     
     composeAllWeeks();
@@ -222,6 +225,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
 
   const handleAcceptPlan = async () => {
     if (isLoading || !!loadError) return;
+    if (isComposing || sessionsByWeek.size === 0 || sessionsByWeek.size < cfg.durationWeeks) return;
     
     setIsSaving(true);
     try {
@@ -480,10 +484,10 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                 <div className="flex gap-3">
                   <button
                     onClick={handleAcceptPlan}
-                                         disabled={isLoading || !!loadError || isSaving}
+                    disabled={isLoading || !!loadError || isSaving || isComposing || sessionsByWeek.size === 0 || sessionsByWeek.size < cfg.durationWeeks}
                     className="flex-1 bg-blue-600 text-white py-3 px-4 rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {isSaving ? 'Creating Plan...' : 'Accept & Create Plan'}
+                    {isSaving ? 'Creating Plan...' : (isComposing || sessionsByWeek.size < cfg.durationWeeks ? 'Preparing Plan…' : 'Accept & Create Plan')}
                   </button>
                   <button
                     onClick={() => window.history.back()}
