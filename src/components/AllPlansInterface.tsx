@@ -865,11 +865,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 <div className="text-sm text-gray-600">Workouts</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">{Math.round(totalVolume / 60)}h</div>
+                <div className="text-2xl font-bold">{formatDuration(totalVolume)}</div>
                 <div className="text-sm text-gray-600">Total Time</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold">{averageWeeklyVolume}m</div>
+                <div className="text-2xl font-bold">{formatDuration(averageWeeklyVolume)}</div>
                 <div className="text-sm text-gray-600">Avg/Week</div>
               </div>
             </div>

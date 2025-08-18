@@ -253,8 +253,8 @@ export async function composeUniversalWeek(params: {
     if ((type === 'tempo' || /threshold/i.test(desc)) && pn.tenK) {
       return `${desc} (${pn.tenK}/mi)`;
     }
-    if ((type === 'vo2max' || /3k|5k|vo2/i.test(desc)) && pn.fiveK) {
-      return `${desc} (${pn.fiveK}/mi)`;
+    if ((type === 'vo2max' || /3k|5k|vo2/i.test(desc)) && (pn.fiveK_pace || pn.fiveK)) {
+      return `${desc} (${pn.fiveK_pace || pn.fiveK}/mi)`;
     }
     return desc;
   }

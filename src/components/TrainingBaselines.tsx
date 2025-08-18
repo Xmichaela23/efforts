@@ -1177,21 +1177,53 @@ return (
                                 {disciplineId === 'running' && (
                                   <div className="space-y-3">
                                     <div>
-                                      <label className="text-xs text-gray-600">5K Pace/Time (mm:ss)</label>
+                                      <label className="text-xs text-gray-600">5K Race Time (mm:ss)</label>
                                       <input
                                         type="text"
                                         value={data.performanceNumbers?.fiveK || ''}
+                                        onChange={(e) => {
+                                          const time = e.target.value;
+                                          const m = time.match(/^(\d{1,2}):(\d{2})$/);
+                                          let fiveKPace = (data as any).performanceNumbers?.fiveK_pace || '';
+                                          if (m) {
+                                            const mins = parseInt(m[1],10);
+                                            const secs = parseInt(m[2],10);
+                                            const totalSec = mins*60+secs;
+                                            const paceSec = Math.round(totalSec / 3.10686);
+                                            const pm = Math.floor(paceSec/60);
+                                            const ps = paceSec%60;
+                                            fiveKPace = `${pm}:${String(ps).padStart(2,'0')}`;
+                                          }
+                                          setData(prev => ({
+                                            ...prev,
+                                            performanceNumbers: {
+                                              ...prev.performanceNumbers,
+                                              fiveK: time,
+                                              fiveK_pace: fiveKPace
+                                            }
+                                          }));
+                                        }}
+                                        placeholder="mm:ss"
+                                        className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
+                                      />
+                                      <p className="text-xs text-gray-500">Used to derive VO2/interval targets.</p>
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">5K Pace (mm:ss/mi)</label>
+                                      <input
+                                        type="text"
+                                        value={(data as any).performanceNumbers?.fiveK_pace || ''}
                                         onChange={(e) => setData(prev => ({
                                           ...prev,
                                           performanceNumbers: {
                                             ...prev.performanceNumbers,
-                                            fiveK: e.target.value
+                                            fiveK_pace: e.target.value
                                           }
                                         }))}
-                                        placeholder="mm:ss"
+                                        placeholder="mm:ss/mi"
                                         className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
                                       />
-                                      <p className="text-xs text-gray-500">Your current 5K race time (e.g., 24:00 for 24 minutes)</p>
+                                      <p className="text-xs text-gray-500">Auto-calculated from race time; you may override. Plans reference this exact pace (ranges applied).</p>
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600">Easy/Long Run Pace - Zone 2 (mm:ss/mi)</label>
@@ -1208,7 +1240,7 @@ return (
                                         placeholder="mm:ss/mi"
                                         className="w-32 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:border-black text-sm"
                                       />
-                                      <p className="text-xs text-gray-500">Your Zone 2 pace for long runs and easy days (conversational pace - can speak in complete sentences, 60-70% max HR, 1-2 min/mi slower than 5K pace)</p>
+                                      <p className="text-xs text-gray-500">Used for easy/long endurance sessions. If blank, we’ll suggest one based on your 5K pace (about 1–2 min/mi slower).</p>
                                     </div>
                                     <div>
                                       <label className="text-xs text-gray-600">10K Time (mm:ss)</label>
