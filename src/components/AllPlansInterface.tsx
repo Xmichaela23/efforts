@@ -300,10 +300,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
   
   const formatDuration = (minutes: number) => {
-    if (!minutes) return '';
+    if (!minutes && minutes !== 0) return '';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+    return `${hours}h ${mins}m`;
   };
 
   const formatTime = (seconds: number) => {
@@ -972,34 +972,50 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   </div>
                 </div>
                 <div className="p-6">
-                  <div className="space-y-3">
-                    {currentWeekData.workouts && currentWeekData.workouts.map((workout: any, index: number) => (
-                      <div
-                        key={workout.id || `workout-${index}`}
-                        onClick={() => handleWorkoutClick(workout)}
-                        className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="font-medium">{workout.name}</div>
-                            <div className="text-sm text-gray-600 mt-1">{workout.day ? `${workout.day} • ` : ''}{workout.description}</div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {getCompletionBadge(workout)}
-                            {workout.intensity && (
-                              <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getIntensityColor(workout.intensity)}`}>
-                                {workout.intensity}
-                              </span>
-                            )}
-                            {!workout.completed && workout.duration && (
-                              <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                {formatDuration(workout.duration)}
-                              </span>
-                            )}
+                  <div className="space-y-4">
+                    {(() => {
+                      const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                      const groups: Record<string, any[]> = {};
+                      (currentWeekData.workouts || []).forEach((w: any) => {
+                        const d = w.day || 'Unscheduled';
+                        groups[d] = groups[d] ? [...groups[d], w] : [w];
+                      });
+                      const keys = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
+                      return keys.map(day => (
+                        <div key={day} className="border border-gray-200 rounded">
+                          <div className="px-3 py-2 text-sm font-medium">{day}</div>
+                          <div className="px-3 pb-3 space-y-3">
+                            {groups[day].map((workout: any, index: number) => (
+                              <div
+                                key={workout.id || `workout-${day}-${index}`}
+                                onClick={() => handleWorkoutClick(workout)}
+                                className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex-1">
+                                    <div className="font-medium">{workout.name}</div>
+                                    <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {getCompletionBadge(workout)}
+                                    {workout.intensity && (
+                                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getIntensityColor(workout.intensity)}`}>
+                                        {workout.intensity}
+                                      </span>
+                                    )}
+                                    {!workout.completed && workout.duration && (
+                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
+                                        {formatDuration(workout.duration)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 </div>
               </div>

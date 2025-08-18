@@ -131,7 +131,7 @@ function markSupplementalThirdIfNeeded(
   strengthDaysRequested: 2|3,
   notes: string[]
 ) {
-  if (strengthTrack !== 'endurance' || strengthDaysRequested !== 3) return;
+  if (strengthDaysRequested !== 3) return;
   const strengthIdxs = slots
     .map((s, i) => ({ i, s }))
     .filter(x => x.s.poolId.startsWith('strength_'))
@@ -142,7 +142,7 @@ function markSupplementalThirdIfNeeded(
   let supplementalIndex = strengthIdxs.find(i => !isStacked(slots[i].day));
   if (supplementalIndex === undefined) supplementalIndex = strengthIdxs[strengthIdxs.length - 1];
   slots[supplementalIndex].optional = true;
-  const msg = 'Endurance track: the 3rd strength day is supplemental (upper/core emphasis) and will be dropped first if needed.';
+  const msg = 'The 3rd strength day is supplemental (upper/core emphasis) and will be dropped first if needed.';
   if (!notes.includes(msg)) notes.push(msg);
 }
 

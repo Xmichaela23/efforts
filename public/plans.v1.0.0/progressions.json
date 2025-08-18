@@ -153,23 +153,23 @@
     },
     "hybrid": {
       "base": [
-        "3x6 Squat @70%",
-        "3x8 DB Bench",
-        "3x10 Pull Ups"
+        "3x5 Back Squat @75% 1RM",
+        "3x10 Dumbbell Bench",
+        "3x12 Walking Lunges"
       ],
       "build": [
-        "4x6 Squat @75%",
-        "4x10 DB Bench",
-        "4x12 Pull Ups"
+        "4x4 Back Squat @80% 1RM",
+        "4x12 Dumbbell Bench",
+        "4x10 Barbell Row @70% 1RM"
       ],
       "peak": [
-        "5x4 Squat @80–85%",
-        "4x8 Bench Press",
-        "4x8 Barbell Row"
+        "5x3 Back Squat @85% 1RM",
+        "4x10 Dumbbell Bench",
+        "4x8 Barbell Row @75% 1RM"
       ],
       "taper": [
-        "3x5 Squat @70%",
-        "3x8 Bench",
+        "3x3 Back Squat @70% 1RM",
+        "3x10 Dumbbell Bench",
         "3x10 Pull Ups"
       ]
     },

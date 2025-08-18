@@ -24,7 +24,7 @@ interface GetStrongerFasterBuilderProps {
 }
 
 export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStrongerFasterBuilderProps) {
-  const { addPlan } = useAppContext();
+  const { addPlan, loadUserBaselines } = useAppContext();
   
   // Simple loading state - no more bundle dependency
   const [isLoading, setIsLoading] = useState(true);
@@ -52,6 +52,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
   const [sessionsByWeek, setSessionsByWeek] = useState<Map<number, Session[]>>(new Map());
   const [notesByWeek, setNotesByWeek] = useState<Map<number, string[]>>(new Map());
   const [isComposing, setIsComposing] = useState(false);
+  const [baselines, setBaselines] = useState<any>(null);
 
   // Check if progressions.json is accessible
   useEffect(() => {
@@ -106,6 +107,16 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     return { weeks: weeksOut, notes: notesMap };
   }, [cfg, isLoading, loadError]);
 
+  // Load user baselines once for exact paces/weights
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await loadUserBaselines?.();
+        if (b) setBaselines(b);
+      } catch {}
+    })();
+  }, [loadUserBaselines]);
+
   // Set weeks and notes when skeletonWeeks changes
   useEffect(() => {
     if (skeletonWeeks && 'weeks' in skeletonWeeks) {
@@ -138,7 +149,8 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
             skeletonWeek: skel,
             planPath: PLAN_PATH,
             strengthTrack: cfg.strengthTrack ?? 'hybrid',
-            strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3
+            strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3,
+            baselines
           });
           
           const mapped: Session[] = composed.map(s => ({
@@ -211,6 +223,11 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     return dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day);
   });
   const totalMinutes = sortedSessions.reduce((t, s) => t + (s.duration || 0), 0);
+  const formatHM = (mins: number) => {
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h ${m}m`;
+  };
   
   // Debug: Check what's being displayed (only in development)
   if (process.env.NODE_ENV === 'development') {
@@ -380,7 +397,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
 
           <div className="border-t pt-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-gray-700">Week {currentWeek} • {Math.round((totalMinutes/60)*10)/10}h • {weekSessions.length} sessions</div>
+              <div className="text-sm text-gray-700">Week {currentWeek} • {formatHM(totalMinutes)} • {weekSessions.length} sessions</div>
               <div className="flex gap-2">
                 {Array.from({ length: cfg.durationWeeks }, (_, i) => i+1).map(w => (
                   <button key={w} onClick={() => setCurrentWeek(w)} className={`w-6 h-6 text-xs border rounded ${currentWeek===w? 'border-gray-900':'border-gray-300'}`}>{w}</button>
@@ -443,7 +460,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                     <div key={day} className="border border-gray-200 rounded p-3">
                       <div className="flex items-center justify-between mb-2">
                         <div className="text-sm font-medium">{day}</div>
-                        <div className="text-xs text-gray-500">{dayTotal} min</div>
+                        <div className="text-xs text-gray-500">{formatHM(dayTotal)}</div>
                       </div>
                       <div className="space-y-2">
                         {list.map((s, idx) => {
