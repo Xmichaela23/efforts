@@ -46,6 +46,7 @@ export default function GetStrongerFasterBuilder() {
     if (!plansBundleReady) return [];
     
     const weeksOut: SkeletonWeek[] = [];
+    const notesMap = new Map<number, string[]>();
     const level = cfg.timeLevel === 'beginner' ? 'new' : cfg.timeLevel === 'advanced' ? 'veryExperienced' : 'experienced';
     const preferredStrengthDays: Day[] = ['Mon','Fri','Wed'];
 
@@ -64,17 +65,17 @@ export default function GetStrongerFasterBuilder() {
       };
       const { week, notes: weekNotes } = buildWeekFromDropdowns(w, phase, params);
       weeksOut.push(week);
-      notesByWeek.set(w, weekNotes);
+      notesMap.set(w, weekNotes);
     }
     
     setWeeks(weeksOut);
-    setNotesByWeek(new Map(notesByWeek));
+    setNotesByWeek(notesMap);
     return weeksOut;
   }, [cfg, plansBundleReady]);
 
   // Compose sessions for each week using universal system
   useEffect(() => {
-    if (!skeletonWeeks.length) return;
+    if (!weeks.length) return;
     
     const composeAllWeeks = async () => {
       const newSessions = new Map<number, Session[]>();
@@ -83,7 +84,7 @@ export default function GetStrongerFasterBuilder() {
         try {
           const composed = await composeUniversalWeek({
             weekNum: w,
-            skeletonWeek: skeletonWeeks[w - 1],
+            skeletonWeek: weeks[w - 1],
             planPath: '/plans.v1.0.0/progressions.json',
             strengthTrack: cfg.strengthTrack ?? 'hybrid',
             strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3
@@ -109,7 +110,7 @@ export default function GetStrongerFasterBuilder() {
     };
     
     composeAllWeeks();
-  }, [skeletonWeeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
+  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
 
   const rec = useMemo(() => {
     if (cfg.timeLevel === 'beginner') return { total: '3–4', strength: '2' };

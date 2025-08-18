@@ -481,8 +481,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                       </svg>
                     </button>
-                    <button className="text-gray-400 hover:text-red-500">
-                      <Trash2 className="h-4 w-4" />
+                    <button className="text-gray-400 hover:text-red-500 text-sm">
+                      Delete
                     </button>
                   </div>
 
@@ -566,8 +566,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         <path fillRule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clipRule="evenodd" />
                       </svg>
                     </button>
-                    <button className="text-gray-400 hover:text-red-500">
-                      <Trash2 className="h-4 w-4" />
+                    <button className="text-gray-400 hover:text-red-500 text-sm">
+                      Delete
                     </button>
                   </div>
 
@@ -702,7 +702,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <button className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 transition-colors">
-                  <Trash2 className="h-4 w-4" />
                   Delete
                 </button>
               </AlertDialogTrigger>
