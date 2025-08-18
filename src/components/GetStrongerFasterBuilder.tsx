@@ -353,7 +353,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                     </select>
                   </div>
                   <div className="shrink-0">
-                    <div className="text-sm font-medium mb-1">Strength</div>
+                    <div className="text-sm font-medium mb-1">Cowboy</div>
                     <div className="flex items-start md:items-center gap-3">
                       <label className="inline-flex items-start gap-2 text-xs text-gray-800">
                         <input
@@ -362,7 +362,9 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                           checked={!!cfg.includeUpper}
                           onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : 2 }))}
                         />
-                        <span className="leading-snug">Include Cowboy (3rd upper/core) day (placed day after your long run)</span>
+                        <span className="leading-snug break-words whitespace-normal text-left flex-1">Add 3rd upper-body strength day for balance and aesthetics
+                          <span className="block text-[11px] text-gray-500">(placed day after your long run)</span>
+                        </span>
                       </label>
                     </div>
                   </div>
