@@ -113,6 +113,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               description: s.description,
               duration: s.duration || 0,
               intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
+              day: s.day,
               completed: false,
             }));
 
@@ -955,8 +956,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {currentWeekData && (
               <div className="border border-gray-200 rounded-lg">
                 <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-bold flex items-center gap-2 mb-2">
-                    <Calendar className="h-5 w-5" />
+                  <h2 className="text-xl font-bold mb-2">
                     Week {currentWeekData.weekNumber}: {currentWeekData.title}
                   </h2>
                   <p className="text-gray-600 mb-4">{currentWeekData.focus}</p>
@@ -980,14 +980,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
                       >
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="text-2xl">{getWorkoutIcon(workout.type)}</div>
-                            <div className="flex-1">
-                              <div className="font-medium">{workout.name}</div>
-                              <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
-                            </div>
+                          <div className="flex-1">
+                            <div className="font-medium">{workout.name}</div>
+                            <div className="text-sm text-gray-600 mt-1">{workout.day ? `${workout.day} • ` : ''}{workout.description}</div>
                           </div>
-                          
                           <div className="flex items-center gap-2">
                             {getCompletionBadge(workout)}
                             {workout.intensity && (

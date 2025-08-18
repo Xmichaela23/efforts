@@ -176,6 +176,7 @@ export async function composeUniversalWeek(params: {
   planPath: string;
   strengthTrack?: string;
   strengthDays?: 2 | 3;
+  baselines?: any; // user baselines for exact targets
 }): Promise<SessionTemplate[]> {
   const planData = await loadPlanData(params.planPath);
   const sessions: SessionTemplate[] = [];
@@ -194,6 +195,61 @@ export async function composeUniversalWeek(params: {
     'swim_technique_pool': 'swim',
   };
 
+  // Helpers to apply baselines to descriptions
+  const roundTo5 = (w: number) => Math.round(w / 5) * 5;
+  function weightFor(lift: string, pctStr: string | undefined): number | null {
+    if (!pctStr || !params.baselines) return null;
+    const pctMatch = pctStr.match(/(\d+)[\.%]*/);
+    const pct = pctMatch ? parseInt(pctMatch[1], 10) / 100 : null;
+    if (!pct) return null;
+    const oneRMs: Record<string, number | undefined> = {
+      squat: params.baselines?.performanceNumbers?.squat,
+      bench: params.baselines?.performanceNumbers?.bench,
+      deadlift: params.baselines?.performanceNumbers?.deadlift,
+      overhead: params.baselines?.performanceNumbers?.overheadPress1RM,
+    };
+    let oneRm: number | undefined;
+    const l = lift.toLowerCase();
+    if (l.includes('squat')) oneRm = oneRMs.squat;
+    else if (l.includes('bench')) oneRm = oneRMs.bench;
+    else if (l.includes('deadlift')) oneRm = oneRMs.deadlift;
+    else if (l.includes('ohp') || l.includes('overhead')) oneRm = oneRMs.overhead;
+    if (!oneRm) return null;
+    return roundTo5(oneRm * pct);
+  }
+
+  function applyStrengthBaselines(exercises: string[]): string[] {
+    if (!params.baselines) return exercises;
+    return exercises.map(e => {
+      // e.g., "3x5 Back Squat @70% 1RM"
+      const m = e.match(/^(.*?)(Back Squat|Bench Press|Deadlift|Overhead Press|OHP|Barbell Row)(.*?)(@\s*\d+%)/i);
+      if (m) {
+        const lift = m[2];
+        const pctStr = m[4];
+        const w = weightFor(lift, pctStr);
+        if (w) {
+          return e.replace(/@\s*\d+%\s*1RM/i, `— ${w} lb`);
+        }
+      }
+      return e;
+    });
+  }
+
+  function applyRunBaselines(desc: string, type: string | undefined): string {
+    if (!params.baselines) return desc;
+    const pn = params.baselines?.performanceNumbers || {};
+    if (/Zone\s*2/i.test(desc) && pn.easyPace) {
+      return `${desc} (target ${pn.easyPace})`;
+    }
+    if ((type === 'tempo' || /threshold/i.test(desc)) && pn.tenK) {
+      return `${desc} (${pn.tenK}/mi)`;
+    }
+    if ((type === 'vo2max' || /3k|5k|vo2/i.test(desc)) && pn.fiveK) {
+      return `${desc} (${pn.fiveK}/mi)`;
+    }
+    return desc;
+  }
+
   params.skeletonWeek.slots.forEach(slot => {
     let session: SessionTemplate | null = null;
     const sport = poolToSport[slot.poolId];
@@ -211,7 +267,7 @@ export async function composeUniversalWeek(params: {
         type: 'endurance',
         duration,
         intensity: 'Zone 2',
-        description: `${sport.charAt(0).toUpperCase() + sport.slice(1)} long session - ${duration} minutes at easy pace.`,
+        description: applyRunBaselines(`${sport.charAt(0).toUpperCase() + sport.slice(1)} long session - ${duration} minutes at easy pace.`, 'endurance'),
         zones: []
       };
     }
@@ -230,7 +286,7 @@ export async function composeUniversalWeek(params: {
           type: 'vo2max',
           duration: qualitySession.duration || 55,
           intensity: qualitySession.intensity || 'Zone 4-5',
-          description: qualitySession.session,
+          description: applyRunBaselines(qualitySession.session, 'vo2max'),
           zones: []
         };
       }
@@ -250,7 +306,7 @@ export async function composeUniversalWeek(params: {
           type: 'tempo',
           duration: qualitySession.duration || 60,
           intensity: qualitySession.intensity || 'Zone 3-4',
-          description: qualitySession.session,
+          description: applyRunBaselines(qualitySession.session, 'tempo'),
           zones: []
         };
       }
@@ -269,14 +325,36 @@ export async function composeUniversalWeek(params: {
         type: 'endurance',
         duration: easyData?.duration || 45,
         intensity: 'Zone 2',
-        description: easyData?.description || 'Easy recovery session. Focus on form and breathing.',
+        description: applyRunBaselines(easyData?.description || 'Easy recovery session. Focus on form and breathing.', 'endurance'),
         zones: []
       };
+    }
+
+    else if (slot.poolId.includes('strength_upper_')) {
+      const upper = getCowboyUpperSession(planData);
+      if (upper.length > 0) {
+        const applied = applyStrengthBaselines(upper);
+        session = {
+          day: slot.day === 'Mon' ? 'Monday' : 
+                slot.day === 'Tue' ? 'Tuesday' : 
+                slot.day === 'Wed' ? 'Wednesday' : 
+                slot.day === 'Thu' ? 'Thursday' : 
+                slot.day === 'Fri' ? 'Friday' : 
+                slot.day === 'Sat' ? 'Saturday' : 'Sunday',
+          discipline: 'strength',
+          type: 'strength',
+          duration: 30,
+          intensity: 'Moderate',
+          description: applied.join(' • '),
+          zones: []
+        };
+      }
     }
 
     else if (slot.poolId.includes('strength_') && params.strengthTrack) {
       const strengthExercises = getStrengthSession(phase, params.strengthTrack, planData);
       if (strengthExercises.length > 0) {
+        const applied = applyStrengthBaselines(strengthExercises);
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
                 slot.day === 'Tue' ? 'Tuesday' : 
@@ -288,7 +366,7 @@ export async function composeUniversalWeek(params: {
           type: 'strength',
           duration: 45,
           intensity: 'Moderate',
-          description: strengthExercises.join(' • '),
+          description: applied.join(' • '),
           zones: []
         };
       }
