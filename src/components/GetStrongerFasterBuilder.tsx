@@ -300,7 +300,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
           </p>
           <div className="text-xs text-gray-800 rounded border border-gray-200 p-3 bg-gray-50">
             <div className="font-medium mb-1">Run volume preset</div>
-            <p>Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). If you’d like a 3rd strength day, the optional upper/core session is placed after your long run.</p>
+            <p>Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). If you’d like a 3rd strength day, Cowboy (optional upper/core) is placed after your long run.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -353,21 +353,23 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                     </select>
                   </div>
                   <div className="shrink-0">
-                    <div className="text-sm font-medium mb-1">Strength / wk</div>
-                    <div className="flex items-center gap-2 text-xs text-gray-800">
-                      <span>Base: 2×</span>
-                      <label className="inline-flex items-center gap-2">
-                        <input type="checkbox" checked={!!cfg.includeUpper} onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : 2 }))} />
-                        Include 3rd upper/core day
+                    <div className="text-sm font-medium mb-1">Strength</div>
+                    <div className="flex items-start md:items-center gap-3">
+                      <span className="text-xs text-gray-600 whitespace-nowrap">Base: 2×</span>
+                      <label className="inline-flex items-start gap-2 text-xs text-gray-800">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 mt-0.5"
+                          checked={!!cfg.includeUpper}
+                          onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : 2 }))}
+                        />
+                        <span className="leading-snug">Include Cowboy (3rd upper/core) day
+                          <span className="block md:inline text-[11px] text-gray-500 md:ml-2">(placed day after your long run; needs ≥6 days for best spacing)</span>
+                        </span>
                       </label>
                     </div>
                   </div>
-                  <span
-                    className="text-xs text-gray-800 flex-1 whitespace-normal break-words"
-                    title={'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance'}
-                  >
-                    Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance
-                  </span>
+                  
                 </div>
               </div>
 
