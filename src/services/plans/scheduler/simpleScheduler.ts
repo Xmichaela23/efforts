@@ -164,6 +164,10 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
 
   // Quality runs
   const wantQual = (level === 'new') ? 1 : 2;
+  // Ensure weekly run volume supports the requested level
+  if (availableDays.length < 5 && level === 'veryExperienced') {
+    notes.push('Adjusted plan: 6-day preset requires ≥5 available days; spacing tightened for weekday-only training.');
+  }
   const qualDays: Day[] = [];
   const qualTargets: Day[] = ['Tue','Thu'];
   for (const target of qualTargets) {

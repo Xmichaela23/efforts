@@ -197,9 +197,12 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
   // Keep long run day valid within available days
   useEffect(() => {
     if (!cfg.availableDays.includes(cfg.longRunDay)) {
-      // Find the first available weekend day, or default to 'Sun'
-      const weekendDay = cfg.availableDays.find(d => d === 'Sat' || d === 'Sun') || 'Sun';
-      setCfg(prev => ({ ...prev, longRunDay: weekendDay as 'Sat' | 'Sun' }));
+      // Prefer weekend if available, otherwise first available day
+      const weekendDay = cfg.availableDays.find(d => d === 'Sat' || d === 'Sun');
+      const fallback = weekendDay || cfg.availableDays[0];
+      if (fallback) {
+        setCfg(prev => ({ ...prev, longRunDay: fallback as Day }));
+      }
     }
   }, [cfg.availableDays]);
 
@@ -295,6 +298,10 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
           <p className="text-sm text-gray-700">
             8 weeks to get faster and stronger. For runners who want sharper 5K–10K times and the durability strength brings.
           </p>
+          <div className="text-xs text-gray-800 rounded border border-gray-200 p-3 bg-gray-50">
+            <div className="font-medium mb-1">Run volume preset</div>
+            <p>Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). If you’d like a 3rd strength day, the optional upper/core session is placed after your long run.</p>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
@@ -347,21 +354,14 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                   </div>
                   <div className="shrink-0">
                     <div className="text-sm font-medium mb-1">Strength / wk</div>
-                    <div className="flex flex-nowrap items-end gap-2">
-                      <select
-                        className="border border-gray-300 rounded px-2 py-1 text-sm w-16"
-                        value={cfg.includeUpper ? 3 : cfg.strengthDaysPerWeek}
-                        onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: parseInt(e.target.value,10) === 3, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
-                      >
-                        <option value={2}>2</option>
-                        <option value={3} disabled={!(cfg.availableDays.length >= 6)}>3</option>
-                      </select>
+                    <div className="flex items-center gap-2 text-xs text-gray-800">
+                      <span>Base: 2×</span>
+                      <label className="inline-flex items-center gap-2">
+                        <input type="checkbox" checked={!!cfg.includeUpper} onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : 2 }))} />
+                        Include 3rd upper/core day
+                      </label>
                     </div>
                   </div>
-                  <label className="inline-flex items-center gap-2 text-xs text-gray-800">
-                    <input type="checkbox" checked={!!cfg.includeUpper} onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : (prev.strengthDaysPerWeek || 2) }))} />
-                    Include 3rd upper/core day
-                  </label>
                   <span
                     className="text-xs text-gray-800 flex-1 whitespace-normal break-words"
                     title={'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance'}
