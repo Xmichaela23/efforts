@@ -161,7 +161,7 @@ export default function GetStrongerFasterBuilder() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <div className="flex flex-nowrap items-end gap-2 w-full">
+            <div className="flex items-end gap-2 w-full">
               <div className="shrink-0">
                 <div className="text-sm font-medium mb-1">Long run day</div>
                 <select
@@ -188,7 +188,7 @@ export default function GetStrongerFasterBuilder() {
                 </div>
               </div>
               <span
-                className="text-xs text-gray-500 flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                className="text-xs text-gray-800 flex-1 whitespace-normal break-words"
                 title={'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance'}
               >
                 Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance
@@ -210,13 +210,13 @@ export default function GetStrongerFasterBuilder() {
             </div>
             {/* inline description – no frame */}
             {cfg.strengthTrack === 'power' && (
-              <p className="mt-1 text-xs text-gray-600">Heavy, low-rep lifting to build raw strength and neural drive.</p>
+              <p className="mt-1 text-xs text-gray-800">Heavy, low-rep lifting to build raw strength and neural drive.</p>
             )}
             {cfg.strengthTrack === 'endurance' && (
-              <p className="mt-1 text-xs text-gray-600">Higher-rep, lighter weights to support stamina and muscular durability.</p>
+              <p className="mt-1 text-xs text-gray-800">Higher-rep, lighter weights to support stamina and muscular durability.</p>
             )}
             {cfg.strengthTrack === 'hybrid' && (
-              <p className="mt-1 text-xs text-gray-600">A mix of heavy and endurance work — balanced strength for all-around performance.</p>
+              <p className="mt-1 text-xs text-gray-800">A mix of heavy and endurance work — balanced strength for all-around performance.</p>
             )}
           </div>
           {/* Preferred strength days removed; scheduler will place Mon/Fri/Wed with safe stacking */}
@@ -237,8 +237,8 @@ export default function GetStrongerFasterBuilder() {
 
         {/* Week-level Notes */}
         {notesByWeek?.get(currentWeek)?.length ? (
-          <div className="mb-3 text-xs text-gray-600">
-            <div className="font-medium text-gray-700">Notes</div>
+          <div className="mb-3 text-xs text-gray-800">
+            <div className="font-medium text-gray-800">Notes</div>
             <ul className="list-disc pl-5 space-y-1">
               {notesByWeek.get(currentWeek)!.map((n, i) => (<li key={i}>{n}</li>))}
             </ul>
