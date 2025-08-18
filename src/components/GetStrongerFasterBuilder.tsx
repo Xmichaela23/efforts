@@ -172,7 +172,6 @@ export default function GetStrongerFasterBuilder() {
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">{HELP_LONG_RUN}</p>
             </div>
 
             {/* Inline hint spanning between the two controls for tighter UI */}
@@ -185,18 +184,19 @@ export default function GetStrongerFasterBuilder() {
               );
             })()}
 
-            <div>
-              <div className="text-sm font-medium mb-1">Strength / wk</div>
-              <select
-                className="border border-gray-300 rounded px-2 py-1 text-sm w-16"
-                value={cfg.strengthDaysPerWeek}
-                onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
-              >
-                <option value={2}>2</option>
-                <option value={3} disabled={!(cfg.availableDays.length >= 6)}>3</option>
-              </select>
-              <p className="mt-1 text-xs text-gray-500">{HELP_STRENGTH}</p>
-              <p className="text-xs text-gray-500">3 strength days require ≥6 available days.</p>
+            <div className="flex items-center gap-2">
+              <div>
+                <div className="text-sm font-medium mb-1">Strength / wk</div>
+                <select
+                  className="border border-gray-300 rounded px-2 py-1 text-sm w-16"
+                  value={cfg.strengthDaysPerWeek}
+                  onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
+                >
+                  <option value={2}>2</option>
+                  <option value={3} disabled={!(cfg.availableDays.length >= 6)}>3</option>
+                </select>
+              </div>
+              <div className="text-xs text-gray-500">{HELP_STRENGTH}</div>
             </div>
           </div>
 

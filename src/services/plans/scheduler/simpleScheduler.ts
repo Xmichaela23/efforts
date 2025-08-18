@@ -251,7 +251,8 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       cur = next(cur);
     }
     if (pick) {
-      add(slots, 'strength_upper' as PoolId, pick, true); // optional, non-hard supplemental
+      // Use existing endurance strength pool for visibility in composer; mark optional to exclude from hard cap
+      add(slots, 'strength_endurance_pool' as PoolId, pick, true);
       const info = 'Upper/Core day is scheduled the day after your long run. It does not count as a hard day and is dropped first if the week is tight.';
       if (!notes.includes(info)) notes.push(info);
     }

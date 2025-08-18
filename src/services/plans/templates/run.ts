@@ -17,7 +17,7 @@ export const run_easy_strides_v1: Template = {
 
 export const run_800s_10k_v1: Template = {
   id: 'run_800s_10k_v1',
-  name: 'Track 800s @ 10K pace',
+  name: 'VO2 Intervals — 3–4 min reps (track or flat road)',
   discipline: 'run',
   tags: ['speed','vo2','track'],
   hardness: 'hard',

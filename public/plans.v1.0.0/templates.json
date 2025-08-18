@@ -8,7 +8,28 @@
       "baseDurationMin": 60,
       "progressionRule": "2w up, 1w deload; +5–10% volume ceiling",
       "constraints": ["no-consecutive-hard-days"],
-      "userNote": "Threshold/tempo focus."
+      "requires": [],
+      "userNote": "Tempo/threshold focus. Can be done on flat road or treadmill."
+    },
+    {
+      "id": "run_vo2_road_A",
+      "poolId": "run_quality",
+      "variant": "A",
+      "phase": "build",
+      "baseDurationMin": 55,
+      "constraints": ["no-consecutive-hard-days"],
+      "requires": [],
+      "userNote": "VO2 intervals (3–4 min reps) on flat road or treadmill."
+    },
+    {
+      "id": "run_vo2_track_A",
+      "poolId": "run_quality",
+      "variant": "A",
+      "phase": "build",
+      "baseDurationMin": 55,
+      "constraints": ["no-consecutive-hard-days"],
+      "requires": ["track_access"],
+      "userNote": "VO2 intervals (e.g., 800s) on track."
     },
     {
       "id": "run_long_A",
