@@ -198,7 +198,18 @@ export default function GetStrongerFasterBuilder() {
   const weekSessions = sessionsByWeek.get(currentWeek) || [];
   const dayOrder: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
   const pretty: Record<Day,string> = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
-  const sortedSessions = [...weekSessions].sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
+  
+  // Convert full day names to short names for sorting
+  const shortDayMap: Record<string, Day> = {
+    'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed', 'Thursday': 'Thu',
+    'Friday': 'Fri', 'Saturday': 'Sat', 'Sunday': 'Sun'
+  };
+  
+  const sortedSessions = [...weekSessions].sort((a, b) => {
+    const aShort = shortDayMap[a.day] || a.day;
+    const bShort = shortDayMap[b.day] || b.day;
+    return dayOrder.indexOf(aShort) - dayOrder.indexOf(bShort);
+  });
   const totalMinutes = sortedSessions.reduce((t, s) => t + (s.duration || 0), 0);
   
   // Debug: Check what's being displayed
@@ -239,8 +250,17 @@ export default function GetStrongerFasterBuilder() {
       await addPlan(planData);
       setShowSuccess(true);
       
-      // The parent component (AppLayout) will handle navigation to All Plans
-      // through the onPlanGenerated callback
+      // Navigate to All Plans after successful creation
+      setTimeout(() => {
+        // Try to find and click the plans dropdown
+        const plansButton = document.querySelector('[data-testid="plans-dropdown"], .plans-dropdown, [aria-label*="plans"], [aria-label*="Plans"]') as HTMLElement;
+        if (plansButton) {
+          plansButton.click();
+        } else {
+          // Fallback: go back and let user navigate manually
+          window.history.back();
+        }
+      }, 1500); // Wait 1.5 seconds to show success message
       
     } catch (error) {
       console.error('Error saving plan:', error);
