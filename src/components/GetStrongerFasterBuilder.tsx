@@ -19,7 +19,11 @@ type Session = {
 
 const dayChips: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
-export default function GetStrongerFasterBuilder() {
+interface GetStrongerFasterBuilderProps {
+  onPlanGenerated?: (plan: any) => void;
+}
+
+export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStrongerFasterBuilderProps) {
   const { plansBundleReady, plansBundleError, addPlan } = useAppContext();
   
   // Debug: Check what's happening with plansBundleReady (only log once)
@@ -214,11 +218,13 @@ export default function GetStrongerFasterBuilder() {
         notes_by_week: Object.fromEntries(notesByWeek)
       };
 
-      await addPlan(planData);
+      // Use the callback if provided, otherwise fall back to direct addPlan
+      if (onPlanGenerated) {
+        onPlanGenerated(planData);
+      } else {
+        await addPlan(planData);
+      }
       setShowSuccess(true);
-      
-      // No automatic navigation - just show success message
-      // User can navigate to plans manually when ready
       
     } catch (error) {
       console.error('Error saving plan:', error);
