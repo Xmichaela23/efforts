@@ -57,7 +57,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   const handlePlanClick = (planId: string) => {
     let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
-    
+
+    // Parse weeks if stored as JSON string
     if (planDetail) {
       if (typeof planDetail.weeks === 'string') {
         try {
@@ -67,24 +68,87 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         }
       }
     }
-    
+
+    // Fallback to basic plan info if detailed record missing
     if (!planDetail) {
       const basicPlan = [...currentPlans, ...completedPlans].find(plan => plan.id === planId);
       if (basicPlan) {
         planDetail = {
           ...basicPlan,
-          weeks: basicPlan.weeks || [],
-          duration: basicPlan.duration || 4,
-          totalWorkouts: basicPlan.totalWorkouts || 0,
+          weeks: (basicPlan as any).weeks || [],
+          duration: (basicPlan as any).duration || (basicPlan as any).duration_weeks || 4,
+          totalWorkouts: (basicPlan as any).totalWorkouts || 0,
           currentWeek: basicPlan.currentWeek || 1
-        };
+        } as any;
       }
     }
-    
+
+    // Normalize new universal plan shape → legacy view expectations
     if (planDetail) {
-      setSelectedPlanDetail(planDetail);
-      setSelectedWeek(planDetail.currentWeek || 1);
-      setPlanStatus(planDetail.status || 'active');
+      const pd: any = planDetail;
+
+      // duration_weeks → duration
+      if (!pd.duration && pd.duration_weeks) {
+        pd.duration = pd.duration_weeks;
+      }
+
+      // sessions_by_week → weeks[].workouts[] expected by this view
+      if ((!pd.weeks || pd.weeks.length === 0) && pd.sessions_by_week) {
+        try {
+          const weeksOut: any[] = [];
+          const sessionsByWeek = pd.sessions_by_week;
+          const notesByWeek = pd.notes_by_week || {};
+
+          const weekNumbers = Object.keys(sessionsByWeek)
+            .map(n => parseInt(n, 10))
+            .filter(n => !Number.isNaN(n))
+            .sort((a, b) => a - b);
+
+          for (const w of weekNumbers) {
+            const sessions = sessionsByWeek[w] || [];
+            const workouts = (sessions as any[]).map((s, idx) => ({
+              id: s.id || `${pd.id}-w${w}-${idx}`,
+              name: s.discipline === 'strength' ? 'Strength' : `${s.discipline} ${s.type}`,
+              type: s.discipline === 'bike' ? 'ride' : s.discipline, // map to icon set used here
+              description: s.description,
+              duration: s.duration || 0,
+              intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
+              completed: false,
+            }));
+
+            weeksOut.push({
+              weekNumber: w,
+              title: `Week ${w}`,
+              focus: Array.isArray(notesByWeek[w]) ? (notesByWeek[w][0] || '') : '',
+              workouts,
+            });
+          }
+
+          // If DB contains skeleton weeks, carry basic meta (weekNumber) ordering
+          if (weeksOut.length === 0 && Array.isArray(pd.weeks)) {
+            for (const wk of pd.weeks) {
+              weeksOut.push({
+                weekNumber: wk.weekNumber,
+                title: `Week ${wk.weekNumber}`,
+                focus: '',
+                workouts: [],
+              });
+            }
+          }
+
+          pd.weeks = weeksOut;
+
+          // compute totals for header
+          const totalWorkouts = weeksOut.reduce((sum, wk) => sum + (wk.workouts?.length || 0), 0);
+          pd.totalWorkouts = totalWorkouts;
+        } catch (err) {
+          console.error('Error normalizing plan detail:', err);
+        }
+      }
+
+      setSelectedPlanDetail(pd);
+      setSelectedWeek(pd.currentWeek || 1);
+      setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
     } else {
       alert('Plan details are not available. Please try again.');
