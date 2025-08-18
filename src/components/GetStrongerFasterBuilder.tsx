@@ -58,10 +58,13 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
 
   // Build skeleton weeks
   const skeletonWeeks = useMemo(() => {
+    console.log('🔨 Skeleton weeks useMemo running...');
     if (!plansBundleReady) {
+      console.log('❌ Plans bundle not ready');
       return [];
     }
     
+    console.log('✅ Plans bundle ready, building weeks...');
     const weeksOut: SkeletonWeek[] = [];
     const notesMap = new Map<number, string[]>();
     const level = cfg.timeLevel === 'beginner' ? 'new' : cfg.timeLevel === 'advanced' ? 'veryExperienced' : 'experienced';
@@ -85,6 +88,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
       notesMap.set(w, weekNotes);
     }
     
+    console.log('✅ Built weeks:', weeksOut.length);
     return { weeks: weeksOut, notes: notesMap };
   }, [cfg, plansBundleReady]);
 
