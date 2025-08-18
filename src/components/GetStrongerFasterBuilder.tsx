@@ -338,9 +338,9 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                     <select
                       className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
                       value={cfg.longRunDay}
-                      onChange={(e)=> setCfg(prev=>({ ...prev, longRunDay: e.target.value as 'Sat' | 'Sun' }))}
+                      onChange={(e)=> setCfg(prev=>({ ...prev, longRunDay: e.target.value as Day }))}
                     >
-                      {cfg.availableDays.filter(d => d === 'Sat' || d === 'Sun').map(d => (
+                      {cfg.availableDays.map(d => (
                         <option key={d} value={d}>{d}</option>
                       ))}
                     </select>

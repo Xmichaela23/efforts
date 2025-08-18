@@ -89,7 +89,7 @@ export interface PlanConfig {
   timeLevel: 'beginner'|'intermediate'|'advanced';
   weeklyHoursTarget?: number;
   availableDays: Day[];
-  longRunDay: 'Sat'|'Sun';
+  longRunDay: Day;
   runQualityDays: 1|2;
   strengthDaysPerWeek: 0|1|2|3;
   strengthDaysPreferred?: Day[];
