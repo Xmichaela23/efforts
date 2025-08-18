@@ -1,0 +1,105 @@
+{
+  "run": {
+    "quality": {
+      "base": [
+        { "week": 1, "type": "VO2", "session": "8x200m @ 3K pace, jog equal rest" },
+        { "week": 2, "type": "Tempo", "session": "2x8min @ threshold, 3min jog" }
+      ],
+      "build": [
+        { "week": 3, "type": "VO2", "session": "6x400m @ 5K pace, 200m jog" },
+        { "week": 4, "type": "Tempo", "session": "3x10min @ threshold, 2min jog" },
+        { "week": 5, "type": "VO2", "session": "8x400m @ 3K–5K pace, 200m jog" },
+        { "week": 6, "type": "Tempo", "session": "20min continuous @ threshold" }
+      ],
+      "peak": [
+        { "week": 7, "type": "VO2", "session": "12x400m @ 3K pace, 200m jog" },
+        { "week": 7, "type": "Tempo", "session": "25min @ threshold" }
+      ],
+      "taper": [
+        { "week": 8, "type": "VO2", "session": "6x200m fast, full recovery" },
+        { "week": 8, "type": "Tempo", "session": "12min @ threshold" }
+      ]
+    },
+    "long": {
+      "base": { "start": 60, "progression": "+10min every 2 weeks", "deload": "week 4 -20%" },
+      "build": { "start": 80, "progression": "+10min each week", "deload": "week 6 -20%" },
+      "peak": { "week7": 100 },
+      "taper": { "week8": 60 }
+    }
+  },
+
+  "strength": {
+    "power": {
+      "base": [
+        "3x5 Back Squat @70% 1RM",
+        "3x5 Bench Press @70%",
+        "3x5 Barbell Row @70%"
+      ],
+      "build": [
+        "4x5 Back Squat @75–80%",
+        "4x5 Bench Press @75–80%",
+        "4x6 Pull Ups (weighted if possible)"
+      ],
+      "peak": [
+        "5x3 Back Squat @85–90%",
+        "5x3 Bench Press @85–90%",
+        "4x5 Deadlift @80%"
+      ],
+      "taper": [
+        "2x3 Back Squat @70%",
+        "2x3 Bench Press @70%",
+        "2x5 Pull Ups (bodyweight)"
+      ]
+    },
+    "endurance": {
+      "base": [
+        "2x15 Goblet Squat",
+        "2x15 Push Ups",
+        "2x20 Walking Lunges"
+      ],
+      "build": [
+        "3x12 Step Ups",
+        "3x15 Dumbbell Bench",
+        "3x20 Reverse Lunge"
+      ],
+      "peak": [
+        "3x15 Bulgarian Split Squat",
+        "3x20 Push Ups",
+        "3x15 Single-Leg RDL"
+      ],
+      "taper": [
+        "2x12 Step Ups",
+        "2x12 Dumbbell Bench",
+        "2x15 Walking Lunges"
+      ]
+    },
+    "hybrid": {
+      "base": [
+        "3x6 Squat @70%",
+        "3x8 DB Bench",
+        "3x10 Pull Ups"
+      ],
+      "build": [
+        "4x6 Squat @75%",
+        "4x10 DB Bench",
+        "4x12 Pull Ups"
+      ],
+      "peak": [
+        "5x4 Squat @80–85%",
+        "4x8 Bench Press",
+        "4x8 Barbell Row"
+      ],
+      "taper": [
+        "3x5 Squat @70%",
+        "3x8 Bench",
+        "3x10 Pull Ups"
+      ]
+    },
+    "cowboy_upper": [
+      "3x10 OHP",
+      "3x10 Pull Ups",
+      "3x10 Barbell Row",
+      "3x12 Curls + 3x12 Triceps Pushdowns"
+    ]
+  }
+}

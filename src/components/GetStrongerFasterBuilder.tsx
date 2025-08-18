@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
-import { composeWeek } from '@/services/plans/compose';
 import { buildWeekFromDropdowns } from '@/services/plans/scheduler/buildWeekFromDropdowns';
+import { composeGetStrongerFasterWeek } from '@/services/plans/composeGetStrongerFaster';
 import type { SimpleSchedulerParams } from '@/services/plans/scheduler/types';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
 import { useAppContext } from '@/contexts/AppContext';
@@ -8,7 +8,7 @@ import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS } from './planBui
 
 type Session = {
   day: string;
-  discipline: 'run'|'ride'|'swim'|'strength';
+  discipline: 'run'|'bike'|'swim'|'strength'|'brick';
   type: string;
   duration: number;
   intensity: string;
@@ -18,7 +18,7 @@ type Session = {
 const dayChips: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 export default function GetStrongerFasterBuilder() {
-  const { plansBundleReady, plansBundleError } = useAppContext();
+  const { plansBundleReady, plansBundleError, addPlan } = useAppContext();
   const [cfg, setCfg] = useState<PlanConfig>({
     durationWeeks: 8,
     timeLevel: 'intermediate',
@@ -35,13 +35,17 @@ export default function GetStrongerFasterBuilder() {
     mobilityDaysPreferred: [],
   });
   const [currentWeek, setCurrentWeek] = useState(1);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [weeks, setWeeks] = useState<SkeletonWeek[]>([]);
+  const [sessionsByWeek, setSessionsByWeek] = useState<Map<number, Session[]>>(new Map());
+  const [notesByWeek, setNotesByWeek] = useState<Map<number, string[]>>(new Map());
 
-  const { weeks, sessionsByWeek, notesByWeek } = useMemo(() => {
-    if (!plansBundleReady) return { weeks: [], sessionsByWeek: new Map(), notesByWeek: new Map() };
-    const sessions = new Map<number, Session[]>();
-    const notes = new Map<number, string[]>();
+  // Build skeleton weeks
+  const skeletonWeeks = useMemo(() => {
+    if (!plansBundleReady) return [];
+    
     const weeksOut: SkeletonWeek[] = [];
-
     const level = cfg.timeLevel === 'beginner' ? 'new' : cfg.timeLevel === 'advanced' ? 'veryExperienced' : 'experienced';
     const preferredStrengthDays: Day[] = ['Mon','Fri','Wed'];
 
@@ -60,20 +64,51 @@ export default function GetStrongerFasterBuilder() {
       };
       const { week, notes: weekNotes } = buildWeekFromDropdowns(w, phase, params);
       weeksOut.push(week);
-      const composed = composeWeek({ weekNum: w, skeletonWeek: week, baselines: undefined }) as any[];
-      const mapped: Session[] = composed.map(s => ({
-        day: s.day,
-        discipline: s.discipline,
-        type: s.type,
-        duration: s.duration,
-        intensity: s.intensity,
-        description: s.description,
-      }));
-      sessions.set(w, mapped);
-      notes.set(w, weekNotes);
+      notesByWeek.set(w, weekNotes);
     }
-    return { weeks: weeksOut, sessionsByWeek: sessions, notesByWeek: notes };
-  }, [cfg]);
+    
+    setWeeks(weeksOut);
+    setNotesByWeek(new Map(notesByWeek));
+    return weeksOut;
+  }, [cfg, plansBundleReady]);
+
+  // Compose sessions for each week
+  useEffect(() => {
+    if (!skeletonWeeks.length) return;
+    
+    const composeAllWeeks = async () => {
+      const newSessions = new Map<number, Session[]>();
+      
+      for (let w = 1; w <= cfg.durationWeeks; w++) {
+        try {
+          const composed = await composeGetStrongerFasterWeek({
+            weekNum: w,
+            skeletonWeek: skeletonWeeks[w - 1],
+            strengthTrack: cfg.strengthTrack ?? 'hybrid',
+            strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3
+          });
+          
+          const mapped: Session[] = composed.map(s => ({
+            day: s.day,
+            discipline: s.discipline,
+            type: s.type,
+            duration: s.duration,
+            intensity: s.intensity,
+            description: s.description,
+          }));
+          
+          newSessions.set(w, mapped);
+        } catch (error) {
+          console.error('Error composing week:', w, error);
+          newSessions.set(w, []);
+        }
+      }
+      
+      setSessionsByWeek(newSessions);
+    };
+    
+    composeAllWeeks();
+  }, [skeletonWeeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
 
   const rec = useMemo(() => {
     if (cfg.timeLevel === 'beginner') return { total: '3–4', strength: '2' };
@@ -92,8 +127,9 @@ export default function GetStrongerFasterBuilder() {
   // Keep long run day valid within available days
   useEffect(() => {
     if (!cfg.availableDays.includes(cfg.longRunDay)) {
-      const next = cfg.availableDays[0] ?? 'Sun';
-      setCfg(prev => ({ ...prev, longRunDay: next as Day }));
+      // Find the first available weekend day, or default to 'Sun'
+      const weekendDay = cfg.availableDays.find(d => d === 'Sat' || d === 'Sun') || 'Sun';
+      setCfg(prev => ({ ...prev, longRunDay: weekendDay as 'Sat' | 'Sun' }));
     }
   }, [cfg.availableDays]);
 
@@ -112,6 +148,39 @@ export default function GetStrongerFasterBuilder() {
   const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const sortedSessions = [...weekSessions].sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
   const totalMinutes = sortedSessions.reduce((t, s) => t + (s.duration || 0), 0);
+
+  const handleAcceptPlan = async () => {
+    if (!plansBundleReady) return;
+    
+    setIsSaving(true);
+    try {
+      // Create the plan data structure
+      const planData = {
+        name: `Get Stronger Faster - ${cfg.timeLevel} (8 weeks)`,
+        description: `8-week plan to improve 5K-10K times with strength training. ${cfg.strengthTrack} strength focus, ${cfg.availableDays.length} days/week available.`,
+        duration_weeks: cfg.durationWeeks,
+        current_week: 1,
+        status: 'active',
+        plan_type: 'get_stronger_faster',
+        config: cfg,
+        weeks: weeks,
+        sessions_by_week: Object.fromEntries(sessionsByWeek),
+        notes_by_week: Object.fromEntries(notesByWeek)
+      };
+
+      await addPlan(planData);
+      setShowSuccess(true);
+      
+      // The parent component (AppLayout) will handle navigation to All Plans
+      // through the onPlanGenerated callback
+      
+    } catch (error) {
+      console.error('Error saving plan:', error);
+      alert('Error saving plan. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="max-w-3xl mx-auto p-3 space-y-6">
@@ -167,9 +236,9 @@ export default function GetStrongerFasterBuilder() {
                 <select
                   className="border border-gray-300 rounded px-2 py-1 text-sm w-24"
                   value={cfg.longRunDay}
-                  onChange={(e)=> setCfg(prev=>({ ...prev, longRunDay: e.target.value as Day }))}
+                  onChange={(e)=> setCfg(prev=>({ ...prev, longRunDay: e.target.value as 'Sat' | 'Sun' }))}
                 >
-                  {cfg.availableDays.map(d => (
+                  {cfg.availableDays.filter(d => d === 'Sat' || d === 'Sun').map(d => (
                     <option key={d} value={d}>{d}</option>
                   ))}
                 </select>
@@ -245,6 +314,37 @@ export default function GetStrongerFasterBuilder() {
           </div>
         ) : null}
 
+        {/* Plan Overview */}
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+          <div className="text-sm font-medium text-blue-900 mb-2">Plan Overview</div>
+          <div className="text-xs text-blue-800 space-y-1">
+            <div>• Week 1-2: Base building - establish routine and form</div>
+            <div>• Week 3-6: Build phase - increase intensity and volume</div>
+            <div>• Week 7: Peak week - highest training load</div>
+            <div>• Week 8: Taper - reduce volume, maintain intensity</div>
+          </div>
+        </div>
+
+        {/* Week Progression Details */}
+        <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
+          <div className="text-sm font-medium text-gray-900 mb-2">Week {currentWeek} Details</div>
+          <div className="text-xs text-gray-700 space-y-2">
+            {currentWeek <= 2 && (
+              <div>• <strong>Base Phase:</strong> Focus on building endurance and establishing good form. Easy pace runs with 1-2 quality sessions per week.</div>
+            )}
+            {currentWeek >= 3 && currentWeek <= 6 && (
+              <div>• <strong>Build Phase:</strong> Increasing intensity and volume. More challenging workouts while maintaining recovery.</div>
+            )}
+            {currentWeek === 7 && (
+              <div>• <strong>Peak Week:</strong> Highest training load. Push your limits while staying healthy.</div>
+            )}
+            {currentWeek === 8 && (
+              <div>• <strong>Taper Week:</strong> Reduce volume by 20-30%, maintain intensity. Focus on feeling fresh and ready.</div>
+            )}
+            <div>• <strong>Strength Focus:</strong> {cfg.strengthTrack === 'power' ? 'Heavy weights, low reps for neural drive' : cfg.strengthTrack === 'endurance' ? 'Moderate weights, higher reps for muscular endurance' : 'Balanced approach with both power and endurance elements'}</div>
+          </div>
+        </div>
+
         <div className="space-y-3">
           {(() => {
             const grouped: Record<string, Session[]> = {};
@@ -287,6 +387,32 @@ export default function GetStrongerFasterBuilder() {
               );
             });
           })()}
+        </div>
+
+        {/* Accept Button */}
+        <div className="border-t pt-6 mt-6">
+          {showSuccess ? (
+            <div className="text-center p-4 bg-green-50 border border-green-200 rounded">
+              <div className="text-green-800 font-medium mb-2">Plan Created Successfully!</div>
+              <div className="text-green-700 text-sm">Your plan has been saved and is now active.</div>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button
+                onClick={handleAcceptPlan}
+                disabled={!plansBundleReady || isSaving}
+                className="flex-1 bg-blue-600 text-white py-3 px-4 rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? 'Creating Plan...' : 'Accept & Create Plan'}
+              </button>
+              <button
+                onClick={() => window.history.back()}
+                className="px-4 py-3 border border-gray-300 rounded text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
