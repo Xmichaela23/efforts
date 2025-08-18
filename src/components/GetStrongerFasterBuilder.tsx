@@ -252,6 +252,11 @@ export default function GetStrongerFasterBuilder() {
 
   return (
     <div className="max-w-3xl mx-auto p-3 space-y-6">
+      {/* Debug: Always show this to see what's happening */}
+      <div className="p-3 bg-blue-50 text-blue-700 border border-blue-200 rounded text-sm">
+        🔍 DEBUG: weeks={weeks.length}, sessions={sessionsByWeek.size}, currentWeek={currentWeek}
+      </div>
+      
       {!plansBundleReady && (
         <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded text-sm">
           {plansBundleError || 'Plan data bundle is not ready.'}
