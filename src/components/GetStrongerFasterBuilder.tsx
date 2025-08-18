@@ -129,7 +129,7 @@ export default function GetStrongerFasterBuilder() {
         <div className="space-y-3">
           <div>
             <div className="text-sm font-medium mb-1">{LABEL_RUN_VOLUME}</div>
-            <p className="text-xs text-gray-600 mb-2">{HELP_RUN_VOLUME}</p>
+            <p className="text-xs text-gray-800 mb-2">{HELP_RUN_VOLUME}</p>
             <div className="flex gap-2">
               {RUN_VOLUME_OPTIONS.map(opt => (
                 <button key={opt.value} onClick={() => setCfg(prev=>({...prev, timeLevel: opt.value === 'new' ? 'beginner' : opt.value === 'veryExperienced' ? 'advanced' : 'intermediate' }))}
@@ -141,8 +141,8 @@ export default function GetStrongerFasterBuilder() {
               ))}
             </div>
           </div>
-          <p className="text-xs text-gray-500">Recommended: {rec.total} days/week (including {rec.strength} strength)</p>
-          <p className="text-xs text-gray-500">Quality run days/week: {cfg.timeLevel === 'beginner' ? '1' : '2'}</p>
+          <p className="text-xs text-gray-800">Recommended: {rec.total} days/week (including {rec.strength} strength)</p>
+          <p className="text-xs text-gray-800">Quality run days/week: {cfg.timeLevel === 'beginner' ? '1' : '2'}</p>
 
           <div>
             <div className="text-sm font-medium mb-1">Available days</div>
@@ -263,9 +263,18 @@ export default function GetStrongerFasterBuilder() {
                   </div>
                   <div className="space-y-2">
                     {list.map((s, idx) => {
-                      const detail = s.discipline === 'strength'
-                        ? (/(Neural)/i.test(s.description) ? 'neural' : 'strength')
-                        : `${s.type} • ${s.intensity}`;
+                      let detail: string;
+                      if (s.discipline === 'strength') {
+                        if (/(upper\/core|upper|core)/i.test(s.description)) {
+                          detail = 'upper/core';
+                        } else if (/(neural)/i.test(s.description)) {
+                          detail = 'neural';
+                        } else {
+                          detail = 'strength';
+                        }
+                      } else {
+                        detail = `${s.type} • ${s.intensity}`;
+                      }
                       return (
                         <div key={idx} className="">
                           <div className="text-sm text-gray-700">{s.discipline} • {detail}</div>
