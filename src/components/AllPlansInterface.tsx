@@ -319,6 +319,56 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     }, 0);
   };
 
+  // Export selected plan to Markdown (all weeks)
+  const exportPlanToMarkdown = (plan: any) => {
+    if (!plan) return;
+    const fmtHM = (m: number) => {
+      const h = Math.floor((m || 0) / 60);
+      const md = (m || 0) % 60;
+      return `${h}h ${md}m`;
+    };
+
+    const lines: string[] = [];
+    lines.push(`# ${plan.name || 'Training Plan'}`);
+    if (plan.description) lines.push(`${plan.description}`);
+    const duration = plan.duration || plan.duration_weeks || (plan.weeks ? plan.weeks.length : undefined);
+    if (duration) lines.push(`Duration: ${duration} weeks`);
+    lines.push('');
+
+    const weeks: any[] = (plan.weeks || []).slice().sort((a: any, b: any) => (a.weekNumber || 0) - (b.weekNumber || 0));
+    const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+    for (const wk of weeks) {
+      lines.push(`## Week ${wk.weekNumber}${wk.title ? `: ${wk.title}` : ''}`);
+      if (wk.focus) lines.push(`> ${wk.focus}`);
+      const groups: Record<string, any[]> = {};
+      (wk.workouts || []).forEach((w: any) => {
+        const d = w.day || 'Unscheduled';
+        groups[d] = groups[d] ? [...groups[d], w] : [w];
+      });
+      const orderedDays = dayOrder.filter(d => groups[d]).concat(Object.keys(groups).filter(k => !dayOrder.includes(k)));
+      for (const d of orderedDays) {
+        lines.push(`### ${d}`);
+        for (const w of groups[d]) {
+          const meta: string[] = [];
+          if (w.intensity) meta.push(`${w.intensity}`);
+          if (typeof w.duration === 'number') meta.push(fmtHM(w.duration));
+          lines.push(`- ${w.name}${meta.length ? ` (${meta.join(' • ')})` : ''}`);
+          if (w.description) lines.push(`  - ${w.description}`);
+        }
+        lines.push('');
+      }
+      lines.push('');
+    }
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(plan.name || 'training-plan').replace(/\s+/g,'-').toLowerCase()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Day View Rendering with Summary/Edit modes
   if (currentView === 'day' && selectedWorkout) {
     const intervals = selectedWorkout.intervals || [];
@@ -758,6 +808,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 Resume
               </button>
             )}
+
+            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden md:flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+              Export
+            </button>
             
             <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
               <Edit className="h-4 w-4" />
