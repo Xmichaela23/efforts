@@ -161,7 +161,7 @@ export default function GetStrongerFasterBuilder() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <div className="flex items-center gap-3">
+            <div className="flex flex-nowrap items-center gap-3">
               <div>
                 <div className="text-sm font-medium mb-1">Long run day</div>
                 <select
@@ -174,9 +174,9 @@ export default function GetStrongerFasterBuilder() {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="shrink-0">
                 <div className="text-sm font-medium mb-1">Strength / wk</div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-nowrap items-center gap-2">
                   <select
                     className="border border-gray-300 rounded px-2 py-1 text-sm w-16"
                     value={cfg.strengthDaysPerWeek}

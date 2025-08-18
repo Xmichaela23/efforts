@@ -47,7 +47,7 @@
       "baseDurationMin": 45,
       "userNote": "Neural bias (low-rep, long rest)."
     },
-    { "id":"upper_power_barbell_A", "poolId":"strength_upper", "variant":"A", "phase":"build", "baseDurationMin":40, "track":"power", "tierOrder":1, "requires":["barbell","bench","pullup_bar"], "fallback":false, "userNote":"Upper/core day (power): Bench/OHP 4x6–8 @70–80% 1RM, weighted pull-ups/rows 4x6–8, rollouts 3x10." },
+    { "id":"upper_power_barbell_A", "poolId":"strength_upper_power", "variant":"A", "phase":"build", "baseDurationMin":40, "track":"power", "tierOrder":1, "requires":["barbell","bench","pullup_bar"], "fallback":false, "userNote":"Upper/core day (power): Bench/OHP 4x6–8 @70–80% 1RM, weighted pull-ups/rows 4x6–8, rollouts 3x10." },
     { "id":"upper_power_bodyweight_fallback_A", "poolId":"strength_upper_power", "variant":"A", "phase":"build", "baseDurationMin":30, "tierOrder":4, "requires":[], "fallback":true, "userNote":"Upper/CORE (Power, fallback): Push-ups, table rows, plank/rollout sub." },
     { "id":"upper_power_barbell_A_v2", "poolId":"strength_upper_power", "variant":"A", "phase":"build", "baseDurationMin":40, "tierOrder":1, "requires":["barbell","bench","pullup_bar"], "fallback":false, "userNote":"Upper/CORE (Power): Bench/OHP 4x6–8, Weighted Pull-ups/Rows 4x6–8, Rollouts 3x10." },
     { "id":"upper_endurance_bodyweight_fallback_A", "poolId":"strength_upper_endurance", "variant":"A", "phase":"build", "baseDurationMin":30, "tierOrder":4, "requires":[], "fallback":true, "userNote":"Upper/CORE (Endurance, fallback): Push-ups 4x12–20, inverted rows, plank circuit." },
