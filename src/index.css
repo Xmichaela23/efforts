@@ -7,8 +7,8 @@
 @layer base {
   :root {
     --background: 0 0% 100%;
-    /* Slightly darker for general copy */
-    --foreground: 0 0% 12%;
+    /* Darker for all copy */
+    --foreground: 0 0% 10%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 0%;
     --popover: 0 0% 100%;
@@ -18,8 +18,8 @@
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 0%;
     --muted: 0 0% 96%;
-    /* Darken muted copy ~2 shades, keep metrics untouched */
-    --muted-foreground: 0 0% 34%;
+    /* Darken muted copy to match body text closely */
+    --muted-foreground: 0 0% 14%;
     --accent: 0 0% 0%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84% 60%;

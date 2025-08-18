@@ -76,7 +76,7 @@ export const strengthTemplates = [
   // Optional UPPER/CORE (non-hard) cowboy day variants
   {
     id: 'strength_upper_power_A_v1',
-    name: 'Upper/Core — Power (Optional)',
+    name: 'Upper/Core — Power',
     discipline: 'strength',
     tags: ['upper','core','optional'],
     hardness: 'easy',
@@ -89,7 +89,7 @@ export const strengthTemplates = [
   } as Template,
   {
     id: 'strength_upper_endurance_A_v1',
-    name: 'Upper/Core — Endurance (Optional)',
+    name: 'Upper/Core — Endurance',
     discipline: 'strength',
     tags: ['upper','core','optional'],
     hardness: 'easy',
@@ -101,7 +101,7 @@ export const strengthTemplates = [
   } as Template,
   {
     id: 'strength_upper_hybrid_A_v1',
-    name: 'Upper/Core — Hybrid (Optional)',
+    name: 'Upper/Core — Hybrid',
     discipline: 'strength',
     tags: ['upper','core','optional'],
     hardness: 'easy',

@@ -4,7 +4,7 @@ import { buildWeekFromDropdowns } from '@/services/plans/scheduler/buildWeekFrom
 import type { SimpleSchedulerParams } from '@/services/plans/scheduler/types';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
 import { useAppContext } from '@/contexts/AppContext';
-import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS, HELP_STRENGTH, HELP_LONG_RUN } from './planBuilder/strings';
+import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS } from './planBuilder/strings';
 
 type Session = {
   day: string;
@@ -187,7 +187,12 @@ export default function GetStrongerFasterBuilder() {
                   </select>
                 </div>
               </div>
-              <span className="text-xs text-gray-500 flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap" title={HELP_STRENGTH}>{HELP_STRENGTH}</span>
+              <span
+                className="text-xs text-gray-500 flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap"
+                title={'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance'}
+              >
+                Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance
+              </span>
             </div>
           </div>
 

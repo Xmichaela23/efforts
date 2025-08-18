@@ -9,7 +9,7 @@ export const RUN_VOLUME_OPTIONS = [
   { value: 'veryExperienced',label: '6 days (Very experienced)' },
 ];
 
-export const HELP_STRENGTH = 'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance · 3 strength days require ≥6 available days.';
+export const HELP_STRENGTH = 'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance';
 
 export const HELP_LONG_RUN =
   'Long run is protected. Strength is never scheduled on the long-run day.';
