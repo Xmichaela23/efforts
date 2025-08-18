@@ -200,6 +200,15 @@ export default function GetStrongerFasterBuilder() {
   const pretty: Record<Day,string> = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
   const sortedSessions = [...weekSessions].sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
   const totalMinutes = sortedSessions.reduce((t, s) => t + (s.duration || 0), 0);
+  
+  // Debug: Check what's being displayed
+  console.log('🎯 Display Debug:', {
+    currentWeek,
+    weekSessions: weekSessions.length,
+    sortedSessions: sortedSessions.length,
+    totalMinutes,
+    sessionsByWeekSize: sessionsByWeek.size
+  });
 
   const handleAcceptPlan = async () => {
     if (!plansBundleReady) return;
