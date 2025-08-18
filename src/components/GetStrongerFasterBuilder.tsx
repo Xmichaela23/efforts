@@ -26,10 +26,14 @@ interface GetStrongerFasterBuilderProps {
 export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStrongerFasterBuilderProps) {
   const { plansBundleReady, plansBundleError, addPlan } = useAppContext();
   
-  // Debug: Check what's happening with plansBundleReady (only log once)
+  // Debug: Check what's happening with plansBundleReady and callback (only log once)
   useEffect(() => {
-    console.log('🔍 GetStrongerFasterBuilder mounted:', { plansBundleReady, plansBundleError });
-  }, [plansBundleReady, plansBundleError]);
+    console.log('🔍 GetStrongerFasterBuilder mounted:', { 
+      plansBundleReady, 
+      plansBundleError, 
+      hasCallback: !!onPlanGenerated 
+    });
+  }, [plansBundleReady, plansBundleError, onPlanGenerated]);
   const [cfg, setCfg] = useState<PlanConfig>({
     durationWeeks: 8,
     timeLevel: 'intermediate',
@@ -94,8 +98,8 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
 
   // Compose sessions for each week using universal system
   useEffect(() => {
-    // Only compose when weeks are actually available and stable
-    if (!weeks.length || weeks.length !== cfg.durationWeeks) {
+    // SIMPLE LOGIC: Just compose when weeks are available
+    if (!weeks.length) {
       return;
     }
     
@@ -138,7 +142,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     };
     
     composeAllWeeks();
-  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek, cfg.durationWeeks]);
+  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
 
   // Remove the session clearing useEffect that was causing race conditions
   // Sessions will now persist between config changes
