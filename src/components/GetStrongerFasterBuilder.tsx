@@ -6,6 +6,8 @@ import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/pl
 import { useAppContext } from '@/contexts/AppContext';
 import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS } from './planBuilder/strings';
 
+const PLAN_PATH = `${import.meta.env.BASE_URL}plans.v1.0.0/progressions.json`;
+
 type Session = {
   day: string;
   discipline: 'run'|'bike'|'swim'|'strength'|'brick';
@@ -43,7 +45,14 @@ export default function GetStrongerFasterBuilder() {
 
   // Build skeleton weeks
   const skeletonWeeks = useMemo(() => {
-    if (!plansBundleReady) return [];
+    console.log('🔨 Building skeleton weeks...');
+    console.log('📊 plansBundleReady:', plansBundleReady);
+    console.log('📊 cfg:', cfg);
+    
+    if (!plansBundleReady) {
+      console.log('❌ Plans bundle not ready, returning empty array');
+      return [];
+    }
     
     const weeksOut: SkeletonWeek[] = [];
     const notesMap = new Map<number, string[]>();
@@ -68,27 +77,58 @@ export default function GetStrongerFasterBuilder() {
       notesMap.set(w, weekNotes);
     }
     
-    setWeeks(weeksOut);
-    setNotesByWeek(notesMap);
-    return weeksOut;
+    console.log('✅ Skeleton weeks built:', { weeks: weeksOut, notes: notesMap });
+    return { weeks: weeksOut, notes: notesMap };
   }, [cfg, plansBundleReady]);
+
+  // Set weeks and notes when skeletonWeeks changes
+  useEffect(() => {
+    console.log('🔄 Setting weeks useEffect triggered');
+    console.log('📊 skeletonWeeks:', skeletonWeeks);
+    
+    if (skeletonWeeks && 'weeks' in skeletonWeeks) {
+      console.log('✅ Setting weeks and notes from skeletonWeeks');
+      setWeeks(skeletonWeeks.weeks);
+      setNotesByWeek(skeletonWeeks.notes);
+    } else {
+      console.log('❌ skeletonWeeks is empty or missing weeks property');
+    }
+  }, [skeletonWeeks]);
 
   // Compose sessions for each week using universal system
   useEffect(() => {
-    if (!weeks.length) return;
+    console.log('🔄 Session composition useEffect triggered');
+    console.log('📊 weeks.length:', weeks.length);
+    console.log('📊 weeks:', weeks);
+    
+    if (!weeks.length) {
+      console.log('❌ No weeks available, returning early');
+      return;
+    }
     
     const composeAllWeeks = async () => {
+      console.log('🚀 Starting to compose all weeks...');
       const newSessions = new Map<number, Session[]>();
       
       for (let w = 1; w <= cfg.durationWeeks; w++) {
+        console.log(`📅 Composing week ${w}...`);
         try {
+          const skel = weeks[w - 1];
+          if (!skel) { 
+            console.log(`❌ No skeleton week for week ${w}, skipping`);
+            newSessions.set(w, []); 
+            continue; 
+          }
+          
           const composed = await composeUniversalWeek({
             weekNum: w,
-            skeletonWeek: weeks[w - 1],
-            planPath: '/plans.v1.0.0/progressions.json',
+            skeletonWeek: skel,
+            planPath: PLAN_PATH,
             strengthTrack: cfg.strengthTrack ?? 'hybrid',
             strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3
           });
+          
+          console.log(`✅ Week ${w} composed:`, composed);
           
           const mapped: Session[] = composed.map(s => ({
             day: s.day,
@@ -101,16 +141,22 @@ export default function GetStrongerFasterBuilder() {
           
           newSessions.set(w, mapped);
         } catch (error) {
-          console.error('Error composing week:', w, error);
+          console.error('❌ Error composing week:', w, error);
           newSessions.set(w, []);
         }
       }
       
+      console.log('🎯 Final sessions map:', newSessions);
       setSessionsByWeek(newSessions);
     };
     
     composeAllWeeks();
   }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
+
+  // Clear session map on config changes
+  useEffect(() => {
+    setSessionsByWeek(new Map());
+  }, [cfg.strengthTrack, cfg.strengthDaysPerWeek, weeks.length]);
 
   const rec = useMemo(() => {
     if (cfg.timeLevel === 'beginner') return { total: '3–4', strength: '2' };
@@ -147,7 +193,8 @@ export default function GetStrongerFasterBuilder() {
   // Preferred strength days removed; scheduler places deterministically
 
   const weekSessions = sessionsByWeek.get(currentWeek) || [];
-  const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const dayOrder: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  const pretty: Record<Day,string> = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
   const sortedSessions = [...weekSessions].sort((a, b) => dayOrder.indexOf(a.day) - dayOrder.indexOf(b.day));
   const totalMinutes = sortedSessions.reduce((t, s) => t + (s.duration || 0), 0);
 
@@ -156,6 +203,13 @@ export default function GetStrongerFasterBuilder() {
     
     setIsSaving(true);
     try {
+      // Quick sanity logs
+      console.log('Saving plan:', {
+        weeksCount: weeks.length,
+        w1: sessionsByWeek.get(1),
+        pathUsed: PLAN_PATH
+      });
+      
       // Create the plan data structure
       const planData = {
         name: `Get Stronger Faster - ${cfg.timeLevel} (8 weeks)`,
