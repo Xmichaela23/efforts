@@ -100,6 +100,8 @@ export interface PlanConfig {
   mobilityDaysPerWeek?: 0|1|2|3|4|5;
   mobilityDaysPreferred?: Day[];
   standaloneMobility?: boolean;
+  // Optional supplemental upper/core day toggle
+  includeUpper?: boolean;
 }
 
 export const HardCaps = {

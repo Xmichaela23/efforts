@@ -244,17 +244,54 @@ export async function composeUniversalWeek(params: {
   function applyRunBaselines(desc: string, type: string | undefined): string {
     if (!params.baselines) return desc;
     const pn = params.baselines?.performanceNumbers || {};
-    if (type === 'endurance' && pn.easyPace) {
-      return `${desc} (target ${pn.easyPace})`;
+    // helpers
+    const parsePace = (s?: string | null): number | null => {
+      if (!s) return null;
+      const m = s.match(/^(\d{1,2}):(\d{2})$/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const formatPace = (sec: number): string => {
+      const m = Math.max(0, Math.floor(sec / 60));
+      const s = Math.max(0, sec % 60);
+      return `${m}:${String(s).padStart(2, '0')}`;
+    };
+    const band = (baseSec: number, pct: number): [string, string] => {
+      const low = Math.round(baseSec * (1 - pct)); // faster
+      const high = Math.round(baseSec * (1 + pct));
+      return [formatPace(low), formatPace(high)];
+    };
+
+    const fiveKPaceSec = parsePace(pn.fiveK_pace) || null;
+    const easyPaceSec = parsePace(pn.easyPace) || null;
+
+    // Endurance / Zone 2 → loose ±10%
+    if (type === 'endurance' || /Zone\s*2/i.test(desc)) {
+      if (easyPaceSec) {
+        const [lo, hi] = band(easyPaceSec, 0.10);
+        return `${desc} (target ${lo}–${hi}/mi)`;
+      }
+      return desc;
     }
-    if (/Zone\s*2/i.test(desc) && pn.easyPace) {
-      return `${desc} (target ${pn.easyPace})`;
+
+    // Tempo/Threshold → base ≈ fiveK pace × 1.06 (slower), tight ±3%
+    if (type === 'tempo' || /threshold/i.test(desc)) {
+      if (fiveKPaceSec) {
+        const base = Math.round(fiveKPaceSec * 1.06);
+        const [lo, hi] = band(base, 0.03);
+        return `${desc} (target ${lo}–${hi}/mi)`;
+      }
+      return desc;
     }
-    if ((type === 'tempo' || /threshold/i.test(desc)) && pn.tenK) {
-      return `${desc} (${pn.tenK}/mi)`;
-    }
-    if ((type === 'vo2max' || /3k|5k|vo2/i.test(desc)) && (pn.fiveK_pace || pn.fiveK)) {
-      return `${desc} (${pn.fiveK_pace || pn.fiveK}/mi)`;
+
+    // VO2 / 3K-5K work → base 3K ≈ fiveK pace × 0.94 (faster), tight ±3%
+    if (type === 'vo2max' || /3k|5k|vo2/i.test(desc)) {
+      if (fiveKPaceSec) {
+        const base3k = Math.round(fiveKPaceSec * 0.94);
+        const [lo, hi] = band(base3k, 0.03);
+        return `${desc} (target ${lo}–${hi}/mi)`;
+      }
+      return desc;
     }
     return desc;
   }
@@ -340,7 +377,7 @@ export async function composeUniversalWeek(params: {
     }
 
     else if (slot.poolId.includes('strength_upper_')) {
-      const upper = getCowboyUpperSession(planData);
+      const upper = params.strengthTrack ? getTrackUpperSession(planData, params.strengthTrack) : getCowboyUpperSession(planData);
       if (upper.length > 0) {
         const applied = applyStrengthBaselines(upper);
         session = {
@@ -387,7 +424,7 @@ export async function composeUniversalWeek(params: {
   });
 
   // Add cowboy upper session if 3 strength days requested
-  if (params.strengthDays === 3 && params.weekNum >= 3 && params.strengthTrack) {
+  if (params.strengthDays === 3 && params.strengthTrack) {
     const cowboyExercises = getTrackUpperSession(planData, params.strengthTrack);
     if (cowboyExercises.length > 0) {
       // Find a day that doesn't have strength already

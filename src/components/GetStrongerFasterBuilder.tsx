@@ -41,6 +41,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     strengthDaysPreferred: ['Mon','Fri'],
     strengthTrack: 'hybrid',
     includeStrength: true,
+    includeUpper: false,
     includeMobility: true,
     mobilityDaysPerWeek: 2,
     mobilityDaysPreferred: [],
@@ -93,7 +94,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
         longRunDay: cfg.longRunDay,
         level: level as any,
         strengthTrack: cfg.strengthTrack ?? 'hybrid',
-        strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3,
+        strengthDays: (cfg.includeUpper ? 3 : (cfg.strengthDaysPerWeek ?? 2)) as 2 | 3,
         preferredStrengthDays,
         includeMobility: false,
         mobilityDays: 0,
@@ -349,14 +350,18 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                     <div className="flex flex-nowrap items-end gap-2">
                       <select
                         className="border border-gray-300 rounded px-2 py-1 text-sm w-16"
-                        value={cfg.strengthDaysPerWeek}
-                        onChange={(e)=> setCfg(prev=>({ ...prev, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
+                        value={cfg.includeUpper ? 3 : cfg.strengthDaysPerWeek}
+                        onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: parseInt(e.target.value,10) === 3, strengthDaysPerWeek: (parseInt(e.target.value,10) as 2|3) }))}
                       >
                         <option value={2}>2</option>
                         <option value={3} disabled={!(cfg.availableDays.length >= 6)}>3</option>
                       </select>
                     </div>
                   </div>
+                  <label className="inline-flex items-center gap-2 text-xs text-gray-800">
+                    <input type="checkbox" checked={!!cfg.includeUpper} onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : (prev.strengthDaysPerWeek || 2) }))} />
+                    Include 3rd upper/core day
+                  </label>
                   <span
                     className="text-xs text-gray-800 flex-1 whitespace-normal break-words"
                     title={'Cowboy option: choose a 3rd upper body focus strength day for aesthetics and balance'}
