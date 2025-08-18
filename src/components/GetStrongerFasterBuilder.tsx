@@ -21,6 +21,9 @@ const dayChips: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 export default function GetStrongerFasterBuilder() {
   const { plansBundleReady, plansBundleError, addPlan } = useAppContext();
+  
+  // Debug: Check what's happening with plansBundleReady
+  console.log('🔍 GetStrongerFasterBuilder render:', { plansBundleReady, plansBundleError });
   const [cfg, setCfg] = useState<PlanConfig>({
     durationWeeks: 8,
     timeLevel: 'intermediate',
