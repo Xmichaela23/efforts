@@ -300,7 +300,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
           </p>
           <div className="text-xs text-gray-800 rounded border border-gray-200 p-3 bg-gray-50">
             <div className="font-medium mb-1">Run volume preset</div>
-            <p>Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). If you’d like a 3rd strength day, Cowboy (optional upper/core) is placed after your long run.</p>
+            <p>Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). 2 strength by default with an optional 3rd strength day, Cowboy (upper/core), placed the day after your long run — you should add an additional available day for proper spacing.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -355,7 +355,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                   <div className="shrink-0">
                     <div className="text-sm font-medium mb-1">Strength</div>
                     <div className="flex items-start md:items-center gap-3">
-                      <span className="text-xs text-gray-600 whitespace-nowrap">Base: 2×</span>
                       <label className="inline-flex items-start gap-2 text-xs text-gray-800">
                         <input
                           type="checkbox"
@@ -363,9 +362,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                           checked={!!cfg.includeUpper}
                           onChange={(e)=> setCfg(prev=>({ ...prev, includeUpper: e.target.checked, strengthDaysPerWeek: e.target.checked ? 3 : 2 }))}
                         />
-                        <span className="leading-snug">Include Cowboy (3rd upper/core) day
-                          <span className="block md:inline text-[11px] text-gray-500 md:ml-2">(placed day after your long run; needs ≥6 days for best spacing)</span>
-                        </span>
+                        <span className="leading-snug">Include Cowboy (3rd upper/core) day (placed day after your long run)</span>
                       </label>
                     </div>
                   </div>
