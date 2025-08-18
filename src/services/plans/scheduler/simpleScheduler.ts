@@ -12,6 +12,12 @@ const prev = (d: Day) => ORDER[(idx(d)+6)%7] as Day;
 const neighbors = (d: Day) => [prev(d), next(d)];
 const includesDay = (arr: Day[], d: Day) => arr.indexOf(d) !== -1;
 
+const HARD_STRENGTH = new Set<PoolId>([
+  'strength_power_pool',
+  'strength_endurance_pool',
+  'strength_hybrid_pool'
+]);
+
 const isHardPool = (p: PoolId) =>
   // Run hard
   p === 'run_speed_vo2_pool' ||
@@ -21,8 +27,8 @@ const isHardPool = (p: PoolId) =>
   p === 'bike_vo2_pool' ||
   p === 'bike_threshold_pool' ||
   p === 'bike_long_pool' ||
-  // Strength (exclude upper supplemental)
-  ((p.startsWith('strength_') as any) && (p as any) !== 'strength_upper') ||
+  // Strength (explicit list; upper/core pools are non-hard)
+  HARD_STRENGTH.has(p) ||
   // Bricks are always hard and count as one hard day
   p.startsWith('brick_');
 
@@ -176,9 +182,9 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   const anchorHard = uniq<Day>([longRunDay, ...qualDays]);
   let budget = MAX_HARD_PER_WEEK - anchorHard.length;  // how many standalone hard days we can add
 
-  // For very experienced with 7+ availability and 3x strength, only 2 count toward hard cap.
-  const isVECandidate = (level === 'veryExperienced' && availableDays.length >= 7 && strengthDays === 3);
-  const hardStrengthTarget = isVECandidate ? 2 : strengthDays;
+  // Optional upper/core day allowed for any level if 3x strength requested and ≥6 available days
+  const isUpperCandidate = (availableDays.length >= 6 && strengthDays === 3);
+  const hardStrengthTarget = isUpperCandidate ? 2 : strengthDays;
 
   // helper: find safe standalone strength days
   const safeStandalone: Day[] = [];
@@ -205,7 +211,7 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       if (!chosen.includes(d)) chosen.push(d);
       if (uniq(chosen.filter(x => stackTargets.includes(x))).length >= MAX_STACKED_DAYS) break;
     }
-    if (!isVECandidate && chosen.length < hardStrengthTarget) {
+    if (!isUpperCandidate && chosen.length < hardStrengthTarget) {
       // Reduce to 2× with a single consolidated note (VE path handles supplemental separately)
       const msg = 'Reduced strength to 2× due to weekly hard-day cap and spacing limits.';
       if (!notes.includes(msg)) notes.push(msg);
@@ -230,8 +236,13 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   }
 
   const finalStrengthDays = Math.min(hardStrengthTarget, chosen.length);
-  if (!isVECandidate && finalStrengthDays < strengthDays && !addedBudgetReductionNote) {
-    notes.push(`Reduced strength to ${finalStrengthDays}× due to weekly hard-day cap and spacing limits.`);
+  if (!isUpperCandidate && finalStrengthDays < strengthDays && !addedBudgetReductionNote) {
+    if (strengthDays === 3 && availableDays.length < 6) {
+      const msg = 'Cowboy upper/core requires ≥6 available days; scheduling 2× strength this week.';
+      if (!notes.includes(msg)) notes.push(msg);
+    } else {
+      notes.push(`Reduced strength to ${finalStrengthDays}× due to weekly hard-day cap and spacing limits.`);
+    }
   }
   chosen.slice(0, finalStrengthDays).forEach(d => add(slots, strengthPool, d));
 
@@ -239,7 +250,7 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   markSupplementalThirdIfNeeded(slots, strengthTrack, strengthDays, notes);
 
   // VE special rule: add non-hard supplemental on day after long run, unstacked
-  if (isVECandidate && availableDays.length >= 6) {
+  if (isUpperCandidate) {
     const start = next(longRunDay);
     let pick: Day | null = null;
     // find next legal easy day: available, not long, not a quality day, no existing slot on that day
