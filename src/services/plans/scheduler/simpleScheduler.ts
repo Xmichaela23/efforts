@@ -154,8 +154,13 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   const slots: Slot[] = [];
   const isAvail = (d: Day) => includesDay(availableDays, d);
 
-  // Long run
-  add(slots, 'run_long_pool', longRunDay);
+  // Long run — if requested day isn't available, fallback to weekend or first available
+  let lr: Day = longRunDay;
+  if (!isAvail(lr)) {
+    const weekend: Day[] = (['Sat','Sun'] as Day[]).filter(d => isAvail(d));
+    lr = weekend.length ? weekend[0] : availableDays[0];
+  }
+  add(slots, 'run_long_pool', lr);
 
   // Quality runs
   const wantQual = (level === 'new') ? 1 : 2;
@@ -175,11 +180,11 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
 
   // --- Strength placement (budget-aware, deterministic) ---
   const strengthPool = strengthPoolFor(strengthTrack);
-  const protectedDays = uniq<Day>([longRunDay, ...qualDays]);
+  const protectedDays = uniq<Day>([lr, ...qualDays]);
   const protectedRing = uniq<Day>(protectedDays.flatMap(d => [d, ...neighbors(d)]));
 
   // anchors = distinct hard-day anchors already placed
-  const anchorHard = uniq<Day>([longRunDay, ...qualDays]);
+  const anchorHard = uniq<Day>([lr, ...qualDays]);
   let budget = MAX_HARD_PER_WEEK - anchorHard.length;  // how many standalone hard days we can add
 
   // Optional upper/core day allowed for any level if 3x strength requested and ≥6 available days
@@ -251,12 +256,12 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
 
   // Always add one optional supplemental upper/core day (hidden best friend)
   {
-    const start = next(longRunDay);
+    const start = next(lr);
     let pick: Day | null = null;
     // find next legal easy day: available, not long, not a quality day, no existing slot on that day
     let cur = start;
     for (let i=0; i<7; i++) {
-      if (includesDay(availableDays, cur) && cur !== longRunDay && !qualDays.includes(cur) && !slots.some(s => s.day===cur)) {
+      if (includesDay(availableDays, cur) && cur !== lr && !qualDays.includes(cur) && !slots.some(s => s.day===cur)) {
         pick = cur; break;
       }
       cur = next(cur);
