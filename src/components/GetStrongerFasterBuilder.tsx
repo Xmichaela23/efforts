@@ -90,7 +90,8 @@ export default function GetStrongerFasterBuilder() {
 
   // Compose sessions for each week using universal system
   useEffect(() => {
-    if (!weeks.length) {
+    // Only compose when weeks are actually available and stable
+    if (!weeks.length || weeks.length !== cfg.durationWeeks) {
       return;
     }
     
@@ -133,7 +134,7 @@ export default function GetStrongerFasterBuilder() {
     };
     
     composeAllWeeks();
-  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
+  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek, cfg.durationWeeks]);
 
   // Remove the session clearing useEffect that was causing race conditions
   // Sessions will now persist between config changes
@@ -216,12 +217,8 @@ export default function GetStrongerFasterBuilder() {
       await addPlan(planData);
       setShowSuccess(true);
       
-      // Simple navigation - just go back to previous view
-      // User can then navigate to plans manually
-      setTimeout(() => {
-        console.log('🔄 Navigating back to previous view...');
-        window.history.back();
-      }, 2000); // Wait 2 seconds to show success message
+      // No automatic navigation - just show success message
+      // User can navigate to plans manually when ready
       
     } catch (error) {
       console.error('Error saving plan:', error);
