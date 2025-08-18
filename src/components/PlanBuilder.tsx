@@ -4,7 +4,11 @@ import GetStrongerFasterBuilder from './GetStrongerFasterBuilder';
 
 type Discipline = 'run'|'ride'|'swim'|'strength'|'hybrid';
 
-export default function PlanBuilder() {
+interface PlanBuilderProps {
+  onPlanGenerated?: (plan: any) => void;
+}
+
+export default function PlanBuilder({ onPlanGenerated }: PlanBuilderProps) {
   const [discipline, setDiscipline] = useState<Discipline | null>(null);
   const [planId, setPlanId] = useState<string | null>(null);
 
@@ -63,7 +67,7 @@ export default function PlanBuilder() {
     return (
       <div className="w-full">
         <div className="max-w-3xl mx-auto p-2"></div>
-        <GetStrongerFasterBuilder />
+        <GetStrongerFasterBuilder onPlanGenerated={onPlanGenerated} />
       </div>
     );
   }
