@@ -230,7 +230,7 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   }
 
   const finalStrengthDays = Math.min(hardStrengthTarget, chosen.length);
-  if (finalStrengthDays < strengthDays && !addedBudgetReductionNote) {
+  if (!isVECandidate && finalStrengthDays < strengthDays && !addedBudgetReductionNote) {
     notes.push(`Reduced strength to ${finalStrengthDays}× due to weekly hard-day cap and spacing limits.`);
   }
   chosen.slice(0, finalStrengthDays).forEach(d => add(slots, strengthPool, d));
@@ -251,8 +251,9 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
       cur = next(cur);
     }
     if (pick) {
-      // Use existing endurance strength pool for visibility in composer; mark optional to exclude from hard cap
-      add(slots, 'strength_endurance_pool' as PoolId, pick, true);
+      // Honor chosen strength track; mark optional so it is non-hard
+      const trackPool: PoolId = strengthTrack === 'power' ? 'strength_power_pool' : strengthTrack === 'hybrid' ? 'strength_hybrid_pool' : 'strength_endurance_pool';
+      add(slots, trackPool, pick, true);
       const info = 'Upper/Core day is scheduled the day after your long run. It does not count as a hard day and is dropped first if the week is tight.';
       if (!notes.includes(info)) notes.push(info);
     }
