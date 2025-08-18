@@ -298,10 +298,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
           <p className="text-sm text-gray-700">
             8 weeks to get faster and stronger. For runners who want sharper 5K–10K times and the durability strength brings.
           </p>
-          <div className="text-xs text-gray-800 rounded border border-gray-200 p-3 bg-gray-50">
-            <div className="font-medium mb-1">Run volume preset</div>
-            <p>Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). 2 strength by default with an optional 3rd strength day, Cowboy (upper/core), placed the day after your long run — you should add an additional available day for proper spacing.</p>
-          </div>
+          {/* Removed duplicate framed preset note; the section below shows the updated language */}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-3">
@@ -339,7 +336,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-                <div className="flex items-end gap-2 w-full">
+                <div className="flex items-end gap-4 w-full flex-wrap">
                   <div className="shrink-0">
                     <div className="text-sm font-medium mb-1">Long run day</div>
                     <select
@@ -354,7 +351,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                   </div>
                   <div className="shrink-0">
                     <div className="text-sm font-medium mb-1">Cowboy</div>
-                    <div className="flex items-start md:items-center gap-3">
+                    <div className="flex items-start md:items-center gap-2 max-w-xs">
                       <label className="inline-flex items-start gap-2 text-xs text-gray-800">
                         <input
                           type="checkbox"

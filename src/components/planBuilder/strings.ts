@@ -1,7 +1,7 @@
 export const LABEL_RUN_VOLUME = 'Run volume preset';
 
 export const HELP_RUN_VOLUME =
-  "Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo), and if you'd like a 3rd strength day, cowboy is an optional upper/core session placed after your long run.";
+  "Your run days are set by your preset (4, 5, or 6). Strength sessions pair with your harder runs (like intervals or tempo). 2 strength by default with an optional 3rd strength day, Cowboy (upper/core), placed the day after your long run — add an additional available day for proper spacing.";
 
 export const RUN_VOLUME_OPTIONS = [
   { value: 'new',            label: '4 days (New to running)' },
