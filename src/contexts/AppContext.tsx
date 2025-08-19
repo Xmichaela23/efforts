@@ -461,9 +461,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               duration: s.duration ?? null,
               workout_status: 'planned',
               source: 'plan',
-              intensity: s.intensity ?? null,
-              intervals: s.intervals ?? null,
-              strength_exercises: s.strength_exercises ?? null,
+              intensity: typeof s.intensity === 'object' ? s.intensity : null,
+              intervals: Array.isArray(s.intervals) ? s.intervals : null,
+              strength_exercises: Array.isArray(s.strength_exercises) ? s.strength_exercises : null,
             };
             rows.push(row);
           });
