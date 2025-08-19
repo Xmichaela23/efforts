@@ -1155,7 +1155,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             {plannedWorkouts.slice(0, 5).map((workout) => (
               <div 
                 key={workout.id} 
-                className="border-l-2 border-blue-200 pl-4 py-2 cursor-pointer hover:bg-gray-50 rounded"
+                className="pl-4 py-2 cursor-pointer hover:bg-gray-50 rounded"
                 onClick={() => {
                   if (onSelectWorkout) onSelectWorkout(workout);
                 }}
