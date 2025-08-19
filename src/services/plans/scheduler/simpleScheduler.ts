@@ -258,8 +258,8 @@ export function placeWeek(params: SimpleSchedulerParams): PlaceResult {
   // Mark supplemental third on endurance track
   markSupplementalThirdIfNeeded(slots, strengthTrack, strengthDays, notes);
 
-  // Always add one optional supplemental upper/core day (hidden best friend)
-  {
+  // Add optional supplemental upper/core day ONLY when 3× strength is requested (checkbox on)
+  if (strengthDays === 3) {
     const start = next(lr);
     let pick: Day | null = null;
     // find next legal easy day: available, not long, not a quality day, no existing slot on that day
