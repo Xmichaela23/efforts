@@ -48,6 +48,7 @@ export interface UniversalPlanData {
 
 // Cache for loaded plan data
 const planDataCache = new Map<string, UniversalPlanData>();
+const poolsDataCache = new Map<string, any>();
 
 /**
  * Load a plan's progression data from JSON
@@ -70,6 +71,50 @@ export async function loadPlanData(planPath: string): Promise<UniversalPlanData>
     console.error('Failed to load plan data:', error);
     throw new Error(`Failed to load training plan: ${planPath}`);
   }
+}
+
+async function loadPoolsData(): Promise<any> {
+  const key = 'pools';
+  if (poolsDataCache.has(key)) return poolsDataCache.get(key);
+  const url = `${import.meta.env.BASE_URL || '/'}plans.v1.0.0/pools.json`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Failed to load pools.json: ${res.status} ${res.statusText}`);
+  const data = await res.json();
+  poolsDataCache.set(key, data);
+  return data;
+}
+
+function parseGarminVariantId(text?: string | null): string | null {
+  if (!text) return null;
+  const m = text.match(/(?:GARMIN:|garmin:|variantId=|garmin_variant=)([A-Za-z0-9_\-]+)/);
+  if (m) return m[1];
+  // also accept exact id tokens in brackets e.g. [200m_3k_eq_jog]
+  const b = text.match(/\[([A-Za-z0-9_\-]+)\]/);
+  if (b) return b[1];
+  // or if description equals a known id-like token
+  if (/^[A-Za-z0-9_\-]+$/.test(text)) return text;
+  return null;
+}
+
+export async function expandGarminIntervals(variantId: string, repsOverride?: number): Promise<string[]> {
+  const pools = await loadPoolsData();
+  const run = pools?.run;
+  const igr = run?.intervals_garmin_ready;
+  if (!igr) throw new Error('Intervals library not found: run.intervals_garmin_ready');
+  const defs = igr.defaults || {};
+  const variants: any[] = igr.variants || [];
+  const v = variants.find(x => x.id === variantId);
+  if (!v) throw new Error(`Intervals variant not found: ${variantId}`);
+  const reps = typeof repsOverride === 'number' ? repsOverride : (v.rep_schema?.reps || 0);
+  const steps: string[] = [];
+  if (defs.warmup?.label) steps.push(defs.warmup.label);
+  for (let i = 0; i < reps; i++) {
+    for (const s of (v.rep_schema?.steps || [])) {
+      steps.push(s.label);
+    }
+  }
+  if (defs.cooldown?.label) steps.push(defs.cooldown.label);
+  return steps;
 }
 
 /**
@@ -168,7 +213,7 @@ function getCowboyUpperSession(planData: UniversalPlanData): string[] {
 }
 
 function getTrackUpperSession(planData: UniversalPlanData, track: string): string[] {
-  const key = track === 'power' ? 'upper_power' : track === 'endurance' ? 'upper_endurance' : 'upper_hybrid';
+  const key = track === 'power' ? 'upper_power' : 'upper_endurance';
   // @ts-ignore
   return planData.strength?.[key] || getCowboyUpperSession(planData);
 }
@@ -321,6 +366,12 @@ export async function composeUniversalWeek(params: {
     else if (slot.poolId.includes('_vo2_pool') && sport) {
       const qualitySession = getQualitySession(params.weekNum, phase, sport, planData);
       if (qualitySession && qualitySession.type === 'VO2') {
+        // Attempt to expand Garmin-ready intervals if variant id present in session string
+        const variantId = parseGarminVariantId(qualitySession.session);
+        let intervals: string[] | undefined = undefined;
+        if (variantId) {
+          intervals = await expandGarminIntervals(variantId);
+        }
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
                 slot.day === 'Tue' ? 'Tuesday' : 
@@ -333,6 +384,7 @@ export async function composeUniversalWeek(params: {
           duration: qualitySession.duration || 55,
           intensity: qualitySession.intensity || 'Zone 4-5',
           description: applyRunBaselines(qualitySession.session, 'vo2max'),
+          intervals: intervals,
           zones: []
         };
       }
@@ -341,6 +393,11 @@ export async function composeUniversalWeek(params: {
     else if (slot.poolId.includes('_threshold_pool') && sport) {
       const qualitySession = getQualitySession(params.weekNum, phase, sport, planData);
       if (qualitySession && qualitySession.type === 'Tempo') {
+        const variantId = parseGarminVariantId(qualitySession.session);
+        let intervals: string[] | undefined = undefined;
+        if (variantId) {
+          intervals = await expandGarminIntervals(variantId);
+        }
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
                 slot.day === 'Tue' ? 'Tuesday' : 
@@ -353,6 +410,7 @@ export async function composeUniversalWeek(params: {
           duration: qualitySession.duration || 60,
           intensity: qualitySession.intensity || 'Zone 3-4',
           description: applyRunBaselines(qualitySession.session, 'tempo'),
+          intervals: intervals,
           zones: []
         };
       }
@@ -423,26 +481,55 @@ export async function composeUniversalWeek(params: {
     }
   });
 
-  // Add cowboy upper session if 3 strength days requested
-  if (params.strengthDays === 3 && params.strengthTrack) {
-    const cowboyExercises = getTrackUpperSession(planData, params.strengthTrack);
-    if (cowboyExercises.length > 0) {
-      // Find a day that doesn't have strength already
-      const strengthDays = sessions.filter(s => s.discipline === 'strength').map(s => s.day);
-      const availableDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      const freeDay = availableDays.find(day => !strengthDays.includes(day));
+  // Enforce Garmin-ready interval expansion for run intervals if plan specifies
+  // (Assumes quality sessions description includes a variant id; otherwise leave as-is)
 
-      if (freeDay) {
+  // Insert optional upper/core supportive day with adjacency rule when 3× strength requested
+  if (params.strengthDays === 3 && params.strengthTrack) {
+    const upperExercises = getTrackUpperSession(planData, params.strengthTrack);
+    if (upperExercises.length > 0) {
+      const strengthDays = sessions.filter(s => s.discipline === 'strength').map(s => s.day);
+      const orderedDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+      const isUpperHeavy = (day: string) => false; // anchors defined in scheduler placement; composer enforces separation at insert
+      let candidate: string | null = null;
+      for (const d of orderedDays) {
+        if (!strengthDays.includes(d)) {
+          const idx = orderedDays.indexOf(d);
+          const prev = orderedDays[(idx + 6) % 7];
+          const next = orderedDays[(idx + 1) % 7];
+          if (!strengthDays.includes(prev) && !strengthDays.includes(next)) {
+            candidate = d; break;
+          }
+        }
+      }
+      if (candidate) {
         sessions.push({
-          day: freeDay,
+          day: candidate,
           discipline: 'strength',
           type: 'strength',
           duration: 30,
           intensity: 'Moderate',
-          description: `Upper body focus: ${cowboyExercises.join(' • ')}`,
+          description: `Strength – Optional Upper/Core (supportive): ${applyStrengthBaselines(upperExercises).join(' • ')}`,
           zones: []
         });
       }
+    }
+  }
+
+  // Validation enforcement: ensure power anchors appear when track is power
+  if (params.strengthTrack === 'power') {
+    const text = sessions.filter(s => s.discipline === 'strength').map(s => `${s.description}`.toLowerCase()).join(' \n');
+    const required = ['squat', 'deadlift', 'bench', 'overhead'];
+    const missing = required.filter(k => !text.includes(k));
+    if (missing.length) {
+      console.warn('Validation: missing heavy compounds in week', params.weekNum, missing);
+    }
+  }
+  // Endurance circuits: soft assert that no heavy compounds
+  if (params.strengthTrack === 'endurance') {
+    const hasHeavy = sessions.some(s => s.discipline==='strength' && /squat|deadlift|bench|overhead/i.test(s.description));
+    if (hasHeavy) {
+      console.warn('Validation: endurance circuits contained heavy compounds in week', params.weekNum);
     }
   }
 

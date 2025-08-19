@@ -1,60 +1,71 @@
 {
-  "templates": [
-    {
-      "id": "run_quality_A",
-      "poolId": "run_quality",
-      "variant": "A",
-      "phase": "build",
-      "baseDurationMin": 60,
-      "progressionRule": "2w up, 1w deload; +5–10% volume ceiling",
-      "constraints": ["no-consecutive-hard-days"],
-      "requires": [],
-      "userNote": "Tempo/threshold focus. Can be done on flat road or treadmill."
+  "version": "1.0.0-clean",
+  "templates": {
+    "run_plan": {
+      "anchors": ["Long Run", "Quality Run 1", "Quality Run 2"],
+      "fillers": ["Easy Run"],
+      "notes": "Use Garmin-ready Intervals for any interval session; expand to step-by-step (WU, each work+recovery, CD)."
     },
-    {
-      "id": "run_vo2_road_A",
-      "poolId": "run_quality",
-      "variant": "A",
-      "phase": "build",
-      "baseDurationMin": 55,
-      "constraints": ["no-consecutive-hard-days"],
-      "requires": [],
-      "userNote": "VO2 intervals (3–4 min reps) on flat road or treadmill."
+
+    "strength_power": {
+      "track": "power",
+      "anchors_per_week": [
+        "Strength – Power: Squat/Bench",
+        "Strength – Power: Deadlift/OHP"
+      ],
+      "optional_day_label": "Strength – Optional Upper/Core (supportive)",
+      "optional_day_rules": {
+        "enabled_when_strength_days": 3,
+        "pool_ref": "strength.power.optional_upper_core_supportive_pool",
+        "no_heavy_compounds": true,
+        "not_adjacent_to_upper_heavy": true
+      },
+      "validation": [
+        "include Squat ≥1×/week",
+        "include Deadlift ≥1×/week",
+        "include Bench ≥1×/week",
+        "include OHP ≥1×/week",
+        "optional day (if present) uses supportive pool only; no Squat/Dead/Bench/OHP",
+        "optional day not adjacent to another upper-heavy day"
+      ]
     },
-    {
-      "id": "run_vo2_track_A",
-      "poolId": "run_quality",
-      "variant": "A",
-      "phase": "build",
-      "baseDurationMin": 55,
-      "constraints": ["no-consecutive-hard-days"],
-      "requires": ["track_access"],
-      "userNote": "VO2 intervals (e.g., 800s) on track."
+
+    "strength_endurance": {
+      "track": "endurance",
+      "sessions_per_week": 1,
+      "max_sessions_per_week": 2,
+      "label": "Strength – Endurance: Circuit",
+      "pool_ref": "strength.endurance.circuits_pool",
+      "rules": {
+        "no_heavy_compounds": true
+      }
     },
-    {
-      "id": "run_long_A",
-      "poolId": "run_long",
-      "variant": "A",
-      "phase": "build",
-      "baseDurationMin": 80,
-      "progressionRule": "+10 min every other week; deload week −20%"
+
+    "bike_plan": {
+      "anchors": ["Long Ride", "Quality Ride"],
+      "fillers": ["Endurance Ride (Z2 steady)"]
     },
-    {
-      "id": "strength_fullbody_A",
-      "poolId": "strength_nonhard",
-      "variant": "A",
-      "phase": "build",
-      "baseDurationMin": 45,
-      "userNote": "Neural bias (low-rep, long rest)."
+
+    "swim_plan": {
+      "anchors": ["Endurance Swim", "Swim Intervals"],
+      "fillers": ["Technique Drills (kickboard, pull buoy, form)"]
     },
-    { "id":"upper_power_barbell_A", "poolId":"strength_upper_power", "variant":"A", "phase":"build", "baseDurationMin":40, "track":"power", "tierOrder":1, "requires":["barbell","bench","pullup_bar"], "fallback":false, "userNote":"Upper/core day (power): Bench/OHP 4x6–8 @70–80% 1RM, weighted pull-ups/rows 4x6–8, rollouts 3x10." },
-    { "id":"upper_power_bodyweight_fallback_A", "poolId":"strength_upper_power", "variant":"A", "phase":"build", "baseDurationMin":30, "tierOrder":4, "requires":[], "fallback":true, "userNote":"Upper/CORE (Power, fallback): Push-ups, table rows, plank/rollout sub." },
-    { "id":"upper_power_barbell_A_v2", "poolId":"strength_upper_power", "variant":"A", "phase":"build", "baseDurationMin":40, "tierOrder":1, "requires":["barbell","bench","pullup_bar"], "fallback":false, "userNote":"Upper/CORE (Power): Bench/OHP 4x6–8, Weighted Pull-ups/Rows 4x6–8, Rollouts 3x10." },
-    { "id":"upper_endurance_bodyweight_fallback_A", "poolId":"strength_upper_endurance", "variant":"A", "phase":"build", "baseDurationMin":30, "tierOrder":4, "requires":[], "fallback":true, "userNote":"Upper/CORE (Endurance, fallback): Push-ups 4x12–20, inverted rows, plank circuit." },
-    { "id":"upper_endurance_dumbbell_A", "poolId":"strength_upper_endurance", "variant":"A", "phase":"build", "baseDurationMin":35, "tierOrder":2, "requires":["adjustable_dumbbells","bench"], "fallback":false, "userNote":"Upper/CORE (Endurance): DB press 3x12–15, band pulls 3x12–15, core circuit x3." },
-    { "id":"upper_hybrid_bodyweight_fallback_A", "poolId":"strength_upper_hybrid", "variant":"A", "phase":"build", "baseDurationMin":30, "tierOrder":4, "requires":[], "fallback":true, "userNote":"Upper/CORE (Hybrid, fallback): Push-ups/rows 5x, core combo." },
-    { "id":"upper_hybrid_dumbbell_A", "poolId":"strength_upper_hybrid", "variant":"A", "phase":"build", "baseDurationMin":40, "tierOrder":2, "requires":["adjustable_dumbbells","bench"], "fallback":false, "userNote":"Upper/CORE (Hybrid): DB press/row 4x8–10, core combo." }
-  ]
+
+    "hybrid_tri_composition": {
+      "note": "Hybrid is composition-only here (combining run/bike/swim/strength). There is no 'hybrid' strength track.",
+      "compose": ["run_plan", "bike_plan", "swim_plan", "strength_power OR strength_endurance"]
+    }
+  },
+
+  "builder_rules": {
+    "use_garmin_ready_intervals": true,
+    "intervals_source": "run.intervals_garmin_ready",
+    "expand_intervals_to_steps": true,
+    "defaults": {
+      "warmup": "Warm-Up: 10 min easy",
+      "cooldown": "Cool-Down: 10 min easy"
+    }
+  }
 }
 
 

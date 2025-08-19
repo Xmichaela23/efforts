@@ -12,6 +12,7 @@ export interface SessionTemplate {
   zones: number[];
   strengthType?: 'power' | 'stability' | 'traditional' | 'traditional_lower' | 'traditional_upper' | 'cowboy_endurance' | 'cowboy_endurance_upper' | 'cowboy_endurance_walks';
   detailedWorkout?: string; // Detailed workout prescription
+  intervals?: any[]; // Garmin-ready expanded steps for device export
 }
 
 export interface UserBaselines {

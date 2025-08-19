@@ -82,7 +82,7 @@ export interface Baselines {
 
 // ---- Plan configuration & caps ----
 export type Day = 'Mon'|'Tue'|'Wed'|'Thu'|'Fri'|'Sat'|'Sun';
-export type StrengthTrack = 'power'|'endurance'|'hybrid';
+export type StrengthTrack = 'power'|'endurance';
 
 export interface PlanConfig {
   durationWeeks: 8|12|16;

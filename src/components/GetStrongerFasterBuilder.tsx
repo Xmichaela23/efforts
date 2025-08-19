@@ -39,7 +39,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     runQualityDays: 2,
     strengthDaysPerWeek: 2,
     strengthDaysPreferred: ['Mon','Fri'],
-    strengthTrack: 'hybrid',
+    strengthTrack: 'endurance',
     includeStrength: true,
     includeUpper: false,
     includeMobility: true,
@@ -93,7 +93,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
         availableDays: cfg.availableDays,
         longRunDay: cfg.longRunDay,
         level: level as any,
-        strengthTrack: cfg.strengthTrack ?? 'hybrid',
+        strengthTrack: cfg.strengthTrack ?? 'endurance',
         strengthDays: (cfg.includeUpper ? 3 : (cfg.strengthDaysPerWeek ?? 2)) as 2 | 3,
         preferredStrengthDays,
         includeMobility: false,
@@ -149,7 +149,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
             weekNum: w,
             skeletonWeek: skel,
             planPath: PLAN_PATH,
-            strengthTrack: cfg.strengthTrack ?? 'hybrid',
+            strengthTrack: cfg.strengthTrack ?? 'endurance',
             strengthDays: (cfg.includeUpper ? 3 : (cfg.strengthDaysPerWeek ?? 2)) as 2 | 3,
             baselines
           });
@@ -389,7 +389,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
               <div>
                 <div className="text-sm font-medium mb-1">Strength focus</div>
                 <div className="flex gap-2">
-                  {(['power','endurance','hybrid'] as StrengthTrack[]).map(t => (
+                  {(['power','endurance'] as StrengthTrack[]).map(t => (
                     <button key={t} onClick={() => setCfg(prev=>({...prev, strengthTrack: t }))}
                       className={`px-3 py-1 border rounded ${cfg.strengthTrack===t? 'bg-gray-100 border-gray-300':'border-gray-200'}`}>{t}</button>
                   ))}
@@ -401,9 +401,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                 {cfg.strengthTrack === 'endurance' && (
                   <p className="mt-1 text-xs text-gray-800">Higher-rep, lighter weights to support stamina and muscular durability.</p>
                 )}
-                {cfg.strengthTrack === 'hybrid' && (
-                  <p className="mt-1 text-xs text-gray-800">A mix of heavy and endurance work — balanced strength for all-around performance.</p>
-                )}
+                
               </div>
               {/* Preferred strength days removed; scheduler will place Mon/Fri/Wed with safe stacking */}
 
