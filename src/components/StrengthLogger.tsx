@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface LoggedSet {
   reps: number;
@@ -25,6 +26,7 @@ interface StrengthLoggerProps {
   onClose: () => void;
   scheduledWorkout?: any; // Optional scheduled workout to pre-populate
   onWorkoutSaved?: (workout: any) => void; // NEW: Navigate to completed workout
+  targetDate?: string; // YYYY-MM-DD date to prefill from planned_workouts
 }
 
 // Simple volume calculator for save button
@@ -129,8 +131,9 @@ const PlateMath: React.FC<{
   );
 };
 
-export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved }: StrengthLoggerProps) {
+export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
   const { workouts, addWorkout } = useAppContext();
+  const { plannedWorkouts } = usePlannedWorkouts();
   const { plannedWorkouts, refresh: refreshPlanned } = usePlannedWorkouts();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
@@ -159,6 +162,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // Get today's date string - FIXED: Use PST timezone to avoid date shifting
   const getTodayDateString = () => {
+    // If a date was selected from calendar, prefer that
+    if (targetDate && /\d{4}-\d{2}-\d{2}/.test(targetDate)) {
+      return targetDate;
+    }
     // Use a more direct approach to get PST date
     const now = new Date();
     
@@ -200,6 +207,44 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     expanded: true
   });
 
+  // Parse a textual strength description into structured exercises
+  const parseStrengthDescription = (desc: string): LoggedExercise[] => {
+    if (!desc || typeof desc !== 'string') return [];
+    // Drop any lead-in before a colon (e.g., "Strength – Power...:")
+    const afterColon = desc.includes(':') ? desc.split(':').slice(1).join(':') : desc;
+    // Split on bullets or commas
+    const parts = afterColon
+      .split(/•|\n|,/) // bullets, newlines, commas
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    const results: LoggedExercise[] = [];
+    for (const p of parts) {
+      // Examples: "Back Squat 3x5 — 225 lb", "Bench Press 4×6", "Pull-Ups 3x8"
+      const m = p.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:.*?—\s*(\d+)\s*lb)?/i);
+      if (m) {
+        const name = m[1].trim();
+        const sets = parseInt(m[2], 10);
+        const reps = parseInt(m[3], 10);
+        const weight = m[4] ? parseInt(m[4], 10) : 0;
+        const ex: LoggedExercise = {
+          id: `${Date.now()}-${name}-${Math.random().toString(36).slice(2,8)}`,
+          name,
+          sets: Array.from({ length: sets }, () => ({
+            reps,
+            weight,
+            barType: 'standard',
+            rir: undefined,
+            completed: false
+          })),
+          expanded: true
+        };
+        results.push(ex);
+      }
+    }
+    return results;
+  };
+
   // Proper initialization with cleanup
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
@@ -213,12 +258,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     let workoutToLoad = scheduledWorkout;
 
-    // If no scheduled workout provided, do a FRESH check for today's planned workout
+    // If no scheduled workout provided, do a FRESH check for selected date's planned workout
     if (!workoutToLoad) {
       console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
       const todayDate = getTodayDateString();
       
-      // Prefer planned_workouts
+      // Prefer planned_workouts table
       const todaysPlanned = (plannedWorkouts || []).filter(w => w.date === todayDate && w.type === 'strength' && w.workout_status === 'planned');
       let todaysStrengthWorkouts = todaysPlanned;
 
@@ -259,6 +304,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }));
       
       setExercises(prePopulatedExercises);
+    } else if (workoutToLoad && typeof workoutToLoad.description === 'string') {
+      // Fallback: parse description if structured array missing
+      const parsed = parseStrengthDescription(workoutToLoad.description);
+      if (parsed.length > 0) {
+        console.log('📝 Parsed exercises from description');
+        setExercises(parsed);
+      } else {
+        console.log('🆕 Starting with empty exercise for manual logging');
+        setExercises([createEmptyExercise()]);
+      }
     } else {
       console.log('🆕 Starting with empty exercise for manual logging');
       // Start with empty exercise for manual logging
@@ -266,7 +321,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
     
     setIsInitialized(true);
-  }, [scheduledWorkout, workouts, plannedWorkouts]);
+  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate]);
 
   // Cleanup when component unmounts
   useEffect(() => {
