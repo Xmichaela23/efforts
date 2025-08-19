@@ -1,5 +1,6 @@
 import React from 'react';
 import { Clock, Target, Dumbbell, MapPin, Info } from 'lucide-react';
+import { getDisciplineColor } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
 
 
@@ -124,7 +125,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
         <div className={`text-xs font-bold px-2 py-1 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm truncate text-gray-900">{workout.name || (workout as any).focus || 'Planned Workout'}</h4>
+          <h4 className="font-medium text-sm truncate" style={{ color: getDisciplineColor(workout.type) }}>{workout.name || (workout as any).focus || 'Planned Workout'}</h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span>{formatDate(workout.date)}</span>
             {workout.duration && (

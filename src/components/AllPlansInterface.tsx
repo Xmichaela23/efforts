@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { getDisciplineColor } from '@/lib/utils';
 import PlannedWorkoutView from './PlannedWorkoutView';
 
 interface Plan {
@@ -1047,7 +1048,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
-                                    <div className="font-medium">{workout.name}</div>
+                                    <div className="font-medium flex items-center gap-2">
+                                      <span
+                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded border"
+                                        style={{
+                                          backgroundColor: `${getDisciplineColor(workout.type)}20`,
+                                          color: getDisciplineColor(workout.type),
+                                          borderColor: `${getDisciplineColor(workout.type)}33`
+                                        }}
+                                      >
+                                        {workout.type}
+                                      </span>
+                                      {workout.name}
+                                    </div>
                                     <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
                                   </div>
                                   <div className="flex items-center gap-2">

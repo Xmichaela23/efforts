@@ -7,6 +7,7 @@ import LogEffortDropdown from './LogEffortDropdown';
 import PlansDropdown from './PlansDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { getDisciplineColor as getHexColor } from '@/lib/utils';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -257,13 +258,16 @@ export default function WorkoutCalendar({
                       {dayWorkouts.length > 0 && (
                         <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
                           {dayWorkouts.slice(0, 2).map((workout, idx) => {
-                            const isCompleted = workout.workout_status === 'completed';
+                            const hex = getHexColor(workout.type);
                             return (
                               <div
                                 key={workout.id || idx}
-                                className={`text-[10px] font-medium px-1 py-0.5 rounded ${
-                                  getDisciplineColor(workout.type, isCompleted)
-                                }`}
+                                className={`text-[10px] font-medium px-1 py-0.5 rounded`}
+                                style={{
+                                  backgroundColor: `${hex}20`,
+                                  color: hex,
+                                  border: `1px solid ${hex}33`
+                                }}
                                 title={workout.name || workout.type}
                               >
                                 {getDisciplineName(workout.type)}

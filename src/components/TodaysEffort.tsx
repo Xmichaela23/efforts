@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, MapPin, Zap, Heart, Mountain, Clock, Activity, Bike, Waves, Dumbbell, Weight } from 'lucide-react';
+import { getDisciplineColor } from '@/lib/utils';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -353,7 +354,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   <div className="space-y-1">
                     {/* Title and Duration Row */}
                     <div className="flex items-center justify-between">
-                      <div className="font-medium text-sm">
+                      <div className="font-medium text-sm" style={{ color: getDisciplineColor(workout.type) }}>
                         {workout.name || getDisciplineName(workout.type)}
                         {workout.workout_status === 'planned' && (
                           <span className="text-xs text-orange-600 ml-2">(Planned)</span>
