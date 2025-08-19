@@ -1,71 +1,12 @@
 {
-  "version": "1.0.0-clean",
-  "templates": {
-    "run_plan": {
-      "anchors": ["Long Run", "Quality Run 1", "Quality Run 2"],
-      "fillers": ["Easy Run"],
-      "notes": "Use Garmin-ready Intervals for any interval session; expand to step-by-step (WU, each work+recovery, CD)."
-    },
-
-    "strength_power": {
-      "track": "power",
-      "anchors_per_week": [
-        "Strength – Power: Squat/Bench",
-        "Strength – Power: Deadlift/OHP"
-      ],
-      "optional_day_label": "Strength – Optional Upper/Core (supportive)",
-      "optional_day_rules": {
-        "enabled_when_strength_days": 3,
-        "pool_ref": "strength.power.optional_upper_core_supportive_pool",
-        "no_heavy_compounds": true,
-        "not_adjacent_to_upper_heavy": true
-      },
-      "validation": [
-        "include Squat ≥1×/week",
-        "include Deadlift ≥1×/week",
-        "include Bench ≥1×/week",
-        "include OHP ≥1×/week",
-        "optional day (if present) uses supportive pool only; no Squat/Dead/Bench/OHP",
-        "optional day not adjacent to another upper-heavy day"
-      ]
-    },
-
-    "strength_endurance": {
-      "track": "endurance",
-      "sessions_per_week": 1,
-      "max_sessions_per_week": 2,
-      "label": "Strength – Endurance: Circuit",
-      "pool_ref": "strength.endurance.circuits_pool",
-      "rules": {
-        "no_heavy_compounds": true
-      }
-    },
-
-    "bike_plan": {
-      "anchors": ["Long Ride", "Quality Ride"],
-      "fillers": ["Endurance Ride (Z2 steady)"]
-    },
-
-    "swim_plan": {
-      "anchors": ["Endurance Swim", "Swim Intervals"],
-      "fillers": ["Technique Drills (kickboard, pull buoy, form)"]
-    },
-
-    "hybrid_tri_composition": {
-      "note": "Hybrid is composition-only here (combining run/bike/swim/strength). There is no 'hybrid' strength track.",
-      "compose": ["run_plan", "bike_plan", "swim_plan", "strength_power OR strength_endurance"]
-    }
-  },
-
-  "builder_rules": {
-    "use_garmin_ready_intervals": true,
-    "intervals_source": "run.intervals_garmin_ready",
-    "expand_intervals_to_steps": true,
-    "defaults": {
-      "warmup": "Warm-Up: 10 min easy",
-      "cooldown": "Cool-Down: 10 min easy"
-    }
-  }
+  "templates": [
+    { "id": "run_plan" },
+    { "id": "strength_power" },
+    { "id": "strength_endurance" },
+    { "id": "bike_plan" },
+    { "id": "swim_plan" },
+    { "id": "hybrid_tri_composition" }
+  ]
 }
 
 

@@ -1,0 +1,162 @@
+{
+  "version": "1.0.0-clean",
+  "run": {
+    "easy": { "name": "Easy Run" },
+    "long": { "name": "Long Run" },
+    "tempo": { "name": "Tempo Run" },
+
+    "intervals_garmin_ready": {
+      "name": "Intervals (Garmin-ready)",
+      "defaults": {
+        "warmup": { "type": "warmup", "label": "Warm-Up: 10 min easy", "duration": "10:00" },
+        "cooldown": { "type": "cooldown", "label": "Cool-Down: 10 min easy", "duration": "10:00" }
+      },
+      "variants": [
+        {
+          "id": "200m_3k_eq_jog",
+          "label": "200m @ 3K pace + 200m jog",
+          "rep_schema": {
+            "reps": 8,
+            "steps": [
+              { "type": "work", "label": "200m @ 3K pace", "distance": "200m", "target": "3K pace" },
+              { "type": "recovery", "label": "200m jog", "distance": "200m", "target": "Easy jog" }
+            ]
+          }
+        },
+        {
+          "id": "400m_5k_eq_jog",
+          "label": "400m @ 5K pace + 400m jog",
+          "rep_schema": {
+            "reps": 6,
+            "steps": [
+              { "type": "work", "label": "400m @ 5K pace", "distance": "400m", "target": "5K pace" },
+              { "type": "recovery", "label": "400m jog", "distance": "400m", "target": "Easy jog" }
+            ]
+          }
+        },
+        {
+          "id": "800m_10k_eq_or_2min",
+          "label": "800m @ 10K pace + 400m jog or 2:00 jog",
+          "rep_schema": {
+            "reps": 5,
+            "steps": [
+              { "type": "work", "label": "800m @ 10K pace", "distance": "800m", "target": "10K pace" },
+              { "type": "recovery", "label": "400m jog (or 2:00 jog)", "distance": "400m", "time_alt": "2:00", "target": "Easy jog" }
+            ]
+          }
+        },
+        {
+          "id": "1mi_thr_3to4min",
+          "label": "1 mile @ Threshold + 3:00–4:00 jog",
+          "rep_schema": {
+            "reps": 4,
+            "steps": [
+              { "type": "work", "label": "1 mile @ Threshold", "distance": "1mi", "target": "Threshold pace" },
+              { "type": "recovery", "label": "3:00–4:00 jog", "time": "3:00-4:00", "target": "Easy jog" }
+            ]
+          }
+        }
+      ]
+    },
+
+    "hills": { "name": "Hill Repeats" },
+    "strides": { "name": "Strides / Speed Drills" }
+  },
+
+  "strength": {
+    "power": {
+      "anchors": [
+        {
+          "label": "Strength – Power: Squat/Bench",
+          "main_lifts": [
+            { "name": "Back Squat", "scheme": "3–5 reps", "intensity_hint": "70–85%" },
+            { "name": "Bench Press", "scheme": "3–5 reps", "intensity_hint": "70–85%" }
+          ],
+          "support_light": [
+            { "name": "Pull-Ups/Chin-Ups", "scheme": "3×6–8" },
+            { "name": "Core (rollouts/planks/carries)", "scheme": "3–4 sets" }
+          ]
+        },
+        {
+          "label": "Strength – Power: Deadlift/OHP",
+          "main_lifts": [
+            { "name": "Deadlift", "scheme": "2–5 reps", "intensity_hint": "70–85%", "volume_note": "low volume" },
+            { "name": "Overhead Press", "scheme": "3–5 reps", "intensity_hint": "65–80%" }
+          ],
+          "support_light": [
+            { "name": "Row (barbell or chest-supported)", "scheme": "3×6–8" },
+            { "name": "Posterior chain (RDL/Hip Thrust)", "scheme": "2–3×8–10" }
+          ]
+        }
+      ],
+      "optional_upper_core_supportive_pool": {
+        "label": "Strength – Optional Upper/Core (supportive)",
+        "identity": "Optional, supportive; never an anchor; no Squat/Dead/Bench/OHP; not adjacent to another upper-heavy day.",
+        "exercises": [
+          { "name": "Incline DB Press", "scheme": "3×6–10", "RPE": "6–7" },
+          { "name": "Dips", "scheme": "3×6–10", "RPE": "6–7" },
+          { "name": "Push-Ups", "scheme": "3×10–20", "RPE": "6–7" },
+          { "name": "Pull-Ups/Chins", "scheme": "3×6–8", "RPE": "6–7" },
+          { "name": "Inverted Rows", "scheme": "3×8–12", "RPE": "6–7" },
+          { "name": "Light Rows", "scheme": "3×8–12", "RPE": "6–7" },
+          { "name": "Core Circuit (rollouts / hanging leg raises / carries / anti-rotation)", "scheme": "3–4 rounds", "RPE": "6–7" },
+          { "name": "Prehab (face pulls, band work, shoulder mobility)", "scheme": "2–3×12–15" }
+        ]
+      }
+    },
+
+    "endurance": {
+      "circuits_pool": {
+        "label": "Strength – Endurance: Circuit",
+        "identity": "Bodyweight/accessory circuits; no heavy compounds.",
+        "blocks": [
+          {
+            "name": "Circuit A",
+            "rounds": 3,
+            "items": [
+              { "name": "Walking Lunges", "reps": "12/leg" },
+              { "name": "Step-Ups", "reps": "12/leg" },
+              { "name": "Push-Ups", "reps": "15–20" },
+              { "name": "Plank", "time": "45–60s" }
+            ]
+          },
+          {
+            "name": "Circuit B",
+            "rounds": 3,
+            "items": [
+              { "name": "Split Squat (BW or light DB)", "reps": "10/leg" },
+              { "name": "Hamstring Curl (ball or machine)", "reps": "12–15" },
+              { "name": "Dips or Bench Dips", "reps": "10–15" },
+              { "name": "Stir-the-Pot", "time": "40–60s" }
+            ]
+          }
+        ]
+      }
+    }
+  },
+
+  "bike": {
+    "endurance": { "name": "Endurance Ride (Z2 steady)" },
+    "tempo": { "name": "Tempo Ride" },
+    "intervals": {
+      "name": "Bike Intervals",
+      "examples": [
+        "3×10′ Z4 w/5′ easy",
+        "5×5′ Z4 w/3′ easy",
+        "Over/Unders 5×5′ (Z3/Z4) w/3′ easy"
+      ]
+    },
+    "long": { "name": "Long Ride" }
+  },
+
+  "swim": {
+    "endurance": { "name": "Endurance Swim" },
+    "intervals": { "name": "Swim Intervals (25/50/100m repeats)" },
+    "drills": { "name": "Technique Drills (kickboard, pull buoy, form)" }
+  },
+
+  "brick": {
+    "short": { "name": "Short Brick (30′ ride + 15′ run)" },
+    "long": { "name": "Long Brick (90′ ride + 30′ run)" }
+  }
+}

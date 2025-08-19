@@ -76,7 +76,7 @@ export async function loadPlanData(planPath: string): Promise<UniversalPlanData>
 async function loadPoolsData(): Promise<any> {
   const key = 'pools';
   if (poolsDataCache.has(key)) return poolsDataCache.get(key);
-  const url = `${import.meta.env.BASE_URL || '/'}plans.v1.0.0/pools.json`;
+  const url = `${import.meta.env.BASE_URL || '/'}plans.v1.0.0/pools.clean.json`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Failed to load pools.json: ${res.status} ${res.statusText}`);
   const data = await res.json();
