@@ -409,8 +409,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addPlan = async (planData: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      const { data, error } = await supabase.from('plans').insert([{ ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: user?.id }]).select().single();
+      const { data, error } = await supabase
+        .from('plans')
+        .insert([{ ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: user?.id }])
+        .select()
+        .single();
       if (error) throw error;
+
+      // Materialize sessions into planned_workouts for Today/Calendar/Planned views
+      try {
+        const startDate: string = planData.start_date || new Date().toISOString().slice(0, 10);
+        // sessions_by_week comes as object from builder: { "1": [sessions], ... }
+        const sessionsByWeek: Record<string, any[]> = planData.sessions_by_week || {};
+        const dayIndex: Record<string, number> = {
+          Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7,
+        };
+        const addDays = (iso: string, n: number) => {
+          const d = new Date(iso);
+          d.setDate(d.getDate() + n);
+          return d.toISOString().slice(0, 10);
+        };
+        const rows: any[] = [];
+        Object.keys(sessionsByWeek).forEach((wkKey) => {
+          const weekNum = parseInt(wkKey, 10);
+          const sessions = sessionsByWeek[wkKey] || [];
+          sessions.forEach((s: any) => {
+            const dow = dayIndex[s.day] || 1;
+            const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
+            if (weekNum === 1 && date < startDate) return; // skip pre-start in week 1
+            rows.push({
+              user_id: user?.id,
+              training_plan_id: data.id,
+              week_number: weekNum,
+              day_number: dow,
+              date,
+              type: s.discipline || s.type || 'other',
+              name: s.name || (s.discipline === 'strength' ? 'Strength' : s.type || 'Session'),
+              description: s.description || '',
+              duration: s.duration ?? null,
+              workout_status: 'planned',
+              source: 'plan',
+              intensity: s.intensity ?? null,
+              intervals: s.intervals ?? null,
+              strength_exercises: s.strength_exercises ?? null,
+            });
+          });
+        });
+        if (rows.length) {
+          const { error: pErr } = await supabase.from('planned_workouts').insert(rows);
+          if (pErr) console.error('Error materializing planned workouts:', pErr);
+        }
+      } catch (mErr) {
+        console.error('Materialization error:', mErr);
+      }
       await loadPlans();
     } catch (error) {
       console.error('Error in addPlan:', error);
@@ -422,6 +473,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to delete plans');
+      // Remove planned rows for this plan_id first; keep completed history intact
+      await supabase.from('planned_workouts').delete().eq('training_plan_id', planId);
       const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', user.id);
       if (error) throw error;
       await loadPlans();
