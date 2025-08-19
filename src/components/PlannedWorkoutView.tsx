@@ -123,7 +123,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
-        <div className={`text-xs font-bold px-2 py-1 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
+        <div className="text-xs font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
+          {getWorkoutTypeIcon(workout.type)}
+        </div>
         <div className="flex-1 min-w-0">
           <h4 className="font-medium text-sm truncate" style={{ color: getDisciplineColor(workout.type) }}>{workout.name || (workout as any).focus || 'Planned Workout'}</h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -136,7 +138,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             )}
           </div>
         </div>
-        <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(workout.workout_status)}`}>
+        <span className="text-xs text-gray-500">
           {workout.workout_status.replace('_', ' ')}
         </span>
       </div>
@@ -149,9 +151,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <div className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`text-sm font-bold px-3 py-2 rounded border ${getWorkoutTypeColor(workout.type)}`}>{getWorkoutTypeIcon(workout.type)}</div>
+              <div className="text-sm font-bold" style={{ color: getDisciplineColor(workout.type) }}>{getWorkoutTypeIcon(workout.type)}</div>
               <div>
-                <h3 className="text-lg font-semibold">{workout.name || (workout as any).focus || 'Planned Workout'}</h3>
+                <h3 className="text-lg font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
+                  {workout.name || (workout as any).focus || 'Planned Workout'}
+                </h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <span>{formatDate(workout.date)}</span>
                   {workout.duration && (
@@ -163,15 +167,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 </div>
               </div>
             </div>
-            <div className="flex gap-2">
-              <span className={`px-2 py-1 text-xs rounded-full ${getStatusColor(workout.workout_status)}`}>
-                {workout.workout_status.replace('_', ' ')}
-              </span>
-              {workout.source && (
-                <span className={`px-2 py-1 text-xs rounded-full ${getSourceColor(workout.source)}`}>
-                  {workout.source.replace('_', ' ')}
-                </span>
-              )}
+            <div className="text-xs text-gray-500">
+              {workout.workout_status.replace('_', ' ')}
+              {workout.source ? ` · ${workout.source.replace('_', ' ')}` : ''}
             </div>
           </div>
         </div>
