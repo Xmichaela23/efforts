@@ -134,7 +134,6 @@ const PlateMath: React.FC<{
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
   const { workouts, addWorkout } = useAppContext();
   const { plannedWorkouts } = usePlannedWorkouts();
-  const { plannedWorkouts, refresh: refreshPlanned } = usePlannedWorkouts();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
