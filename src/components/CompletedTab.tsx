@@ -652,7 +652,17 @@ const formatPace = (paceValue: any): string => {
      },
      {
        label: 'Max Cadence',
-       value: workoutData.max_cadence ? safeNumber(workoutData.max_cadence) : 'N/A',
+       value: (() => {
+         const v = (
+           workoutData.max_cadence ??
+           workoutData.metrics?.max_cadence ??
+           workoutData.max_running_cadence ??
+           workoutData.max_bike_cadence ??
+           workoutData.max_run_cadence
+         );
+         const n = Number(v);
+         return Number.isFinite(n) && n > 0 ? safeNumber(n) : 'N/A';
+       })(),
        unit: isRun ? 'spm' : 'rpm'
      }
    ];

@@ -150,6 +150,60 @@ async function fetchStravaLatLngStreams(activityId: number, accessToken: string)
   }
 }
 
+// Fetch multiple streams (latlng, altitude, time, heartrate, cadence) to enrich gps_track and metrics
+async function fetchStravaStreamsData(
+  activityId: number,
+  accessToken: string
+): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } | null> {
+  try {
+    console.log(`🗺️ Fetching combined streams (latlng, altitude, time) for activity ${activityId}...`);
+
+    const response = await fetch(
+      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence`,
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+    );
+
+    try {
+      const limit = response.headers.get('X-RateLimit-Limit');
+      const usage = response.headers.get('X-RateLimit-Usage');
+      const reset = response.headers.get('X-RateLimit-Reset');
+      if (limit || usage || reset) {
+        console.log(`📈 Strava rate headers (combined streams ${activityId}): usage=${usage} limit=${limit} reset=${reset} status=${response.status}`);
+      }
+    } catch (_) {}
+
+    if (!response.ok) {
+      console.log(`⚠️ Could not fetch combined streams: ${response.status}`);
+      return null;
+    }
+
+    const streams = await response.json();
+    const latlng = streams.find((s: any) => s.type === 'latlng')?.data || undefined;
+    const altitude = streams.find((s: any) => s.type === 'altitude')?.data || undefined;
+    const time = streams.find((s: any) => s.type === 'time')?.data || undefined;
+    const heartrate = streams.find((s: any) => s.type === 'heartrate')?.data || undefined;
+    const cadence = streams.find((s: any) => s.type === 'cadence')?.data || undefined;
+
+    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } = {};
+    if (Array.isArray(latlng) && latlng.length > 0) {
+      result.latlng = latlng
+        .filter((p: any) => Array.isArray(p) && p.length === 2)
+        .map((p: [number, number]) => [p[0], p[1]]);
+    }
+    if (Array.isArray(altitude) && altitude.length > 0) result.altitude = altitude as number[];
+    if (Array.isArray(time) && time.length > 0) result.time = time as number[];
+    if (Array.isArray(heartrate) && heartrate.length > 0) result.heartrate = heartrate as number[];
+    if (Array.isArray(cadence) && cadence.length > 0) result.cadence = cadence as number[];
+
+    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence) return null;
+    console.log(`🗺️ Combined streams fetched: latlng=${result.latlng?.length || 0}, altitude=${result.altitude?.length || 0}, time=${result.time?.length || 0}, hr=${result.heartrate?.length || 0}, cad=${result.cadence?.length || 0}`);
+    return result;
+  } catch (err) {
+    console.log(`⚠️ Error fetching combined streams: ${err}`);
+    return null;
+  }
+}
+
 function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
   const s = (a.sport_type || a.type || '').toLowerCase();
 
@@ -197,9 +251,9 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     maxSpeedKmh: a.max_speed ? (a.max_speed * 3.6) : null
   });
 
-  // Pace calculations (min/km from m/s) - only calculate if speed > 0
-  const avgPace = a.average_speed && a.average_speed > 0 ? Math.round((1000 / a.average_speed / 60) * 100) / 100 : null;
-  const maxPace = a.max_speed && a.max_speed > 0 ? Math.round((1000 / a.max_speed / 60) * 100) / 100 : null;
+  // Pace calculations stored as seconds per km (to match Garmin/UI expectations)
+  const avgPace = a.average_speed && a.average_speed > 0 ? Math.round(1000 / a.average_speed) : null;
+  const maxPace = a.max_speed && a.max_speed > 0 ? Math.round(1000 / a.max_speed) : null;
 
   // Heart rate (BPM)
   const avgHr = a.average_heartrate != null ? Math.round(a.average_heartrate) : null;
@@ -273,6 +327,106 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     }
   }
 
+  // Enrich gpsTrack with altitude and proper timestamps if available
+  let sensorData: any[] | null = null;
+  try {
+    if (a.id) {
+      const streams = await fetchStravaStreamsData(a.id, accessToken);
+      if (streams) {
+        const startEpochSec = Math.floor(new Date(a.start_date).getTime() / 1000);
+        // If we have latlng in streams and either gpsTrack is empty or lengths match poorly, rebuild from streams
+        if (streams.latlng && streams.latlng.length > 0) {
+          const len = streams.latlng.length;
+          const altLen = streams.altitude?.length || 0;
+          const timeLen = streams.time?.length || 0;
+          const useLen = Math.min(len, altLen || len, timeLen || len);
+          gpsTrack = new Array(useLen).fill(0).map((_, i) => {
+            const [lat, lng] = streams.latlng![i];
+            const elev = streams.altitude && Number.isFinite(streams.altitude[i]) ? streams.altitude[i] : null;
+            const tRel = streams.time && Number.isFinite(streams.time[i]) ? streams.time[i] : i;
+            return {
+              lat,
+              lng,
+              elevation: elev,
+              // Provide both to maximize compatibility
+              startTimeInSeconds: startEpochSec + (tRel as number),
+              timestamp: (startEpochSec + (tRel as number)) * 1000,
+            };
+          });
+          console.log(`🗺️ gpsTrack rebuilt from combined streams: ${gpsTrack.length} points`);
+        } else if (gpsTrack && gpsTrack.length > 0 && (streams.altitude || streams.time)) {
+          // Merge altitude/time into existing gpsTrack by index
+          const len = gpsTrack.length;
+          const useLen = Math.min(
+            len,
+            streams.altitude?.length || len,
+            streams.time?.length || len
+          );
+          for (let i = 0; i < useLen; i++) {
+            if (streams.altitude && Number.isFinite(streams.altitude[i])) {
+              gpsTrack[i].elevation = streams.altitude[i];
+            }
+            if (streams.time && Number.isFinite(streams.time[i])) {
+              const t = startEpochSec + streams.time[i];
+              gpsTrack[i].startTimeInSeconds = t;
+              gpsTrack[i].timestamp = t * 1000;
+            }
+          }
+          console.log(`🗺️ gpsTrack enriched with altitude/time. Updated points: ${useLen}/${len}`);
+        }
+
+        // Build sensor_data with heart rate stream if present
+        if (streams.heartrate && streams.heartrate.length > 0) {
+          const hrLen = streams.heartrate.length;
+          const timeLen = streams.time?.length || 0;
+          const useLen = Math.min(hrLen, timeLen || hrLen);
+          sensorData = new Array(useLen).fill(0).map((_, i) => {
+            const hr = streams.heartrate![i];
+            const relSec = streams.time ? streams.time[i] : i;
+            const t = startEpochSec + relSec;
+            return {
+              heartRate: hr,
+              hr: hr,
+              startTimeInSeconds: t,
+              timestamp: t * 1000,
+            };
+          });
+          console.log(`❤️ sensor_data built from heartrate stream: ${sensorData.length} points`);
+        }
+
+        // Compute cadence summary if cadence stream exists
+        if (streams.cadence && streams.cadence.length > 0) {
+          const cadArray = (streams.cadence as number[]).filter((v) => Number.isFinite(v));
+          if (cadArray.length > 0) {
+            let cadMax = Math.round(Math.max(...cadArray));
+            let cadAvg = Math.round(cadArray.reduce((a, b) => a + b, 0) / cadArray.length);
+            // Heuristic: Strava run cadence sometimes reported as strides/min; if very low, scale to steps/min
+            const isRun = (a.sport_type || a.type || '').toLowerCase().includes('run') || (a.sport_type || a.type || '').toLowerCase().includes('walk');
+            if (isRun && cadMax < 120) {
+              cadMax *= 2;
+              cadAvg *= 2;
+            }
+            // Attach to sensorData points where possible
+            if (sensorData && sensorData.length > 0 && streams.time && streams.time.length > 0) {
+              const useLen = Math.min(sensorData.length, streams.cadence.length, streams.time.length);
+              for (let i = 0; i < useLen; i++) {
+                const c = streams.cadence[i];
+                if (Number.isFinite(c)) {
+                  sensorData[i].cadence = isRun && c < 120 ? Math.round(c * 2) : Math.round(c);
+                }
+              }
+            }
+            // Stash on a temp object on gpsTrack[0] so we can return later; or just override below when building row
+            (globalThis as any).__computedCadence = { avg: cadAvg, max: cadMax };
+            console.log(`🌀 cadence computed from stream: avg=${cadAvg}, max=${cadMax}`);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.log('⚠️ Failed to enrich gpsTrack with altitude/time:', e);
+  }
+
   return {
     name: a.name || 'Strava Activity',
     type,
@@ -293,8 +447,8 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     max_heart_rate: maxHr,
     avg_power: avgPwr,
     max_power: maxPwr,
-    avg_cadence: avgCad,
-    max_cadence: maxCad,
+    avg_cadence: (avgCad ?? (globalThis as any).__computedCadence?.avg) ?? null,
+    max_cadence: (maxCad ?? (globalThis as any).__computedCadence?.max) ?? null,
     elevation_gain: elev,
     calories: cals,
 
@@ -309,6 +463,9 @@ async function convertStravaToWorkout(a: StravaActivity, userId: string, accessT
     gps_trackpoints: a.map?.polyline ?? null, // Keep polyline string as backup
     start_position_lat: null,
     start_position_long: null,
+
+    // Time-series sensor data for charts (HR, etc.)
+    sensor_data: sensorData,
 
     strava_data: {
       original_activity: a,
