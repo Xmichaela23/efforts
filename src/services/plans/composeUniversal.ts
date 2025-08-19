@@ -435,9 +435,10 @@ export async function composeUniversalWeek(params: {
     }
 
     else if (slot.poolId.includes('strength_upper_')) {
-      const upper = params.strengthTrack ? getTrackUpperSession(planData, params.strengthTrack) : getCowboyUpperSession(planData);
+      const pools = await loadPoolsData();
+      const upper = pools?.strength?.power?.optional_upper_core_supportive_pool?.exercises || [];
       if (upper.length > 0) {
-        const applied = applyStrengthBaselines(upper);
+        const applied = applyStrengthBaselines(upper.map((e: any) => `${e.name} ${e.scheme}`));
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
                 slot.day === 'Tue' ? 'Tuesday' : 
@@ -449,28 +450,49 @@ export async function composeUniversalWeek(params: {
           type: 'strength',
           duration: 30,
           intensity: 'Moderate',
-          description: applied.join(' • '),
+          description: `Strength – Optional Upper/Core (supportive): ${applied.join(' • ')}`,
           zones: []
         };
       }
     }
 
     else if (slot.poolId.includes('strength_') && params.strengthTrack) {
-      const strengthExercises = getStrengthSession(phase, params.strengthTrack, planData);
-      if (strengthExercises.length > 0) {
-        const applied = applyStrengthBaselines(strengthExercises);
+      const pools = await loadPoolsData();
+      const isPower = params.strengthTrack === 'power';
+      const isEndurance = params.strengthTrack === 'endurance';
+      const dayName = slot.day === 'Mon' ? 'Monday' : slot.day === 'Tue' ? 'Tuesday' : slot.day === 'Wed' ? 'Wednesday' : slot.day === 'Thu' ? 'Thursday' : slot.day === 'Fri' ? 'Friday' : slot.day === 'Sat' ? 'Saturday' : 'Sunday';
+      if (isPower) {
+        const anchors: any[] = pools?.strength?.power?.anchors || [];
+        const existingStrength = sessions.filter(s => s.discipline === 'strength');
+        const anchorIdx = existingStrength.length % 2; // 0 then 1
+        const anchor = anchors[anchorIdx] || anchors[0];
+        const parts: string[] = [];
+        if (anchor?.label) parts.push(anchor.label);
+        (anchor?.main_lifts || []).forEach((l: any) => parts.push(`${l.name} ${l.scheme}${l.intensity_hint ? ' @'+l.intensity_hint : ''}`));
+        (anchor?.support_light || []).forEach((l: any) => parts.push(`${l.name} ${l.scheme}`));
+        const applied = applyStrengthBaselines(parts);
         session = {
-          day: slot.day === 'Mon' ? 'Monday' : 
-                slot.day === 'Tue' ? 'Tuesday' : 
-                slot.day === 'Wed' ? 'Wednesday' : 
-                slot.day === 'Thu' ? 'Thursday' : 
-                slot.day === 'Fri' ? 'Friday' : 
-                slot.day === 'Sat' ? 'Saturday' : 'Sunday',
+          day: dayName,
           discipline: 'strength',
           type: 'strength',
           duration: 45,
           intensity: 'Moderate',
           description: applied.join(' • '),
+          zones: []
+        };
+      } else if (isEndurance) {
+        const circuits = pools?.strength?.endurance?.circuits_pool?.blocks || [];
+        const pick = circuits[(params.weekNum - 1) % Math.max(1, circuits.length)] || circuits[0];
+        const items: string[] = [];
+        if (pick?.name) items.push(`${pick.name} x${pick.rounds || 3}`);
+        (pick?.items || []).forEach((it: any) => items.push(`${it.name} ${it.reps || it.time || ''}`.trim()));
+        session = {
+          day: dayName,
+          discipline: 'strength',
+          type: 'strength',
+          duration: 40,
+          intensity: 'Moderate',
+          description: `Strength – Endurance: Circuit • ${items.join(' • ')}`,
           zones: []
         };
       }
