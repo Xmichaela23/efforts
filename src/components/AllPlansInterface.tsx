@@ -1046,32 +1046,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
                                     <div className="font-medium flex items-center gap-2">
-                                      <span
-                                        className="text-[10px] font-medium px-1.5 py-0.5 rounded border"
-                                        style={{
-                                          backgroundColor: `${getDisciplineColor(workout.type)}20`,
-                                          color: getDisciplineColor(workout.type),
-                                          borderColor: `${getDisciplineColor(workout.type)}33`
-                                        }}
-                                      >
-                                        {workout.type}
-                                      </span>
+                                      <span style={{ color: getDisciplineColor(workout.type) }}>{workout.type}</span>
                                       {workout.name}
                                     </div>
                                     <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
                                   </div>
-                                  <div className="flex items-center gap-2">
-                                    {getCompletionBadge(workout)}
-                                    {workout.intensity && (
-                                      <span className={`px-2 py-1 rounded-full text-xs font-medium border ${getIntensityColor(workout.intensity)}`}>
-                                        {workout.intensity}
-                                      </span>
-                                    )}
-                                    {!workout.completed && workout.duration && (
-                                      <span className="px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 border border-gray-200">
-                                        {formatDuration(workout.duration)}
-                                      </span>
-                                    )}
+                                  <div className="text-xs text-gray-600">
+                                    {workout.intensity ? workout.intensity : ''}
+                                    {workout.intensity && typeof workout.duration === 'number' ? ' · ' : ''}
+                                    {typeof workout.duration === 'number' ? formatDuration(workout.duration) : ''}
                                   </div>
                                 </div>
                               </div>
