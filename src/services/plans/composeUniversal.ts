@@ -409,7 +409,9 @@ export async function composeUniversalWeek(params: {
           type: 'vo2max',
           duration: qualitySession.duration || 55,
           intensity: qualitySession.intensity || 'Zone 4-5',
-          description: applyRunBaselines(qualitySession.session, 'vo2max'),
+          description: (intervals && intervals.length > 0)
+            ? intervals.join(' • ')
+            : applyRunBaselines(qualitySession.session, 'vo2max'),
           intervals: intervals,
           zones: []
         };
@@ -435,7 +437,9 @@ export async function composeUniversalWeek(params: {
           type: 'tempo',
           duration: qualitySession.duration || 60,
           intensity: qualitySession.intensity || 'Zone 3-4',
-          description: applyRunBaselines(qualitySession.session, 'tempo'),
+          description: (intervals && intervals.length > 0)
+            ? intervals.join(' • ')
+            : applyRunBaselines(qualitySession.session, 'tempo'),
           intervals: intervals,
           zones: []
         };
@@ -462,9 +466,27 @@ export async function composeUniversalWeek(params: {
 
     else if (slot.poolId.includes('strength_upper_')) {
       const pools = await loadPoolsData();
-      const upper = pools?.strength?.power?.optional_upper_core_supportive_pool?.exercises || [];
-      if (upper.length > 0) {
-        const applied = applyStrengthBaselines(upper.map((e: any) => `${e.name} ${e.scheme}`));
+      const isPowerUpper = slot.poolId === 'strength_upper_power';
+      let lines: string[] = [];
+      if (isPowerUpper) {
+        const upper = pools?.strength?.power?.optional_upper_core_supportive_pool?.exercises || [];
+        lines = upper.map((e: any) => `${e.name} ${e.scheme}`);
+      } else {
+        // Endurance upper/core supportive: prefer track-specific from planData if present
+        const planUpper = (planData as any)?.strength?.upper_endurance as string[] | undefined;
+        if (Array.isArray(planUpper) && planUpper.length) {
+          lines = planUpper.slice();
+        } else {
+          // Fallback: derive from endurance circuits pool (upper-biased subset)
+          const blocks = pools?.strength?.endurance?.circuits_pool?.blocks || [];
+          const pick = blocks[(params.weekNum - 1) % Math.max(1, blocks.length)] || blocks[0];
+          const upperish = (pick?.items || []).filter((it: any) => /press|push|pull|row|core|plank|carry|raise|rotation/i.test(it.name));
+          lines = upperish.map((it: any) => `${it.name} ${it.reps || it.time || ''}`.trim());
+          if (pick?.name) lines.unshift(`${pick.name} x${pick.rounds || 3}`);
+        }
+      }
+      if (lines.length > 0) {
+        const applied = applyStrengthBaselines(lines);
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
                 slot.day === 'Tue' ? 'Tuesday' : 
@@ -497,8 +519,8 @@ export async function composeUniversalWeek(params: {
         // Prefer explicit @% 1RM for loads to trigger conversion
         (anchor?.main_lifts || []).forEach((l: any) => {
           const pct = l.intensity_hint?.match(/(\d+\s*–\s*\d+|\d+\-\d+|\d+\s*to\s*\d+|\d+\-?\d*?)%/i);
-          const chosen = pct ? (pct[0].includes('–') || pct[0].includes('to') || pct[0].includes('-') ? pct[0].split(/[–to-]/)[0].trim() : pct[0]) : undefined;
-          const at = chosen ? `@${chosen} 1RM` : '';
+          const chosenRaw = pct ? (pct[0].includes('–') || pct[0].includes('to') || pct[0].includes('-') ? pct[0].split(/[–to-]/)[0].trim() : pct[0].replace(/%/g,'')) : undefined;
+          const at = chosenRaw ? `@${chosenRaw}% 1RM` : '';
           parts.push(`${l.name} ${l.scheme} ${at}`.trim());
         });
         (anchor?.support_light || []).forEach((l: any) => parts.push(`${l.name} ${l.scheme}`));
