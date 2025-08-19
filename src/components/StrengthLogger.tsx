@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface LoggedSet {
   reps: number;
@@ -130,6 +131,7 @@ const PlateMath: React.FC<{
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved }: StrengthLoggerProps) {
   const { workouts, addWorkout } = useAppContext();
+  const { plannedWorkouts, refresh: refreshPlanned } = usePlannedWorkouts();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -216,13 +218,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
       const todayDate = getTodayDateString();
       
-      // Get CURRENT workouts from the hub (not stale data)
-      const currentWorkouts = workouts || [];
-      const todaysStrengthWorkouts = currentWorkouts.filter(workout => 
-        workout.date === todayDate && 
-        workout.type === 'strength' && 
-        workout.workout_status === 'planned'
-      );
+      // Prefer planned_workouts
+      const todaysPlanned = (plannedWorkouts || []).filter(w => w.date === todayDate && w.type === 'strength' && w.workout_status === 'planned');
+      let todaysStrengthWorkouts = todaysPlanned;
+
+      if (todaysStrengthWorkouts.length === 0) {
+        // Fallback to any planned in workouts hub if present
+        const currentWorkouts = workouts || [];
+        todaysStrengthWorkouts = currentWorkouts.filter(workout => 
+          workout.date === todayDate && 
+          workout.type === 'strength' && 
+          workout.workout_status === 'planned'
+        );
+      }
 
       console.log('📊 Found planned workouts for today:', todaysStrengthWorkouts);
 
@@ -238,7 +246,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
       const prePopulatedExercises: LoggedExercise[] = workoutToLoad.strength_exercises.map((exercise: any, index: number) => ({
-        id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`, // More unique ID
+        id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
         name: exercise.name || '',
         expanded: true,
         sets: Array.from({ length: exercise.sets || 3 }, (_, setIndex) => ({
@@ -258,7 +266,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
     
     setIsInitialized(true);
-  }, [scheduledWorkout, workouts]);
+  }, [scheduledWorkout, workouts, plannedWorkouts]);
 
   // Cleanup when component unmounts
   useEffect(() => {

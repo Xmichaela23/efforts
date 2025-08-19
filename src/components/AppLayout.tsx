@@ -625,6 +625,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   setSelectedWorkout(workout);
                   setActiveTab('completed');
                 }}
+                targetDate={selectedDate}
               />
             </div>
           ) : showMobilityLogger ? (

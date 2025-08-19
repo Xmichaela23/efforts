@@ -145,6 +145,13 @@ export default function WorkoutCalendar({
     if (onDateSelect) {
       onDateSelect(dateStr);
     }
+
+    // If the clicked date has a planned strength workout, open the Strength Logger prefilled
+    const workoutsForDate = getWorkoutsForDate(day) as any[];
+    const hasPlannedStrength = workoutsForDate.some(w => w.type === 'strength' && w.workout_status === 'planned');
+    if (hasPlannedStrength) {
+      onAddEffort && onAddEffort('strength_logger', dateStr);
+    }
   };
 
   const isToday = (day: number) => {

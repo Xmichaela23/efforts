@@ -312,6 +312,20 @@ export async function composeUniversalWeek(params: {
     });
   }
 
+  // Build structured strength exercises to prefill Strength Logger
+  type StrengthExercise = { name: string; sets: number; reps?: number; weight?: number };
+  const parseScheme = (scheme?: string): { sets: number; reps?: number } => {
+    if (!scheme) return { sets: 3, reps: 8 };
+    // Examples: "3–5 reps", "3x5", "3×6–8", "2–3×8–10"
+    const xMatch = scheme.match(/(\d+)\s*[x×]\s*(\d+)(?:[–-]\d+)?/i);
+    if (xMatch) return { sets: parseInt(xMatch[1],10), reps: parseInt(xMatch[2],10) };
+    const setOnly = scheme.match(/(\d+)[–-]?(\d+)?\s*sets/i);
+    if (setOnly) return { sets: parseInt(setOnly[1],10) };
+    const repsOnly = scheme.match(/(\d+)[–-]?(\d+)?\s*reps/i);
+    if (repsOnly) return { sets: 3, reps: parseInt(repsOnly[1],10) };
+    return { sets: 3, reps: 8 };
+  };
+
   function applyRunBaselines(desc: string, type: string | undefined): string {
     if (!params.baselines) return desc;
     const pn = params.baselines?.performanceNumbers || {};
@@ -487,6 +501,11 @@ export async function composeUniversalWeek(params: {
       }
       if (lines.length > 0) {
         const applied = applyStrengthBaselines(lines);
+        const structured: StrengthExercise[] = lines.map((raw: string) => {
+          const name = raw.replace(/\s*\d.+$/, '').trim();
+          const sc = parseScheme(raw);
+          return { name, sets: sc.sets, reps: sc.reps };
+        });
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
                 slot.day === 'Tue' ? 'Tuesday' : 
@@ -499,6 +518,7 @@ export async function composeUniversalWeek(params: {
           duration: 30,
           intensity: 'Moderate',
           description: `Strength – Optional Upper/Core (supportive): ${applied.join(' • ')}`,
+          strength_exercises: structured,
           zones: []
         };
       }
@@ -515,6 +535,7 @@ export async function composeUniversalWeek(params: {
         const anchorIdx = existingStrength.length % 2; // 0 then 1
         const anchor = anchors[anchorIdx] || anchors[0];
         const parts: string[] = [];
+        const structured: StrengthExercise[] = [];
         if (anchor?.label) parts.push(anchor.label);
         // Prefer explicit @% 1RM for loads to trigger conversion
         (anchor?.main_lifts || []).forEach((l: any) => {
@@ -522,6 +543,9 @@ export async function composeUniversalWeek(params: {
           const chosenRaw = pct ? (pct[0].includes('–') || pct[0].includes('to') || pct[0].includes('-') ? pct[0].split(/[–to-]/)[0].trim() : pct[0].replace(/%/g,'')) : undefined;
           const at = chosenRaw ? `@${chosenRaw}% 1RM` : '';
           parts.push(`${l.name} ${l.scheme} ${at}`.trim());
+          const w = weightFor(l.name, at);
+          const sc = parseScheme(l.scheme);
+          structured.push({ name: l.name, sets: sc.sets, reps: sc.reps, weight: w || undefined });
         });
         (anchor?.support_light || []).forEach((l: any) => parts.push(`${l.name} ${l.scheme}`));
         const applied = applyStrengthBaselines(parts);
@@ -532,14 +556,21 @@ export async function composeUniversalWeek(params: {
           duration: 45,
           intensity: 'Moderate',
           description: applied.join(' • '),
+          strength_exercises: structured,
           zones: []
         };
       } else if (isEndurance) {
         const circuits = pools?.strength?.endurance?.circuits_pool?.blocks || [];
         const pick = circuits[(params.weekNum - 1) % Math.max(1, circuits.length)] || circuits[0];
         const items: string[] = [];
+        const structured: StrengthExercise[] = [];
         if (pick?.name) items.push(`${pick.name} x${pick.rounds || 3}`);
-        (pick?.items || []).forEach((it: any) => items.push(`${it.name} ${it.reps || it.time || ''}`.trim()));
+        (pick?.items || []).forEach((it: any) => {
+          items.push(`${it.name} ${it.reps || it.time || ''}`.trim());
+          const firstRep = (it.reps || '').toString().match(/\d+/)?.[0];
+          const sc = parseScheme(`${pick.rounds || 3}x${firstRep || 10}`);
+          structured.push({ name: it.name, sets: sc.sets, reps: sc.reps });
+        });
         session = {
           day: dayName,
           discipline: 'strength',
@@ -547,6 +578,7 @@ export async function composeUniversalWeek(params: {
           duration: 40,
           intensity: 'Moderate',
           description: `Strength – Endurance: Circuit • ${items.join(' • ')}`,
+          strength_exercises: structured,
           zones: []
         };
       }
