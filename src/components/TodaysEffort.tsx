@@ -357,17 +357,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       <div className="font-medium text-sm" style={{ color: getDisciplineColor(workout.type) }}>
                         {workout.name || getDisciplineName(workout.type)}
                         {workout.workout_status === 'planned' && (
-                          <span className="text-xs text-orange-600 ml-2">(Planned)</span>
+                          <span className="text-xs ml-2" style={{ color: '#999' }}>(planned)</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-xs">
-                        {workout.workout_status === 'completed' ? (
-                          <span className="text-green-600 font-medium">✓</span>
-                        ) : workout.workout_status === 'planned' ? (
-                          <span className="text-orange-600 font-medium">📋</span>
-                        ) : (
-                          <span className="text-gray-600 font-medium">•</span>
-                        )}
+                        {/* status glyphs removed for cleaner layout */}
                         <span className="text-muted-foreground">
                           {formatRichWorkoutDisplay(workout).duration}
                         </span>

@@ -260,18 +260,14 @@ export default function WorkoutCalendar({
                           {dayWorkouts.slice(0, 2).map((workout, idx) => {
                             const hex = getHexColor(workout.type);
                             return (
-                              <div
+                              <span
                                 key={workout.id || idx}
-                                className={`text-[10px] font-medium px-1 py-0.5 rounded`}
-                                style={{
-                                  backgroundColor: `${hex}20`,
-                                  color: hex,
-                                  border: `1px solid ${hex}33`
-                                }}
+                                className={`text-[10px] font-medium`}
+                                style={{ color: hex }}
                                 title={workout.name || workout.type}
                               >
                                 {getDisciplineName(workout.type)}
-                              </div>
+                              </span>
                             );
                           })}
                           {dayWorkouts.length > 2 && (

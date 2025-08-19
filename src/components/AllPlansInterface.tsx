@@ -304,7 +304,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     if (!minutes && minutes !== 0) return '';
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
-    return `${hours}h ${mins}m`;
+    // Show hours with 'h', minutes as plain number (no trailing 'm')
+    return `${hours}h ${mins}`;
   };
 
   const formatTime = (seconds: number) => {
