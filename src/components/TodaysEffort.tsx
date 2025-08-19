@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { Calendar, MapPin, Zap, Heart, Mountain, Clock, Activity, Bike, Waves, Dumbbell, Weight } from 'lucide-react';
+import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 
 interface TodaysEffortProps {
@@ -64,9 +64,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // PLANNED: Show workout description/structure
         const description = workout.description || workout.intervals?.map(i => i.description).join(', ') || 
                            workout.workout_type || 'Planned workout';
-        return [
-          { icon: Activity, value: description }
-        ];
+        return [description];
       }
       
       // COMPLETED: Show actual metrics
@@ -171,12 +169,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         const elevation = workout.elevation_gain || workout.metrics?.elevation_gain;
         const elevationFt = elevation && elevation > 0 ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
         
-        return [
-          { icon: MapPin, value: distance },
-          { icon: Zap, value: paceSpeed },
-          { icon: Heart, value: hrDisplay },
-          { icon: Mountain, value: elevationFt }
-        ];
+        return [distance, paceSpeed, hrDisplay, elevationFt];
       }
     };
     
@@ -370,15 +363,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     
                     {/* Metrics Row */}
                     <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {formatRichWorkoutDisplay(workout).metrics.map((metric, index) => {
-                        const IconComponent = metric.icon;
-                        return (
-                          <div key={index} className="flex items-center gap-1">
-                            <IconComponent className="h-3 w-3" />
-                            <span>{metric.value}</span>
-                          </div>
-                        );
-                      })}
+                      {formatRichWorkoutDisplay(workout).metrics.map((metric, index) => (
+                        <span key={index}>{metric}</span>
+                      ))}
                     </div>
                   </div>
                 </button>
