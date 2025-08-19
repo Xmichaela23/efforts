@@ -16,10 +16,8 @@ export type PoolId =
   | 'swim_technique_pool'
   | 'strength_power_pool'
   | 'strength_endurance_pool'
-  | 'strength_hybrid_pool'
   | 'strength_upper_power'
   | 'strength_upper_endurance'
-  | 'strength_upper_hybrid'
   | 'strength_upper'
   // Brick pools (first-class citizens)
   | 'brick_bike_run_threshold'
@@ -27,7 +25,7 @@ export type PoolId =
   | 'mobility_pool';
 
 export type Level = 'new'|'experienced'|'veryExperienced';
-export type StrengthTrack = 'power'|'endurance'|'hybrid';
+export type StrengthTrack = 'power'|'endurance';
 export type PlanPriority = 'endurance_first'|'balanced'|'strength_first';
 
 export interface SimpleSchedulerParams {
@@ -61,7 +59,7 @@ export interface PlanUIForm {
   preferredStrengthDays: Day[];      // multi-select, must be 2 or 3
   availableDays: Day[];              // multi-select
   experience: Level;                 // new | experienced | veryExperienced
-  strengthTrack: StrengthTrack;      // power | endurance | hybrid
+  strengthTrack: StrengthTrack;      // power | endurance
   strengthDaysPerWeek: 2 | 3;        // UI limits to 2 or 3
 }
 

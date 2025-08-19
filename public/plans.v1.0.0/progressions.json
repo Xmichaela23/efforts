@@ -6,17 +6,17 @@
     "run": {
       "quality": {
         "base": [
-          { "week": 1, "type": "VO2", "session": "8x200m @ 3K pace, jog equal rest" },
+          { "week": 1, "type": "VO2", "session": "8x200m @ 3K pace, jog equal rest [200m_3k_eq_jog]" },
           { "week": 2, "type": "Tempo", "session": "2x8min @ threshold, 3min jog" }
         ],
         "build": [
-          { "week": 3, "type": "VO2", "session": "6x400m @ 5K pace, 200m jog" },
+          { "week": 3, "type": "VO2", "session": "6x400m @ 5K pace, 400m jog [400m_5k_eq_jog]" },
           { "week": 4, "type": "Tempo", "session": "3x10min @ threshold, 2min jog" },
-          { "week": 5, "type": "VO2", "session": "8x400m @ 3K–5K pace, 200m jog" },
+          { "week": 5, "type": "VO2", "session": "5x800m @ 10K pace, 400m jog or 2:00 jog [800m_10k_eq_or_2min]" },
           { "week": 6, "type": "Tempo", "session": "20min continuous @ threshold" }
         ],
         "peak": [
-          { "week": 7, "type": "VO2", "session": "12x400m @ 3K pace, 200m jog" },
+          { "week": 7, "type": "VO2", "session": "4x1 mile @ threshold, 3:00–4:00 jog [1mi_thr_3to4min]" },
           { "week": 7, "type": "Tempo", "session": "25min @ threshold" }
         ],
         "taper": [

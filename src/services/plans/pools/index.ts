@@ -95,7 +95,7 @@ export const strength_hybrid_pool: Pool = {
 Object.assign(poolsById, {
   [strength_power_pool.id]: strength_power_pool,
   [strength_endurance_pool.id]: strength_endurance_pool,
-  [strength_hybrid_pool.id]: strength_hybrid_pool
+  // hybrid removed
 });
 
 // Upper/Core optional non-hard pools (cowboy day)
@@ -120,7 +120,7 @@ export const strength_upper_hybrid: Pool = {
 Object.assign(poolsById, {
   [strength_upper_power.id]: strength_upper_power,
   [strength_upper_endurance.id]: strength_upper_endurance,
-  [strength_upper_hybrid.id]: strength_upper_hybrid
+  // removed hybrid upper
 });
 
 
