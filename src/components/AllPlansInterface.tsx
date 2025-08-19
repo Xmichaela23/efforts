@@ -1147,46 +1147,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
       )}
 
-      {/* Planned Workouts Section */}
-      {plannedWorkouts.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-lg font-medium text-gray-900">Planned Workouts</h2>
-          <div className="space-y-2">
-            {plannedWorkouts.slice(0, 5).map((workout) => (
-              <div 
-                key={workout.id} 
-                className="pl-4 py-2 cursor-pointer hover:bg-gray-50 rounded"
-                onClick={() => {
-                  if (onSelectWorkout) onSelectWorkout(workout);
-                }}
-              >
-                <PlannedWorkoutView 
-                  workout={workout}
-                  compact={true}
-                  showHeader={false}
-                  onDelete={async () => {
-                    if (confirm('Delete this planned workout? This action cannot be undone.')) {
-                      try {
-                        await deletePlannedWorkout(workout.id);
-                        // The hook will automatically update the local state
-                      } catch (error) {
-                        console.error('Error deleting planned workout:', error);
-                      }
-                    }
-                  }}
-                />
-              </div>
-            ))}
-            {plannedWorkouts.length > 5 && (
-              <div className="text-center py-2">
-                <span className="text-sm text-gray-500">
-                  +{plannedWorkouts.length - 5} more planned workouts
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      {/* Planned Workouts Section (hidden per design: planned visible in plan view and calendar) */}
 
       {currentPlans.length === 0 && completedPlans.length === 0 && plannedWorkouts.length === 0 && (
         <div className="text-center py-8">
