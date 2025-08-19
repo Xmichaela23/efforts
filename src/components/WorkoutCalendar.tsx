@@ -6,6 +6,7 @@ import NewEffortDropdown from './NewEffortDropdown';
 import LogEffortDropdown from './LogEffortDropdown';
 import PlansDropdown from './PlansDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -54,6 +55,7 @@ export default function WorkoutCalendar({
   completedPlans = [] // NEW: Default to empty array
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
+  const { plannedWorkouts } = usePlannedWorkouts();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
@@ -88,7 +90,7 @@ export default function WorkoutCalendar({
   };
 
   const getWorkoutsForDate = (day: number) => {
-    if (!day || !workouts) return [];
+    if (!day) return [];
     
     const year = currentDate.getFullYear();
     const month = String(currentDate.getMonth() + 1).padStart(2, '0');
@@ -97,8 +99,12 @@ export default function WorkoutCalendar({
     
     // 🔧 FIXED: Apply same filtering logic as TodaysEffort - show both planned AND completed
     const today = new Date().toLocaleDateString('en-CA');
+    const all = [
+      ...(Array.isArray(workouts) ? workouts : []),
+      ...(Array.isArray(plannedWorkouts) ? plannedWorkouts : []),
+    ];
     
-    const filtered = workouts.filter((w) => {
+    const filtered = all.filter((w: any) => {
       if (!w || w.date !== dateStr) return false;
       
       // For today and future dates: show both planned AND completed workouts
