@@ -62,12 +62,48 @@ export default function PlanBuilder({ onPlanGenerated }: PlanBuilderProps) {
     );
   }
 
+  if (discipline === 'hybrid' && !planId) {
+    return (
+      <div className="max-w-3xl mx-auto p-4 space-y-4">
+        <div className="flex items-center justify-between">
+          <button onClick={() => setDiscipline(null)} className="text-sm text-blue-600">← Back</button>
+          <h2 className="text-xl font-semibold">Hybrid Plans</h2>
+          <div />
+        </div>
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={() => setPlanId('hpmbwwasw12')}
+            className="w-full py-3 text-left hover:bg-gray-50 focus:bg-gray-50 border-none outline-none ring-0 focus:outline-none focus:ring-0"
+          >
+            <div className="font-medium">Highlander Power Marathon Build (12w)</div>
+            <div className="text-sm text-gray-600">12 weeks • Marathon build + Power barbell • Bike + optional swim technique</div>
+            <div className="text-sm text-gray-700 mt-1">Fergus Crawley-inspired hybrid: long run focus, neural heavy lifts, weekly bike quality, optional swim drills.</div>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Step 3: Render selected plan builder
   if (planId === 'get_stronger_faster_8w') {
     return (
       <div className="w-full">
         <div className="max-w-3xl mx-auto p-2"></div>
         <GetStrongerFasterBuilder onPlanGenerated={onPlanGenerated} />
+      </div>
+    );
+  }
+
+  if (planId === 'hpmbwwasw12') {
+    return (
+      <div className="w-full">
+        <div className="max-w-3xl mx-auto p-2"></div>
+        <GetStrongerFasterBuilder 
+          onPlanGenerated={onPlanGenerated}
+          planPath={`${import.meta.env.BASE_URL}plans.v1.0.0/hpmbwwasw12.progressions.json`}
+          initialDurationWeeks={12}
+          defaultStrengthTrack="power"
+        />
       </div>
     );
   }

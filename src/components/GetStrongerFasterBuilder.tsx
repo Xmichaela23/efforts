@@ -6,7 +6,7 @@ import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/pl
 import { useAppContext } from '@/contexts/AppContext';
 import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS } from './planBuilder/strings';
 
-const PLAN_PATH = `${import.meta.env.BASE_URL}plans.v1.0.0/progressions.json`;
+const DEFAULT_PLAN_PATH = `${import.meta.env.BASE_URL}plans.v1.0.0/progressions.json`;
 
 type Session = {
   day: string; // Keep as string since composeUniversalWeek returns full names
@@ -21,17 +21,21 @@ const dayChips: Day[] = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
 interface GetStrongerFasterBuilderProps {
   onPlanGenerated?: (plan: any) => void;
+  planPath?: string;
+  initialDurationWeeks?: number;
+  defaultStrengthTrack?: 'power' | 'endurance';
 }
 
-export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStrongerFasterBuilderProps) {
+export default function GetStrongerFasterBuilder({ onPlanGenerated, planPath, initialDurationWeeks, defaultStrengthTrack }: GetStrongerFasterBuilderProps) {
   const { addPlan, loadUserBaselines } = useAppContext();
+  const PLAN_PATH = planPath || DEFAULT_PLAN_PATH;
   
   // Simple loading state - no more bundle dependency
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   
   const [cfg, setCfg] = useState<PlanConfig>({
-    durationWeeks: 8,
+    durationWeeks: initialDurationWeeks || 8,
     timeLevel: 'intermediate',
     weeklyHoursTarget: 8,
     availableDays: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
@@ -39,7 +43,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     runQualityDays: 2,
     strengthDaysPerWeek: 2,
     strengthDaysPreferred: ['Mon','Fri'],
-    strengthTrack: 'endurance',
+    strengthTrack: (defaultStrengthTrack || 'endurance') as any,
     includeStrength: true,
     includeUpper: false,
     includeMobility: true,

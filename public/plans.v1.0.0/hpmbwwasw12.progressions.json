@@ -1,0 +1,223 @@
+{
+  "name": "Highlander Power Marathon Build with Wheels and Some Water 12",
+  "short_code": "hpmbwwasw12",
+  "description": "12-week hybrid plan combining marathon preparation, barbell strength, bike, and optional swim technique for experienced to very experienced athletes.",
+  "duration_weeks": 12,
+  "current_week": 1,
+  "status": "active",
+  "plan_type": "marathon_power",
+  "config": {
+    "experience": "experienced|very_experienced",
+    "days_per_week": 6,
+    "optional_day": 1,
+    "long_run_day": "Saturday",
+    "rest_day": "Sunday"
+  },
+  "constraints": {
+    "defaults": {
+      "long_run_day": "Saturday",
+      "mandatory_ride_day": "Friday",
+      "optional_long_ride_day": "Sunday",
+      "rest_day": "Sunday",
+      "heavy_lower_days": ["Tuesday", "Thursday"]
+    },
+    "allowed_modifications": {
+      "long_run_day": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"],
+      "mandatory_ride_day": ["Wednesday","Friday"],
+      "optional_long_ride_day": ["Sunday"],
+      "rest_day": ["Monday","Friday","Sunday"]
+    },
+    "validators": [
+      { "name": "no_strength_on_long_run_day", "error": "Long run cannot be scheduled on a strength day.", "rule": "DAY(long_run_day) != ANY(heavy_lower_days)" },
+      { "name": "buffer_from_heavy_lower_before_after_long_run", "error": "Long run must have at least 1 day buffer from heavy lower lifts.", "rule": "ABS(DIFF_DAYS(long_run_day, Tuesday)) >= 1 && ABS(DIFF_DAYS(long_run_day, Thursday)) >= 1" },
+      { "name": "no_long_run_and_long_ride_same_day", "error": "Long run cannot share a day with the optional long ride.", "rule": "long_run_day != optional_long_ride_day" },
+      { "name": "mandatory_ride_not_on_long_run_or_strength", "error": "Mandatory ride cannot land on long run day or a heavy strength day.", "rule": "mandatory_ride_day != long_run_day && mandatory_ride_day != Tuesday && mandatory_ride_day != Thursday" },
+      { "name": "rest_not_on_long_run_day", "error": "Rest day cannot be the same as the long run day.", "rule": "rest_day != long_run_day" },
+      { "name": "avoid_back_to_back_long_endurance", "error": "Avoid stacking long run and long ride on consecutive days unless 'very_experienced' is selected.", "rule": "(experience == 'very_experienced') || ABS(DIFF_DAYS(long_run_day, optional_long_ride_day)) >= 2" }
+    ],
+    "auto_adjustments": [
+      {
+        "name": "tempo_swap_when_ride_moves_to_wed",
+        "when": "mandatory_ride_day == 'Wednesday'",
+        "do": [
+          "MOVE_SESSION(type='bike', focus='intervals_or_endurance') TO 'Wednesday'",
+          "MOVE_SESSION(type='run', focus='tempo') TO 'Friday'"
+        ],
+        "note": "Keeps midweek quality balance: Mon run intervals, Wed bike quality, Fri tempo."
+      },
+      {
+        "name": "disable_optional_long_ride_if_conflict",
+        "when": "optional_long_ride_day == long_run_day",
+        "do": ["REMOVE_SESSION(type='bike', focus='long', day=optional_long_ride_day)"],
+        "note": "If athlete places the long run on Sunday, the optional long ride is removed for that week."
+      },
+      {
+        "name": "shift_rest_day_if_conflict",
+        "when": "rest_day == long_run_day",
+        "do": ["IF 'Monday' != long_run_day && 'Monday' NOT IN heavy_lower_days THEN SET rest_day='Monday' ELSE SET rest_day='Friday'"],
+        "note": "Rest moves off the long run day, preferring Monday unless it collides with heavy strength rules."
+      }
+    ],
+    "priority": ["long_run_day","heavy_lower_days","mandatory_ride_day","rest_day","optional_long_ride_day"]
+  },
+
+  "sessions_by_week": {
+    "1": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "6x800m @ {5k_pace}, 2-3 min jog recovery.", "intensity": "{5k_pace}" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @70%, Bench 5x5 @70%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.70", "bench": "{bench_1rm}*0.70" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd swim: catch-up, single arm, scull, kick.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "100yd", "drill": "sculling" }, { "repeats": 4, "distance": "100yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "4mi @ {5k_pace}+0:45/mi.", "intensity": "{5k_pace}+0:45/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 5x3 @75%, OHP 4x5 @70%, Core rollouts.", "intensity": { "deadlift": "{deadlift_1rm}*0.75", "ohp": "{ohp_1rm}*0.70" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd swim: fist, single arm, pull buoy, fins.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "repeats": 4, "distance": "100yd", "drill": "kick fins" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "6x3min @ VO2 (RPE 8.5–9) OR 90min endurance ride.", "intensity": "VO2 or Zone 2-4" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "90min continuous @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "2": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "7x800m @ {5k_pace}, 2-3 min jog recovery.", "intensity": "{5k_pace}" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @72%, Bench 5x5 @72%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.72", "bench": "{bench_1rm}*0.72" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (catch-up, single arm, kick).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "5mi @ {5k_pace}+0:45/mi.", "intensity": "{5k_pace}+0:45/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 5x3 @77%, OHP 4x5 @72%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.77", "ohp": "{ohp_1rm}*0.72" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (fist, scull, pull buoy).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "sculling" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "6x3min @ VO2 OR 90min endurance.", "intensity": "VO2 or Zone 2-4" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "1h40 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "3": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "8x800m @ {5k_pace}, 2-3 min jog recovery.", "intensity": "{5k_pace}" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @75%, Bench 5x5 @75%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.75", "bench": "{bench_1rm}*0.75" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (catch-up, single arm, kick).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "6mi @ {5k_pace}+0:40/mi.", "intensity": "{5k_pace}+0:40/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 5x3 @80%, OHP 4x5 @75%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.80", "ohp": "{ohp_1rm}*0.75" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (fist, scull, pull buoy).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "sculling" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "6x3min @ VO2 OR 90min endurance.", "intensity": "VO2 or Zone 2-4" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "1h50 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "4": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "5x1mi @ {5k_pace}, 2 min jog recovery (deload intensity cap: keep RPE ~8).", "intensity": "{5k_pace}" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Deload: Squat 3x5 @65–70%, Bench 3x5 @65–70%, light accessories.", "intensity": { "squat": "{squat_1rm}*0.68", "bench": "{bench_1rm}*0.68" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd easy technique (drill emphasis).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 8, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "4mi @ {5k_pace}+1:00/mi (deload).", "intensity": "{5k_pace}+1:00/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deload: Deadlift 3x3 @70%, OHP 3x5 @65%, easy core.", "intensity": { "deadlift": "{deadlift_1rm}*0.70", "ohp": "{ohp_1rm}*0.65" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd easy technique (fist, scull, pull buoy).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "sculling" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "Deload: 4x3min @ VO2 (RPE ~8) OR 60–75min endurance.", "intensity": "VO2 (reduced) or Zone 2" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "75–90min @ {easy_pace} (deload).", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "90min–2h aerobic (deload).", "intensity": "Zone 2" }
+    ],
+
+    "5": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "6x1mi @ {5k_pace}, 2 min jog recovery.", "intensity": "{5k_pace}" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @78%, Bench 5x5 @78%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.78", "bench": "{bench_1rm}*0.78" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (fingertip drag, 6-1-6 kick, scull).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fingertip drag (zipper)" }, { "repeats": 4, "distance": "100yd", "drill": "6-1-6 kick (alt sides)" }, { "repeats": 4, "distance": "100yd", "drill": "sculling (front/mid)" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "6mi @ {5k_pace}+0:40/mi.", "intensity": "{5k_pace}+0:40/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 5x3 @82%, OHP 4x5 @77%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.82", "ohp": "{ohp_1rm}*0.77" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (catch-up, fist, kick).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "fist" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "4x8min @ Threshold (RPE ~8) OR 100–110min endurance ride.", "intensity": "Threshold or Zone 2-3" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "2h00 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h30 aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "6": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "4x1.5mi @ {5k_pace}+0:10/mi, 3 min jog recovery.", "intensity": "{5k_pace}+0:10/mi" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @80%, Bench 5x5 @80%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.80", "bench": "{bench_1rm}*0.80" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (single arm, 6-kick switch, scull).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "single arm (alt)" }, { "repeats": 4, "distance": "100yd", "drill": "6-kick switch" }, { "repeats": 4, "distance": "100yd", "drill": "sculling (mid/rear)" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "7mi @ {5k_pace}+0:40/mi.", "intensity": "{5k_pace}+0:40/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 5x3 @85%, OHP 4x5 @80%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.85", "ohp": "{ohp_1rm}*0.80" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (fist, fingertip drag, kick).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "fingertip drag (zipper)" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "4x8min @ Threshold OR 110min endurance.", "intensity": "Threshold or Zone 2-3" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "2h10 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h30 aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "7": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "5x1.5mi @ {5k_pace}+0:10/mi, 3 min jog recovery.", "intensity": "{5k_pace}+0:10/mi" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @82%, Bench 5x5 @82%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.82", "bench": "{bench_1rm}*0.82" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (catch-up, single arm, scull).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "100yd", "drill": "sculling (front/mid)" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "7mi @ {5k_pace}+0:35/mi.", "intensity": "{5k_pace}+0:35/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 5x3 @85%, OHP 4x5 @80%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.85", "ohp": "{ohp_1rm}*0.80" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd drills (fist, 6-1-6 kick, pull buoy).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "6-1-6 kick" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "4x8min @ Threshold OR 110min endurance.", "intensity": "Threshold or Zone 2-3" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "2h20 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h30 aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "8": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "3x2mi @ {5k_pace}+0:15/mi, 3 min jog recovery (deload).", "intensity": "{5k_pace}+0:15/mi" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Deload: Squat 3x5 @65–70%, Bench 3x5 @65–70%, light accessories.", "intensity": { "squat": "{squat_1rm}*0.68", "bench": "{bench_1rm}*0.68" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd easy technique (drill emphasis).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 8, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "5mi @ {5k_pace}+0:50/mi (deload).", "intensity": "{5k_pace}+0:50/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deload: Deadlift 3x3 @70%, OHP 3x5 @65%, easy core.", "intensity": { "deadlift": "{deadlift_1rm}*0.70", "ohp": "{ohp_1rm}*0.65" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd easy technique (fist, scull, pull buoy).", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "sculling" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "intervals_or_endurance", "description": "Deload: 3x8min @ Threshold (RPE ~7.5–8) OR 75–90min endurance.", "intensity": "Threshold (reduced) or Zone 2" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "90min @ {easy_pace} (deload).", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "1.5–2h aerobic (deload).", "intensity": "Zone 2" }
+    ],
+
+    "9": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "4x2mi @ {5k_pace}+0:15/mi, 3 min jog recovery. [3200m_cruise_or_3min]", "intensity": "{5k_pace}+0:15/mi" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @76%, Bench 5x5 @76%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.76", "bench": "{bench_1rm}*0.76" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd: catch-up, single arm, scull, pull buoy.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "100yd", "drill": "sculling (front/mid)" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "8mi @ {5k_pace}+0:35/mi.", "intensity": "{5k_pace}+0:35/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 4x3 @80%, OHP 4x5 @75%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.80", "ohp": "{ohp_1rm}*0.75" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd: fist, fingertip drag, kick.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "fingertip drag (zipper)" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "sweet_spot_or_endurance", "description": "2x20min @ Sweet Spot (RPE 7.5–8) w/ 5–8min easy between OR 2h endurance ride.", "intensity": "Sweet Spot or Zone 3–4" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "2h20–2h30 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "3h aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "10": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "3x2.5mi @ {5k_pace}+0:20/mi, 3 min jog recovery. [4000m_cruise_or_3min]", "intensity": "{5k_pace}+0:20/mi" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @74%, Bench 5x5 @74%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.74", "bench": "{bench_1rm}*0.74" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd: single arm, 6-kick switch, scull, pull buoy.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "single arm (alt)" }, { "repeats": 4, "distance": "100yd", "drill": "6-kick switch" }, { "repeats": 4, "distance": "100yd", "drill": "sculling (mid/rear)" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "8mi @ {5k_pace}+0:35/mi.", "intensity": "{5k_pace}+0:35/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 4x3 @78%, OHP 4x5 @72%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.78", "ohp": "{ohp_1rm}*0.72" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd: catch-up, scull, pull buoy.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "100yd", "drill": "sculling" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "sweet_spot_or_endurance", "description": "2x22min @ Sweet Spot (RPE 7.5–8) w/ 6–8min easy between OR 2h endurance ride.", "intensity": "Sweet Spot or Zone 3–4" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "2h30 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "3h aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "11": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "2x3mi @ {5k_pace}+0:20/mi, 3 min jog recovery. [4800m_cruise_or_3min]", "intensity": "{5k_pace}+0:20/mi" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Squat 5x5 @72%, Bench 5x5 @72%, Pull accessory.", "intensity": { "squat": "{squat_1rm}*0.72", "bench": "{bench_1rm}*0.72" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd: fist, single arm, pull buoy, fins optional.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fist" }, { "repeats": 4, "distance": "100yd", "drill": "single arm" }, { "repeats": 4, "distance": "100yd", "drill": "pull buoy aerobic" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "6mi @ {5k_pace}+0:45/mi.", "intensity": "{5k_pace}+0:45/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Deadlift 4x3 @76%, OHP 4x5 @70%, Core work.", "intensity": { "deadlift": "{deadlift_1rm}*0.76", "ohp": "{ohp_1rm}*0.70" } },
+      { "day": "Thursday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–2000yd: fingertip drag, scull, kick.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "fingertip drag (zipper)" }, { "repeats": 4, "distance": "100yd", "drill": "sculling (mid/rear)" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Friday", "type": "bike", "focus": "sweet_spot_or_endurance", "description": "2x25min @ Sweet Spot (RPE 7.5–8) w/ 6–8min easy between OR 2h endurance ride.", "intensity": "Sweet Spot or Zone 3–4" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "2h15 @ {easy_pace}.", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "3h aerobic ride, steady Zone 2.", "intensity": "Zone 2" }
+    ],
+
+    "12": [
+      { "day": "Monday", "type": "run", "focus": "intervals", "description": "4x1mi @ {5k_pace}, 2 min jog recovery (sharpen). [1600m_5k_eq_or_2min]", "intensity": "{5k_pace}" },
+      { "day": "Tuesday", "type": "strength", "focus": "squat_bench", "description": "Taper: Squat 3x3 @62–65%, Bench 3x3 @62–65%, light accessories.", "intensity": { "squat": "{squat_1rm}*0.64", "bench": "{bench_1rm}*0.64" } },
+      { "day": "Tuesday", "type": "swim", "optional": true, "focus": "technique", "description": "1500–1800yd easy: drill mix; stay fresh.", "sets": [ { "distance": "300yd", "type": "easy" }, { "repeats": 6, "distance": "50yd", "drill": "catch-up" }, { "repeats": 4, "distance": "75yd", "drill": "single arm" }, { "repeats": 4, "distance": "50yd", "drill": "kick board" }, { "distance": "200yd", "type": "cooldown" } ] },
+      { "day": "Wednesday", "type": "run", "focus": "tempo", "description": "4mi @ {5k_pace}+1:00/mi (taper).", "intensity": "{5k_pace}+1:00/mi" },
+      { "day": "Thursday", "type": "strength", "focus": "deadlift_ohp", "description": "Taper: Deadlift 3x2 @60–65%, OHP 3x3 @60%, easy core.", "intensity": { "deadlift": "{deadlift_1rm}*0.62", "ohp": "{ohp_1rm}*0.60" } },
+      { "day": "Friday", "type": "bike", "focus": "sweet_spot_or_endurance", "description": "Taper: 2x12min @ upper Z3 (RPE ~7) w/ 5min easy OR 60–75min endurance.", "intensity": "Upper Z3 or Zone 2" },
+      { "day": "Saturday", "type": "run", "focus": "long", "description": "90min @ {easy_pace} (taper).", "intensity": "{easy_pace}" },
+      { "day": "Sunday", "type": "bike", "optional": true, "focus": "long", "description": "2h aerobic (taper).", "intensity": "Zone 2" }
+    ]
+  },
+
+  "notes_by_week": {
+    "1": ["Establish baselines. Keep barbell technique crisp; don't overshoot paces."],
+    "2": ["Progress volume modestly; swims stay technique-first."],
+    "3": ["Heavier but still neural on lifts; ensure sleep/nutrition support."],
+    "4": ["Deload across all modalities. Arrive fresh for next build block."],
+    "5": ["Start Build 2: threshold bike work begins; lifts to ~78–82% (neural)."],
+    "6": ["Sustain build: longest tempo so far; deads up to ~85% with controlled volume."],
+    "7": ["High build week: keep bar speed snappy on 82–85%; protect sleep and fueling."],
+    "8": ["Deload across run/bike/lift; technique focus in the pool. Prepare for final block."],
+    "9": ["Peak block begins. Longest tempos + sweet spot bike. Keep lifts neural (≈70–80%) and avoid grinders."],
+    "10": ["Peak volume. Protect sleep and fueling; bar speed > load. Sweet spot duration nudges up."],
+    "11": ["Sharpen while holding volume. Lifts submax; prioritize run quality and freshness."],
+    "12": ["Taper: drop total load 40–60% but keep frequency. Short, sharp reps; arrive fresh."]
+  }
+}

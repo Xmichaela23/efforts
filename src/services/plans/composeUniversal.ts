@@ -5,6 +5,18 @@ export interface UniversalPlanData {
   name: string;
   description: string;
   duration_weeks: number;
+  // Optional alternate format used by hybrid plans
+  sessions_by_week?: {
+    [week: string]: Array<{
+      day: string;
+      type: 'run'|'bike'|'swim'|'strength'|'walk';
+      focus?: string;
+      description?: string;
+      intensity?: any;
+      optional?: boolean;
+      sets?: any[]; // for swim drills
+    }>;
+  };
   sports: {
     [sport: string]: {
       quality?: {
@@ -93,6 +105,21 @@ function parseGarminVariantId(text?: string | null): string | null {
   if (b) return b[1];
   // or if description equals a known id-like token
   if (/^[A-Za-z0-9_\-]+$/.test(text)) return text;
+  return null;
+}
+
+function mapGarminVariantFromText(text?: string | null): string | null {
+  if (!text) return null;
+  const t = text.toLowerCase();
+  if (/\[\s*[a-z0-9_\-]+\s*\]/i.test(text)) return parseGarminVariantId(text); // already tagged
+  if (/\b200m\b.*3k/.test(t)) return '200m_3k_eq_jog';
+  if (/\b400m\b.*5k/.test(t)) return '400m_5k_eq_jog';
+  if (/\b800m\b.*10k/.test(t)) return '800m_10k_eq_or_2min';
+  if (/(^|\s)1\s*mile\b.*threshold|\b1mi\b.*thr/.test(t)) return '1mi_thr_3to4min';
+  if (/(^|\s)1\s*mile\b.*5k|\b1600m\b.*5k/.test(t)) return '1600m_5k_eq_or_2min';
+  if (/\b2x2mi|3x2mi|4x2mi|\b3200m\b/.test(t)) return '3200m_cruise_or_3min';
+  if (/\b3x2\.5mi|2500m|4000m/.test(t)) return '4000m_cruise_or_3min';
+  if (/\b2x3mi|4800m/.test(t)) return '4800m_cruise_or_3min';
   return null;
 }
 
@@ -258,6 +285,53 @@ export async function composeUniversalWeek(params: {
   const planData = await loadPlanData(params.planPath);
   const sessions: SessionTemplate[] = [];
   const phase = getPhase(params.weekNum, planData);
+
+  // Alternate format: explicit sessions_by_week
+  const explicit = (planData as any)?.sessions_by_week?.[String(params.weekNum)] as any[] | undefined;
+  if (Array.isArray(explicit) && explicit.length) {
+    for (const sess of explicit) {
+      const day = sess.day || 'Monday';
+      const discipline = (sess.type || 'run') as any;
+      let description: string = sess.description || '';
+      let intervals: string[] | undefined;
+      if (discipline === 'run') {
+        const variantId = parseGarminVariantId(description) || mapGarminVariantFromText(description);
+        if (variantId) {
+          intervals = await expandGarminIntervals(variantId, undefined, params.baselines);
+        }
+      }
+      // Strength: build structured exercises from description percentages when present
+      let strength_exercises: any[] | undefined;
+      if (discipline === 'strength') {
+        const lines = description.split(',').map((s: string) => s.trim());
+        const parsed: any[] = [];
+        for (const raw of lines) {
+          const m = raw.match(/^(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)\s+(\d+)x(\d+)\s*@\s*(\d+)%/i);
+          if (m) {
+            const name = m[1].replace(/Bench$/, 'Bench Press');
+            const sets = parseInt(m[2],10);
+            const reps = parseInt(m[3],10);
+            const pct = `${m[4]}%`;
+            const w = weightFor(name, `@${pct}`);
+            parsed.push({ name, sets, reps, weight: w || undefined });
+          }
+        }
+        if (parsed.length) strength_exercises = parsed;
+      }
+      sessions.push({
+        day,
+        discipline,
+        type: sess.focus || discipline,
+        duration: discipline === 'run' && /long/i.test(sess.focus || '') ? 100 : (sess.duration || 45),
+        intensity: typeof sess.intensity === 'string' ? sess.intensity : (discipline==='run' ? 'Planned' : 'Moderate'),
+        description: intervals && intervals.length ? intervals.join(' • ') : (description || `${discipline} session`),
+        intervals,
+        strength_exercises,
+        zones: []
+      } as any);
+    }
+    return sessions;
+  }
 
   // Map pool IDs to sports
   const poolToSport: Record<string, string> = {
