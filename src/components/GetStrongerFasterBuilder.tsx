@@ -178,7 +178,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
     };
     
     composeAllWeeks();
-  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek]);
+  }, [weeks, cfg.strengthTrack, cfg.strengthDaysPerWeek, cfg.includeUpper]);
 
   // Remove the session clearing useEffect that was causing race conditions
   // Sessions will now persist between config changes

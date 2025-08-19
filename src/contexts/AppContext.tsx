@@ -448,23 +448,35 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const dow = dayIndex[s.day] || 1;
             const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
             if (weekNum === 1 && date < startDate) return; // skip pre-start in week 1
-            
-            const row = {
+
+            // Normalize type to satisfy DB check constraints
+            const rawType = (s.discipline || s.type || '').toLowerCase();
+            let mappedType: string = 'run';
+            if (rawType === 'run') mappedType = 'run';
+            else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride';
+            else if (rawType === 'swim') mappedType = 'swim';
+            else if (rawType === 'strength') mappedType = 'strength';
+            else if (rawType === 'brick') mappedType = 'run'; // represent brick on calendar as run
+
+            const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
+
+            const row: any = {
               user_id: user?.id,
               training_plan_id: data.id,
               week_number: weekNum,
               day_number: dow,
               date,
-              type: s.discipline || s.type || 'other',
-              name: s.name || (s.discipline === 'strength' ? 'Strength' : s.type || 'Session'),
+              type: mappedType,
+              name: s.name || (mappedType === 'strength' ? 'Strength' : s.type || 'Session'),
               description: s.description || '',
-              duration: s.duration ?? null,
+              duration: durationVal,
               workout_status: 'planned',
-              source: 'plan',
-              intensity: typeof s.intensity === 'object' ? s.intensity : null,
-              intervals: Array.isArray(s.intervals) ? s.intervals : null,
-              strength_exercises: Array.isArray(s.strength_exercises) ? s.strength_exercises : null,
+              source: 'training_plan',
             };
+            if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
+            if (Array.isArray(s.intervals)) row.intervals = s.intervals;
+            if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
+
             rows.push(row);
           });
         });
