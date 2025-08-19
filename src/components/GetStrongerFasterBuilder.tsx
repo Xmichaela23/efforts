@@ -411,24 +411,16 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
             </div>
 
             {/* Weeks header */}
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <div className="text-sm text-gray-700">Week {currentWeek} • {formatHM(totalMinutes)} • {weekSessions.length} sessions</div>
-              <div className="flex gap-2 self-end mt-2 md:mt-3">
+              <div className="flex gap-2 self-end mt-3 md:mt-4">
                 {Array.from({ length: cfg.durationWeeks }, (_, i) => i+1).map(w => (
                   <button key={w} onClick={() => setCurrentWeek(w)} className={`w-6 h-6 text-xs border rounded ${currentWeek===w? 'border-gray-900':'border-gray-300'}`}>{w}</button>
                 ))}
               </div>
             </div>
 
-            {/* Week-level Notes */}
-            {notesByWeek?.get(currentWeek)?.length ? (
-              <div className="mb-3 text-xs text-gray-800">
-                <div className="font-medium text-gray-800">Notes</div>
-                <ul className="list-disc pl-5 space-y-1">
-                  {notesByWeek.get(currentWeek)!.map((n, i) => (<li key={i}>{n}</li>))}
-                </ul>
-              </div>
-            ) : null}
+            {/* Notes removed for a cleaner mobile layout */}
 
             {/* Week Progression Details */}
             <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
@@ -506,7 +498,7 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                   <button
                     onClick={handleAcceptPlan}
                     disabled={isLoading || !!loadError || isSaving || isComposing || sessionsByWeek.size === 0 || sessionsByWeek.size < cfg.durationWeeks}
-                    className="flex-1 bg-blue-600 text-white py-3 px-4 rounded font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-transparent text-gray-800 underline underline-offset-2 decoration-gray-400 hover:decoration-gray-800 disabled:opacity-50 disabled:cursor-not-allowed py-2 px-1 text-left"
                   >
                     {isSaving ? 'Creating Plan...' : (isComposing || sessionsByWeek.size < cfg.durationWeeks ? 'Preparing Plan…' : 'Accept & Create Plan')}
                   </button>
