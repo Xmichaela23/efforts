@@ -856,34 +856,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </span>
             </div>
           </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              <div className="text-center">
-                <div className="text-2xl font-bold">{selectedPlanDetail.duration || 0}</div>
-                <div className="text-sm text-gray-600">Weeks</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{selectedPlanDetail.totalWorkouts || 0}</div>
-                <div className="text-sm text-gray-600">Workouts</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{formatDuration(totalVolume)}</div>
-                <div className="text-sm text-gray-600">Total Time</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl font-bold">{formatDuration(averageWeeklyVolume)}</div>
-                <div className="text-sm text-gray-600">Avg/Week</div>
-              </div>
+          <div className="p-4">
+            {/* Compact, single-line stats */}
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3">
+              <span>
+                <span className="font-semibold text-gray-900">{selectedPlanDetail.duration || 0}</span> wk
+              </span>
+              <span>
+                <span className="font-semibold text-gray-900">{selectedPlanDetail.totalWorkouts || 0}</span> workouts
+              </span>
+              <span>
+                <span className="font-semibold text-gray-900">{formatDuration(totalVolume)}</span> total
+              </span>
+              <span>
+                <span className="font-semibold text-gray-900">{formatDuration(averageWeeklyVolume)}</span> avg/wk
+              </span>
             </div>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Progress</span>
-                <span>Week {selectedPlanDetail.currentWeek || 1} of {selectedPlanDetail.duration || 0}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div className="bg-black rounded-full h-2 transition-all duration-300" style={{ width: `${progress}%` }}></div>
-              </div>
+
+            {/* Slim progress row */}
+            <div className="flex items-center justify-between text-xs text-gray-600 mb-1">
+              <span>Progress</span>
+              <span>Week {selectedPlanDetail.currentWeek || 1} of {selectedPlanDetail.duration || 0}</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5">
+              <div className="bg-black rounded-full h-1.5 transition-all duration-300" style={{ width: `${progress}%` }}></div>
             </div>
           </div>
         </div>
