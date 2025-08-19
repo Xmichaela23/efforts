@@ -96,7 +96,7 @@ function parseGarminVariantId(text?: string | null): string | null {
   return null;
 }
 
-export async function expandGarminIntervals(variantId: string, repsOverride?: number): Promise<string[]> {
+export async function expandGarminIntervals(variantId: string, repsOverride?: number, baselines?: any): Promise<string[]> {
   const pools = await loadPoolsData();
   const run = pools?.run;
   const igr = run?.intervals_garmin_ready;
@@ -110,7 +110,33 @@ export async function expandGarminIntervals(variantId: string, repsOverride?: nu
   if (defs.warmup?.label) steps.push(defs.warmup.label);
   for (let i = 0; i < reps; i++) {
     for (const s of (v.rep_schema?.steps || [])) {
-      steps.push(s.label);
+      let label: string = s.label;
+      // Append pace band for work steps where label references 3K/5K/Threshold
+      if (s.type === 'work' && baselines) {
+        const pn = baselines?.performanceNumbers || {};
+        const parsePace = (p?: string) => {
+          if (!p) return null;
+          const m = p.match(/^(\d{1,2}):(\d{2})$/); if (!m) return null; return parseInt(m[1],10)*60+parseInt(m[2],10);
+        };
+        const format = (sec: number) => {
+          const m = Math.max(0, Math.floor(sec/60)); const s = Math.max(0, sec%60); return `${m}:${String(s).padStart(2,'0')}`;
+        };
+        const band = (base: number, pct: number) => [format(Math.round(base*(1-pct))), format(Math.round(base*(1+pct)))];
+        const fiveK = parsePace(pn.fiveK_pace);
+        const easy = parsePace(pn.easyPace);
+        let lo: string|undefined, hi: string|undefined;
+        if (/3k/i.test(label) && fiveK) {
+          const base3k = Math.round(fiveK*0.94); const [l,h] = band(base3k,0.03); lo=l; hi=h;
+        } else if (/5k/i.test(label) && fiveK) {
+          const [l,h] = band(fiveK,0.03); lo=l; hi=h;
+        } else if (/threshold|thr/i.test(label) && fiveK) {
+          const thr = Math.round(fiveK*1.06); const [l,h]=band(thr,0.03); lo=l; hi=h;
+        } else if (/easy|jog/i.test(label) && easy) {
+          const [l,h]=band(easy,0.10); lo=l; hi=h;
+        }
+        if (lo && hi) label = `${label} (target ${lo}–${hi}/mi)`;
+      }
+      steps.push(label);
     }
   }
   if (defs.cooldown?.label) steps.push(defs.cooldown.label);
@@ -370,7 +396,7 @@ export async function composeUniversalWeek(params: {
         const variantId = parseGarminVariantId(qualitySession.session);
         let intervals: string[] | undefined = undefined;
         if (variantId) {
-          intervals = await expandGarminIntervals(variantId);
+          intervals = await expandGarminIntervals(variantId, undefined, params.baselines);
         }
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
@@ -396,7 +422,7 @@ export async function composeUniversalWeek(params: {
         const variantId = parseGarminVariantId(qualitySession.session);
         let intervals: string[] | undefined = undefined;
         if (variantId) {
-          intervals = await expandGarminIntervals(variantId);
+          intervals = await expandGarminIntervals(variantId, undefined, params.baselines);
         }
         session = {
           day: slot.day === 'Mon' ? 'Monday' : 
@@ -468,7 +494,13 @@ export async function composeUniversalWeek(params: {
         const anchor = anchors[anchorIdx] || anchors[0];
         const parts: string[] = [];
         if (anchor?.label) parts.push(anchor.label);
-        (anchor?.main_lifts || []).forEach((l: any) => parts.push(`${l.name} ${l.scheme}${l.intensity_hint ? ' @'+l.intensity_hint : ''}`));
+        // Prefer explicit @% 1RM for loads to trigger conversion
+        (anchor?.main_lifts || []).forEach((l: any) => {
+          const pct = l.intensity_hint?.match(/(\d+\s*–\s*\d+|\d+\-\d+|\d+\s*to\s*\d+|\d+\-?\d*?)%/i);
+          const chosen = pct ? (pct[0].includes('–') || pct[0].includes('to') || pct[0].includes('-') ? pct[0].split(/[–to-]/)[0].trim() : pct[0]) : undefined;
+          const at = chosen ? `@${chosen} 1RM` : '';
+          parts.push(`${l.name} ${l.scheme} ${at}`.trim());
+        });
         (anchor?.support_light || []).forEach((l: any) => parts.push(`${l.name} ${l.scheme}`));
         const applied = applyStrengthBaselines(parts);
         session = {
