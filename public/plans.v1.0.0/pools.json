@@ -1,19 +1,33 @@
 {
   "pools": [
-    { "id": "run_easy", "name": "Easy Run" },
-    { "id": "run_long", "name": "Long Run" },
-    { "id": "run_tempo", "name": "Tempo Run" },
-    { "id": "strength_power_anchor_A", "name": "Strength – Power: Squat/Bench" },
-    { "id": "strength_power_anchor_B", "name": "Strength – Power: Deadlift/OHP" },
-    { "id": "strength_optional_supportive", "name": "Strength – Optional Upper/Core (supportive)" },
-    { "id": "strength_endurance_circuit", "name": "Strength – Endurance: Circuit" },
-    { "id": "bike_endurance", "name": "Endurance Ride (Z2 steady)" },
-    { "id": "bike_tempo", "name": "Tempo Ride" },
-    { "id": "bike_intervals", "name": "Bike Intervals" },
-    { "id": "bike_long", "name": "Long Ride" },
-    { "id": "swim_endurance", "name": "Endurance Swim" },
-    { "id": "swim_intervals", "name": "Swim Intervals (25/50/100m repeats)" },
-    { "id": "swim_drills", "name": "Technique Drills (kickboard, pull buoy, form)" }
+    {
+      "id": "run_quality",
+      "discipline": "run",
+      "hardness": "hard",
+      "stackableWith": ["strength_nonhard"],
+      "notes": "Quality run (intervals/tempo/threshold)."
+    },
+    {
+      "id": "run_long",
+      "discipline": "run",
+      "hardness": "hard",
+      "stackableWith": []
+    },
+    {
+      "id": "strength_nonhard",
+      "discipline": "strength",
+      "hardness": "nonhard_strength",
+      "stackableWith": ["run_quality"]
+    },
+    {
+      "id": "strength_neural",
+      "discipline": "strength",
+      "hardness": "hard",
+      "stackableWith": []
+    },
+    { "id": "strength_upper_power",     "discipline": "strength", "hardness": "nonhard_strength", "stackableWith": [] },
+    { "id": "strength_upper_endurance", "discipline": "strength", "hardness": "nonhard_strength", "stackableWith": [] },
+    { "id": "strength_upper_hybrid",    "discipline": "strength", "hardness": "nonhard_strength", "stackableWith": [] }
   ]
 }
 
