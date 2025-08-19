@@ -59,12 +59,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const isCompleted = workout.workout_status === 'completed';
     
     // Get metrics/description based on workout status
+    const truncate = (text: string, max = 120) => {
+      if (!text) return '';
+      return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
+    };
+
     const getMetrics = () => {
       if (!isCompleted) {
         // PLANNED: Show workout description/structure
-        const description = workout.description || workout.intervals?.map(i => i.description).join(', ') || 
-                           workout.workout_type || 'Planned workout';
-        return [description];
+        const full = workout.description || (Array.isArray(workout.intervals) ? workout.intervals.join(' • ') : '') ||
+                     workout.workout_type || 'Planned workout';
+        return [truncate(full, 140)];
       }
       
       // COMPLETED: Show actual metrics
