@@ -341,7 +341,7 @@ export async function composeUniversalWeek(params: {
     return desc;
   }
 
-  params.skeletonWeek.slots.forEach(slot => {
+  for (const slot of params.skeletonWeek.slots) {
     let session: SessionTemplate | null = null;
     const sport = poolToSport[slot.poolId];
 
@@ -479,7 +479,7 @@ export async function composeUniversalWeek(params: {
     if (session) {
       sessions.push(session);
     }
-  });
+  }
 
   // Enforce Garmin-ready interval expansion for run intervals if plan specifies
   // (Assumes quality sessions description includes a variant id; otherwise leave as-is)
