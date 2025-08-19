@@ -567,7 +567,20 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Cadence',
-          value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
+          value: (() => {
+            const v = (
+              workoutData.avg_cadence ??
+              workoutData.metrics?.avg_cadence ??
+              workoutData.avg_running_cadence ??
+              workoutData.avg_run_cadence ??
+              workoutData.max_cadence ??
+              workoutData.metrics?.max_cadence ??
+              workoutData.max_running_cadence ??
+              workoutData.max_run_cadence
+            );
+            const n = typeof v === 'string' ? parseFloat(v) : (v as number);
+            return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
+          })(),
           unit: 'spm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -587,7 +600,20 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Cadence',
-          value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
+          value: (() => {
+            const v = (
+              workoutData.avg_cadence ??
+              workoutData.metrics?.avg_cadence ??
+              workoutData.avg_bike_cadence ??
+              workoutData.metrics?.avg_bike_cadence ??
+              workoutData.max_cadence ??
+              workoutData.metrics?.max_cadence ??
+              workoutData.max_bike_cadence ??
+              workoutData.metrics?.max_bike_cadence
+            );
+            const n = typeof v === 'string' ? parseFloat(v) : (v as number);
+            return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
+          })(),
           unit: 'rpm'
         },
         ...baseMetrics.slice(3) // Elevation, Calories
@@ -658,10 +684,13 @@ const formatPace = (paceValue: any): string => {
            workoutData.metrics?.max_cadence ??
            workoutData.max_running_cadence ??
            workoutData.max_bike_cadence ??
-           workoutData.max_run_cadence
+           workoutData.max_run_cadence ??
+           workoutData.metrics?.max_bike_cadence ??
+           workoutData.avg_cadence ??
+           workoutData.metrics?.avg_cadence
          );
-         const n = Number(v);
-         return Number.isFinite(n) && n > 0 ? safeNumber(n) : 'N/A';
+         const n = typeof v === 'string' ? parseFloat(v) : (v as number);
+         return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
        })(),
        unit: isRun ? 'spm' : 'rpm'
      }
