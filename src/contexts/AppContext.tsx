@@ -418,9 +418,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       // Materialize sessions into planned_workouts for Today/Calendar/Planned views
       try {
-        const startDate: string = planData.start_date || new Date().toISOString().slice(0, 10);
-        // sessions_by_week comes as object from builder: { "1": [sessions], ... }
-        const sessionsByWeek: Record<string, any[]> = planData.sessions_by_week || {};
+        // Prefer next Monday to keep week 1 forward-looking if no explicit start_date
+        const computeNextMonday = (): string => {
+          const d = new Date();
+          const day = d.getDay(); // 0=Sun..6=Sat
+          const diff = (8 - day) % 7 || 7;
+          const nm = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+          return nm.toISOString().slice(0, 10);
+        };
+        const startDate: string = planData.start_date || data?.start_date || computeNextMonday();
+        
+        // sessions_by_week may be present on the saved plan or the original payload
+        const sessionsByWeek: Record<string, any[]> = (data?.sessions_by_week as any) || planData.sessions_by_week || {};
+        
         const dayIndex: Record<string, number> = {
           Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7,
         };
@@ -433,11 +443,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         Object.keys(sessionsByWeek).forEach((wkKey) => {
           const weekNum = parseInt(wkKey, 10);
           const sessions = sessionsByWeek[wkKey] || [];
+          
           sessions.forEach((s: any) => {
             const dow = dayIndex[s.day] || 1;
             const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
             if (weekNum === 1 && date < startDate) return; // skip pre-start in week 1
-            rows.push({
+            
+            const row = {
               user_id: user?.id,
               training_plan_id: data.id,
               week_number: weekNum,
@@ -452,15 +464,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               intensity: s.intensity ?? null,
               intervals: s.intervals ?? null,
               strength_exercises: s.strength_exercises ?? null,
-            });
+            };
+            rows.push(row);
           });
         });
+        
         if (rows.length) {
           const { error: pErr } = await supabase.from('planned_workouts').insert(rows);
-          if (pErr) console.error('Error materializing planned workouts:', pErr);
+          if (pErr) {
+            console.error('Error materializing planned workouts:', pErr);
+            throw pErr;
+          }
+        } else {
+          console.warn('⚠️ No rows to insert - sessions_by_week may be empty or malformed');
         }
       } catch (mErr) {
         console.error('Materialization error:', mErr);
+        throw mErr; // Re-throw to fail the plan creation
       }
       await loadPlans();
     } catch (error) {

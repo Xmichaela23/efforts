@@ -5,6 +5,7 @@ import type { SimpleSchedulerParams } from '@/services/plans/scheduler/types';
 import type { Day, PlanConfig, StrengthTrack, SkeletonWeek } from '@/services/plans/types';
 import { useAppContext } from '@/contexts/AppContext';
 import { LABEL_RUN_VOLUME, HELP_RUN_VOLUME, RUN_VOLUME_OPTIONS } from './planBuilder/strings';
+import { supabase } from '@/lib/supabase';
 
 const PLAN_PATH = `${import.meta.env.BASE_URL}plans.v1.0.0/progressions.json`;
 
@@ -150,10 +151,13 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
             skeletonWeek: skel,
             planPath: PLAN_PATH,
             strengthTrack: cfg.strengthTrack ?? 'hybrid',
-            strengthDays: (cfg.strengthDaysPerWeek ?? 2) as 2 | 3,
+            strengthDays: (cfg.includeUpper ? 3 : (cfg.strengthDaysPerWeek ?? 2)) as 2 | 3,
             baselines
           });
           
+          console.log(`Week ${w} composed:`, composed.length, 'sessions');
+          
+          // Map SessionTemplate to our local Session type
           const mapped: Session[] = composed.map(s => ({
             day: s.day,
             discipline: s.discipline,
@@ -270,6 +274,64 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
       } else {
         await addPlan(planData);
       }
+      
+      // Directly insert planned workouts to avoid complex materialization
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('User not authenticated');
+        
+        // Start next Monday
+        const computeNextMonday = (): string => {
+          const d = new Date();
+          const day = d.getDay(); // 0=Sun..6=Sat
+          const diff = (8 - day) % 7 || 7;
+          const nm = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+          return nm.toISOString().slice(0, 10);
+        };
+        const startDate = computeNextMonday();
+        
+        const dayIndex: Record<string, number> = {
+          Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7,
+        };
+        const addDays = (iso: string, n: number) => {
+          const d = new Date(iso);
+          d.setDate(d.getDate() + n);
+          return d.toISOString().slice(0, 10);
+        };
+        
+        const rows: any[] = [];
+        sessionsByWeek.forEach((sessions, weekNum) => {
+          sessions.forEach((s: Session) => {
+            const dow = dayIndex[s.day] || 1;
+            const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
+            
+            rows.push({
+              user_id: user.id,
+              training_plan_id: null, // Will be set after plan is saved
+              week_number: weekNum,
+              day_number: dow,
+              date,
+              type: s.discipline,
+              name: s.type === 'strength' ? 'Strength' : s.type,
+              description: s.description,
+              duration: s.duration,
+              workout_status: 'planned',
+              source: 'plan',
+              intensity: s.intensity,
+            });
+          });
+        });
+        
+        if (rows.length > 0) {
+          const { error } = await supabase.from('planned_workouts').insert(rows);
+          if (error) throw error;
+          console.log(`✅ Inserted ${rows.length} planned workouts`);
+        }
+      } catch (error) {
+        console.error('Error inserting planned workouts:', error);
+        // Don't fail the plan creation, just log the error
+      }
+      
       setShowSuccess(true);
       
     } catch (error) {
