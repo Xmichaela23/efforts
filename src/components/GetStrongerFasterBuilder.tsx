@@ -399,6 +399,18 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
           </div>
 
           <div className="border-t pt-4">
+            {/* Plan Overview */}
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+              <div className="text-sm font-medium text-blue-900 mb-2">Plan Overview</div>
+              <div className="text-xs text-blue-800 space-y-1">
+                <div>• Week 1-2: Base building - establish routine and form</div>
+                <div>• Week 3-6: Build phase - increase intensity and volume</div>
+                <div>• Week 7: Peak week - highest training load</div>
+                <div>• Week 8: Taper - reduce volume, maintain intensity</div>
+              </div>
+            </div>
+
+            {/* Weeks header */}
             <div className="flex items-center justify-between mb-2">
               <div className="text-sm text-gray-700">Week {currentWeek} • {formatHM(totalMinutes)} • {weekSessions.length} sessions</div>
               <div className="flex gap-2 self-end mt-2 md:mt-3">
@@ -417,17 +429,6 @@ export default function GetStrongerFasterBuilder({ onPlanGenerated }: GetStronge
                 </ul>
               </div>
             ) : null}
-
-            {/* Plan Overview */}
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
-              <div className="text-sm font-medium text-blue-900 mb-2">Plan Overview</div>
-              <div className="text-xs text-blue-800 space-y-1">
-                <div>• Week 1-2: Base building - establish routine and form</div>
-                <div>• Week 3-6: Build phase - increase intensity and volume</div>
-                <div>• Week 7: Peak week - highest training load</div>
-                <div>• Week 8: Taper - reduce volume, maintain intensity</div>
-              </div>
-            </div>
 
             {/* Week Progression Details */}
             <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
