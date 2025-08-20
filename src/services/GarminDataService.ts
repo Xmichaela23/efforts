@@ -556,17 +556,7 @@ private static groupActivitiesBySport(activities: GarminActivity[]): Record<stri
   const groups: Record<string, GarminActivity[]> = {};
 
   activities.forEach(activity => {
-    let sport = '';
-    const typeKey = activity.activityType?.typeKey?.toLowerCase() || '';
-
-    if (this.isRunningActivity(typeKey)) {
-      sport = 'running';
-    } else if (this.isCyclingActivity(typeKey)) {
-      sport = 'cycling';
-    } else if (this.isSwimmingActivity(typeKey)) {
-      sport = 'swimming';
-    }
-
+    const sport = this.detectSport(activity);
     if (sport) {
       if (!groups[sport]) groups[sport] = [];
       groups[sport].push(activity);
@@ -576,13 +566,60 @@ private static groupActivitiesBySport(activities: GarminActivity[]): Record<stri
   return groups;
 }
 
+// Heuristic sport detection to correct common Garmin misclassifications
+private static detectSport(activity: GarminActivity): 'running' | 'cycling' | 'swimming' | '' {
+  const typeKey = activity.activityType?.typeKey?.toLowerCase() || '';
+
+  // Direct type hints first
+  if (this.isSwimmingActivity(typeKey)) return 'swimming';
+  if (this.isCyclingActivity(typeKey)) return 'cycling';
+  if (this.isRunningActivity(typeKey)) {
+    // If Garmin labeled it as run but cycling signals are strong, flip to cycling
+    const looksLikeCycling = (
+      (typeof activity.averagePower === 'number' && activity.averagePower > 50) ||
+      (typeof activity.maxPower === 'number' && activity.maxPower > 100) ||
+      (typeof activity.averageCadence === 'number' && activity.averageCadence > 60 && activity.averageCadence < 130) ||
+      (typeof activity.averageRunningCadence === 'number' && activity.averageRunningCadence < 90 && !!activity.averagePower && activity.averagePower > 50) ||
+      (typeof activity.averageSpeed === 'number' && activity.averageSpeed >= 4.5)
+    );
+    if (looksLikeCycling) return 'cycling';
+    return 'running';
+  }
+
+  // Fallbacks based on metrics only when type is unknown
+  if (
+    (typeof activity.averagePower === 'number' && activity.averagePower > 50) ||
+    (typeof activity.maxPower === 'number' && activity.maxPower > 100) ||
+    (typeof activity.averageSpeed === 'number' && activity.averageSpeed >= 4.5)
+  ) {
+    return 'cycling';
+  }
+
+  if (
+    typeof activity.averageRunningCadence === 'number' && activity.averageRunningCadence >= 130
+  ) {
+    return 'running';
+  }
+
+  return '';
+}
+
 private static isRunningActivity(typeKey: string): boolean {
   return typeKey.toLowerCase().includes('run');
 }
 
 private static isCyclingActivity(typeKey: string): boolean {
   const cycling = typeKey.toLowerCase();
-  return cycling.includes('cycl') || cycling.includes('bik') || cycling.includes('ride');
+  return (
+    cycling.includes('cycl') ||
+    cycling.includes('bik') ||
+    cycling.includes('ride') ||
+    cycling.includes('road_bik') ||
+    cycling.includes('gravel') ||
+    cycling.includes('mtb') ||
+    cycling.includes('mountain_bik') ||
+    cycling.includes('ebike')
+  );
 }
 
 private static isSwimmingActivity(typeKey: string): boolean {

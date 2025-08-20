@@ -187,7 +187,7 @@ async function handleWebhookUnsubscription(userId: string, accessToken: string) 
 async function getWebhookStatus(userId: string) {
   try {
     const { data: userConnection, error: connectionError } = await supabase
-      .from('user_connections')
+      .from('device_connections')
       .select('connection_data, provider_user_id')
       .eq('user_id', userId)
       .eq('provider', 'strava')
@@ -226,11 +226,10 @@ async function getWebhookStatus(userId: string) {
 async function checkExistingWebhook(stravaUserId: number) {
   try {
     // Get all webhooks for our app
-    const webhooksResponse = await fetch('https://www.strava.com/api/v3/push_subscriptions', {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
-    });
+    const clientId = Deno.env.get('STRAVA_CLIENT_ID');
+    const clientSecret = Deno.env.get('STRAVA_CLIENT_SECRET');
+    const url = `https://www.strava.com/api/v3/push_subscriptions?client_id=${clientId}&client_secret=${clientSecret}`;
+    const webhooksResponse = await fetch(url);
 
     if (!webhooksResponse.ok) {
       console.warn(`⚠️ Could not check existing webhooks: ${webhooksResponse.status}`);
