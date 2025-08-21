@@ -288,10 +288,11 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
     if (sportType?.includes('run')) workoutType = 'running';
     else if (sportType?.includes('ride') || sportType?.includes('bike')) workoutType = 'cycling';
     else if (sportType?.includes('swim')) workoutType = 'swimming';
+    else if (sportType?.includes('walk') || sportType?.includes('hike')) workoutType = 'walking';
     else if (sportType?.includes('weight') || sportType?.includes('strength')) workoutType = 'strength';
 
     // Only create workouts for supported sports
-    if (!['running', 'cycling', 'swimming', 'strength'].includes(workoutType)) {
+    if (!['running', 'cycling', 'swimming', 'strength', 'walking'].includes(workoutType)) {
       console.log(`⏭️ Skipping workout creation for unsupported sport: ${sportType}`);
       return;
     }

@@ -209,7 +209,8 @@ function mapStravaTypeToWorkoutType(a: StravaActivity): FourTypes {
 
   if (['run', 'trailrun', 'virtualrun', 'treadmillrun'].some(x => s.includes(x))) return 'run';
 
-  if (s.includes('walk')) return 'walk';
+  // Treat hikes as walking for category, preserve raw label elsewhere
+  if (s.includes('walk') || s.includes('hike')) return 'walk';
 
   if (
     ['ride', 'virtualride', 'ebikeride', 'indoorcycling', 'mountainbikeride', 'gravelride'].some(x => s.includes(x)) ||

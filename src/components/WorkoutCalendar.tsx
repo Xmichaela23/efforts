@@ -183,6 +183,16 @@ export default function WorkoutCalendar({
     }
   };
 
+  // Prefer provider sport label (e.g., Hike, Gravel Ride) for display
+  const getDisplayLabel = (w: any): string => {
+    const provider = w?.strava_data?.original_activity?.sport_type || w?.provider_sport || '';
+    if (typeof provider === 'string' && provider.trim().length > 0) {
+      const label = provider.replace(/_/g, ' ');
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+    return getDisciplineName(w?.type);
+  };
+
   const getDisciplineColor = (type: string, isCompleted?: boolean): string => {
     // Color code by status: completed = green, planned = orange
     if (isCompleted) {
@@ -266,9 +276,9 @@ export default function WorkoutCalendar({
                                 key={workout.id || idx}
                                 className={`text-[10px] font-medium`}
                                 style={{ color: hex }}
-                                title={workout.name || workout.type}
+                                title={workout.name || getDisplayLabel(workout)}
                               >
-                                {getDisciplineName(workout.type)}
+                                {getDisplayLabel(workout)}
                               </span>
                             );
                           })}

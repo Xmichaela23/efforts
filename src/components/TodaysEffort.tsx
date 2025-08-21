@@ -54,7 +54,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // Format rich workout display - different for planned vs completed
   const formatRichWorkoutDisplay = (workout: any) => {
-    const discipline = getDisciplineName(workout.type);
+    const discipline = getDisplaySport(workout);
     const duration = workout.duration ? formatDuration(workout.duration) : 'N/A';
     const isCompleted = workout.workout_status === 'completed';
     
@@ -182,6 +182,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   };
 
   // Get discipline name
+  // Display label: prefer provider sport when present (e.g., Hike, Gravel Ride)
+  const getDisplaySport = (workout: any): string => {
+    const provider = workout?.strava_data?.original_activity?.sport_type
+      || workout?.provider_sport
+      || '';
+
+    if (typeof provider === 'string' && provider.trim().length > 0) {
+      // Title case
+      const label = provider.replace(/_/g, ' ');
+      return label.charAt(0).toUpperCase() + label.slice(1);
+    }
+
+    return getDisciplineName(workout?.type);
+  };
+
   const getDisciplineName = (type: string): string => {
     switch (type) {
       case 'run': return 'Run';
@@ -353,7 +368,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     {/* Title and Duration Row */}
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-sm" style={{ color: getDisciplineColor(workout.type) }}>
-                        {workout.name || getDisciplineName(workout.type)}
+                        {workout.name || getDisplaySport(workout)}
                         {workout.workout_status === 'planned' && (
                           <span className="text-xs ml-2" style={{ color: '#999' }}>(planned)</span>
                         )}
