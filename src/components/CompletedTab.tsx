@@ -1073,18 +1073,42 @@ const formatPace = (paceValue: any): string => {
        </div>
        
        {workoutType === 'ride' ? (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A'}
+         <>
+           <div className="px-2 py-1">
+             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+               {workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A'}
+             </div>
+             <div className="text-xs text-[#666666] font-normal">
+               <div className="font-medium">Avg Power</div>
+             </div>
            </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Avg Power</div>
+           <div className="px-2 py-1">
+             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+               {(() => {
+                 const v = (
+                   workoutData.avg_cadence ??
+                   workoutData.metrics?.avg_cadence ??
+                   workoutData.avg_bike_cadence
+                 );
+                 return v != null ? safeNumber(v) : 'N/A';
+               })()}
+             </div>
+             <div className="text-xs text-[#666666] font-normal">
+               <div className="font-medium">Avg Cadence</div>
+             </div>
            </div>
-         </div>
+         </>
        ) : (
          <div className="px-2 py-1">
            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A'}
+             {(() => {
+               const v = (
+                 workoutData.avg_cadence ??
+                 workoutData.metrics?.avg_cadence ??
+                 workoutData.avg_running_cadence
+               );
+               return v != null ? safeNumber(v) : 'N/A';
+             })()}
            </div>
            <div className="text-xs text-[#666666] font-normal">
              <div className="font-medium">Avg Cadence</div>
@@ -1123,7 +1147,15 @@ const formatPace = (paceValue: any): string => {
        {/* Row 4: Max Cadence, TSS, VAM */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.max_cadence ? safeNumber(workoutData.max_cadence) : 'N/A'}
+           {(() => {
+             const v = (
+               workoutData.max_cadence ??
+               workoutData.metrics?.max_cadence ??
+               workoutData.max_bike_cadence ??
+               workoutData.max_running_cadence
+             );
+             return v != null ? safeNumber(v) : 'N/A';
+           })()}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Max Cadence</div>

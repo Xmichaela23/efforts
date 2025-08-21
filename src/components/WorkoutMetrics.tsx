@@ -169,8 +169,17 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCadence(workout.avg_cadence || workout.avg_bike_cadence)}</div>
-              <p className="text-xs text-muted-foreground">Max: {formatCadence(workout.max_cadence || workout.max_bike_cadence)}</p>
+              <div className="text-2xl font-bold">{formatCadence(
+                workout.avg_cadence ||
+                // fallback to nested metrics
+                (workout as any).metrics?.avg_cadence ||
+                workout.avg_bike_cadence
+              )}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatCadence(
+                workout.max_cadence ||
+                (workout as any).metrics?.max_cadence ||
+                workout.max_bike_cadence
+              )}</p>
             </CardContent>
           </Card>
 
@@ -217,8 +226,16 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCadence(workout.avg_running_cadence || workout.avg_cadence)}</div>
-              <p className="text-xs text-muted-foreground">Max: {formatCadence(workout.max_running_cadence || workout.max_cadence)}</p>
+              <div className="text-2xl font-bold">{formatCadence(
+                workout.avg_running_cadence ||
+                workout.avg_cadence ||
+                (workout as any).metrics?.avg_cadence
+              )}</div>
+              <p className="text-xs text-muted-foreground">Max: {formatCadence(
+                workout.max_running_cadence ||
+                workout.max_cadence ||
+                (workout as any).metrics?.max_cadence
+              )}</p>
             </CardContent>
           </Card>
 
