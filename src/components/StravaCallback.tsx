@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const StravaCallback: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
@@ -25,13 +26,7 @@ const StravaCallback: React.FC = () => {
         }
 
         // Exchange code via Edge Function so tokens are persisted for the user
-        const { createClient } = await import('@supabase/supabase-js');
-        const sb = createClient(
-          'https://yyriamwvtvzlkumqrvpm.supabase.co',
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
-        );
-
-        const { data: { user } } = await sb.auth.getUser();
+        const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
 
         const resp = await fetch(

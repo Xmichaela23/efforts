@@ -22,16 +22,24 @@ type StravaTokenResp = {
   athlete?: { id: number };
 };
 
+function cors() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'content-type, authorization, apikey',
+  } as Record<string, string>;
+}
+
 Deno.serve(async (req) => {
   try {
-    if (req.method === 'OPTIONS') return new Response(null, { status: 204 });
-    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+    if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors() });
+    if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: cors() });
 
     const { code, userId, redirectUri }: ExchangeBody = await req.json();
     if (!code || !userId) {
       return new Response(JSON.stringify({ error: 'Missing code or userId' }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...cors() },
       });
     }
 
@@ -53,7 +61,7 @@ Deno.serve(async (req) => {
       const errText = await resp.text();
       return new Response(JSON.stringify({ error: `Strava token error: ${resp.status} ${errText}` }), {
         status: 400,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...cors() },
       });
     }
 
@@ -82,20 +90,19 @@ Deno.serve(async (req) => {
     if (error) {
       return new Response(JSON.stringify({ error: `DB error: ${error.message}` }), {
         status: 500,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...cors() },
       });
     }
 
     return new Response(JSON.stringify({ success: true, stravaUserId, expires_at: token.expires_at }), {
       status: 200,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...cors() },
     });
   } catch (e) {
     return new Response(JSON.stringify({ error: `${e}` }), {
       status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...cors() },
     });
   }
 });
-
 

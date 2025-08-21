@@ -64,6 +64,44 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       return text.length > max ? text.slice(0, max).trimEnd() + '…' : text;
     };
 
+    // Distance helpers
+    const haversine = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+      const toRad = (d: number) => (d * Math.PI) / 180;
+      const R = 6371000; // meters
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    };
+
+    const computeDistanceKm = (w: any): number | null => {
+      // direct km
+      if (typeof w?.distance === 'number' && w.distance > 0) {
+        // If value looks like meters (very large for walks), convert
+        return w.distance > 2000 ? w.distance / 1000 : w.distance;
+      }
+      // meters fields
+      const m = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
+      if (typeof m === 'number' && m > 0) return m / 1000;
+      // gps_track fallback
+      const track = Array.isArray(w?.gps_track) ? w.gps_track : null;
+      if (track && track.length > 1) {
+        let meters = 0;
+        for (let i = 1; i < track.length; i++) {
+          const a = track[i - 1];
+          const b = track[i];
+          if (a?.lat != null && a?.lng != null && b?.lat != null && b?.lng != null) {
+            meters += haversine(a.lat, a.lng, b.lat, b.lng);
+          }
+        }
+        if (meters > 0) return meters / 1000;
+      }
+      // steps fallback (~0.78 m per step average)
+      const steps = w?.steps ?? w?.metrics?.steps;
+      if (typeof steps === 'number' && steps > 0) return (steps * 0.78) / 1000;
+      return null;
+    };
+
     const getMetrics = () => {
       if (!isCompleted) {
         // PLANNED: Show workout description/structure
@@ -133,17 +171,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // Endurance: distance, pace/speed, heart rate, elevation
         // 🔧 FIXED: Use consistent distance formatting like CompletedTab
         let distance = 'N/A';
-        if (workout.distance) {
-          const dist = Number(workout.distance);
-          if (dist && !isNaN(dist)) {
-            // Always treat as km (from useWorkouts transformation), convert to miles if imperial
-            if (useImperial) {
-              const miles = dist * 0.621371;
-              distance = `${miles.toFixed(1)} mi`;
-            } else {
-              distance = `${dist.toFixed(1)} km`;
-            }
-          }
+        const km = computeDistanceKm(workout);
+        if (km && !isNaN(km)) {
+          if (useImperial) distance = `${(km * 0.621371).toFixed(1)} mi`;
+          else distance = `${km.toFixed(1)} km`;
         }
         
         const isRun = workout.type === 'run' || workout.type === 'walk';

@@ -130,7 +130,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
           {/* Distance */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.distance ? `${(workoutData.distance / 1000).toFixed(2)} km` : 'N/A'}
+              {(() => {
+                const km = computeDistanceKm(workoutData) ?? Number(workoutData.distance) || 0;
+                return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
+              })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Distance</div>
@@ -224,13 +227,40 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
+ const haversine = (lat: number, lon: number, lat2: number, lon2: number) => {
+   const toRad = (d: number) => (d * Math.PI) / 180;
+   const R = 6371000;
+   const dLat = toRad(lat2 - lat);
+   const dLon = toRad(lon2 - lon);
+   const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+   return 2 * R * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+ };
+
+ const computeDistanceKm = (w: any): number | null => {
+   if (typeof w?.distance === 'number' && w.distance > 0) return w.distance > 2000 ? w.distance / 1000 : w.distance;
+   const m = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
+   if (typeof m === 'number' && m > 0) return m / 1000;
+   const track = Array.isArray(w?.gps_track) ? w.gps_track : null;
+   if (track && track.length > 1) {
+     let meters = 0;
+     for (let i = 1; i < track.length; i++) {
+       const a = track[i - 1];
+       const b = track[i];
+       if (a?.lat != null && a?.lng != null && b?.lat != null && b?.lng != null) {
+         meters += haversine(a.lat, a.lng, b.lat, b.lng);
+       }
+     }
+     if (meters > 0) return meters / 1000;
+   }
+   const steps = w?.steps ?? w?.metrics?.steps;
+   if (typeof steps === 'number' && steps > 0) return (steps * 0.78) / 1000;
+   return null;
+ };
+
  const formatDistance = (km: any): string => {
    const num = Number(km);
    if (!num || isNaN(num)) return '0.0';
-   
-   if (useImperial) {
-     return (num * 0.621371).toFixed(1);
-   }
+   if (useImperial) return (num * 0.621371).toFixed(1);
    return num.toFixed(1);
  };
 
