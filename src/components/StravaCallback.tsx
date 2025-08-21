@@ -24,40 +24,36 @@ const StravaCallback: React.FC = () => {
           return;
         }
 
-        // Exchange code for tokens directly with Strava (like Garmin does)
-        const clientId = import.meta.env.VITE_STRAVA_CLIENT_ID;
-        const clientSecret = import.meta.env.VITE_STRAVA_CLIENT_SECRET;
+        // Exchange code via Edge Function so tokens are persisted for the user
+        const { createClient } = await import('@supabase/supabase-js');
+        const sb = createClient(
+          'https://yyriamwvtvzlkumqrvpm.supabase.co',
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY'
+        );
 
-        const tokenResponse = await fetch('https://www.strava.com/oauth/token', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            client_id: clientId,
-            client_secret: clientSecret,
-            code: code,
-            grant_type: 'authorization_code',
-          }),
-        });
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) throw new Error('Not authenticated');
 
-        if (!tokenResponse.ok) {
-          throw new Error(`Token exchange failed: ${tokenResponse.status}`);
-        }
+        const resp = await fetch(
+          'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-token-exchange',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, userId: user.id }),
+          }
+        );
 
-        const tokenData = await tokenResponse.json();
+        if (!resp.ok) throw new Error(`Token exchange failed: ${resp.status}`);
 
-        // Store in localStorage (exactly like Garmin does)
-        localStorage.setItem('strava_access_token', tokenData.access_token);
-        localStorage.setItem('strava_refresh_token', tokenData.refresh_token);
-        localStorage.setItem('strava_expires_at', tokenData.expires_at);
-        localStorage.setItem('strava_athlete', JSON.stringify(tokenData.athlete));
+        const tokenData = await resp.json();
+
+        // Also keep a local flag so UI can reflect connected state quickly
         localStorage.setItem('strava_connected', 'true');
 
         setStatus('success');
         setMessage('Successfully connected to Strava!');
 
-        // Redirect back to main app (like Garmin does)
+        // Redirect back to main app
         setTimeout(() => {
           window.location.href = '/';
         }, 2000);
