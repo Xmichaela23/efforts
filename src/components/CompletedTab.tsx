@@ -131,7 +131,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
-                const km = computeDistanceKm(workoutData) ?? Number(workoutData.distance) || 0;
+                const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
                 return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
               })()}
             </div>
