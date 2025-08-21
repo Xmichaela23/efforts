@@ -1082,6 +1082,24 @@ const formatPace = (paceValue: any): string => {
                <div className="font-medium">Avg Power</div>
              </div>
            </div>
+           {/* Max Power */}
+           <div className="px-2 py-1">
+             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+               {(() => {
+                 const field = workoutData.max_power ?? workoutData.metrics?.max_power;
+                 if (field != null) return safeNumber(field);
+                 const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
+                 const maxSensor = sensors
+                   .map((s: any) => Number(s.power))
+                   .filter((n: any) => Number.isFinite(n))
+                   .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
+                 return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
+               })()}
+             </div>
+             <div className="text-xs text-[#666666] font-normal">
+               <div className="font-medium">Max Power</div>
+             </div>
+           </div>
            <div className="px-2 py-1">
              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                {(() => {
@@ -1148,13 +1166,19 @@ const formatPace = (paceValue: any): string => {
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {(() => {
-             const v = (
+             const field = (
                workoutData.max_cadence ??
                workoutData.metrics?.max_cadence ??
                workoutData.max_bike_cadence ??
                workoutData.max_running_cadence
              );
-             return v != null ? safeNumber(v) : 'N/A';
+             if (field != null) return safeNumber(field);
+             const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
+             const maxSensor = sensors
+               .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
+               .filter((n: any) => Number.isFinite(n))
+               .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
+             return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
            })()}
          </div>
          <div className="text-xs text-[#666666] font-normal">
