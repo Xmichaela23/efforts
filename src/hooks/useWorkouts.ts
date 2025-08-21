@@ -600,8 +600,21 @@ export const useWorkouts = () => {
         // Garmin-specific fields
         isGarminImported: w.isGarminImported,
         garmin_activity_id: w.garmin_activity_id,
-        gps_track: w.gps_track,
-        sensor_data: w.sensor_data
+        // Ensure JSON fields are parsed for downstream calculations (e.g., max cadence from samples)
+        gps_track: (() => {
+          try {
+            return typeof (w as any).gps_track === 'string' ? JSON.parse((w as any).gps_track) : (w as any).gps_track;
+          } catch {
+            return (w as any).gps_track;
+          }
+        })(),
+        sensor_data: (() => {
+          try {
+            return typeof (w as any).sensor_data === 'string' ? JSON.parse((w as any).sensor_data) : (w as any).sensor_data;
+          } catch {
+            return (w as any).sensor_data;
+          }
+        })()
       }));
 
       console.log(`✅ Final mapped workouts: ${mapped.length}`);
