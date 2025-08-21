@@ -29,18 +29,11 @@ const StravaCallback: React.FC = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
 
-        const resp = await fetch(
-          'https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-token-exchange',
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, userId: user.id }),
-          }
-        );
-
-        if (!resp.ok) throw new Error(`Token exchange failed: ${resp.status}`);
-
-        const tokenData = await resp.json();
+        const { data, error: fxErr } = await supabase.functions.invoke('strava-token-exchange', {
+          body: { code, userId: user.id },
+        });
+        if (fxErr) throw new Error(`Token exchange failed: ${fxErr.message || 'invoke error'}`);
+        const tokenData = data;
 
         // Also keep a local flag so UI can reflect connected state quickly
         localStorage.setItem('strava_connected', 'true');
