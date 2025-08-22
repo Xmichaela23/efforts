@@ -456,6 +456,10 @@ export const useWorkouts = () => {
         id: w.id,
         name: w.name,
         type: w.type,
+        // Preserve provider sport information for UI labels (e.g., Hike, Gravel Ride)
+        // If present from Strava import/pipeline, carry it through so calendar shows correct sport label
+        provider_sport: (w as any)?.strava_data?.original_activity?.sport_type || (w as any)?.provider_sport,
+        strava_data: (w as any)?.strava_data,
         duration: w.duration,
         date: w.date,
         description: w.description,

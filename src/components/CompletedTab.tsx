@@ -377,44 +377,31 @@ const formatMaxSpeed = (speedValue: any): string => {
 
  // Format pace using basic calculation from distance and duration
 const formatPace = (paceValue: any): string => {
-  // For max pace, use transformed max_pace field (seconds per km from useWorkouts)
-  if (paceValue === (workoutData.metrics?.max_pace || workoutData.max_pace)) {
-    const maxPaceSecondsPerKm = Number(workoutData.max_pace);
-    if (maxPaceSecondsPerKm && maxPaceSecondsPerKm > 0) {
-      // Convert seconds per km to seconds per mile: multiply by 1.60934
-      const maxPaceSecondsPerMile = maxPaceSecondsPerKm * 1.60934;
-      const minutes = Math.floor(maxPaceSecondsPerMile / 60);
-      const seconds = Math.round(maxPaceSecondsPerMile % 60);
-      return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-    }
+  let secondsPerKm: number | null = null;
+  const raw = Number(paceValue);
+  if (Number.isFinite(raw) && raw > 0) {
+    // Normalize: if value looks like minutes/km (< 30), convert to seconds/km
+    secondsPerKm = raw < 30 ? raw * 60 : raw;
   }
-  
-  // For average pace, calculate from distance and duration
-  // useWorkouts.ts transforms Garmin data: duration_seconds → duration (minutes), distance_meters → distance (km)
-  const distanceKm = Number(workoutData.distance); // Already in km from useWorkouts transformation
-  const durationMinutes = Number(workoutData.duration); // Already in minutes from useWorkouts transformation
-  
-  console.log('🔍 formatPace debug:', {
-    raw_distance_meters: workoutData.distance_meters,
-    transformed_distance_km: workoutData.distance,
-    raw_duration_seconds: workoutData.duration_seconds, 
-    transformed_duration_minutes: workoutData.duration,
-    calculated_distanceKm: distanceKm,
-    calculated_durationMinutes: durationMinutes
-  });
-  
-  if (distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
-    // Convert km to miles
-    const distanceMiles = distanceKm * 0.621371;
-    // Calculate pace in minutes per mile
-    const paceMinPerMile = durationMinutes / distanceMiles;
-    
-    const minutes = Math.floor(paceMinPerMile);
-    const seconds = Math.round((paceMinPerMile - minutes) * 60);
-    console.log('🔍 formatPace calculated:', `${minutes}:${seconds.toString().padStart(2, '0')}/mi`);
+
+  if (secondsPerKm != null) {
+    const secondsPerMile = secondsPerKm * 1.60934; // km → mi
+    const minutes = Math.floor(secondsPerMile / 60);
+    const seconds = Math.round(secondsPerMile % 60);
     return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
   }
-  
+
+  // Fallback: compute average pace from distance (km) and duration (minutes)
+  const distanceKm = Number(workoutData.distance);
+  const durationMinutes = Number(workoutData.duration);
+  if (distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
+    const distanceMiles = distanceKm * 0.621371;
+    const paceMinPerMile = durationMinutes / distanceMiles;
+    const minutes = Math.floor(paceMinPerMile);
+    const seconds = Math.round((paceMinPerMile - minutes) * 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
+  }
+
   return 'N/A';
 };
 
@@ -538,8 +525,11 @@ const formatPace = (paceValue: any): string => {
         },
         {
           label: 'Distance',
-          value: formatDistance(workoutData.distance),
-          unit: useImperial ? 'mi' : 'mi'
+          value: (() => {
+            const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
+            return km ? formatDistance(km) : 'N/A';
+          })(),
+          unit: useImperial ? 'mi' : 'km'
         },
         {
           label: 'Heart Rate',
@@ -562,8 +552,11 @@ const formatPace = (paceValue: any): string => {
     const baseMetrics = [
       {
         label: 'Distance',
-        value: formatDistance(workoutData.distance),
-        unit: useImperial ? 'mi' : 'mi'
+        value: (() => {
+          const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
+          return km ? formatDistance(km) : 'N/A';
+        })(),
+        unit: useImperial ? 'mi' : 'km'
       },
       {
         label: 'Duration', 
