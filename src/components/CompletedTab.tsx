@@ -1108,7 +1108,15 @@ const formatPace = (paceValue: any): string => {
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {(workoutType === 'run' || workoutType === 'walk')
-             ? formatPace(workoutData.metrics?.max_pace || workoutData.max_pace)
+             ? (() => {
+                 const raw = workoutData.metrics?.max_pace || workoutData.max_pace;
+                 const n = Number(raw);
+                 if (!Number.isFinite(n) || n <= 0) return 'N/A';
+                 const secPerKm = n < 30 ? n * 60 : n;
+                 const secPerMile = secPerKm * 1.60934;
+                 if (workoutType === 'walk' && secPerMile < 360) return 'N/A'; // guard for walk/hike
+                 return formatPace(raw);
+               })()
              : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
          </div>
          <div className="text-xs text-[#666666] font-normal">
