@@ -29,8 +29,9 @@ const StravaCallback: React.FC = () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) throw new Error('Not authenticated');
 
+        const redirectUri = `${window.location.origin}/strava/callback`;
         const { data, error: fxErr } = await supabase.functions.invoke('strava-token-exchange', {
-          body: { code, userId: user.id },
+          body: { code, userId: user.id, redirectUri },
         });
         if (fxErr) throw new Error(`Token exchange failed: ${fxErr.message || 'invoke error'}`);
         const tokenData = data;
