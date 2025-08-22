@@ -212,12 +212,21 @@ const Connections: React.FC = () => {
     try {
       setLoading(true);
       
-      // Clear localStorage tokens (we use client-side storage for Strava)
+      // Clear any legacy localStorage tokens (no longer required)
       localStorage.removeItem('strava_access_token');
       localStorage.removeItem('strava_refresh_token');
       localStorage.removeItem('strava_expires_at');
       localStorage.removeItem('strava_athlete');
       localStorage.removeItem('strava_connected');
+
+      // Remove server-side connection so the user can reconnect cleanly
+      if (user?.id) {
+        await supabase
+          .from('device_connections')
+          .delete()
+          .eq('user_id', user.id)
+          .eq('provider', 'strava');
+      }
 
       toast({
         title: "Strava Disconnected",
@@ -255,43 +264,33 @@ const Connections: React.FC = () => {
           throw new Error('User not authenticated');
         }
         
-        // Use localStorage token for Strava imports
-        const accessToken = localStorage.getItem('strava_access_token');
-        const refreshToken = localStorage.getItem('strava_refresh_token');
-        const isConnected = localStorage.getItem('strava_connected') === 'true';
-        if (!isConnected || !accessToken) {
-          throw new Error('Strava is not connected on this device');
-        }
+        // Read tokens from server-side device_connections (authoritative)
+        const { data: conn } = await supabase
+          .from('device_connections')
+          .select('connection_data')
+          .eq('user_id', authUser.id)
+          .eq('provider', 'strava')
+          .single();
 
-        // Call Supabase Edge Function to import historical data
-        const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/import-strava-history', {
-          method: 'POST',
-                  headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`
-        },
-        body: JSON.stringify({
-          userId: authUser.id,
-          accessToken,
-          refreshToken,
-          importType: 'historical',
-          startDate,
-          endDate
-        })
+        const accessToken = conn?.connection_data?.access_token as string | undefined;
+        const refreshToken = conn?.connection_data?.refresh_token as string | undefined;
+        if (!accessToken) throw new Error('Strava is not connected');
+
+        // Call Supabase Edge Function via client (auth headers auto-applied)
+        const { data: result, error: fxErr } = await supabase.functions.invoke('import-strava-history', {
+          body: {
+            userId: authUser.id,
+            accessToken,
+            refreshToken,
+            importType: 'historical',
+            startDate,
+            endDate,
+          },
         });
-
-        if (!response.ok) {
-          throw new Error('Failed to import historical data');
-        }
-
-        const result = await response.json();
+        if (fxErr) throw new Error(fxErr.message || 'Failed to import historical data');
 
         // If function refreshed tokens, persist them
-        if (result?.tokens?.access_token) {
-          localStorage.setItem('strava_access_token', result.tokens.access_token);
-          if (result.tokens.refresh_token) localStorage.setItem('strava_refresh_token', result.tokens.refresh_token);
-          if (result.tokens.expires_at) localStorage.setItem('strava_expires_at', String(result.tokens.expires_at));
-        }
+        // (No localStorage writes needed; function updates device_connections)
         
         // Show success message
         toast({
