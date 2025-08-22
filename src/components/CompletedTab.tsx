@@ -680,7 +680,15 @@ const formatPace = (paceValue: any): string => {
        },
        {
          label: 'Max Pace',
-         value: formatPace(workoutData.max_pace),
+         value: (() => {
+           const raw = workoutData.metrics?.max_pace || workoutData.max_pace;
+           const n = Number(raw);
+           if (!Number.isFinite(n) || n <= 0) return 'N/A';
+           const secPerKm = n < 30 ? n * 60 : n;
+           const secPerMile = secPerKm * 1.60934;
+           if (secPerMile < 360) return 'N/A'; // guard: unrealistic for walk/hike
+           return formatPace(raw);
+         })(),
          unit: '/mi'
        }
      ];
@@ -1024,6 +1032,19 @@ const formatPace = (paceValue: any): string => {
      
      {/* 🏠 ALL METRICS - 3-column grid with proper row alignment */}
      <div className="grid grid-cols-3 gap-3">
+       {/* Distance */}
+       <div className="px-2 py-1">
+         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+           {(() => {
+             const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
+             return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
+           })()}
+         </div>
+         <div className="text-xs text-[#666666] font-normal">
+           <div className="font-medium">Distance</div>
+         </div>
+       </div>
+
        {/* Row 1: Duration, Avg HR, Avg Pace */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
