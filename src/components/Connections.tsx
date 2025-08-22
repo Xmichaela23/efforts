@@ -267,13 +267,13 @@ const Connections: React.FC = () => {
         // Read tokens from server-side device_connections (authoritative)
         const { data: conn } = await supabase
           .from('device_connections')
-          .select('connection_data')
+          .select('connection_data, access_token, refresh_token')
           .eq('user_id', authUser.id)
           .eq('provider', 'strava')
           .single();
 
-        const accessToken = conn?.connection_data?.access_token as string | undefined;
-        const refreshToken = conn?.connection_data?.refresh_token as string | undefined;
+        const accessToken = (conn?.connection_data?.access_token || conn?.access_token) as string | undefined;
+        const refreshToken = (conn?.connection_data?.refresh_token || conn?.refresh_token) as string | undefined;
         if (!accessToken) throw new Error('Strava is not connected');
 
         // Call Supabase Edge Function via client (auth headers auto-applied)
