@@ -110,14 +110,23 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           </>
         )}
 
-        {/* Build a plan */}
+        {/* Admin: publish template (JSON) */}
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
           onClick={() => onOpenPlanBuilder?.()}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
-          <span>Select a plan</span>
+          <span>Admin – Add template (JSON)</span>
+        </DropdownMenuItem>
+
+        {/* User: select a plan from catalog */}
+        <DropdownMenuItem
+          onClick={() => onOpenPlanBuilder?.()}
+          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
+          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
+        >
+          <span>Select a plan (catalog)</span>
         </DropdownMenuItem>
 
         {/* Show All Plans if there are any plans or as fallback */}
@@ -130,7 +139,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
-          <span>{currentPlans.length === 0 && completedPlans.length === 0 ? 'All Plans' : 'View All Plans'}</span>
+          <span>{currentPlans.length === 0 && completedPlans.length === 0 ? 'Current Plans' : 'View Current Plans'}</span>
           <ArrowRight className="h-4 w-4" />
         </DropdownMenuItem>
       </DropdownMenuContent>
