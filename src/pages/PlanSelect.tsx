@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
-import { useAppContext } from '@/contexts/AppContext';
 
 function computeNextMonday(): string {
   const d = new Date();
@@ -108,132 +107,55 @@ export default function PlanSelect() {
     if (!libPlan) return;
     try {
       const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
-      // Load baselines and map tokens/targets into descriptions
       let baselines: any = null;
       try { baselines = await loadUserBaselines?.(); } catch {}
       const mapped = { ...remapped, sessions_by_week: {} as any };
       const fiveK = baselines?.performanceNumbers?.fiveK?.toString() || null;
       const easyPace = baselines?.performanceNumbers?.easyPace?.toString() || null;
       const ftp = baselines?.performanceNumbers?.ftp || null;
-      const oneRMs = {
-        squat: baselines?.performanceNumbers?.squat,
-        bench: baselines?.performanceNumbers?.bench,
-        deadlift: baselines?.performanceNumbers?.deadlift,
-        overhead: baselines?.performanceNumbers?.overheadPress1RM,
-      } as any;
-
-      const parsePace = (p?: string|null) => {
-        if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() };
-      };
+      const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
+      const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
       const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
-      const addOffset = (base: string, off: string) => {
-        const b = base.trim(); const o = off.trim();
-        const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i);
-        if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]=== '-' || om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu);
-      };
-      const resolvePaces = (text: string) => {
-        let out = text;
-        if (fiveK) out = out.replaceAll('{5k_pace}', fiveK);
-        if (easyPace) out = out.replaceAll('{easy_pace}', easyPace);
-        // handle patterns like "M:SS/unit +/- M:SS/unit"
-        out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`));
-        return out;
-      };
+      const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
+      const resolvePaces = (text: string) => { let out = text; if (fiveK) out = out.replaceAll('{5k_pace}', fiveK); if (easyPace) out = out.replaceAll('{easy_pace}', easyPace); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
       const round = (w: number) => Math.round(w / 5) * 5;
-      const resolveStrength = (text: string) => {
-        // Append computed weight after patterns like "Squat ... @70%" using 1RMs
-        return text.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
-          const key = String(lift).toLowerCase(); let orm:
-            number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined;
-          if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`;
+      const resolveStrength = (text: string) => text.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
+      const mapBike = (text: string) => { if (!ftp) return text; const t = text.toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
+      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) { const outWeek: any[] = []; for (const s of sessions as any[]) { let desc = String(s.description||''); if (desc) desc = resolvePaces(desc); if (desc) desc = resolveStrength(desc); if (desc) desc = mapBike(desc); const copy = { ...s, description: desc }; outWeek.push(copy); } (mapped.sessions_by_week as any)[wk] = outWeek; }
+      const payload = { name: libPlan.name, description: libPlan.description || '', duration_weeks: mapped.duration_weeks, current_week: 1, status: 'active', plan_type: 'catalog', start_date: startDate, config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id }, weeks: [], sessions_by_week: mapped.sessions_by_week, notes_by_week: mapped.notes_by_week || {} } as any;
+
+      // Direct insert into plans and materialize planned_workouts
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('You must be signed in to save a plan.');
+      const insertPayload: any = { ...payload, user_id: user.id }; delete insertPayload.start_date;
+      const { data: planRow, error: planErr } = await supabase.from('plans').insert([insertPayload]).select().single();
+      if (planErr) throw planErr;
+      const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
+      const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+      const rows: any[] = [];
+      Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
+        const weekNum = parseInt(wkKey, 10);
+        const sessions = payload.sessions_by_week[wkKey] || [];
+        sessions.forEach((s: any) => {
+          const dow = dayIndex[s.day] || 1;
+          const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
+          if (weekNum === 1 && date < startDate) return;
+          const rawType = (s.discipline || s.type || '').toLowerCase();
+          let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
+          if (rawType === 'run') mappedType = 'run'; else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride'; else if (rawType === 'swim') mappedType = 'swim'; else if (rawType === 'strength') mappedType = 'strength';
+          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
+          const row: any = { user_id: user.id, training_plan_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'), description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan' };
+          if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
+          if (Array.isArray(s.intervals)) row.intervals = s.intervals;
+          if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
+          rows.push(row);
         });
-      };
-      const mapBike = (text: string) => {
-        if (!ftp) return text; const t = text.toLowerCase();
-        const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`;
-        if (t.includes('vo2')) return add(1.06,1.20);
-        if (t.includes('threshold')) return add(0.95,1.00);
-        if (t.includes('sweet spot')) return add(0.88,0.94);
-        if (t.includes('zone 2')) return add(0.60,0.75);
-        return text;
-      };
-
-      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) {
-        const outWeek: any[] = [];
-        for (const s of sessions as any[]) {
-          let desc = String(s.description||'');
-          if (desc) desc = resolvePaces(desc);
-          if (desc) desc = resolveStrength(desc);
-          if (desc) desc = mapBike(desc);
-          const copy = { ...s, description: desc };
-          outWeek.push(copy);
-        }
-        (mapped.sessions_by_week as any)[wk] = outWeek;
-      }
-
-      const payload = {
-        name: libPlan.name,
-        description: libPlan.description || '',
-        duration_weeks: mapped.duration_weeks,
-        current_week: 1,
-        status: 'active',
-        plan_type: 'catalog',
-        start_date: startDate,
-        config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id },
-        weeks: [],
-        sessions_by_week: mapped.sessions_by_week,
-        notes_by_week: mapped.notes_by_week || {},
-      } as any;
-      await addPlan(payload);
+      });
+      if (rows.length) { const { error: pwErr } = await supabase.from('planned_workouts').insert(rows); if (pwErr) throw pwErr; }
       try { await refreshPlans?.(); } catch {}
       navigate('/');
     } catch (e: any) {
-      // Fallback: attempt direct insert and surface full error text
-      try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) throw new Error('You must be signed in to save a plan.');
-        const insertPayload: any = { ...payload, user_id: user.id };
-        delete insertPayload.start_date; // not a column on plans
-        const { data, error } = await supabase.from('plans').insert([insertPayload]).select().single();
-        if (error) throw error;
-        // Materialize planned_workouts like context normally does
-        try {
-          const start = startDate;
-          const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
-          const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
-          const rows: any[] = [];
-          Object.keys((payload as any).sessions_by_week || {}).forEach((wkKey) => {
-            const weekNum = parseInt(wkKey, 10);
-            const sessions = (payload as any).sessions_by_week[wkKey] || [];
-            sessions.forEach((s: any) => {
-              const dow = dayIndex[s.day] || 1;
-              const date = addDays(start, (weekNum - 1) * 7 + (dow - 1));
-              if (weekNum === 1 && date < start) return;
-              const rawType = (s.discipline || s.type || '').toLowerCase();
-              let mappedType: string = 'run';
-              if (rawType === 'run') mappedType = 'run';
-              else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride';
-              else if (rawType === 'swim') mappedType = 'swim';
-              else if (rawType === 'strength') mappedType = 'strength';
-              const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
-              const row: any = {
-                user_id: user.id, training_plan_id: data.id, week_number: weekNum, day_number: dow, date,
-                type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'),
-                description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan'
-              };
-              if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
-              if (Array.isArray(s.intervals)) row.intervals = s.intervals;
-              if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
-              rows.push(row);
-            });
-          });
-          if (rows.length) await supabase.from('planned_workouts').insert(rows);
-        } catch {}
-        try { await refreshPlans?.(); } catch {}
-        navigate('/');
-      } catch (inner: any) {
-        setError(inner?.message ? String(inner.message) : JSON.stringify(inner));
-      }
+      setError(e?.message ? String(e.message) : JSON.stringify(e));
     }
   }
 
