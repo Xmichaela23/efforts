@@ -521,10 +521,23 @@ Deno.serve(async (req) => {
     const perPage = 200;
     let updatedTokens: any = null;
 
+    // Normalize date boundaries to UTC day start/end to avoid TZ drift
+    const toUnix = (d: string, endOfDay = false) => {
+      try {
+        const iso = `${d}T${endOfDay ? '23:59:59' : '00:00:00'}Z`;
+        return Math.floor(new Date(iso).getTime() / 1000);
+      } catch (_) {
+        return undefined as unknown as number;
+      }
+    };
+
+    const afterEpoch = startDate ? toUnix(startDate, false) : undefined;
+    const beforeEpoch = endDate ? toUnix(endDate, true) : undefined;
+
     while (true) {
       let url = `https://www.strava.com/api/v3/athlete/activities?page=${page}&per_page=${perPage}`;
-      if (startDate) url += `&after=${Math.floor(new Date(startDate).getTime() / 1000)}`;
-      if (endDate) url += `&before=${Math.floor(new Date(endDate).getTime() / 1000)}`;
+      if (afterEpoch) url += `&after=${afterEpoch}`;
+      if (beforeEpoch) url += `&before=${beforeEpoch}`;
       
       console.log(`🔍 Requesting Strava API: ${url}`);
       
@@ -579,6 +592,13 @@ Deno.serve(async (req) => {
       if (!activities.length) break;
 
       for (const a of activities) {
+        // Defensive filter in case API returns out-of-range items
+        try {
+          const startTs = Math.floor(new Date(a.start_date).getTime() / 1000);
+          if (afterEpoch && startTs < afterEpoch) { skipped++; continue; }
+          if (beforeEpoch && startTs > beforeEpoch) { skipped++; continue; }
+        } catch (_) {}
+
         if (existing.has(a.id)) { skipped++; continue; }
 
         // Fetch detailed activity data to get HR, calories, etc.
