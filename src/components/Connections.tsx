@@ -20,6 +20,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { useToast } from './ui/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
 import { useAppContext } from '../contexts/AppContext';
 
@@ -57,6 +58,13 @@ const Connections: React.FC = () => {
   const { user } = useAppContext();
   const [stravaStartDate, setStravaStartDate] = useState<string>('');
   const [stravaEndDate, setStravaEndDate] = useState<string>('');
+  const isMobile = useIsMobile();
+  const [showDateControls, setShowDateControls] = useState(false);
+
+  useEffect(() => {
+    // On desktop, show controls by default; on mobile, keep them collapsed
+    setShowDateControls(!isMobile);
+  }, [isMobile]);
 
   const goToDashboard = () => {
     window.location.href = '/';
@@ -553,7 +561,7 @@ const Connections: React.FC = () => {
 
                   <div className="flex items-center space-x-2">
                     {/* Strava Date Range Picker */}
-                    {connection.provider === 'strava' && (
+                    {connection.provider === 'strava' && showDateControls && (
                       <div className="flex flex-col space-y-2 w-full">
                         {/* Quick Preset Buttons */}
                         <div className="flex items-center space-x-2 text-xs">
@@ -619,15 +627,39 @@ const Connections: React.FC = () => {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => connection.provider === 'strava' ? 
-                        importHistoricalData(connection.provider, stravaStartDate, stravaEndDate) : 
-                        importHistoricalData(connection.provider)
-                      }
+                      onClick={() => {
+                        if (connection.provider === 'strava') {
+                          let start = stravaStartDate;
+                          let end = stravaEndDate;
+                          if (isMobile && !start && !end) {
+                            const endD = new Date();
+                            const startD = new Date();
+                            startD.setDate(startD.getDate() - 30);
+                            start = startD.toISOString().split('T')[0];
+                            end = endD.toISOString().split('T')[0];
+                          }
+                          return importHistoricalData(connection.provider, start, end);
+                        }
+                        return importHistoricalData(connection.provider);
+                      }}
                       disabled={loading}
                     >
                       <Zap className="h-4 w-4 mr-2" />
-                      Import History
+                      {isMobile ? 'Import' : 'Import History'}
                     </Button>
+
+                    {/* Mobile-only: quick toggle to reveal date range controls */}
+                    {connection.provider === 'strava' && isMobile && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowDateControls((v) => !v)}
+                        disabled={loading}
+                      >
+                        <Calendar className="h-4 w-4 mr-2" />
+                        {showDateControls ? 'Hide Range' : 'Date Range'}
+                      </Button>
+                    )}
                     
                     {/* Progress Bar for Import */}
                     {importProgress.importing && connection.provider === 'strava' && (
