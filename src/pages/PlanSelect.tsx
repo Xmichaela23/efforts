@@ -55,6 +55,8 @@ export default function PlanSelect() {
   const [longRideDay, setLongRideDay] = useState<string>('Saturday');
   const [includeStrength, setIncludeStrength] = useState<boolean>(true);
   const [showPreview, setShowPreview] = useState<boolean>(true);
+  const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const byDay = (a: any, b: any) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
 
   useEffect(() => {
     (async () => {
@@ -89,18 +91,81 @@ export default function PlanSelect() {
     if (!libPlan) return;
     try {
       const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength });
+      // Load baselines and map tokens/targets into descriptions
+      let baselines: any = null;
+      try { baselines = await loadUserBaselines?.(); } catch {}
+      const mapped = { ...remapped, sessions_by_week: {} as any };
+      const fiveK = baselines?.performanceNumbers?.fiveK?.toString() || null;
+      const easyPace = baselines?.performanceNumbers?.easyPace?.toString() || null;
+      const ftp = baselines?.performanceNumbers?.ftp || null;
+      const oneRMs = {
+        squat: baselines?.performanceNumbers?.squat,
+        bench: baselines?.performanceNumbers?.bench,
+        deadlift: baselines?.performanceNumbers?.deadlift,
+        overhead: baselines?.performanceNumbers?.overheadPress1RM,
+      } as any;
+
+      const parsePace = (p?: string|null) => {
+        if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() };
+      };
+      const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
+      const addOffset = (base: string, off: string) => {
+        const b = base.trim(); const o = off.trim();
+        const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i);
+        if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]=== '-' || om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu);
+      };
+      const resolvePaces = (text: string) => {
+        let out = text;
+        if (fiveK) out = out.replaceAll('{5k_pace}', fiveK);
+        if (easyPace) out = out.replaceAll('{easy_pace}', easyPace);
+        // handle patterns like "M:SS/unit +/- M:SS/unit"
+        out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`));
+        return out;
+      };
+      const round = (w: number) => Math.round(w / 5) * 5;
+      const resolveStrength = (text: string) => {
+        // Append computed weight after patterns like "Squat ... @70%" using 1RMs
+        return text.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
+          const key = String(lift).toLowerCase(); let orm:
+            number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined;
+          if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`;
+        });
+      };
+      const mapBike = (text: string) => {
+        if (!ftp) return text; const t = text.toLowerCase();
+        const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`;
+        if (t.includes('vo2')) return add(1.06,1.20);
+        if (t.includes('threshold')) return add(0.95,1.00);
+        if (t.includes('sweet spot')) return add(0.88,0.94);
+        if (t.includes('zone 2')) return add(0.60,0.75);
+        return text;
+      };
+
+      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) {
+        const outWeek: any[] = [];
+        for (const s of sessions as any[]) {
+          let desc = String(s.description||'');
+          if (desc) desc = resolvePaces(desc);
+          if (desc) desc = resolveStrength(desc);
+          if (desc) desc = mapBike(desc);
+          const copy = { ...s, description: desc };
+          outWeek.push(copy);
+        }
+        (mapped.sessions_by_week as any)[wk] = outWeek;
+      }
+
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
-        duration_weeks: remapped.duration_weeks,
+        duration_weeks: mapped.duration_weeks,
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
         start_date: startDate,
         config: { source: 'catalog', preferences: { longRunDay, longRideDay, includeStrength }, catalog_id: libPlan.id },
         weeks: [],
-        sessions_by_week: remapped.sessions_by_week,
-        notes_by_week: remapped.notes_by_week || {},
+        sessions_by_week: mapped.sessions_by_week,
+        notes_by_week: mapped.notes_by_week || {},
       } as any;
       await addPlan(payload);
       navigate('/');
@@ -128,19 +193,37 @@ export default function PlanSelect() {
             <div className="text-sm font-medium">Plan Preview</div>
             <button className="text-xs text-blue-600" onClick={()=>setShowPreview(false)}>Hide</button>
           </div>
-          <div className="space-y-3 max-h-72 overflow-auto">
-            {Object.keys(libPlan.template.sessions_by_week||{}).sort((a: any,b: any)=>parseInt(a,10)-parseInt(b,10)).map((wk: string) => {
-              const sess = (libPlan.template.sessions_by_week[wk]||[]).slice();
-              const mins = sess.reduce((t: number, s: any)=>t+(s.duration||0),0);
-              return (
-                <div key={wk} className="border rounded p-2">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium">Week {wk}</div>
-                    <div className="text-xs text-gray-600">{sess.length} sessions • {mins} min</div>
+          <div className="space-y-3 max-h-96 overflow-auto">
+            {Object.keys(libPlan.template.sessions_by_week||{})
+              .sort((a: any,b: any)=>parseInt(a,10)-parseInt(b,10))
+              .map((wk: string) => {
+                const sess = (libPlan.template.sessions_by_week[wk]||[]).slice().sort(byDay);
+                const mins = sess.reduce((t: number, s: any)=>t+(typeof s.duration==='number'?s.duration:0),0);
+                return (
+                  <div key={wk} className="border rounded p-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium">Week {wk}</div>
+                      <div className="text-xs text-gray-600">{sess.length} sessions{mins>0?` • ${mins} min`:''}</div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-1">
+                      {sess.map((s: any, i: number) => {
+                        const fallback = [s.discipline || s.type || '']
+                          .concat((s.type && s.type!==s.discipline) ? [`• ${s.type}`] : [])
+                          .concat(typeof s.duration === 'number' ? [`• ${s.duration} min`] : [])
+                          .filter(Boolean)
+                          .join(' ')
+                          .trim();
+                        const label = s.description ? s.description : fallback;
+                        return (
+                          <div key={i} className="text-xs text-gray-700">
+                            <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
           </div>
         </div>
       )}
