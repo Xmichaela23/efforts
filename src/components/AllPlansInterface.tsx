@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -95,7 +96,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [adjustmentsUsed, setAdjustmentsUsed] = useState(0);
   const [adjustmentLimit] = useState(3);
 
-  const handlePlanClick = (planId: string) => {
+  const handlePlanClick = async (planId: string) => {
     let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
 
     // Parse weeks if stored as JSON string
@@ -132,8 +133,47 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         pd.duration = pd.duration_weeks;
       }
 
-      // sessions_by_week → weeks[].workouts[] expected by this view
-      if (pd.sessions_by_week) {
+      // Prefer materialized planned_workouts if present, so we honor actual scheduling and dates
+      try {
+        const { data: mat, error: matErr } = await supabase
+          .from('planned_workouts')
+          .select('*')
+          .eq('training_plan_id', planId)
+          .order('week_number', { ascending: true })
+          .order('day_number', { ascending: true });
+        if (!matErr && Array.isArray(mat) && mat.length > 0) {
+          const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
+          const byWeek: Record<number, any[]> = {};
+          for (const w of mat) {
+            const wk = w.week_number || 1;
+            const dayName = numToDay[w.day_number as number] || w.day || '';
+            const workout = {
+              id: w.id,
+              name: w.name || 'Session',
+              type: w.type,
+              description: w.description,
+              duration: typeof w.duration === 'number' ? w.duration : 0,
+              intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
+              day: dayName,
+              completed: false,
+            };
+            byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
+          }
+          const weekNumbers = Object.keys(byWeek).map(n=>parseInt(n,10)).sort((a,b)=>a-b);
+          const weeksOut = weekNumbers.map(wn => ({
+            weekNumber: wn,
+            title: `Week ${wn}`,
+            focus: '',
+            workouts: byWeek[wn],
+          }));
+          pd.weeks = weeksOut;
+        }
+      } catch (e) {
+        // fall back silently to sessions_by_week normalization
+      }
+
+      // If no materialized rows, normalize sessions_by_week → weeks[].workouts[] expected by this view
+      if (!pd.weeks && pd.sessions_by_week) {
         try {
           const weeksOut: any[] = [];
           const sessionsByWeek = pd.sessions_by_week;
