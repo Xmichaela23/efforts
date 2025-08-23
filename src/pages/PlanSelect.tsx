@@ -269,12 +269,7 @@ export default function PlanSelect() {
               </select>
             </div>
           )}
-          {hasStrength && (
-            <div className="flex items-center gap-2 mt-5">
-              <input id="incl-str" type="checkbox" checked={includeStrength} onChange={e=>setIncludeStrength(e.target.checked)} className="h-4 w-4" />
-              <label htmlFor="incl-str" className="text-sm">Include strength</label>
-            </div>
-          )}
+          {/* Strength is included as authored; no toggle */}
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
         <div>
