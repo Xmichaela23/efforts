@@ -467,6 +467,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             const row: any = {
               user_id: user?.id,
               training_plan_id: data.id,
+              template_id: String(data.id),
               week_number: weekNum,
               day_number: dow,
               date,
@@ -509,8 +510,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to delete plans');
-      // Remove planned rows for this plan_id first; keep completed history intact
-      await supabase.from('planned_workouts').delete().eq('training_plan_id', planId);
+      // Remove planned rows for this plan first (both linked and any fallback rows tagged via template_id)
+      await supabase
+        .from('planned_workouts')
+        .delete()
+        .or(`training_plan_id.eq.${planId},template_id.eq.${planId}`);
       const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', user.id);
       if (error) throw error;
       await loadPlans();
