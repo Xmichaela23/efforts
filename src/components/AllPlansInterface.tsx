@@ -180,8 +180,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         // fall back silently to sessions_by_week normalization
       }
 
-      // If no materialized rows, normalize sessions_by_week → weeks[].workouts[] expected by this view
-      if (!pd.weeks && pd.sessions_by_week) {
+      // If no materialized rows or empty weeks, normalize sessions_by_week → weeks[].workouts[] expected by this view
+      if ((!
+        pd.weeks || (Array.isArray(pd.weeks) && pd.weeks.length === 0)
+      ) && pd.sessions_by_week) {
         try {
           const weeksOut: any[] = [];
           const sessionsByWeek = pd.sessions_by_week;
