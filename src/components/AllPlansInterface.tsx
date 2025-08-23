@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
 import PlannedWorkoutView from './PlannedWorkoutView';
 
@@ -79,6 +80,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   onSelectWorkout
 }) => {
   const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
+  const { loadUserBaselines } = useAppContext();
+  const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>('list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
@@ -133,6 +136,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         pd.duration = pd.duration_weeks;
       }
 
+      // Load baselines for token resolution
+      try { if (!baselines) setBaselines(await loadUserBaselines?.()); } catch {}
+
       // Prefer materialized planned_workouts if present, so we honor actual scheduling and dates
       try {
         const commonSelect = '*';
@@ -152,6 +158,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         if (!e1 && !e2 && Array.isArray(mat) && mat.length > 0) {
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const byWeek: Record<number, any[]> = {};
+          // Baseline helpers
+          const fiveK: string | null = (baselines?.performanceNumbers?.fiveK || null) as any;
+          const easyPace: string | null = (baselines?.performanceNumbers?.easyPace || null) as any;
+          const ftp: number | null = (baselines?.performanceNumbers?.ftp || null) as any;
+          const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
+          const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
+          const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.split('{5k_pace}').join(String(fiveK)); if (easyPace) out = out.split('{easy_pace}').join(String(easyPace)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
+          const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
+
           for (const w of mat) {
             const wk = w.week_number || 1;
             const dayName = numToDay[w.day_number as number] || w.day || '';
@@ -159,7 +174,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               id: w.id,
               name: w.name || 'Session',
               type: w.type,
-              description: w.description,
+              description: mapBike(resolvePaces(w.description || '')),
               duration: typeof w.duration === 'number' ? w.duration : 0,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
@@ -180,10 +195,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         // fall back silently to sessions_by_week normalization
       }
 
-      // If no materialized rows or empty weeks, normalize sessions_by_week → weeks[].workouts[] expected by this view
-      if ((!
-        pd.weeks || (Array.isArray(pd.weeks) && pd.weeks.length === 0)
-      ) && pd.sessions_by_week) {
+      // Always normalize sessions_by_week → weeks[].workouts[] expected by this view
+      if (pd.sessions_by_week) {
         try {
           const weeksOut: any[] = [];
           const sessionsByWeek = pd.sessions_by_week;
@@ -198,7 +211,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const sessions = sessionsByWeek[w] || [];
             const workouts = (sessions as any[]).map((s, idx) => {
               const rawDesc = s.description || '';
-              const description = cleanSessionDescription(rawDesc);
+              // Baseline helpers (reuse same computation as above)
+              const fiveK: string | null = (baselines?.performanceNumbers?.fiveK || null) as any;
+              const easyPace: string | null = (baselines?.performanceNumbers?.easyPace || null) as any;
+              const ftp: number | null = (baselines?.performanceNumbers?.ftp || null) as any;
+              const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
+              const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
+              const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.split('{5k_pace}').join(String(fiveK)); if (easyPace) out = out.split('{easy_pace}').join(String(easyPace)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
+              const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
+              const description = mapBike(resolvePaces(cleanSessionDescription(rawDesc)));
               const discipline = (s.discipline || inferDisciplineFromText(rawDesc)) as any;
               const mappedType = discipline === 'bike' ? 'ride' : discipline;
               const extracted = extractTypeFromText(rawDesc);

@@ -144,7 +144,7 @@ export default function PlanSelect() {
           let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
           if (rawType === 'run') mappedType = 'run'; else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride'; else if (rawType === 'swim') mappedType = 'swim'; else if (rawType === 'strength') mappedType = 'strength';
           const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
-          const row: any = { user_id: user.id, training_plan_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'), description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan' };
+          const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'), description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan' };
           if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
           if (Array.isArray(s.intervals)) row.intervals = s.intervals;
           if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
