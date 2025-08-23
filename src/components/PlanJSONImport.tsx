@@ -263,19 +263,28 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
             <div className="space-y-3 max-h-96 overflow-auto">
               {Object.keys(planPreview.sessions_by_week).sort((a,b)=>parseInt(a,10)-parseInt(b,10)).map(week => {
                 const sessions = (planPreview.sessions_by_week[week] || []).slice().sort(byDay);
-                const mins = sessions.reduce((t: number, s: any) => t + (s.duration||0), 0);
+                const mins = sessions.reduce((t: number, s: any) => t + (typeof s.duration === 'number' ? s.duration : 0), 0);
                 return (
                   <div key={week} className="border rounded p-2">
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-medium">Week {week}</div>
-                      <div className="text-xs text-gray-600">{sessions.length} sessions • {mins} min</div>
+                      <div className="text-xs text-gray-600">{sessions.length} sessions{mins>0?` • ${mins} min`:''}</div>
                     </div>
                     <div className="mt-2 grid grid-cols-1 gap-1">
-                      {sessions.map((s: any, i: number) => (
-                        <div key={i} className="text-xs text-gray-700">
-                          <span className="font-medium">{s.day}</span> — {s.discipline || s.type} {s.type && s.type!==s.discipline ? `• ${s.type}`: ''} {s.duration?`• ${s.duration} min`:''}
-                        </div>
-                      ))}
+                      {sessions.map((s: any, i: number) => {
+                        const fallback = [s.discipline || s.type || '']
+                          .concat((s.type && s.type!==s.discipline) ? [`• ${s.type}`] : [])
+                          .concat(typeof s.duration === 'number' ? [`• ${s.duration} min`] : [])
+                          .filter(Boolean)
+                          .join(' ')
+                          .trim();
+                        const label = s.description ? s.description : fallback;
+                        return (
+                          <div key={i} className="text-xs text-gray-700">
+                            <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 );
