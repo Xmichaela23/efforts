@@ -151,7 +151,19 @@ export default function PlanSelect() {
           rows.push(row);
         });
       });
-      if (rows.length) { const { error: pwErr } = await supabase.from('planned_workouts').insert(rows); if (pwErr) throw pwErr; }
+      if (rows.length) {
+        const { error: pwErr } = await supabase.from('planned_workouts').insert(rows);
+        if (pwErr) {
+          const msg = String((pwErr as any)?.message || '');
+          if (msg.includes('planned_workouts_plan_fk')) {
+            const rowsNoLink = rows.map(r => ({ ...r, training_plan_id: null }));
+            const { error: pwErr2 } = await supabase.from('planned_workouts').insert(rowsNoLink);
+            if (pwErr2) throw pwErr2;
+          } else {
+            throw pwErr;
+          }
+        }
+      }
       try { await refreshPlans?.(); } catch {}
       navigate('/');
     } catch (e: any) {

@@ -9,6 +9,45 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { getDisciplineColor } from '@/lib/utils';
 import PlannedWorkoutView from './PlannedWorkoutView';
 
+// Helpers for normalizing minimal JSON sessions into legacy view expectations
+function cleanSessionDescription(text: string): string {
+  // Remove catalog/control tags like [cat:run], [plan:...] but keep interval variant tags
+  return String(text || '').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '');
+}
+
+function inferDisciplineFromText(text?: string): 'run' | 'ride' | 'swim' | 'strength' | undefined {
+  if (!text) return undefined;
+  const t = text.toLowerCase();
+  if (/\[cat:\s*run\]/i.test(text) || /\brun\b/.test(t)) return 'run';
+  if (/\[cat:\s*(bike|ride)\]/i.test(text) || /\b(bike|ride|cycling)\b/.test(t)) return 'ride';
+  if (/\[cat:\s*swim\]/i.test(text) || /\bswim\b/.test(t)) return 'swim';
+  if (/\[cat:\s*strength\]/i.test(text) || /(strength|squat|deadlift|bench|ohp)/.test(t)) return 'strength';
+  return undefined;
+}
+
+function extractTypeFromText(text?: string): string | undefined {
+  if (!text) return undefined;
+  // Match patterns like "Run — Intervals: ..." or "Bike — VO2 set: ..."
+  const m = text.match(/[—\-]\s*([^:]+):/);
+  if (m && m[1]) return m[1].trim();
+  // Fallbacks
+  if (/tempo/i.test(text)) return 'Tempo';
+  if (/interval/i.test(text)) return 'Intervals';
+  if (/long/i.test(text)) return 'Long';
+  if (/sweet\s*spot/i.test(text)) return 'Sweet Spot';
+  if (/vo2/i.test(text)) return 'VO2';
+  return undefined;
+}
+
+function extractMinutesFromText(text?: string): number | undefined {
+  if (!text) return undefined;
+  const m = text.match(/(\d{1,3})\s*min\b/i);
+  if (m) return parseInt(m[1], 10);
+  return undefined;
+}
+
+function capitalize(w?: string) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''; }
+
 interface Plan {
   id: string;
   name: string;
@@ -107,16 +146,26 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
           for (const w of weekNumbers) {
             const sessions = sessionsByWeek[w] || [];
-            const workouts = (sessions as any[]).map((s, idx) => ({
-              id: s.id || `${pd.id}-w${w}-${idx}`,
-              name: s.discipline === 'strength' ? 'Strength' : `${s.discipline} ${s.type}`,
-              type: s.discipline === 'bike' ? 'ride' : s.discipline, // map to icon set used here
-              description: s.description,
-              duration: s.duration || 0,
-              intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
-              day: s.day,
-              completed: false,
-            }));
+            const workouts = (sessions as any[]).map((s, idx) => {
+              const rawDesc = s.description || '';
+              const description = cleanSessionDescription(rawDesc);
+              const discipline = (s.discipline || inferDisciplineFromText(rawDesc)) as any;
+              const mappedType = discipline === 'bike' ? 'ride' : discipline;
+              const extracted = extractTypeFromText(rawDesc);
+              const typeName = s.type || extracted || '';
+              const name = discipline === 'strength' ? 'Strength' : [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
+              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (extractMinutesFromText(rawDesc) || 0);
+              return {
+                id: s.id || `${pd.id}-w${w}-${idx}`,
+                name,
+                type: mappedType || 'run',
+                description,
+                duration,
+                intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
+                day: s.day,
+                completed: false,
+              };
+            });
 
             weeksOut.push({
               weekNumber: w,
