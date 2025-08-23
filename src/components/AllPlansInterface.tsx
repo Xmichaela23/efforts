@@ -135,13 +135,21 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
       // Prefer materialized planned_workouts if present, so we honor actual scheduling and dates
       try {
-        const { data: mat, error: matErr } = await supabase
+        const commonSelect = '*';
+        const { data: byLink, error: e1 } = await supabase
           .from('planned_workouts')
-          .select('*')
-          .or(`training_plan_id.eq.${planId},template_id.eq.${planId}`)
+          .select(commonSelect)
+          .eq('training_plan_id', planId)
           .order('week_number', { ascending: true })
           .order('day_number', { ascending: true });
-        if (!matErr && Array.isArray(mat) && mat.length > 0) {
+        const { data: byTemplate, error: e2 } = await supabase
+          .from('planned_workouts')
+          .select(commonSelect)
+          .eq('template_id', planId)
+          .order('week_number', { ascending: true })
+          .order('day_number', { ascending: true });
+        const mat = ([] as any[]).concat(byLink || []).concat(byTemplate || []);
+        if (!e1 && !e2 && Array.isArray(mat) && mat.length > 0) {
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const byWeek: Record<number, any[]> = {};
           for (const w of mat) {
