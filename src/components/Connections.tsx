@@ -219,13 +219,19 @@ const Connections: React.FC = () => {
       localStorage.removeItem('strava_athlete');
       localStorage.removeItem('strava_connected');
 
+      // Get authenticated user (avoid relying solely on context)
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) {
+        throw new Error('Not authenticated');
+      }
+
       // Prefer server-side delete via Edge Function (uses service role to bypass RLS)
-      if (user?.id) {
+      if (authUser.id) {
         let invoked = false;
         let invokeErr: any = null;
         // Primary function name
         const primary = await supabase.functions.invoke('disconnect-connection', {
-          body: { userId: user.id, provider: 'strava' }
+          body: { userId: authUser.id, provider: 'strava' }
         });
         if (!primary.error) {
           invoked = true;
@@ -233,7 +239,7 @@ const Connections: React.FC = () => {
           invokeErr = primary.error;
           // Some environments have it deployed with a misspelling; try alternate
           const alt = await supabase.functions.invoke('disconect-connection', {
-            body: { userId: user.id, provider: 'strava' }
+            body: { userId: authUser.id, provider: 'strava' }
           });
           if (!alt.error) {
             invoked = true;
@@ -247,7 +253,7 @@ const Connections: React.FC = () => {
           const { error: clientDelErr } = await supabase
             .from('device_connections')
             .delete()
-            .eq('user_id', user.id)
+            .eq('user_id', authUser.id)
             .eq('provider', 'strava');
           if (clientDelErr) {
             throw new Error(`Disconnect failed: ${invokeErr?.message || 'invoke error'}; client delete blocked by RLS`);
@@ -258,7 +264,7 @@ const Connections: React.FC = () => {
         const { data: remains, error: checkErr } = await supabase
           .from('device_connections')
           .select('id')
-          .eq('user_id', user.id)
+          .eq('user_id', authUser.id)
           .eq('provider', 'strava');
         if (checkErr) {
           throw checkErr;
@@ -269,6 +275,7 @@ const Connections: React.FC = () => {
         }
       }
 
+      // Only show success after verification passes
       toast({
         title: "Strava Disconnected",
         description: "Your Strava account has been disconnected.",
@@ -278,8 +285,9 @@ const Connections: React.FC = () => {
       setConnections(prev => prev.map(conn =>
         conn.provider === 'strava' ? { ...conn, connected: false, webhookActive: false } : conn
       ));
-      
-      loadConnectionStatus();
+
+      // Re-fetch status
+      await loadConnectionStatus();
       
     } catch (error) {
       console.error('Error disconnecting Strava:', error);
