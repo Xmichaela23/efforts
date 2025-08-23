@@ -219,13 +219,19 @@ const Connections: React.FC = () => {
       localStorage.removeItem('strava_athlete');
       localStorage.removeItem('strava_connected');
 
-      // Remove server-side connection so the user can reconnect cleanly
+      // Prefer server-side delete via Edge Function (uses service role to bypass RLS)
       if (user?.id) {
-        await supabase
-          .from('device_connections')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('provider', 'strava');
+        const { error: fxErr } = await supabase.functions.invoke('disconnect-connection', {
+          body: { userId: user.id, provider: 'strava' }
+        });
+        if (fxErr) {
+          // Fallback to client delete in case function unavailable
+          await supabase
+            .from('device_connections')
+            .delete()
+            .eq('user_id', user.id)
+            .eq('provider', 'strava');
+        }
       }
 
       toast({
