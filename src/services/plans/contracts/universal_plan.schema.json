@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://efforts.app/schemas/universal_plan.schema.json",
+  "title": "Universal Training Plan",
+  "type": "object",
+  "required": ["name", "duration_weeks", "sessions_by_week"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": "string" },
+    "duration_weeks": { "type": "integer", "minimum": 1 },
+    "plan_type": { "type": "string" },
+    "sessions_by_week": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/session" }
+      }
+    },
+    "notes_by_week": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  },
+  "definitions": {
+    "session": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["day"],
+      "properties": {
+        "day": { "type": "string", "enum": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] },
+        "discipline": { "type": "string", "enum": ["run","bike","ride","swim","strength","brick","walk"] },
+        "type": { "type": "string" },
+        "duration": { "type": "number", "minimum": 0 },
+        "intensity": { "type": ["string","object"] },
+        "description": { "type": "string" },
+        "intervals": {
+          "type": "array",
+          "items": { "type": ["string","object"] }
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "strength_exercises": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name","sets"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "sets": { "type": "integer", "minimum": 1 },
+              "reps": { "type": "integer", "minimum": 1 },
+              "weight": { "type": "number", "minimum": 0 }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+

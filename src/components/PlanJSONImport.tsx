@@ -1,0 +1,295 @@
+import React, { useState } from 'react';
+import { validateUniversalPlan } from '@/services/plans/UniversalPlanValidator';
+import { publishLibraryPlan } from '@/services/LibraryPlans';
+
+export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
+  const [tab, setTab] = useState<'paste'|'upload'|'url'>('paste');
+  const [text, setText] = useState('');
+  const [url, setUrl] = useState('');
+  const [fileName, setFileName] = useState<string>('');
+  const [planPreview, setPlanPreview] = useState<any | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [discipline, setDiscipline] = useState<'run'|'ride'|'swim'|'strength'|'hybrid'>('run');
+  // Acceptance preferences
+  const [startDate, setStartDate] = useState<string>('');
+  const [longRunDay, setLongRunDay] = useState<string>('Sunday');
+  const [longRideDay, setLongRideDay] = useState<string>('Saturday');
+  const [includeStrength, setIncludeStrength] = useState<boolean>(true);
+
+  async function handleValidate(input: any) {
+    setError(null);
+    setPlanPreview(null);
+    const res = validateUniversalPlan(input);
+    if (!res.ok) {
+      setError(res.errors);
+      return;
+    }
+    // Minimal sanity checks: week count matches max key
+    const keys = Object.keys(res.plan.sessions_by_week).map(k => parseInt(k, 10)).filter(n => Number.isFinite(n));
+    const maxWeek = keys.length ? Math.max(...keys) : 0;
+    if (res.plan.duration_weeks < maxWeek) {
+      setError(`duration_weeks (${res.plan.duration_weeks}) is less than last week key (${maxWeek})`);
+      return;
+    }
+    // Infer discipline from sessions for convenience
+    try {
+      const weeks = Object.values(res.plan.sessions_by_week || {}) as any[];
+      const s = (weeks.flat() as any[]);
+      const hasRun = s.some(x => (x.discipline||x.type||'').toLowerCase()==='run');
+      const hasRide = s.some(x => ['ride','bike','cycling'].includes(String(x.discipline||x.type||'').toLowerCase()));
+      const hasSwim = s.some(x => (x.discipline||x.type||'').toLowerCase()==='swim');
+      const hasStrength = s.some(x => (x.discipline||x.type||'').toLowerCase()==='strength');
+      if (hasRun && hasRide && hasSwim) setDiscipline('hybrid');
+      else if (hasRide && !hasRun && !hasSwim) setDiscipline('ride');
+      else if (hasSwim && !hasRun && !hasRide) setDiscipline('swim');
+      else if (hasStrength && !hasRun && !hasRide && !hasSwim) setDiscipline('strength');
+      else setDiscipline('run');
+    } catch {}
+    setPlanPreview(res.plan);
+  }
+
+  async function parseAndValidateText() {
+    try {
+      const json = JSON.parse(text);
+      await handleValidate(json);
+    } catch (e: any) {
+      setError(e.message || 'Invalid JSON');
+    }
+  }
+
+  async function fetchAndValidateUrl() {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      const json = await res.json();
+      await handleValidate(json);
+    } catch (e: any) {
+      setError(e.message || 'Failed to fetch');
+    }
+  }
+
+  async function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setFileName(f.name);
+    try {
+      const txt = await f.text();
+      const json = JSON.parse(txt);
+      await handleValidate(json);
+    } catch (e: any) {
+      setError(e.message || 'Invalid JSON file');
+    }
+  }
+
+  async function savePlan() {
+    if (!planPreview) return;
+    setSaving(true);
+    try {
+      // Publish template JSON to catalog
+      await publishLibraryPlan({
+        name: planPreview.name,
+        description: planPreview.description || '',
+        discipline,
+        duration_weeks: planPreview.duration_weeks,
+        tags: [],
+        template: planPreview,
+        status: 'published'
+      } as any);
+      if (onClose) onClose();
+    } catch (e: any) {
+      setError(e.message || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function computeNextMonday(): string {
+    const d = new Date();
+    const day = d.getDay(); // 0=Sun..6=Sat
+    const diff = (8 - day) % 7 || 7;
+    const nm = new Date(d.getFullYear(), d.getMonth(), d.getDate() + diff);
+    return nm.toISOString().slice(0, 10);
+  }
+
+  function isRunSession(s: any): boolean {
+    const d = (s.discipline || s.type || '').toLowerCase();
+    return d === 'run';
+  }
+  function isRideSession(s: any): boolean {
+    const d = (s.discipline || s.type || '').toLowerCase();
+    return d === 'bike' || d === 'ride' || d === 'cycling';
+  }
+  function isStrengthSession(s: any): boolean {
+    const d = (s.discipline || s.type || '').toLowerCase();
+    return d === 'strength';
+  }
+  function hasTag(s: any, tag: string): boolean {
+    return Array.isArray(s.tags) && s.tags.includes(tag);
+  }
+  function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay: string; includeStrength: boolean }) {
+    const out: any = { ...plan, sessions_by_week: {} };
+    for (const [week, sessions] of Object.entries<any>(plan.sessions_by_week || {})) {
+      const copy = (sessions as any[]).map(s => ({ ...s }));
+      // Move long run
+      const runIdxTagged = copy.findIndex(s => hasTag(s, 'long_run'));
+      const runIdxLongest = runIdxTagged >= 0 ? runIdxTagged : (() => {
+        let best = -1, bestDur = -1;
+        copy.forEach((s, i) => { if (isRunSession(s) && (s.duration || 0) > bestDur) { best = i; bestDur = s.duration || 0; } });
+        return best;
+      })();
+      if (runIdxLongest >= 0) copy[runIdxLongest].day = prefs.longRunDay;
+      // Move long ride
+      const rideIdxTagged = copy.findIndex(s => hasTag(s, 'long_ride'));
+      const rideIdxLongest = rideIdxTagged >= 0 ? rideIdxTagged : (() => {
+        let best = -1, bestDur = -1;
+        copy.forEach((s, i) => { if (isRideSession(s) && (s.duration || 0) > bestDur) { best = i; bestDur = s.duration || 0; } });
+        return best;
+      })();
+      if (rideIdxLongest >= 0) copy[rideIdxLongest].day = prefs.longRideDay;
+      // Strength include toggle
+      const filtered = prefs.includeStrength ? copy : copy.filter(s => !isStrengthSession(s) || hasTag(s, 'mandatory_strength'));
+      out.sessions_by_week[week] = filtered;
+    }
+    return out;
+  }
+
+  const totalSessions = planPreview
+    ? Object.values(planPreview.sessions_by_week).reduce((t: number, arr: any) => t + (Array.isArray(arr) ? arr.length : 0), 0)
+    : 0;
+
+  const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  function byDay(a: any, b: any) {
+    return DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
+  }
+
+  function exportMarkdown() {
+    if (!planPreview) return;
+    const lines: string[] = [];
+    lines.push(`# ${planPreview.name}`);
+    if (planPreview.description) lines.push('', planPreview.description);
+    lines.push('', `Weeks: ${planPreview.duration_weeks}`, '');
+    const weekKeys = Object.keys(planPreview.sessions_by_week || {}).sort((a,b)=>parseInt(a,10)-parseInt(b,10));
+    for (const wk of weekKeys) {
+      lines.push(`## Week ${wk}`);
+      const sessions = (planPreview.sessions_by_week[wk] || []).slice().sort(byDay);
+      for (const s of sessions) {
+        const parts: string[] = [];
+        parts.push(`- ${s.day}: ${s.discipline || s.type || ''}`.trim());
+        const meta: string[] = [];
+        if (s.type && s.type !== s.discipline) meta.push(s.type);
+        if (typeof s.duration === 'number') meta.push(`${s.duration} min`);
+        if (meta.length) lines.push(`  - ${meta.join(' • ')}`);
+        if (s.description) lines.push(`  - ${s.description}`);
+      }
+      lines.push('');
+    }
+    const text = lines.join('\n');
+    const blob = new Blob([text], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = String(planPreview.name || 'plan').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+    a.download = `${safeName}.md`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-semibold">Import JSON Plan</h2>
+        {onClose && (
+          <button onClick={onClose} className="text-sm text-blue-600">Close</button>
+        )}
+      </div>
+
+      <div className="flex gap-2">
+        <button onClick={() => setTab('paste')} className={`px-3 py-1 border rounded text-sm ${tab==='paste'?'bg-gray-100 border-gray-300':'border-gray-200'}`}>Paste JSON</button>
+        <button onClick={() => setTab('upload')} className={`px-3 py-1 border rounded text-sm ${tab==='upload'?'bg-gray-100 border-gray-300':'border-gray-200'}`}>Upload File</button>
+        <button onClick={() => setTab('url')} className={`px-3 py-1 border rounded text-sm ${tab==='url'?'bg-gray-100 border-gray-300':'border-gray-200'}`}>From URL</button>
+      </div>
+
+      {tab === 'paste' && (
+        <div className="space-y-2">
+          <textarea value={text} onChange={e=>setText(e.target.value)} className="w-full h-56 border border-gray-300 rounded p-2 text-sm" placeholder="Paste plan JSON here" />
+          <div className="flex gap-2">
+            <button onClick={parseAndValidateText} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">Validate</button>
+          </div>
+        </div>
+      )}
+
+      {tab === 'upload' && (
+        <div className="space-y-2">
+          <input type="file" accept="application/json" onChange={onFileChange} />
+          {fileName && <div className="text-xs text-gray-600">Selected: {fileName}</div>}
+        </div>
+      )}
+
+      {tab === 'url' && (
+        <div className="space-y-2">
+          <input value={url} onChange={e=>setUrl(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" placeholder="https://.../plan.json" />
+          <div>
+            <button onClick={fetchAndValidateUrl} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">Fetch & Validate</button>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="p-3 bg-red-50 text-red-700 border border-red-200 rounded text-sm whitespace-pre-wrap">{error}</div>
+      )}
+
+      {planPreview && (
+        <div className="space-y-3">
+          <div className="p-3 bg-green-50 border border-green-200 rounded">
+            <div className="text-sm text-green-800">Valid JSON plan detected.</div>
+          </div>
+          <div className="text-sm text-gray-700">{planPreview.name} • {planPreview.duration_weeks} weeks • {totalSessions} sessions</div>
+          <div className="p-3 border border-gray-200 rounded space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-gray-700 mb-1">Discipline</div>
+                <select value={discipline} onChange={e=>setDiscipline(e.target.value as any)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                  {['run','ride','swim','strength','hybrid'].map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+          {/* Read-only plan preview for admins before publishing */}
+          <div className="p-3 border border-gray-200 rounded space-y-2">
+            <div className="text-sm font-medium">Plan Preview (read-only)</div>
+            <div className="space-y-3 max-h-96 overflow-auto">
+              {Object.keys(planPreview.sessions_by_week).sort((a,b)=>parseInt(a,10)-parseInt(b,10)).map(week => {
+                const sessions = (planPreview.sessions_by_week[week] || []).slice().sort(byDay);
+                const mins = sessions.reduce((t: number, s: any) => t + (s.duration||0), 0);
+                return (
+                  <div key={week} className="border rounded p-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-medium">Week {week}</div>
+                      <div className="text-xs text-gray-600">{sessions.length} sessions • {mins} min</div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-1">
+                      {sessions.map((s: any, i: number) => (
+                        <div key={i} className="text-xs text-gray-700">
+                          <span className="font-medium">{s.day}</span> — {s.discipline || s.type} {s.type && s.type!==s.discipline ? `• ${s.type}`: ''} {s.duration?`• ${s.duration} min`:''}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          <div>
+            <button disabled={saving} onClick={savePlan} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50">{saving? 'Publishing...' : 'Publish to catalog'}</button>
+            <button onClick={exportMarkdown} className="ml-2 px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">Export Markdown</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+

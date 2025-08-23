@@ -1,6 +1,8 @@
 import React from 'react';
 import React, { useState } from 'react';
 import GetStrongerFasterBuilder from './GetStrongerFasterBuilder';
+import PlanJSONImport from './PlanJSONImport';
+import PlanCatalog from './PlanCatalog';
 
 type Discipline = 'run'|'ride'|'swim'|'strength'|'hybrid';
 
@@ -33,6 +35,12 @@ export default function PlanBuilder({ onPlanGenerated }: PlanBuilderProps) {
               {d.label}
             </button>
           ))}
+        </div>
+        <div className="mt-6">
+          <div className="text-sm font-medium mb-2">Import JSON plan</div>
+          <div className="border rounded">
+            <PlanJSONImport />
+          </div>
         </div>
       </div>
     );
@@ -108,15 +116,6 @@ export default function PlanBuilder({ onPlanGenerated }: PlanBuilderProps) {
     );
   }
 
-  // Placeholder for other disciplines (no plans yet)
-  return (
-    <div className="max-w-3xl mx-auto p-4 space-y-4">
-      <div className="flex items-center justify-between">
-        <button onClick={() => setDiscipline(null)} className="text-sm text-blue-600">← Back</button>
-        <h2 className="text-xl font-semibold">{discipline?.charAt(0).toUpperCase() + discipline!.slice(1)} Plans</h2>
-        <div />
-      </div>
-      <div className="text-sm text-gray-600">No plans available yet for this discipline.</div>
-    </div>
-  );
+  // Default: show catalog filtered by current discipline
+  return <PlanCatalog />;
 }

@@ -12,6 +12,7 @@ import StravaCallback from "./components/StravaCallback"; // ✅ UNCOMMENTED
 import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
 import PlannedWorkoutDemo from "./components/PlannedWorkoutDemo";
+import PlanSelect from "./pages/PlanSelect";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ const App = () => (
 <Route path="/auth/garmin/callback" element={<GarminCallback />} />
 <Route path="/connections" element={<Connections />} />
 <Route path="/demo" element={<PlannedWorkoutDemo />} />
+<Route path="/plans/select" element={<PlanSelect />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>
