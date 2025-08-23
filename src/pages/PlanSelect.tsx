@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
+import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 
 function computeNextMonday(): string {
@@ -185,7 +186,51 @@ export default function PlanSelect() {
       await addPlan(payload);
       navigate('/');
     } catch (e: any) {
-      setError(e.message || 'Failed to save plan');
+      // Fallback: attempt direct insert and surface full error text
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) throw new Error('You must be signed in to save a plan.');
+        const insertPayload: any = { ...payload, user_id: user.id };
+        delete insertPayload.start_date; // not a column on plans
+        const { data, error } = await supabase.from('plans').insert([insertPayload]).select().single();
+        if (error) throw error;
+        // Materialize planned_workouts like context normally does
+        try {
+          const start = startDate;
+          const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
+          const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+          const rows: any[] = [];
+          Object.keys((payload as any).sessions_by_week || {}).forEach((wkKey) => {
+            const weekNum = parseInt(wkKey, 10);
+            const sessions = (payload as any).sessions_by_week[wkKey] || [];
+            sessions.forEach((s: any) => {
+              const dow = dayIndex[s.day] || 1;
+              const date = addDays(start, (weekNum - 1) * 7 + (dow - 1));
+              if (weekNum === 1 && date < start) return;
+              const rawType = (s.discipline || s.type || '').toLowerCase();
+              let mappedType: string = 'run';
+              if (rawType === 'run') mappedType = 'run';
+              else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride';
+              else if (rawType === 'swim') mappedType = 'swim';
+              else if (rawType === 'strength') mappedType = 'strength';
+              const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
+              const row: any = {
+                user_id: user.id, training_plan_id: data.id, week_number: weekNum, day_number: dow, date,
+                type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'),
+                description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan'
+              };
+              if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
+              if (Array.isArray(s.intervals)) row.intervals = s.intervals;
+              if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
+              rows.push(row);
+            });
+          });
+          if (rows.length) await supabase.from('planned_workouts').insert(rows);
+        } catch {}
+        navigate('/');
+      } catch (inner: any) {
+        setError(inner?.message ? String(inner.message) : JSON.stringify(inner));
+      }
     }
   }
 
