@@ -17,9 +17,27 @@ function computeNextMonday(): string {
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
-function isRun(s: any) { const d = (s.discipline||s.type||'').toLowerCase(); return d==='run'; }
-function isRide(s: any) { const d = (s.discipline||s.type||'').toLowerCase(); return d==='ride'||d==='bike'||d==='cycling'; }
-function isStrength(s: any) { const d = (s.discipline||s.type||'').toLowerCase(); return d==='strength'; }
+function inferDisciplineFromDescription(desc?: string): string | null {
+  if (!desc) return null;
+  const t = desc.toLowerCase();
+  if (/\brun\b/.test(t)) return 'run';
+  if (/\b(bike|ride|cycling)\b/.test(t)) return 'ride';
+  if (/\bswim\b/.test(t)) return 'swim';
+  if (/\bstrength\b|squat|deadlift|bench|ohp/.test(t)) return 'strength';
+  return null;
+}
+function isRun(s: any) {
+  const d = (s.discipline||s.type||'')?.toLowerCase();
+  return d==='run' || inferDisciplineFromDescription(s.description)==='run';
+}
+function isRide(s: any) {
+  const d = (s.discipline||s.type||'')?.toLowerCase();
+  return d==='ride'||d==='bike'||d==='cycling' || inferDisciplineFromDescription(s.description)==='ride';
+}
+function isStrength(s: any) {
+  const d = (s.discipline||s.type||'')?.toLowerCase();
+  return d==='strength' || inferDisciplineFromDescription(s.description)==='strength';
+}
 function hasTag(s: any, t: string) { return Array.isArray(s.tags) && s.tags.includes(t); }
 
 function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay: string; includeStrength: boolean }) {
@@ -57,6 +75,7 @@ export default function PlanSelect() {
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const byDay = (a: any, b: any) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
+  const cleanDesc = (text: string) => String(text || '').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '');
 
   useEffect(() => {
     (async () => {
@@ -182,9 +201,12 @@ export default function PlanSelect() {
     <div className="max-w-3xl mx-auto p-4 space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-semibold">{libPlan.name}</h2>
-        <button onClick={() => navigate(-1)} className="text-sm text-blue-600">Back</button>
+        <div className="flex gap-3">
+          <button onClick={() => navigate(-1)} className="text-sm text-blue-600">Back to Catalog</button>
+          <button onClick={() => navigate('/')} className="text-sm text-blue-600">Dashboard</button>
+        </div>
       </div>
-      <div className="text-sm text-gray-700">{libPlan.description}</div>
+      <div className="text-sm text-gray-700">{cleanDesc(libPlan.description)}</div>
 
       {/* Read-only preview for users before accepting */}
       {showPreview && (
@@ -213,7 +235,7 @@ export default function PlanSelect() {
                           .filter(Boolean)
                           .join(' ')
                           .trim();
-                        const label = s.description ? s.description : fallback;
+                        const label = s.description ? cleanDesc(s.description) : fallback;
                         return (
                           <div key={i} className="text-xs text-gray-700">
                             <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}
