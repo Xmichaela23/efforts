@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
+import { useAppContext } from '@/contexts/AppContext';
 
 function computeNextMonday(): string {
   const d = new Date();
@@ -65,7 +66,7 @@ export default function PlanSelect() {
   const [sp] = useSearchParams();
   const id = sp.get('id');
   const navigate = useNavigate();
-  const { addPlan, loadUserBaselines } = useAppContext();
+  const { addPlan, loadUserBaselines, refreshPlans } = useAppContext();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
   const [libPlan, setLibPlan] = useState<any|null>(null);
@@ -184,6 +185,7 @@ export default function PlanSelect() {
         notes_by_week: mapped.notes_by_week || {},
       } as any;
       await addPlan(payload);
+      try { await refreshPlans?.(); } catch {}
       navigate('/');
     } catch (e: any) {
       // Fallback: attempt direct insert and surface full error text
@@ -227,6 +229,7 @@ export default function PlanSelect() {
           });
           if (rows.length) await supabase.from('planned_workouts').insert(rows);
         } catch {}
+        try { await refreshPlans?.(); } catch {}
         navigate('/');
       } catch (inner: any) {
         setError(inner?.message ? String(inner.message) : JSON.stringify(inner));
