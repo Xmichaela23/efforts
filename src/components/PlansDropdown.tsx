@@ -113,7 +113,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         {/* Admin: publish template (JSON) */}
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
-          onClick={() => onOpenPlanBuilder?.()}
+          onClick={() => { window.location.href = '/plans/admin'; }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
@@ -122,7 +122,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
 
         {/* User: select a plan from catalog */}
         <DropdownMenuItem
-          onClick={() => onOpenPlanBuilder?.()}
+          onClick={() => { window.location.href = '/plans/catalog'; }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >

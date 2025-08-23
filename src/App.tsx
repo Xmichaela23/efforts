@@ -13,6 +13,8 @@ import GarminCallback from "./components/GarminCallback";
 import Connections from "./components/Connections";
 import PlannedWorkoutDemo from "./components/PlannedWorkoutDemo";
 import PlanSelect from "./pages/PlanSelect";
+import PlansAdminImport from "./pages/PlansAdminImport";
+import PlansCatalogPage from "./pages/PlansCatalog.tsx";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +33,8 @@ const App = () => (
 <Route path="/connections" element={<Connections />} />
 <Route path="/demo" element={<PlannedWorkoutDemo />} />
 <Route path="/plans/select" element={<PlanSelect />} />
+<Route path="/plans/admin" element={<PlansAdminImport />} />
+<Route path="/plans/catalog" element={<PlansCatalogPage />} />
 <Route path="*" element={<NotFound />} />
 </Routes>
 </BrowserRouter>
