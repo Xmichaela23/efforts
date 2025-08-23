@@ -221,16 +221,51 @@ const Connections: React.FC = () => {
 
       // Prefer server-side delete via Edge Function (uses service role to bypass RLS)
       if (user?.id) {
-        const { error: fxErr } = await supabase.functions.invoke('disconnect-connection', {
+        let invoked = false;
+        let invokeErr: any = null;
+        // Primary function name
+        const primary = await supabase.functions.invoke('disconnect-connection', {
           body: { userId: user.id, provider: 'strava' }
         });
-        if (fxErr) {
+        if (!primary.error) {
+          invoked = true;
+        } else {
+          invokeErr = primary.error;
+          // Some environments have it deployed with a misspelling; try alternate
+          const alt = await supabase.functions.invoke('disconect-connection', {
+            body: { userId: user.id, provider: 'strava' }
+          });
+          if (!alt.error) {
+            invoked = true;
+          } else {
+            invokeErr = alt.error;
+          }
+        }
+
+        if (!invoked) {
           // Fallback to client delete in case function unavailable
-          await supabase
+          const { error: clientDelErr } = await supabase
             .from('device_connections')
             .delete()
             .eq('user_id', user.id)
             .eq('provider', 'strava');
+          if (clientDelErr) {
+            throw new Error(`Disconnect failed: ${invokeErr?.message || 'invoke error'}; client delete blocked by RLS`);
+          }
+        }
+
+        // Verify deletion actually succeeded before updating UI
+        const { data: remains, error: checkErr } = await supabase
+          .from('device_connections')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('provider', 'strava');
+        if (checkErr) {
+          throw checkErr;
+        }
+        const stillConnected = Array.isArray(remains) && remains.length > 0;
+        if (stillConnected) {
+          throw new Error('Disconnect did not remove the connection record');
         }
       }
 
@@ -250,7 +285,7 @@ const Connections: React.FC = () => {
       console.error('Error disconnecting Strava:', error);
       toast({
         title: "Disconnect Failed",
-        description: "Failed to disconnect from Strava. Please try again.",
+        description: `${error instanceof Error ? error.message : 'Failed to disconnect from Strava.'}`,
         variant: "destructive"
       });
     } finally {
