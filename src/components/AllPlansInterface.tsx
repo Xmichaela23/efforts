@@ -138,7 +138,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         const { data: mat, error: matErr } = await supabase
           .from('planned_workouts')
           .select('*')
-          .eq('training_plan_id', planId)
+          .or(`training_plan_id.eq.${planId},template_id.eq.${planId}`)
           .order('week_number', { ascending: true })
           .order('day_number', { ascending: true });
         if (!matErr && Array.isArray(mat) && mat.length > 0) {
