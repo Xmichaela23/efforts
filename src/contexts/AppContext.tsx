@@ -409,6 +409,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addPlan = async (planData: any) => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('You must be signed in to save a plan.');
       // Do not send non-column fields in insert (e.g., start_date)
       const insertPayload: any = { ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: user?.id };
       if ('start_date' in insertPayload) delete insertPayload.start_date;
