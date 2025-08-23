@@ -71,7 +71,6 @@ export default function PlanSelect() {
   const [startDate, setStartDate] = useState<string>('');
   const [longRunDay, setLongRunDay] = useState<string>('Sunday');
   const [longRideDay, setLongRideDay] = useState<string>('Saturday');
-  const [includeStrength, setIncludeStrength] = useState<boolean>(true);
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const byDay = (a: any, b: any) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
@@ -101,15 +100,12 @@ export default function PlanSelect() {
     if (!libPlan?.template?.sessions_by_week) return false;
     return Object.values(libPlan.template.sessions_by_week).some((arr: any) => (arr as any[]).some(isRide));
   }, [libPlan]);
-  const hasStrength = useMemo(() => {
-    if (!libPlan?.template?.sessions_by_week) return false;
-    return Object.values(libPlan.template.sessions_by_week).some((arr: any) => (arr as any[]).some(isStrength));
-  }, [libPlan]);
+  // Strength is not optional in scheduling; presence in plan is respected as-authored
 
   async function save() {
     if (!libPlan) return;
     try {
-      const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength });
+      const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
       // Load baselines and map tokens/targets into descriptions
       let baselines: any = null;
       try { baselines = await loadUserBaselines?.(); } catch {}
@@ -181,7 +177,7 @@ export default function PlanSelect() {
         status: 'active',
         plan_type: 'catalog',
         start_date: startDate,
-        config: { source: 'catalog', preferences: { longRunDay, longRideDay, includeStrength }, catalog_id: libPlan.id },
+        config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id },
         weeks: [],
         sessions_by_week: mapped.sessions_by_week,
         notes_by_week: mapped.notes_by_week || {},
