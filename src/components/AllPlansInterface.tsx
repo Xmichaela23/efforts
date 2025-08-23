@@ -931,8 +931,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </button>
             )}
 
-            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="hidden md:flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
-              Export
+            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+              Download
             </button>
             
             <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
