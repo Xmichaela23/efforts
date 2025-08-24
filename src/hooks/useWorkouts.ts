@@ -760,6 +760,29 @@ export const useWorkouts = () => {
     }
   }, [authReady]);
 
+  // 🔔 Realtime: refresh when new Strava/Garmin/workouts rows arrive
+  useEffect(() => {
+    let channel: any;
+    let mounted = true;
+    (async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!mounted || !user) return;
+      channel = supabase
+        .channel('workout-realtime')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'strava_activities', filter: `user_id=eq.${user.id}` }, () => {
+          fetchWorkouts();
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'garmin_activities', filter: `garmin_user_id=is.not.null` }, () => {
+          fetchWorkouts();
+        })
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => {
+          fetchWorkouts();
+        })
+        .subscribe();
+    })();
+    return () => { mounted = false; if (channel) supabase.removeChannel(channel); };
+  }, [authReady]);
+
   // 🆕 FIXED FUNCTION: Import Garmin activities to workouts table with proper user mapping
   const importGarminActivities = async () => {
     try {
