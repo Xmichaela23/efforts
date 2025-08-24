@@ -186,12 +186,17 @@ export default function PlanSelect() {
         });
       });
       if (rows.length) {
-        const { error: pwErr } = await supabase.from('planned_workouts').insert(rows);
+        // Use upsert with ignore to avoid 409 conflicts from duplicate retries
+        const { error: pwErr } = await supabase
+          .from('planned_workouts')
+          .upsert(rows, { onConflict: 'training_plan_id,week_number,day_number,name', ignoreDuplicates: true });
         if (pwErr) {
           const msg = String((pwErr as any)?.message || '');
           if (msg.includes('planned_workouts_plan_fk')) {
             const rowsNoLink = rows.map(r => ({ ...r, training_plan_id: null }));
-            const { error: pwErr2 } = await supabase.from('planned_workouts').insert(rowsNoLink);
+            const { error: pwErr2 } = await supabase
+              .from('planned_workouts')
+              .upsert(rowsNoLink, { onConflict: 'template_id,week_number,day_number,name', ignoreDuplicates: true });
             if (pwErr2) throw pwErr2;
           } else {
             throw pwErr;
