@@ -44,6 +44,10 @@ function hasTag(s: any, t: string) { return Array.isArray(s.tags) && s.tags.incl
 function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay: string; includeStrength: boolean }) {
   // Only move explicitly tagged long_run / long_ride; otherwise preserve JSON order and days exactly
   const out: any = { ...plan, sessions_by_week: {} };
+  // Preserve week notes if provided in template
+  if (plan && plan.notes_by_week) {
+    out.notes_by_week = plan.notes_by_week;
+  }
   for (const [wk, sessions] of Object.entries<any>(plan.sessions_by_week || {})) {
     const copy = (sessions as any[]).map(s => ({ ...s }));
     const runTagged = copy.findIndex(s => hasTag(s,'long_run'));
