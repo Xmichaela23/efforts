@@ -35,4 +35,9 @@ export async function publishLibraryPlan(input: Omit<LibraryPlan,'id'|'status'|'
   return data as LibraryPlan;
 }
 
+export async function deleteLibraryPlan(id: string): Promise<void> {
+  const { error } = await supabase.from('library_plans').delete().eq('id', id);
+  if (error) throw error;
+}
+
 

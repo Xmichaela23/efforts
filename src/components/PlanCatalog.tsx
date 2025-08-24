@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { listLibraryPlans, type LibraryPlan } from '@/services/LibraryPlans';
+import { listLibraryPlans, deleteLibraryPlan, type LibraryPlan } from '@/services/LibraryPlans';
 import { useAppContext } from '@/contexts/AppContext';
 import PlanJSONImport from './PlanJSONImport';
 
@@ -9,12 +9,33 @@ export default function PlanCatalog() {
   const [tab, setTab] = useState<Tab>('run');
   const [items, setItems] = useState<LibraryPlan[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string|null>(null);
   const { plansBundleReady } = useAppContext();
 
-  useEffect(() => {
-    setLoading(true);
-    listLibraryPlans(tab).then(setItems).finally(() => setLoading(false));
-  }, [tab]);
+  async function refresh() {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await listLibraryPlans(tab);
+      setItems(data);
+    } catch (e: any) {
+      setError(e?.message || 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { refresh(); }, [tab]);
+
+  async function handleDelete(id: string) {
+    if (!confirm('Delete this catalog plan? This cannot be undone.')) return;
+    try {
+      await deleteLibraryPlan(id);
+      await refresh();
+    } catch (e: any) {
+      alert(e?.message || 'Delete failed');
+    }
+  }
 
   return (
     <div className="max-w-3xl mx-auto p-4 space-y-4">
@@ -26,6 +47,7 @@ export default function PlanCatalog() {
       </div>
 
       {loading && <div className="text-sm text-gray-600">Loading…</div>}
+      {error && <div className="text-sm text-red-600">{error}</div>}
       {!loading && items.length === 0 && (
         <div className="text-sm text-gray-600">No plans yet.</div>
       )}
@@ -37,8 +59,10 @@ export default function PlanCatalog() {
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-gray-600">{p.duration_weeks} weeks • {p.discipline}</div>
             </div>
-            {/* Reuse the importer in plan mode by feeding template JSON via URL/payload in future; for now the importer accepts pasted JSON */}
-            <a href={`/plans/select?id=${p.id}`} className="text-sm text-blue-600">Select</a>
+            <div className="flex items-center gap-3">
+              <a href={`/plans/select?id=${p.id}`} className="text-sm text-blue-600">Select</a>
+              <button onClick={() => handleDelete(p.id)} className="text-sm text-red-600">Delete</button>
+            </div>
           </div>
         ))}
       </div>
