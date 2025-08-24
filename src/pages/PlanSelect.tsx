@@ -116,6 +116,10 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
         if (isIntervals(hr) && canPlace(s,hr,'Monday')) { moveTo(hr,'Monday'); emitNote(notesByWeek, wk, 'Intervals moved to Monday to maintain 24h before long run.'); }
         else if (isTempo(hr) && canPlace(s,hr,'Thursday')) { moveTo(hr,'Thursday'); emitNote(notesByWeek, wk, 'Tempo moved to Thursday to maintain 24h before long run.'); }
       }
+      // General rule: if authored placement already satisfies spacing, keep authored day
+      if (longRun && hoursBetween(hr._origDay, longRun.day) >= 24) {
+        hr.day = hr._origDay;
+      }
     }
 
     // Final same-day collisions
@@ -128,7 +132,8 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
           const b = dayHard.find(x=>hasTag(x,'bike_intensity'))!; if (!deload) { ensureTag(b,'downgraded'); b.description = `${b.description ? b.description+ ' — ' : ''}Z2 45–60min`; emitNote(notesByWeek, wk, `${d} bike set to Z2 due to same-day hard collision.`); }
         } else {
           const sorted = [...dayHard].sort((a,b)=> priority.findIndex(t=>hasTag(a,t)) - priority.findIndex(t=>hasTag(b,t)));
-          const moveCandidate = sorted[sorted.length-1];
+          // Prefer moving a session that is not on its authored day to preserve author intent
+          let moveCandidate = sorted.reverse().find(x => x._origDay !== d) || sorted[sorted.length-1];
           const di = dayIndex(d); const newDay = idxDay(di+1);
           if (canPlace(s,moveCandidate,newDay)) moveTo(moveCandidate,newDay); else { ensureTag(moveCandidate,'warning'); emitNote(notesByWeek, wk, 'Couldn’t fully satisfy spacing; review Tue/Wed stack.'); }
         }
