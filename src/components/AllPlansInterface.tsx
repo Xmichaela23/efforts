@@ -1171,10 +1171,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex-1">
-                                    <div className="font-medium flex items-center gap-2">
-                                      <span style={{ color: getDisciplineColor(workout.type) }}>{workout.type}</span>
-                                      {workout.name}
-                                    </div>
+                                    <div className="font-medium">{workout.name}</div>
                                     <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
                                   </div>
                                   <div className="text-xs text-gray-600">

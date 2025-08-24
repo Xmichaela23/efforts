@@ -105,7 +105,25 @@ export default function PlanSelect() {
       let baselines: any = null;
       try { baselines = await loadUserBaselines?.(); } catch {}
       const mapped = { ...remapped, sessions_by_week: {} as any };
-      const fiveK = baselines?.performanceNumbers?.fiveK?.toString() || null;
+      // Normalize 5k to a pace if a race time was provided (e.g., 24:00 → 7:44/mi)
+      const derivePaceFromRace = (race?: string|null): string|null => {
+        if (!race) return null;
+        const s = String(race).trim();
+        // If already a pace with unit, keep it
+        if (/^\d+:\d{2}\/(mi|km)$/i.test(s)) return s;
+        // If looks like a race time mm:ss or h:mm:ss, convert to /mi
+        const mmss = s.match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
+        if (!mmss) return s; // fall back, will show raw if malformed
+        const h = mmss[3] ? parseInt(mmss[1],10) : 0;
+        const m = mmss[3] ? parseInt(mmss[2],10) : parseInt(mmss[1],10);
+        const sec = mmss[3] ? parseInt(mmss[3],10) : parseInt(mmss[2],10);
+        const total = h*3600 + m*60 + sec; // total race seconds
+        const pacePerMile = Math.round(total / 3.10686); // 5k miles
+        const mm = Math.floor(pacePerMile/60);
+        const ss = pacePerMile%60;
+        return `${mm}:${String(ss).padStart(2,'0')}/mi`;
+      };
+      const fiveK = derivePaceFromRace(baselines?.performanceNumbers?.fiveK?.toString() || null);
       const easyPace = baselines?.performanceNumbers?.easyPace?.toString() || null;
       const ftp = baselines?.performanceNumbers?.ftp || null;
       const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
