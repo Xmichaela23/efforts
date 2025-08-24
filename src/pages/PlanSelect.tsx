@@ -114,6 +114,7 @@ export default function PlanSelect() {
       const candidate5k = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
       const fiveK = candidate5k ? String(candidate5k) : null;
       const easyPace = pn.easyPace ? String(pn.easyPace) : null;
+      const swimPace100 = pn.swimPace100 ? String(pn.swimPace100) : null;
       const ftp = baselines?.performanceNumbers?.ftp || null;
       const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
       const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
@@ -179,6 +180,28 @@ export default function PlanSelect() {
           const guessKind = /interval/i.test(cleanedDesc) ? 'Intervals' : /tempo/i.test(cleanedDesc) ? 'Tempo' : /long/i.test(cleanedDesc) ? 'Long' : 'Session';
           const derivedName = mappedType==='strength' ? 'Strength' : mappedType==='swim' ? 'Swim' : mappedType==='ride' ? 'Ride' : 'Run';
           const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || `${derivedName} ${guessKind}`.trim(), description: cleanedDesc, duration: durationVal, workout_status: 'planned', source: 'training_plan' };
+          // Build swim intervals from steps[] so Garmin export works
+          if (mappedType === 'swim' && Array.isArray((s as any).steps) && (s as any).steps.length) {
+            const parseSwimPace = (p?: string|null): number | null => {
+              if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*100\s*(yd|m)/i); if (!m) return null; const mins = parseInt(m[1],10); const secs = parseInt(m[2],10); const unit = m[3].toLowerCase(); const total = mins*60+secs; const meters = unit==='yd'?100*0.9144:100; return total/meters; // sec per meter
+            };
+            const secPerMeter = parseSwimPace(swimPace100) ?? 2.0;
+            const defaultUnit = (libPlan?.template?.swim_unit || 'yd').toLowerCase();
+            const toMeters = (val: number, unit?: string) => ((unit||defaultUnit).toLowerCase()==='yd'? val*0.9144 : val);
+            const parseRest = (rest?: string) => { const m = rest? String(rest).match(/(\d+)\s*s/):null; return m? parseInt(m[1],10):0; };
+            const steps = (s as any).steps as any[];
+            const intervals: any[] = [];
+            for (const step of steps) {
+              const repeat = Number(step.repeat || 1);
+              const distM = step.distance ? toMeters(Number(step.distance), step.unit) : 0;
+              const workSec = distM>0 ? Math.round(distM * secPerMeter) : 0;
+              for (let r = 0; r < Math.max(1, repeat); r += 1) {
+                if (workSec>0) intervals.push({ duration: workSec, effortLabel: step.effort || step.stroke || 'Swim' });
+                const restSec = parseRest(step.rest); if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
+              }
+            }
+            if (intervals.length) row.intervals = intervals;
+          }
           if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
           if (Array.isArray(s.intervals)) row.intervals = s.intervals;
           if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
