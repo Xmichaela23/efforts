@@ -205,8 +205,55 @@ export default function PlanSelect() {
               const distM = step.distance ? toMeters(Number(step.distance), step.unit) : 0;
               const workSec = distM>0 ? Math.round(distM * secPerMeter) : 0;
               for (let r = 0; r < Math.max(1, repeat); r += 1) {
-                if (workSec>0) intervals.push({ duration: workSec, effortLabel: step.effort || step.stroke || 'Swim' });
+                if (distM>0) intervals.push({ distanceMeters: Math.round(distM), effortLabel: step.effort || step.stroke || 'Swim' });
                 const restSec = parseRest(step.rest); if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
+              }
+            }
+            if (intervals.length) row.intervals = intervals;
+          } else if (mappedType === 'swim' && !Array.isArray((s as any).steps)) {
+            // Auto-parse simple swim description patterns into intervals so swims without steps are Garmin-ready
+            const parseSwimPace = (p?: string|null): number | null => {
+              if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*100\s*(yd|m)/i); if (!m) return null; const mins = parseInt(m[1],10); const secs = parseInt(m[2],10); const unit = m[3].toLowerCase(); const total = mins*60+secs; const meters = unit==='yd'?100*0.9144:100; return total/meters;
+            };
+            const secPerMeter = parseSwimPace(swimPace100) ?? 2.0;
+            const defaultUnit = (libPlan?.template?.swim_unit || 'yd').toLowerCase();
+            const toMeters = (val: number, unit?: string) => ((unit||defaultUnit).toLowerCase()==='yd'? val*0.9144 : val);
+            const parseRest = (rest?: string) => {
+              if (!rest) return 0; const t = String(rest).trim(); const secOnly = t.match(/^(\d+)\s*s$/i); if (secOnly) return parseInt(secOnly[1],10); const mmss = t.match(/^(\d{1,2}):(\d{2})$/); if (mmss) return parseInt(mmss[1],10)*60 + parseInt(mmss[2],10); return 0;
+            };
+            const description = String(s.description||'');
+            // Split on commas and semicolons; derive segments
+            const parts = description.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
+            const intervals: any[] = [];
+            for (const part of parts) {
+              // Match like "4x50 drill:catch-up /20s" or "2x100 pull /20s" or "200 easy"
+              const repDist = part.match(/^(\d+)x\s*(\d{2,4})\s*(yd|m)?/i);
+              const singleDist = part.match(/^(\d{2,4})\s*(yd|m)?/i);
+              const restMatch = part.match(/\/(\s*)?([0-9:]+)s?/i);
+              const restSec = restMatch ? ((): number => { const t = restMatch[2]; const mm = t.match(/^(\d{1,2}):(\d{2})$/); if (mm) return parseInt(mm[1],10)*60+parseInt(mm[2],10); const ss = t.match(/^(\d{1,3})$/); return ss ? parseInt(ss[1],10) : 0; })() : 0;
+              const label = /drill\s*:/.test(part) ? (part.match(/drill\s*:\s*([a-z\-]+)/i)?.[1] || 'Drill')
+                            : /pull/i.test(part) ? 'Pull'
+                            : /kick/i.test(part) ? 'Kick'
+                            : /easy/i.test(part) ? 'Easy'
+                            : 'Swim';
+              if (repDist) {
+                const repeat = parseInt(repDist[1],10);
+                const dist = parseInt(repDist[2],10);
+                const unit = (repDist[3] || defaultUnit) as string;
+                const distM = toMeters(dist, unit);
+                for (let r = 0; r < Math.max(1, repeat); r += 1) {
+                  if (distM>0) intervals.push({ distanceMeters: Math.round(distM), effortLabel: label });
+                  if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
+                }
+                continue;
+              }
+              if (singleDist) {
+                const dist = parseInt(singleDist[1],10);
+                const unit = (singleDist[2] || defaultUnit) as string;
+                const distM = toMeters(dist, unit);
+                if (distM>0) intervals.push({ distanceMeters: Math.round(distM), effortLabel: label });
+                if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
+                continue;
               }
             }
             if (intervals.length) row.intervals = intervals;

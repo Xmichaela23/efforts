@@ -148,9 +148,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       for (let r = 0; r < Number(interval.repeatCount); r += 1) {
         for (const seg of interval.segments) {
           const sIntensity = mapEffortToIntensity(String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim())
+          const sMeters = Number(seg?.distanceMeters)
           const sSeconds = Number(seg?.duration)
-          if (!Number.isFinite(sSeconds) || sSeconds <= 0) {
-            throw new Error('Invalid segment duration: must be seconds')
+          if (!(Number.isFinite(sMeters) && sMeters > 0) && !(Number.isFinite(sSeconds) && sSeconds > 0)) {
+            throw new Error('Invalid segment: must include distanceMeters>0 or duration>0')
           }
           const step: GarminStep = {
             type: 'WorkoutStep',
@@ -158,8 +159,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             stepOrder: stepId,
             intensity: sIntensity,
             description: String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim() || undefined,
-            durationType: 'TIME',
-            durationValue: sSeconds > 0 ? sSeconds : 0
+            durationType: (Number.isFinite(sMeters) && sMeters > 0) ? 'DISTANCE' : 'TIME',
+            durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? Math.floor(sMeters) : Math.floor(sSeconds)
           }
           applyTargets(step, seg, interval)
           steps.push(step)
@@ -171,9 +172,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
 
     // Simple single step
     const intensity = mapEffortToIntensity(String(interval?.effortLabel ?? '').trim())
+    const meters = Number(interval?.distanceMeters)
     const seconds = Number(interval?.duration)
-    if (!Number.isFinite(seconds) || seconds <= 0) {
-      throw new Error('Invalid interval duration: must be seconds')
+    if (!(Number.isFinite(meters) && meters > 0) && !(Number.isFinite(seconds) && seconds > 0)) {
+      throw new Error('Invalid interval: must include distanceMeters>0 or duration>0')
     }
     const step: GarminStep = {
       type: 'WorkoutStep',
@@ -181,8 +183,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       stepOrder: stepId,
       intensity,
       description: String(interval?.effortLabel ?? '').trim() || undefined,
-      durationType: 'TIME',
-      durationValue: Math.floor(seconds)
+      durationType: (Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME',
+      durationValue: (Number.isFinite(meters) && meters > 0) ? Math.floor(meters) : Math.floor(seconds)
     }
     applyTargets(step, interval)
     steps.push(step)
