@@ -42,21 +42,110 @@ function isStrength(s: any) {
 function hasTag(s: any, t: string) { return Array.isArray(s.tags) && s.tags.includes(t); }
 
 function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay: string; includeStrength: boolean }) {
-  // Only move explicitly tagged long_run / long_ride; otherwise preserve JSON order and days exactly
+  const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+  const dayIndex = (d: string) => DAYS.indexOf(d);
+  const idxDay = (i: number) => DAYS[(i+7)%7];
+  const hoursBetween = (a: string, b: string) => {
+    const ia = dayIndex(a); const ib = dayIndex(b); if (ia<0||ib<0) return 9999; const diff = Math.abs(ib-ia); const min = Math.min(diff, 7-diff); return min*24;
+  };
+  const cloneSessions = (arr: any[]) => arr.map(s => ({ ...s, tags: Array.isArray(s.tags)?[...s.tags]:[], _origDay: s.day }));
+  const isIntervals = (s: any) => /interval|cruise|1mi|800m/i.test(String(s.description||''));
+  const isTempo = (s: any) => /tempo|mp\b/i.test(String(s.description||''));
+  const ensureTag = (s: any, t: string) => { if (!Array.isArray(s.tags)) s.tags=[]; if (!s.tags.includes(t)) s.tags.push(t); };
+  const isHard = (s: any) => hasTag(s,'long_run')||hasTag(s,'hard_run')||hasTag(s,'bike_intensity')||hasTag(s,'strength_lower')||hasTag(s,'long_ride');
+  const inferTags = (s: any) => {
+    const text = String(s.description||'');
+    if (/\b(Intervals|Cruise|1mi|800m)\b/i.test(text)) ensureTag(s,'hard_run');
+    if (/\bTempo\b|MP\b/i.test(text)) ensureTag(s,'hard_run');
+    if (/\b(VO2|Threshold|Sweet Spot)\b/i.test(text)) ensureTag(s,'bike_intensity');
+    if (/squat|deadlift/i.test(text)) ensureTag(s,'strength_lower');
+  };
+  const moveTo = (s: any, day: string) => { s.day = day; };
+  const canPlace = (sessions: any[], s: any, day: string) => {
+    // No other hard sessions that day
+    return !sessions.some(x => x !== s && x.day === day && isHard(x));
+  };
+  const findByTag = (arr: any[], tag: string) => arr.find(x => (Array.isArray(x.tags)&&x.tags.includes(tag)));
+  const wednesdayRunIsAerobic = (arr: any[]) => arr.some(x => x.day==='Wednesday' && (isRun(x) && !hasTag(x,'hard_run')));
+  const isDeloadWeek = (arr: any[]) => arr.some(ss => /deload/i.test(String(ss.description||'')) || hasTag(ss,'deload'));
+  const emitNote = (bucket: Record<string,string[]>, key: string, msg: string) => { (bucket[key] = bucket[key] || []).push(msg); };
+
   const out: any = { ...plan, sessions_by_week: {} };
-  // Preserve week notes if provided in template
-  if (plan && plan.notes_by_week) {
-    out.notes_by_week = plan.notes_by_week;
-  }
+  if (plan && plan.notes_by_week) out.notes_by_week = plan.notes_by_week;
+  const notesByWeek: Record<string,string[]> = { ...(out.notes_by_week||{}) };
+
   for (const [wk, sessions] of Object.entries<any>(plan.sessions_by_week || {})) {
-    const copy = (sessions as any[]).map(s => ({ ...s }));
-    const runTagged = copy.findIndex(s => hasTag(s,'long_run'));
-    if (runTagged >= 0) copy[runTagged].day = prefs.longRunDay;
-    const rideTagged = copy.findIndex(s => hasTag(s,'long_ride'));
-    if (rideTagged >= 0) copy[rideTagged].day = prefs.longRideDay;
-    const filtered = prefs.includeStrength ? copy : copy.filter(s => !isStrength(s) || hasTag(s,'mandatory_strength'));
+    const s = cloneSessions(sessions as any[]);
+    const deload = isDeloadWeek(s);
+    // Infer missing tags
+    s.forEach(inferTags);
+    // Pin long days
+    const lr = findByTag(s,'long_run'); if (lr) moveTo(lr, prefs.longRunDay);
+    const lrd = findByTag(s,'long_ride'); if (lrd) moveTo(lrd, prefs.longRideDay);
+
+    // Bike intensity vs long ride
+    const bike = findByTag(s,'bike_intensity');
+    if (bike) {
+      if (prefs.longRideDay === 'Saturday') {
+        if (canPlace(s,bike,'Tuesday')) moveTo(bike,'Tuesday');
+        else if (wednesdayRunIsAerobic(s) && canPlace(s,bike,'Wednesday')) moveTo(bike,'Wednesday');
+        else { if (!deload) { ensureTag(bike,'downgraded'); bike.description = `${bike.description ? bike.description+ ' — ' : ''}Z2 45–60min`; emitNote(notesByWeek, wk, 'Friday bike set to Z2 to respect spacing with Saturday long ride.'); } moveTo(bike,'Friday'); }
+      } else {
+        moveTo(bike,'Friday');
+      }
+    }
+
+    // Strength gaps
+    const strength = s.filter(x => hasTag(x,'strength_lower'));
+    const longRun = findByTag(s,'long_run'); const longRide = findByTag(s,'long_ride');
+    for (const st of strength) {
+      if (longRun && hoursBetween(st.day,longRun.day) < 48) {
+        // prefer Monday else Wednesday
+        if (canPlace(s,st,'Monday')) { moveTo(st,'Monday'); } else if (canPlace(s,st,'Wednesday')) moveTo(st,'Wednesday');
+      }
+      if (longRide && hoursBetween(st.day,longRide.day) < 36) {
+        if (canPlace(s,st,'Friday')) moveTo(st,'Friday'); else if (canPlace(s,st,'Wednesday')) moveTo(st,'Wednesday');
+        if (longRide && hoursBetween(st.day,longRide.day) < 36) { if (!deload) { ensureTag(st,'lightened'); emitNote(notesByWeek, wk, 'Deadlift volume reduced to maintain 36h from long ride.'); } }
+      }
+    }
+
+    // Hard runs vs long run
+    const hardRuns = s.filter(x => hasTag(x,'hard_run'));
+    for (const hr of hardRuns) {
+      if (longRun && hoursBetween(hr.day,longRun.day) < 24) {
+        if (isIntervals(hr) && canPlace(s,hr,'Monday')) { moveTo(hr,'Monday'); emitNote(notesByWeek, wk, 'Intervals moved to Monday to maintain 24h before long run.'); }
+        else if (isTempo(hr) && canPlace(s,hr,'Thursday')) { moveTo(hr,'Thursday'); emitNote(notesByWeek, wk, 'Tempo moved to Thursday to maintain 24h before long run.'); }
+      }
+    }
+
+    // Final same-day collisions
+    for (const d of DAYS) {
+      const dayHard = s.filter(x => x.day===d && isHard(x));
+      if (dayHard.length > 1) {
+        const priority = ['long_run','strength_lower','hard_run','bike_intensity','long_ride'];
+        const hasBike = dayHard.some(x=>hasTag(x,'bike_intensity'));
+        if (hasBike) {
+          const b = dayHard.find(x=>hasTag(x,'bike_intensity'))!; if (!deload) { ensureTag(b,'downgraded'); b.description = `${b.description ? b.description+ ' — ' : ''}Z2 45–60min`; emitNote(notesByWeek, wk, `${d} bike set to Z2 due to same-day hard collision.`); }
+        } else {
+          const sorted = [...dayHard].sort((a,b)=> priority.findIndex(t=>hasTag(a,t)) - priority.findIndex(t=>hasTag(b,t)));
+          const moveCandidate = sorted[sorted.length-1];
+          const di = dayIndex(d); const newDay = idxDay(di+1);
+          if (canPlace(s,moveCandidate,newDay)) moveTo(moveCandidate,newDay); else { ensureTag(moveCandidate,'warning'); emitNote(notesByWeek, wk, 'Couldn’t fully satisfy spacing; review Tue/Wed stack.'); }
+        }
+      }
+    }
+
+    const filtered = prefs.includeStrength ? s : s.filter(ss => !isStrength(ss) || hasTag(ss,'mandatory_strength'));
     out.sessions_by_week[wk] = filtered;
   }
+  if (Object.keys(notesByWeek).length) out.notes_by_week = notesByWeek;
+  try {
+    const snapshot: any = { chosenDays: { longRun: prefs.longRunDay, longRide: prefs.longRideDay }, weeks: {} };
+    for (const [wk, wkSessions] of Object.entries<any>(out.sessions_by_week || {})) {
+      snapshot.weeks[wk] = (wkSessions as any[]).map(ss => ({ name: ss.name || ss.description || '', day: ss.day, tags: ss.tags }));
+    }
+    console.debug('autoSpaceWeek snapshot', snapshot);
+  } catch {}
   return out;
 }
 
