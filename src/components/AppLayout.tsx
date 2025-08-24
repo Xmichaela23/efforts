@@ -90,6 +90,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [selectedWorkout?.id]);
 
+  // When navigated from PlanSelect with state { openPlans: true, focusPlanId }
+  useEffect(() => {
+    const navState = (window.history.state && (window.history.state as any).usr) || (window as any).navigation?.state || {};
+    const openPlans = navState?.openPlans;
+    if (openPlans) {
+      setShowAllPlans(true);
+      // focusPlanId is available to the child via detailedPlans and internal selection; nothing else to do here
+      // Clear the flag so refreshes don't keep reopening
+      try { window.history.replaceState({ ...window.history.state, usr: {} }, ''); } catch {}
+    }
+  }, []);
+
 
 
 

@@ -345,7 +345,8 @@ export default function PlanSelect() {
         }
       }
       try { await refreshPlans?.(); } catch {}
-      navigate('/');
+      // Navigate directly to Plans view focused on this plan
+      navigate('/', { state: { openPlans: true, focusPlanId: planRow.id } });
     } catch (e: any) {
       setError(e?.message ? String(e.message) : JSON.stringify(e));
     }
