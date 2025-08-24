@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
@@ -25,28 +25,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const activeDate = selectedDate || today;
 
-  const loadWorkoutsForDate = () => {
-    // Combine completed workouts and planned workouts
+  const dateWorkoutsMemo = useMemo(() => {
     const allWorkouts = [...(workouts || []), ...(plannedWorkouts || [])];
-    
-    if (allWorkouts.length > 0) {
-      console.log('🔍 All workouts for', activeDate, ':', allWorkouts.filter((w: any) => w.date === activeDate));
-      
-      // Filter by date
-      const dateWorkouts = allWorkouts.filter((w: any) => w.date === activeDate);
-      
-      console.log('✅ Filtered workouts to display:', dateWorkouts);
-      setDisplayWorkouts(dateWorkouts);
-    } else {
-      setDisplayWorkouts([]);
-    }
-  };
+    return allWorkouts.filter((w: any) => w.date === activeDate);
+  }, [workouts, plannedWorkouts, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
-    console.log('🔄 TodaysEffort useEffect triggered - selectedDate:', selectedDate, 'activeDate:', activeDate);
-    loadWorkoutsForDate();
-  }, [workouts, plannedWorkouts, selectedDate]); // Watch both completed and planned workouts
+    setDisplayWorkouts(dateWorkoutsMemo);
+  }, [dateWorkoutsMemo]);
 
   // Icons removed - using text-only interface
 

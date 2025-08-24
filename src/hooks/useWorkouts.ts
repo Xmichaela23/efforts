@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 
 // [Keep all your existing interfaces exactly as they are]
@@ -288,7 +288,7 @@ export const useWorkouts = () => {
 
         if (!connectionError && userConnection?.connection_data?.user_id) {
           const garminUserId = userConnection.connection_data.user_id;
-          console.log("🔗 Found Garmin connection, fetching activities for user:", garminUserId);
+          // Quiet logs in production
 
           const { data: garminActivities, error: garminError } = await supabase
             .from("garmin_activities")
@@ -297,7 +297,6 @@ export const useWorkouts = () => {
             .order("start_time", { ascending: false });
 
           if (!garminError && garminActivities) {
-            console.log(`✅ Found ${garminActivities.length} Garmin activities`);
             
             // Transform Garmin activities to workout format
             garminWorkouts = await Promise.all(garminActivities.map(async (activity) => {
@@ -519,7 +518,7 @@ export const useWorkouts = () => {
       // Show all workouts including Garmin (removed duplicate filter)
       const uniqueWorkouts = allWorkouts;
 
-      console.log(`✅ Total unique workouts after merge: ${uniqueWorkouts.length}`);
+      // Quiet logs
 
       // Step 4: Map and set workouts
       const mapWorkoutType = (activityType: string | undefined): "run" | "ride" | "swim" | "strength" | "walk" => {
@@ -708,7 +707,7 @@ export const useWorkouts = () => {
         })()
       }));
 
-      console.log(`✅ Final mapped workouts: ${mapped.length}`);
+      // Quiet logs
       setWorkouts(mapped);
     } catch (error) {
       console.error("❌ Error in fetchWorkouts:", error);
