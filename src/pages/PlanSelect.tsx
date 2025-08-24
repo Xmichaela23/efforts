@@ -283,20 +283,57 @@ export default function PlanSelect() {
         if (!desc) return 0;
         const text = desc.toLowerCase();
         let totalMin = 0;
+        let matched = false;
+
+        // Pattern: NxY min with optional rest
         const repsMin = [...text.matchAll(/(\d+)x(\d+)\s*min/g)];
         if (repsMin.length) {
+          matched = true;
           for (const m of repsMin) { totalMin += parseInt(m[1],10) * parseInt(m[2],10); }
           const rest = text.match(/w\/?\s*(\d+)\s*min\s*(?:easy|rest|jog)?/);
           if (rest) { const r = parseInt(rest[1],10); const n = repsMin.reduce((s, m) => s + parseInt(m[1],10), 0); totalMin += Math.max(0, n - 1) * r; }
         }
-        if (totalMin === 0) {
-          const singleMin = text.match(/(\d+)\s*min\b/);
-          if (singleMin) return parseInt(singleMin[1],10);
-        }
+
+        // Pattern: distance in miles with explicit pace or implied tokens
         const distMi = text.match(/(\d+(?:\.\d+)?)\s*mi\b/);
-        if (distMi) { const miles = parseFloat(distMi[1]); const pace = text.includes('{easy_pace}') ? easySecs : fiveKSecs; if (pace) totalMin += Math.round((miles * pace) / 60); }
+        if (distMi) {
+          const miles = parseFloat(distMi[1]);
+          // explicit mm:ss/mi nearby
+          const paceMatch = desc.match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+          let paceSec: number | null = null;
+          if (paceMatch) {
+            paceSec = parseInt(paceMatch[1],10)*60 + parseInt(paceMatch[2],10);
+          } else if (text.includes('{easy_pace}')) {
+            paceSec = easySecs ?? null;
+          } else if (text.includes('{5k_pace}')) {
+            paceSec = fiveKSecs ?? null;
+          } else if (/long\b/.test(text)) {
+            paceSec = easySecs ?? fiveKSecs ?? null;
+          } else {
+            paceSec = fiveKSecs ?? easySecs ?? null;
+          }
+          if (paceSec) { totalMin += Math.round((miles * paceSec) / 60); matched = true; }
+        }
+
+        // Pattern: reps of meters (e.g., 6x800m)
         const repsMeters = text.match(/(\d+)x(\d{3,4})m/);
-        if (repsMeters) { const n = parseInt(repsMeters[1],10); const meters = parseInt(repsMeters[2],10); const milesEach = metersToMiles(meters); const pace = fiveKSecs || easySecs || null; if (pace) totalMin += Math.round((n * milesEach * pace) / 60); const rest = text.match(/(\d+)\s*min\s*(?:jog|easy|rest)/); if (rest) totalMin += Math.max(0, n - 1) * parseInt(rest[1],10); }
+        if (repsMeters) {
+          matched = true;
+          const n = parseInt(repsMeters[1],10);
+          const meters = parseInt(repsMeters[2],10);
+          const milesEach = metersToMiles(meters);
+          const pace = fiveKSecs || easySecs || null;
+          if (pace) totalMin += Math.round((n * milesEach * pace) / 60);
+          const rest = text.match(/(\d+)\s*min\s*(?:jog|easy|rest)/);
+          if (rest) totalMin += Math.max(0, n - 1) * parseInt(rest[1],10);
+        }
+
+        // Fallback: single "X min" only if we didn't match more specific patterns
+        if (!matched) {
+          const singleMin = text.match(/(\d+)\s*min\b/);
+          if (singleMin) totalMin += parseInt(singleMin[1],10);
+        }
+
         return Math.max(0, Math.round(totalMin));
       };
       for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) { const outWeek: any[] = []; for (const s of sessions as any[]) { let desc = String(s.description||''); if (desc) desc = resolvePaces(desc); if (desc) desc = resolveStrength(desc); const isBikeText = /\b(bike|ride|cycling)\b/i.test(String(s.discipline||s.type||'')); if (desc && isBikeText) desc = mapBike(desc); const copy = { ...s, description: desc }; outWeek.push(copy); } (mapped.sessions_by_week as any)[wk] = outWeek; }

@@ -211,16 +211,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (!desc || typeof desc !== 'string') return [];
     // Drop any lead-in before a colon (e.g., "Strength – Power...:")
     const afterColon = desc.includes(':') ? desc.split(':').slice(1).join(':') : desc;
-    // Split on bullets or commas
+    // Split on bullets, semicolons, commas, or newlines
     const parts = afterColon
-      .split(/•|\n|,/) // bullets, newlines, commas
+      .split(/•|;|\n|,/) // bullets, semicolons, newlines, commas
       .map(s => s.trim())
       .filter(Boolean);
 
     const results: LoggedExercise[] = [];
     for (const p of parts) {
-      // Examples: "Back Squat 3x5 — 225 lb", "Bench Press 4×6", "Pull-Ups 3x8"
-      const m = p.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:.*?—\s*(\d+)\s*lb)?/i);
+      // Examples: "Back Squat 3x5 — 225 lb", "Bench Press 4×6", "Deadlift 5x3 - 315 lb"
+      const m = p.match(/^\s*(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:.*?[—–-]\s*(\d+)\s*(?:lb|lbs|kg)?\b)?/i);
       if (m) {
         const name = m[1].trim();
         const sets = parseInt(m[2], 10);
