@@ -517,20 +517,35 @@ export const useWorkouts = () => {
       console.log(`✅ Total unique workouts after merge: ${uniqueWorkouts.length}`);
 
       // Step 4: Map and set workouts
-      const mapped = uniqueWorkouts.map((w) => ({
+      const mapWorkoutType = (activityType: string | undefined): "run" | "ride" | "swim" | "strength" | "walk" => {
+        const type = (activityType || '').toLowerCase();
+        if (type.includes('walk') || type.includes('hike')) return 'walk';
+        if (type.includes('run') || type.includes('jog')) return 'run';
+        if (type.includes('ride') || type.includes('bike') || type.includes('cycle') || type.includes('cycling')) return 'ride';
+        if (type.includes('swim')) return 'swim';
+        if (type.includes('strength') || type.includes('weight')) return 'strength';
+        return 'run';
+      };
+
+      const mapped = uniqueWorkouts.map((w: any) => ({
         id: w.id,
-        name: w.name,
-        type: w.type,
+        name: w.name || w.activity_name || w.friendly_name || 'Workout',
+        type: w.type || mapWorkoutType(w.workout_type || w.provider_sport),
         // Preserve provider sport information for UI labels (e.g., Hike, Gravel Ride)
         // If present from Strava import/pipeline, carry it through so calendar shows correct sport label
         provider_sport: (w as any)?.strava_data?.original_activity?.sport_type || (w as any)?.provider_sport,
         strava_data: (w as any)?.strava_data,
         duration: w.duration,
-        date: w.date,
+        date: (() => {
+          const d = w.date || w.start_time || w.timestamp;
+          if (!d) return undefined;
+          const s = String(d);
+          return s.includes('T') ? s.slice(0, 10) : s;
+        })(),
         description: w.description,
         userComments: w.userComments ?? w.usercomments ?? "",
         completedManually: w.completedManually ?? w.completedmanually ?? false,
-        workout_status: w.workout_status ?? "planned",
+        workout_status: w.workout_status ?? (w.strava_activity_id || w.isGarminImported ? 'completed' : 'planned'),
         created_at: w.created_at,
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
@@ -669,6 +684,8 @@ export const useWorkouts = () => {
         // Garmin-specific fields
         isGarminImported: w.isGarminImported,
         garmin_activity_id: w.garmin_activity_id,
+        // Strava-specific link if present from webhook-imported workouts
+        strava_activity_id: w.strava_activity_id,
         // Ensure JSON fields are parsed for downstream calculations (e.g., max cadence from samples)
         gps_track: (() => {
           try {
