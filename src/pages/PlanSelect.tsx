@@ -105,25 +105,8 @@ export default function PlanSelect() {
       let baselines: any = null;
       try { baselines = await loadUserBaselines?.(); } catch {}
       const mapped = { ...remapped, sessions_by_week: {} as any };
-      // Normalize 5k to a pace if a race time was provided (e.g., 24:00 → 7:44/mi)
-      const derivePaceFromRace = (race?: string|null): string|null => {
-        if (!race) return null;
-        const s = String(race).trim();
-        // If already a pace with unit, keep it
-        if (/^\d+:\d{2}\/(mi|km)$/i.test(s)) return s;
-        // If looks like a race time mm:ss or h:mm:ss, convert to /mi
-        const mmss = s.match(/^(\d+):(\d{2})(?::(\d{2}))?$/);
-        if (!mmss) return s; // fall back, will show raw if malformed
-        const h = mmss[3] ? parseInt(mmss[1],10) : 0;
-        const m = mmss[3] ? parseInt(mmss[2],10) : parseInt(mmss[1],10);
-        const sec = mmss[3] ? parseInt(mmss[3],10) : parseInt(mmss[2],10);
-        const total = h*3600 + m*60 + sec; // total race seconds
-        const pacePerMile = Math.round(total / 3.10686); // 5k miles
-        const mm = Math.floor(pacePerMile/60);
-        const ss = pacePerMile%60;
-        return `${mm}:${String(ss).padStart(2,'0')}/mi`;
-      };
-      const fiveK = derivePaceFromRace(baselines?.performanceNumbers?.fiveK?.toString() || null);
+      // Use the stored pace directly from baselines (already converted in assessment)
+      const fiveK = baselines?.performanceNumbers?.fiveK?.toString() || null;
       const easyPace = baselines?.performanceNumbers?.easyPace?.toString() || null;
       const ftp = baselines?.performanceNumbers?.ftp || null;
       const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
@@ -179,10 +162,17 @@ export default function PlanSelect() {
           const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
           if (weekNum === 1 && date < startDate) return;
           const rawType = (s.discipline || s.type || '').toLowerCase();
+          const inferred = inferDisciplineFromDescription(String(s.description||'')) || undefined;
           let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
-          if (rawType === 'run') mappedType = 'run'; else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride'; else if (rawType === 'swim') mappedType = 'swim'; else if (rawType === 'strength') mappedType = 'strength';
+          if (rawType === 'run' || inferred === 'run') mappedType = 'run';
+          else if (rawType === 'bike' || rawType === 'ride' || inferred === 'ride') mappedType = 'ride';
+          else if (rawType === 'swim' || inferred === 'swim') mappedType = 'swim';
+          else if (rawType === 'strength' || inferred === 'strength') mappedType = 'strength';
           const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : computeDurationMinutes(s.description);
-          const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'), description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan' };
+          const cleanedDesc = String(s.description||'').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi,'');
+          const guessKind = /interval/i.test(cleanedDesc) ? 'Intervals' : /tempo/i.test(cleanedDesc) ? 'Tempo' : /long/i.test(cleanedDesc) ? 'Long' : 'Session';
+          const derivedName = mappedType==='strength' ? 'Strength' : mappedType==='swim' ? 'Swim' : mappedType==='ride' ? 'Ride' : 'Run';
+          const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || `${derivedName} ${guessKind}`.trim(), description: cleanedDesc, duration: durationVal, workout_status: 'planned', source: 'training_plan' };
           if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
           if (Array.isArray(s.intervals)) row.intervals = s.intervals;
           if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
