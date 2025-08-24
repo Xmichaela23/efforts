@@ -214,7 +214,63 @@ export default function PlanSelect() {
       const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
       const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
       const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
-      const resolvePaces = (text: string) => { let out = text; if (fiveK) out = out.split('{5k_pace}').join(fiveK); if (easyPace) out = out.split('{easy_pace}').join(easyPace); return out; };
+      const resolvePaces = (text: string) => {
+        let out = text || '';
+        if (fiveK) out = out.split('{5k_pace}').join(fiveK);
+        if (easyPace) out = out.split('{easy_pace}').join(easyPace);
+        // Compute offsets like "7:43/mi + 0:45/mi" → "8:28/mi"
+        out = out.replace(/(\d+:\d{2}\/(mi|km))\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
+          if (u1 !== u2) return m;
+          const off = `${sign}${t}/${u1}`;
+          return addOffset(base, off);
+        });
+
+        // Alias mapping when no explicit offset is provided (tempo, threshold, etc.)
+        const f = parsePace(fiveK || undefined);
+        const e = parsePace(easyPace || undefined);
+        const fmt = (sec: number, unit: string) => fmtPace(sec, unit);
+        const aliasToPace = (alias: string, unitHint: string): string | null => {
+          const unit = (unitHint === 'km' || unitHint === 'mi') ? unitHint : (f?.u || 'mi');
+          const fiveKSec = f?.u === unit ? (f?.s || 0) : (f ? Math.round(f.s * (f.u==='mi' && unit==='km' ? 0.621371 : (f.u==='km' && unit==='mi' ? 1/0.621371 : 1))) : 0);
+          const easySec = e?.u === unit ? (e?.s || 0) : (e ? Math.round(e.s * (e.u==='mi' && unit==='km' ? 0.621371 : (e.u==='km' && unit==='mi' ? 1/0.621371 : 1))) : 0);
+          const add = (base: number, sec: number) => fmt(Math.max(1, base + sec), unit);
+          const sub = (base: number, sec: number) => fmt(Math.max(1, base - sec), unit);
+          switch (alias) {
+            case 'easy':
+              if (easySec) return fmt(easySec, unit);
+              // fallback: +60s/mi or +37s/km approx
+              return add(fiveKSec, unit==='mi' ? 60 : 37);
+            case 'steady':
+            case 'aerobic':
+              return add(fiveKSec, unit==='mi' ? 45 : 28);
+            case 'marathon pace':
+            case 'mp':
+              return add(fiveKSec, unit==='mi' ? 30 : 19);
+            case 'tempo':
+              return add(fiveKSec, unit==='mi' ? 45 : 28);
+            case 'threshold':
+              return add(fiveKSec, unit==='mi' ? 35 : 22);
+            case 'cruise':
+              return add(fiveKSec, unit==='mi' ? 10 : 6);
+            case 'vo2':
+              return fmt(fiveKSec, unit);
+            case 'rep':
+              return sub(fiveKSec, unit==='mi' ? 20 : 12);
+            default:
+              return null;
+          }
+        };
+
+        // Replace patterns like "@ tempo", "@ MP", "@ aerobic"
+        out = out.replace(/@\s*(easy|steady|aerobic|tempo|threshold|cruise|vo2|rep|mp|marathon pace)\b/gi, (m, a) => {
+          // try to infer unit from nearby text
+          const unitHintMatch = out.match(/\/(mi|km)\b/);
+          const unitHint = unitHintMatch ? unitHintMatch[1] : (f?.u || 'mi');
+          const pace = aliasToPace(String(a).toLowerCase(), unitHint as any);
+          return pace ? `@ ${pace}` : m;
+        });
+        return out;
+      };
       const round = (w: number) => Math.round(w / 5) * 5;
       const resolveStrength = (text: string) => text.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
       const mapBike = (text: string) => { if (!ftp) return text; const t = text.toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
@@ -243,7 +299,7 @@ export default function PlanSelect() {
         if (repsMeters) { const n = parseInt(repsMeters[1],10); const meters = parseInt(repsMeters[2],10); const milesEach = metersToMiles(meters); const pace = fiveKSecs || easySecs || null; if (pace) totalMin += Math.round((n * milesEach * pace) / 60); const rest = text.match(/(\d+)\s*min\s*(?:jog|easy|rest)/); if (rest) totalMin += Math.max(0, n - 1) * parseInt(rest[1],10); }
         return Math.max(0, Math.round(totalMin));
       };
-      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) { const outWeek: any[] = []; for (const s of sessions as any[]) { let desc = String(s.description||''); if (desc) desc = resolvePaces(desc); if (desc) desc = resolveStrength(desc); if (desc) desc = mapBike(desc); const copy = { ...s, description: desc }; outWeek.push(copy); } (mapped.sessions_by_week as any)[wk] = outWeek; }
+      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) { const outWeek: any[] = []; for (const s of sessions as any[]) { let desc = String(s.description||''); if (desc) desc = resolvePaces(desc); if (desc) desc = resolveStrength(desc); const isBikeText = /\b(bike|ride|cycling)\b/i.test(String(s.discipline||s.type||'')); if (desc && isBikeText) desc = mapBike(desc); const copy = { ...s, description: desc }; outWeek.push(copy); } (mapped.sessions_by_week as any)[wk] = outWeek; }
       const payload = { name: libPlan.name, description: libPlan.description || '', duration_weeks: mapped.duration_weeks, current_week: 1, status: 'active', plan_type: 'catalog', start_date: startDate, config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id }, weeks: [], sessions_by_week: mapped.sessions_by_week, notes_by_week: mapped.notes_by_week || {} } as any;
 
       // Direct insert into plans and materialize planned_workouts
