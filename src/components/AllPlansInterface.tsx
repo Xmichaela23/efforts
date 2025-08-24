@@ -247,7 +247,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const typeName = s.type || extracted || '';
               const name = discipline === 'strength' ? 'Strength' : [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
               const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (extractMinutesFromText(rawDesc) || 0);
-              return {
+              const base = {
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
                 type: mappedType || 'run',
@@ -256,7 +256,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
                 day: s.day,
                 completed: false,
-              };
+              } as any;
+              if ((s.discipline || mappedType) === 'swim' && Array.isArray((s as any).steps) && (s as any).steps.length > 0) {
+                base.intervals = (s as any).steps.map((st: any) => ({ effortLabel: st.effort || st.stroke || 'Swim', duration: 0 }));
+              }
+              return base;
             });
 
             weeksOut.push({

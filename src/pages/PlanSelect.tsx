@@ -188,7 +188,16 @@ export default function PlanSelect() {
             const secPerMeter = parseSwimPace(swimPace100) ?? 2.0;
             const defaultUnit = (libPlan?.template?.swim_unit || 'yd').toLowerCase();
             const toMeters = (val: number, unit?: string) => ((unit||defaultUnit).toLowerCase()==='yd'? val*0.9144 : val);
-            const parseRest = (rest?: string) => { const m = rest? String(rest).match(/(\d+)\s*s/):null; return m? parseInt(m[1],10):0; };
+            const parseRest = (rest?: string) => {
+              if (!rest) return 0;
+              const t = String(rest).trim();
+              // Support "20s", "0:20", "1:00", "00:20"
+              const secOnly = t.match(/^(\d+)\s*s$/i);
+              if (secOnly) return parseInt(secOnly[1], 10);
+              const mmss = t.match(/^(\d{1,2}):(\d{2})$/);
+              if (mmss) return parseInt(mmss[1],10)*60 + parseInt(mmss[2],10);
+              return 0;
+            };
             const steps = (s as any).steps as any[];
             const intervals: any[] = [];
             for (const step of steps) {

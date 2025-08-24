@@ -10,6 +10,7 @@
     "description": { "type": "string" },
     "duration_weeks": { "type": "integer", "minimum": 1 },
     "plan_type": { "type": "string" },
+    "swim_unit": { "type": "string", "enum": ["yd","m"] },
     "sessions_by_week": {
       "type": "object",
       "propertyNames": { "pattern": "^[1-9][0-9]*$" },
@@ -46,6 +47,26 @@
         "tags": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "distance": { "type": "number", "minimum": 0 },
+              "unit": { "type": "string", "enum": ["yd","m"] },
+              "effort": { "type": "string" },
+              "stroke": { "type": "string" },
+              "rest": { "type": "string" },
+              "repeat": { "type": "integer", "minimum": 1 },
+              "equipment": {
+                "type": "array",
+                "items": { "type": "string" }
+              },
+              "note": { "type": "string" }
+            }
+          }
         },
         "strength_exercises": {
           "type": "array",

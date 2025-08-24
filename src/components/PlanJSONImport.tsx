@@ -279,9 +279,15 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
                           .join(' ')
                           .trim();
                         const label = s.description ? s.description : fallback;
+                        const hasSwimSteps = (s.discipline||s.type||'').toLowerCase()==='swim' && Array.isArray(s.steps) && s.steps.length>0;
                         return (
                           <div key={i} className="text-xs text-gray-700">
                             <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}
+                            {hasSwimSteps && (
+                              <div className="text-[11px] text-gray-500 mt-1">
+                                Swim steps: {s.steps.reduce((count: number, st: any) => count + Math.max(1, Number(st.repeat||1)), 0)} segments
+                              </div>
+                            )}
                           </div>
                         );
                       })}
