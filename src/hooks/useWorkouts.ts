@@ -760,6 +760,41 @@ export const useWorkouts = () => {
     }
   }, [authReady]);
 
+  // 🧲 Background Strava backfill (recent days) in case webhook misses
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!authReady) return;
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        // Try a lightweight recent import once on load
+        const { data: conn } = await supabase
+          .from('device_connections')
+          .select('provider, connection_data, access_token, refresh_token')
+          .eq('user_id', user.id)
+          .eq('provider', 'strava')
+          .single();
+        const accessToken = (conn?.connection_data?.access_token || conn?.access_token) as string | undefined;
+        const refreshToken = (conn?.connection_data?.refresh_token || conn?.refresh_token) as string | undefined;
+        if (!accessToken) return;
+        await supabase.functions.invoke('import-strava-history', {
+          body: {
+            userId: user.id,
+            accessToken,
+            refreshToken,
+            importType: 'recent'
+          }
+        });
+        if (!cancelled) await fetchWorkouts();
+      } catch (e) {
+        // Silent fail; user can still use manual import
+        console.log('ℹ️ Background Strava backfill skipped:', e);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [authReady]);
+
   // 🔔 Realtime: refresh when new Strava/Garmin/workouts rows arrive
   useEffect(() => {
     let channel: any;
@@ -781,6 +816,22 @@ export const useWorkouts = () => {
         .subscribe();
     })();
     return () => { mounted = false; if (channel) supabase.removeChannel(channel); };
+  }, [authReady]);
+
+  // ⏱️ Polling + focus refresh as a safety net if realtime is disabled on the table
+  useEffect(() => {
+    if (!authReady) return;
+    const onFocus = () => fetchWorkouts();
+    window.addEventListener('visibilitychange', onFocus);
+    window.addEventListener('focus', onFocus);
+    const interval = setInterval(() => {
+      fetchWorkouts();
+    }, 30000); // 30s
+    return () => {
+      window.removeEventListener('visibilitychange', onFocus);
+      window.removeEventListener('focus', onFocus);
+      clearInterval(interval);
+    };
   }, [authReady]);
 
   // 🆕 FIXED FUNCTION: Import Garmin activities to workouts table with proper user mapping
