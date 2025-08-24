@@ -257,12 +257,17 @@ export const useWorkouts = () => {
 
       // 🔧 FIXED: Fetch BOTH workouts table AND Garmin activities to show all workouts
       
-      // Step 1: Fetch manual/planned workouts from workouts table
+      // Step 1: Fetch manual/planned workouts from workouts table (bounded window to avoid timeouts)
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const lookbackIso = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 180 days
       const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
         .select("*")
         .eq("user_id", user.id)
-        .order("date", { ascending: false });
+        .gte("date", lookbackIso)
+        .lte("date", todayIso)
+        .order("date", { ascending: false })
+        .limit(500);
 
       if (manualError) {
         console.error("❌ Supabase error fetching manual workouts:", manualError);
