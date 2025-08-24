@@ -1,39 +1,36 @@
-# Efforts - Fitness Tracking & Training Plans
+# Efforts App — Overview, Setup, and Deployment
 
 A React + TypeScript fitness app that integrates with Garmin Connect to display GPS routes, workout analytics, and generates training plans using proven methodology.
 
-## 🚀 **Current Status: LIVE & WORKING**
+## 🚀 Current Status
 
-The app is **fully functional** with:
-- ✅ **Garmin Integration** - Automatic workout sync via webhooks
-- ✅ **GPS Route Maps** - Interactive Mapbox maps showing workout paths
-- ✅ **Elevation Charts** - Interactive elevation profiles with metric overlays
-- ✅ **Workout Analytics** - Comprehensive performance metrics and data
-- ✅ **Training Plans** - 12-week triathlon plans using proven methodology
+Fully functional app with:
+- Garmin integration (webhooks + send-to-Garmin edge function)
+- Catalog/import of deterministic JSON plans (admin)
+- Baseline mapping (paces, FTP, 1RM) and deterministic alias table
+- Auto-spacing resolver for long run/ride with clear notes
+- Swim steps → distance intervals; Strength steps → REPS with rest
+- Calendar, Today’s Effort, Strength Logger with prefill
 
-## 🎯 **Current Focus: Elevation Chart Enhancement**
+## 🔧 Deterministic Scaling (Run/Bike/Swim)
 
-We're currently working on improving the **Completed Tab** elevation chart experience:
+- Run alias table (from fiveK_pace/easyPace): easy, steady/aerobic, MP, tempo, threshold, cruise, VO2, rep
+- Bike zones from FTP: Z1–Z2, Sweet Spot, Threshold, VO2, Anaerobic, Sprint
+- Swim offsets from swimPace100: easy/steady/threshold/interval/VO2
+- Explicit plan offsets always win; otherwise aliases map to concrete paces/powers automatically
 
-### **What We're Building:**
-- **Interactive Elevation Profile** - Strava-style fixed height, responsive width
-- **Metric Selection** - Toggle between Pace, Heart Rate (BPM), and VAM
-- **Smart Cursor** - Shows selected metric data as you scroll through workout
-- **Clean UI** - Minimal Scandinavian design, no cards/borders/black boxes
+## 🗂 Plan Flow
 
-### **Current Implementation:**
-- **`CleanElevationChart`** - New, clean component handling metric selection and data display
-- **Metric Buttons** - Simple text with underlines (Pace, BPM, VAM)
-- **Interactive Tooltips** - Show distance, elevation, and selected metric data
-- **Scroll Control** - Range slider to navigate through workout timeline
+1. Admin publishes JSON (sessions_by_week, optional steps, notes_by_week)
+2. User selects from catalog → picks start date, long run/ride days
+3. On save we:
+   - Map baselines; compute offsets; estimate durations
+   - Convert swim steps to distance intervals; strength steps to REPS
+   - Auto-space hard sessions with notes; pin safe authored tempos
+   - Materialize planned_workouts and prefill Strength Logger
+   - Redirect to the saved plan
 
-### **Recent Fixes:**
-- ✅ **Map Loading** - Fixed Mapbox initialization and GPS route display
-- ✅ **Metric Buttons** - Enhanced visibility with colors and shadows
-- ✅ **Chart Rendering** - Increased height and improved data processing
-- ✅ **Tooltip Data** - Shows selected metric values, not just elevation
-
-## 🏗️ **Architecture**
+## 🏗️ Architecture
 
 - **Frontend**: React 18 + TypeScript + Vite
 - **Styling**: Tailwind CSS + shadcn/ui components
@@ -42,7 +39,7 @@ We're currently working on improving the **Completed Tab** elevation chart exper
 - **Backend**: Supabase (PostgreSQL + Edge Functions)
 - **Data**: Garmin Connect integration via webhooks
 
-## 🚀 **Quick Start**
+## 🚀 Quick Start (Frontend)
 
 ```bash
 git clone https://github.com/Xmichaela23/efforts.git
@@ -51,26 +48,26 @@ npm install
 npm run dev
 ```
 
-## 🔑 **Environment Variables**
+## 🔑 Environment Variables
 
 - `VITE_MAPBOX_ACCESS_TOKEN` - For GPS route maps
 - Supabase credentials for database and auth
 
-## 📁 **Key Components**
+## 📁 Key Components
 
 - **`CompletedTab.tsx`** - Main workout detail view with map and elevation chart
 - **`CleanElevationChart.tsx`** - Interactive elevation profile with metric selection
 - **`ActivityMap.tsx`** - Mapbox GPS route display
 - **`useWorkouts.ts`** - Data fetching and transformation hook
 
-## 🎨 **Design Principles**
+## 🎨 Design Principles
 
 - **Minimal Scandinavian Design** - Clean, uncluttered interfaces
 - **No Cards/Borders** - Direct content presentation
 - **Inter Font** - Modern, readable typography
 - **Responsive Layout** - Works on all device sizes
 
-## 📚 **Documentation**
+## 📚 Documentation
 
 - **`APP_BIBLE.md`** - Complete development philosophy and architecture
 - **`QUICK_START_FOR_NEW_CHAT.md`** - Quick setup for new developers
@@ -81,6 +78,8 @@ npm run dev
 
 ---
 
-**Status**: ✅ **Production Ready** - All core features working, currently enhancing elevation chart UX
-**Last Updated**: January 2025
-**Next Milestone**: Perfect the interactive elevation chart experience 
+**Status**: ✅ Production Ready — Plans, Garmin exports, spacing resolver live
+**Last Updated**: August 2025
+**Deploy**:
+- Netlify (frontend): push to main
+- Supabase (edge): `supabase functions deploy send-workout-to-garmin`

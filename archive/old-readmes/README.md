@@ -1,4 +1,8 @@
-# Efforts - Fitness Training App
+# Archived Readmes — Superseded Docs Index
+
+> Archived. These docs describe legacy JSON-rules engines and UI that have been replaced by the universal catalog/import flow and deterministic scheduler documented in the root README.
+
+---
 
 A comprehensive fitness training application built with React, TypeScript, and Supabase, featuring **JSON Rules Engine training plan generation** and integration with fitness platforms like Garmin and Strava.
 

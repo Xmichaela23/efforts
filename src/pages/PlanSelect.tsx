@@ -445,6 +445,40 @@ export default function PlanSelect() {
             }
             if (intervals.length) row.intervals = intervals;
           }
+          // Build basic RUN intervals for common patterns (e.g., 6x800m @ 7:43, 2min jog) with pace ranges
+          if (mappedType === 'run' && !row.intervals) {
+            const dtext = cleanedDesc;
+            const repsMeters = dtext.match(/(\d+)x\s*(\d{3,4})m/i);
+            const repsMiles = dtext.match(/(\d+)x\s*(\d+(?:\.\d+)?)\s*mi/i);
+            const paceMatch = dtext.match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+            const restMin = dtext.match(/(\d+)\s*min\s*(?:jog|easy|rest)/i);
+            if ((repsMeters || repsMiles) && paceMatch) {
+              const unit = paceMatch[3].toLowerCase();
+              const baseSec = parseInt(paceMatch[1],10)*60 + parseInt(paceMatch[2],10);
+              const quality = /(interval|cruise|tempo|threshold)/i.test(dtext);
+              const tol = quality ? 0.04 : 0.06;
+              const minSec = Math.round(baseSec * (1 - tol));
+              const maxSec = Math.round(baseSec * (1 + tol));
+              const rangeStr = `${fmtPace(minSec, unit)}-${fmtPace(maxSec, unit)}`;
+              const intervals: any[] = [];
+              const reps = parseInt((repsMeters || repsMiles)![1], 10);
+              if (repsMeters) {
+                const metersEach = parseInt(repsMeters[2], 10);
+                for (let r=0; r<reps; r+=1) {
+                  intervals.push({ distanceMeters: metersEach, effortLabel: quality? 'Interval':'Run', paceTarget: rangeStr });
+                  if (restMin) intervals.push({ duration: parseInt(restMin[1],10)*60, effortLabel: 'Rest' });
+                }
+              } else if (repsMiles) {
+                const milesEach = parseFloat(repsMiles[2]);
+                const metersEach = Math.round(milesEach * 1609.34);
+                for (let r=0; r<reps; r+=1) {
+                  intervals.push({ distanceMeters: metersEach, effortLabel: quality? 'Interval':'Run', paceTarget: rangeStr });
+                  if (restMin) intervals.push({ duration: parseInt(restMin[1],10)*60, effortLabel: 'Rest' });
+                }
+              }
+              if (intervals.length) row.intervals = intervals;
+            }
+          }
 
           // Strength: convert steps to structured intervals for Garmin Strength
           if (mappedType === 'strength' && Array.isArray((s as any).steps) && (s as any).steps.length) {

@@ -1,4 +1,17 @@
-### Deterministic Week Scheduler
+### Deterministic Week Scheduler — Rules and Integration
+#### Run Pace/Bike FTP/Swim Alias Tables (Deterministic)
+- Run: easy (easyPace fallback fiveK+60s), steady (+45s), MP (+30s), tempo (+45s), threshold (+35s), cruise (+10s), VO2 (5k), rep (−20s)
+- Bike (FTP): Z1 50–60%, Z2 60–75%, Sweet Spot 88–94%, Threshold 95–100%, VO2 106–120%, Anaerobic 120–150%
+- Swim (swimPace100): easy +8–10s, steady +5–7s, threshold ±0s, interval −2–4s, VO2 −5–7s
+Implementation: explicit session offsets win; otherwise aliases resolve to concrete targets at compose/save time.
+
+#### Auto-Spacing (Universal Catalog Plans)
+Inputs: longRunDay, longRideDay; tags long_run, long_ride, hard_run, bike_intensity, strength_lower (plus heuristics).
+Constraints: strength_lower↔long_run ≥48h; strength_lower↔long_ride ≥36h; hard_run↔long_run ≥24h; bike_intensity↔long_ride ≥24h; no two hard same day.
+Priority: long_run > strength_lower > hard_run > bike_intensity > long_ride.
+Behavior: pin long anchors; move/downgrade per constraints; emit notes (e.g., “Friday bike set to Z2...”, “Deadlift volume reduced...”).
+Deload: skip downgrades/lighten but enforce gaps.
+
 ### Plan-Specific Scheduling Rules: Get Stronger Faster (8 weeks)
 
 #### Experience → Base Run Volume

@@ -236,7 +236,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const fiveK: string | null = (candidate5k2 ? String(candidate5k2) : null) as any;
               const easyPace: string | null = (pn2.easyPace ? String(pn2.easyPace) : null) as any;
               const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
-              const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK)); if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace)); return out; };
+              const resolvePaces = (text: string) => {
+                let out = text || '';
+                if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK));
+                if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace));
+                // Compute offsets
+                out = out.replace(/(\d+:\d{2}\/(mi|km))\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
+                  if (u1 !== u2) return m; const off = `${sign}${t}/${u1}`; return ((): string => {
+                    const bm = base.match(/(\d+):(\d{2})\/(mi|km)/i); const om = off.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i);
+                    if (!bm || !om) return base; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const signc = om[1]==='-'||om[1]==='−'?-1:1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const unit = bm[3].toLowerCase(); const ns = bs + signc*os; const mm = Math.floor(ns/60); const ss = ns%60; return `${mm}:${String(ss).padStart(2,'0')}/${unit}`;
+                  })();
+                });
+                return out;
+              };
               const round = (w: number) => Math.round(w / 5) * 5;
               const resolveStrength = (text: string) => { const pn = bl?.performanceNumbers || {}; const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any; return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; }); };
               const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
