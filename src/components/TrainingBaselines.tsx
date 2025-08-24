@@ -1562,6 +1562,13 @@ return (
                                       <span>{performanceNumbers.join(', ')}</span>
                                     </div>
                                   )}
+                                  {/* NEW: Show exact 5K pace if available */}
+                                  {disciplineId === 'running' && (data as any).performanceNumbers?.fiveK_pace && (
+                                    <div className="md:col-span-2">
+                                      <span className="text-gray-600">Exact 5K Pace: </span>
+                                      <span>{(data as any).performanceNumbers.fiveK_pace}</span>
+                                    </div>
+                                  )}
                                   <div className="md:col-span-2">
                                     <span className="text-gray-600">Benchmark Recency: </span>
                                     <span>{data.benchmark_recency?.[disciplineId] || 'Not set'}</span>
