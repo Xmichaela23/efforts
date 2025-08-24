@@ -54,10 +54,13 @@ export default function PlanCatalog() {
 
       <div className="space-y-2">
         {items.map(p => (
-          <div key={p.id} className="p-3 border rounded flex items-center justify-between">
-            <div>
+          <div key={p.id} className="p-3 border rounded flex items-start justify-between">
+            <div className="max-w-[75%]">
               <div className="font-medium">{p.name}</div>
               <div className="text-xs text-gray-600">{p.duration_weeks} weeks • {p.discipline}</div>
+              {p.description && (
+                <div className="mt-1 text-xs text-gray-700 line-clamp-2">{p.description}</div>
+              )}
             </div>
             <div className="flex items-center gap-3">
               <a href={`/plans/select?id=${p.id}`} className="text-sm text-blue-600">Select</a>
