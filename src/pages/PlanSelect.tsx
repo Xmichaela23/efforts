@@ -42,19 +42,14 @@ function isStrength(s: any) {
 function hasTag(s: any, t: string) { return Array.isArray(s.tags) && s.tags.includes(t); }
 
 function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay: string; includeStrength: boolean }) {
+  // Only move explicitly tagged long_run / long_ride; otherwise preserve JSON order and days exactly
   const out: any = { ...plan, sessions_by_week: {} };
   for (const [wk, sessions] of Object.entries<any>(plan.sessions_by_week || {})) {
     const copy = (sessions as any[]).map(s => ({ ...s }));
     const runTagged = copy.findIndex(s => hasTag(s,'long_run'));
-    if (runTagged >= 0) copy[runTagged].day = prefs.longRunDay; else {
-      let i=-1,b=-1; copy.forEach((s,idx)=>{ const dur=s.duration||0; if(isRun(s)&&dur>b){b=dur;i=idx;} });
-      if (i>=0) copy[i].day = prefs.longRunDay;
-    }
+    if (runTagged >= 0) copy[runTagged].day = prefs.longRunDay;
     const rideTagged = copy.findIndex(s => hasTag(s,'long_ride'));
-    if (rideTagged >= 0) copy[rideTagged].day = prefs.longRideDay; else {
-      let i=-1,b=-1; copy.forEach((s,idx)=>{ const dur=s.duration||0; if(isRide(s)&&dur>b){b=dur;i=idx;} });
-      if (i>=0) copy[i].day = prefs.longRideDay;
-    }
+    if (rideTagged >= 0) copy[rideTagged].day = prefs.longRideDay;
     const filtered = prefs.includeStrength ? copy : copy.filter(s => !isStrength(s) || hasTag(s,'mandatory_strength'));
     out.sessions_by_week[wk] = filtered;
   }
@@ -121,6 +116,31 @@ export default function PlanSelect() {
       const round = (w: number) => Math.round(w / 5) * 5;
       const resolveStrength = (text: string) => text.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
       const mapBike = (text: string) => { if (!ftp) return text; const t = text.toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
+
+      // Compute duration in minutes from description using baselines
+      const fiveKSecs = parsePace(fiveK || undefined)?.s ?? null;
+      const easySecs = parsePace(easyPace || undefined)?.s ?? null;
+      const metersToMiles = (m: number) => m / 1609.34;
+      const computeDurationMinutes = (desc?: string): number => {
+        if (!desc) return 0;
+        const text = desc.toLowerCase();
+        let totalMin = 0;
+        const repsMin = [...text.matchAll(/(\d+)x(\d+)\s*min/g)];
+        if (repsMin.length) {
+          for (const m of repsMin) { totalMin += parseInt(m[1],10) * parseInt(m[2],10); }
+          const rest = text.match(/w\/?\s*(\d+)\s*min\s*(?:easy|rest|jog)?/);
+          if (rest) { const r = parseInt(rest[1],10); const n = repsMin.reduce((s, m) => s + parseInt(m[1],10), 0); totalMin += Math.max(0, n - 1) * r; }
+        }
+        if (totalMin === 0) {
+          const singleMin = text.match(/(\d+)\s*min\b/);
+          if (singleMin) return parseInt(singleMin[1],10);
+        }
+        const distMi = text.match(/(\d+(?:\.\d+)?)\s*mi\b/);
+        if (distMi) { const miles = parseFloat(distMi[1]); const pace = text.includes('{easy_pace}') ? easySecs : fiveKSecs; if (pace) totalMin += Math.round((miles * pace) / 60); }
+        const repsMeters = text.match(/(\d+)x(\d{3,4})m/);
+        if (repsMeters) { const n = parseInt(repsMeters[1],10); const meters = parseInt(repsMeters[2],10); const milesEach = metersToMiles(meters); const pace = fiveKSecs || easySecs || null; if (pace) totalMin += Math.round((n * milesEach * pace) / 60); const rest = text.match(/(\d+)\s*min\s*(?:jog|easy|rest)/); if (rest) totalMin += Math.max(0, n - 1) * parseInt(rest[1],10); }
+        return Math.max(0, Math.round(totalMin));
+      };
       for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) { const outWeek: any[] = []; for (const s of sessions as any[]) { let desc = String(s.description||''); if (desc) desc = resolvePaces(desc); if (desc) desc = resolveStrength(desc); if (desc) desc = mapBike(desc); const copy = { ...s, description: desc }; outWeek.push(copy); } (mapped.sessions_by_week as any)[wk] = outWeek; }
       const payload = { name: libPlan.name, description: libPlan.description || '', duration_weeks: mapped.duration_weeks, current_week: 1, status: 'active', plan_type: 'catalog', start_date: startDate, config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id }, weeks: [], sessions_by_week: mapped.sessions_by_week, notes_by_week: mapped.notes_by_week || {} } as any;
 
@@ -143,7 +163,7 @@ export default function PlanSelect() {
           const rawType = (s.discipline || s.type || '').toLowerCase();
           let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
           if (rawType === 'run') mappedType = 'run'; else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride'; else if (rawType === 'swim') mappedType = 'swim'; else if (rawType === 'strength') mappedType = 'strength';
-          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
+          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : computeDurationMinutes(s.description);
           const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || (mappedType==='strength'?'Strength': s.type || 'Session'), description: s.description || '', duration: durationVal, workout_status: 'planned', source: 'training_plan' };
           if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
           if (Array.isArray(s.intervals)) row.intervals = s.intervals;

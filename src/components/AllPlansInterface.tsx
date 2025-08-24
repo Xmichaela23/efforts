@@ -136,8 +136,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         pd.duration = pd.duration_weeks;
       }
 
-      // Load baselines for token resolution
-      try { if (!baselines) setBaselines(await loadUserBaselines?.()); } catch {}
+      // Load baselines for token resolution (use local variable immediately)
+      let bl: any = baselines;
+      try {
+        if (!bl) {
+          bl = await loadUserBaselines?.();
+          if (bl) setBaselines(bl);
+        }
+      } catch {}
 
       // Prefer materialized planned_workouts if present, so we honor actual scheduling and dates
       try {
@@ -159,9 +165,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const byWeek: Record<number, any[]> = {};
           // Baseline helpers
-          const fiveK: string | null = (baselines?.performanceNumbers?.fiveK || null) as any;
-          const easyPace: string | null = (baselines?.performanceNumbers?.easyPace || null) as any;
-          const ftp: number | null = (baselines?.performanceNumbers?.ftp || null) as any;
+          const fiveK: string | null = (bl?.performanceNumbers?.fiveK || null) as any;
+          const easyPace: string | null = (bl?.performanceNumbers?.easyPace || null) as any;
+          const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
           const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
           const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
           const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.split('{5k_pace}').join(String(fiveK)); if (easyPace) out = out.split('{easy_pace}').join(String(easyPace)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
@@ -212,9 +218,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const workouts = (sessions as any[]).map((s, idx) => {
               const rawDesc = s.description || '';
               // Baseline helpers (reuse same computation as above)
-              const fiveK: string | null = (baselines?.performanceNumbers?.fiveK || null) as any;
-              const easyPace: string | null = (baselines?.performanceNumbers?.easyPace || null) as any;
-              const ftp: number | null = (baselines?.performanceNumbers?.ftp || null) as any;
+              const fiveK: string | null = (bl?.performanceNumbers?.fiveK || null) as any;
+              const easyPace: string | null = (bl?.performanceNumbers?.easyPace || null) as any;
+              const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
               const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
               const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
               const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.split('{5k_pace}').join(String(fiveK)); if (easyPace) out = out.split('{easy_pace}').join(String(easyPace)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
