@@ -275,6 +275,51 @@ function parsePaceToMetersPerSecond(pace: string): { value?: number; low?: numbe
   return { value: parseOne(rangeSplit[0]) }
 }
 
+function widenPaceToRangeMetersPerSecond(pace: string, intensity: string, opts?: { durationSec?: number; distanceMeters?: number }): { low: number; high: number } | null {
+  // Accepts pace like "7:00/mi" or "4:20/km"; returns m/s bounds with science-based tolerances
+  if (!pace) return null
+  const mi = pace.includes('/mi')
+  const km = pace.includes('/km')
+  if (!mi && !km) return null
+  const parts = pace.replace('/mi','').replace('/km','').split(':').map(p=>parseInt(p.trim(),10))
+  if (parts.some(n=>Number.isNaN(n))) return null
+  let secs = 0
+  if (parts.length === 2) secs = parts[0]*60 + parts[1]
+  else if (parts.length === 3) secs = parts[0]*3600 + parts[1]*60 + parts[2]
+  if (secs <= 0) return null
+  // Science-based tolerances
+  const upper = (intensity || '').toUpperCase()
+  const d = Math.max(0, Number(opts?.durationSec || 0))
+  const distM = Math.max(0, Number(opts?.distanceMeters || 0))
+
+  // Determine bucket: short reps, tempo/threshold, or endurance
+  let bucket: 'short' | 'tempo' | 'endurance' = 'endurance'
+  if (d > 0) {
+    if (d <= 5 * 60) bucket = 'short'
+    else if (d >= 10 * 60 && d <= 30 * 60) bucket = 'tempo'
+    else bucket = 'endurance'
+  } else if (distM > 0) {
+    if (distM <= 1200) bucket = 'short'
+    else if (distM >= 3200 && distM <= 10000) bucket = 'tempo'
+    else bucket = 'endurance'
+  } else {
+    // Fallback to intensity label if no duration/distance
+    if (upper.includes('INTERVAL') || upper.includes('VO2')) bucket = 'short'
+    else if (upper.includes('TEMPO') || upper.includes('THRESHOLD')) bucket = 'tempo'
+    else bucket = 'endurance'
+  }
+
+  let delta = 0
+  if (bucket === 'short') delta = mi ? 4 : 3
+  else if (bucket === 'tempo') delta = mi ? 7 : 5
+  else delta = mi ? 12 : 8
+
+  const unitMeters = mi ? 1609.34 : 1000
+  const lowSpeed = unitMeters / (secs + delta) // slower pace -> lower speed
+  const highSpeed = unitMeters / (secs - delta) // faster pace -> higher speed
+  return { low: Math.min(lowSpeed, highSpeed), high: Math.max(lowSpeed, highSpeed) }
+}
+
 function parseRangeNumber(text: string): { value?: number; low?: number; high?: number } {
   // Accepts "250W", "250-300W", "150-160", "85"
   const cleaned = text.replace(/[^0-9\-\.]/g, '')
@@ -300,7 +345,14 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
         step.targetValueLow = parsed.low
         step.targetValueHigh = parsed.high
       } else if (parsed.value != null) {
-        step.targetValue = parsed.value
+        // Expand single pace to a sensible range based on intensity
+        const widened = widenPaceToRangeMetersPerSecond(pace, step.intensity || '', { durationSec: (step.durationType === 'TIME' ? step.durationValue : undefined) as any, distanceMeters: (step.durationType === 'DISTANCE' ? step.durationValue : undefined) as any })
+        if (widened) {
+          step.targetValueLow = widened.low
+          step.targetValueHigh = widened.high
+        } else {
+          step.targetValue = parsed.value
+        }
       }
     }
     return
@@ -313,7 +365,10 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
       step.targetValueLow = pow.low
       step.targetValueHigh = pow.high
     } else if (pow.value != null) {
-      step.targetValue = pow.value
+      // Expand single wattage to ±5%
+      const base = pow.value
+      step.targetValueLow = Math.round(base * 0.95)
+      step.targetValueHigh = Math.round(base * 1.05)
     }
     return
   }
