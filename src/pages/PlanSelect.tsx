@@ -262,7 +262,8 @@ export default function PlanSelect() {
           // Strength: convert steps to structured intervals for Garmin Strength
           if (mappedType === 'strength' && Array.isArray((s as any).steps) && (s as any).steps.length) {
             const pn2 = baselines?.performanceNumbers || {};
-            const orm = { squat: pn2.squat, bench: pn2.bench, deadlift: pn2.deadlift, overhead: pn2.overheadPress1RM } as any;
+            const estimatedRow1RM = pn2.bench ? pn2.bench * 0.7 : undefined; // Row ≈ 70% of bench 1RM
+            const orm = { squat: pn2.squat, bench: pn2.bench, deadlift: pn2.deadlift, overhead: pn2.overheadPress1RM, row: estimatedRow1RM } as any;
             const toSeconds = (t?: string) => { if (!t) return 0; const m = String(t).trim(); const sec = m.match(/^(\d+)\s*s$/i); if (sec) return parseInt(sec[1],10); const mmss = m.match(/^(\d{1,2}):(\d{2})$/); if (mmss) return parseInt(mmss[1],10)*60+parseInt(mmss[2],10); return 0; };
             const round5 = (w: number) => Math.round(w/5)*5;
             const exMap: Record<string,string> = {
@@ -270,10 +271,15 @@ export default function PlanSelect() {
               back_squat: 'squat',
               deadlift: 'deadlift',
               overhead_press: 'overhead',
-              ohp: 'overhead'
+              ohp: 'overhead',
+              row: 'row',
+              barbell_row: 'row',
+              pendlay_row: 'row'
             };
             const steps = (s as any).steps as any[];
             const intervals: any[] = [];
+            const strengthAgg: Record<string, { name: string; sets: number; reps: number; weight: number } > = {};
+            const formatName = (k: string) => k.replace(/_/g,' ').replace(/\b\w/g, (c) => c.toUpperCase());
             for (const step of steps) {
               const repeat = Math.max(1, Number(step.repeat||1));
               if (String(step.type||'').toLowerCase()==='strength') {
@@ -285,6 +291,18 @@ export default function PlanSelect() {
                 for (let r=0;r<repeat;r+=1) {
                   intervals.push({ kind:'strength', exercise: String(step.exercise||'').toLowerCase(), reps: Number(step.reps||0), weight, note: step.note||undefined });
                 }
+                // Aggregate for logger prefill
+                const aggKey = String(step.exercise||'').toLowerCase();
+                const prev = strengthAgg[aggKey];
+                const repsNum = Number(step.reps||0);
+                if (prev) {
+                  prev.sets += repeat;
+                  // If weights differ across sets, keep the heavier one for display; user can edit per set
+                  if (weight > 0) prev.weight = Math.max(prev.weight, weight);
+                  if (repsNum > 0) prev.reps = repsNum; // keep latest reps spec
+                } else {
+                  strengthAgg[aggKey] = { name: formatName(aggKey), sets: repeat, reps: repsNum, weight: weight||0 };
+                }
               } else if (String(step.type||'').toLowerCase()==='rest') {
                 const dur = toSeconds(step.duration);
                 for (let r=0;r<repeat;r+=1) {
@@ -293,6 +311,11 @@ export default function PlanSelect() {
               }
             }
             if (intervals.length) row.intervals = intervals;
+            // Emit strength_exercises for logger prepopulation
+            const strengthExercises = Object.values(strengthAgg);
+            if (strengthExercises.length) {
+              row.strength_exercises = strengthExercises.map(se => ({ name: se.name, sets: se.sets, reps: se.reps, weight: se.weight }));
+            }
           }
           if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
           if (Array.isArray(s.intervals)) row.intervals = s.intervals;
