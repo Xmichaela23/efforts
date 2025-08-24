@@ -265,17 +265,20 @@ export default function PlanSelect() {
         });
       });
       if (rows.length) {
-        // Use upsert with ignore to avoid 409 conflicts from duplicate retries
+        // Ensure idempotency: remove any prior materialization for this plan/template, then insert fresh
+        await supabase.from('planned_workouts').delete().eq('training_plan_id', planRow.id);
+        await supabase.from('planned_workouts').delete().eq('template_id', planRow.id);
+
         const { error: pwErr } = await supabase
           .from('planned_workouts')
-          .upsert(rows, { onConflict: 'training_plan_id,week_number,day_number,name', ignoreDuplicates: true });
+          .insert(rows);
         if (pwErr) {
           const msg = String((pwErr as any)?.message || '');
           if (msg.includes('planned_workouts_plan_fk')) {
             const rowsNoLink = rows.map(r => ({ ...r, training_plan_id: null }));
             const { error: pwErr2 } = await supabase
               .from('planned_workouts')
-              .upsert(rowsNoLink, { onConflict: 'template_id,week_number,day_number,name', ignoreDuplicates: true });
+              .insert(rowsNoLink);
             if (pwErr2) throw pwErr2;
           } else {
             throw pwErr;
