@@ -259,7 +259,7 @@ export const useWorkouts = () => {
       
       // Step 1: Fetch manual/planned workouts from workouts table (bounded window to avoid timeouts)
       const todayIso = new Date().toISOString().slice(0, 10);
-      const lookbackIso = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 180 days
+      const lookbackIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 30 days
       const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
         .select("*")
@@ -267,7 +267,7 @@ export const useWorkouts = () => {
         .gte("date", lookbackIso)
         .lte("date", todayIso)
         .order("date", { ascending: false })
-        .limit(500);
+        .limit(200);
 
       if (manualError) {
         console.error("❌ Supabase error fetching manual workouts:", manualError);
