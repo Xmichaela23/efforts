@@ -109,15 +109,17 @@ export default function PlanSelect() {
       let baselines: any = null;
       try { baselines = await loadUserBaselines?.(); } catch {}
       const mapped = { ...remapped, sessions_by_week: {} as any };
-      // Use the stored pace directly from baselines (already converted in assessment)
-      const fiveK = baselines?.performanceNumbers?.fiveK?.toString() || null;
-      const easyPace = baselines?.performanceNumbers?.easyPace?.toString() || null;
+      // Use stored paces from baselines (from assessment)
+      const pn = baselines?.performanceNumbers || {};
+      const candidate5k = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
+      const fiveK = candidate5k ? String(candidate5k) : null;
+      const easyPace = pn.easyPace ? String(pn.easyPace) : null;
       const ftp = baselines?.performanceNumbers?.ftp || null;
       const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
       const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
       const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
       const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
-      const resolvePaces = (text: string) => { let out = text; if (fiveK) out = out.split('{5k_pace}').join(fiveK); if (easyPace) out = out.split('{easy_pace}').join(easyPace); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
+      const resolvePaces = (text: string) => { let out = text; if (fiveK) out = out.split('{5k_pace}').join(fiveK); if (easyPace) out = out.split('{easy_pace}').join(easyPace); return out; };
       const round = (w: number) => Math.round(w / 5) * 5;
       const resolveStrength = (text: string) => text.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
       const mapBike = (text: string) => { if (!ftp) return text; const t = text.toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };

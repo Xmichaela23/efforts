@@ -243,6 +243,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to save baselines');
+      // Ensure performance_numbers contains explicit fiveK_pace if only 5K race time was entered
+      const perf = { ...(data.performanceNumbers || {}) } as any;
+      if (!perf.fiveK_pace && typeof perf.fiveK === 'string') {
+        const mmss = perf.fiveK.match(/^(\d{1,2}):(\d{2})$/);
+        if (mmss) {
+          const mins = parseInt(mmss[1], 10);
+          const secs = parseInt(mmss[2], 10);
+          const total = mins * 60 + secs;
+          const paceSec = Math.round(total / 3.10686); // 5k miles
+          const pm = Math.floor(paceSec / 60);
+          const ps = paceSec % 60;
+          perf.fiveK_pace = `${pm}:${String(ps).padStart(2, '0')}/mi`;
+        }
+      }
+
       const baselineRecord = {
         user_id: user.id,
         // Enhanced user details
@@ -262,7 +277,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         current_fitness: data.currentFitness,
         discipline_fitness: data.disciplineFitness,
         benchmarks: data.benchmarks,
-        performance_numbers: data.performanceNumbers,
+        performance_numbers: perf,
         injury_history: data.injuryHistory,
         injury_regions: data.injuryRegions,
         training_background: data.trainingBackground,

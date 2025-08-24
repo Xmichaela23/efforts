@@ -170,18 +170,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const fiveK: string | null = (candidate5k ? String(candidate5k) : null) as any;
           const easyPace: string | null = (pn.easyPace ? String(pn.easyPace) : null) as any;
           const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
-          const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
-          const parsePace = (p?: string|null): { s: number; u: 'mi'|'km' } | null => { if (!p) return null; const m = String(p).trim().match(/^(\d+):(\d{2})\/(mi|km)$/i); if (m) return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() as any }; const mmss = String(p).trim().match(/^(\d+):(\d{2})(?::(\d{2}))?$/); if (mmss) { const h = mmss[3]?parseInt(mmss[1],10):0; const m2 = mmss[3]?parseInt(mmss[2],10):parseInt(mmss[1],10); const s2 = mmss[3]?parseInt(mmss[3],10):parseInt(mmss[2],10); const total=h*3600+m2*60+s2; const perMi=Math.round(total/3.10686); return { s: perMi, u: 'mi' }; } return null; };
-          const band = (sec: number, pct: number, u: 'mi'|'km') => { const lo = Math.round(sec*(1-pct)); const hi = Math.round(sec*(1+pct)); return `${fmtPace(lo,u)}–${fmtPace(hi,u)}`; };
-          const addOffsetSecs = (baseSec: number, baseUnit: 'mi'|'km', off: string) => { const om = off.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!om) return fmtPace(baseSec, baseUnit); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase() as 'mi'|'km'; if (ou!==baseUnit) return fmtPace(baseSec, baseUnit); return fmtPace(baseSec + sign*os, baseUnit); };
           const resolvePaces = (text: string) => {
             let out = text || '';
-            const fiveKParsed = parsePace(fiveK);
-            const easyParsed = parsePace(easyPace);
-            // Replace tokens with ranges ±3%
-            if (fiveKParsed) out = out.replaceAll('{5k_pace}', band(fiveKParsed.s, 0.03, fiveKParsed.u));
-            if (easyParsed) out = out.replaceAll('{easy_pace}', band(easyParsed.s, 0.03, easyParsed.u));
-            // Handle explicit offsets around printed paces "mm:ss/unit +/- mm:ss/unit" → keep as-is
+            if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK));
+            if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace));
             out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => `${a} ${s} ${b}`);
             return out;
           };
