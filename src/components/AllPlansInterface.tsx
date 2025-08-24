@@ -165,12 +165,33 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const byWeek: Record<number, any[]> = {};
           // Baseline helpers
-          const fiveK: string | null = (bl?.performanceNumbers?.fiveK || null) as any;
-          const easyPace: string | null = (bl?.performanceNumbers?.easyPace || null) as any;
+          const pn = bl?.performanceNumbers || {};
+          const candidate5k = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
+          const fiveK: string | null = (candidate5k ? String(candidate5k) : null) as any;
+          const easyPace: string | null = (pn.easyPace ? String(pn.easyPace) : null) as any;
           const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
           const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
-          const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
-          const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.split('{5k_pace}').join(String(fiveK)); if (easyPace) out = out.split('{easy_pace}').join(String(easyPace)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
+          const parsePace = (p?: string|null): { s: number; u: 'mi'|'km' } | null => { if (!p) return null; const m = String(p).trim().match(/^(\d+):(\d{2})\/(mi|km)$/i); if (m) return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() as any }; const mmss = String(p).trim().match(/^(\d+):(\d{2})(?::(\d{2}))?$/); if (mmss) { const h = mmss[3]?parseInt(mmss[1],10):0; const m2 = mmss[3]?parseInt(mmss[2],10):parseInt(mmss[1],10); const s2 = mmss[3]?parseInt(mmss[3],10):parseInt(mmss[2],10); const total=h*3600+m2*60+s2; const perMi=Math.round(total/3.10686); return { s: perMi, u: 'mi' }; } return null; };
+          const band = (sec: number, pct: number, u: 'mi'|'km') => { const lo = Math.round(sec*(1-pct)); const hi = Math.round(sec*(1+pct)); return `${fmtPace(lo,u)}–${fmtPace(hi,u)}`; };
+          const addOffsetSecs = (baseSec: number, baseUnit: 'mi'|'km', off: string) => { const om = off.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!om) return fmtPace(baseSec, baseUnit); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase() as 'mi'|'km'; if (ou!==baseUnit) return fmtPace(baseSec, baseUnit); return fmtPace(baseSec + sign*os, baseUnit); };
+          const resolvePaces = (text: string) => {
+            let out = text || '';
+            const fiveKParsed = parsePace(fiveK);
+            const easyParsed = parsePace(easyPace);
+            // Replace tokens with ranges ±3%
+            if (fiveKParsed) out = out.replaceAll('{5k_pace}', band(fiveKParsed.s, 0.03, fiveKParsed.u));
+            if (easyParsed) out = out.replaceAll('{easy_pace}', band(easyParsed.s, 0.03, easyParsed.u));
+            // Handle explicit offsets around printed paces "mm:ss/unit +/- mm:ss/unit" → keep as-is
+            out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => `${a} ${s} ${b}`);
+            return out;
+          };
+          const round = (w: number) => Math.round(w / 5) * 5;
+          const resolveStrength = (text: string) => {
+            const pn = bl?.performanceNumbers || {};
+            const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any;
+            return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
+              const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
+          };
           const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
 
           for (const w of mat) {
@@ -180,7 +201,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               id: w.id,
               name: w.name || 'Session',
               type: w.type,
-              description: mapBike(resolvePaces(w.description || '')),
+              description: resolveStrength(mapBike(resolvePaces(w.description || ''))),
               duration: typeof w.duration === 'number' ? w.duration : 0,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
@@ -218,14 +239,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const workouts = (sessions as any[]).map((s, idx) => {
               const rawDesc = s.description || '';
               // Baseline helpers (reuse same computation as above)
-              const fiveK: string | null = (bl?.performanceNumbers?.fiveK || null) as any;
-              const easyPace: string | null = (bl?.performanceNumbers?.easyPace || null) as any;
+              const pn2 = bl?.performanceNumbers || {};
+              const candidate5k2 = pn2.fiveK_pace || pn2.fiveKPace || pn2.fiveK || null;
+              const fiveK: string | null = (candidate5k2 ? String(candidate5k2) : null) as any;
+              const easyPace: string | null = (pn2.easyPace ? String(pn2.easyPace) : null) as any;
               const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
               const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
-              const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
-              const resolvePaces = (text: string) => { let out = text || ''; if (fiveK) out = out.split('{5k_pace}').join(String(fiveK)); if (easyPace) out = out.split('{easy_pace}').join(String(easyPace)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => addOffset(a, `${s}${b}`)); return out; };
+              const parsePace = (p?: string|null): { s: number; u: 'mi'|'km' } | null => { if (!p) return null; const m = String(p).trim().match(/^(\d+):(\d{2})\/(mi|km)$/i); if (m) return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() as any }; const mmss = String(p).trim().match(/^(\d+):(\d{2})(?::(\d{2}))?$/); if (mmss) { const h = mmss[3]?parseInt(mmss[1],10):0; const m2 = mmss[3]?parseInt(mmss[2],10):parseInt(mmss[1],10); const s2 = mmss[3]?parseInt(mmss[3],10):parseInt(mmss[2],10); const total=h*3600+m2*60+s2; const perMi=Math.round(total/3.10686); return { s: perMi, u: 'mi' }; } return null; };
+              const band = (sec: number, pct: number, u: 'mi'|'km') => { const lo = Math.round(sec*(1-pct)); const hi = Math.round(sec*(1+pct)); return `${fmtPace(lo,u)}–${fmtPace(hi,u)}`; };
+              const resolvePaces = (text: string) => { let out = text || ''; const fk=parsePace(fiveK); const ez=parsePace(easyPace); if (fk) out = out.replaceAll('{5k_pace}', band(fk.s,0.03,fk.u)); if (ez) out = out.replaceAll('{easy_pace}', band(ez.s,0.03,ez.u)); out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m,a,s,b)=>`${a} ${s} ${b}`); return out; };
+              const round = (w: number) => Math.round(w / 5) * 5;
+              const resolveStrength = (text: string) => { const pn = bl?.performanceNumbers || {}; const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any; return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; }); };
               const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
-              const description = mapBike(resolvePaces(cleanSessionDescription(rawDesc)));
+              const description = resolveStrength(mapBike(resolvePaces(cleanSessionDescription(rawDesc))));
               const discipline = (s.discipline || inferDisciplineFromText(rawDesc)) as any;
               const mappedType = discipline === 'bike' ? 'ride' : discipline;
               const extracted = extractTypeFromText(rawDesc);
