@@ -143,6 +143,42 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const intervals = Array.isArray(workout.intervals) ? workout.intervals : []
 
   for (const interval of intervals) {
+    // Strength intervals: send as GARMIN strength steps; rest remains TIME
+    if (String((interval as any)?.kind || '').toLowerCase() === 'strength') {
+      const label = String((interval as any).exercise || '').trim()
+      const reps = Number((interval as any).reps || 0)
+      const weight = Number((interval as any).weight || 0)
+      const note = String((interval as any).note || '')
+      const step: GarminStep = {
+        type: 'WorkoutStep',
+        stepId,
+        stepOrder: stepId,
+        intensity: 'ACTIVE',
+        description: [label, reps ? `${reps} reps` : '', weight ? `${weight} lb` : '', note].filter(Boolean).join(' • ') || undefined,
+        durationType: 'REPS',
+        durationValue: Math.max(1, reps)
+      }
+      step.exerciseName = label
+      if (weight > 0) step.weightValue = weight
+      steps.push(step)
+      stepId += 1
+      continue
+    }
+    if (String((interval as any)?.kind || '').toLowerCase() === 'rest') {
+      const sec = Number((interval as any).duration || 0)
+      const step: GarminStep = {
+        type: 'WorkoutStep',
+        stepId,
+        stepOrder: stepId,
+        intensity: 'REST',
+        description: 'Rest',
+        durationType: 'TIME',
+        durationValue: Math.max(1, Math.floor(sec))
+      }
+      steps.push(step)
+      stepId += 1
+      continue
+    }
     // Handle repeat blocks with child segments
     if (Array.isArray(interval?.segments) && interval?.repeatCount && interval.repeatCount > 0) {
       for (let r = 0; r < Number(interval.repeatCount); r += 1) {

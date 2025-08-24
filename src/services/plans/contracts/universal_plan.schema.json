@@ -52,20 +52,37 @@
           "type": "array",
           "items": {
             "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "distance": { "type": "number", "minimum": 0 },
-              "unit": { "type": "string", "enum": ["yd","m"] },
-              "effort": { "type": "string" },
-              "stroke": { "type": "string" },
-              "rest": { "type": "string" },
-              "repeat": { "type": "integer", "minimum": 1 },
-              "equipment": {
-                "type": "array",
-                "items": { "type": "string" }
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "distance": { "type": "number", "minimum": 0 },
+                  "unit": { "type": "string", "enum": ["yd","m"] },
+                  "effort": { "type": "string" },
+                  "stroke": { "type": "string" },
+                  "rest": { "type": "string" },
+                  "repeat": { "type": "integer", "minimum": 1 },
+                  "equipment": { "type": "array", "items": { "type": "string" } },
+                  "note": { "type": "string" }
+                }
               },
-              "note": { "type": "string" }
-            }
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type"],
+                "properties": {
+                  "type": { "type": "string", "enum": ["strength","rest"] },
+                  "exercise": { "type": "string" },
+                  "reps": { "type": "integer", "minimum": 1 },
+                  "target_weight": { "type": "number", "minimum": 0 },
+                  "target_percent_1rm": { "type": "number", "minimum": 0, "maximum": 2 },
+                  "duration": { "type": "string" },
+                  "note": { "type": "string" },
+                  "repeat": { "type": "integer", "minimum": 1 }
+                }
+              }
+            ]
           }
         },
         "strength_exercises": {

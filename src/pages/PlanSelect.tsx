@@ -258,6 +258,42 @@ export default function PlanSelect() {
             }
             if (intervals.length) row.intervals = intervals;
           }
+
+          // Strength: convert steps to structured intervals for Garmin Strength
+          if (mappedType === 'strength' && Array.isArray((s as any).steps) && (s as any).steps.length) {
+            const pn2 = baselines?.performanceNumbers || {};
+            const orm = { squat: pn2.squat, bench: pn2.bench, deadlift: pn2.deadlift, overhead: pn2.overheadPress1RM } as any;
+            const toSeconds = (t?: string) => { if (!t) return 0; const m = String(t).trim(); const sec = m.match(/^(\d+)\s*s$/i); if (sec) return parseInt(sec[1],10); const mmss = m.match(/^(\d{1,2}):(\d{2})$/); if (mmss) return parseInt(mmss[1],10)*60+parseInt(mmss[2],10); return 0; };
+            const round5 = (w: number) => Math.round(w/5)*5;
+            const exMap: Record<string,string> = {
+              bench_press: 'bench',
+              back_squat: 'squat',
+              deadlift: 'deadlift',
+              overhead_press: 'overhead',
+              ohp: 'overhead'
+            };
+            const steps = (s as any).steps as any[];
+            const intervals: any[] = [];
+            for (const step of steps) {
+              const repeat = Math.max(1, Number(step.repeat||1));
+              if (String(step.type||'').toLowerCase()==='strength') {
+                const key = exMap[String(step.exercise||'').toLowerCase()] || '';
+                let weight = Number(step.target_weight||0);
+                if (!weight && Number(step.target_percent_1rm||0) > 0 && orm[key]) {
+                  weight = round5(orm[key] * Number(step.target_percent_1rm));
+                }
+                for (let r=0;r<repeat;r+=1) {
+                  intervals.push({ kind:'strength', exercise: String(step.exercise||'').toLowerCase(), reps: Number(step.reps||0), weight, note: step.note||undefined });
+                }
+              } else if (String(step.type||'').toLowerCase()==='rest') {
+                const dur = toSeconds(step.duration);
+                for (let r=0;r<repeat;r+=1) {
+                  intervals.push({ kind:'rest', duration: dur, effortLabel: 'Rest' });
+                }
+              }
+            }
+            if (intervals.length) row.intervals = intervals;
+          }
           if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
           if (Array.isArray(s.intervals)) row.intervals = s.intervals;
           if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
