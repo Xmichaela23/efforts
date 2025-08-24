@@ -281,59 +281,52 @@ async function markStravaActivityDeleted(activityId: number, userId: string) {
 
 async function createWorkoutFromStravaActivity(userId: string, activityData: any) {
   try {
-    // Map Strava sport type to our workout types
-    const sportType = activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase();
-    let workoutType = 'other';
-    
-    if (sportType?.includes('run')) workoutType = 'running';
-    else if (sportType?.includes('ride') || sportType?.includes('bike')) workoutType = 'cycling';
-    else if (sportType?.includes('swim')) workoutType = 'swimming';
-    else if (sportType?.includes('walk') || sportType?.includes('hike')) workoutType = 'walking';
-    else if (sportType?.includes('weight') || sportType?.includes('strength')) workoutType = 'strength';
+    // Map Strava sport to our type values used in UI
+    const s = (activityData.sport_type?.toLowerCase() || activityData.type?.toLowerCase() || '');
+    const type = s.includes('run') ? 'run'
+      : (s.includes('ride') || s.includes('bike')) ? 'ride'
+      : s.includes('swim') ? 'swim'
+      : (s.includes('walk') || s.includes('hike')) ? 'walk'
+      : (s.includes('weight') || s.includes('strength')) ? 'strength'
+      : 'run';
 
-    // Only create workouts for supported sports
-    if (!['running', 'cycling', 'swimming', 'strength', 'walking'].includes(workoutType)) {
-      console.log(`⏭️ Skipping workout creation for unsupported sport: ${sportType}`);
-      return;
-    }
+    // Only persist supported types
+    if (!['run','ride','swim','strength','walk'].includes(type)) return;
 
-    // Check if workout already exists for this Strava activity
+    // Dedupe by strava_activity_id
     const { data: existingWorkout } = await supabase
       .from('workouts')
       .select('id')
       .eq('user_id', userId)
       .eq('strava_activity_id', activityData.id)
       .single();
+    if (existingWorkout) return;
 
-    if (existingWorkout) {
-      console.log(`⏭️ Workout already exists for Strava activity ${activityData.id}`);
-      return;
-    }
+    const date = new Date(activityData.start_date_local || activityData.start_date).toISOString().split('T')[0];
+    const duration = Math.max(0, Math.round((activityData.moving_time || 0) / 60));
+    const distance = Number.isFinite(activityData.distance) ? Math.round(activityData.distance) : null; // meters or leave as provided
 
-    // Create workout data
-    const workoutData = {
+    const row: any = {
       user_id: userId,
-      workout_type: workoutType,
-      date: new Date(activityData.start_date).toISOString(),
-      duration: Math.round(activityData.moving_time / 60), // Convert to minutes
-      distance: activityData.distance ? Math.round(activityData.distance) : null, // Convert to meters
-      notes: `Imported from Strava: ${activityData.name}`,
+      name: activityData.name || 'Strava Activity',
+      type,
+      date,
+      duration,
+      distance,
+      description: `Imported from Strava: ${activityData.name || ''}`.trim(),
+      workout_status: 'completed',
+      completedmanually: false,
       strava_activity_id: activityData.id,
-      source: 'strava_webhook',
-      start_position_lat: activityData.start_latlng?.[0] || null,
-      start_position_long: activityData.start_latlng?.[1] || null,
-      created_at: new Date().toISOString()
+      source: 'strava',
+      start_position_lat: activityData.start_latlng?.[0] ?? null,
+      start_position_long: activityData.start_latlng?.[1] ?? null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase
-      .from('workouts')
-      .insert(workoutData);
-
-    if (error) {
-      console.error(`❌ Error creating workout for Strava activity ${activityData.id}:`, error);
-    } else {
-      console.log(`✅ Created workout for Strava activity ${activityData.id}`);
-    }
+    const { error } = await supabase.from('workouts').insert(row);
+    if (error) console.error(`❌ Error creating workout for Strava activity ${activityData.id}:`, error);
+    else console.log(`✅ Created workout for Strava activity ${activityData.id}`);
   } catch (error) {
     console.error(`❌ Error in createWorkoutFromStravaActivity:`, error);
   }
@@ -355,13 +348,15 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
       return;
     }
 
-    // Update workout data
+    // Update with our schema fields
     const workoutData = {
-      duration: Math.round(activityData.moving_time / 60),
-      distance: activityData.distance ? Math.round(activityData.distance) : null,
-      notes: `Updated from Strava: ${activityData.name}`,
-      updated_at: new Date().toISOString()
-    };
+      name: activityData.name || 'Strava Activity',
+      duration: Math.max(0, Math.round((activityData.moving_time || 0) / 60)),
+      distance: Number.isFinite(activityData.distance) ? Math.round(activityData.distance) : null,
+      description: `Updated from Strava: ${activityData.name || ''}`.trim(),
+      workout_status: 'completed',
+      updated_at: new Date().toISOString(),
+    } as any;
 
     const { error } = await supabase
       .from('workouts')

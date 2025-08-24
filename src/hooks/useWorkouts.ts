@@ -760,18 +760,19 @@ export const useWorkouts = () => {
     }
   }, [authReady]);
 
-  // 🧲 Background Strava backfill (recent days) in case webhook misses
+  // 🧲 Background Strava backfill (recent days) is disabled by default to avoid function errors on app load.
+  // Enable by setting VITE_ENABLE_STRAVA_AUTO_BACKFILL=true at build time.
   useEffect(() => {
+    const ENABLE = (import.meta as any)?.env?.VITE_ENABLE_STRAVA_AUTO_BACKFILL === 'true';
+    if (!ENABLE || !authReady) return;
     let cancelled = false;
     (async () => {
-      if (!authReady) return;
       try {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        // Try a lightweight recent import once on load
         const { data: conn } = await supabase
           .from('device_connections')
-          .select('provider, connection_data, access_token, refresh_token')
+          .select('connection_data, access_token, refresh_token')
           .eq('user_id', user.id)
           .eq('provider', 'strava')
           .single();
@@ -779,16 +780,10 @@ export const useWorkouts = () => {
         const refreshToken = (conn?.connection_data?.refresh_token || conn?.refresh_token) as string | undefined;
         if (!accessToken) return;
         await supabase.functions.invoke('import-strava-history', {
-          body: {
-            userId: user.id,
-            accessToken,
-            refreshToken,
-            importType: 'recent'
-          }
+          body: { userId: user.id, accessToken, refreshToken, importType: 'recent' }
         });
         if (!cancelled) await fetchWorkouts();
       } catch (e) {
-        // Silent fail; user can still use manual import
         console.log('ℹ️ Background Strava backfill skipped:', e);
       }
     })();
