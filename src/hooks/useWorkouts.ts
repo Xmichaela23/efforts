@@ -443,8 +443,73 @@ export const useWorkouts = () => {
         console.log("⚠️ Error fetching Garmin activities (continuing with manual workouts):", garminError);
       }
 
-      // Step 3: Merge both workout sources and remove duplicates
-      const allWorkouts = [...(manualWorkouts || []), ...garminWorkouts];
+      // Step 2b: Fetch Strava activities saved by webhook/importer (if connected)
+      let stravaWorkouts: any[] = [];
+      try {
+        const { data: stravaRows, error: stravaErr } = await supabase
+          .from('strava_activities')
+          .select('*')
+          .eq('user_id', user.id)
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false })
+          .limit(200);
+
+        if (!stravaErr && Array.isArray(stravaRows)) {
+          stravaWorkouts = await Promise.all(stravaRows.map(async (row: any) => {
+            const a = row.activity_data || {};
+            const sportType = (a.sport_type || a.type || '').toLowerCase();
+            const getWorkoutType = (t: string): "run" | "ride" | "swim" | "strength" | "walk" => {
+              if (t.includes('walk') || t.includes('hike')) return 'walk';
+              if (t.includes('run')) return 'run';
+              if (t.includes('ride') || t.includes('bike') || t.includes('cycling')) return 'ride';
+              if (t.includes('swim')) return 'swim';
+              if (t.includes('weight') || t.includes('strength')) return 'strength';
+              return 'run';
+            };
+            const type = getWorkoutType(sportType);
+            const iso = a.start_date || a.start_date_local || new Date().toISOString();
+            const date = String(iso).split('T')[0];
+            const startLatLng = Array.isArray(a.start_latlng) ? a.start_latlng : null;
+            const locationTitle = await generateLocationTitle(
+              startLatLng?.[0] ?? null,
+              startLatLng?.[1] ?? null,
+              type
+            );
+            return {
+              id: `strava_${row.strava_id || a.id}`,
+              name: locationTitle || a.name || `Strava ${type}`,
+              type,
+              duration: Math.round((a.moving_time || a.elapsed_time || 0) / 60),
+              date,
+              description: `Imported from Strava - ${a.name || 'Activity'}`,
+              workout_status: 'completed' as const,
+              distance: typeof a.distance === 'number' ? a.distance / 1000 : undefined,
+              avg_heart_rate: a.average_heartrate,
+              max_heart_rate: a.max_heartrate,
+              avg_power: a.average_watts,
+              max_power: a.max_watts,
+              normalized_power: a.weighted_average_watts,
+              calories: a.kilojoules,
+              elevation_gain: a.total_elevation_gain,
+              moving_time: a.moving_time,
+              elapsed_time: a.elapsed_time,
+              start_position_lat: startLatLng?.[0] ?? null,
+              start_position_long: startLatLng?.[1] ?? null,
+              provider_sport: sportType,
+              strava_data: { original_activity: a },
+            };
+          }));
+        }
+      } catch (e) {
+        console.log('⚠️ Error fetching Strava activities (continuing):', e);
+      }
+
+      // Step 3: Merge all sources and remove duplicates (keep simple for now)
+      const allWorkouts = [
+        ...(manualWorkouts || []),
+        ...garminWorkouts,
+        ...stravaWorkouts,
+      ];
       
       // Show all workouts including Garmin (removed duplicate filter)
       const uniqueWorkouts = allWorkouts;

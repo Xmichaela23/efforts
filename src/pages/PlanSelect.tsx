@@ -218,10 +218,11 @@ export default function PlanSelect() {
         let out = text || '';
         if (fiveK) out = out.split('{5k_pace}').join(fiveK);
         if (easyPace) out = out.split('{easy_pace}').join(easyPace);
-        // Compute offsets like "7:43/mi + 0:45/mi" → "8:28/mi"
-        out = out.replace(/(\d+:\d{2}\/(mi|km))\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
-          if (u1 !== u2) return m;
-          const off = `${sign}${t}/${u1}`;
+        // Compute offsets like "7:43/mi + 0:45/mi" or base without unit "7:43 + 0:45/mi"
+        out = out.replace(/(\d+:\d{2})(?:\/(mi|km))?\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, baseNoUnit, baseUnit, sign, t, offUnit) => {
+          const unit = baseUnit || offUnit;
+          const base = `${baseNoUnit}/${unit}`;
+          const off = `${sign}${t}/${unit}`;
           return addOffset(base, off);
         });
 
@@ -268,6 +269,17 @@ export default function PlanSelect() {
           const unitHint = unitHintMatch ? unitHintMatch[1] : (f?.u || 'mi');
           const pace = aliasToPace(String(a).toLowerCase(), unitHint as any);
           return pace ? `@ ${pace}` : m;
+        });
+        // Ensure bare paces have unit (default to mi) e.g., "@ 7:43" → "@ 7:43/mi"
+        out = out.replace(/@\s*(\d+:\d{2})(?!\/(mi|km))/g, (m, p) => `@ ${p}/${(parsePace(fiveK || easyPace || '')?.u || 'mi')}`);
+        // Append pace ranges based on context tolerance
+        const toSec = (mmss: string) => { const mm = parseInt(mmss.split(':')[0],10); const ss = parseInt(mmss.split(':')[1],10); return mm*60+ss; };
+        const secTo = (s: number, unit: string) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}/${unit}`; };
+        const context = out.toLowerCase();
+        const tol = /interval|tempo|threshold|vo2|rep|800m|400m/.test(context) ? 0.04 : (/easy|long|aerobic|endurance|steady/.test(context) ? 0.06 : 0.05);
+        out = out.replace(/@\s*(\d+:\d{2})\/(mi|km)(?!\s*\()/g, (m, p, u) => {
+          const s = toSec(p); const min = s*(1 - tol); const max = s*(1 + tol);
+          return `${m} (${secTo(min,u)}–${secTo(max,u)})`;
         });
         return out;
       };
@@ -346,7 +358,16 @@ export default function PlanSelect() {
       const { data: planRow, error: planErr } = await supabase.from('plans').insert([insertPayload]).select().single();
       if (planErr) throw planErr;
       const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
-      const addDays = (iso: string, n: number) => { const d = new Date(iso); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+      // Local-safe date math: avoid UTC shifts from toISOString/new Date(YYYY-MM-DD)
+      const addDays = (iso: string, n: number) => {
+        const parts = String(iso).split('-').map((x) => parseInt(x, 10));
+        const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+        base.setDate(base.getDate() + n);
+        const y = base.getFullYear();
+        const m = String(base.getMonth() + 1).padStart(2, '0');
+        const d = String(base.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
       const rows: any[] = [];
       Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
         const weekNum = parseInt(wkKey, 10);
