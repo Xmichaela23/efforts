@@ -116,7 +116,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           const sum = n.friendlySummary && n.friendlySummary.length > 0 ? n.friendlySummary : (workout.description || '').replace(/\[[^\]]*\]/g, '').trim();
           return [truncate(sum, 140)];
         } catch {
-          const full = (workout.description || '').replace(/\[[^\]]*\]/g, '').trim() || 'Planned workout';
+          const replaceTokens = (txt: string): string => {
+            try {
+              const pn: any = baselines?.performanceNumbers || {};
+              const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || '';
+              const easy = pn.easyPace || '';
+              let out = String(txt || '');
+              if (fiveK) out = out.replace(/\{5k_pace\}/gi, String(fiveK));
+              if (easy) out = out.replace(/\{easy_pace\}/gi, String(easy));
+              return out;
+            } catch { return txt; }
+          };
+          const full = replaceTokens((workout.description || '').replace(/\[[^\]]*\]/g, '').trim()) || 'Planned workout';
           return [truncate(full, 140)];
         }
       }
