@@ -454,9 +454,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6, Sunday: 7,
         };
         const addDays = (iso: string, n: number) => {
-          const d = new Date(iso);
-          d.setDate(d.getDate() + n);
-          return d.toISOString().slice(0, 10);
+          // Local-safe date math to avoid UTC rollbacks
+          const parts = String(iso).split('-').map((x) => parseInt(x, 10));
+          const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+          base.setDate(base.getDate() + n);
+          const y = base.getFullYear();
+          const m = String(base.getMonth() + 1).padStart(2, '0');
+          const d = String(base.getDate()).padStart(2, '0');
+          return `${y}-${m}-${d}`;
         };
         const rows: any[] = [];
         const planExportHints: any = (planData as any)?.export_hints || (data as any)?.export_hints || null;
