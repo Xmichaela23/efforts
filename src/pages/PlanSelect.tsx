@@ -442,6 +442,7 @@ export default function PlanSelect() {
         if (pwErr) throw pwErr;
       }
 
+      try { await refreshPlans?.(); } catch {}
       navigate('/', { state: { openPlans: true } });
     } catch (e: any) {
       setError(e?.message ? String(e.message) : JSON.stringify(e));
