@@ -371,7 +371,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    console.log('🎯 Workout clicked:', workout);
                     onEditEffort && onEditEffort(workout);
                   }}
                   className={`w-full text-left p-1.5 rounded-md transition-colors hover:bg-gray-50 ${

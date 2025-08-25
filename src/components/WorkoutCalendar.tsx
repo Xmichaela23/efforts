@@ -135,7 +135,7 @@ export default function WorkoutCalendar({
     const dayStr = String(day).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
-    console.log('📅 Calendar cell clicked:', dateStr);
+    // quiet calendar cell click logs
     
     // Set this date as selected for visual feedback
     setSelectedDate(dateStr);
