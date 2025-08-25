@@ -376,7 +376,71 @@ export default function PlanSelect() {
         export_hints: (libPlan?.export_hints || libPlan?.template?.export_hints || null)
       } as any;
 
-      await addPlan(payload);
+      // Direct insert to ensure reliability
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('You must be signed in to save a plan.');
+      const insertPayload: any = { ...payload, user_id: user.id };
+      delete insertPayload.start_date;
+      const { data: planRow, error: planErr } = await supabase
+        .from('plans')
+        .insert([insertPayload])
+        .select()
+        .single();
+      if (planErr) throw planErr;
+
+      // Minimal materialization of planned_workouts (type/name/description/duration/date)
+      const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
+      const addDays = (iso: string, n: number) => {
+        const parts = String(iso).split('-').map((x) => parseInt(x, 10));
+        const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+        base.setDate(base.getDate() + n);
+        const y = base.getFullYear();
+        const m = String(base.getMonth() + 1).padStart(2, '0');
+        const d = String(base.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+      };
+
+      const rows: any[] = [];
+      Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
+        const weekNum = parseInt(wkKey, 10);
+        const sessions = (payload.sessions_by_week as any)[wkKey] || [];
+        (sessions as any[]).forEach((s: any) => {
+          const dow = dayIndex[s.day] || 1;
+          const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
+          if (weekNum === 1 && date < startDate) return;
+          const rawType = String(s.discipline || s.type || '').toLowerCase();
+          let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
+          if (rawType === 'run') mappedType = 'run';
+          else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride';
+          else if (rawType === 'swim') mappedType = 'swim';
+          else if (rawType === 'strength') mappedType = 'strength';
+          const cleanedDesc = String(s.description || '');
+          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
+          const nameGuess = s.name || (mappedType === 'strength' ? 'Strength' : mappedType === 'ride' ? 'Ride' : mappedType === 'swim' ? 'Swim' : 'Run');
+          rows.push({
+            user_id: user.id,
+            training_plan_id: planRow.id,
+            template_id: planRow.id,
+            week_number: weekNum,
+            day_number: dow,
+            date,
+            type: mappedType,
+            name: nameGuess,
+            description: cleanedDesc,
+            duration: durationVal,
+            workout_status: 'planned',
+            source: 'training_plan',
+            steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
+            export_hints: payload.export_hints || null
+          });
+        });
+      });
+
+      if (rows.length) {
+        const { error: pwErr } = await supabase.from('planned_workouts').insert(rows);
+        if (pwErr) throw pwErr;
+      }
+
       navigate('/', { state: { openPlans: true } });
     } catch (e: any) {
       setError(e?.message ? String(e.message) : JSON.stringify(e));
