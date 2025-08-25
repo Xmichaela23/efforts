@@ -1256,7 +1256,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 + Add Workout
               </Button>
               <Button
-                onClick={() => window.location.href = '/demo'}
+                onClick={() => { try { (window as any).appNavigate?.('/demo'); } catch { window.location.assign('/demo'); } }}
                 variant="outline"
                 size="sm"
                 className="text-xs"

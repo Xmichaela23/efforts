@@ -637,7 +637,7 @@ export default function SimplePlanBuilder() {
           We need your performance data to create safe, personalized training plans.
         </div>
         <button 
-          onClick={() => window.location.href = '/baselines'}
+          onClick={() => { try { (window as any).appNavigate?.('/baselines'); } catch { window.location.assign('/baselines'); } }}
           className="px-4 py-2 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
         >
           Go to Fitness Assessment

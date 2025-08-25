@@ -56,7 +56,7 @@ const GarminCallback: React.FC = () => {
           sessionStorage.setItem('garmin_auth_code', code);
           
           // Redirect to main app
-          window.location.href = '/';
+          try { (window as any).appNavigate?.('/'); } catch { window.location.assign('/'); }
         }
 
       } catch (error) {

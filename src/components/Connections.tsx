@@ -359,7 +359,7 @@ const Connections: React.FC = () => {
 
         // Redirect to dashboard after a short delay
         setTimeout(() => {
-          window.location.href = '/';
+          navigate('/');
         }, 2000);
       }
       

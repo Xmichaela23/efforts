@@ -142,6 +142,7 @@ export const useWorkouts = () => {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
+  const hasLoadedRef = useRef(false);
 
   // Cache for reverse geocoding results to avoid repeated API calls
   const geocodingCache = new Map<string, string>();
@@ -179,7 +180,10 @@ export const useWorkouts = () => {
 
   const fetchWorkouts = async () => {
     try {
-      setLoading(true);
+      // Show the global spinner only on first load
+      if (!hasLoadedRef.current) {
+        setLoading(true);
+      }
 
       // 🔄 Enhanced auth retry with exponential backoff
       let user = null;
@@ -663,6 +667,7 @@ export const useWorkouts = () => {
       setWorkouts([]);
     } finally {
       setLoading(false);
+      hasLoadedRef.current = true;
     }
   };
 
