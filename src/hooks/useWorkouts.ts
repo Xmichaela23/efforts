@@ -236,7 +236,10 @@ export const useWorkouts = () => {
             .from("garmin_activities")
             .select("*")
             .eq("garmin_user_id", garminUserId)
-            .order("start_time", { ascending: false });
+            .gte("start_time", lookbackIso)
+            .lte("start_time", todayIso)
+            .order("start_time", { ascending: false })
+            .limit(200);
 
           if (!garminError && garminActivities) {
             
@@ -400,6 +403,7 @@ export const useWorkouts = () => {
           .select('*')
           .eq('user_id', user.id)
           .is('deleted_at', null)
+          .gte('updated_at', lookbackIso)
           .order('updated_at', { ascending: false })
           .limit(200);
 

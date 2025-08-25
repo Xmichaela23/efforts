@@ -1,3 +1,6 @@
+// @ts-nocheck
+/// <reference lib="deno.ns" />
+// @ts-ignore Deno Edge Functions resolve jsr imports at runtime
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 // Strava webhook verification and processing
@@ -223,6 +226,39 @@ async function fetchStravaActivity(activityId: number, accessToken: string) {
   }
 }
 
+// Fetch streams (latlng, altitude, time, heartrate, cadence)
+async function fetchStravaStreamsData(
+  activityId: number,
+  accessToken: string
+): Promise<{ latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } | null> {
+  try {
+    const response = await fetch(
+      `https://www.strava.com/api/v3/activities/${activityId}/streams?keys=latlng,altitude,time,heartrate,cadence`,
+      { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+    );
+
+    if (!response.ok) return null;
+
+    const streams = await response.json();
+    const latlng = streams.find((s: any) => s.type === 'latlng')?.data || undefined;
+    const altitude = streams.find((s: any) => s.type === 'altitude')?.data || undefined;
+    const time = streams.find((s: any) => s.type === 'time')?.data || undefined;
+    const heartrate = streams.find((s: any) => s.type === 'heartrate')?.data || undefined;
+    const cadence = streams.find((s: any) => s.type === 'cadence')?.data || undefined;
+
+    const result: { latlng?: [number, number][], altitude?: number[], time?: number[], heartrate?: number[], cadence?: number[] } = {};
+    if (Array.isArray(latlng) && latlng.length > 0) result.latlng = latlng as [number, number][];
+    if (Array.isArray(altitude) && altitude.length > 0) result.altitude = altitude as number[];
+    if (Array.isArray(time) && time.length > 0) result.time = time as number[];
+    if (Array.isArray(heartrate) && heartrate.length > 0) result.heartrate = heartrate as number[];
+    if (Array.isArray(cadence) && cadence.length > 0) result.cadence = cadence as number[];
+    if (!result.latlng && !result.altitude && !result.time && !result.heartrate && !result.cadence) return null;
+    return result;
+  } catch (_e) {
+    return null;
+  }
+}
+
 async function storeStravaActivity(activityId: number, userId: string, activityData: any) {
   try {
     const { error } = await supabase
@@ -308,6 +344,38 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
     const duration = Math.max(0, Math.round((activityData.moving_time || 0) / 60));
     const distance = Number.isFinite(activityData.distance) ? Math.round(activityData.distance) : null; // meters or leave as provided
 
+    // Try to enrich with streams
+    let gps_track: any[] | null = null;
+    let sensor_data: any[] | null = null;
+    try {
+      const token = (await supabase.from('device_connections').select('connection_data').eq('user_id', userId).eq('provider', 'strava').single()).data?.connection_data?.access_token;
+      if (token) {
+        const streams = await fetchStravaStreamsData(activityData.id, token);
+        if (streams) {
+          const startEpochSec = Math.floor(new Date(activityData.start_date).getTime() / 1000);
+          if (streams.latlng && streams.latlng.length > 0) {
+            const len = streams.latlng.length;
+            const altLen = streams.altitude?.length || 0;
+            const timeLen = streams.time?.length || 0;
+            const useLen = Math.min(len, altLen || len, timeLen || len);
+            gps_track = new Array(useLen).fill(0).map((_, i) => {
+              const [lat, lng] = streams.latlng![i];
+              const elev = streams.altitude && Number.isFinite(streams.altitude[i]) ? streams.altitude[i] : null;
+              const tRel = streams.time && Number.isFinite(streams.time[i]) ? streams.time[i] : i;
+              return { lat, lng, elevation: elev, startTimeInSeconds: startEpochSec + (tRel as number), timestamp: (startEpochSec + (tRel as number)) * 1000 };
+            });
+          }
+          if (streams.heartrate && streams.time) {
+            const len = Math.min(streams.heartrate.length, streams.time.length);
+            sensor_data = new Array(len).fill(0).map((_, i) => {
+              const t = Math.floor(new Date(activityData.start_date).getTime() / 1000) + streams.time![i];
+              return { heartRate: streams.heartrate![i], startTimeInSeconds: t, timestamp: t * 1000 };
+            });
+          }
+        }
+      }
+    } catch {}
+
     const row: any = {
       user_id: userId,
       name: activityData.name || 'Strava Activity',
@@ -324,6 +392,8 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       start_position_long: activityData.start_latlng?.[1] ?? null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
+      gps_track: gps_track ? JSON.stringify(gps_track) : null,
+      sensor_data: sensor_data ? JSON.stringify(sensor_data) : null,
     };
 
     const { error } = await supabase.from('workouts').insert(row);
