@@ -124,7 +124,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (parsed) {
         const rng = paceRange(pace, hQ);
         workMin = (reps * distMiles * parsed.seconds) / 60;
-        mainText += ` @ ${mmss(parsed.seconds)}/${parsed.unit}`;
+        mainText += ` @ ${mmss(parsed.seconds)}/${parsed.unit} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: pace, range: rng };
       }
     }
@@ -173,7 +173,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (parsed) {
         const rng = paceRange(pace, hQ);
         totalMin += Math.round((dist * parsed.seconds) / 60);
-        text += ` @ ${mmss(parsed.seconds)}/${parsed.unit}`;
+        text += ` @ ${mmss(parsed.seconds)}/${parsed.unit} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: pace, range: rng };
       }
     }
@@ -222,6 +222,14 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const mins = parseInt(lrun[1], 10);
     totalMin += mins;
     summaryParts.push(`Long run ${mins} min`);
+  }
+
+  // Strength single-block time (e.g., strength_main_50min)
+  const strengthMain = tokenStr.match(/strength_main_(\d+)min/i);
+  if (strengthMain) {
+    const mins = parseInt(strengthMain[1], 10);
+    totalMin += mins;
+    summaryParts.push(`Strength ${mins} min`);
   }
 
   // Strides (e.g., strides_6x20s)
