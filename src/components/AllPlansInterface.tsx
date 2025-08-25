@@ -117,6 +117,52 @@ function estimateMinutesFromDescription(desc?: string): number {
   return 0;
 }
 
+// Estimate interval block duration from steps_preset + description pace
+function estimateMinutesFromIntervals(steps?: string[], desc?: string): number {
+  if (!Array.isArray(steps) || !desc) return 0;
+  const joined = steps.join(' ').toLowerCase();
+  const m = joined.match(/(?:interval|cruise)_(\d+)x(\d+(?:\.\d+)?)(m|mi)/i);
+  if (!m) return 0;
+  const reps = parseInt(m[1], 10);
+  const per = parseFloat(m[2]);
+  const unit = m[3].toLowerCase();
+  const perMiles = unit === 'm' ? per / 1609.34 : per; // meters → miles
+
+  // Resolve pace from description (already token-resolved)
+  // Handle formats: "@ 7:43/mi", or "@ 7:43 + 0:45/mi"
+  let paceSec: number | null = null;
+  let pm = desc.match(/@(.*?)\b/); // capture after @ up to next whitespace
+  if (pm) {
+    const seg = pm[1];
+    let mm: RegExpMatchArray | null = null;
+    // 7:43/mi + 0:45/mi OR 7:43 + 0:45/mi
+    mm = String(seg).match(/(\d+):(\d{2})(?:\/(mi|km))?\s*[+\-−]\s*(\d+):(\d{2})\/(mi|km)/i);
+    if (mm) {
+      const base = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
+      const off = parseInt(mm[4], 10) * 60 + parseInt(mm[5], 10);
+      paceSec = base + off; // assume plus; minus uncommon for quality
+    }
+    if (!paceSec) {
+      mm = String(seg).match(/(\d+):(\d{2})\/(mi|km)/i);
+      if (mm) paceSec = parseInt(mm[1], 10) * 60 + parseInt(mm[2], 10);
+    }
+  }
+  if (!paceSec) return 0;
+
+  // Rest between reps: _R2min or _R2-3min → average
+  const rm = joined.match(/_r(\d+)(?:-(\d+))?min/i);
+  let restMin = 0;
+  if (rm) {
+    const ra = parseInt(rm[1], 10);
+    const rb = rm[2] ? parseInt(rm[2], 10) : ra;
+    const avg = (ra + rb) / 2;
+    restMin = avg * Math.max(0, reps - 1);
+  }
+
+  const workMin = (reps * perMiles * paceSec) / 60;
+  return Math.round(workMin + restMin);
+}
+
 function capitalize(w?: string) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''; }
 
 interface Plan {
@@ -358,8 +404,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const typeName = s.type || extracted || '';
               const name = discipline === 'strength' ? 'Strength' : [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
               const stepsSummary = summarizeSteps((s as any).steps_preset);
-              const estFromSteps = estimateMinutesFromSteps((s as any).steps_preset);
-              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (estFromSteps || estimateMinutesFromDescription(description) || extractMinutesFromText(rawDesc) || 0);
+              const stepsPreset = (s as any).steps_preset as string[] | undefined;
+              const estFromSteps = estimateMinutesFromSteps(stepsPreset);
+              const estFromIntervals = estimateMinutesFromIntervals(stepsPreset, description);
+              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (estFromIntervals || estFromSteps || estimateMinutesFromDescription(description) || extractMinutesFromText(rawDesc) || 0);
               const base = {
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
