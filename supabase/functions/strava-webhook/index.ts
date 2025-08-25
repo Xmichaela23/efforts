@@ -16,15 +16,17 @@ Deno.serve(async (req) => {
     const challenge = url.searchParams.get('hub.challenge');
     
     // Verify the webhook subscription
-    if (mode === 'subscribe' && token === Deno.env.get('STRAVA_WEBHOOK_VERIFY_TOKEN')) {
+    if (mode === 'subscribe') {
+      const expected = Deno.env.get('STRAVA_WEBHOOK_VERIFY_TOKEN') || '';
+      if (expected && token !== expected) {
+        console.log('❌ Strava webhook verify token mismatch');
+        return new Response('Verification failed', { status: 403 });
+      }
       console.log('✅ Strava webhook verified successfully');
       return new Response(JSON.stringify({ 'hub.challenge': challenge }), {
         status: 200,
         headers: { 'Content-Type': 'application/json' }
       });
-    } else {
-      console.log('❌ Strava webhook verification failed');
-      return new Response('Verification failed', { status: 403 });
     }
   }
 

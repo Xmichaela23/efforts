@@ -312,7 +312,10 @@ export const useWorkouts = () => {
               };
 
               const workoutType = getWorkoutType(activity.activity_type);
-              const activityDate = activity.start_time?.split('T')[0] || new Date().toISOString().split('T')[0];
+              const activityDate = (() => {
+                const d = activity.start_time ? new Date(activity.start_time) : new Date();
+                return d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
+              })();
               
               // Generate location-based title using the existing function
               const locationTitle = await generateLocationTitle(
