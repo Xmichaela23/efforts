@@ -56,22 +56,11 @@ export default function WorkoutCalendar({
   currentPlans = [], // NEW: Default to empty array
   completedPlans = [] // NEW: Default to empty array
 }: WorkoutCalendarProps) {
-  const { workouts, loadUserBaselines, detailedPlans } = useAppContext();
+  const { workouts } = useAppContext();
   const { plannedWorkouts } = usePlannedWorkouts();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [baselines, setBaselines] = useState<any | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const b = await loadUserBaselines();
-        setBaselines(b || null);
-      } catch {
-        setBaselines(null);
-      }
-    })();
-  }, [loadUserBaselines]);
+  // Calendar stays simple; no baselines or summaries needed here
 
   const navigateMonth = (direction: number) => {
     setCurrentDate(prev => {
@@ -206,17 +195,7 @@ export default function WorkoutCalendar({
     return getDisciplineName(w?.type);
   };
 
-  const getPlannedSummary = (w: any): string => {
-    try {
-      if (w?.workout_status !== 'planned') return '';
-      const steps = Array.isArray(w?.steps_preset)
-        ? w.steps_preset
-        : (() => { try { const p = JSON.parse(w?.steps_preset || 'null'); return Array.isArray(p) ? p : []; } catch { return []; }})();
-      const hints = (w as any).export_hints || detailedPlans?.[w?.training_plan_id]?.export_hints || {};
-      const n = normalizePlannedSession({ steps_preset: steps, description: w?.description || '' }, baselines || {}, hints);
-      return n?.friendlySummary || '';
-    } catch { return ''; }
-  };
+  // No inline summaries in calendar cells per request
 
   const getDisciplineColor = (type: string, isCompleted?: boolean): string => {
     // Color code by status: completed = green, planned = orange
@@ -296,21 +275,10 @@ export default function WorkoutCalendar({
                         <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
                           {dayWorkouts.slice(0, 2).map((workout, idx) => {
                             const hex = getHexColor(workout.type);
-                            const summary = getPlannedSummary(workout);
                             return (
-                              <div key={workout.id || idx} className="flex flex-col items-center max-w-[88px]">
-                                <span
-                                  className={`text-[10px] font-medium`}
-                                  style={{ color: hex }}
-                                >
-                                  {getDisplayLabel(workout)}
-                                </span>
-                                {summary && (
-                                  <span className="block text-[9px] text-muted-foreground leading-tight truncate max-w-[88px]">
-                                    {summary}
-                                  </span>
-                                )}
-                              </div>
+                              <span key={workout.id || idx} className={`text-[10px] font-medium`} style={{ color: hex }}>
+                                {getDisplayLabel(workout)}
+                              </span>
                             );
                           })}
                           {dayWorkouts.length > 2 && (

@@ -101,7 +101,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
   // Intervals / Tempo / Bike sets
   const tokenStr = steps.join(' ').toLowerCase();
   // Intervals like interval_6x800m_5kpace_R2min
-  const im = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_(\w+?)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?min)?/i);
+  const im = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_(\w+?)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?(?:min)?)?/i);
   if (im) {
     const reps = parseInt(im[1], 10);
     const per = parseFloat(im[2]);
@@ -128,7 +128,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     }
     const restMin = restEach * Math.max(0, reps - 1);
     totalMin += Math.round(workMin + restMin);
-    summaryParts.push(`${mainText}${restEach ? ` with ${mmss(restEach * 60)} jog rest` : ''}`);
+    summaryParts.push(`${mainText}${restEach ? ` w ${restEach} min jog` : ''}`);
   }
 
   // Cruise intervals like cruise_4x1_5mi_5kpace_plus10s_R3min
