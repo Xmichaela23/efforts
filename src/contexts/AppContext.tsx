@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import { supabase } from '@/lib/supabase';
 import { loadPlansBundle } from '@/services/plans/BundleLoader';
+import { normalizePlannedSession } from '@/services/plans/normalizer';
 
 export interface WorkoutInterval {
   id: string;
@@ -443,6 +444,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('You must be signed in to save a plan.');
+      // Load baselines for normalization (pace/power derivations)
+      const userBaselines = await loadUserBaselines();
+      const unitsPref = (userBaselines?.units === 'metric' || userBaselines?.units === 'imperial') ? userBaselines.units : 'imperial';
       // Do not send non-column fields in insert (e.g., start_date)
       const insertPayload: any = { ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: user?.id };
       if ('start_date' in insertPayload) delete insertPayload.start_date;
@@ -503,6 +507,30 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
 
+            // Normalize into friendly text and precise totals/ranges
+            let rendered: string | undefined;
+            let totalSeconds: number | undefined;
+            let targetsSummary: any | undefined;
+            try {
+              const norm = normalizePlannedSession(s, { performanceNumbers: userBaselines?.performanceNumbers as any }, planExportHints || {});
+              rendered = norm.friendlySummary || s.description || '';
+              totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
+              if (norm.primaryTarget) {
+                if (norm.primaryTarget.type === 'pace') {
+                  const range = norm.primaryTarget.range as [string, string] | undefined;
+                  targetsSummary = { pace: { value: norm.primaryTarget.value, range } };
+                } else if (norm.primaryTarget.type === 'power') {
+                  const range = norm.primaryTarget.range as [number, number] | undefined;
+                  targetsSummary = { power: { value: norm.primaryTarget.value, range } };
+                }
+              }
+            } catch (e) {
+              // Fallbacks keep insertion robust; details can be computed later
+              rendered = s.description || '';
+              totalSeconds = Math.max(0, Math.round(((typeof s.duration === 'number' ? s.duration : 0) || 0) * 60));
+              targetsSummary = undefined;
+            }
+
             const row: any = {
               user_id: user?.id,
               training_plan_id: data.id,
@@ -519,6 +547,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               // New fields for deterministic rendering
               steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
               export_hints: planExportHints,
+              // Newly persisted rendering/computed helpers
+              rendered_description: rendered,
+              computed: {
+                normalization_version: 'v1',
+                total_duration_seconds: totalSeconds,
+                targets_summary: targetsSummary || {},
+              },
+              units: unitsPref,
             };
             if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
             if (Array.isArray(s.intervals)) row.intervals = s.intervals;
@@ -529,7 +565,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         });
         
         if (rows.length) {
-          const { error: pErr } = await supabase.from('planned_workouts').insert(rows);
+          const { error: pErr } = await supabase.from('planned_workouts').insert(rows as any);
           if (pErr) {
             console.error('Error materializing planned workouts:', pErr);
             throw pErr;
