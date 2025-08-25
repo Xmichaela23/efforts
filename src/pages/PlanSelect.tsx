@@ -387,7 +387,11 @@ export default function PlanSelect() {
           const cleanedDesc = String(s.description||'').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi,'');
           const guessKind = /interval/i.test(cleanedDesc) ? 'Intervals' : /tempo/i.test(cleanedDesc) ? 'Tempo' : /long/i.test(cleanedDesc) ? 'Long' : 'Session';
           const derivedName = mappedType==='strength' ? 'Strength' : mappedType==='swim' ? 'Swim' : mappedType==='ride' ? 'Ride' : 'Run';
-          const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || `${derivedName} ${guessKind}`.trim(), description: cleanedDesc, duration: durationVal, workout_status: 'planned', source: 'training_plan' };
+          const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || `${derivedName} ${guessKind}`.trim(), description: cleanedDesc, duration: durationVal, workout_status: 'planned', source: 'training_plan',
+            // Persist deterministic rendering data for normalizer
+            steps_preset: Array.isArray((s as any)?.steps_preset) ? (s as any).steps_preset : null,
+            export_hints: (libPlan?.template?.export_hints || null)
+          };
           // Build swim intervals from steps[] so Garmin export works
           if (mappedType === 'swim' && Array.isArray((s as any).steps) && (s as any).steps.length) {
             const parseSwimPace = (p?: string|null): number | null => {
