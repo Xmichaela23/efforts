@@ -107,7 +107,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       if (!isCompleted) {
         // PLANNED: Friendly summary via normalizer (fallback to cleaned description)
         try {
-          const hints = detailedPlans?.[workout.training_plan_id]?.export_hints || {};
+          // Prefer row-level export_hints/steps_preset; fall back to plan-level hints
+          const hints = (workout as any).export_hints || detailedPlans?.[workout.training_plan_id]?.export_hints || {};
           const session = {
             steps_preset: Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
             description: workout.description || ''
@@ -475,7 +476,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                             const base = formatRichWorkoutDisplay(workout).duration;
                             if (workout.workout_status !== 'planned') return base;
                             try {
-                              const hints = detailedPlans?.[workout.training_plan_id]?.export_hints || {};
+                              const hints = (workout as any).export_hints || detailedPlans?.[workout.training_plan_id]?.export_hints || {};
                               const session = {
                                 steps_preset: Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
                                 description: workout.description || ''

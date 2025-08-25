@@ -43,26 +43,43 @@ export const usePlannedWorkouts = () => {
       }
 
       // Transform the data to match our PlannedWorkout interface
-      const transformedWorkouts: PlannedWorkout[] = (data || []).map(workout => ({
-        id: workout.id,
-        name: workout.name,
-        type: workout.type,
-        date: workout.date,
-        description: workout.description,
-        duration: workout.duration,
-        intervals: workout.intervals || [],
-        strength_exercises: workout.strength_exercises || [],
-        workout_status: workout.workout_status,
-        source: workout.source,
-        training_plan_id: workout.training_plan_id,
-        week_number: workout.week_number,
-        day_number: workout.day_number,
-        // pass-through for normalizer
-        // @ts-ignore allow dynamic fields
-        steps_preset: workout.steps_preset || [],
-        // @ts-ignore
-        export_hints: workout.export_hints || null,
-      }));
+      const transformedWorkouts: PlannedWorkout[] = (data || []).map(workout => {
+        // Normalize JSONB fields that may come back as strings
+        const parseMaybeJson = (v: any) => {
+          if (v == null) return v;
+          if (typeof v === 'string') {
+            try { return JSON.parse(v); } catch { return v; }
+          }
+          return v;
+        };
+        const stepsPreset = Array.isArray(workout.steps_preset)
+          ? workout.steps_preset
+          : Array.isArray(parseMaybeJson(workout.steps_preset))
+            ? parseMaybeJson(workout.steps_preset)
+            : [];
+        const exportHints = parseMaybeJson(workout.export_hints) || null;
+
+        return {
+          id: workout.id,
+          name: workout.name,
+          type: workout.type,
+          date: workout.date,
+          description: workout.description,
+          duration: workout.duration,
+          intervals: workout.intervals || [],
+          strength_exercises: workout.strength_exercises || [],
+          workout_status: workout.workout_status,
+          source: workout.source,
+          training_plan_id: workout.training_plan_id,
+          week_number: workout.week_number,
+          day_number: workout.day_number,
+          // pass-through for normalizer
+          // @ts-ignore allow dynamic fields
+          steps_preset: stepsPreset,
+          // @ts-ignore
+          export_hints: exportHints,
+        } as any;
+      });
 
       setPlannedWorkouts(transformedWorkouts);
     } catch (err) {
