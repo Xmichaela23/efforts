@@ -170,11 +170,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           const fiveK: string | null = (candidate5k ? String(candidate5k) : null) as any;
           const easyPace: string | null = (pn.easyPace ? String(pn.easyPace) : null) as any;
           const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
+          const hints = (pd?.export_hints || {}) as any;
+          const paceTolQuality = typeof hints.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
+          const paceTolEasy = typeof hints.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
+          const pTolSS = typeof hints.power_tolerance_SS_thr === 'number' ? hints.power_tolerance_SS_thr : 0.05;
+          const pTolVO2 = typeof hints.power_tolerance_VO2 === 'number' ? hints.power_tolerance_VO2 : 0.10;
+          const paceToSec = (p: string) => { const m = p.match(/(\d+):(\d{2})\/(mi|km)/i); if (!m) return null as any; return { sec:Number(m[1])*60+Number(m[2]), unit:m[3].toLowerCase() }; };
+          const secToPace = (sec: number, unit: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${unit}`; };
+          const appendPaceRange = (txt: string) => {
+            const m = txt.match(/(\d+:\d{2}\/((?:mi|km)))/i);
+            if (!m) return txt;
+            const isEasy = /easy|warm\s*up|cool\s*down|cooldown|warmup|\{easy_pace\}/i.test(txt);
+            const isQuality = /tempo|interval|threshold|5k|10k|vo2|repeat/i.test(txt) && !isEasy;
+            const tol = isQuality ? paceTolQuality : paceTolEasy;
+            const ps = paceToSec(m[1]); if (!ps) return txt;
+            const lo = secToPace(ps.sec*(1 - tol), ps.unit); const hi = secToPace(ps.sec*(1 + tol), ps.unit);
+            if (txt.includes('(') && txt.includes('–')) return txt;
+            return txt.replace(m[1], `${m[1]} (${lo}–${hi})`);
+          };
           const resolvePaces = (text: string) => {
             let out = text || '';
             if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK));
             if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace));
             out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => `${a} ${s} ${b}`);
+            out = appendPaceRange(out);
             return out;
           };
           const round = (w: number) => Math.round(w / 5) * 5;
@@ -184,7 +203,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
               const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; });
           };
-          const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
+          const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (center: number, tol: number) => `${text} — target ${Math.round((center*(1-tol))*ftp)}–${Math.round((center*(1+tol))*ftp)} W`; if (t.includes('vo2')) return add(1.10, pTolVO2); if (t.includes('threshold')) return add(0.98, pTolSS); if (t.includes('sweet spot')) return add(0.91, pTolSS); if (t.includes('zone 2') || t.includes('endurance')) return add(0.68, 0.05); return text; };
 
           for (const w of mat) {
             const wk = w.week_number || 1;

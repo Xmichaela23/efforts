@@ -293,7 +293,7 @@ export const useWorkouts = () => {
 
               return {
                 id: `garmin_${activity.garmin_activity_id || activity.id}`,
-                name: activity.activity_name || locationTitle || `Garmin ${workoutType}`,
+                name: activity.activity_name || activity.activity_type || locationTitle || `Garmin ${workoutType}`,
                 type: workoutType,
                 duration: Math.round(activity.duration_seconds / 60) || 0,
                 date: activityDate,
@@ -326,6 +326,7 @@ export const useWorkouts = () => {
                 start_position_lat: activity.starting_latitude || (activity.gps_track?.[0]?.latitude || null),
                 start_position_long: activity.starting_longitude || (activity.gps_track?.[0]?.longitude || null),
                 friendly_name: `Garmin ${activity.garmin_activity_id}`,
+                provider_sport: (activity.activity_type || '').toLowerCase(),
                 moving_time: activity.duration_seconds, // FIXED: Use duration_seconds
                 elapsed_time: activity.duration_seconds,
                 // CORRECT: Use the right pace fields
