@@ -37,6 +37,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   onComplete,
   onDelete
 }) => {
+  const [friendlyDesc, setFriendlyDesc] = React.useState<string | undefined>(undefined);
+  const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
@@ -78,6 +80,57 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       default: return type;
     }
   };
+
+  // Helpers copied from plan detail for consistent rendering
+  const stripCodes = (text?: string) => String(text || '')
+    .replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '')
+    .replace(/\[[A-Za-z0-9_:+\-x\/]+\]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  const estimateMinutesFromDescription = (desc?: string): number => {
+    if (!desc) return 0; const s = desc.toLowerCase();
+    let m = s.match(/(\d+(?:\.\d+)?)\s*mi[^\d]*(\d+):(\d{2})\s*\/\s*mi/);
+    if (m) { const dist=parseFloat(m[1]); const pace=parseInt(m[2],10)*60+parseInt(m[3],10); return Math.round((dist*pace)/60); }
+    m = s.match(/(\d+(?:\.\d+)?)\s*km[^\d]*(\d+):(\d{2})\s*\/\s*km/);
+    if (m) { const distKm=parseFloat(m[1]); const paceSec=parseInt(m[2],10)*60+parseInt(m[3],10); return Math.round((distKm*paceSec)/60); }
+    return 0;
+  };
+
+  React.useEffect(() => {
+    (async () => {
+      try {
+        const raw = workout.description || '';
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setFriendlyDesc(stripCodes(raw)); return; }
+        const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
+        const pn: any = (data as any)?.performance_numbers || {};
+        const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
+        const easy = pn.easyPace || null;
+        let out = raw || '';
+        if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
+        if (easy) out = out.split('{easy_pace}').join(String(easy));
+        // Resolve 7:43/mi + 0:45/mi → 8:28/mi
+        out = out.replace(/(\d+):(\d{2})\/(mi|km)\s*([+\-−])\s*(\d+):(\d{2})\/(mi|km)/g, (m, m1, s1, u1, sign, m2, s2, u2) => {
+          if (u1 !== u2) return m;
+          const base = parseInt(m1, 10) * 60 + parseInt(s1, 10);
+          const off  = parseInt(m2, 10) * 60 + parseInt(s2, 10);
+          const sec = sign === '-' || sign === '−' ? base - off : base + off;
+          const mm = Math.floor(sec / 60); const ss = sec % 60;
+          return `${mm}:${String(ss).padStart(2,'0')}/${u1}`;
+        });
+        out = stripCodes(out);
+        setFriendlyDesc(out);
+        if (!workout.duration) {
+          const est = estimateMinutesFromDescription(out);
+          if (est > 0) setResolvedDuration(est);
+        }
+      } catch {
+        setFriendlyDesc(stripCodes(workout.description));
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout.id]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -158,10 +211,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <span>{formatDate(workout.date)}</span>
-                  {workout.duration && (
+                  {(workout.duration || resolvedDuration) && (
                     <>
                       <Clock className="h-4 w-4" />
-                      <span>{workout.duration} minutes</span>
+                      <span>{workout.duration || resolvedDuration} minutes</span>
                     </>
                   )}
                 </div>
@@ -203,10 +256,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         </div>
 
         {/* Description */}
-        {workout.description && (
+        {(friendlyDesc || workout.description) && (
           <div className="flex gap-2">
             <Info className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-gray-600">{workout.description}</p>
+            <p className="text-sm text-gray-600">{friendlyDesc || workout.description}</p>
           </div>
         )}
 
