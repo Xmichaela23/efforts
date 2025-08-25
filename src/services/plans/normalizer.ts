@@ -34,9 +34,11 @@ const mmss = (s: number) => {
 };
 
 const parsePace = (p: string) => {
-  const m = p.match(/(\d+):(\d{2})\/(mi|km)/i);
+  // Accept mm:ss, mm:ss/mi, mm:ss/km, mm:ss per mi
+  let m = p.match(/(\d+):(\d{2})\s*(?:\/\s*(mi|km)|per\s*(mi|km))?/i);
   if (!m) return null;
-  return { seconds: sec(parseInt(m[1], 10), parseInt(m[2], 10)), unit: m[3].toLowerCase() } as { seconds: number; unit: 'mi' | 'km' };
+  const unit = (m[3] || m[4] || 'mi').toLowerCase();
+  return { seconds: sec(parseInt(m[1], 10), parseInt(m[2], 10)), unit: unit as 'mi' | 'km' };
 };
 
 function resolvePaceToken(token: string, baselines: Baselines): string | null {
@@ -122,7 +124,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (parsed) {
         const rng = paceRange(pace, hQ);
         workMin = (reps * distMiles * parsed.seconds) / 60;
-        mainText += ` @ ${pace} (${rng[0]}–${rng[1]})`;
+        mainText += ` @ ${mmss(parsed.seconds)}/${parsed.unit}`;
         primary = { type: 'pace', value: pace, range: rng };
       }
     }
@@ -171,7 +173,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (parsed) {
         const rng = paceRange(pace, hQ);
         totalMin += Math.round((dist * parsed.seconds) / 60);
-        text += ` @ ${pace} (${rng[0]}–${rng[1]})`;
+        text += ` @ ${mmss(parsed.seconds)}/${parsed.unit}`;
         primary = { type: 'pace', value: pace, range: rng };
       }
     }
@@ -190,7 +192,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const tol = kind === 'vo2' ? hVO2 : hSS;
     const pr = powerRange(center, tol);
     totalMin += reps * tmin + rmin * Math.max(0, reps - 1);
-    summaryParts.push(`${reps} × ${tmin} min @ ${Math.round(center)} W (${pr[0]}–${pr[1]})${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
+    summaryParts.push(`${reps} × ${tmin} min @ ${Math.round(center)} W${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
     primary = { type: 'power', value: Math.round(center), range: pr };
   }
 
