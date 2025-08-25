@@ -204,7 +204,7 @@ const Connections: React.FC = () => {
         .from('device_connections')
         .update({ webhook_active: true })
         .eq('user_id', authUser.id)
-        .eq('provider', 'strava');
+        .filter('provider', 'eq', 'strava');
 
       if (error) throw error;
 
@@ -264,7 +264,7 @@ const Connections: React.FC = () => {
             .from('device_connections')
             .delete()
             .eq('user_id', authUser.id)
-            .eq('provider', 'strava');
+            .filter('provider', 'eq', 'strava');
           if (clientDelErr) {
             throw new Error(`Disconnect failed: ${invokeErr?.message || 'invoke error'}; client delete blocked by RLS`);
           }
@@ -275,7 +275,7 @@ const Connections: React.FC = () => {
           .from('device_connections')
           .select('id')
           .eq('user_id', authUser.id)
-          .eq('provider', 'strava');
+          .filter('provider', 'eq', 'strava');
         if (checkErr) {
           throw checkErr;
         }
@@ -328,7 +328,7 @@ const Connections: React.FC = () => {
           .from('device_connections')
           .select('connection_data, access_token, refresh_token')
           .eq('user_id', authUser.id)
-          .eq('provider', 'strava')
+          .filter('provider', 'eq', 'strava')
           .single();
 
         const accessToken = (conn?.connection_data?.access_token || conn?.access_token) as string | undefined;
@@ -386,7 +386,7 @@ const Connections: React.FC = () => {
           .from('device_connections')
           .select('*')
           .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
-          .eq('provider', provider)
+          .filter('provider', 'eq', provider)
           .single();
 
         if (connection) {
@@ -413,7 +413,7 @@ const Connections: React.FC = () => {
         .from('device_connections')
         .update({ webhook_active: enabled })
         .eq('user_id', authUser2?.id || '')
-        .eq('provider', provider);
+        .filter('provider', 'eq', provider);
 
       if (error) throw error;
 
