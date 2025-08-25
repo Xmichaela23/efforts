@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -27,6 +28,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
+  const navigate = useNavigate();
   const {
     workouts,
     loading,
@@ -160,8 +162,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   // NEW: Connections handler
   const handleConnectionsClick = () => {
-    // Navigate to connections page
-    window.location.href = '/connections';
+    navigate('/connections');
   };
 
   // NEW: Import handlers

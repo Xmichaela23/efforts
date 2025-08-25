@@ -24,11 +24,19 @@ export const usePlannedWorkouts = () => {
         throw new Error('User must be authenticated to fetch planned workouts');
       }
 
+      // Bound by date window to avoid loading entire history/future at once
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const pastIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 7 days
+      const futureIso = new Date(Date.now() + 120 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // next ~4 months
+
       const { data, error } = await supabase
         .from('planned_workouts')
         .select('*')
         .eq('user_id', user.id)
-        .order('date', { ascending: true });
+        .gte('date', pastIso)
+        .lte('date', futureIso)
+        .order('date', { ascending: true })
+        .limit(1000);
 
       if (error) {
         throw error;

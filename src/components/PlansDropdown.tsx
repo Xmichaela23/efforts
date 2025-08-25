@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { ChevronDown, ArrowRight, Calendar } from 'lucide-react';
@@ -26,6 +27,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
   onOpenPlanBuilder,
 }) => {
   // Removed plannedWorkouts surfacing here; keep dropdown focused on plan navigation
+  const navigate = useNavigate();
   
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
@@ -113,7 +115,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         {/* Admin: publish template (JSON) */}
         <DropdownMenuSeparator className="my-2" />
         <DropdownMenuItem
-          onClick={() => { window.location.href = '/plans/admin'; }}
+          onClick={() => { navigate('/plans/admin'); }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >
@@ -122,7 +124,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
 
         {/* User: select a plan from catalog */}
         <DropdownMenuItem
-          onClick={() => { window.location.href = '/plans/catalog'; }}
+          onClick={() => { navigate('/plans/catalog'); }}
           className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
           style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
         >

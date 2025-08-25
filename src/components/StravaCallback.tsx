@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 
 const StravaCallback: React.FC = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState('Processing Strava authorization...');
+  const navigate = useNavigate();
 
   useEffect(() => {
     const handleStravaCallback = async () => {
@@ -44,7 +46,7 @@ const StravaCallback: React.FC = () => {
 
         // Redirect back to main app
         setTimeout(() => {
-          window.location.href = '/';
+          navigate('/');
         }, 2000);
 
       } catch (error) {
@@ -91,7 +93,7 @@ const StravaCallback: React.FC = () => {
               </div>
               <p className="text-red-600 font-medium">{message}</p>
               <button 
-                onClick={() => window.location.href = '/'}
+                onClick={() => navigate('/')}
                 className="text-blue-600 hover:text-blue-800 underline"
               >
                 Go Back to App

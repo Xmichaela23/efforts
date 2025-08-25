@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -22,7 +23,6 @@ import {
 import { useToast } from './ui/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '../lib/supabase';
-import { useAppContext } from '../contexts/AppContext';
 
 interface ConnectionStatus {
   provider: string;
@@ -55,11 +55,11 @@ const Connections: React.FC = () => {
     total: 0
   });
   const { toast } = useToast();
-  const { user } = useAppContext();
   const [stravaStartDate, setStravaStartDate] = useState<string>('');
   const [stravaEndDate, setStravaEndDate] = useState<string>('');
   const isMobile = useIsMobile();
   const [showDateControls, setShowDateControls] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // On desktop, show controls by default; on mobile, keep them collapsed
@@ -67,7 +67,7 @@ const Connections: React.FC = () => {
   }, [isMobile]);
 
   const goToDashboard = () => {
-    window.location.href = '/';
+    navigate('/');
   };
 
   useEffect(() => {
@@ -178,6 +178,8 @@ const Connections: React.FC = () => {
 
   const setupStravaWebhook = async (athleteId: string, accessToken: string) => {
     try {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (!authUser?.id) throw new Error('Not authenticated');
       // Call your Supabase Edge Function to setup webhook
       const response = await fetch('https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/strava-webhook-manager', {
         method: 'POST',
@@ -187,7 +189,7 @@ const Connections: React.FC = () => {
         },
         body: JSON.stringify({
           action: 'subscribe',
-          userId: user?.id,
+          userId: authUser.id,
           accessToken,
           athleteId
         })
@@ -201,7 +203,7 @@ const Connections: React.FC = () => {
       const { error } = await supabase
         .from('device_connections')
         .update({ webhook_active: true })
-        .eq('user_id', user?.id)
+        .eq('user_id', authUser.id)
         .eq('provider', 'strava');
 
       if (error) throw error;
@@ -383,7 +385,7 @@ const Connections: React.FC = () => {
         const { data: connection } = await supabase
           .from('device_connections')
           .select('*')
-          .eq('user_id', user?.id)
+          .eq('user_id', (await supabase.auth.getUser()).data.user?.id || '')
           .eq('provider', provider)
           .single();
 
@@ -400,16 +402,17 @@ const Connections: React.FC = () => {
         },
         body: JSON.stringify({
           action: 'unsubscribe',
-          userId: user?.id
+          userId: (await supabase.auth.getUser()).data.user?.id
         })
         });
       }
 
       // Update connection status
+      const { data: { user: authUser2 } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('device_connections')
         .update({ webhook_active: enabled })
-        .eq('user_id', user?.id)
+        .eq('user_id', authUser2?.id || '')
         .eq('provider', provider);
 
       if (error) throw error;
