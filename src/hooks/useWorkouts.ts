@@ -293,7 +293,7 @@ export const useWorkouts = () => {
 
               return {
                 id: `garmin_${activity.garmin_activity_id || activity.id}`,
-                name: locationTitle || activity.activity_name || `Garmin ${workoutType}`,
+                name: activity.activity_name || locationTitle || `Garmin ${workoutType}`,
                 type: workoutType,
                 duration: Math.round(activity.duration_seconds / 60) || 0,
                 date: activityDate,
@@ -452,7 +452,7 @@ export const useWorkouts = () => {
             );
             return {
               id: `strava_${row.strava_id || a.id}`,
-              name: locationTitle || a.name || `Strava ${type}`,
+              name: a.name || locationTitle || `Strava ${type}`,
               type,
               duration: Math.round((a.moving_time || a.elapsed_time || 0) / 60),
               date,
