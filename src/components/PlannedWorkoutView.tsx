@@ -100,29 +100,42 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   React.useEffect(() => {
     (async () => {
       try {
-        const raw = workout.description || '';
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setFriendlyDesc(stripCodes(raw)); return; }
-        const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
-        const pn: any = (data as any)?.performance_numbers || {};
-        const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
-        const easy = pn.easyPace || null;
-        let out = raw || '';
-        if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
-        if (easy) out = out.split('{easy_pace}').join(String(easy));
-        // Resolve 7:43/mi + 0:45/mi → 8:28/mi
-        out = out.replace(/(\d+):(\d{2})\/(mi|km)\s*([+\-−])\s*(\d+):(\d{2})\/(mi|km)/g, (m, m1, s1, u1, sign, m2, s2, u2) => {
-          if (u1 !== u2) return m;
-          const base = parseInt(m1, 10) * 60 + parseInt(s1, 10);
-          const off  = parseInt(m2, 10) * 60 + parseInt(s2, 10);
-          const sec = sign === '-' || sign === '−' ? base - off : base + off;
-          const mm = Math.floor(sec / 60); const ss = sec % 60;
-          return `${mm}:${String(ss).padStart(2,'0')}/${u1}`;
-        });
-        out = stripCodes(out);
-        setFriendlyDesc(out);
-        if (!workout.duration) {
-          const est = estimateMinutesFromDescription(out);
+        // Prefer server-rendered friendly text if present
+        const storedText = (workout as any).rendered_description;
+        if (typeof storedText === 'string' && storedText.trim().length > 0) {
+          setFriendlyDesc(storedText);
+        } else {
+          const raw = workout.description || '';
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) { setFriendlyDesc(stripCodes(raw)); return; }
+          const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
+          const pn: any = (data as any)?.performance_numbers || {};
+          const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
+          const easy = pn.easyPace || null;
+          let out = raw || '';
+          if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
+          if (easy) out = out.split('{easy_pace}').join(String(easy));
+          // Resolve 7:43/mi + 0:45/mi → 8:28/mi
+          out = out.replace(/(\d+):(\d{2})\/(mi|km)\s*([+\-−])\s*(\d+):(\d{2})\/(mi|km)/g, (m, m1, s1, u1, sign, m2, s2, u2) => {
+            if (u1 !== u2) return m;
+            const base = parseInt(m1, 10) * 60 + parseInt(s1, 10);
+            const off  = parseInt(m2, 10) * 60 + parseInt(s2, 10);
+            const sec = sign === '-' || sign === '−' ? base - off : base + off;
+            const mm = Math.floor(sec / 60); const ss = sec % 60;
+            return `${mm}:${String(ss).padStart(2,'0')}/${u1}`;
+          });
+          out = stripCodes(out);
+          setFriendlyDesc(out);
+        }
+
+        // Prefer computed.total_duration_seconds
+        const comp: any = (workout as any).computed || null;
+        let secs: any = comp ? comp.total_duration_seconds : null;
+        if (typeof secs === 'string') secs = parseInt(secs, 10);
+        if (typeof secs === 'number' && isFinite(secs) && secs > 0) {
+          setResolvedDuration(Math.round(secs / 60));
+        } else if (!workout.duration) {
+          const est = estimateMinutesFromDescription((workout as any).rendered_description || workout.description);
           if (est > 0) setResolvedDuration(est);
         }
       } catch {

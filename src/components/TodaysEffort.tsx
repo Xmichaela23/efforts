@@ -105,7 +105,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
     const getMetrics = () => {
       if (!isCompleted) {
-        // PLANNED: Friendly summary via normalizer (fallback to cleaned description)
+        // PLANNED: Prefer precomputed friendly text if present
+        const storedText = (workout as any).rendered_description;
+        if (typeof storedText === 'string' && storedText.trim().length > 0) {
+          return [truncate(storedText, 200)];
+        }
+        // Otherwise compute via normalizer (fallback to cleaned description)
         try {
           // Prefer row-level export_hints/steps_preset; fall back to plan-level hints
           const hints = (workout as any).export_hints || detailedPlans?.[workout.training_plan_id]?.export_hints || {};
@@ -475,6 +480,19 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           {(() => {
                             const base = formatRichWorkoutDisplay(workout).duration;
                             if (workout.workout_status !== 'planned') return base;
+                            // Prefer computed.total_duration_seconds if present
+                            try {
+                              const comp: any = (workout as any).computed || null;
+                              let secs: any = comp ? comp.total_duration_seconds : null;
+                              if (typeof secs === 'string') secs = parseInt(secs, 10);
+                              if (typeof secs === 'number' && isFinite(secs) && secs > 0) {
+                                const mins = Math.round(secs / 60);
+                                if (mins < 60) return `${mins}min`;
+                                const h = Math.floor(mins / 60); const m = mins % 60;
+                                return m ? `${h}h ${m}min` : `${h}h`;
+                              }
+                            } catch {}
+                            // Else compute via normalizer
                             try {
                               const hints = (workout as any).export_hints || detailedPlans?.[workout.training_plan_id]?.export_hints || {};
                               const session = {
