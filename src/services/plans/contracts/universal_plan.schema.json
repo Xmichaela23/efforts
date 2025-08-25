@@ -26,6 +26,17 @@
         "type": "array",
         "items": { "type": "string" }
       }
+    },
+    "export_hints": {
+      "type": "object",
+      "properties": {
+        "pace_tolerance_quality": { "type": "number", "minimum": 0, "maximum": 0.25, "default": 0.04 },
+        "pace_tolerance_easy":     { "type": "number", "minimum": 0, "maximum": 0.25, "default": 0.06 },
+        "power_tolerance_SS_thr":  { "type": "number", "minimum": 0, "maximum": 0.25, "default": 0.05 },
+        "power_tolerance_VO2":     { "type": "number", "minimum": 0, "maximum": 0.25, "default": 0.10 }
+      },
+      "required": [],
+      "additionalProperties": false
     }
   },
   "definitions": {
@@ -47,6 +58,11 @@
         "tags": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "steps_preset": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 1
         },
         "steps": {
           "type": "array",

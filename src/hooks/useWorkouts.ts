@@ -505,11 +505,20 @@ export const useWorkouts = () => {
 
       const mapped = uniqueWorkouts.map((w: any) => ({
         id: w.id,
-        name: w.name || w.activity_name || w.friendly_name || 'Workout',
+        name: (() => {
+          const providerLabel = (w as any)?.provider_sport ? String((w as any).provider_sport).replace(/_/g,' ').toLowerCase() : '';
+          const nice = providerLabel ? providerLabel.replace(/\b\w/g, c => c.toUpperCase()) : '';
+          return w.name || w.activity_name || nice || w.friendly_name || 'Workout';
+        })(),
         type: w.type || mapWorkoutType(w.workout_type || w.provider_sport),
         // Preserve provider sport information for UI labels (e.g., Hike, Gravel Ride)
         // If present from Strava import/pipeline, carry it through so calendar shows correct sport label
-        provider_sport: (w as any)?.strava_data?.original_activity?.sport_type || (w as any)?.provider_sport,
+        provider_sport: (() => {
+          const s = (w as any)?.strava_data?.original_activity?.sport_type || (w as any)?.provider_sport;
+          if (!s) return s;
+          const label = String(s).replace(/_/g,' ').toLowerCase();
+          return label.replace(/\b\w/g, c => c.toUpperCase());
+        })(),
         strava_data: (w as any)?.strava_data,
         duration: w.duration,
         date: (() => {
