@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { getLibraryPlan } from '@/services/LibraryPlans';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
+import { normalizePlannedSession } from '@/services/plans/normalizer';
 
 function computeNextMonday(): string {
   const d = new Date();
@@ -402,6 +403,11 @@ export default function PlanSelect() {
       };
 
       const rows: any[] = [];
+      // Load baselines to resolve tokens to concrete paces/power
+      const baselines = await (async () => {
+        try { return await (useAppContext().loadUserBaselines?.() as any); } catch { return null; }
+      })();
+      const unitsPref = (baselines?.units === 'metric' || baselines?.units === 'imperial') ? baselines.units : 'imperial';
       Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
         const weekNum = parseInt(wkKey, 10);
         const sessions = (payload.sessions_by_week as any)[wkKey] || [];
@@ -418,6 +424,20 @@ export default function PlanSelect() {
           const cleanedDesc = String(s.description || '');
           const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
           const nameGuess = s.name || (mappedType === 'strength' ? 'Strength' : mappedType === 'ride' ? 'Ride' : mappedType === 'swim' ? 'Swim' : 'Run');
+
+          let rendered: string | undefined = cleanedDesc;
+          let totalSeconds = Math.max(0, Math.round(durationVal * 60));
+          let targetsSummary: any = {};
+          try {
+            const norm = normalizePlannedSession(s, { performanceNumbers: baselines?.performanceNumbers as any }, payload.export_hints || {});
+            if (norm?.friendlySummary) rendered = norm.friendlySummary;
+            if (typeof norm?.durationMinutes === 'number') totalSeconds = Math.max(0, Math.round(norm.durationMinutes * 60));
+            if (norm?.primaryTarget) {
+              if (norm.primaryTarget.type === 'pace') targetsSummary = { pace: { value: norm.primaryTarget.value, range: norm.primaryTarget.range } };
+              if (norm.primaryTarget.type === 'power') targetsSummary = { power: { value: norm.primaryTarget.value, range: norm.primaryTarget.range } };
+            }
+          } catch {}
+
           rows.push({
             user_id: user.id,
             training_plan_id: planRow.id,
@@ -432,7 +452,10 @@ export default function PlanSelect() {
             workout_status: 'planned',
             source: 'training_plan',
             steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
-            export_hints: payload.export_hints || null
+            export_hints: payload.export_hints || null,
+            rendered_description: rendered,
+            computed: { normalization_version: 'v1', total_duration_seconds: totalSeconds, targets_summary: targetsSummary },
+            units: unitsPref
           });
         });
       });
