@@ -381,6 +381,7 @@ export default function PlanSelect() {
       if (!user) throw new Error('You must be signed in to save a plan.');
       const insertPayload: any = { ...payload, user_id: user.id };
       delete insertPayload.start_date;
+      delete insertPayload.export_hints;
       const { data: planRow, error: planErr } = await supabase
         .from('plans')
         .insert([insertPayload])
