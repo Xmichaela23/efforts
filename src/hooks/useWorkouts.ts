@@ -262,12 +262,20 @@ export const useWorkouts = () => {
               // Map activity type from Garmin to our workout types
               const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" | "walk" => {
                 const type = activityType?.toLowerCase() || '';
+                // Primary string mapping
                 if (type.includes('walk') || type.includes('hiking')) return 'walk';
-                if (type.includes('run') || type.includes('jog')) return 'run';
-                if (type.includes('bike') || type.includes('cycling') || type.includes('cycle')) return 'ride';
                 if (type.includes('swim')) return 'swim';
+                if (type.includes('bike') || type.includes('cycling') || type.includes('cycle') || type.includes('ride')) return 'ride';
                 if (type.includes('strength') || type.includes('weight')) return 'strength';
-                return 'run'; // Default to run for endurance activities
+                if (type.includes('run') || type.includes('jog')) return 'run';
+                // Heuristics fallback based on metrics when provider string is ambiguous or missing
+                const hasBikeSignals = (activity.avg_bike_cadence != null) || (activity.avg_power != null) || (activity.activity_type?.toLowerCase()?.includes('e-bike') || false);
+                const hasRunSignals = (activity.avg_run_cadence != null) || (activity.steps != null);
+                if (hasBikeSignals && !hasRunSignals) return 'ride';
+                if (hasRunSignals && !hasBikeSignals) return 'run';
+                // Default to ride for speed/power centric activities if avg_speed_mps is present
+                if (typeof activity.avg_speed_mps === 'number' && activity.avg_speed_mps > 0 && !hasRunSignals) return 'ride';
+                return 'run';
               };
 
               const workoutType = getWorkoutType(activity.activity_type);
