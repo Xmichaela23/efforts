@@ -245,6 +245,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (!user) throw new Error('User must be authenticated to save baselines');
       // Ensure performance_numbers contains explicit fiveK_pace if only 5K race time was entered
       const perf = { ...(data.performanceNumbers || {}) } as any;
+      const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';
       if (!perf.fiveK_pace && typeof perf.fiveK === 'string') {
         const mmss = perf.fiveK.match(/^(\d{1,2}):(\d{2})$/);
         if (mmss) {
@@ -254,8 +255,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           const paceSec = Math.round(total / 3.10686); // 5k miles
           const pm = Math.floor(paceSec / 60);
           const ps = paceSec % 60;
-          perf.fiveK_pace = `${pm}:${String(ps).padStart(2, '0')}/mi`;
+          perf.fiveK_pace = `${pm}:${String(ps).padStart(2, '0')}${unitsSuffix}`;
         }
+      }
+      // Coerce unitless paces to the user's unit preference so normalizer always has a unit
+      if (typeof perf.fiveK_pace === 'string' && !/\/(mi|km)$/i.test(perf.fiveK_pace)) {
+        const m = perf.fiveK_pace.match(/^(\d{1,2}):(\d{2})$/);
+        if (m) perf.fiveK_pace = `${m[1]}:${m[2]}${unitsSuffix}`;
+      }
+      if (typeof perf.easyPace === 'string' && !/\/(mi|km)$/i.test(perf.easyPace)) {
+        const m = perf.easyPace.match(/^(\d{1,2}):(\d{2})$/);
+        if (m) perf.easyPace = `${m[1]}:${m[2]}${unitsSuffix}`;
       }
 
       const baselineRecord = {
@@ -349,6 +359,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       
       console.log('🔍 Final age being returned:', calculatedAge);
 
+      // Coerce unitless paces on read using the stored units preference
+      const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';
+      const pn = { ...(data.performance_numbers || {}) } as any;
+      const coerce = (v: any) => (typeof v === 'string' && !/\/(mi|km)$/i.test(v) && /^(\d{1,2}):(\d{2})$/.test(v))
+        ? `${v}${unitsSuffix}` : v;
+      pn.fiveK_pace = coerce(pn.fiveK_pace);
+      pn.easyPace = coerce(pn.easyPace);
+
       return {
         // Enhanced user details
         birthday: formattedBirthday,
@@ -367,7 +385,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentFitness: data.current_fitness,
         disciplineFitness: data.discipline_fitness || {},
         benchmarks: data.benchmarks || {},
-        performanceNumbers: data.performance_numbers || {},
+        performanceNumbers: pn,
         injuryHistory: data.injury_history || '',
         injuryRegions: data.injury_regions || [],
         trainingBackground: data.training_background || '',
