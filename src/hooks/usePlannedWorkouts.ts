@@ -58,6 +58,9 @@ export const usePlannedWorkouts = () => {
             ? parseMaybeJson(workout.steps_preset)
             : [];
         const exportHints = parseMaybeJson(workout.export_hints) || null;
+        const computed = parseMaybeJson((workout as any).computed) || null;
+        const rendered = (workout as any).rendered_description || undefined;
+        const units = (workout as any).units || undefined;
 
         return {
           id: workout.id,
@@ -78,6 +81,12 @@ export const usePlannedWorkouts = () => {
           steps_preset: stepsPreset,
           // @ts-ignore
           export_hints: exportHints,
+          // @ts-ignore
+          rendered_description: rendered,
+          // @ts-ignore
+          computed,
+          // @ts-ignore
+          units,
         } as any;
       });
 

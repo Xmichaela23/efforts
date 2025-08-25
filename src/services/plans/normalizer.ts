@@ -279,6 +279,47 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     });
   }
 
+  // Fallback: parse human description for intervals/tempo and WU/CD when tokens don't match
+  try {
+    const desc: string = String(session?.description || '').toLowerCase();
+    if (desc && summaryParts.filter(Boolean).length === 0) {
+      // Warm-up / Cool-down in description
+      const wu = desc.match(/warm\s*-?\s*up\s*(\d{1,3})\s*min/);
+      if (wu) { totalMin += parseInt(wu[1],10); summaryParts.push(`Warm‑up ${wu[1]}min`); }
+      const cd = desc.match(/cool\s*-?\s*down\s*(\d{1,3})\s*min/);
+      if (cd) { totalMin += parseInt(cd[1],10); summaryParts.push(`Cool‑down ${cd[1]}min`); }
+
+      // Intervals like 6x400m @ 7:43/mi, 2min jog
+      const iv = desc.match(/(\d+)\s*x\s*(\d{3,4})\s*m[^@]*@\s*(\d+):(\d{2})\s*\/\s*(mi|km)(?:[^\d]+(\d+)\s*min\s*(?:jog|easy))?/);
+      if (iv) {
+        const reps = parseInt(iv[1],10);
+        const meters = parseInt(iv[2],10);
+        const baseSec = parseInt(iv[3],10)*60 + parseInt(iv[4],10);
+        const unit = iv[5].toLowerCase();
+        const restEach = iv[6] ? parseInt(iv[6],10) : 0;
+        const milesEach = meters / 1609.34;
+        const rng = [`${mmss(baseSec*(1-hQ))}/${unit}`, `${mmss(baseSec*(1+hQ))}/${unit}`] as [string,string];
+        const workMin = (reps * milesEach * baseSec) / 60;
+        const restMin = restEach * Math.max(0, reps - 1);
+        totalMin += Math.round(workMin + restMin);
+        summaryParts.push(`${reps} × ${meters} m @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]})${restEach?` w ${restEach} min jog`:''}`.trim());
+        primary = { type: 'pace', value: `${mmss(baseSec)}/${unit}`, range: rng };
+      }
+
+      // Tempo like Tempo: 4mi @ 8:28/mi
+      const tp = desc.match(/tempo[^\d]*(\d+(?:\.\d+)?)\s*mi[^@]*@\s*(\d+):(\d{2})\s*\/\s*(mi|km)/);
+      if (tp) {
+        const miles = parseFloat(tp[1]);
+        const baseSec = parseInt(tp[2],10)*60 + parseInt(tp[3],10);
+        const unit = tp[4].toLowerCase();
+        const rng = [`${mmss(baseSec*(1-hQ))}/${unit}`, `${mmss(baseSec*(1+hQ))}/${unit}`] as [string,string];
+        totalMin += Math.round((miles * baseSec) / 60);
+        summaryParts.push(`Tempo ${miles} mi @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]})`);
+        primary = { type: 'pace', value: `${mmss(baseSec)}/${unit}`, range: rng };
+      }
+    }
+  } catch {}
+
   return {
     friendlySummary: summaryParts.filter(Boolean).join(' • '),
     durationMinutes: totalMin,
