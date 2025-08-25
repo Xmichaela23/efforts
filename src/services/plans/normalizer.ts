@@ -114,14 +114,47 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
 
     let pace = resolvePaceToken(paceTag, baselines) || '';
     pace = applyOffset(pace, plus || undefined);
-    const rng = paceRange(pace, hQ);
     const distMiles = unit === 'mi' ? per : per / 1609.34;
-    const p = parsePace(pace)!;
-    const workMin = (reps * distMiles * p.seconds) / 60;
+    let workMin = 0;
+    let mainText = `${reps} × ${unit === 'mi' ? per : Math.round(per)} ${unit}`;
+    if (pace) {
+      const parsed = parsePace(pace);
+      if (parsed) {
+        const rng = paceRange(pace, hQ);
+        workMin = (reps * distMiles * parsed.seconds) / 60;
+        mainText += ` @ ${pace} (${rng[0]}–${rng[1]})`;
+        primary = { type: 'pace', value: pace, range: rng };
+      }
+    }
     const restMin = restEach * Math.max(0, reps - 1);
     totalMin += Math.round(workMin + restMin);
-    summaryParts.push(`${reps} × ${unit === 'mi' ? per : Math.round(per)} ${unit} @ ${pace} (${rng[0]}–${rng[1]})${restEach ? ` with ${mmss(restEach * 60)} jog rest` : ''}`);
-    primary = { type: 'pace', value: pace, range: rng };
+    summaryParts.push(`${mainText}${restEach ? ` with ${mmss(restEach * 60)} jog rest` : ''}`);
+  }
+
+  // Cruise intervals like cruise_4x1_5mi_5kpace_plus10s_R3min
+  const cr = tokenStr.match(/cruise_(\d+)x(\d+(?:_\d+|\.\d+)?)mi_(\w+?)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)min)?/i);
+  if (cr) {
+    const reps = parseInt(cr[1], 10);
+    const distToken = cr[2].replace('_', '.');
+    const dist = parseFloat(distToken);
+    const tag = cr[3];
+    const plus = cr[4];
+    const rmin = cr[5] ? parseInt(cr[5], 10) : 0;
+    let pace = resolvePaceToken(tag, baselines) || '';
+    pace = applyOffset(pace, plus || undefined);
+    let mainText = `${reps} × ${dist} mi`;
+    if (pace) {
+      const parsed = parsePace(pace);
+      if (parsed) {
+        const rng = paceRange(pace, hQ);
+        totalMin += Math.round(reps * (dist * parsed.seconds) / 60) + rmin * Math.max(0, reps - 1);
+        mainText += ` @ ${pace} (${rng[0]}–${rng[1]})`;
+        primary = { type: 'pace', value: pace, range: rng };
+      }
+    } else {
+      totalMin += rmin * Math.max(0, reps - 1);
+    }
+    summaryParts.push(`${mainText}${rmin ? ` with ${mmss(rmin * 60)} jog rest` : ''}`);
   }
 
   // Tempo like tempo_4mi_5kpace_plus45s
@@ -132,11 +165,17 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const plus = tm[3];
     let pace = resolvePaceToken(tag, baselines) || '';
     pace = applyOffset(pace, plus || undefined);
-    const rng = paceRange(pace, hQ);
-    const p = parsePace(pace)!;
-    totalMin += Math.round((dist * p.seconds) / 60);
-    summaryParts.push(`Tempo ${dist} mi @ ${pace} (${rng[0]}–${rng[1]})`);
-    primary = { type: 'pace', value: pace, range: rng };
+    let text = `Tempo ${dist} mi`;
+    if (pace) {
+      const parsed = parsePace(pace);
+      if (parsed) {
+        const rng = paceRange(pace, hQ);
+        totalMin += Math.round((dist * parsed.seconds) / 60);
+        text += ` @ ${pace} (${rng[0]}–${rng[1]})`;
+        primary = { type: 'pace', value: pace, range: rng };
+      }
+    }
+    summaryParts.push(text);
   }
 
   // Bike sets
@@ -155,12 +194,52 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     primary = { type: 'power', value: Math.round(center), range: pr };
   }
 
+  // Generic bike set fallback (e.g., bike_taper_2x12min_Z3_R5min)
+  if (!bikeSet) {
+    const gb = tokenStr.match(/bike_[a-z0-9]+_(\d+)x(\d+)min(?:_r(\d+)min)?/i);
+    if (gb) {
+      const reps = parseInt(gb[1], 10);
+      const tmin = parseInt(gb[2], 10);
+      const rmin = gb[3] ? parseInt(gb[3], 10) : 0;
+      totalMin += reps * tmin + rmin * Math.max(0, reps - 1);
+      summaryParts.push(`${reps} × ${tmin} min set${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
+    }
+  }
+
   // Endurance bike
   const bend = tokenStr.match(/bike_endurance_(\d+)min/i);
   if (bend) {
     const mins = parseInt(bend[1], 10);
     totalMin += mins;
     summaryParts.push(`Endurance ${mins} min (Z2)`);
+  }
+
+  // Long run blocks (e.g., longrun_150min_...)
+  const lrun = tokenStr.match(/longrun_(\d+)min/i);
+  if (lrun) {
+    const mins = parseInt(lrun[1], 10);
+    totalMin += mins;
+    summaryParts.push(`Long run ${mins} min`);
+  }
+
+  // Strides (e.g., strides_6x20s)
+  const strides = tokenStr.match(/strides_(\d+)x(\d+)s/i);
+  if (strides) {
+    const reps = parseInt(strides[1], 10);
+    const secsEach = parseInt(strides[2], 10);
+    totalMin += Math.round((reps * secsEach) / 60);
+    summaryParts.push(`${reps} × ${secsEach}s strides`);
+  }
+
+  // Speed micro-sets (e.g., speed_8x20s_fast_R60s)
+  const speed = tokenStr.match(/speed_(\d+)x(\d+)s(?:_.*)?_r(\d+)s/i);
+  if (speed) {
+    const reps = parseInt(speed[1], 10);
+    const secsEach = parseInt(speed[2], 10);
+    const rest = parseInt(speed[3], 10);
+    const totalSecs = reps * secsEach + Math.max(0, reps - 1) * rest;
+    totalMin += Math.round(totalSecs / 60);
+    summaryParts.push(`${reps} × ${secsEach}s with ${rest}s easy`);
   }
 
   // Cooldown
@@ -178,6 +257,16 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const s = session.description.toLowerCase();
     const m = s.match(/(\d{1,3})\s*min\b/);
     if (m) totalMin += parseInt(m[1], 10);
+  }
+
+  // Catch-all: add any single-step explicit minutes not covered above, avoiding double count
+  if (steps.length > 0) {
+    steps.forEach((t) => {
+      const lower = t.toLowerCase();
+      if (/(^interval_|^tempo_|^cruise_|^bike_.*\dx\d+min|^bike_endurance_|^warmup|^cooldown)/.test(lower)) return;
+      const mins = lower.match(/(\d{1,3})\s*min/);
+      if (mins) totalMin += parseInt(mins[1], 10);
+    });
   }
 
   return {

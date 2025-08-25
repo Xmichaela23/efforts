@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
@@ -8,6 +8,7 @@ import PlansDropdown from './PlansDropdown';
 import AllEffortsDropdown from './AllEffortsDropdown';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { getDisciplineColor as getHexColor } from '@/lib/utils';
+import { normalizePlannedSession } from '@/services/plans/normalizer';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -55,10 +56,22 @@ export default function WorkoutCalendar({
   currentPlans = [], // NEW: Default to empty array
   completedPlans = [] // NEW: Default to empty array
 }: WorkoutCalendarProps) {
-  const { workouts } = useAppContext();
+  const { workouts, loadUserBaselines, detailedPlans } = useAppContext();
   const { plannedWorkouts } = usePlannedWorkouts();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [baselines, setBaselines] = useState<any | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await loadUserBaselines();
+        setBaselines(b || null);
+      } catch {
+        setBaselines(null);
+      }
+    })();
+  }, [loadUserBaselines]);
 
   const navigateMonth = (direction: number) => {
     setCurrentDate(prev => {
@@ -193,6 +206,18 @@ export default function WorkoutCalendar({
     return getDisciplineName(w?.type);
   };
 
+  const getPlannedSummary = (w: any): string => {
+    try {
+      if (w?.workout_status !== 'planned') return '';
+      const steps = Array.isArray(w?.steps_preset)
+        ? w.steps_preset
+        : (() => { try { const p = JSON.parse(w?.steps_preset || 'null'); return Array.isArray(p) ? p : []; } catch { return []; }})();
+      const hints = (w as any).export_hints || detailedPlans?.[w?.training_plan_id]?.export_hints || {};
+      const n = normalizePlannedSession({ steps_preset: steps, description: w?.description || '' }, baselines || {}, hints);
+      return n?.friendlySummary || '';
+    } catch { return ''; }
+  };
+
   const getDisciplineColor = (type: string, isCompleted?: boolean): string => {
     // Color code by status: completed = green, planned = orange
     if (isCompleted) {
@@ -271,15 +296,21 @@ export default function WorkoutCalendar({
                         <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
                           {dayWorkouts.slice(0, 2).map((workout, idx) => {
                             const hex = getHexColor(workout.type);
+                            const summary = getPlannedSummary(workout);
                             return (
-                              <span
-                                key={workout.id || idx}
-                                className={`text-[10px] font-medium`}
-                                style={{ color: hex }}
-                                title={workout.name || getDisplayLabel(workout)}
-                              >
-                                {getDisplayLabel(workout)}
-                              </span>
+                              <div key={workout.id || idx} className="flex flex-col items-center max-w-[88px]">
+                                <span
+                                  className={`text-[10px] font-medium`}
+                                  style={{ color: hex }}
+                                >
+                                  {getDisplayLabel(workout)}
+                                </span>
+                                {summary && (
+                                  <span className="block text-[9px] text-muted-foreground leading-tight truncate max-w-[88px]">
+                                    {summary}
+                                  </span>
+                                )}
+                              </div>
                             );
                           })}
                           {dayWorkouts.length > 2 && (
