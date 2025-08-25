@@ -248,15 +248,12 @@ export const useWorkouts = () => {
 
         if (garminUserId) {
           // Quiet logs in production
-          const garminLookbackIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 90 days
           const { data: garminActivities, error: garminError } = await supabase
             .from("garmin_activities")
             .select("*")
             .or(`user_id.eq.${user.id},garmin_user_id.eq.${garminUserId}`)
-            .gte("start_time", garminLookbackIso)
-            .lte("start_time", todayIso)
             .order("start_time", { ascending: false })
-            .limit(200);
+            .limit(50);
 
           if (!garminError && garminActivities) {
             
