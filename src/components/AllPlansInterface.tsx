@@ -14,7 +14,12 @@ import PlannedWorkoutView from './PlannedWorkoutView';
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
   // Remove catalog/control tags like [cat:run], [plan:...] but keep interval variant tags
-  return String(text || '').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '');
+  const s = String(text || '')
+    .replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '') // control tags
+    .replace(/\[[A-Za-z0-9_:+\-x\/]+\]/g, '')   // code-like tokens [800m_x6_R2min]
+    .replace(/\s{2,}/g, ' ')                      // extra spaces
+    .trim();
+  return s;
 }
 
 function inferDisciplineFromText(text?: string): 'run' | 'ride' | 'swim' | 'strength' | undefined {
@@ -46,6 +51,48 @@ function extractMinutesFromText(text?: string): number | undefined {
   const m = text.match(/(\d{1,3})\s*min\b/i);
   if (m) return parseInt(m[1], 10);
   return undefined;
+}
+
+// Humanize steps_preset tokens and estimate duration
+function humanizeToken(token: string): string {
+  const t = token.toLowerCase();
+  const dur = (() => {
+    const m = t.match(/(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
+    if (!m) return '';
+    return m[2] ? `${m[1]}–${m[2]}min` : `${m[1]}min`;
+  })();
+  if (t.startsWith('warmup')) return `Warm‑up ${dur}`.trim();
+  if (t.startsWith('cooldown')) return `Cool‑down ${dur}`.trim();
+  if (t.startsWith('longrun')) return `Long run ${dur}`.trim();
+  if (t.startsWith('tempo')) return `Tempo ${dur}`.trim();
+  if (t.startsWith('interval')) return `Intervals`;
+  if (t.startsWith('strides')) return `Strides`;
+  if (t.startsWith('drills')) return `Drills`;
+  if (t.startsWith('bike_vo2')) return `Bike VO₂ ${dur}`.trim();
+  if (t.startsWith('bike_thr') || t.includes('threshold')) return `Bike Threshold ${dur}`.trim();
+  if (t.startsWith('bike_ss')) return `Bike Sweet Spot ${dur}`.trim();
+  if (t.startsWith('bike_endurance')) return `Bike Endurance ${dur}`.trim();
+  // Generic fallback
+  return token.replace(/_/g, ' ');
+}
+
+function summarizeSteps(steps?: string[]): string[] {
+  if (!Array.isArray(steps) || steps.length === 0) return [];
+  return steps.map(humanizeToken);
+}
+
+function estimateMinutesFromSteps(steps?: string[]): number {
+  if (!Array.isArray(steps)) return 0;
+  let total = 0;
+  for (const tok of steps) {
+    const m = tok.toLowerCase().match(/(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
+    if (m) {
+      const a = parseInt(m[1], 10);
+      const b = m[2] ? parseInt(m[2], 10) : a;
+      total += Math.round((a + b) / 2);
+    }
+  }
+  return total;
 }
 
 function capitalize(w?: string) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''; }
@@ -192,7 +239,18 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             let out = text || '';
             if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK));
             if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace));
-            out = out.replace(/(\d+:\d{2}\/(?:mi|km))\s*([+\-−])\s*(\d+:\d{2}\/(?:mi|km))/g, (_m, a, s, b) => `${a} ${s} ${b}`);
+            // Compute offsets like 7:43/mi + 0:45/mi → 8:28/mi
+            out = out.replace(/(\d+:\d{2})\/(mi|km)\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
+              if (u1 !== u2) return m;
+              const [bm, bs] = base.split(':').map(Number);
+              const [tm, ts] = t.split(':').map(Number);
+              const baseSec = bm * 60 + bs;
+              const offSec = tm * 60 + ts;
+              const newSec = sign === '-' || sign === '−' ? baseSec - offSec : baseSec + offSec;
+              const mm = Math.floor(newSec / 60);
+              const ss = newSec % 60;
+              return `${mm}:${String(ss).padStart(2, '0')}/${u1}`;
+            });
             out = appendPaceRange(out);
             return out;
           };
@@ -277,12 +335,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const extracted = extractTypeFromText(rawDesc);
               const typeName = s.type || extracted || '';
               const name = discipline === 'strength' ? 'Strength' : [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
-              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (extractMinutesFromText(rawDesc) || 0);
+              const stepsSummary = summarizeSteps((s as any).steps_preset);
+              const estFromSteps = estimateMinutesFromSteps((s as any).steps_preset);
+              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (estFromSteps || extractMinutesFromText(rawDesc) || 0);
               const base = {
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
                 type: mappedType || 'run',
-                description,
+                description: [description, stepsSummary.length ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
                 duration,
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
                 day: s.day,
