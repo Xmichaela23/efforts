@@ -6,8 +6,10 @@ A React + TypeScript fitness app that integrates with Garmin Connect to display 
 
 Fully functional app with:
 - Garmin integration (webhooks + send-to-Garmin edge function)
+- Strava webhook (direct → workouts with gps_track, sensor_data)
 - Catalog/import of deterministic JSON plans (admin)
 - Baseline mapping (paces, FTP, 1RM) and deterministic alias table
+- Deterministic normalizer: friendly summaries, exact targets, total duration
 - Auto-spacing resolver for long run/ride with clear notes
 - Swim steps → distance intervals; Strength steps → REPS with rest
 - Calendar, Today’s Effort, Strength Logger with prefill
@@ -21,10 +23,10 @@ Fully functional app with:
 
 ## 🗂 Plan Flow
 
-1. Admin publishes JSON (sessions_by_week, optional steps, notes_by_week)
+1. Admin publishes JSON (sessions_by_week, optional steps_preset, export_hints, notes_by_week)
 2. User selects from catalog → picks start date, long run/ride days
 3. On save we:
-   - Map baselines; compute offsets; estimate durations
+   - Map baselines; resolve aliases/offsets; estimate durations
    - Convert swim steps to distance intervals; strength steps to REPS
    - Auto-space hard sessions with notes; pin safe authored tempos
    - Materialize planned_workouts and prefill Strength Logger
@@ -46,6 +48,29 @@ git clone https://github.com/Xmichaela23/efforts.git
 cd efforts
 npm install
 npm run dev
+```
+
+Create `.env.local` in the repo root:
+```
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_MAPBOX_ACCESS_TOKEN=your_mapbox_token
+```
+
+## 🚀 Deploy Frontend (Netlify)
+
+- Netlify auto‑deploys from `main` per `netlify.toml` (build `npm run build`, publish `dist`).
+
+## 🔧 Deploy Edge Functions (Supabase CLI)
+
+```bash
+brew install supabase/tap/supabase
+supabase login
+supabase link --project-ref yyriamwvtvzlkumqrvpm
+supabase functions deploy strava-webhook --project-ref yyriamwvtvzlkumqrvpm
+supabase functions deploy import-strava-history --project-ref yyriamwvtvzlkumqrvpm
+supabase functions deploy send-workout-to-garmin --project-ref yyriamwvtvzlkumqrvpm
+supabase functions list --project-ref yyriamwvtvzlkumqrvpm | cat
 ```
 
 ## 🔑 Environment Variables
@@ -75,11 +100,32 @@ npm run dev
 - **`GARMIN_TRAINING_API_V2.md`** - Training data API specifications
 - **`GARMIN_OAUTH2_PKCE.md`** - Authentication flow documentation
 - **`GARMIN_DATABASE_SCHEMA.md`** - Database structure for Garmin data
+ - Plan JSON schema: `src/services/plans/contracts/universal_plan.schema.json`
+ - Normalizer: `src/services/plans/normalizer.ts`
+ - Plan Authoring: `PLAN_AUTHORING.md`
+  - Design Guidelines: `DESIGN_GUIDELINES.md`
 
 ---
 
-**Status**: ✅ Production Ready — Plans, Garmin exports, spacing resolver live
+**Status**: ✅ Production Ready — Plans, Garmin/Strava ingest, spacing resolver live
 **Last Updated**: August 2025
 **Deploy**:
 - Netlify (frontend): push to main
-- Supabase (edge): `supabase functions deploy send-workout-to-garmin`
+- Supabase CLI (edge): see section above
+
+## 🛠️ Troubleshooting (quick refs)
+- 401 from webhook (Strava): ensure function config disables JWT for webhook (`verify_jwt = false`) and tokens are valid.
+- 406 from Supabase filters: prefer `filter('provider','eq','garmin')` over `.eq('provider','garmin')` in tricky cases.
+- DB timeouts on `workouts`: add indexes (`workouts(user_id, date desc)` etc.) and use reasonable date windows if needed.
+
+## Ingestion overview
+- Garmin: webhook → edge function → `garmin_activities` + merged to `workouts` via app logic.
+- Strava: webhook → edge function writes directly to `workouts` with `gps_track` and `sensor_data`.
+
+## CLI quick refs
+```bash
+supabase functions deploy strava-webhook --project-ref yyriamwvtvzlkumqrvpm
+supabase functions deploy import-strava-history --project-ref yyriamwvtvzlkumqrvpm
+supabase functions deploy send-workout-to-garmin --project-ref yyriamwvtvzlkumqrvpm
+supabase functions list --project-ref yyriamwvtvzlkumqrvpm | cat
+```

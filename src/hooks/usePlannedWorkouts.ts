@@ -56,7 +56,12 @@ export const usePlannedWorkouts = () => {
         source: workout.source,
         training_plan_id: workout.training_plan_id,
         week_number: workout.week_number,
-        day_number: workout.day_number
+        day_number: workout.day_number,
+        // pass-through for normalizer
+        // @ts-ignore allow dynamic fields
+        steps_preset: workout.steps_preset || [],
+        // @ts-ignore
+        export_hints: workout.export_hints || null,
       }));
 
       setPlannedWorkouts(transformedWorkouts);

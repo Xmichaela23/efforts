@@ -5,6 +5,9 @@
 - Swim (swimPace100): easy +8–10s, steady +5–7s, threshold ±0s, interval −2–4s, VO2 −5–7s
 Implementation: explicit session offsets win; otherwise aliases resolve to concrete targets at compose/save time.
 
+#### Authoring note
+Plan authoring is handled via standalone JSON templates now. See `PLAN_AUTHORING.md`.
+
 #### Auto-Spacing (Universal Catalog Plans)
 Inputs: longRunDay, longRideDay; tags long_run, long_ride, hard_run, bike_intensity, strength_lower (plus heuristics).
 Constraints: strength_lower↔long_run ≥48h; strength_lower↔long_ride ≥36h; hard_run↔long_run ≥24h; bike_intensity↔long_ride ≥24h; no two hard same day.

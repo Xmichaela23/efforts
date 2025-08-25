@@ -1,4 +1,13 @@
-# EFFORTS APP BIBLE 📚
+# [ARCHIVED] EFFORTS APP BIBLE 📚
+
+This document reflects an older architecture (AI/70.3-centric). For the current system, see:
+- Quick start: `QUICK_START_FOR_NEW_CHAT.md`
+- Plan authoring: `PLAN_AUTHORING.md`
+- Plan schema: `src/services/plans/contracts/universal_plan.schema.json`
+- Deterministic normalizer: `src/services/plans/normalizer.ts`
+- Data feed: `src/hooks/useWorkouts.ts`
+
+The content below is retained for historical reference only.
 
 ## 🎯 DEVELOPMENT PHILOSOPHY
 - Rule‑driven engine, not ad‑hoc algorithms

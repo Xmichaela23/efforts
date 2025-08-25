@@ -232,7 +232,7 @@ export const useWorkouts = () => {
             .from("device_connections")
             .select("connection_data")
             .eq("user_id", user.id)
-            .eq("provider", "garmin")
+            .filter("provider", "eq", "garmin")
             .single();
           garminUserId = dc?.connection_data?.user_id || null;
         }
@@ -241,7 +241,7 @@ export const useWorkouts = () => {
             .from("user_connections")
             .select("connection_data")
             .eq("user_id", user.id)
-            .eq("provider", "garmin")
+            .filter("provider", "eq", "garmin")
             .single();
           garminUserId = uc?.connection_data?.user_id || null;
         }
@@ -760,7 +760,7 @@ export const useWorkouts = () => {
           .from('device_connections')
           .select('connection_data, access_token, refresh_token')
           .eq('user_id', user.id)
-          .eq('provider', 'strava')
+          .filter('provider', 'eq', 'strava')
           .single();
         const accessToken = (conn?.connection_data?.access_token || conn?.access_token) as string | undefined;
         const refreshToken = (conn?.connection_data?.refresh_token || conn?.refresh_token) as string | undefined;
@@ -833,7 +833,7 @@ export const useWorkouts = () => {
           .from("device_connections")
           .select("connection_data")
           .eq("user_id", user.id)
-          .eq("provider", "garmin")
+          .filter("provider", "eq", "garmin")
           .single();
         garminUserId = dc?.connection_data?.user_id || null;
       }
@@ -842,7 +842,7 @@ export const useWorkouts = () => {
           .from("user_connections")
           .select("connection_data")
           .eq("user_id", user.id)
-          .eq("provider", "garmin")
+          .filter("provider", "eq", "garmin")
           .single();
         garminUserId = uc?.connection_data?.user_id || null;
       }

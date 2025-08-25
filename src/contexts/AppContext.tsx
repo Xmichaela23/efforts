@@ -459,6 +459,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           return d.toISOString().slice(0, 10);
         };
         const rows: any[] = [];
+        const planExportHints: any = (planData as any)?.export_hints || (data as any)?.export_hints || null;
         Object.keys(sessionsByWeek).forEach((wkKey) => {
           const weekNum = parseInt(wkKey, 10);
           const sessions = sessionsByWeek[wkKey] || [];
@@ -492,6 +493,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               duration: durationVal,
               workout_status: 'planned',
               source: 'training_plan',
+              // New fields for deterministic rendering
+              steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
+              export_hints: planExportHints,
             };
             if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
             if (Array.isArray(s.intervals)) row.intervals = s.intervals;

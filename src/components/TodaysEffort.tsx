@@ -3,6 +3,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
+import { normalizePlannedSession } from '@/services/plans/normalizer';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -17,9 +18,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   onViewCompleted, 
   onEditEffort 
 }) => {
-  const { useImperial, workouts, loading } = useAppContext();
+  const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
   const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
+  const [baselines, setBaselines] = useState<any | null>(null);
 
   // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -34,6 +36,18 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   useEffect(() => {
     setDisplayWorkouts(dateWorkoutsMemo);
   }, [dateWorkoutsMemo]);
+
+  // Load baselines for planned summaries
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await loadUserBaselines();
+        setBaselines(b || null);
+      } catch (e) {
+        setBaselines(null);
+      }
+    })();
+  }, [loadUserBaselines]);
 
   // Icons removed - using text-only interface
 
@@ -91,10 +105,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
     const getMetrics = () => {
       if (!isCompleted) {
-        // PLANNED: Show workout description/structure
-        const full = workout.description || (Array.isArray(workout.intervals) ? workout.intervals.join(' • ') : '') ||
-                     workout.workout_type || 'Planned workout';
-        return [truncate(full, 140)];
+        // PLANNED: Friendly summary via normalizer (fallback to cleaned description)
+        try {
+          const hints = detailedPlans?.[workout.training_plan_id]?.export_hints || {};
+          const session = {
+            steps_preset: Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
+            description: workout.description || ''
+          };
+          const n = normalizePlannedSession(session, baselines || {}, hints);
+          const sum = n.friendlySummary && n.friendlySummary.length > 0 ? n.friendlySummary : (workout.description || '').replace(/\[[^\]]*\]/g, '').trim();
+          return [truncate(sum, 140)];
+        } catch {
+          const full = (workout.description || '').replace(/\[[^\]]*\]/g, '').trim() || 'Planned workout';
+          return [truncate(full, 140)];
+        }
       }
       
       // COMPLETED: Show actual metrics
@@ -393,7 +417,26 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       <div className="flex items-center gap-2 text-xs">
                         {/* status glyphs removed for cleaner layout */}
                         <span className="text-muted-foreground">
-                          {formatRichWorkoutDisplay(workout).duration}
+                          {(() => {
+                            const base = formatRichWorkoutDisplay(workout).duration;
+                            if (workout.workout_status !== 'planned') return base;
+                            try {
+                              const hints = detailedPlans?.[workout.training_plan_id]?.export_hints || {};
+                              const session = {
+                                steps_preset: Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
+                                description: workout.description || ''
+                              };
+                              const n = normalizePlannedSession(session, baselines || {}, hints);
+                              const mins = Number.isFinite(n.durationMinutes) && n.durationMinutes > 0 ? n.durationMinutes : null;
+                              if (!mins) return base;
+                              if (mins < 60) return `${mins}min`;
+                              const h = Math.floor(mins / 60);
+                              const m = mins % 60;
+                              return m ? `${h}h ${m}min` : `${h}h`;
+                            } catch {
+                              return base;
+                            }
+                          })()}
                         </span>
                       </div>
                     </div>
