@@ -450,6 +450,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       // Do not send non-column fields in insert (e.g., start_date)
       const insertPayload: any = { ...planData, status: planData.status || 'active', current_week: planData.currentWeek || 1, user_id: user?.id };
       if ('start_date' in insertPayload) delete insertPayload.start_date;
+      // Remove fields that are not columns on plans table (they are used only for materialization)
+      if ('export_hints' in insertPayload) delete insertPayload.export_hints;
       const { data, error } = await supabase
         .from('plans')
         .insert([insertPayload])
