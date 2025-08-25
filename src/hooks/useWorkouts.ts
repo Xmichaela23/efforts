@@ -225,22 +225,35 @@ export const useWorkouts = () => {
       // Step 2: Fetch Garmin activities (if user has Garmin connection)
       let garminWorkouts: any[] = [];
       try {
-        const { data: userConnection, error: connectionError } = await supabase
-          .from("user_connections")
-          .select("connection_data")
-          .eq("user_id", user.id)
-          .eq("provider", "garmin")
-          .single();
+        // Try device_connections first; fall back to legacy user_connections
+        let garminUserId: string | null = null;
+        {
+          const { data: dc } = await supabase
+            .from("device_connections")
+            .select("connection_data")
+            .eq("user_id", user.id)
+            .eq("provider", "garmin")
+            .single();
+          garminUserId = dc?.connection_data?.user_id || null;
+        }
+        if (!garminUserId) {
+          const { data: uc } = await supabase
+            .from("user_connections")
+            .select("connection_data")
+            .eq("user_id", user.id)
+            .eq("provider", "garmin")
+            .single();
+          garminUserId = uc?.connection_data?.user_id || null;
+        }
 
-        if (!connectionError && userConnection?.connection_data?.user_id) {
-          const garminUserId = userConnection.connection_data.user_id;
+        if (garminUserId) {
           // Quiet logs in production
-
+          const garminLookbackIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 90 days
           const { data: garminActivities, error: garminError } = await supabase
             .from("garmin_activities")
             .select("*")
-            .eq("garmin_user_id", garminUserId)
-            .gte("start_time", lookbackIso)
+            .or(`user_id.eq.${user.id},garmin_user_id.eq.${garminUserId}`)
+            .gte("start_time", garminLookbackIso)
             .lte("start_time", todayIso)
             .order("start_time", { ascending: false })
             .limit(200);
@@ -798,19 +811,31 @@ export const useWorkouts = () => {
       console.log("🔍 Importing Garmin activities for user:", user.id);
 
       // Step 1: Get user's Garmin connection to find their garmin_user_id
-      const { data: userConnection, error: connectionError } = await supabase
-        .from("user_connections")
-        .select("connection_data")
-        .eq("user_id", user.id)
-        .eq("provider", "garmin")
-        .single();
+      // Device connections then legacy fallback
+      let garminUserId: string | null = null;
+      {
+        const { data: dc } = await supabase
+          .from("device_connections")
+          .select("connection_data")
+          .eq("user_id", user.id)
+          .eq("provider", "garmin")
+          .single();
+        garminUserId = dc?.connection_data?.user_id || null;
+      }
+      if (!garminUserId) {
+        const { data: uc } = await supabase
+          .from("user_connections")
+          .select("connection_data")
+          .eq("user_id", user.id)
+          .eq("provider", "garmin")
+          .single();
+        garminUserId = uc?.connection_data?.user_id || null;
+      }
 
-      if (connectionError || !userConnection) {
+      if (!garminUserId) {
         console.log("🚫 No Garmin connection found for user");
         return { imported: 0, skipped: 0 };
       }
-
-      const garminUserId = userConnection.connection_data?.user_id;
       if (!garminUserId) {
         console.log("🚫 No Garmin user_id in connection data");
         return { imported: 0, skipped: 0 };

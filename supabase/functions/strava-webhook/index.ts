@@ -112,9 +112,18 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     }
 
     // Fetch detailed activity data from Strava
-    const activityData = await fetchStravaActivity(activityId, accessToken);
+    let { data: activityData, status } = await fetchStravaActivityWithStatus(activityId, accessToken);
+    if (status === 401) {
+      // Access token expired/invalid → refresh and retry once
+      const refreshed = await refreshStravaAccessToken(userId);
+      if (refreshed) {
+        const retry = await fetchStravaActivityWithStatus(activityId, refreshed);
+        activityData = retry.data;
+        status = retry.status;
+      }
+    }
     if (!activityData) {
-      console.log(`⚠️ Could not fetch activity ${activityId} from Strava`);
+      console.log(`⚠️ Could not fetch activity ${activityId} from Strava (status ${status})`);
       return;
     }
 
@@ -157,9 +166,17 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     }
 
     // Fetch updated activity data
-    const activityData = await fetchStravaActivity(activityId, accessToken);
+    let { data: activityData, status } = await fetchStravaActivityWithStatus(activityId, accessToken);
+    if (status === 401) {
+      const refreshed = await refreshStravaAccessToken(userId);
+      if (refreshed) {
+        const retry = await fetchStravaActivityWithStatus(activityId, refreshed);
+        activityData = retry.data;
+        status = retry.status;
+      }
+    }
     if (!activityData) {
-      console.log(`⚠️ Could not fetch updated activity ${activityId} from Strava`);
+      console.log(`⚠️ Could not fetch updated activity ${activityId} from Strava (status ${status})`);
       return;
     }
 
@@ -206,22 +223,71 @@ async function handleActivityDeleted(activityId: number, ownerId: number) {
   }
 }
 
-async function fetchStravaActivity(activityId: number, accessToken: string) {
+async function fetchStravaActivityWithStatus(activityId: number, accessToken: string): Promise<{ data: any | null; status: number; }> {
   try {
     const response = await fetch(`https://www.strava.com/api/v3/activities/${activityId}`, {
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-      },
+      headers: { 'Authorization': `Bearer ${accessToken}` },
     });
-
     if (!response.ok) {
       console.warn(`⚠️ Strava API error for activity ${activityId}: ${response.status}`);
-      return null;
+      return { data: null, status: response.status };
     }
-
-    return await response.json();
+    const json = await response.json();
+    return { data: json, status: 200 };
   } catch (error) {
     console.error(`❌ Error fetching Strava activity ${activityId}:`, error);
+    return { data: null, status: 0 };
+  }
+}
+
+async function refreshStravaAccessToken(userId: string): Promise<string | null> {
+  try {
+    const { data: conn } = await supabase
+      .from('device_connections')
+      .select('connection_data')
+      .eq('user_id', userId)
+      .eq('provider', 'strava')
+      .single();
+    const refreshToken = conn?.connection_data?.refresh_token;
+    if (!refreshToken) {
+      console.warn('⚠️ Missing Strava refresh_token for user', userId);
+      return null;
+    }
+    const clientId = Deno.env.get('STRAVA_CLIENT_ID');
+    const clientSecret = Deno.env.get('STRAVA_CLIENT_SECRET');
+    if (!clientId || !clientSecret) {
+      console.warn('⚠️ Missing STRAVA_CLIENT_ID/SECRET env vars');
+      return null;
+    }
+    const tokenResp = await fetch('https://www.strava.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+        refresh_token: refreshToken,
+      }),
+    });
+    if (!tokenResp.ok) {
+      console.warn('⚠️ Strava token refresh failed:', tokenResp.status);
+      return null;
+    }
+    const tokenJson = await tokenResp.json();
+    const newAccess = tokenJson.access_token;
+    const newRefresh = tokenJson.refresh_token || refreshToken;
+    // Persist
+    const { error: upErr } = await supabase
+      .from('device_connections')
+      .update({ connection_data: { ...(conn?.connection_data || {}), access_token: newAccess, refresh_token: newRefresh, expires_at: tokenJson.expires_at } })
+      .eq('user_id', userId)
+      .eq('provider', 'strava');
+    if (upErr) {
+      console.warn('⚠️ Failed to persist refreshed Strava token:', upErr);
+    }
+    return newAccess || null;
+  } catch (e) {
+    console.error('❌ Error refreshing Strava access token:', e);
     return null;
   }
 }
