@@ -113,8 +113,51 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             description: workout.description || ''
           };
           const n = normalizePlannedSession(session, baselines || {}, hints);
-          const sum = n.friendlySummary && n.friendlySummary.length > 0 ? n.friendlySummary : (workout.description || '').replace(/\[[^\]]*\]/g, '').trim();
-          return [truncate(sum, 140)];
+          if (n.friendlySummary && n.friendlySummary.length > 0) {
+            return [truncate(n.friendlySummary, 200)];
+          }
+          // Fallback from steps_preset if normalizer returns empty
+          const steps: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+          if (steps.length > 0) {
+            const lower = steps.map(s=>String(s||'').toLowerCase());
+            const wu = lower.find(t=>t.startsWith('warmup')) || '';
+            const cd = lower.find(t=>t.startsWith('cooldown')) || '';
+            const wz = (wu.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/) || [,''])[1];
+            const cz = (cd.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/) || [,''])[1];
+            const tokenStr = lower.join(' ');
+            const im = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_(\w+?)(?:_r(\d+(?:-\d+)?)min)?/i);
+            let mid = '';
+            if (im) {
+              const reps = parseInt(im[1],10);
+              const per = im[2];
+              const unit = im[3].toLowerCase();
+              const tag = im[4];
+              const tol = (hints?.pace_tolerance_quality ?? 0.04);
+              const pn: any = baselines?.performanceNumbers || {};
+              const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || '';
+              const easy = pn.easyPace || '';
+              const base = tag.includes('5k') ? fiveK : tag.includes('easy') ? easy : '';
+              const paceRange = (p: string, t: number): string => {
+                const m = String(p||'').match(/(\d+):(\d{2})\/(mi|km)/i);
+                if (!m) return p;
+                const sec = parseInt(m[1],10)*60+parseInt(m[2],10);
+                const u = m[3];
+                const fmt = (s:number)=>{ const mm=Math.floor(s/60), ss=s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
+                return `${fmt(Math.round(sec*(1-t)))}–${fmt(Math.round(sec*(1+t)))}`;
+              };
+              const pr = base ? paceRange(String(base), tol) : '';
+              const rest = im[5] ? im[5].replace('-', '–') : '';
+              mid = `${reps} × ${per} ${unit} ${base ? `@ ${pr}` : ''}${rest ? ` w/ ${rest} jog` : ''}`.trim();
+            }
+            const pieces = [wz ? `Warm‑up ${wz}` : '', mid, cz ? `Cool‑down ${cz}` : ''].filter(Boolean);
+            if (pieces.length) return [truncate(pieces.join(' • '), 200)];
+          }
+          // Final fallback: cleaned description (strip codes and leading labels)
+          const cleaned = (workout.description || '')
+            .replace(/\[[^\]]*\]/g, '')
+            .replace(/^\s*(intervals?|tempo|cruise)\s*:\s*/i,'')
+            .trim();
+          return [truncate(cleaned, 200)];
         } catch {
           const replaceTokens = (txt: string): string => {
             try {
@@ -127,8 +170,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               return out;
             } catch { return txt; }
           };
-          const full = replaceTokens((workout.description || '').replace(/\[[^\]]*\]/g, '').trim()) || 'Planned workout';
-          return [truncate(full, 140)];
+          const full = replaceTokens((workout.description || '').replace(/\[[^\]]*\]/g, '').replace(/^\s*(intervals?|tempo|cruise)\s*:\s*/i,'').trim()) || 'Planned workout';
+          return [truncate(full, 200)];
         }
       }
       
