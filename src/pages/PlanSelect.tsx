@@ -403,10 +403,7 @@ export default function PlanSelect() {
       };
 
       const rows: any[] = [];
-      // Load baselines to resolve tokens to concrete paces/power
-      const baselines = await (async () => {
-        try { return await (useAppContext().loadUserBaselines?.() as any); } catch { return null; }
-      })();
+      // Use baselines loaded above to resolve tokens to concrete paces/power
       const unitsPref = (baselines?.units === 'metric' || baselines?.units === 'imperial') ? baselines.units : 'imperial';
       Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
         const weekNum = parseInt(wkKey, 10);
