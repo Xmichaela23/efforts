@@ -348,251 +348,36 @@ export default function PlanSelect() {
 
         return Math.max(0, Math.round(totalMin));
       };
-      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) { const outWeek: any[] = []; for (const s of sessions as any[]) { let desc = String(s.description||''); if (desc) desc = resolvePaces(desc); if (desc) desc = resolveStrength(desc); const isBikeText = /\b(bike|ride|cycling)\b/i.test(String(s.discipline||s.type||'')); if (desc && isBikeText) desc = mapBike(desc); const copy = { ...s, description: desc }; outWeek.push(copy); } (mapped.sessions_by_week as any)[wk] = outWeek; }
-      const payload = { name: libPlan.name, description: libPlan.description || '', duration_weeks: mapped.duration_weeks, current_week: 1, status: 'active', plan_type: 'catalog', start_date: startDate, config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id }, weeks: [], sessions_by_week: mapped.sessions_by_week, notes_by_week: mapped.notes_by_week || {} } as any;
-
-      // Direct insert into plans and materialize planned_workouts
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('You must be signed in to save a plan.');
-      const insertPayload: any = { ...payload, user_id: user.id }; delete insertPayload.start_date;
-      const { data: planRow, error: planErr } = await supabase.from('plans').insert([insertPayload]).select().single();
-      if (planErr) throw planErr;
-      const dayIndex: Record<string, number> = { Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6, Sunday:7 };
-      // Local-safe date math: avoid UTC shifts from toISOString/new Date(YYYY-MM-DD)
-      const addDays = (iso: string, n: number) => {
-        const parts = String(iso).split('-').map((x) => parseInt(x, 10));
-        const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
-        base.setDate(base.getDate() + n);
-        const y = base.getFullYear();
-        const m = String(base.getMonth() + 1).padStart(2, '0');
-        const d = String(base.getDate()).padStart(2, '0');
-        return `${y}-${m}-${d}`;
-      };
-      const rows: any[] = [];
-      Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
-        const weekNum = parseInt(wkKey, 10);
-        const sessions = payload.sessions_by_week[wkKey] || [];
-        sessions.forEach((s: any) => {
-          const dow = dayIndex[s.day] || 1;
-          const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
-          if (weekNum === 1 && date < startDate) return;
-          const rawType = (s.discipline || s.type || '').toLowerCase();
-          const inferred = inferDisciplineFromDescription(String(s.description||'')) || undefined;
-          let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
-          if (rawType === 'run' || inferred === 'run') mappedType = 'run';
-          else if (rawType === 'bike' || rawType === 'ride' || inferred === 'ride') mappedType = 'ride';
-          else if (rawType === 'swim' || inferred === 'swim') mappedType = 'swim';
-          else if (rawType === 'strength' || inferred === 'strength') mappedType = 'strength';
-          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : computeDurationMinutes(s.description);
-          const cleanedDesc = String(s.description||'').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi,'');
-          const guessKind = /interval/i.test(cleanedDesc) ? 'Intervals' : /tempo/i.test(cleanedDesc) ? 'Tempo' : /long/i.test(cleanedDesc) ? 'Long' : 'Session';
-          const derivedName = mappedType==='strength' ? 'Strength' : mappedType==='swim' ? 'Swim' : mappedType==='ride' ? 'Ride' : 'Run';
-          const row: any = { user_id: user.id, training_plan_id: planRow.id, template_id: planRow.id, week_number: weekNum, day_number: dow, date, type: mappedType, name: s.name || `${derivedName} ${guessKind}`.trim(), description: cleanedDesc, duration: durationVal, workout_status: 'planned', source: 'training_plan',
-            // Persist deterministic rendering data for normalizer
-            steps_preset: Array.isArray((s as any)?.steps_preset) ? (s as any).steps_preset : null,
-            export_hints: (libPlan?.template?.export_hints || null)
-          };
-          // Build swim intervals from steps[] so Garmin export works
-          if (mappedType === 'swim' && Array.isArray((s as any).steps) && (s as any).steps.length) {
-            const parseSwimPace = (p?: string|null): number | null => {
-              if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*100\s*(yd|m)/i); if (!m) return null; const mins = parseInt(m[1],10); const secs = parseInt(m[2],10); const unit = m[3].toLowerCase(); const total = mins*60+secs; const meters = unit==='yd'?100*0.9144:100; return total/meters; // sec per meter
-            };
-            const secPerMeter = parseSwimPace(swimPace100) ?? 2.0;
-            const defaultUnit = (libPlan?.template?.swim_unit || 'yd').toLowerCase();
-            const toMeters = (val: number, unit?: string) => ((unit||defaultUnit).toLowerCase()==='yd'? val*0.9144 : val);
-            const parseRest = (rest?: string) => {
-              if (!rest) return 0;
-              const t = String(rest).trim();
-              // Support "20s", "0:20", "1:00", "00:20"
-              const secOnly = t.match(/^(\d+)\s*s$/i);
-              if (secOnly) return parseInt(secOnly[1], 10);
-              const mmss = t.match(/^(\d{1,2}):(\d{2})$/);
-              if (mmss) return parseInt(mmss[1],10)*60 + parseInt(mmss[2],10);
-              return 0;
-            };
-            const steps = (s as any).steps as any[];
-            const intervals: any[] = [];
-            for (const step of steps) {
-              const repeat = Number(step.repeat || 1);
-              const distM = step.distance ? toMeters(Number(step.distance), step.unit) : 0;
-              const workSec = distM>0 ? Math.round(distM * secPerMeter) : 0;
-              for (let r = 0; r < Math.max(1, repeat); r += 1) {
-                if (distM>0) intervals.push({ distanceMeters: Math.round(distM), effortLabel: step.effort || step.stroke || 'Swim' });
-                const restSec = parseRest(step.rest); if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
-              }
-            }
-            if (intervals.length) row.intervals = intervals;
-          } else if (mappedType === 'swim' && !Array.isArray((s as any).steps)) {
-            // Auto-parse simple swim description patterns into intervals so swims without steps are Garmin-ready
-            const parseSwimPace = (p?: string|null): number | null => {
-              if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*100\s*(yd|m)/i); if (!m) return null; const mins = parseInt(m[1],10); const secs = parseInt(m[2],10); const unit = m[3].toLowerCase(); const total = mins*60+secs; const meters = unit==='yd'?100*0.9144:100; return total/meters;
-            };
-            const secPerMeter = parseSwimPace(swimPace100) ?? 2.0;
-            const defaultUnit = (libPlan?.template?.swim_unit || 'yd').toLowerCase();
-            const toMeters = (val: number, unit?: string) => ((unit||defaultUnit).toLowerCase()==='yd'? val*0.9144 : val);
-            const parseRest = (rest?: string) => {
-              if (!rest) return 0; const t = String(rest).trim(); const secOnly = t.match(/^(\d+)\s*s$/i); if (secOnly) return parseInt(secOnly[1],10); const mmss = t.match(/^(\d{1,2}):(\d{2})$/); if (mmss) return parseInt(mmss[1],10)*60 + parseInt(mmss[2],10); return 0;
-            };
-            const description = String(s.description||'');
-            // Split on commas and semicolons; derive segments
-            const parts = description.split(/[,;]+/).map(p => p.trim()).filter(Boolean);
-            const intervals: any[] = [];
-            for (const part of parts) {
-              // Match like "4x50 drill:catch-up /20s" or "2x100 pull /20s" or "200 easy"
-              const repDist = part.match(/^(\d+)x\s*(\d{2,4})\s*(yd|m)?/i);
-              const singleDist = part.match(/^(\d{2,4})\s*(yd|m)?/i);
-              const restMatch = part.match(/\/(\s*)?([0-9:]+)s?/i);
-              const restSec = restMatch ? ((): number => { const t = restMatch[2]; const mm = t.match(/^(\d{1,2}):(\d{2})$/); if (mm) return parseInt(mm[1],10)*60+parseInt(mm[2],10); const ss = t.match(/^(\d{1,3})$/); return ss ? parseInt(ss[1],10) : 0; })() : 0;
-              const label = /drill\s*:/.test(part) ? (part.match(/drill\s*:\s*([a-z\-]+)/i)?.[1] || 'Drill')
-                            : /pull/i.test(part) ? 'Pull'
-                            : /kick/i.test(part) ? 'Kick'
-                            : /easy/i.test(part) ? 'Easy'
-                            : 'Swim';
-              if (repDist) {
-                const repeat = parseInt(repDist[1],10);
-                const dist = parseInt(repDist[2],10);
-                const unit = (repDist[3] || defaultUnit) as string;
-                const distM = toMeters(dist, unit);
-                for (let r = 0; r < Math.max(1, repeat); r += 1) {
-                  if (distM>0) intervals.push({ distanceMeters: Math.round(distM), effortLabel: label });
-                  if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
-                }
-                continue;
-              }
-              if (singleDist) {
-                const dist = parseInt(singleDist[1],10);
-                const unit = (singleDist[2] || defaultUnit) as string;
-                const distM = toMeters(dist, unit);
-                if (distM>0) intervals.push({ distanceMeters: Math.round(distM), effortLabel: label });
-                if (restSec>0) intervals.push({ duration: restSec, effortLabel: 'Rest' });
-                continue;
-              }
-            }
-            if (intervals.length) row.intervals = intervals;
-          }
-          // Build basic RUN intervals for common patterns (e.g., 6x800m @ 7:43, 2min jog) with pace ranges
-          if (mappedType === 'run' && !row.intervals) {
-            const dtext = cleanedDesc;
-            const repsMeters = dtext.match(/(\d+)x\s*(\d{3,4})m/i);
-            const repsMiles = dtext.match(/(\d+)x\s*(\d+(?:\.\d+)?)\s*mi/i);
-            const paceMatch = dtext.match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
-            const restMin = dtext.match(/(\d+)\s*min\s*(?:jog|easy|rest)/i);
-            if ((repsMeters || repsMiles) && paceMatch) {
-              const unit = paceMatch[3].toLowerCase();
-              const baseSec = parseInt(paceMatch[1],10)*60 + parseInt(paceMatch[2],10);
-              const quality = /(interval|cruise|tempo|threshold)/i.test(dtext);
-              const tol = quality ? 0.04 : 0.06;
-              const minSec = Math.round(baseSec * (1 - tol));
-              const maxSec = Math.round(baseSec * (1 + tol));
-              const rangeStr = `${fmtPace(minSec, unit)}-${fmtPace(maxSec, unit)}`;
-              const intervals: any[] = [];
-              const reps = parseInt((repsMeters || repsMiles)![1], 10);
-              if (repsMeters) {
-                const metersEach = parseInt(repsMeters[2], 10);
-                for (let r=0; r<reps; r+=1) {
-                  intervals.push({ distanceMeters: metersEach, effortLabel: quality? 'Interval':'Run', paceTarget: rangeStr });
-                  if (restMin) intervals.push({ duration: parseInt(restMin[1],10)*60, effortLabel: 'Rest' });
-                }
-              } else if (repsMiles) {
-                const milesEach = parseFloat(repsMiles[2]);
-                const metersEach = Math.round(milesEach * 1609.34);
-                for (let r=0; r<reps; r+=1) {
-                  intervals.push({ distanceMeters: metersEach, effortLabel: quality? 'Interval':'Run', paceTarget: rangeStr });
-                  if (restMin) intervals.push({ duration: parseInt(restMin[1],10)*60, effortLabel: 'Rest' });
-                }
-              }
-              if (intervals.length) row.intervals = intervals;
-            }
-          }
-
-          // Strength: convert steps to structured intervals for Garmin Strength
-          if (mappedType === 'strength' && Array.isArray((s as any).steps) && (s as any).steps.length) {
-            const pn2 = baselines?.performanceNumbers || {};
-            const estimatedRow1RM = pn2.bench ? pn2.bench * 0.7 : undefined; // Row ≈ 70% of bench 1RM
-            const orm = { squat: pn2.squat, bench: pn2.bench, deadlift: pn2.deadlift, overhead: pn2.overheadPress1RM, row: estimatedRow1RM } as any;
-            const toSeconds = (t?: string) => { if (!t) return 0; const m = String(t).trim(); const sec = m.match(/^(\d+)\s*s$/i); if (sec) return parseInt(sec[1],10); const mmss = m.match(/^(\d{1,2}):(\d{2})$/); if (mmss) return parseInt(mmss[1],10)*60+parseInt(mmss[2],10); return 0; };
-            const round5 = (w: number) => Math.round(w/5)*5;
-            const exMap: Record<string,string> = {
-              bench_press: 'bench',
-              back_squat: 'squat',
-              deadlift: 'deadlift',
-              overhead_press: 'overhead',
-              ohp: 'overhead',
-              row: 'row',
-              barbell_row: 'row',
-              pendlay_row: 'row'
-            };
-            const steps = (s as any).steps as any[];
-            const intervals: any[] = [];
-            const strengthAgg: Record<string, { name: string; sets: number; reps: number; weight: number } > = {};
-            const formatName = (k: string) => k.replace(/_/g,' ').replace(/\b\w/g, (c) => c.toUpperCase());
-            for (const step of steps) {
-              const repeat = Math.max(1, Number(step.repeat||1));
-              if (String(step.type||'').toLowerCase()==='strength') {
-                const key = exMap[String(step.exercise||'').toLowerCase()] || '';
-                let weight = Number(step.target_weight||0);
-                if (!weight && Number(step.target_percent_1rm||0) > 0 && orm[key]) {
-                  weight = round5(orm[key] * Number(step.target_percent_1rm));
-                }
-                for (let r=0;r<repeat;r+=1) {
-                  intervals.push({ kind:'strength', exercise: String(step.exercise||'').toLowerCase(), reps: Number(step.reps||0), weight, note: step.note||undefined });
-                }
-                // Aggregate for logger prefill
-                const aggKey = String(step.exercise||'').toLowerCase();
-                const prev = strengthAgg[aggKey];
-                const repsNum = Number(step.reps||0);
-                if (prev) {
-                  prev.sets += repeat;
-                  // If weights differ across sets, keep the heavier one for display; user can edit per set
-                  if (weight > 0) prev.weight = Math.max(prev.weight, weight);
-                  if (repsNum > 0) prev.reps = repsNum; // keep latest reps spec
-                } else {
-                  strengthAgg[aggKey] = { name: formatName(aggKey), sets: repeat, reps: repsNum, weight: weight||0 };
-                }
-              } else if (String(step.type||'').toLowerCase()==='rest') {
-                const dur = toSeconds(step.duration);
-                for (let r=0;r<repeat;r+=1) {
-                  intervals.push({ kind:'rest', duration: dur, effortLabel: 'Rest' });
-                }
-              }
-            }
-            if (intervals.length) row.intervals = intervals;
-            // Emit strength_exercises for logger prepopulation
-            const strengthExercises = Object.values(strengthAgg);
-            if (strengthExercises.length) {
-              row.strength_exercises = strengthExercises.map(se => ({ name: se.name, sets: se.sets, reps: se.reps, weight: se.weight }));
-            }
-          }
-          if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
-          if (Array.isArray(s.intervals)) row.intervals = s.intervals;
-          if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
-          rows.push(row);
-        });
-      });
-      if (rows.length) {
-        // Ensure idempotency: remove any prior materialization for this plan/template, then insert fresh
-        await supabase.from('planned_workouts').delete().eq('training_plan_id', planRow.id);
-        await supabase.from('planned_workouts').delete().eq('template_id', planRow.id);
-
-        const { error: pwErr } = await supabase
-          .from('planned_workouts')
-          .insert(rows);
-        if (pwErr) {
-          const msg = String((pwErr as any)?.message || '');
-          if (msg.includes('planned_workouts_plan_fk')) {
-            const rowsNoLink = rows.map(r => ({ ...r, training_plan_id: null }));
-            const { error: pwErr2 } = await supabase
-              .from('planned_workouts')
-              .insert(rowsNoLink);
-            if (pwErr2) throw pwErr2;
-          } else {
-            throw pwErr;
-          }
+      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) {
+        const outWeek: any[] = [];
+        for (const s of sessions as any[]) {
+          let desc = String(s.description||'');
+          if (desc) desc = resolvePaces(desc);
+          if (desc) desc = resolveStrength(desc);
+          const isBikeText = /\b(bike|ride|cycling)\b/i.test(String(s.discipline||s.type||''));
+          if (desc && isBikeText) desc = mapBike(desc);
+          const copy = { ...s, description: desc };
+          outWeek.push(copy);
         }
+        (mapped.sessions_by_week as any)[wk] = outWeek;
       }
-      try { await refreshPlans?.(); } catch {}
-      // Navigate directly to Plans view focused on this plan
-      navigate('/', { state: { openPlans: true, focusPlanId: planRow.id } });
+      const payload = {
+        name: libPlan.name,
+        description: libPlan.description || '',
+        duration_weeks: mapped.duration_weeks,
+        current_week: 1,
+        status: 'active',
+        plan_type: 'catalog',
+        start_date: startDate,
+        config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id },
+        weeks: [],
+        sessions_by_week: mapped.sessions_by_week,
+        notes_by_week: mapped.notes_by_week || {},
+        export_hints: (libPlan?.export_hints || libPlan?.template?.export_hints || null)
+      } as any;
+
+      await addPlan(payload);
+      navigate('/', { state: { openPlans: true } });
     } catch (e: any) {
       setError(e?.message ? String(e.message) : JSON.stringify(e));
     }
