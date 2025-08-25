@@ -95,6 +95,28 @@ function estimateMinutesFromSteps(steps?: string[]): number {
   return total;
 }
 
+// Estimate duration from description like "4mi @ 7:30/mi"
+function estimateMinutesFromDescription(desc?: string): number {
+  if (!desc) return 0;
+  const s = desc.toLowerCase();
+  // distance in miles
+  let m = s.match(/(\d+(?:\.\d+)?)\s*mi[^\d]*(\d+):(\d{2})\s*\/\s*mi/);
+  if (m) {
+    const dist = parseFloat(m[1]);
+    const pace = parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+    return Math.round((dist * pace) / 60);
+  }
+  // distance in km
+  m = s.match(/(\d+(?:\.\d+)?)\s*km[^\d]*(\d+):(\d{2})\s*\/\s*km/);
+  if (m) {
+    const distKm = parseFloat(m[1]);
+    const paceSec = parseInt(m[2], 10) * 60 + parseInt(m[3], 10);
+    const minutes = (distKm * paceSec) / 60;
+    return Math.round(minutes);
+  }
+  return 0;
+}
+
 function capitalize(w?: string) { return w ? w.charAt(0).toUpperCase() + w.slice(1) : ''; }
 
 interface Plan {
@@ -337,7 +359,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const name = discipline === 'strength' ? 'Strength' : [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
               const stepsSummary = summarizeSteps((s as any).steps_preset);
               const estFromSteps = estimateMinutesFromSteps((s as any).steps_preset);
-              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (estFromSteps || extractMinutesFromText(rawDesc) || 0);
+              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (estFromSteps || estimateMinutesFromDescription(description) || extractMinutesFromText(rawDesc) || 0);
               const base = {
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
@@ -1279,15 +1301,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 onClick={() => handleWorkoutClick(workout)}
                                 className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
                               >
-                                <div className="flex items-center justify-between">
+                                <div className="flex items-start justify-between gap-3">
                                   <div className="flex-1">
-                                    <div className="font-medium">{workout.name}</div>
+                                    <div className="font-medium flex items-center gap-2">
+                                      <span>{workout.name}</span>
+                                      {typeof workout.duration === 'number' && (
+                                        <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">
+                                          {formatDuration(workout.duration)}
+                                        </span>
+                                      )}
+                                    </div>
                                     <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
-                                  </div>
-                                  <div className="text-xs text-gray-600">
-                                    {workout.intensity ? workout.intensity : ''}
-                                    {workout.intensity && typeof workout.duration === 'number' ? ' · ' : ''}
-                                    {typeof workout.duration === 'number' ? formatDuration(workout.duration) : ''}
                                   </div>
                                 </div>
                               </div>
