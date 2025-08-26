@@ -2,7 +2,7 @@ import React from 'react';
 import { Clock, Target, Dumbbell, MapPin, Info } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-
+import WorkoutDetailView from './WorkoutDetailView';
 
 export interface PlannedWorkout {
   id: string;
@@ -18,6 +18,8 @@ export interface PlannedWorkout {
   training_plan_id?: string;
   week_number?: number;
   day_number?: number;
+  computed?: any; // Computed data from plan baker
+  rendered_description?: string; // Rendered description from plan baker
 }
 
 interface PlannedWorkoutViewProps {
@@ -39,6 +41,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 }) => {
   const [friendlyDesc, setFriendlyDesc] = React.useState<string | undefined>(undefined);
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
+  
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
     return date.toLocaleDateString('en-US', {
@@ -65,7 +68,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       case 'ride': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
       case 'swim': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'strength': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'walk': return 'bg-green-100 text-green-800 border-green-200';
+      case 'walk': return 'bg-green-100 text-green-100 text-green-800 border-green-200';
       default: return 'bg-green-100 text-green-800 border-green-200';
     }
   };
@@ -89,11 +92,20 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     .trim();
 
   const estimateMinutesFromDescription = (desc?: string): number => {
-    if (!desc) return 0; const s = desc.toLowerCase();
+    if (!desc) return 0; 
+    const s = desc.toLowerCase();
     let m = s.match(/(\d+(?:\.\d+)?)\s*mi[^\d]*(\d+):(\d{2})\s*\/\s*mi/);
-    if (m) { const dist=parseFloat(m[1]); const pace=parseInt(m[2],10)*60+parseInt(m[3],10); return Math.round((dist*pace)/60); }
+    if (m) { 
+      const dist=parseFloat(m[1]); 
+      const pace=parseInt(m[2],10)*60+parseInt(m[3],10); 
+      return Math.round((dist*pace)/60); 
+    }
     m = s.match(/(\d+(?:\.\d+)?)\s*km[^\d]*(\d+):(\d{2})\s*\/\s*km/);
-    if (m) { const distKm=parseFloat(m[1]); const paceSec=parseInt(m[2],10)*60+parseInt(m[3],10); return Math.round((distKm*paceSec)/60); }
+    if (m) { 
+      const distKm=parseFloat(m[1]); 
+      const paceSec=parseInt(m[2],10)*60+parseInt(m[3],10); 
+      return Math.round((distKm*paceSec)/60); 
+    }
     return 0;
   };
 
@@ -193,7 +205,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           {getWorkoutTypeIcon(workout.type)}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm truncate" style={{ color: getDisciplineColor(workout.type) }}>{workout.name || (workout as any).focus || 'Planned Workout'}</h4>
+          <h4 className="font-medium text-sm truncate" style={{ color: getDisciplineColor(workout.type) }}>
+            {workout.name || (workout as any).focus || 'Planned Workout'}
+          </h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
             <span>{formatDate(workout.date)}</span>
             {workout.duration && (
@@ -217,7 +231,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <div className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-sm font-bold" style={{ color: getDisciplineColor(workout.type) }}>{getWorkoutTypeIcon(workout.type)}</div>
+              <div className="text-sm font-bold" style={{ color: getDisciplineColor(workout.type) }}>
+                {getWorkoutTypeIcon(workout.type)}
+              </div>
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
                   {workout.name || (workout as any).focus || 'Planned Workout'}
@@ -242,101 +258,24 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       )}
 
       <div className="space-y-4">
-        {/* Workout Structure Display */}
-        {/* Removed legacy top summary block per design request */}
-        
-        {workout.strength_exercises && workout.strength_exercises.length > 0 && (
-          <div className="border-l-2 border-blue-200 pl-4 py-2">
-            <h4 className="font-medium text-sm text-gray-700 mb-2">Exercises:</h4>
-            <div className="space-y-1">
-              {workout.strength_exercises.map((exercise: any, index: number) => (
-                <div key={index} className="text-xs text-gray-600">
-                  {exercise.name}: {exercise.sets}s × {exercise.reps}r @ {exercise.weight} lbs
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {/* Workout Type & Details */}
-        <div className="flex items-center gap-2 text-sm">
-          <Target className="h-4 w-4 text-blue-600" />
-          <span className="font-medium">{getWorkoutTypeLabel(workout.type)}</span>
-          {workout.training_plan_id && workout.week_number && workout.day_number && (
-            <span className="text-gray-500">
-              • Week {workout.week_number}, Day {workout.day_number}
-            </span>
-          )}
-        </div>
-
-        {/* Description */}
-        {(friendlyDesc || workout.description) && (
-          <div className="flex gap-2">
-            <Info className="h-4 w-4 text-gray-400 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-gray-600">{friendlyDesc || workout.description}</p>
-          </div>
-        )}
-
-        {/* Intervals (for run/ride/swim) */}
-        {workout.intervals && workout.intervals.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="font-medium text-sm flex items-center gap-2 text-gray-700">
-              <MapPin className="h-4 w-4 text-gray-500" />
-              Intervals
-            </h4>
-            <div className="space-y-2">
-              {workout.intervals.map((interval: any, index: number) => (
-                <div key={index} className="p-3 border-l-2 border-gray-200 pl-4">
-                  <div className="text-sm text-gray-900">
-                    {formatIntervalLine(interval, index)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Strength Exercises */}
-        {workout.strength_exercises && workout.strength_exercises.length > 0 && (
-          <div className="space-y-3">
-            <h4 className="font-medium text-sm flex items-center gap-2 text-gray-700">
-              <Dumbbell className="h-4 w-4 text-gray-500" />
-              Exercises
-            </h4>
-            <div className="space-y-2">
-              {workout.strength_exercises.map((exercise: any, index: number) => (
-                <div key={index} className="p-3 border-l-2 border-gray-200 pl-4">
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm text-gray-900">{exercise.name}</span>
-                    {exercise.weight && (
-                      <span className="text-xs text-gray-500 font-medium">
-                        {exercise.weight} lbs
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 mt-1 text-xs text-gray-600">
-                    {exercise.sets && (
-                      <span>{exercise.sets}s</span>
-                    )}
-                    {exercise.reps && (
-                      <span>{exercise.reps}r</span>
-                    )}
-                    {exercise.distance && (
-                      <span>{exercise.distance} {exercise.distanceUnit || 'm'}</span>
-                    )}
-                    {exercise.time && (
-                      <span>{exercise.time}</span>
-                    )}
-                  </div>
-                  {exercise.notes && (
-                    <div className="text-xs text-gray-500 mt-1 italic">
-                      {exercise.notes}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+        {/* Template System - No Fallbacks */}
+        <WorkoutDetailView
+          computed={workout.computed || { total_duration_seconds: 0, steps: [] }}
+          baselines={{
+            fiveK_pace_sec_per_mi: (workout as any).fiveK_pace_sec_per_mi,
+            easy_pace_sec_per_mi: (workout as any).easy_pace_sec_per_mi,
+            ftp: (workout as any).ftp,
+            swim_pace_per_100_sec: (workout as any).swim_pace_per_100_sec,
+            // Strength 1RMs
+            squat: (workout as any).squat,
+            bench: (workout as any).bench,
+            deadlift: (workout as any).deadlift,
+            overheadPress1RM: (workout as any).overheadPress1RM,
+            barbellRow: (workout as any).barbellRow
+          }}
+          workoutType={getWorkoutTypeLabel(workout.type)}
+          description={workout.rendered_description || workout.description}
+        />
 
         {/* Action Buttons */}
         {(onEdit || onComplete || onDelete || true) && (

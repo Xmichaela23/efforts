@@ -4,6 +4,7 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
+import WorkoutExecutionView from './WorkoutExecutionView';
 
 interface TodaysEffortProps {
   selectedDate?: string;
@@ -437,59 +438,70 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       : 'bg-white border border-gray-200'
                   }`}
                 >
-                  <div className="space-y-1">
-                    {/* Title and Duration Row */}
-                    <div className="flex items-center justify-between">
-                      <div className="font-medium text-sm" style={{ color: getDisciplineColor(workout.type) }}>
-                        {workout.name || getDisplaySport(workout)}
-                        {workout.workout_status === 'planned' && (
-                          <span className="text-xs ml-2" style={{ color: '#999' }}>(planned)</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2 text-xs">
-                        {/* status glyphs removed for cleaner layout */}
-                        <span className="text-muted-foreground">
+                  {workout.workout_status === 'planned' && workout.computed && workout.computed.steps && workout.computed.total_duration_seconds ? (
+                    <WorkoutExecutionView
+                      computed={workout.computed}
+                      baselines={baselines?.performanceNumbers || {}}
+                      workoutType={workout.name || getDisplaySport(workout)}
+                      description={workout.rendered_description || workout.description}
+                      showStatus={false}
+                      className="p-0"
+                    />
+                  ) : (
+                    <div className="space-y-1">
+                      {/* Title and Duration Row */}
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium text-sm" style={{ color: getDisciplineColor(workout.type) }}>
+                          {workout.name || getDisplaySport(workout)}
+                          {workout.workout_status === 'planned' && (
+                            <span className="text-xs ml-2" style={{ color: '#999' }}>(planned)</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          {/* status glyphs removed for cleaner layout */}
+                          <span className="text-muted-foreground">
+                            {(() => {
+                              const base = formatRichWorkoutDisplay(workout).duration;
+                              if (workout.workout_status !== 'planned') return base;
+                              // Prefer computed.total_duration_seconds if present
+                              try {
+                                const comp: any = (workout as any).computed || null;
+                                let secs: any = comp ? comp.total_duration_seconds : null;
+                                if (typeof secs === 'string') secs = parseInt(secs, 10);
+                                if (typeof secs === 'number' && isFinite(secs) && secs > 0) {
+                                  const mins = Math.round(secs / 60);
+                                  if (mins < 60) return `${mins}min`;
+                                  const h = Math.floor(mins / 60); const m = mins % 60;
+                                  return m ? `${h}h ${m}min` : `${h}h`;
+                                }
+                              } catch {}
+                              // Else compute via normalizer
+                              return base;
+                            })()}
+                          </span>
                           {(() => {
-                            const base = formatRichWorkoutDisplay(workout).duration;
-                            if (workout.workout_status !== 'planned') return base;
-                            // Prefer computed.total_duration_seconds if present
+                            // Show computed status chip
                             try {
                               const comp: any = (workout as any).computed || null;
-                              let secs: any = comp ? comp.total_duration_seconds : null;
-                              if (typeof secs === 'string') secs = parseInt(secs, 10);
-                              if (typeof secs === 'number' && isFinite(secs) && secs > 0) {
-                                const mins = Math.round(secs / 60);
-                                if (mins < 60) return `${mins}min`;
-                                const h = Math.floor(mins / 60); const m = mins % 60;
-                                return m ? `${h}h ${m}min` : `${h}h`;
-                              }
-                            } catch {}
-                            // Else compute via normalizer
-                            return base;
+                              const ok = comp && Number(comp.total_duration_seconds) > 0 && Array.isArray(comp.steps) && comp.steps.length > 0;
+                              return (
+                                <span className={`px-1.5 py-0.5 rounded border text-[10px] ${ok ? 'text-green-700 border-green-300 bg-green-50' : 'text-red-700 border-red-300 bg-red-50'}`}>
+                                  {ok ? 'v2 OK' : 'MISSING'}
+                                </span>
+                              );
+                            } catch { return null; }
                           })()}
-                        </span>
-                        {(() => {
-                          // Show computed status chip
-                          try {
-                            const comp: any = (workout as any).computed || null;
-                            const ok = comp && Number(comp.total_duration_seconds) > 0 && Array.isArray(comp.steps) && comp.steps.length > 0;
-                            return (
-                              <span className={`px-1.5 py-0.5 rounded border text-[10px] ${ok ? 'text-green-700 border-green-300 bg-green-50' : 'text-red-700 border-red-300 bg-red-50'}`}>
-                                {ok ? 'v2 OK' : 'MISSING'}
-                              </span>
-                            );
-                          } catch { return null; }
-                        })()}
+                        </div>
+                      </div>
+                      
+                      {/* Metrics Row */}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        {formatRichWorkoutDisplay(workout).metrics.map((metric, index) => (
+                          <span key={index}>{metric}</span>
+                        ))}
                       </div>
                     </div>
-                    
-                    {/* Metrics Row */}
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      {formatRichWorkoutDisplay(workout).metrics.map((metric, index) => (
-                        <span key={index}>{metric}</span>
-                      ))}
-                    </div>
-                  </div>
+                  )}
                 </button>
               ))}
             </div>

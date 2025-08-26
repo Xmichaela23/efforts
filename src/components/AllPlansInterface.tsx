@@ -10,6 +10,7 @@ import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
 import PlannedWorkoutView from './PlannedWorkoutView';
+import WorkoutSummaryView from './WorkoutSummaryView';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -690,9 +691,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   // Day View Rendering with Summary/Edit modes
   if (currentView === 'day' && selectedWorkout) {
     const intervals = selectedWorkout.intervals || [];
-    const strengthExercises = selectedWorkout.strength_exercises || [];
-    const isStrengthWorkout = selectedWorkout.type === 'strength' || strengthExercises.length > 0;
-    const totalTime = isStrengthWorkout ? 2400 : intervals.reduce((sum: number, interval: any) => sum + (interval.duration || 0), 0);
+    const totalTime = intervals.reduce((sum: number, interval: any) => sum + (interval.duration || 0), 0);
 
     // SUMMARY MODE - Clean workout overview
     if (workoutViewMode === 'summary') {
@@ -729,63 +728,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </div>
             </div>
 
-            {isStrengthWorkout && strengthExercises.length > 0 && (
-              <div className="space-y-6">
-                <div className="bg-gray-50 p-6 rounded-lg">
-                  <h2 className="text-xl font-semibold mb-4">Workout Overview</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <div className="text-2xl font-bold text-gray-900">{strengthExercises.length}</div>
-                      <div className="text-sm text-gray-600">Exercises</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {Math.round(strengthExercises.reduce((total: number, ex: any) => total + (ex.sets || 0), 0))}
-                      </div>
-                      <div className="text-sm text-gray-600">Total Sets</div>
-                    </div>
-                    <div>
-                      <div className="text-2xl font-bold text-gray-900">{formatTime(totalTime)}</div>
-                      <div className="text-sm text-gray-600">Estimated Time</div>
-                    </div>
-                  </div>
-                  {selectedWorkout.description && (
-                    <p className="text-gray-700 leading-relaxed">{selectedWorkout.description}</p>
-                  )}
-                </div>
 
-                <div>
-                  <h2 className="text-xl font-semibold mb-4">Exercises</h2>
-                  <div className="space-y-3">
-                    {strengthExercises.map((exercise: any, index: number) => (
-                      <div key={exercise.id || index} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                            <span className="text-sm font-medium text-gray-600">{index + 1}</span>
-                          </div>
-                          <div>
-                            <div className="font-medium text-gray-900">{exercise.name}</div>
-                            {exercise.note && (
-                              <div className="text-sm text-gray-600">{exercise.note}</div>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-medium text-gray-900">
-                            {exercise.sets} sets × {exercise.reps} reps
-                          </div>
-                          {exercise.weight && exercise.weight > 0 && (
-                            <div className="text-sm text-gray-600">{exercise.weight} lbs</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            )}
 
-            {!isStrengthWorkout && intervals.length > 0 && (
+            {intervals.length > 0 && (
               <div className="space-y-6">
                 <div className="bg-gray-50 p-6 rounded-lg">
                   <h2 className="text-xl font-semibold mb-4">Workout Overview</h2>
@@ -1359,19 +1304,34 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 onClick={() => handleWorkoutClick(workout)}
                                 className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
                               >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1">
-                                    <div className="font-medium flex items-center gap-2">
-                                      <span>{workout.name}</span>
-                                      {typeof workout.duration === 'number' && (
-                                        <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">
-                                          {formatDuration(workout.duration)}
-                                        </span>
-                                      )}
+                                {workout.computed && workout.computed.steps && workout.computed.total_duration_seconds ? (
+                                  <WorkoutSummaryView
+                                    computed={workout.computed}
+                                    baselines={{
+                                      fiveK_pace_sec_per_mi: (workout as any).fiveK_pace_sec_per_mi,
+                                      easy_pace_sec_per_mi: (workout as any).easy_pace_sec_per_mi,
+                                      ftp: (workout as any).ftp,
+                                      swim_pace_per_100_sec: (workout as any).swim_pace_per_100_sec
+                                    }}
+                                    workoutType={workout.name || 'Session'}
+                                    description={workout.rendered_description || workout.description}
+                                    compact={true}
+                                  />
+                                ) : (
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="flex-1">
+                                      <div className="font-medium flex items-center gap-2">
+                                        <span>{workout.name}</span>
+                                        {typeof workout.duration === 'number' && (
+                                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">
+                                            {formatDuration(workout.duration)}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
                                     </div>
-                                    <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
                                   </div>
-                                </div>
+                                )}
                               </div>
                             ))}
                           </div>
