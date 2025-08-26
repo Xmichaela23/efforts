@@ -562,6 +562,8 @@ const computeWorkout = (
           kind: (s.kind === "steady" ? "steady" : (s.kind as Exclude<SegmentKind, "repeat">)),
           ctrl: "time" as const,
           seconds: t,
+          original_val: s.val,
+          original_units: "sec",
           swim_pace_sec_per_100: base100 ?? undefined,
           swim_pace_range_per_100: base100 != null ? roundRange(base100 + add, 0.03) : undefined, // ±3% band
           label: s.label
@@ -581,6 +583,8 @@ const computeWorkout = (
           kind: (s.kind === "steady" ? "steady" : (s.kind as Exclude<SegmentKind, "repeat">)),
           ctrl: "distance" as const,
           seconds: sec,
+          original_val: s.val,
+          original_units: spec.units,
           swim_pace_sec_per_100: base100 ?? undefined,
           swim_pace_range_per_100: base100 != null ? roundRange(base100 + add, 0.03) : undefined,
           label: s.label
@@ -639,6 +643,8 @@ const computeWorkout = (
         kind: (s.kind === "steady" ? "steady" : (s.kind as Exclude<SegmentKind, "repeat">)),
         ctrl: "time" as const,
         seconds: t,
+        original_val: s.val,
+        original_units: "sec",
         pace_sec_per_mi: pace,
         pace_range: roundRange(pace, pct),
         label: s.label
@@ -658,6 +664,8 @@ const computeWorkout = (
         kind: (s.kind === "steady" ? "steady" : (s.kind as Exclude<SegmentKind, "repeat">)),
         ctrl: "distance" as const,
         seconds: Math.round(seconds),
+        original_val: s.val,
+        original_units: spec.units,
         pace_sec_per_mi: pace,
         pace_range: roundRange(pace, pct),
         label: s.label
