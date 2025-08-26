@@ -168,9 +168,24 @@ export default function PlanSelect() {
   const [longRunDay, setLongRunDay] = useState<string>('Sunday');
   const [longRideDay, setLongRideDay] = useState<string>('Saturday');
   const [showPreview, setShowPreview] = useState<boolean>(true);
+  const [baselines, setBaselines] = useState<any|null>(null);
   const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   const byDay = (a: any, b: any) => DAY_ORDER.indexOf(a.day) - DAY_ORDER.indexOf(b.day);
   const cleanDesc = (text: string) => String(text || '').replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '');
+
+  // Load user baselines when component mounts
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await loadUserBaselines?.();
+        setBaselines(b);
+        console.log('🔍 DEBUG - Loaded baselines on mount:', b);
+      } catch (e) {
+        console.error('🔍 DEBUG - Failed to load baselines:', e);
+        setBaselines(null);
+      }
+    })();
+  }, [loadUserBaselines]);
 
   useEffect(() => {
     (async () => {
@@ -202,10 +217,8 @@ export default function PlanSelect() {
     if (!libPlan) return;
     try {
       const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
-      let baselines: any = null;
-      try { baselines = await loadUserBaselines?.(); } catch {}
       
-      // DEBUG: Log what we got from loadUserBaselines
+      // Use baselines loaded on mount
       console.log('🔍 DEBUG - PlanSelect baselines:', baselines);
       console.log('🔍 DEBUG - baselines.performanceNumbers:', baselines?.performanceNumbers);
       console.log('🔍 DEBUG - performanceNumbers keys:', baselines?.performanceNumbers ? Object.keys(baselines.performanceNumbers) : 'null/undefined');
