@@ -334,15 +334,25 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           for (const w of mat) {
             const wk = w.week_number || 1;
             const dayName = numToDay[w.day_number as number] || w.day || '';
+            
+            // Prefer computed fields if available
+            const computed = w.computed || {};
+            const renderedDesc = w.rendered_description || w.description || '';
+            const totalSeconds = computed.total_duration_seconds;
+            const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof w.duration === 'number' ? w.duration : 0);
+            
             const workout = {
               id: w.id,
               name: w.name || 'Session',
               type: w.type,
-              description: resolveStrength(mapBike(resolvePaces(w.description || ''))),
-              duration: typeof w.duration === 'number' ? w.duration : 0,
+              description: renderedDesc || resolveStrength(mapBike(resolvePaces(w.description || ''))),
+              duration,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
               completed: false,
+              // Pass through computed data for PlannedWorkoutView
+              computed: computed,
+              rendered_description: renderedDesc,
             };
             byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
           }

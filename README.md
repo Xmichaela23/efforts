@@ -103,7 +103,26 @@ supabase functions list --project-ref yyriamwvtvzlkumqrvpm | cat
  - Plan JSON schema: `src/services/plans/contracts/universal_plan.schema.json`
  - Normalizer: `src/services/plans/normalizer.ts`
  - Plan Authoring: `PLAN_AUTHORING.md`
-  - Design Guidelines: `DESIGN_GUIDELINES.md`
+ - Design Guidelines: `DESIGN_GUIDELINES.md`
+
+## Plan baking details (no-CLI)
+
+- Translator: `src/services/plans/tools/plan_bake_and_compute.ts` (called by `PlanSelect.tsx`)
+- Inputs: plan JSON (`sessions_by_week`, optional `steps_preset`, `export_hints`) + user baselines
+- Outputs per session:
+  - `computed.steps`: flattened steps with duration seconds and target ranges
+  - `computed.total_seconds`: full workout duration (WU+main+CD)
+  - Friendly `rendered_description` (one‑liner) including primary range (pace/power/swim)
+- Baselines (required): `fiveK_pace_sec_per_mi`, `easy_pace_sec_per_mi`; optional `ftp`, `swim_pace_per_100_sec`, `tenK/mp`.
+- No silent fallbacks: missing baselines abort compute and log the failure.
+
+UI rendering
+- Today’s Effort and Planned Workout View prefer `rendered_description` and `computed.total_duration_seconds`.
+- If `computed` is missing for a tokened session, the card shows a “MISSING” indicator.
+
+Troubleshooting
+- Verify `planned_workouts` has `rendered_description text`, `computed jsonb`, `units text`.
+- Ensure RLS allows INSERT/UPDATE for the user.
 
 ---
 

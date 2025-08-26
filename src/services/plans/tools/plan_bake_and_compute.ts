@@ -79,6 +79,11 @@ type Plan = {
   export_hints?: Record<string, number>;
   sessions_by_week: Record<string, Session[]>;
   notes_by_week?: Record<string, string[]>;
+  computed_rollups?: {
+    perWeek: Record<string, { total_seconds: number; total_hmmss: string }>;
+    grand_total_seconds: number;
+    grand_total_hmmss: string;
+  };
 };
 
 // ====== Deterministic constants ======
@@ -170,7 +175,8 @@ const targetPace = (
   if (kind === "easy")    return easy;
   if (kind === "longrun") return easy * 0.97; // deterministic LR knob
   if (kind === "tempo") {
-    const base = baselines.fiveK_pace_sec_per_mi ?? easy / 0.90;
+    if (typeof baselines.fiveK_pace_sec_per_mi !== 'number') throw new Error('fiveK pace missing');
+    const base = baselines.fiveK_pace_sec_per_mi;
     const offset = targets.target_pace_sec_per_mi_offset_from_fiveK ?? 45; // default tempo = 5K + 45s/mi
     return base + offset;
   }
@@ -342,6 +348,58 @@ const PRESET_MAP: Record<string, Step[]> = {
       { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
     ]}
   ],
+  
+  // Additional cruise tokens found in plans
+  "3200m_cruise_or_3min": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 2.0, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
+  "4000m_cruise_or_3min": [
+    { kind: "repeat", times: 3, of: [
+      { kind: "work", ctrl: "distance", val: 2.5, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
+  "4800m_cruise_or_3min": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 3.0, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
+  "1600m_5k_eq_or_2min": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
+    ]}
+  ],
+  
+  // Additional interval tokens found in plans
+  "200m_3k_eq_jog": [
+    { kind: "repeat", times: 8, of: [
+      { kind: "work", ctrl: "distance", val: 0.125, intensity: "target" },
+      { kind: "recovery", ctrl: "distance", val: 0.125, intensity: "easy" }
+    ]}
+  ],
+  "400m_5k_eq_jog": [
+    { kind: "repeat", times: 6, of: [
+      { kind: "work", ctrl: "distance", val: 0.25, intensity: "target" },
+      { kind: "recovery", ctrl: "distance", val: 0.25, intensity: "easy" }
+    ]}
+  ],
+  "800m_10k_eq_or_2min": [
+    { kind: "repeat", times: 5, of: [
+      { kind: "work", ctrl: "distance", val: 0.5, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
+    ]}
+  ],
+  "1mi_thr_3to4min": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 210, intensity: "easy" } // 3.5 min midpoint
+    ]}
+  ],
 
   // --- STRIDES / SPEED DRILLS (RUN) ---
   "strides_6x20s": [
@@ -469,7 +527,49 @@ const PRESET_MAP: Record<string, Step[]> = {
   // --- Generic endurance shorthand used in descriptions ---
   "END_120min": [{ kind: "steady", ctrl: "time", val: 120 * 60, intensity: "easy", label: "Z2" }],
   "END_150min": [{ kind: "steady", ctrl: "time", val: 150 * 60, intensity: "easy", label: "Z2" }],
-  "END_180min": [{ kind: "steady", ctrl: "time", val: 180 * 60, intensity: "easy", label: "Z2" }]
+  "END_180min": [{ kind: "steady", ctrl: "time", val: 180 * 60, intensity: "easy", label: "Z2" }],
+
+  // --- SWIM ---
+  "swim_warmup_200yd_easy": [{ kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "WU" }],
+  "swim_warmup_300yd_easy": [{ kind: "steady", ctrl: "distance", val: 300, intensity: "easy", label: "WU" }],
+  "swim_cooldown_200yd_easy": [{ kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "CD" }],
+  
+  "swim_endurance_1500yd_easy": [{ kind: "steady", ctrl: "distance", val: 1500, intensity: "easy", label: "endurance" }],
+  "swim_endurance_2000yd_easy": [{ kind: "steady", ctrl: "distance", val: 2000, intensity: "easy", label: "endurance" }],
+  
+  "swim_intervals_6x100yd_threshold_R30s": [
+    { kind: "repeat", times: 6, of: [
+      { kind: "work", ctrl: "distance", val: 100, intensity: "target", label: "threshold" },
+      { kind: "recovery", ctrl: "time", val: 30, intensity: "easy", label: "rest" }
+    ]}
+  ],
+  "swim_intervals_8x50yd_vo2_R20s": [
+    { kind: "repeat", times: 8, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "target", label: "VO2" },
+      { kind: "recovery", ctrl: "time", val: 20, intensity: "easy", label: "rest" }
+    ]}
+  ],
+  
+  "swim_drills_4x50yd_catchup": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "catch-up drill" }
+    ]}
+  ],
+  "swim_drills_4x50yd_singlearm": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "single arm drill" }
+    ]}
+  ],
+  "swim_drills_4x50yd_scull": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "sculling drill" }
+    ]}
+  ],
+  "swim_drills_4x50yd_kick": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "kick drill" }
+    ]}
+  ]
 };
 
 // === CURSOR PATCH FIXES ===
@@ -763,7 +863,9 @@ function augmentPlan(plan: Plan): Plan {
     });
   }
 
-  return { ...plan, baselines_template: bakedBaselines, tolerances, sessions_by_week: newSessionsByWeek };
+  const augmented = { ...plan, baselines_template: bakedBaselines, tolerances, sessions_by_week: newSessionsByWeek };
+  const computed_rollups = formatPlanRollups(augmented);
+  return { ...augmented, computed_rollups };
 }
 
 // ====== Optional: weekly/plan rollups (helpful in UIs) ======

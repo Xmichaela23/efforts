@@ -182,6 +182,21 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
       return;
     }
 
+    // Compute stream-based max cadence for runs/walks to match Strava UI
+    try {
+      const streams = await fetchStravaStreamsData(activityId, accessToken);
+      if (streams && streams.cadence && streams.cadence.length > 0) {
+        const cad = (streams.cadence as number[]).filter((v) => Number.isFinite(v));
+        if (cad.length > 0) {
+          let peak = Math.round(Math.max(...cad));
+          const sport = (activityData.sport_type || activityData.type || '').toLowerCase();
+          const isRunWalkUpd = sport.includes('run') || sport.includes('walk');
+          if (isRunWalkUpd && peak < 120) peak = peak * 2; // normalize to steps/min
+          (activityData as any).max_cadence = peak;
+        }
+      }
+    } catch { /* ignore stream failures */ }
+
     // Update the stored activity
     await updateStravaActivity(activityId, userId, activityData);
     
@@ -418,6 +433,8 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
     // Try to enrich with streams
     let gps_track: any[] | null = null;
     let sensor_data: any[] | null = null;
+    let cadAvgComputed: number | null = null;
+    let cadMaxComputed: number | null = null;
     try {
       const token = (await supabase.from('device_connections').select('connection_data').eq('user_id', userId).eq('provider', 'strava').single()).data?.connection_data?.access_token;
       if (token) {
@@ -443,9 +460,63 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
               return { heartRate: streams.heartrate![i], startTimeInSeconds: t, timestamp: t * 1000 };
             });
           }
+
+          // Cadence stream → compute avg/max and best-5s window for runs
+          if (streams.cadence && streams.cadence.length > 0) {
+            const cadArray = (streams.cadence as number[]).filter((v) => Number.isFinite(v));
+            if (cadArray.length > 0) {
+              const cMax = Math.round(Math.max(...cadArray));
+              const cAvg = Math.round(cadArray.reduce((a, b) => a + b, 0) / cadArray.length);
+              cadMaxComputed = cMax; cadAvgComputed = cAvg;
+
+              // For run/walk, compute a best-5s average cadence window using stream time
+              const sport = (activityData.sport_type || activityData.type || '').toLowerCase();
+              const isRunWalkStream = sport.includes('run') || sport.includes('walk');
+              if (isRunWalkStream && streams.time && streams.time.length === (streams.cadence as number[]).length) {
+                const times = streams.time as number[]; // seconds
+                const windowSec = 5;
+                let start = 0;
+                let sum = 0;
+                let bestAvg = 0;
+                for (let i = 0; i < cadArray.length; i++) {
+                  sum += cadArray[i];
+                  while (times[i] - times[start] > windowSec && start < i) {
+                    sum -= cadArray[start];
+                    start++;
+                  }
+                  const len = i - start + 1;
+                  if (len > 0) {
+                    const avgWin = sum / len;
+                    if (avgWin > bestAvg) bestAvg = avgWin;
+                  }
+                }
+                // We keep cadMaxComputed as the true peak sample to match Strava UI; best-5s is available if we ever need smoothing
+              }
+              // annotate sensor_data when present
+              if (sensor_data && streams.time && streams.time.length > 0) {
+                const useLen = Math.min(sensor_data.length, streams.cadence.length, streams.time.length);
+                for (let i = 0; i < useLen; i++) {
+                  const cv = streams.cadence[i];
+                  if (Number.isFinite(cv)) {
+                    sensor_data[i].cadence = Math.round(cv as number);
+                  }
+                }
+              }
+            }
+          }
         }
       }
     } catch {}
+
+    // Normalize cadence to steps/min for runs/walks
+    const sportLower = (activityData.sport_type || activityData.type || '').toLowerCase();
+    const isRunWalk = sportLower.includes('run') || sportLower.includes('walk');
+    let avgCadNorm = Number.isFinite(activityData.average_cadence) ? Math.round(activityData.average_cadence) : (cadAvgComputed != null ? cadAvgComputed : null);
+    let maxCadNorm = Number.isFinite(activityData.max_cadence) ? Math.round(activityData.max_cadence) : (cadMaxComputed != null ? cadMaxComputed : null);
+    if (isRunWalk) {
+      if (avgCadNorm != null && avgCadNorm < 120) avgCadNorm = avgCadNorm * 2;
+      if (maxCadNorm != null && maxCadNorm < 120) maxCadNorm = maxCadNorm * 2;
+    }
 
     const row: any = {
       user_id: userId,
@@ -471,23 +542,23 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       // Parity fields using existing columns
       moving_time: activityData.moving_time != null ? Math.round(activityData.moving_time / 60) : null,
       elapsed_time: activityData.elapsed_time != null ? Math.round(activityData.elapsed_time / 60) : null,
-      elevation_gain: activityData.total_elevation_gain ?? null,
-      avg_heart_rate: activityData.average_heartrate ?? null,
-      max_heart_rate: activityData.max_heartrate ?? null,
-      avg_cadence: activityData.average_cadence ?? null,
-      max_cadence: activityData.max_cadence ?? null,
-      avg_temperature: activityData.average_temp ?? null,
-      max_temperature: (activityData as any).max_temp ?? null,
-      calories: activityData.calories ?? null,
+      elevation_gain: Number.isFinite(activityData.total_elevation_gain) ? Math.round(activityData.total_elevation_gain) : null,
+      avg_heart_rate: Number.isFinite(activityData.average_heartrate) ? Math.round(activityData.average_heartrate) : null,
+      max_heart_rate: Number.isFinite(activityData.max_heartrate) ? Math.round(activityData.max_heartrate) : null,
+      avg_cadence: avgCadNorm,
+      max_cadence: maxCadNorm,
+      avg_temperature: Number.isFinite((activityData as any).average_temp) ? Math.round((activityData as any).average_temp) : null,
+      max_temperature: Number.isFinite((activityData as any).max_temp) ? Math.round((activityData as any).max_temp) : null,
+      calories: Number.isFinite(activityData.calories) ? Math.round(activityData.calories) : null,
       avg_speed: activityData.average_speed != null ? Number((activityData.average_speed * 3.6).toFixed(2)) : null,
       max_speed: activityData.max_speed != null ? Number((activityData.max_speed * 3.6).toFixed(2)) : null,
       // pace (sec/km)
       avg_pace: activityData.average_speed && activityData.average_speed > 0 ? Math.round(1000 / activityData.average_speed) : null,
       max_pace: activityData.max_speed && activityData.max_speed > 0 ? Math.round(1000 / activityData.max_speed) : null,
       // power
-      avg_power: (activityData as any).average_watts ?? null,
-      max_power: (activityData as any).max_watts ?? null,
-      normalized_power: (activityData as any).weighted_average_watts ?? null,
+      avg_power: Number.isFinite((activityData as any).average_watts) ? Math.round((activityData as any).average_watts) : null,
+      max_power: Number.isFinite((activityData as any).max_watts) ? Math.round((activityData as any).max_watts) : null,
+      normalized_power: Number.isFinite((activityData as any).weighted_average_watts) ? Math.round((activityData as any).weighted_average_watts) : null,
       provider_sport: activityData.sport_type || activityData.type || null,
     };
 
@@ -519,6 +590,8 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
     const distance_meters = Number.isFinite(activityData.distance) ? Number(activityData.distance) : null;
     const distance_km = distance_meters != null ? Number((distance_meters / 1000).toFixed(3)) : null;
 
+    const sportLower2 = (activityData.sport_type || activityData.type || '').toLowerCase();
+    const isRunWalk2 = sportLower2.includes('run') || sportLower2.includes('walk');
     const workoutData = {
       name: activityData.name || 'Strava Activity',
       duration: Math.max(0, Math.round((activityData.moving_time || 0) / 60)),
@@ -526,27 +599,27 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
       description: `Updated from Strava: ${activityData.name || ''}`.trim(),
       workout_status: 'completed',
       updated_at: new Date().toISOString(),
-      timestamp,
+      timestamp: new Date(activityData.start_date || activityData.start_date_local || Date.now()).toISOString(),
       is_strava_imported: true,
       gps_trackpoints: activityData.map?.polyline || activityData.map?.summary_polyline || null,
       // Parity fields using existing columns
       moving_time: activityData.moving_time != null ? Math.round(activityData.moving_time / 60) : null,
       elapsed_time: activityData.elapsed_time != null ? Math.round(activityData.elapsed_time / 60) : null,
-      elevation_gain: activityData.total_elevation_gain ?? null,
-      avg_heart_rate: activityData.average_heartrate ?? null,
-      max_heart_rate: activityData.max_heartrate ?? null,
-      avg_cadence: activityData.average_cadence ?? null,
-      max_cadence: activityData.max_cadence ?? null,
-      avg_temperature: activityData.average_temp ?? null,
-      max_temperature: (activityData as any).max_temp ?? null,
-      calories: activityData.calories ?? null,
+      elevation_gain: Number.isFinite(activityData.total_elevation_gain) ? Math.round(activityData.total_elevation_gain) : null,
+      avg_heart_rate: Number.isFinite(activityData.average_heartrate) ? Math.round(activityData.average_heartrate) : null,
+      max_heart_rate: Number.isFinite(activityData.max_heartrate) ? Math.round(activityData.max_heartrate) : null,
+      avg_cadence: (() => { let v = Number.isFinite(activityData.average_cadence) ? Math.round(activityData.average_cadence) : null; if (isRunWalk2 && v != null && v < 120) v = v * 2; return v; })(),
+      max_cadence: (() => { let v = Number.isFinite(activityData.max_cadence) ? Math.round(activityData.max_cadence) : null; if (isRunWalk2 && v != null && v < 120) v = v * 2; return v; })(),
+      avg_temperature: Number.isFinite((activityData as any).average_temp) ? Math.round((activityData as any).average_temp) : null,
+      max_temperature: Number.isFinite((activityData as any).max_temp) ? Math.round((activityData as any).max_temp) : null,
+      calories: Number.isFinite(activityData.calories) ? Math.round(activityData.calories) : null,
       avg_speed: activityData.average_speed != null ? Number((activityData.average_speed * 3.6).toFixed(2)) : null,
       max_speed: activityData.max_speed != null ? Number((activityData.max_speed * 3.6).toFixed(2)) : null,
       avg_pace: activityData.average_speed && activityData.average_speed > 0 ? Math.round(1000 / activityData.average_speed) : null,
       max_pace: activityData.max_speed && activityData.max_speed > 0 ? Math.round(1000 / activityData.max_speed) : null,
-      avg_power: (activityData as any).average_watts ?? null,
-      max_power: (activityData as any).max_watts ?? null,
-      normalized_power: (activityData as any).weighted_average_watts ?? null,
+      avg_power: Number.isFinite((activityData as any).average_watts) ? Math.round((activityData as any).average_watts) : null,
+      max_power: Number.isFinite((activityData as any).max_watts) ? Math.round((activityData as any).max_watts) : null,
+      normalized_power: Number.isFinite((activityData as any).weighted_average_watts) ? Math.round((activityData as any).weighted_average_watts) : null,
       provider_sport: activityData.sport_type || activityData.type || null,
     } as any;
 
