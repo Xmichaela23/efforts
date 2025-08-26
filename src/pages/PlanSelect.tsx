@@ -367,13 +367,19 @@ export default function PlanSelect() {
       // --- Translate with deterministic baker at import-time ---
       const toSecPerMi = (pace: string | null | undefined): number | null => {
         if (!pace) return null;
-        const m = String(pace).match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
-        if (!m) return null;
-        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-        const unit = m[3].toLowerCase();
-        if (unit === 'mi') return sec;
-        if (unit === 'km') return Math.round(sec * 1.60934);
-        return sec;
+        const txt = String(pace).trim();
+        // Accept 7:43, 7:43/mi, 4:45/km
+        let m = txt.match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
+        if (m) {
+          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+          const unit = m[3].toLowerCase();
+          if (unit === 'mi') return sec;
+          if (unit === 'km') return Math.round(sec * 1.60934);
+          return sec;
+        }
+        m = txt.match(/^(\d+):(\d{2})$/); // no unit → assume /mi
+        if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
+        return null;
       };
 
       const baselinesTemplate = {
@@ -469,20 +475,20 @@ export default function PlanSelect() {
             computedSteps = bakedSess.computed.steps;
             // Enhance rendered text with primary range if missing
             try {
-              const hasAt = /@\s*\d+:\d{2}/.test(rendered || '') || /target\s+\d+/.test(rendered || '');
+              const hasAt = /@\s*\d+:\d{2}/.test(rendered || '') || /target\s+\d+/.test(rendered || '') || /\(\d+:\d{2}\/.test(rendered || '');
               const secTo = (s: number) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
               const addRun = () => {
                 const st = (computedSteps || []).find((st: any) => st.pace_sec_per_mi && (st.kind==='work' || st.intensity==='tempo'));
                 if (!st) return;
                 const base = `${secTo(st.pace_sec_per_mi!)}/mi`;
                 const rng = st.pace_range ? ` (${secTo(st.pace_range.lower)}/mi–${secTo(st.pace_range.upper)}/mi)` : '';
-                if (!hasAt) rendered = `${rendered} @ ${base}${rng}`.trim();
+                if (!hasAt) rendered = `${rendered} @ ${base}${rng}`.replace(/\s+/g,' ').trim();
               };
               const addBike = () => {
                 const st = (computedSteps || []).find((st: any) => typeof st.target_watts === 'number' || st.power_range);
                 if (!st) return;
                 const rng = st.power_range ? `${st.power_range.lower}–${st.power_range.upper} W` : `${st.target_watts} W`;
-                if (!hasAt) rendered = `${rendered} — target ${rng}`.trim();
+                if (!hasAt) rendered = `${rendered} — target ${rng}`.replace(/\s+/g,' ').trim();
               };
               const addSwim = () => {
                 const st = (computedSteps || []).find((st: any) => typeof st.swim_pace_sec_per_100 === 'number' || st.swim_pace_range_per_100);
@@ -490,18 +496,60 @@ export default function PlanSelect() {
                 const unit = (String((libPlan?.template?.swim_unit)||'yd').toLowerCase()==='m') ? '100m' : '100yd';
                 const base = typeof st.swim_pace_sec_per_100==='number' ? secTo(st.swim_pace_sec_per_100) : undefined;
                 const rng = st.swim_pace_range_per_100 ? ` (${secTo(st.swim_pace_range_per_100.lower)}–${secTo(st.swim_pace_range_per_100.upper)}/${unit})` : (base?`/${unit}`:'');
-                if (!hasAt && (base || rng)) rendered = `${rendered} @ ${base || ''}${rng}`.trim();
+                if (!hasAt && (base || rng)) rendered = `${rendered} @ ${base || ''}${rng}`.replace(/\s+/g,' ').trim();
               };
               if (mappedType==='run') addRun();
               else if (mappedType==='ride') addBike();
               else if (mappedType==='swim') addSwim();
             } catch {}
-          } else {
-            // Fallback to legacy normalizer if baker couldn't compute
+
+            // If we have concrete steps, synthesize a friendly structure summary deterministically
             try {
-              const norm = normalizePlannedSession(s, { performanceNumbers: baselines?.performanceNumbers as any }, payload.export_hints || {});
-              if (norm?.friendlySummary) rendered = norm.friendlySummary;
-              if (typeof norm?.durationMinutes === 'number') totalSeconds = Math.max(0, Math.round(norm.durationMinutes * 60));
+              if (Array.isArray(computedSteps) && computedSteps.length > 0) {
+                const secTo = (s: number) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+                const parts: string[] = [];
+                // WU
+                const wu = computedSteps.find((st:any)=>st.label==='WU' && st.ctrl==='time');
+                if (wu) parts.push(`Warm‑up ${Math.round(wu.seconds/60)}min`);
+                // Main reps: group identical work reps
+                const works = computedSteps.filter((st:any)=>st.kind==='work');
+                if (works.length) {
+                  // pick distance-controlled pattern
+                  const dw = works.find((w:any)=>w.ctrl==='distance');
+                  if (dw) {
+                    const count = works.filter((w:any)=>w.ctrl==='distance' && Math.abs(w.seconds-dw.seconds)<2).length;
+                    const meters = Math.round((dw.original_units==='m' || dw.original_units==='yd') ? (dw.original_units==='m'? dw.original_val : dw.original_val*0.9144) : (dw.original_val*1609.34));
+                    const show = meters >= 200 ? `${Math.round(meters/100)*100} m` : `${dw.original_val} mi`;
+                    const base = dw.pace_sec_per_mi ? `${secTo(dw.pace_sec_per_mi)}/mi` : '';
+                    const rng = dw.pace_range ? ` (${secTo(dw.pace_range.lower)}/mi–${secTo(dw.pace_range.upper)}/mi)` : '';
+                    parts.push(`${count} × ${show}${base?` @ ${base}`:''}${rng}`.trim());
+                  } else {
+                    // time-controlled work
+                    const tw = works[0];
+                    const count = works.filter((w:any)=>w.ctrl==='time' && Math.abs(w.seconds-tw.seconds)<2).length;
+                    const base = typeof tw.pace_sec_per_mi==='number' ? `${secTo(tw.pace_sec_per_mi)}/mi` : '';
+                    parts.push(`${count} × ${Math.round(tw.seconds/60)} min${base?` @ ${base}`:''}`.trim());
+                  }
+                }
+                // CD
+                const cd = computedSteps.find((st:any)=>st.label==='CD' && st.ctrl==='time');
+                if (cd) parts.push(`Cool‑down ${Math.round(cd.seconds/60)}min`);
+                if (parts.length) rendered = parts.join(' • ');
+              }
+            } catch {}
+          } else {
+            // No computed → keep authored description; do not invent ranges
+            try {
+              // Surface a hard signal so we can see which sessions failed to compute
+              // eslint-disable-next-line no-console
+              console.error('[baker] Missing computed for session', {
+                week: wkKey,
+                index: idx,
+                discipline: mappedType,
+                tokens: Array.isArray(s?.steps_preset) ? s.steps_preset : [],
+                description: s.description || '',
+                baselinesTemplate
+              });
             } catch {}
           }
 

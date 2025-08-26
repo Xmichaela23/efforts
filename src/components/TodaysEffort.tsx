@@ -108,77 +108,43 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // PLANNED: Prefer precomputed friendly text if present
         const storedText = (workout as any).rendered_description;
         if (typeof storedText === 'string' && storedText.trim().length > 0) {
+          // If stored text lacks target info, append from computed
+          try {
+            const comp: any = (workout as any).computed || {};
+            const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
+            const hasTarget = /@\s*\d+:\d{2}|target\s+\d+|\(\d+:\d{2}\//.test(storedText);
+            if (!hasTarget && steps.length) {
+              const secTo = (s: number) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+              let suffix = '';
+              if (workout.type === 'run') {
+                const st = steps.find(s => typeof s.pace_sec_per_mi==='number' && (s.kind==='work' || s.intensity==='tempo'));
+                if (st) {
+                  const base = `${secTo(st.pace_sec_per_mi)}/mi`;
+                  const rng = st.pace_range ? ` (${secTo(st.pace_range.lower)}/mi–${secTo(st.pace_range.upper)}/mi)` : '';
+                  suffix = ` @ ${base}${rng}`;
+                }
+              } else if (workout.type === 'ride') {
+                const st = steps.find(s => typeof s.target_watts==='number' || s.power_range);
+                if (st) {
+                  const rng = st.power_range ? `${st.power_range.lower}–${st.power_range.upper} W` : `${st.target_watts} W`;
+                  suffix = ` — target ${rng}`;
+                }
+              } else if (workout.type === 'swim') {
+                const st = steps.find(s => typeof s.swim_pace_sec_per_100==='number' || s.swim_pace_range_per_100);
+                if (st) {
+                  const unit = '100yd';
+                  const base = typeof st.swim_pace_sec_per_100==='number' ? secTo(st.swim_pace_sec_per_100) : undefined;
+                  const rng = st.swim_pace_range_per_100 ? ` (${secTo(st.swim_pace_range_per_100.lower)}–${secTo(st.swim_pace_range_per_100.upper)}/${unit})` : (base?`/${unit}`:'');
+                  suffix = ` @ ${base || ''}${rng}`;
+                }
+              }
+              if (suffix) return [truncate((storedText + ' ' + suffix).replace(/\s+/g,' ').trim(), 200)];
+            }
+          } catch {}
           return [truncate(storedText, 200)];
         }
-        // Otherwise compute via normalizer (fallback to cleaned description)
-        try {
-          // Prefer row-level export_hints/steps_preset; fall back to plan-level hints
-          const hints = (workout as any).export_hints || detailedPlans?.[workout.training_plan_id]?.export_hints || {};
-          const session = {
-            steps_preset: Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
-            description: workout.description || ''
-          };
-          const n = normalizePlannedSession(session, baselines || {}, hints);
-          if (n.friendlySummary && n.friendlySummary.length > 0) {
-            return [truncate(n.friendlySummary, 200)];
-          }
-          // Fallback from steps_preset if normalizer returns empty
-          const steps: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-          if (steps.length > 0) {
-            const lower = steps.map(s=>String(s||'').toLowerCase());
-            const wu = lower.find(t=>t.startsWith('warmup')) || '';
-            const cd = lower.find(t=>t.startsWith('cooldown')) || '';
-            const wz = (wu.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/) || [,''])[1];
-            const cz = (cd.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/) || [,''])[1];
-            const tokenStr = lower.join(' ');
-            const im = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_(\w+?)(?:_r(\d+(?:-\d+)?)min)?/i);
-            let mid = '';
-            if (im) {
-              const reps = parseInt(im[1],10);
-              const per = im[2];
-              const unit = im[3].toLowerCase();
-              const tag = im[4];
-              const tol = (hints?.pace_tolerance_quality ?? 0.04);
-              const pn: any = baselines?.performanceNumbers || {};
-              const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || '';
-              const easy = pn.easyPace || '';
-              const base = tag.includes('5k') ? fiveK : tag.includes('easy') ? easy : '';
-              const paceRange = (p: string, t: number): string => {
-                const m = String(p||'').match(/(\d+):(\d{2})\/(mi|km)/i);
-                if (!m) return p;
-                const sec = parseInt(m[1],10)*60+parseInt(m[2],10);
-                const u = m[3];
-                const fmt = (s:number)=>{ const mm=Math.floor(s/60), ss=s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
-                return `${fmt(Math.round(sec*(1-t)))}–${fmt(Math.round(sec*(1+t)))}`;
-              };
-              const pr = base ? paceRange(String(base), tol) : '';
-              const rest = im[5] ? im[5].replace('-', '–') : '';
-              mid = `${reps} × ${per} ${unit} ${base ? `@ ${pr}` : ''}${rest ? ` w/ ${rest} jog` : ''}`.trim();
-            }
-            const pieces = [wz ? `Warm‑up ${wz}` : '', mid, cz ? `Cool‑down ${cz}` : ''].filter(Boolean);
-            if (pieces.length) return [truncate(pieces.join(' • '), 200)];
-          }
-          // Final fallback: cleaned description (strip codes and leading labels)
-          const cleaned = (workout.description || '')
-            .replace(/\[[^\]]*\]/g, '')
-            .replace(/^\s*(intervals?|tempo|cruise)\s*:\s*/i,'')
-            .trim();
-          return [truncate(cleaned, 200)];
-        } catch {
-          const replaceTokens = (txt: string): string => {
-            try {
-              const pn: any = baselines?.performanceNumbers || {};
-              const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || '';
-              const easy = pn.easyPace || '';
-              let out = String(txt || '');
-              if (fiveK) out = out.replace(/\{5k_pace\}/gi, String(fiveK));
-              if (easy) out = out.replace(/\{easy_pace\}/gi, String(easy));
-              return out;
-            } catch { return txt; }
-          };
-          const full = replaceTokens((workout.description || '').replace(/\[[^\]]*\]/g, '').replace(/^\s*(intervals?|tempo|cruise)\s*:\s*/i,'').trim()) || 'Planned workout';
-          return [truncate(full, 200)];
-        }
+        // No stored text → do not synthesize from fallbacks anymore
+        return [truncate(stripCodes(workout.description || ''), 200)];
       }
       
       // COMPLETED: Show actual metrics
@@ -493,24 +459,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               }
                             } catch {}
                             // Else compute via normalizer
-                            try {
-                              const hints = (workout as any).export_hints || detailedPlans?.[workout.training_plan_id]?.export_hints || {};
-                              const session = {
-                                steps_preset: Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
-                                description: workout.description || ''
-                              };
-                              const n = normalizePlannedSession(session, baselines || {}, hints);
-                              const mins = Number.isFinite(n.durationMinutes) && n.durationMinutes > 0 ? n.durationMinutes : null;
-                              if (!mins) return base;
-                              if (mins < 60) return `${mins}min`;
-                              const h = Math.floor(mins / 60);
-                              const m = mins % 60;
-                              return m ? `${h}h ${m}min` : `${h}h`;
-                            } catch {
-                              return base;
-                            }
+                            return base;
                           })()}
                         </span>
+                        {(() => {
+                          // Show computed status chip
+                          try {
+                            const comp: any = (workout as any).computed || null;
+                            const ok = comp && Number(comp.total_duration_seconds) > 0 && Array.isArray(comp.steps) && comp.steps.length > 0;
+                            return (
+                              <span className={`px-1.5 py-0.5 rounded border text-[10px] ${ok ? 'text-green-700 border-green-300 bg-green-50' : 'text-red-700 border-red-300 bg-red-50'}`}>
+                                {ok ? 'v2 OK' : 'MISSING'}
+                              </span>
+                            );
+                          } catch { return null; }
+                        })()}
                       </div>
                     </div>
                     
