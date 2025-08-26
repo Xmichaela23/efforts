@@ -3,6 +3,7 @@ import { useWorkouts } from '@/hooks/useWorkouts';
 import { supabase } from '@/lib/supabase';
 import { loadPlansBundle } from '@/services/plans/BundleLoader';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 
 export interface WorkoutInterval {
   id: string;
