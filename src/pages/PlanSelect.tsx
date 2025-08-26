@@ -475,7 +475,7 @@ export default function PlanSelect() {
             computedSteps = bakedSess.computed.steps;
             // Enhance rendered text with primary range if missing
             try {
-              const hasAt = /@\s*\d+:\d{2}/.test(rendered || '') || /target\s+\d+/.test(rendered || '') || /\(\d+:\d{2}\/.test(rendered || '');
+              const hasAt = /@\s*\d+:\d{2}/.test(rendered || '') || /target\s+\d+/.test(rendered || '') || /\(\d+:\d{2}\/((mi|km)|100(yd|m))/.test(rendered || '');
               const secTo = (s: number) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
               const addRun = () => {
                 const st = (computedSteps || []).find((st: any) => st.pace_sec_per_mi && (st.kind==='work' || st.intensity==='tempo'));
