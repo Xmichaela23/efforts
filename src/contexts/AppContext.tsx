@@ -572,7 +572,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 };
 
                 // Bake the plan to get computed workout data
-                const bakedPlan = augmentPlan(workoutPlan);
+                const bakedPlan = augmentPlan(workoutPlan as any);
                 const bakedSession = bakedPlan.sessions_by_week['1'][0];
                 
                 if (bakedSession.computed) {
