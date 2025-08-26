@@ -100,17 +100,13 @@ export function generateDetailedWorkoutTemplate(
   workoutType: string,
   description?: string
 ): WorkoutDisplay {
-  console.log('🔍 generateDetailedWorkoutTemplate received:', { computed, baselines, workoutType, description });
-  
   // Check if this is a strength workout
   if (isStrengthWorkout(computed)) {
-    console.log('🔍 Detected strength workout, using strength template');
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
 
   // Handle case where there's no computed data - show minimal info
   if (!computed.steps || computed.steps.length === 0) {
-    console.log('🔍 No computed steps, showing minimal info');
     return {
       title: workoutType,
       totalDuration: 'Duration not specified',

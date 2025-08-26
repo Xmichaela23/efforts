@@ -18,12 +18,7 @@ const WorkoutDetailView: React.FC<WorkoutDetailViewProps> = ({
   description,
   className = ''
 }) => {
-  console.log('🔍 WorkoutDetailView received computed:', computed);
-  console.log('🔍 WorkoutDetailView received baselines:', baselines);
-  
   const workoutDisplay = generateDetailedWorkoutTemplate(computed, baselines, workoutType, description);
-  
-  console.log('🔍 WorkoutDetailView generated display:', workoutDisplay);
 
   // If this is a strength workout, use the strength-specific view
   if (isStrengthWorkout(computed)) {

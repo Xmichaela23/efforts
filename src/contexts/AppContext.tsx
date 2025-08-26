@@ -534,6 +534,61 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               targetsSummary = undefined;
             }
 
+            // Try to use plan baker to generate detailed computed data with steps
+            let computedData: any = {
+              normalization_version: 'v2',
+              total_duration_seconds: totalSeconds,
+              targets_summary: targetsSummary || {},
+            };
+
+            // If we have steps_preset, try to bake the workout to get detailed steps
+            if (Array.isArray(s?.steps_preset) && s.steps_preset.length > 0 && userBaselines) {
+              try {
+                // Create a minimal plan structure for the baker
+                const workoutPlan = {
+                  name: 'temp',
+                  description: '',
+                  duration_weeks: 1,
+                  baselines_template: {
+                    fiveK_pace_sec_per_mi: null, // Will be computed by baker if needed
+                    easy_pace_sec_per_mi: null,  // Will be computed by baker if needed
+                    ftp: userBaselines.performanceNumbers?.ftp || null,
+                    swim_pace_per_100_sec: null, // Will be computed by baker if needed
+                    easy_from_5k_multiplier: 1.30,
+                  },
+                  sessions_by_week: {
+                    '1': [{
+                      day: s.day || 'Monday',
+                      discipline: mappedType,
+                      description: s.description || '',
+                      steps_preset: s.steps_preset,
+                      workout_spec: {
+                        units: mappedType === 'swim' ? 'yd' : 'mi',
+                        steps: [],
+                        targets: {}
+                      }
+                    }]
+                  }
+                };
+
+                // Bake the plan to get computed workout data
+                const bakedPlan = augmentPlan(workoutPlan);
+                const bakedSession = bakedPlan.sessions_by_week['1'][0];
+                
+                if (bakedSession.computed) {
+                  computedData = {
+                    ...computedData,
+                    total_duration_seconds: bakedSession.computed.total_seconds || totalSeconds,
+                    steps: bakedSession.computed.steps || [],
+                    total_hmmss: bakedSession.computed.total_hmmss
+                  };
+                }
+              } catch (bakeError) {
+                console.warn('Plan baking failed, using fallback computed data:', bakeError);
+                // Keep the basic computed data if baking fails
+              }
+            }
+
             const row: any = {
               user_id: user?.id,
               training_plan_id: data.id,
@@ -552,11 +607,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               export_hints: planExportHints,
               // Newly persisted rendering/computed helpers
               rendered_description: rendered,
-              computed: {
-                normalization_version: 'v1',
-                total_duration_seconds: totalSeconds,
-                targets_summary: targetsSummary || {},
-              },
+              computed: computedData,
               units: unitsPref,
             };
             if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;

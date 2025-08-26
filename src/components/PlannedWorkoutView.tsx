@@ -39,9 +39,6 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   onComplete,
   onDelete
 }) => {
-  console.log('🔍 PlannedWorkoutView computed data:', workout.computed);
-  console.log('🔍 PlannedWorkoutView workout:', workout);
-  
   const [friendlyDesc, setFriendlyDesc] = React.useState<string | undefined>(undefined);
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
   
