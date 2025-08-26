@@ -4,6 +4,7 @@ import { getLibraryPlan } from '@/services/LibraryPlans';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 
 function computeNextMonday(): string {
   const d = new Date();
@@ -362,6 +363,43 @@ export default function PlanSelect() {
         }
         (mapped.sessions_by_week as any)[wk] = outWeek;
       }
+
+      // --- Translate with deterministic baker at import-time ---
+      const toSecPerMi = (pace: string | null | undefined): number | null => {
+        if (!pace) return null;
+        const m = String(pace).match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
+        if (!m) return null;
+        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+        const unit = m[3].toLowerCase();
+        if (unit === 'mi') return sec;
+        if (unit === 'km') return Math.round(sec * 1.60934);
+        return sec;
+      };
+
+      const baselinesTemplate = {
+        fiveK_pace_sec_per_mi: toSecPerMi(fiveK),
+        easy_pace_sec_per_mi: toSecPerMi(easyPace),
+        tenK_pace_sec_per_mi: null,
+        mp_pace_sec_per_mi: null,
+        ftp: typeof ftp === 'number' ? ftp : null,
+        swim_pace_per_100_sec: swimPace100 ? (()=>{ const [mm,ss] = String(swimPace100).split(':').map((x:string)=>parseInt(x,10)); return (mm||0)*60+(ss||0); })() : null,
+        easy_from_5k_multiplier: 1.30
+      };
+
+      const planForAugment: any = {
+        name: libPlan.name,
+        description: libPlan.description || '',
+        duration_weeks: mapped.duration_weeks,
+        swim_unit: libPlan.template?.swim_unit || 'yd',
+        baselines_template: baselinesTemplate,
+        tolerances: libPlan.template?.tolerances || undefined,
+        export_hints: (libPlan?.export_hints || libPlan?.template?.export_hints || null),
+        sessions_by_week: mapped.sessions_by_week,
+        notes_by_week: mapped.notes_by_week || {}
+      };
+
+      let baked: any | null = null;
+      try { baked = augmentPlan(planForAugment); } catch {}
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
@@ -408,7 +446,7 @@ export default function PlanSelect() {
       Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
         const weekNum = parseInt(wkKey, 10);
         const sessions = (payload.sessions_by_week as any)[wkKey] || [];
-        (sessions as any[]).forEach((s: any) => {
+        (sessions as any[]).forEach((s: any, idx: number) => {
           const dow = dayIndex[s.day] || 1;
           const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
           if (weekNum === 1 && date < startDate) return;
@@ -424,16 +462,19 @@ export default function PlanSelect() {
 
           let rendered: string | undefined = cleanedDesc;
           let totalSeconds = Math.max(0, Math.round(durationVal * 60));
-          let targetsSummary: any = {};
-          try {
-            const norm = normalizePlannedSession(s, { performanceNumbers: baselines?.performanceNumbers as any }, payload.export_hints || {});
-            if (norm?.friendlySummary) rendered = norm.friendlySummary;
-            if (typeof norm?.durationMinutes === 'number') totalSeconds = Math.max(0, Math.round(norm.durationMinutes * 60));
-            if (norm?.primaryTarget) {
-              if (norm.primaryTarget.type === 'pace') targetsSummary = { pace: { value: norm.primaryTarget.value, range: norm.primaryTarget.range } };
-              if (norm.primaryTarget.type === 'power') targetsSummary = { power: { value: norm.primaryTarget.value, range: norm.primaryTarget.range } };
-            }
-          } catch {}
+          let computedSteps: any[] | undefined;
+          const bakedSess = baked?.sessions_by_week?.[wkKey]?.[idx];
+          if (bakedSess?.computed?.total_seconds) {
+            totalSeconds = bakedSess.computed.total_seconds;
+            computedSteps = bakedSess.computed.steps;
+          } else {
+            // Fallback to legacy normalizer if baker couldn't compute
+            try {
+              const norm = normalizePlannedSession(s, { performanceNumbers: baselines?.performanceNumbers as any }, payload.export_hints || {});
+              if (norm?.friendlySummary) rendered = norm.friendlySummary;
+              if (typeof norm?.durationMinutes === 'number') totalSeconds = Math.max(0, Math.round(norm.durationMinutes * 60));
+            } catch {}
+          }
 
           rows.push({
             user_id: user.id,
@@ -451,7 +492,7 @@ export default function PlanSelect() {
             steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
             export_hints: payload.export_hints || null,
             rendered_description: rendered,
-            computed: { normalization_version: 'v1', total_duration_seconds: totalSeconds, targets_summary: targetsSummary },
+            computed: { normalization_version: 'v2', total_duration_seconds: totalSeconds, steps: computedSteps },
             units: unitsPref
           });
         });
