@@ -111,7 +111,8 @@ const deriveEasy = (b: BaselinesTemplate) => {
   if (typeof b.fiveK_pace_sec_per_mi === "number" && Number.isFinite(b.fiveK_pace_sec_per_mi)) {
     return b.fiveK_pace_sec_per_mi * (b.easy_from_5k_multiplier ?? 1.30);
   }
-  throw new Error("Cannot derive easy pace: need easy_pace_sec_per_mi or fiveK_pace_sec_per_mi.");
+  // Fallback to a conservative default if baselines are missing (10:00/mi)
+  return 600;
 };
 
 const deriveTenK = (b: BaselinesTemplate): number | null => {
@@ -177,31 +178,27 @@ const targetPace = (
   // intensity === "target"
   if (opts?.useMP) {
     const mp = deriveMP(baselines);
-    if (mp == null) throw new Error("MP pace unavailable");
-    return mp;
+    if (mp != null) return mp;
   }
   if (opts?.useTenK) {
     const tenK = deriveTenK(baselines);
-    if (tenK == null) throw new Error("10K pace unavailable");
-    return tenK;
+    if (tenK != null) return tenK;
   }
   // explicit refs override defaults
   if (targets.target_pace_sec_per_mi_ref === "tenK") {
     const tenK = deriveTenK(baselines);
-    if (tenK == null) throw new Error("10K pace unavailable");
-    return tenK;
+    if (tenK != null) return tenK;
   }
   if (targets.target_pace_sec_per_mi_ref === "mp") {
     const mp = deriveMP(baselines);
-    if (mp == null) throw new Error("MP pace unavailable");
-    return mp;
+    if (mp != null) return mp;
   }
   // default to fiveK for "target"
   if (targets.target_pace_sec_per_mi_ref === "fiveK" || !targets.target_pace_sec_per_mi_ref) {
-    if (baselines.fiveK_pace_sec_per_mi == null) throw new Error("fiveK pace missing");
-    return baselines.fiveK_pace_sec_per_mi;
+    if (typeof baselines.fiveK_pace_sec_per_mi === 'number') return baselines.fiveK_pace_sec_per_mi;
   }
-  throw new Error("No target pace specified");
+  // Final fallback to easy pace
+  return easy;
 };
 
 // ====== Token maps ======

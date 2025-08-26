@@ -540,16 +540,19 @@ export default function PlanSelect() {
           } else {
             // No computed → keep authored description; do not invent ranges
             try {
-              // Surface a hard signal so we can see which sessions failed to compute
-              // eslint-disable-next-line no-console
-              console.error('[baker] Missing computed for session', {
-                week: wkKey,
-                index: idx,
-                discipline: mappedType,
-                tokens: Array.isArray(s?.steps_preset) ? s.steps_preset : [],
-                description: s.description || '',
-                baselinesTemplate
-              });
+              const toks = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+              // Only log as a failure for run/ride/swim sessions that had tokens to compute
+              if ((mappedType === 'run' || mappedType === 'ride' || mappedType === 'swim') && toks.length > 0) {
+                // eslint-disable-next-line no-console
+                console.error('[baker] Missing computed for session', {
+                  week: wkKey,
+                  index: idx,
+                  discipline: mappedType,
+                  tokens: toks,
+                  description: s.description || '',
+                  baselinesTemplate
+                });
+              }
             } catch {}
           }
 
