@@ -323,17 +323,20 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const desc: string = String(session?.description || '').toLowerCase();
     // Always attempt to enrich when tokens failed to produce a pace-based main
     if (desc) {
-      // Intervals fallback (compute work only; rests already counted above if tokens existed)
+      // Intervals fallback (compute work and rests; WU/CD may already be counted)
       const iv = desc.match(/(\d+)\s*x\s*(\d{3,4})\s*m[^@]*@\s*(\d+):(\d{2})\s*\/\s*(mi|km)(?:[^\d]+(\d+)\s*min\s*(?:jog|easy))?/);
       if (iv && primary == null) {
         const reps = parseInt(iv[1],10);
         const meters = parseInt(iv[2],10);
         const baseSec = parseInt(iv[3],10)*60 + parseInt(iv[4],10);
         const unit = iv[5].toLowerCase();
+        const restEach = iv[6] ? parseInt(iv[6],10) : 0;
         const milesEach = meters / 1609.34;
         const rng = [`${mmss(baseSec*(1-hQ))}/${unit}`, `${mmss(baseSec*(1+hQ))}/${unit}`] as [string,string];
         const workMin = (reps * milesEach * baseSec) / 60;
-        totalMin += Math.round(workMin);
+        const restMin = restEach * Math.max(0, reps - 1);
+        totalMin += Math.round(workMin + restMin);
+        summaryParts.push(`${reps} × ${meters} m @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]})${restEach?` w ${restEach} min jog`:''}`.trim());
         primary = { type: 'pace', value: `${mmss(baseSec)}/${unit}`, range: rng };
       }
       // Tempo fallback
@@ -344,6 +347,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         const unit = tp[4].toLowerCase();
         const rng = [`${mmss(baseSec*(1-hQ))}/${unit}`, `${mmss(baseSec*(1+hQ))}/${unit}`] as [string,string];
         totalMin += Math.round((miles * baseSec) / 60);
+        summaryParts.push(`Tempo ${miles} mi @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]})`);
         primary = { type: 'pace', value: `${mmss(baseSec)}/${unit}`, range: rng };
       }
       // When no tokens at all, add WU/CD minutes from description
