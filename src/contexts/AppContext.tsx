@@ -366,6 +366,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const pn = { ...(data.performance_numbers || {}) } as any;
       const coerce = (v: any) => (typeof v === 'string' && !/\/(mi|km)$/i.test(v) && /^(\d{1,2}):(\d{2})$/.test(v))
         ? `${v}${unitsSuffix}` : v;
+      // Fix field names to match database schema
       pn.fiveK_pace = coerce(pn.fiveK_pace);
       pn.easyPace = coerce(pn.easyPace);
 

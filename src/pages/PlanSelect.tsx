@@ -204,14 +204,24 @@ export default function PlanSelect() {
       const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
       let baselines: any = null;
       try { baselines = await loadUserBaselines?.(); } catch {}
+      
+      // DEBUG: Log what we got from loadUserBaselines
+      console.log('🔍 DEBUG - PlanSelect baselines:', baselines);
+      console.log('🔍 DEBUG - baselines.performanceNumbers:', baselines?.performanceNumbers);
+      console.log('🔍 DEBUG - performanceNumbers keys:', baselines?.performanceNumbers ? Object.keys(baselines.performanceNumbers) : 'null/undefined');
+      
       const mapped = { ...remapped, sessions_by_week: {} as any };
       // Use stored paces from baselines (from assessment)
       const pn = baselines?.performanceNumbers || {};
-      const candidate5k = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
+      const candidate5k = pn.fiveK_pace || pn.fiveK || pn.fiveKPace || null;
       const fiveK = candidate5k ? String(candidate5k) : null;
       const easyPace = pn.easyPace ? String(pn.easyPace) : null;
       const swimPace100 = pn.swimPace100 ? String(pn.swimPace100) : null;
       const ftp = baselines?.performanceNumbers?.ftp || null;
+      
+      // DEBUG: Log what we extracted from baselines
+      console.log('🔍 DEBUG - Extracted values:', { fiveK, easyPace, swimPace100, ftp });
+      
       const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
       const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
       const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
