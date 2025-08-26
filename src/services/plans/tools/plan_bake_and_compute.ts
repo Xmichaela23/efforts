@@ -781,19 +781,3 @@ export type {
 };
 export { augmentPlan, formatPlanRollups };
 
-// ====== CLI ======
-if (typeof require !== 'undefined' && require.main === module) {
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const fs = require("fs");
-  const path = process.argv[2];
-  if (!path) {
-    console.error("Usage: ts-node src/services/plans/tools/plan_bake_and_compute.ts ./plan.json > ./plan.baked.json");
-    process.exit(1);
-  }
-  const raw = fs.readFileSync(path, "utf8");
-  const plan: Plan = JSON.parse(raw);
-  const baked = augmentPlan(plan);
-  const rollups = formatPlanRollups(baked);
-  const out = { ...baked, computed_rollups: rollups };
-  process.stdout.write(JSON.stringify(out, null, 2));
-}
