@@ -85,7 +85,7 @@ Deno.serve(async (req) => {
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
-      });
+      }, { onConflict: 'user_id,provider' });
 
     if (error) {
       return new Response(JSON.stringify({ error: `DB error: ${error.message}` }), {

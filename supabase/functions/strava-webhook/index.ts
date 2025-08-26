@@ -336,7 +336,7 @@ async function storeStravaActivity(activityId: number, userId: string, activityD
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         deleted_at: null
-      });
+      }, { onConflict: 'user_id,strava_id' });
 
     if (error) {
       console.error(`❌ Error storing Strava activity ${activityId}:`, error);
@@ -408,7 +408,9 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
 
     const date = new Date(activityData.start_date_local || activityData.start_date).toISOString().split('T')[0];
     const duration = Math.max(0, Math.round((activityData.moving_time || 0) / 60));
-    const distance = Number.isFinite(activityData.distance) ? Math.round(activityData.distance) : null; // meters or leave as provided
+    // Strava returns distance in meters. Persist both raw meters and normalized km.
+    const distance_meters = Number.isFinite(activityData.distance) ? Number(activityData.distance) : null;
+    const distance_km = distance_meters != null ? Number((distance_meters / 1000).toFixed(3)) : null;
 
     // Try to enrich with streams
     let gps_track: any[] | null = null;
@@ -448,7 +450,8 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       type,
       date,
       duration,
-      distance,
+      distance: distance_km, // km (normalized)
+      distance_meters,
       description: `Imported from Strava: ${activityData.name || ''}`.trim(),
       workout_status: 'completed',
       completedmanually: false,
@@ -487,10 +490,14 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
     }
 
     // Update with our schema fields
+    const distance_meters = Number.isFinite(activityData.distance) ? Number(activityData.distance) : null;
+    const distance_km = distance_meters != null ? Number((distance_meters / 1000).toFixed(3)) : null;
+
     const workoutData = {
       name: activityData.name || 'Strava Activity',
       duration: Math.max(0, Math.round((activityData.moving_time || 0) / 60)),
-      distance: Number.isFinite(activityData.distance) ? Math.round(activityData.distance) : null,
+      distance: distance_km,
+      distance_meters,
       description: `Updated from Strava: ${activityData.name || ''}`.trim(),
       workout_status: 'completed',
       updated_at: new Date().toISOString(),

@@ -237,9 +237,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  };
 
  const computeDistanceKm = (w: any): number | null => {
+   // Prefer explicit meters → km if present
+   const meters = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
+   if (typeof meters === 'number' && meters > 0) return meters / 1000;
+   // Else, if distance is already km (normalized), use as-is. If it's suspiciously large (meters), convert.
    if (typeof w?.distance === 'number' && w.distance > 0) return w.distance > 2000 ? w.distance / 1000 : w.distance;
-   const m = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
-   if (typeof m === 'number' && m > 0) return m / 1000;
    const track = Array.isArray(w?.gps_track) ? w.gps_track : null;
    if (track && track.length > 1) {
      let meters = 0;

@@ -83,14 +83,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     };
 
     const computeDistanceKm = (w: any): number | null => {
-      // direct km
-      if (typeof w?.distance === 'number' && w.distance > 0) {
-        // If value looks like meters (very large for walks), convert
-        return w.distance > 2000 ? w.distance / 1000 : w.distance;
-      }
-      // meters fields
+      // Prefer explicit meters if present
       const m = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
       if (typeof m === 'number' && m > 0) return m / 1000;
+      // Else if distance is already normalized km, use it; if it's meters by mistake, convert
+      if (typeof w?.distance === 'number' && w.distance > 0) {
+        return w.distance > 2000 ? w.distance / 1000 : w.distance;
+      }
       // gps_track fallback
       const track = Array.isArray(w?.gps_track) ? w.gps_track : null;
       if (track && track.length > 1) {

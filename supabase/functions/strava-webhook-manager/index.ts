@@ -266,7 +266,7 @@ async function updateUserConnection(userId: string, stravaUserId: number, access
         },
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
-      });
+      }, { onConflict: 'user_id,provider' });
 
     if (error) {
       console.error(`❌ Error updating user connection for ${userId}:`, error);
