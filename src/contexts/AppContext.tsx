@@ -544,6 +544,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // If we have steps_preset, try to bake the workout to get detailed steps
             if (Array.isArray(s?.steps_preset) && s.steps_preset.length > 0 && userBaselines) {
               try {
+                // DEBUG: Log what we're getting from userBaselines
+                console.log('🔍 DEBUG - userBaselines:', userBaselines);
+                console.log('🔍 DEBUG - performanceNumbers:', userBaselines.performanceNumbers);
+                console.log('🔍 DEBUG - fiveK:', userBaselines.performanceNumbers?.fiveK);
+                console.log('🔍 DEBUG - easyPace:', userBaselines.performanceNumbers?.easyPace);
+                console.log('🔍 DEBUG - ftp:', userBaselines.performanceNumbers?.ftp);
+
                 // Convert pace strings to seconds per mile for the baker (same pattern as PlanSelect.tsx)
                 const toSecPerMi = (pace: string | null | undefined): number | null => {
                   if (!pace) return null;
@@ -576,6 +583,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   easy_from_5k_multiplier: 1.30
                 };
 
+                // DEBUG: Log what we're sending to the baker
+                console.log('🔍 DEBUG - baselinesTemplate:', baselinesTemplate);
+
                 // Create a minimal plan structure for the baker
                 const workoutPlan = {
                   name: 'temp',
@@ -600,9 +610,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   }
                 } as any; // Type assertion to bypass complex type checking
 
+                // DEBUG: Log what we're sending to augmentPlan
+                console.log('🔍 DEBUG - workoutPlan:', workoutPlan);
+
                 // Bake the plan to get computed workout data
                 const bakedPlan = augmentPlan(workoutPlan);
                 const bakedSession = bakedPlan.sessions_by_week['1'][0];
+                
+                // DEBUG: Log what the baker returned
+                console.log('🔍 DEBUG - bakedPlan:', bakedPlan);
+                console.log('🔍 DEBUG - bakedSession:', bakedSession);
+                console.log('🔍 DEBUG - computed:', bakedSession.computed);
                 
                 if (bakedSession.computed) {
                   computedData = {
@@ -611,9 +629,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     steps: bakedSession.computed.steps || [],
                     total_hmmss: bakedSession.computed.total_hmmss
                   };
+                  console.log('🔍 DEBUG - Final computedData:', computedData);
+                } else {
+                  console.log('🔍 DEBUG - No computed data from baker!');
                 }
               } catch (bakeError) {
-                console.warn('Plan baking failed, using fallback computed data:', bakeError);
+                console.error('❌ Plan baking failed:', bakeError);
                 // Keep the basic computed data if baking fails
               }
             }
