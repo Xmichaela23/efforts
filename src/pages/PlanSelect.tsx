@@ -467,6 +467,35 @@ export default function PlanSelect() {
           if (bakedSess?.computed?.total_seconds) {
             totalSeconds = bakedSess.computed.total_seconds;
             computedSteps = bakedSess.computed.steps;
+            // Enhance rendered text with primary range if missing
+            try {
+              const hasAt = /@\s*\d+:\d{2}/.test(rendered || '') || /target\s+\d+/.test(rendered || '');
+              const secTo = (s: number) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+              const addRun = () => {
+                const st = (computedSteps || []).find((st: any) => st.pace_sec_per_mi && (st.kind==='work' || st.intensity==='tempo'));
+                if (!st) return;
+                const base = `${secTo(st.pace_sec_per_mi!)}/mi`;
+                const rng = st.pace_range ? ` (${secTo(st.pace_range.lower)}/mi–${secTo(st.pace_range.upper)}/mi)` : '';
+                if (!hasAt) rendered = `${rendered} @ ${base}${rng}`.trim();
+              };
+              const addBike = () => {
+                const st = (computedSteps || []).find((st: any) => typeof st.target_watts === 'number' || st.power_range);
+                if (!st) return;
+                const rng = st.power_range ? `${st.power_range.lower}–${st.power_range.upper} W` : `${st.target_watts} W`;
+                if (!hasAt) rendered = `${rendered} — target ${rng}`.trim();
+              };
+              const addSwim = () => {
+                const st = (computedSteps || []).find((st: any) => typeof st.swim_pace_sec_per_100 === 'number' || st.swim_pace_range_per_100);
+                if (!st) return;
+                const unit = (String((libPlan?.template?.swim_unit)||'yd').toLowerCase()==='m') ? '100m' : '100yd';
+                const base = typeof st.swim_pace_sec_per_100==='number' ? secTo(st.swim_pace_sec_per_100) : undefined;
+                const rng = st.swim_pace_range_per_100 ? ` (${secTo(st.swim_pace_range_per_100.lower)}–${secTo(st.swim_pace_range_per_100.upper)}/${unit})` : (base?`/${unit}`:'');
+                if (!hasAt && (base || rng)) rendered = `${rendered} @ ${base || ''}${rng}`.trim();
+              };
+              if (mappedType==='run') addRun();
+              else if (mappedType==='ride') addBike();
+              else if (mappedType==='swim') addSwim();
+            } catch {}
           } else {
             // Fallback to legacy normalizer if baker couldn't compute
             try {
