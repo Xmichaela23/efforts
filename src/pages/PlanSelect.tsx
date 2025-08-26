@@ -510,7 +510,11 @@ export default function PlanSelect() {
                 const parts: string[] = [];
                 // WU
                 const wu = computedSteps.find((st:any)=>st.label==='WU' && st.ctrl==='time');
-                if (wu) parts.push(`Warm‑up ${Math.round(wu.seconds/60)}min`);
+                if (wu) {
+                  const wuBase = typeof wu.pace_sec_per_mi==='number' ? `${secTo(wu.pace_sec_per_mi)}/mi` : '';
+                  const wuRng = wu.pace_range ? ` (${secTo(wu.pace_range.lower)}/mi–${secTo(wu.pace_range.upper)}/mi)` : '';
+                  parts.push(`Warm‑up ${Math.round(wu.seconds/60)}min${wuBase?` @ ${wuBase}${wuRng}`:''}`);
+                }
                 // Main reps: group identical work reps
                 const works = computedSteps.filter((st:any)=>st.kind==='work');
                 if (works.length) {
@@ -519,10 +523,13 @@ export default function PlanSelect() {
                   if (dw) {
                     const count = works.filter((w:any)=>w.ctrl==='distance' && Math.abs(w.seconds-dw.seconds)<2).length;
                     const meters = Math.round((dw.original_units==='m' || dw.original_units==='yd') ? (dw.original_units==='m'? dw.original_val : dw.original_val*0.9144) : (dw.original_val*1609.34));
-                    const show = meters >= 200 ? `${Math.round(meters/100)*100} m` : `${dw.original_val} mi`;
+                    const show = (dw.original_units==='mi') ? `${dw.original_val} mi` : `${Math.round(meters/100)*100} m`;
                     const base = dw.pace_sec_per_mi ? `${secTo(dw.pace_sec_per_mi)}/mi` : '';
                     const rng = dw.pace_range ? ` (${secTo(dw.pace_range.lower)}/mi–${secTo(dw.pace_range.upper)}/mi)` : '';
-                    parts.push(`${count} × ${show}${base?` @ ${base}`:''}${rng}`.trim());
+                    // Recovery (first easy-time step)
+                    const rec = (computedSteps || []).find((s:any)=>s.kind==='recovery' && s.ctrl==='time');
+                    const recStr = rec ? ` w/ ${secTo(rec.seconds)} easy${rec.pace_sec_per_mi?` @ ${secTo(rec.pace_sec_per_mi)}/mi${rec.pace_range?` (${secTo(rec.pace_range.lower)}/mi–${secTo(rec.pace_range.upper)}/mi)`:''}`:''}`: '';
+                    parts.push(`${count} × ${show}${base?` @ ${base}`:''}${rng}${recStr}`.trim());
                   } else {
                     // time-controlled work
                     const tw = works[0];
@@ -533,7 +540,11 @@ export default function PlanSelect() {
                 }
                 // CD
                 const cd = computedSteps.find((st:any)=>st.label==='CD' && st.ctrl==='time');
-                if (cd) parts.push(`Cool‑down ${Math.round(cd.seconds/60)}min`);
+                if (cd) {
+                  const cdBase = typeof cd.pace_sec_per_mi==='number' ? `${secTo(cd.pace_sec_per_mi)}/mi` : '';
+                  const cdRng = cd.pace_range ? ` (${secTo(cd.pace_range.lower)}/mi–${secTo(cd.pace_range.upper)}/mi)` : '';
+                  parts.push(`Cool‑down ${Math.round(cd.seconds/60)}min${cdBase?` @ ${cdBase}${cdRng}`:''}`);
+                }
                 if (parts.length) rendered = parts.join(' • ');
               }
             } catch {}
