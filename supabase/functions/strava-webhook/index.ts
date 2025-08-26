@@ -92,7 +92,7 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     // Find the user in our system by Strava ID
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')
-      .select('user_id, connection_data')
+      .select('user_id, connection_data, access_token')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
       .single();
@@ -104,12 +104,14 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
 
     const userId = userConnection.user_id;
     const connectionData = userConnection.connection_data || {};
-    const accessToken = connectionData.access_token;
+    let accessToken = connectionData.access_token || (userConnection as any).access_token;
 
     if (!accessToken) {
-      console.log(`⚠️ No access token for user ${userId}`);
-      return;
+      // Try to refresh using stored refresh_token
+      const refreshed = await refreshStravaAccessToken(userId);
+      if (refreshed) accessToken = refreshed;
     }
+    if (!accessToken) { console.log(`⚠️ No access token for user ${userId}`); return; }
 
     // Fetch detailed activity data from Strava
     let { data: activityData, status } = await fetchStravaActivityWithStatus(activityId, accessToken);
@@ -146,7 +148,7 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
     // Find the user connection
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')
-      .select('user_id, connection_data')
+      .select('user_id, connection_data, access_token')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
       .single();
@@ -158,12 +160,12 @@ async function handleActivityUpdated(activityId: number, ownerId: number, update
 
     const userId = userConnection.user_id;
     const connectionData = userConnection.connection_data || {};
-    const accessToken = connectionData.access_token;
-
+    let accessToken = connectionData.access_token || (userConnection as any).access_token;
     if (!accessToken) {
-      console.log(`⚠️ No access token for user ${userId}`);
-      return;
+      const refreshed = await refreshStravaAccessToken(userId);
+      if (refreshed) accessToken = refreshed;
     }
+    if (!accessToken) { console.log(`⚠️ No access token for user ${userId}`); return; }
 
     // Fetch updated activity data
     let { data: activityData, status } = await fetchStravaActivityWithStatus(activityId, accessToken);
@@ -407,6 +409,7 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
     if (existingWorkout) return;
 
     const date = new Date(activityData.start_date_local || activityData.start_date).toISOString().split('T')[0];
+    const timestamp = new Date(activityData.start_date || activityData.start_date_local || Date.now()).toISOString();
     const duration = Math.max(0, Math.round((activityData.moving_time || 0) / 60));
     // Strava returns distance in meters. Persist both raw meters and normalized km.
     const distance_meters = Number.isFinite(activityData.distance) ? Number(activityData.distance) : null;
@@ -449,20 +452,43 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       name: activityData.name || 'Strava Activity',
       type,
       date,
+      timestamp,
       duration,
-      distance: distance_km, // km (normalized)
-      distance_meters,
+      distance: distance_km, // store km to match imports/UI
       description: `Imported from Strava: ${activityData.name || ''}`.trim(),
       workout_status: 'completed',
       completedmanually: false,
       strava_activity_id: activityData.id,
       source: 'strava',
+      is_strava_imported: true,
       start_position_lat: activityData.start_latlng?.[0] ?? null,
       start_position_long: activityData.start_latlng?.[1] ?? null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       gps_track: gps_track ? JSON.stringify(gps_track) : null,
+      gps_trackpoints: activityData.map?.polyline || activityData.map?.summary_polyline || null,
       sensor_data: sensor_data ? JSON.stringify(sensor_data) : null,
+      // Parity fields using existing columns
+      moving_time: activityData.moving_time != null ? Math.round(activityData.moving_time / 60) : null,
+      elapsed_time: activityData.elapsed_time != null ? Math.round(activityData.elapsed_time / 60) : null,
+      elevation_gain: activityData.total_elevation_gain ?? null,
+      avg_heart_rate: activityData.average_heartrate ?? null,
+      max_heart_rate: activityData.max_heartrate ?? null,
+      avg_cadence: activityData.average_cadence ?? null,
+      max_cadence: activityData.max_cadence ?? null,
+      avg_temperature: activityData.average_temp ?? null,
+      max_temperature: (activityData as any).max_temp ?? null,
+      calories: activityData.calories ?? null,
+      avg_speed: activityData.average_speed != null ? Number((activityData.average_speed * 3.6).toFixed(2)) : null,
+      max_speed: activityData.max_speed != null ? Number((activityData.max_speed * 3.6).toFixed(2)) : null,
+      // pace (sec/km)
+      avg_pace: activityData.average_speed && activityData.average_speed > 0 ? Math.round(1000 / activityData.average_speed) : null,
+      max_pace: activityData.max_speed && activityData.max_speed > 0 ? Math.round(1000 / activityData.max_speed) : null,
+      // power
+      avg_power: (activityData as any).average_watts ?? null,
+      max_power: (activityData as any).max_watts ?? null,
+      normalized_power: (activityData as any).weighted_average_watts ?? null,
+      provider_sport: activityData.sport_type || activityData.type || null,
     };
 
     const { error } = await supabase.from('workouts').insert(row);
@@ -497,10 +523,31 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
       name: activityData.name || 'Strava Activity',
       duration: Math.max(0, Math.round((activityData.moving_time || 0) / 60)),
       distance: distance_km,
-      distance_meters,
       description: `Updated from Strava: ${activityData.name || ''}`.trim(),
       workout_status: 'completed',
       updated_at: new Date().toISOString(),
+      timestamp,
+      is_strava_imported: true,
+      gps_trackpoints: activityData.map?.polyline || activityData.map?.summary_polyline || null,
+      // Parity fields using existing columns
+      moving_time: activityData.moving_time != null ? Math.round(activityData.moving_time / 60) : null,
+      elapsed_time: activityData.elapsed_time != null ? Math.round(activityData.elapsed_time / 60) : null,
+      elevation_gain: activityData.total_elevation_gain ?? null,
+      avg_heart_rate: activityData.average_heartrate ?? null,
+      max_heart_rate: activityData.max_heartrate ?? null,
+      avg_cadence: activityData.average_cadence ?? null,
+      max_cadence: activityData.max_cadence ?? null,
+      avg_temperature: activityData.average_temp ?? null,
+      max_temperature: (activityData as any).max_temp ?? null,
+      calories: activityData.calories ?? null,
+      avg_speed: activityData.average_speed != null ? Number((activityData.average_speed * 3.6).toFixed(2)) : null,
+      max_speed: activityData.max_speed != null ? Number((activityData.max_speed * 3.6).toFixed(2)) : null,
+      avg_pace: activityData.average_speed && activityData.average_speed > 0 ? Math.round(1000 / activityData.average_speed) : null,
+      max_pace: activityData.max_speed && activityData.max_speed > 0 ? Math.round(1000 / activityData.max_speed) : null,
+      avg_power: (activityData as any).average_watts ?? null,
+      max_power: (activityData as any).max_watts ?? null,
+      normalized_power: (activityData as any).weighted_average_watts ?? null,
+      provider_sport: activityData.sport_type || activityData.type || null,
     } as any;
 
     const { error } = await supabase

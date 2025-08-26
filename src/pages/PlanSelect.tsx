@@ -548,7 +548,7 @@ export default function PlanSelect() {
                 if (parts.length) rendered = parts.join(' • ');
               }
             } catch {}
-          } else {
+                } else {
             // No computed → keep authored description; do not invent ranges
             try {
               const toks = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
