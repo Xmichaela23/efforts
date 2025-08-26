@@ -36,6 +36,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   useEffect(() => {
     setDisplayWorkouts(dateWorkoutsMemo);
   }, [dateWorkoutsMemo]);
+  // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
+  const stripCodes = (text?: string) => String(text || '')
+    .replace(/\[(?:cat|plan):[^\]]+\]\s*/gi, '')
+    .replace(/\[[A-Za-z0-9_:+\-x\/]+\]/g, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
 
   // Load baselines for planned summaries
   useEffect(() => {
