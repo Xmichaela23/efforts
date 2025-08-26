@@ -376,19 +376,29 @@ export default function PlanSelect() {
 
       // --- Translate with deterministic baker at import-time ---
       const toSecPerMi = (pace: string | null | undefined): number | null => {
-        if (!pace) return null;
+        if (!pace) {
+          console.log('🔍 DEBUG - toSecPerMi: pace is falsy:', pace);
+          return null;
+        }
         const txt = String(pace).trim();
+        console.log('🔍 DEBUG - toSecPerMi: processing pace:', txt);
         // Accept 7:43, 7:43/mi, 4:45/km
         let m = txt.match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
         if (m) {
           const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
           const unit = m[3].toLowerCase();
+          console.log('🔍 DEBUG - toSecPerMi: matched with unit:', { sec, unit, original: txt });
           if (unit === 'mi') return sec;
           if (unit === 'km') return Math.round(sec * 1.60934);
           return sec;
         }
         m = txt.match(/^(\d+):(\d{2})$/); // no unit → assume /mi
-        if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
+        if (m) {
+          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+          console.log('🔍 DEBUG - toSecPerMi: matched without unit:', { sec, original: txt });
+          return sec;
+        }
+        console.log('🔍 DEBUG - toSecPerMi: no pattern matched for:', txt);
         return null;
       };
 
