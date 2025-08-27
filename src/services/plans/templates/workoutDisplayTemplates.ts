@@ -203,9 +203,12 @@ export function generateDetailedWorkoutTemplate(
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
 
+  // Check if this is an optional workout or has alternatives (always check description)
+  const isOptional = description?.toLowerCase().includes('(optional)') || description?.toLowerCase().includes('optional');
+  const hasAlternatives = description?.includes('Alternative:') || description?.includes('OR');
+
   // Handle case where there's no computed data - show minimal info
   if (!computed.steps || computed.steps.length === 0) {
-    // Check if this is an optional workout or has alternatives
     if (description) {
       const options = parseWorkoutOptions(description);
       const steps: WorkoutStep[] = [];
@@ -270,6 +273,11 @@ export function generateDetailedWorkoutTemplate(
         title += ` @ ${formatPace(baselines.fiveK_pace_sec_per_mi)}`;
       }
     }
+  }
+  
+  // Add optional indicator to title
+  if (isOptional) {
+    title += ' (Optional)';
   }
 
   // Add warmup step
@@ -376,6 +384,18 @@ export function generateDetailedWorkoutTemplate(
     });
   }
 
+  // Add alternatives if they exist in description
+  if (hasAlternatives && description) {
+    const options = parseWorkoutOptions(description);
+    options.alternatives.forEach(alt => {
+      steps.push({
+        type: 'alternative',
+        description: alt,
+        isAlternative: true
+      });
+    });
+  }
+
   return {
     title,
     totalDuration: formatDuration(computed.total_duration_seconds),
@@ -394,6 +414,9 @@ export function generateSummaryWorkoutTemplate(
   if (isStrengthWorkout(computed)) {
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
+
+  // Check if this is an optional workout
+  const isOptional = description?.toLowerCase().includes('(optional)') || description?.toLowerCase().includes('optional');
 
   // Handle case where there's no computed data but we have a description
   if (!computed.steps || computed.steps.length === 0) {
@@ -473,13 +496,27 @@ export function generateSummaryWorkoutTemplate(
   if (hasCooldown) structureParts.push('Cool-down');
   structureSummary = structureParts.join(' • ');
 
+  // Add alternatives if they exist in description
+  const steps: WorkoutStep[] = [{
+    type: 'main',
+    description: `${recoveryDescription}. (${structureSummary})`
+  }];
+  
+  if (description) {
+    const options = parseWorkoutOptions(description);
+    options.alternatives.forEach(alt => {
+      steps.push({
+        type: 'alternative',
+        description: alt,
+        isAlternative: true
+      });
+    });
+  }
+
   return {
-    title: `${title}${mainDescription}`,
+    title: `${title}${mainDescription}${isOptional ? ' (Optional)' : ''}`,
     totalDuration: formatDuration(computed.total_duration_seconds),
-    steps: [{
-      type: 'main',
-      description: `${recoveryDescription}. (${structureSummary})`
-    }]
+    steps
   };
 }
 
@@ -494,6 +531,10 @@ export function generateExecutionTemplate(
   if (isStrengthWorkout(computed)) {
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
+
+  // Check if this is an optional workout
+  const isOptional = description?.toLowerCase().includes('(optional)') || description?.toLowerCase().includes('optional');
+  const hasAlternatives = description?.includes('Alternative:') || description?.includes('OR');
 
   // Handle case where there's no computed data but we have a description
   if (!computed.steps || computed.steps.length === 0) {
@@ -632,8 +673,20 @@ export function generateExecutionTemplate(
     });
   }
 
+  // Add alternatives if they exist in description
+  if (hasAlternatives && description) {
+    const options = parseWorkoutOptions(description);
+    options.alternatives.forEach(alt => {
+      steps.push({
+        type: 'alternative',
+        description: alt,
+        isAlternative: true
+      });
+    });
+  }
+
   return {
-    title: `${workoutType} (planned)`,
+    title: `${workoutType}${isOptional ? ' (Optional)' : ''} (planned)`,
     totalDuration: formatDuration(computed.total_duration_seconds),
     steps
   };
