@@ -373,6 +373,56 @@ const PRESET_MAP: Record<string, Step[]> = {
       { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
     ]}
   ],
+  
+  // Additional interval tokens found in plans
+  "200m_3k_eq_jog": [
+    { kind: "repeat", times: 8, of: [
+      { kind: "work", ctrl: "distance", val: 0.125, intensity: "target" },
+      { kind: "recovery", ctrl: "distance", val: 0.125, intensity: "easy" }
+    ]}
+  ],
+  "400m_5k_eq_jog": [
+    { kind: "repeat", times: 6, of: [
+      { kind: "work", ctrl: "distance", val: 0.25, intensity: "target" },
+      { kind: "recovery", ctrl: "distance", val: 0.25, intensity: "easy" }
+    ]}
+  ],
+  "800m_10k_eq_or_2min": [
+    { kind: "repeat", times: 5, of: [
+      { kind: "work", ctrl: "distance", val: 0.5, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
+    ]}
+  ],
+  "1600m_5k_eq_or_2min": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
+    ]}
+  ],
+  "1mi_thr_3to4min": [
+    { kind: "repeat", times: 3, of: [
+      { kind: "work", ctrl: "distance", val: 1.0, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
+  "3200m_cruise_or_3min": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 2.0, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
+  "4000m_cruise_or_3min": [
+    { kind: "repeat", times: 3, of: [
+      { kind: "work", ctrl: "distance", val: 2.5, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
+  "4800m_cruise_or_3min": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 3.0, intensity: "tempo" },
+      { kind: "recovery", ctrl: "time", val: 180, intensity: "easy" }
+    ]}
+  ],
   "1600m_5k_eq_or_2min": [
     { kind: "repeat", times: 4, of: [
       { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },
