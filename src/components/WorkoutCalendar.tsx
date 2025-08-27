@@ -121,7 +121,20 @@ export default function WorkoutCalendar({
       }
     });
     
-    return filtered;
+    // 🔧 NEW: Deduplicate workouts by ID and type to prevent messy display
+    const uniqueWorkouts = filtered.reduce((acc: any[], workout: any) => {
+      const existingIndex = acc.findIndex((w: any) => 
+        w.id === workout.id || 
+        (w.type === workout.type && w.workout_status === workout.workout_status)
+      );
+      
+      if (existingIndex === -1) {
+        acc.push(workout);
+      }
+      return acc;
+    }, []);
+    
+    return uniqueWorkouts;
   };
 
   const handleDateClick = (date: Date, event: React.MouseEvent | React.TouchEvent) => {
@@ -279,15 +292,15 @@ export default function WorkoutCalendar({
                     {weekDays[0].getDate()}
                   </div>
                   {getWorkoutsForDate(weekDays[0]).length > 0 && (
-                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[0]).slice(0, 4).map((workout, idx) => {
+                    <div className="flex flex-col justify-center items-center gap-2 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[0]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -298,9 +311,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[0]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[0]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[0]).length - 4}
+                          +{getWorkoutsForDate(weekDays[0]).length - 3}
                         </div>
                       )}
                     </div>
@@ -329,15 +342,15 @@ export default function WorkoutCalendar({
                     {weekDays[1].getDate()}
                   </div>
                   {getWorkoutsForDate(weekDays[1]).length > 0 && (
-                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[1]).slice(0, 4).map((workout, idx) => {
+                    <div className="flex flex-col justify-center items-center gap-2 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[1]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -348,9 +361,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[1]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[1]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[1]).length - 4}
+                          +{getWorkoutsForDate(weekDays[1]).length - 3}
                         </div>
                       )}
                     </div>
@@ -380,14 +393,14 @@ export default function WorkoutCalendar({
                   </div>
                   {getWorkoutsForDate(weekDays[2]).length > 0 && (
                     <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[2]).slice(0, 4).map((workout, idx) => {
+                      {getWorkoutsForDate(weekDays[2]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -398,9 +411,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[2]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[2]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[2]).length - 4}
+                          +{getWorkoutsForDate(weekDays[2]).length - 3}
                         </div>
                       )}
                     </div>
@@ -430,15 +443,15 @@ export default function WorkoutCalendar({
                     {weekDays[3].getDate()}
                   </div>
                   {getWorkoutsForDate(weekDays[3]).length > 0 && (
-                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[3]).slice(0, 4).map((workout, idx) => {
+                    <div className="flex flex-col justify-center items-center gap-2 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[3]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -449,9 +462,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[3]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[3]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[3]).length - 4}
+                          +{getWorkoutsForDate(weekDays[3]).length - 3}
                         </div>
                       )}
                     </div>
@@ -480,15 +493,15 @@ export default function WorkoutCalendar({
                     {weekDays[4].getDate()}
                   </div>
                   {getWorkoutsForDate(weekDays[4]).length > 0 && (
-                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[4]).slice(0, 4).map((workout, idx) => {
+                    <div className="flex flex-col justify-center items-center gap-2 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[4]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -499,9 +512,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[4]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[4]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[4]).length - 4}
+                          +{getWorkoutsForDate(weekDays[4]).length - 3}
                         </div>
                       )}
                     </div>
@@ -530,15 +543,15 @@ export default function WorkoutCalendar({
                     {weekDays[5].getDate()}
                   </div>
                   {getWorkoutsForDate(weekDays[5]).length > 0 && (
-                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[5]).slice(0, 4).map((workout, idx) => {
+                    <div className="flex flex-col justify-center items-center gap-2 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[5]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -549,9 +562,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[5]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[5]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[5]).length - 4}
+                          +{getWorkoutsForDate(weekDays[5]).length - 3}
                         </div>
                       )}
                     </div>
@@ -581,15 +594,15 @@ export default function WorkoutCalendar({
                     {weekDays[6].getDate()}
                   </div>
                   {getWorkoutsForDate(weekDays[6]).length > 0 && (
-                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                      {getWorkoutsForDate(weekDays[6]).slice(0, 4).map((workout, idx) => {
+                    <div className="flex flex-col justify-center items-center gap-2 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[6]).slice(0, 3).map((workout, idx) => {
                         const workoutDisplay = generateWorkoutDisplay(workout);
                         const isCompleted = workout.workout_status === 'completed';
                         
                         return (
                           <span 
                             key={workout.id || idx} 
-                            className={`text-sm font-medium px-2 py-1 rounded ${
+                            className={`text-xs font-medium px-2 py-1 rounded-full w-full text-center ${
                               isCompleted 
                                 ? 'text-gray-600 bg-gray-100' 
                                 : 'text-gray-900 bg-blue-100'
@@ -600,9 +613,9 @@ export default function WorkoutCalendar({
                           </span>
                         );
                       })}
-                      {getWorkoutsForDate(weekDays[6]).length > 4 && (
+                      {getWorkoutsForDate(weekDays[6]).length > 3 && (
                         <div className="text-xs text-muted-foreground font-medium leading-none">
-                          +{getWorkoutsForDate(weekDays[6]).length - 4}
+                          +{getWorkoutsForDate(weekDays[6]).length - 3}
                         </div>
                       )}
                     </div>
