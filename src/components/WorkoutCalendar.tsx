@@ -156,7 +156,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* 3-column week grid */}
-      <div className="grid grid-cols-3 w-full mt-2">
+      <div className="grid grid-cols-3 w-full">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
