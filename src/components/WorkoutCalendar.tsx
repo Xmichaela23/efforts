@@ -135,7 +135,7 @@ export default function WorkoutCalendar({
   )} ${weekEnd.getDate()}`;
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col h-72">
+    <div className="w-full max-w-md mx-auto flex flex-col">
       {/* Header with week range and navigation */}
       <div className="flex items-center justify-between mb-1">
         <button
@@ -155,8 +155,8 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* 3-column week grid - fixed height container for consistency */}
-      <div className="grid grid-cols-3 w-full flex-1">
+      {/* 3-column week grid */}
+      <div className="grid grid-cols-3 w-full mt-2">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -168,7 +168,7 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "w-full h-28 border border-gray-200 p-2 flex items-start justify-start",
+                "w-full h-40 border border-gray-200 p-2 flex items-start justify-start",
                 isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
