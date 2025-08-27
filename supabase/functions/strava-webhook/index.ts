@@ -65,7 +65,7 @@ async function processStravaWebhook(payload: any) {
       return;
     }
 
-    console.log(`🔄 Processing ${aspect_type} for activity ${object_id} (owner: ${owner_id})`);
+    console.log(`🔄 Processing ${aspect_type} for activity ${object_id} (owner: ${owner_id}) at ${new Date().toISOString()}`);
 
     switch (aspect_type) {
       case 'create':
@@ -581,8 +581,7 @@ async function updateWorkoutFromStravaActivity(userId: string, activityData: any
       .single();
 
     if (!existingWorkout) {
-      console.log(`⏭️ No workout found for Strava activity ${activityData.id}, creating new one`);
-      await createWorkoutFromStravaActivity(userId, activityData);
+      console.log(`⏭️ No workout found for Strava activity ${activityData.id}, skipping update`);
       return;
     }
 
