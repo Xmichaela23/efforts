@@ -135,9 +135,9 @@ export default function WorkoutCalendar({
   )} ${weekEnd.getDate()}`;
 
   return (
-    <div className="w-full max-w-md mx-auto">
+    <div className="w-full max-w-md mx-auto flex flex-col h-72">
       {/* Header with week range and navigation */}
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between mb-1">
         <button
           aria-label="Previous week"
           className="px-2 py-1 hover:bg-zinc-100"
@@ -145,7 +145,7 @@ export default function WorkoutCalendar({
         >
           ‹
         </button>
-        <h2 className="text-xl font-semibold">Week of {rangeLabel}</h2>
+        <h2 className="text-base font-medium">Week of {rangeLabel}</h2>
         <button
           aria-label="Next week"
           className="px-2 py-1 hover:bg-zinc-100"
@@ -155,8 +155,8 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* 3-column week grid - no gaps, taller cells */}
-      <div className="grid grid-cols-3 w-full">
+      {/* 3-column week grid - fixed height container for consistency */}
+      <div className="grid grid-cols-3 w-full flex-1">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -168,7 +168,7 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "w-full h-40 border border-gray-200 p-3 flex items-start justify-start",
+                "w-full h-28 border border-gray-200 p-2 flex items-start justify-start",
                 isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
@@ -186,7 +186,7 @@ export default function WorkoutCalendar({
                   <span className="text-xs text-gray-400">&nbsp;</span>
                 ) : (
                   items.map((evt, i) => (
-                    <span key={`${key}-${i}`} className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded w-full text-center truncate">
+                    <span key={`${key}-${i}`} className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate">
                       {evt.label}
                     </span>
                   ))
