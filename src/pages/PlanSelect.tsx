@@ -513,7 +513,11 @@ export default function PlanSelect() {
       };
 
       let baked: any | null = null;
-      try { baked = augmentPlan(planForAugment); } catch {}
+      try { 
+        baked = augmentPlan(planForAugment); 
+      } catch (error) {
+        console.error('[baker] Failed to bake plan:', error);
+      }
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
