@@ -31,8 +31,8 @@
     /* Deterministic layout variables */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --todays-h: 8.5rem; /* slightly shorter to free space in browser */
-    --cal-cell-h: 12rem; /* slightly taller cells */
+    --todays-h: 9rem; /* give Today's Effort a bit more space */
+    --cal-cell-h: 11rem; /* reduce cell height slightly across the board */
   }
 }
 
@@ -102,7 +102,8 @@
     height: calc(100vh - var(--header-h) - var(--tabbar-h)); /* fallback */
     height: calc(100svh - var(--header-h) - var(--tabbar-h)); /* Safari stable */
     height: calc(100dvh - var(--header-h) - var(--tabbar-h)); /* Modern browsers */
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     padding-bottom: 0; /* content should touch the tab bar frame */
   }
 
@@ -176,6 +177,28 @@
     height: 100svh; /* Small viewport height for mobile */
     max-height: 100vh;
     max-height: 100svh;
+  }
+
+  /* Responsive height tuning so everything fits without manual tweaks */
+  @media (max-height: 740px) {
+    :root {
+      --todays-h: 8.25rem;
+      --cal-cell-h: 10.25rem;
+    }
+  }
+
+  @media (max-height: 670px) {
+    :root {
+      --todays-h: 7.75rem;
+      --cal-cell-h: 9.75rem;
+    }
+  }
+
+  @media (min-height: 900px) {
+    :root {
+      --todays-h: 9.5rem;
+      --cal-cell-h: 12rem;
+    }
   }
   
   /* Improve touch interactions */
