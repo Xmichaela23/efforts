@@ -9,7 +9,7 @@ import AllEffortsDropdown from './AllEffortsDropdown';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { getDisciplineColor as getHexColor } from '@/lib/utils';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
-import { generateWorkoutDisplay } from '@/utils/workoutCodes';
+import { generateWorkoutDisplay } from '../utils/workoutCodes';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
