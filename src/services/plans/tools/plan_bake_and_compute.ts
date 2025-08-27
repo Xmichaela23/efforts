@@ -111,12 +111,12 @@ const roundRange = (p: number, pct: number) => ({
 });
 
 // ====== Baseline derivations (RUN) ======
-const deriveEasy = (b: BaselinesTemplate) => {
+const deriveEasy = (b: BaselinesTemplate): number | null => {
   if (typeof b.easy_pace_sec_per_mi === "number" && Number.isFinite(b.easy_pace_sec_per_mi)) return b.easy_pace_sec_per_mi;
   if (typeof b.fiveK_pace_sec_per_mi === "number" && Number.isFinite(b.fiveK_pace_sec_per_mi)) {
     return b.fiveK_pace_sec_per_mi * (b.easy_from_5k_multiplier ?? 1.30);
   }
-  throw new Error("Missing baselines: need easy or 5k pace");
+  return null;
 };
 
 const deriveTenK = (b: BaselinesTemplate): number | null => {
@@ -630,6 +630,9 @@ const computeWorkout = (
   ctx?: { discipline: string; swim_unit?: "yd" | "m" }
 ) => {
   const easy = deriveEasy(baselines);
+  if (easy === null) {
+    throw new Error("Missing required baselines: need easy pace or 5K pace to compute workout");
+  }
   const useMP  = (tokensUsed ?? []).some(t => t.includes("MP"));
   const useTenKToken = (tokensUsed ?? []).some(t => t.includes("10kpace"));
 
@@ -857,7 +860,39 @@ function augmentPlan(plan: Plan): Plan {
           { discipline: sess.discipline, swim_unit: plan.swim_unit }
         );
         computed = { total_seconds: calc.total_seconds, total_hmmss: calc.total_hmmss, steps: calc.steps };
-      } catch { /* leave undefined if baselines insufficient */ }
+      } catch (error) {
+        // Log the specific error for debugging
+        console.error(`[baker] Failed to compute workout for session:`, {
+          week: wk,
+          session: sess,
+          error: error instanceof Error ? error.message : String(error),
+          baselines: Object.keys(bakedBaselines).filter(k => bakedBaselines[k as keyof BaselinesTemplate] != null)
+        });
+        
+        // Fallback: try to compute basic duration from steps even without baselines
+        try {
+          const compiledSteps = expandPresets(tokens);
+          const flatSteps = expandRepeats(compiledSteps);
+          const totalSeconds = flatSteps.reduce((sum, step) => sum + (step.val || 0), 0);
+          
+          if (totalSeconds > 0) {
+            computed = { 
+              total_seconds: totalSeconds, 
+              total_hmmss: secondsToHMMSS(totalSeconds), 
+              steps: flatSteps.map((step, idx) => ({
+                index: idx,
+                kind: step.kind === 'repeat' ? 'work' : step.kind,
+                ctrl: step.ctrl,
+                seconds: step.val,
+                label: step.label,
+                intensity: step.intensity
+              }))
+            };
+          }
+        } catch (fallbackError) {
+          console.error(`[baker] Fallback duration calculation also failed:`, fallbackError);
+        }
+      }
 
       return { ...sess, workout_spec, computed };
     });
