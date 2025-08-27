@@ -125,6 +125,9 @@ export default function WorkoutCalendar({
     map.get(key)!.push(evt);
   }
 
+  console.log('WorkoutCalendar - events:', events);
+  console.log('WorkoutCalendar - map:', map);
+
   const weekdayFmt = new Intl.DateTimeFormat('en-US', { weekday: "short" });
   const monthFmt = new Intl.DateTimeFormat('en-US', { month: "short" });
   const rangeLabel = `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(

@@ -405,7 +405,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {/* Content area - fills remaining space */}
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto min-h-[200px]">
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
