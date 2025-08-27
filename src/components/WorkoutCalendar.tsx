@@ -30,9 +30,9 @@ function startOfWeek(date: Date) {
   return d;
 }
 
-function addDays(date: Date, days: number) {
+function addDays(date: Date, n: number) {
   const d = new Date(date);
-  d.setDate(d.getDate() + days);
+  d.setDate(d.getDate() + n);
   return d;
 }
 
@@ -47,14 +47,6 @@ function resolveDate(input: string | Date) {
   if (input instanceof Date) return input;
   const [y, m, d] = input.split("-").map(Number);
   return new Date(y, (m ?? 1) - 1, d ?? 1);
-}
-
-function Chip({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex max-w-[80px] truncate items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-[11px] leading-4 text-zinc-700">
-      {children}
-    </span>
-  );
 }
 
 export default function WorkoutCalendar({
@@ -124,7 +116,7 @@ export default function WorkoutCalendar({
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   const weekEnd = addDays(weekStart, 6);
 
-  // Group events by YYYY-MM-DD
+  // Map events by date (YYYY-MM-DD)
   const map = new Map<string, CalendarEvent[]>();
   for (const evt of events) {
     const d = resolveDate(evt.date);
@@ -135,27 +127,17 @@ export default function WorkoutCalendar({
 
   const weekdayFmt = new Intl.DateTimeFormat('en-US', { weekday: "short" });
   const monthFmt = new Intl.DateTimeFormat('en-US', { month: "short" });
-
   const rangeLabel = `${monthFmt.format(weekStart)} ${weekStart.getDate()} – ${monthFmt.format(
     weekEnd
   )} ${weekEnd.getDate()}`;
 
   return (
     <div className="w-full max-w-md mx-auto">
-      {/* Today banner */}
-      <div className="text-sm text-zinc-600 mb-2">
-        {new Intl.DateTimeFormat('en-US', {
-          weekday: "long",
-          month: "short",
-          day: "numeric",
-        }).format(new Date())}
-      </div>
-
-      {/* Range header */}
+      {/* Header with week range and navigation */}
       <div className="flex items-center justify-between mb-2">
         <button
           aria-label="Previous week"
-          className="px-2 py-1 rounded hover:bg-zinc-100"
+          className="px-2 py-1 hover:bg-zinc-100"
           onClick={() => handlePrevWeek(addDays(weekStart, -1))}
         >
           ‹
@@ -163,48 +145,45 @@ export default function WorkoutCalendar({
         <h2 className="text-xl font-semibold">Week of {rangeLabel}</h2>
         <button
           aria-label="Next week"
-          className="px-2 py-1 rounded hover:bg-zinc-100"
+          className="px-2 py-1 hover:bg-zinc-100"
           onClick={() => handleNextWeek(addDays(weekEnd, 1))}
         >
           ›
         </button>
       </div>
 
-      {/* 7-col grid: headers then dates */}
-      <div className="grid grid-cols-7 gap-y-1 text-center select-none">
-        {weekDays.map((d) => (
-          <div key={`hdr-${d.toISOString()}`} className="text-xs tracking-wide text-zinc-500">
-            {weekdayFmt.format(d).toUpperCase()}
-          </div>
-        ))}
-
+      {/* 3-column week grid (wraps to 3x3) */}
+      <div className="grid grid-cols-3 gap-2 select-none">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
           const isToday = toDateOnlyString(new Date()) === key;
 
           return (
-            <div
+            <button
+              type="button"
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "relative h-16 rounded-xl border border-zinc-200 hover:border-zinc-300 transition-colors px-1 pt-1 cursor-pointer",
-                isToday ? "ring-1 ring-zinc-900/10 bg-zinc-50" : "bg-white",
+                "border border-zinc-200 p-2 text-center",
+                isToday ? "bg-zinc-100" : "bg-white",
               ].join(" ")}
             >
-              <div className="text-sm font-medium text-zinc-900">{d.getDate()}</div>
-
-              {/* Chips */}
-              <div className="mt-1 flex flex-col gap-1 items-center">
-                {items.length === 0 ? (
-                  <span className="text-[10px] text-zinc-400">&nbsp;</span>
-                ) : (
-                  items.map((evt, i) => (
-                    <Chip key={`${key}-${i}`}>{evt.label}</Chip>
-                  ))
-                )}
+              {/* Weekday + date INSIDE the cell */}
+              <div className="text-[11px] tracking-wide text-zinc-500">
+                {weekdayFmt.format(d).toUpperCase()}
               </div>
-            </div>
+              <div className="text-lg font-medium">{d.getDate()}</div>
+
+              {/* Event labels (plain text; no rounded chips) */}
+              <div className="mt-1 flex flex-col gap-1 items-center">
+                {items.map((evt, i) => (
+                  <span key={`${key}-${i}`} className="text-[11px] text-zinc-700 truncate max-w-full">
+                    {evt.label}
+                  </span>
+                ))}
+              </div>
+            </button>
           );
         })}
       </div>
