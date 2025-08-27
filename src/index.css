@@ -31,7 +31,7 @@
     /* Deterministic layout variables */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --todays-h: 9rem; /* h-36 by default */
+    --todays-h: 8.5rem; /* slightly shorter to free space in browser */
     --cal-cell-h: 12rem; /* slightly taller cells */
   }
 }

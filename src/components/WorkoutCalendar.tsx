@@ -199,7 +199,7 @@ export default function WorkoutCalendar({
       </div>
 
       {/* 3-column week grid filling remaining height with min cell size */}
-      <div className="grid grid-cols-3 grid-rows-3 w-full flex-1" style={{ rowGap: 0, columnGap: 0 }}>
+      <div className="grid grid-cols-3 grid-rows-3 w-full flex-1" style={{ rowGap: 0, columnGap: 0, alignContent: 'stretch' }}>
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
