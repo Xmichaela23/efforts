@@ -98,7 +98,9 @@
   .mobile-main-content {
     grid-row: 2;
     /* Deterministic height: viewport minus header and bottom bar */
-    height: calc(100dvh - var(--header-h) - var(--tabbar-h));
+    height: calc(100vh - var(--header-h) - var(--tabbar-h)); /* fallback */
+    height: calc(100svh - var(--header-h) - var(--tabbar-h)); /* Safari stable */
+    height: calc(100dvh - var(--header-h) - var(--tabbar-h)); /* Modern browsers */
     overflow: hidden;
     padding-bottom: 0; /* content should touch the tab bar frame */
   }
