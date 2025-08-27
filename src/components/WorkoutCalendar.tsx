@@ -139,12 +139,23 @@ export default function WorkoutCalendar({
 
   return (
     <div
-      className="w-full max-w-md mx-auto flex flex-col"
+      className="w-full max-w-md mx-auto flex flex-col touch-pan-y"
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
         setTouchStartY(t.clientY);
         setTouchStartT(Date.now());
+      }}
+      onTouchMove={(e) => {
+        // prevent accidental vertical scroll from cancelling quick horizontal swipes
+        if (touchStartX == null || touchStartY == null) return;
+        const t = e.changedTouches[0];
+        const dx = Math.abs(t.clientX - touchStartX);
+        const dy = Math.abs(t.clientY - touchStartY);
+        if (dx > dy && dx > 10) {
+          // hint browser we intend to handle this
+          e.preventDefault();
+        }
       }}
       onTouchEnd={(e) => {
         try {
@@ -153,8 +164,8 @@ export default function WorkoutCalendar({
           const dx = t.clientX - touchStartX;
           const dy = t.clientY - touchStartY;
           const dt = Date.now() - touchStartT;
-          // Quick horizontal swipe: threshold ~50px, vertical drift small, duration < 500ms
-          if (Math.abs(dx) > 50 && Math.abs(dy) < 40 && dt < 600) {
+          // Quick horizontal swipe: threshold ~40px, vertical drift small, duration < 700ms
+          if (Math.abs(dx) > 40 && Math.abs(dy) < 60 && dt < 700) {
             if (dx < 0) {
               handleNextWeek(addDays(weekEnd, 1));
             } else {
