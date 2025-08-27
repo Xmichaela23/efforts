@@ -92,10 +92,22 @@ supabase functions list --project-ref yyriamwvtvzlkumqrvpm | cat
 - **Inter Font** - Modern, readable typography
 - **Responsive Layout** - Works on all device sizes
 
+## ⚠️ Common Issues & Solutions
+
+### Performance Data Not Loading?
+If you're getting `[baker] Missing computed for session` errors or pace values showing as `null`:
+
+1. **Check the data structure**: Performance data exists in TWO locations with different naming conventions
+2. **See `PERFORMANCE_DATA_STRUCTURE.md`** for the complete debugging guide
+3. **Quick fix**: Always check both `baselines.fivek_pace` (snake_case at root) AND `baselines.performance_numbers.fiveK` (camelCase in nested object)
+
+This has been a recurring issue - the documentation will save you hours of debugging!
+
 ## 📚 Documentation
 
 - **`APP_BIBLE.md`** - Complete development philosophy and architecture
 - **`QUICK_START_FOR_NEW_CHAT.md`** - Quick setup for new developers
+- **`PERFORMANCE_DATA_STRUCTURE.md`** - **⚠️ CRITICAL**: Performance data access patterns and common pitfalls
 - **`GARMIN_ACTIVITY_API.md`** - Garmin Connect integration details
 - **`GARMIN_TRAINING_API_V2.md`** - Training data API specifications
 - **`GARMIN_OAUTH2_PKCE.md`** - Authentication flow documentation

@@ -93,6 +93,69 @@ function formatDistanceRange(distance: number, units: string): string {
   return `${distance} ${units}`;
 }
 
+// Helper function to parse strength workout descriptions with inline rest times
+function parseStrengthWorkoutWithRest(description: string): Array<{name: string, sets: string, weight: string, rest: string}> {
+  const exercises: Array<{name: string, sets: string, weight: string, rest: string}> = [];
+  
+  // Split by semicolons and clean up
+  const exerciseStrings = description.split(';').map(ex => ex.trim()).filter(ex => ex.length > 0);
+  
+  exerciseStrings.forEach(exerciseStr => {
+    // Remove the "Includes rest:" part if present
+    const cleanExercise = exerciseStr.replace(/Includes rest:.*$/i, '').trim();
+    
+    // Parse exercise name, sets, weight, and rest time
+    // Pattern: "Exercise Name sets x weight x reps rest_time"
+    // or "Exercise Name sets×reps rest_time" (for bodyweight)
+    
+    // Try to match: "Deadlift 5 x 135 x 5 2-3 minutes rest"
+    let match = cleanExercise.match(/^(.+?)\s+(\d+)\s*x\s*(\d+)\s*x\s*(\d+)\s+(.+)$/i);
+    if (match) {
+      exercises.push({
+        name: match[1].trim(),
+        sets: `${match[2]}×${match[4]}`,
+        weight: `${match[3]} lbs`,
+        rest: match[5].trim()
+      });
+      return;
+    }
+    
+    // Try to match: "Bench press 5 x 140 x 5 90–120 s"
+    match = cleanExercise.match(/^(.+?)\s+(\d+)\s*x\s*(\d+)\s*x\s*(\d+)\s+(.+)$/i);
+    if (match) {
+      exercises.push({
+        name: match[1].trim(),
+        sets: `${match[2]}×${match[4]}`,
+        weight: `${match[3]} lbs`,
+        rest: match[5].trim()
+      });
+      return;
+    }
+    
+    // Try to match: "Bulgarian split squat 3×8–10 60–90 s"
+    match = cleanExercise.match(/^(.+?)\s+(\d+)×(\d+(?:–\d+)?)\s+(.+)$/i);
+    if (match) {
+      exercises.push({
+        name: match[1].trim(),
+        sets: `${match[2]}×${match[3]}`,
+        weight: 'Bodyweight',
+        rest: match[4].trim()
+      });
+      return;
+    }
+    
+    // Fallback: just use the whole string as description
+    exercises.push({
+      name: cleanExercise,
+      sets: '',
+      weight: '',
+      rest: ''
+    });
+  });
+  
+  return exercises;
+}
+
 // Template 1: Detailed breakdown for Planned Tab
 export function generateDetailedWorkoutTemplate(
   computed: WorkoutComputed,
@@ -357,12 +420,35 @@ export function generateStrengthWorkoutTemplate(
   
   // Handle case where there's no computed data
   if (!computed.steps || computed.steps.length === 0) {
+    // Parse the workout description to format each exercise with its rest time
+    if (description) {
+      const formattedExercises = parseStrengthWorkoutWithRest(description);
+      
+      // Create individual steps for each exercise
+      formattedExercises.forEach(exercise => {
+        steps.push({
+          type: 'main',
+          description: exercise.name,
+          duration: exercise.sets,
+          target: exercise.weight,
+          recovery: exercise.rest
+        });
+      });
+      
+      return {
+        title: workoutType,
+        totalDuration: 'Duration not specified',
+        steps
+      };
+    }
+    
+    // Fallback if no description
     return {
       title: workoutType,
       totalDuration: 'Duration not specified',
       steps: [{
         type: 'main',
-        description: description || 'Strength workout details not available'
+        description: 'Strength workout details not available'
       }]
     };
   }
