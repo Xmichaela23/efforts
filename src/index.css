@@ -100,8 +100,7 @@
     /* Deterministic height: viewport minus header and bottom bar */
     height: calc(100dvh - var(--header-h) - var(--tabbar-h));
     overflow: hidden;
-    /* preserve safe area padding for bottom gestures */
-    padding-bottom: env(safe-area-inset-bottom);
+    padding-bottom: 0; /* content should touch the tab bar frame */
   }
 
   /* 🆕 NEW: Sliding container for calendar and summary */
@@ -137,6 +136,21 @@
   .summary-panel {
     /* Summary panel styles */
     padding-left: 1rem; /* Add some spacing between panels */
+  }
+
+  /* 🚨 MOBILE TAB BAR - fixed, includes safe area */
+  .mobile-tabbar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: hsl(var(--card));
+    border-top: 1px solid hsl(var(--border));
+    box-shadow: 0 -2px 6px rgba(0,0,0,0.03);
+    display: flex;
+    align-items: center;
   }
 }
 
