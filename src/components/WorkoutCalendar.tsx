@@ -139,7 +139,7 @@ export default function WorkoutCalendar({
 
   return (
     <div
-      className="w-full max-w-md mx-auto flex flex-col touch-pan-y"
+      className="w-full max-w-md mx-auto flex flex-col h-full touch-pan-y"
       onTouchStart={(e) => {
         const t = e.changedTouches[0];
         setTouchStartX(t.clientX);
@@ -198,8 +198,8 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* 3-column week grid */}
-      <div className="grid grid-cols-3 w-full">
+      {/* 3-column week grid filling remaining height */}
+      <div className="grid grid-cols-3 grid-rows-3 w-full flex-1">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -211,7 +211,7 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "w-full h-44 border border-gray-200 p-2 flex flex-col justify-between items-stretch",
+                "w-full h-full border border-gray-200 p-2 flex flex-col justify-between items-stretch",
                 isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
