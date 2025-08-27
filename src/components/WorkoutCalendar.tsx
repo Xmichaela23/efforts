@@ -231,76 +231,389 @@ export default function WorkoutCalendar({
             </Button>
           </div>
           
-          {/* Day headers */}
-          <div className="grid gap-3 grid-cols-7 mb-3">
-            {DAYS.map(day => (
-              <div key={day} className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
-                {day}
-              </div>
-            ))}
+          {/* Day headers - 3 columns for mobile */}
+          <div className="grid gap-3 grid-cols-3 mb-3">
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              SUN
+            </div>
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              MON
+            </div>
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              TUE
+            </div>
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              WED
+            </div>
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              THU
+            </div>
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              FRI
+            </div>
+            <div className="p-2 text-center font-semibold text-xs text-muted-foreground uppercase tracking-wide" style={{fontFamily: 'Inter, sans-serif'}}>
+              SAT
+            </div>
           </div>
 
-          {/* Week grid - edge-to-edge immersive design */}
-          <div className="grid gap-1 grid-cols-7">
-            {weekDays.map((date, index) => {
-              const dayWorkouts = date ? getWorkoutsForDate(date) : [];
-              
-              return (
-                <button
-                  key={index}
-                  className={`
-                    w-full h-24 p-2 transition-all duration-100 rounded-lg
-                    flex flex-col items-center justify-start
-                    min-h-[44px] touch-manipulation select-none
-                    ${date ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
-                    ${date && isToday(date) ? 'bg-gray-100 border-gray-200' : ''}
-                    ${date && isSelected(date) ? 'bg-gray-200 border-gray-300' : ''}
-                  `}
-                  onClick={(e) => date && handleDateClick(date, e)}
-                  disabled={!date}
-                  type="button"
-                >
-                  {date && (
-                    <>
-                      {/* Date number - clean styling */}
-                      <div className="text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                        {date.getDate()}
-                      </div>
-                      
-                      {/* Workout codes using new system */}
-                      {dayWorkouts.length > 0 && (
-                        <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
-                          {dayWorkouts.slice(0, 3).map((workout, idx) => {
-                            const workoutDisplay = generateWorkoutDisplay(workout);
-                            const isCompleted = workout.workout_status === 'completed';
-                            
-                            return (
-                              <span 
-                                key={workout.id || idx} 
-                                className={`text-xs font-medium px-1 py-0.5 rounded ${
-                                  isCompleted 
-                                    ? 'text-gray-600 bg-gray-100' 
-                                    : 'text-gray-900 bg-blue-100'
-                                }`}
-                              >
-                                {workoutDisplay}
-                                {isCompleted && <span className="ml-1">✓</span>}
-                              </span>
-                            );
-                          })}
-                          {dayWorkouts.length > 3 && (
-                            <div className="text-xs text-muted-foreground font-medium leading-none">
-                              +{dayWorkouts.length - 3}
-                            </div>
-                          )}
+          {/* Week grid - 3 columns for mobile */}
+          <div className="grid gap-1 grid-cols-3">
+            {/* Row 1: Sun, Mon, Tue */}
+            <button
+              key="sun"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[0] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[0] && isToday(weekDays[0]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[0] && isSelected(weekDays[0]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[0] && handleDateClick(weekDays[0], e)}
+              disabled={!weekDays[0]}
+              type="button"
+            >
+              {weekDays[0] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[0].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[0]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[0]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1">✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[0]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[0]).length - 4}
                         </div>
                       )}
-                    </>
+                    </div>
                   )}
-                </button>
-              );
-            })}
-          </div>
+                </>
+              )}
+            </button>
+
+            <button
+              key="mon"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[1] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[1] && isToday(weekDays[1]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[1] && isSelected(weekDays[1]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[1] && handleDateClick(weekDays[1], e)}
+              disabled={!weekDays[1]}
+              type="button"
+            >
+              {weekDays[1] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[1].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[1]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[1]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1">✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[1]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[1]).length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+
+            <button
+              key="tue"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[2] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[2] && isToday(weekDays[2]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[2] && isSelected(weekDays[2]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[2] && handleDateClick(weekDays[2], e)}
+              disabled={!weekDays[2]}
+              type="button"
+            >
+              {weekDays[2] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[2].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[2]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[2]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1">✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[2]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[2]).length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+
+            {/* Row 2: Wed, Thu, Fri */}
+            <button
+              key="wed"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[3] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[3] && isToday(weekDays[3]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[3] && isSelected(weekDays[3]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[3] && handleDateClick(weekDays[3], e)}
+              disabled={!weekDays[3]}
+              type="button"
+            >
+              {weekDays[3] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[3].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[3]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[3]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1'>✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[3]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[3]).length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+
+            <button
+              key="thu"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[4] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[4] && isToday(weekDays[4]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[4] && isSelected(weekDays[4]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[4] && handleDateClick(weekDays[4], e)}
+              disabled={!weekDays[4]}
+              type="button"
+            >
+              {weekDays[4] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[4].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[4]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[4]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1">✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[4]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[4]).length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+
+            <button
+              key="fri"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[5] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[5] && isToday(weekDays[5]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[5] && isSelected(weekDays[5]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[5] && handleDateClick(weekDays[5], e)}
+              disabled={!weekDays[5]}
+              type="button"
+            >
+              {weekDays[5] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[5].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[5]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[5]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1">✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[5]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[5]).length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+
+            {/* Row 3: Sat, empty, empty */}
+            <button
+              key="sat"
+              className={`
+                w-full h-32 p-3 transition-all duration-100 rounded-lg
+                flex flex-col items-center justify-start
+                min-h-[44px] touch-manipulation select-none
+                ${weekDays[6] ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                ${weekDays[6] && isToday(weekDays[6]) ? 'bg-gray-100 border-gray-200' : ''}
+                ${weekDays[6] && isSelected(weekDays[6]) ? 'bg-gray-200 border-gray-300' : ''}
+              `}
+              onClick={(e) => weekDays[6] && handleDateClick(weekDays[6], e)}
+              disabled={!weekDays[6]}
+              type="button"
+            >
+              {weekDays[6] && (
+                <>
+                  <div className="text-sm font-medium mb-2 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
+                    {weekDays[6].getDate()}
+                  </div>
+                  {getWorkoutsForDate(weekDays[6]).length > 0 && (
+                    <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                      {getWorkoutsForDate(weekDays[6]).slice(0, 4).map((workout, idx) => {
+                        const workoutDisplay = generateWorkoutDisplay(workout);
+                        const isCompleted = workout.workout_status === 'completed';
+                        
+                        return (
+                          <span 
+                            key={workout.id || idx} 
+                            className={`text-sm font-medium px-2 py-1 rounded ${
+                              isCompleted 
+                                ? 'text-gray-600 bg-gray-100' 
+                                : 'text-gray-900 bg-blue-100'
+                            }`}
+                          >
+                            {workoutDisplay}
+                            {isCompleted && <span className="ml-1">✓</span>}
+                          </span>
+                        );
+                      })}
+                      {getWorkoutsForDate(weekDays[6]).length > 4 && (
+                        <div className="text-xs text-muted-foreground font-medium leading-none">
+                          +{getWorkoutsForDate(weekDays[6]).length - 4}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </button>
+
+            {/* Empty cells for balance */}
+            <div className="w-full h-32"></div>
+            <div className="w-full h-32"></div>
         </div>
       </div>
     </div>
