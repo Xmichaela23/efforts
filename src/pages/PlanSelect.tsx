@@ -211,6 +211,19 @@ export default function PlanSelect() {
     (async () => {
       try {
         console.log('🔍 DEBUG - About to call loadUserBaselines');
+        console.log('🔍 DEBUG - Checking if user is authenticated...');
+        
+        // Check auth status first
+        const { supabase } = await import('@/lib/supabase');
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('🔍 DEBUG - Auth check result:', { user: !!user, userId: user?.id });
+        
+        if (!user) {
+          console.log('🔍 DEBUG - No user found, loadUserBaselines will return null');
+          setBaselines(null);
+          return;
+        }
+        
         const b = await loadUserBaselines();
         console.log('🔍 DEBUG - loadUserBaselines returned:', b);
         setBaselines(b);
