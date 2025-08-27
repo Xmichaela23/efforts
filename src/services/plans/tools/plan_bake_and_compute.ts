@@ -251,6 +251,24 @@ const PRESET_MAP: Record<string, Step[]> = {
     ]}
   ],
 
+  // --- ADD THESE MISSING PRESETS ---
+  
+  // 6 x 1 mile @ 5k pace, 2:00 jog
+  "interval_6x1mi_5kpace_R2min": [
+    { kind: "repeat", times: 6, of: [
+      { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
+    ]}
+  ],
+
+  // Taper bike threshold: 2 x 12:00 @ THR, 5:00 easy
+  "bike_thr_2x12min_R5min": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "time", val: 12 * 60, intensity: "target", label: "THR" },
+      { kind: "recovery", ctrl: "time", val: 5 * 60, intensity: "easy", label: "easy" }
+    ]}
+  ],
+
   // --- RUN TEMPO / CRUISE ---
   "tempo_4mi_5kpace_plus0:45": [{ kind: "work", ctrl: "distance", val: 4.0, intensity: "tempo" }],
   "tempo_5mi_5kpace_plus0:45": [{ kind: "work", ctrl: "distance", val: 5.0, intensity: "tempo" }],
@@ -561,13 +579,13 @@ const PRESET_MAP: Record<string, Step[]> = {
 
 // === CURSOR PATCH FIXES ===
 // Back-compat alias for plan that uses "1mi_x6_R2min"
-// (Keeps mapping in sync with the 6x1mi token above.)
-// If already defined, this assignment is effectively a no-op.
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
 // @ts-ignore
-PRESET_MAP["1mi_x6_R2min"] = PRESET_MAP["interval_6x1mi_5kpace_R2min"] || PRESET_MAP["1mi_x6_R2min"];
+PRESET_MAP["1mi_x6_R2min"] = PRESET_MAP["interval_6x1mi_5kpace_R2min"];
 
 // Tempo/cruise offsets (seconds per mile added to 5K pace)
+// Make TEMPO_OFFSETS the single source for tempo offsets
+// If we ever add a new tempo/cruise token, add its +sec/mi here and it'll auto-apply.
 const TEMPO_OFFSETS: Record<string, number> = {
   "tempo_4mi_5kpace_plus0:45": 45,
   "tempo_5mi_5kpace_plus0:45": 45,
@@ -817,6 +835,11 @@ function augmentPlan(plan: Plan): Plan {
   for (const wk of Object.keys(plan.sessions_by_week)) {
     newSessionsByWeek[wk] = plan.sessions_by_week[wk].map((sess) => {
       const tokens = sess.steps_preset ?? [];
+      
+      // Warn on unknown tokens (catches any future typos fast)
+      const unknown = tokens.filter(t => !PRESET_MAP[t]);
+      if (unknown.length) console.warn("[baker] Unknown steps_preset tokens:", unknown);
+      
       const compiledSteps = expandPresets(tokens);
 
       // default units/targets per discipline
@@ -868,7 +891,7 @@ function augmentPlan(plan: Plan): Plan {
               total_hmmss: secondsToHMMSS(totalSeconds), 
               steps: flatSteps.map((step, idx) => ({
                 index: idx,
-                kind: step.kind === 'repeat' ? 'work' : step.kind,
+                kind: (step.kind === 'repeat' ? 'work' : step.kind) as Exclude<SegmentKind, 'repeat'>,
                 ctrl: step.ctrl,
                 seconds: step.val,
                 label: step.label,
@@ -912,4 +935,7 @@ export type {
   Units, Intensity, SegmentKind
 };
 export { augmentPlan, formatPlanRollups };
+
+// Export token catalog for authoring-time validation / KB sync
+export const KNOWN_TOKENS = Object.keys(PRESET_MAP);
 
