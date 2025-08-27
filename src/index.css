@@ -28,6 +28,10 @@
     --input: 0 0% 90%;
     --ring: 0 0% 0%;
     --radius: 0rem;
+    /* Deterministic layout variables */
+    --header-h: 64px; /* matches h-16 */
+    --tabbar-h: 56px; /* matches h-14 */
+    --todays-h: 9rem; /* h-36 by default */
   }
 }
 
@@ -93,10 +97,10 @@
   /* 🚨 MOBILE MAIN CONTENT - Scrollable area */
   .mobile-main-content {
     grid-row: 2;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
-    /* Add bottom padding for mobile safe area */
+    /* Deterministic height: viewport minus header and bottom bar */
+    height: calc(100dvh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-bottom));
+    overflow: hidden;
+    /* preserve safe area padding for bottom gestures */
     padding-bottom: env(safe-area-inset-bottom);
   }
 

@@ -393,7 +393,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }
 
   return (
-    <div className="w-full h-36 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif'}}>
+    <div className="w-full flex-shrink-0 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">

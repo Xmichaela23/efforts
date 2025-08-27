@@ -601,7 +601,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      <main className="mobile-main-content pb-0">
+      <main className="mobile-main-content">
         <div className="w-full px-2">
           {showPlanBuilder ? (
             <div className="pt-1">
@@ -677,15 +677,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
               />
             </div>
           ) : (
-            <div className="w-full h-full">
-              <div className="space-y-1 pt-2">
+            <div className="w-full h-full flex flex-col">
+              <div className="space-y-1 pt-2 flex-shrink-0">
                 <TodaysEffort
                   selectedDate={selectedDate}
                   onAddEffort={handleAddEffort}
                   onViewCompleted={handleViewCompleted}
                   onEditEffort={handleEditEffort}
                 />
-                <WorkoutCalendar
+                <div className="flex-1 overflow-hidden">
+                  <div className="h-full overflow-auto">
+                    <WorkoutCalendar
                   onAddEffort={handleAddEffort}
                   onSelectType={handleSelectEffortType}
                   onSelectWorkout={handleEditEffort}
@@ -699,7 +701,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   completedPlans={completedPlans}
                   workouts={workouts}
                   plannedWorkouts={plannedWorkouts}
-                />
+                    />
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -708,7 +712,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
       {!(selectedWorkout || showStrengthLogger || showMobilityLogger || showBuilder || showAllPlans || showStrengthPlans || showPlanBuilder || showSummary || showImportPage || showTrainingBaselines || workoutBeingEdited) && (
-        <div className="fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-gray-200 shadow-sm px-2 flex items-center">
+        <div className="fixed bottom-0 left-0 right-0 h-14 bg-white border-t border-gray-200 shadow-sm px-2 pt-1 flex items-center">
           <div className="w-full">
             <div className="flex justify-around items-center">
               <NewEffortDropdown 
