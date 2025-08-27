@@ -152,8 +152,8 @@ export default function WorkoutCalendar({
         </button>
       </div>
 
-      {/* 3-column week grid (wraps to 3x3) */}
-      <div className="grid grid-cols-3 gap-2 select-none">
+      {/* 3-column week grid - no gaps, taller cells */}
+      <div className="grid grid-cols-3 w-full">
         {weekDays.map((d) => {
           const key = toDateOnlyString(d);
           const items = map.get(key) ?? [];
@@ -165,23 +165,29 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "border border-zinc-200 p-2 text-center",
-                isToday ? "bg-zinc-100" : "bg-white",
+                "w-full h-32 border border-gray-200 p-3 flex items-start justify-start",
+                isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
-              {/* Weekday + date INSIDE the cell */}
-              <div className="text-[11px] tracking-wide text-zinc-500">
-                {weekdayFmt.format(d).toUpperCase()}
+              {/* Left side: Date */}
+              <div className="flex flex-col items-start mr-3">
+                <div className="text-xs tracking-wide text-gray-500 mb-1">
+                  {weekdayFmt.format(d).toUpperCase()}
+                </div>
+                <div className="text-sm font-medium">{d.getDate()}</div>
               </div>
-              <div className="text-lg font-medium">{d.getDate()}</div>
 
-              {/* Event labels (plain text; no rounded chips) */}
-              <div className="mt-1 flex flex-col gap-1 items-center">
-                {items.map((evt, i) => (
-                  <span key={`${key}-${i}`} className="text-[11px] text-zinc-700 truncate max-w-full">
-                    {evt.label}
-                  </span>
-                ))}
+              {/* Right side: Event labels - room for multiple workouts */}
+              <div className="flex flex-col gap-1 items-start flex-1">
+                {items.length === 0 ? (
+                  <span className="text-xs text-gray-400">&nbsp;</span>
+                ) : (
+                  items.map((evt, i) => (
+                    <span key={`${key}-${i}`} className="text-xs text-gray-700 bg-gray-100 px-2 py-1 rounded w-full text-center truncate">
+                      {evt.label}
+                    </span>
+                  ))
+                )}
               </div>
             </button>
           );
