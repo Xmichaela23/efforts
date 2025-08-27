@@ -180,7 +180,7 @@ export default function WorkoutCalendar({
       }}
     >
       {/* Header with week range and navigation */}
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-0">
         <button
           aria-label="Previous week"
           className="px-3 py-2 min-w-10 rounded hover:bg-zinc-100 active:bg-zinc-200"
@@ -211,7 +211,7 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "w-full h-42 border border-gray-200 p-2 flex flex-col justify-between items-stretch",
+                "w-full h-44 border border-gray-200 p-2 flex flex-col justify-between items-stretch",
                 isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
