@@ -32,7 +32,7 @@
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
     --todays-h: 9rem; /* h-36 by default */
-    --cal-cell-h: 11rem; /* matches Tailwind h-44 */
+    --cal-cell-h: 12rem; /* slightly taller cells */
   }
 }
 
