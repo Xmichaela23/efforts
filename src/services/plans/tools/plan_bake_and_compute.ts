@@ -571,6 +571,26 @@ const PRESET_MAP: Record<string, Step[]> = {
     ]}
   ],
 
+  // Missing swim tokens that are in the user's plan
+  "warmup_swim_quality_15min": [{ kind: "steady", ctrl: "time", val: 15 * 60, intensity: "easy", label: "WU" }],
+  "swim_technique_1200yd": [
+    { kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "easy" },
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "catch-up drill" }
+    ]},
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "single-arm drill" }
+    ]},
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 100, intensity: "easy", label: "pull" }
+    ]},
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 100, intensity: "easy", label: "kick" }
+    ]},
+    { kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "easy" }
+  ],
+  "cooldown_swim_easy_10min": [{ kind: "steady", ctrl: "time", val: 10 * 60, intensity: "easy", label: "CD" }],
+
   // --- STRENGTH (reference only) ---
   // Strength is not baked with pace/power, but for consistency in plans
   "strength_main_50min": [{ kind: "steady", ctrl: "time", val: 50 * 60, intensity: "easy", label: "Strength" }],
