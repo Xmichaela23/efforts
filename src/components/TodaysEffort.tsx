@@ -84,12 +84,17 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     };
 
     const computeDistanceKm = (w: any): number | null => {
-      // Prefer explicit meters if present
+      // Priority 1: explicit km field
+      const dk = w?.distance_km ?? w?.metrics?.distance_km;
+      if (typeof dk === 'number' && isFinite(dk) && dk > 0) return dk;
+      // Priority 2: explicit meters field → convert to km
       const m = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
-      if (typeof m === 'number' && m > 0) return m / 1000;
-      // Else if distance is already normalized km, use it; if it's meters by mistake, convert
-      if (typeof w?.distance === 'number' && w.distance > 0) {
-        return w.distance > 2000 ? w.distance / 1000 : w.distance;
+      if (typeof m === 'number' && isFinite(m) && m > 0) return m / 1000;
+      // Priority 3: generic distance → assume km (pipelines normalize to km)
+      if (typeof w?.distance === 'number' && isFinite(w.distance) && w.distance > 0) return w.distance;
+      if (typeof w?.distance === 'string') {
+        const parsed = parseFloat(w.distance);
+        if (!isNaN(parsed) && parsed > 0) return parsed;
       }
       // gps_track fallback
       const track = Array.isArray(w?.gps_track) ? w.gps_track : null;
@@ -226,7 +231,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       // Handle pace/speed using transformed data from useWorkouts
               let paceSpeed = 'N/A';
               // useWorkouts.ts transforms: duration_seconds → duration (minutes), distance_meters → distance (km)
-              const distanceKm = Number(workout.distance);
+              const distanceKm = computeDistanceKm(workout) ?? Number(workout.distance);
               const durationMinutes = Number(workout.duration);
               const avgSpeedMps = Number(workout.avg_speed_mps);
               
@@ -388,7 +393,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }
 
   return (
-    <div className="w-full h-48 flex flex-col" style={{fontFamily: 'Inter, sans-serif'}}>
+    <div className="w-full h-48 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif'}}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -404,8 +409,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - fills remaining space */}
-      <div className="flex-1 overflow-auto min-h-[200px]">
+      {/* Content area - scrolls internally when many workouts */}
+      <div className="flex-1 overflow-auto overscroll-contain scrollbar-hide">
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
