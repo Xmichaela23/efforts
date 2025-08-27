@@ -161,6 +161,11 @@ export default function PlanSelect() {
   const id = sp.get('id');
   const navigate = useNavigate();
   const { addPlan, loadUserBaselines, refreshPlans } = useAppContext();
+  
+  // DEBUG: Check what we got from context
+  console.log('🔍 DEBUG - PlanSelect: loadUserBaselines from context:', loadUserBaselines);
+  console.log('🔍 DEBUG - PlanSelect: typeof loadUserBaselines:', typeof loadUserBaselines);
+  
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
   const [libPlan, setLibPlan] = useState<any|null>(null);
@@ -177,10 +182,36 @@ export default function PlanSelect() {
   useEffect(() => {
     console.log('🔍 DEBUG - useEffect for baselines is running');
     console.log('🔍 DEBUG - loadUserBaselines function:', loadUserBaselines);
+    
+    // Only run if loadUserBaselines is a function
+    if (typeof loadUserBaselines !== 'function') {
+      console.log('🔍 DEBUG - loadUserBaselines is not a function, trying direct DB call');
+      
+      // Try direct database call as fallback
+      (async () => {
+        try {
+          const { supabase } = await import('@/lib/supabase');
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+            console.log('🔍 DEBUG - Direct DB call result:', { data: !!data, error: error?.message });
+            if (data) {
+              console.log('🔍 DEBUG - Direct DB data:', data);
+              console.log('🔍 DEBUG - Direct DB performance_numbers:', data.performance_numbers);
+              setBaselines(data);
+            }
+          }
+        } catch (e) {
+          console.error('🔍 DEBUG - Direct DB call failed:', e);
+        }
+      })();
+      return;
+    }
+    
     (async () => {
       try {
         console.log('🔍 DEBUG - About to call loadUserBaselines');
-        const b = await loadUserBaselines?.();
+        const b = await loadUserBaselines();
         console.log('🔍 DEBUG - loadUserBaselines returned:', b);
         setBaselines(b);
         console.log('🔍 DEBUG - Loaded baselines on mount:', b);
