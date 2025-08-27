@@ -445,7 +445,7 @@ export default function WorkoutCalendar({
                             }`}
                           >
                             {workoutDisplay}
-                            {isCompleted && <span className="ml-1'>✓</span>}
+                            {isCompleted && <span className="ml-1">✓</span>}
                           </span>
                         );
                       })}
@@ -614,6 +614,7 @@ export default function WorkoutCalendar({
             {/* Empty cells for balance */}
             <div className="w-full h-32"></div>
             <div className="w-full h-32"></div>
+          </div>
         </div>
       </div>
     </div>
