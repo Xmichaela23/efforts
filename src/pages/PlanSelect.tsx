@@ -175,9 +175,13 @@ export default function PlanSelect() {
 
   // Load user baselines when component mounts
   useEffect(() => {
+    console.log('🔍 DEBUG - useEffect for baselines is running');
+    console.log('🔍 DEBUG - loadUserBaselines function:', loadUserBaselines);
     (async () => {
       try {
+        console.log('🔍 DEBUG - About to call loadUserBaselines');
         const b = await loadUserBaselines?.();
+        console.log('🔍 DEBUG - loadUserBaselines returned:', b);
         setBaselines(b);
         console.log('🔍 DEBUG - Loaded baselines on mount:', b);
       } catch (e) {
