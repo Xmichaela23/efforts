@@ -224,10 +224,33 @@ export default function PlanSelect() {
           return;
         }
         
+        // Try loadUserBaselines first
         const b = await loadUserBaselines();
         console.log('🔍 DEBUG - loadUserBaselines returned:', b);
-        setBaselines(b);
-        console.log('🔍 DEBUG - Loaded baselines on mount:', b);
+        
+        if (b) {
+          setBaselines(b);
+          console.log('🔍 DEBUG - Loaded baselines on mount:', b);
+        } else {
+          console.log('🔍 DEBUG - loadUserBaselines returned null, trying direct DB call');
+          
+          // Fallback: direct database call
+          try {
+            const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
+            console.log('🔍 DEBUG - Direct DB call result:', { data: !!data, error: error?.message });
+            if (data) {
+              console.log('🔍 DEBUG - Direct DB data:', data);
+              console.log('🔍 DEBUG - Direct DB performance_numbers:', data.performance_numbers);
+              setBaselines(data);
+            } else {
+              console.log('🔍 DEBUG - No data found in database for user:', user.id);
+              setBaselines(null);
+            }
+          } catch (e) {
+            console.error('🔍 DEBUG - Direct DB call failed:', e);
+            setBaselines(null);
+          }
+        }
       } catch (e) {
         console.error('🔍 DEBUG - Failed to load baselines:', e);
         setBaselines(null);
