@@ -291,22 +291,23 @@ export default function PlanSelect() {
       
       // Use baselines loaded on mount
       console.log('🔍 DEBUG - PlanSelect baselines:', baselines);
-      console.log('🔍 DEBUG - baselines.performanceNumbers:', baselines?.performanceNumbers);
-      console.log('🔍 DEBUG - performanceNumbers keys:', baselines?.performanceNumbers ? Object.keys(baselines.performanceNumbers) : 'null/undefined');
+      console.log('🔍 DEBUG - baselines object keys:', baselines ? Object.keys(baselines) : 'null/undefined');
+      console.log('🔍 DEBUG - Raw baselines data:', baselines);
       
       const mapped = { ...remapped, sessions_by_week: {} as any };
       // Use stored paces from baselines (from assessment)
-      const pn = baselines?.performanceNumbers || {};
+      // The database has the data at the root level, not in a performanceNumbers object
+      const pn = baselines || {};
       const candidate5k = pn.fiveK_pace || pn.fiveK || pn.fiveKPace || null;
       const fiveK = candidate5k ? String(candidate5k) : null;
       const easyPace = pn.easyPace ? String(pn.easyPace) : null;
       const swimPace100 = pn.swimPace100 ? String(pn.swimPace100) : null;
-      const ftp = baselines?.performanceNumbers?.ftp || null;
+      const ftp = pn.ftp || null;
       
       // DEBUG: Log what we extracted from baselines
       console.log('🔍 DEBUG - Extracted values:', { fiveK, easyPace, swimPace100, ftp });
       
-      const oneRMs = { squat: baselines?.performanceNumbers?.squat, bench: baselines?.performanceNumbers?.bench, deadlift: baselines?.performanceNumbers?.deadlift, overhead: baselines?.performanceNumbers?.overheadPress1RM } as any;
+      const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any;
       const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
       const fmtPace = (sec: number, u: string) => { const s = Math.max(1, Math.round(sec)); const mm = Math.floor(s/60); const ss = s%60; return `${mm}:${String(ss).padStart(2,'0')}/${u}`; };
       const addOffset = (base: string, off: string) => { const b = base.trim(); const o = off.trim(); const bm = b.match(/^(\d+):(\d{2})\/(mi|km)$/i); const om = o.match(/^([+\-−])(\d+):(\d{2})\/(mi|km)$/i); if (!bm || !om) return base+off; const bs = parseInt(bm[1],10)*60+parseInt(bm[2],10); const bu = bm[3].toLowerCase(); const sign = om[1]==='-'||om[1]==='−' ? -1 : 1; const os = parseInt(om[2],10)*60+parseInt(om[3],10); const ou = om[4].toLowerCase(); if (bu!==ou) return base+off; return fmtPace(bs + sign*os, bu); };
