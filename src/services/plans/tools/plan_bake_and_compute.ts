@@ -250,13 +250,29 @@ const PRESET_MAP: Record<string, Step[]> = {
       { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
     ]}
   ],
-  // alias for 6x1mi
+  // Additional missing tokens from your plan
+  "interval_8x800m_5kpace_R2min": [
+    { kind: "repeat", times: 8, of: [
+      { kind: "work", ctrl: "distance", val: 0.5, intensity: "target" },
+      { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
+    ]}
+  ],
   "interval_6x1mi_5kpace_R2min": [
     { kind: "repeat", times: 6, of: [
       { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },
       { kind: "recovery", ctrl: "time", val: 120, intensity: "easy" }
     ]}
   ],
+  "longrun_90min_easypace": [{ kind: "work", ctrl: "time", val: 90 * 60, intensity: "longrun" }],
+  "longrun_100min_easypace": [{ kind: "work", ctrl: "time", val: 100 * 60, intensity: "longrun" }],
+  "longrun_110min_easypace": [{ kind: "work", ctrl: "time", val: 110 * 60, intensity: "longrun" }],
+  "longrun_120min_easypace": [{ kind: "work", ctrl: "time", val: 120 * 60, intensity: "longrun" }],
+  "longrun_130min_easypace": [{ kind: "work", ctrl: "time", val: 130 * 60, intensity: "longrun" }],
+  "longrun_135min_easypace": [{ kind: "work", ctrl: "time", val: 135 * 60, intensity: "longrun" }],
+  "longrun_140min_easypace": [{ kind: "work", ctrl: "time", val: 140 * 60, intensity: "longrun" }],
+  "longrun_150min_easypace": [{ kind: "work", ctrl: "time", val: 150 * 60, intensity: "longrun" }],
+  "longrun_180min_easypace": [{ kind: "work", ctrl: "time", val: 180 * 60, intensity: "longrun" }],
+
   "1mi_x6_R2min": [
     { kind: "repeat", times: 6, of: [
       { kind: "work", ctrl: "distance", val: 1.0, intensity: "target" },

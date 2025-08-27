@@ -5,7 +5,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface LoggedSet {
   reps: number;

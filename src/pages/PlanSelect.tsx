@@ -513,10 +513,28 @@ export default function PlanSelect() {
       };
 
       let baked: any | null = null;
+      console.log('[baker] About to call augmentPlan with:', {
+        hasBaselines: !!planForAugment.baselines_template,
+        baselineKeys: Object.keys(planForAugment.baselines_template || {}),
+        hasSessions: !!planForAugment.sessions_by_week,
+        sessionCount: Object.keys(planForAugment.sessions_by_week || {}).length,
+        firstSession: planForAugment.sessions_by_week?.['1']?.[0]
+      });
+      
       try { 
+        console.log('[baker] Calling augmentPlan...');
         baked = augmentPlan(planForAugment); 
+        console.log('[baker] augmentPlan returned:', baked ? 'success' : 'null');
+        if (baked?.sessions_by_week) {
+          console.log('[baker] Baked sessions by week:', Object.keys(baked.sessions_by_week));
+        }
       } catch (error) {
         console.error('[baker] Failed to bake plan:', error);
+        console.error('[baker] Error details:', {
+          name: error.name,
+          message: error.message,
+          stack: error.stack
+        });
       }
       const payload = {
         name: libPlan.name,
