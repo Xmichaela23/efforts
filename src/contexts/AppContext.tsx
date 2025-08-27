@@ -537,9 +537,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               sessions_by_week: sessionsByWeek
             } as any;
             
-            console.log('🔍 DEBUG - Baking entire plan with baselines:', workoutPlan);
-            bakedPlan = augmentPlan(workoutPlan);
-            console.log('🔍 DEBUG - Baked plan result:', bakedPlan);
+            // TEMPORARILY DISABLED - BAKER IS CRASHING SUPABASE
+            // console.log('🔍 DEBUG - Baking entire plan with baselines:', workoutPlan);
+            // bakedPlan = augmentPlan(workoutPlan);
+            // console.log('🔍 DEBUG - Baked plan result:', bakedPlan);
+            console.log('🚨 BAKER TEMPORARILY DISABLED - PREVENTING SUPABASE CRASH');
+            bakedPlan = null;
           } catch (bakeError) {
             console.error('❌ Plan baking failed:', bakeError);
           }

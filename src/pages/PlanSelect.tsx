@@ -521,21 +521,24 @@ export default function PlanSelect() {
         firstSession: planForAugment.sessions_by_week?.['1']?.[0]
       });
       
-      try { 
-        console.log('[baker] Calling augmentPlan...');
-        baked = augmentPlan(planForAugment); 
-        console.log('[baker] augmentPlan returned:', baked ? 'success' : 'null');
-        if (baked?.sessions_by_week) {
-          console.log('[baker] Baked sessions by week:', Object.keys(baked.sessions_by_week));
-        }
-      } catch (error) {
-        console.error('[baker] Failed to bake plan:', error);
-        console.error('[baker] Error details:', {
-          name: error.name,
-          message: error.message,
-          stack: error.stack
-        });
-      }
+      // TEMPORARILY DISABLED - BAKER IS CRASHING SUPABASE
+      // try { 
+      //   console.log('[baker] Calling augmentPlan...');
+      //   baked = augmentPlan(planForAugment); 
+      //   console.log('[baker] augmentPlan returned:', baked ? 'success' : 'null');
+      //   if (baked?.sessions_by_week) {
+      //     console.log('[baker] Baked sessions by week:', Object.keys(baked.sessions_by_week));
+      //   }
+      // } catch (error) {
+      //   console.error('[baker] Failed to bake plan:', error);
+      //   console.error('[baker] Error details:', {
+      //     name: error.name,
+      //     message: error.message,
+      //     stack: error.stack
+      //   });
+      //   }
+      console.log('🚨 BAKER TEMPORARILY DISABLED - PREVENTING SUPABASE CRASH');
+      baked = null;
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
