@@ -574,6 +574,8 @@ const PRESET_MAP: Record<string, Step[]> = {
   // --- STRENGTH (reference only) ---
   // Strength is not baked with pace/power, but for consistency in plans
   "strength_main_50min": [{ kind: "steady", ctrl: "time", val: 50 * 60, intensity: "easy", label: "Strength" }],
+  "strength_main_40min": [{ kind: "steady", ctrl: "time", val: 40 * 60, intensity: "easy", label: "Strength" }],
+  "strength_main_35min": [{ kind: "steady", ctrl: "time", val: 35 * 60, intensity: "easy", label: "Strength" }],
   "strength_taper_30min": [{ kind: "steady", ctrl: "time", val: 30 * 60, intensity: "easy", label: "Strength" }],
   "strength_core_20min": [{ kind: "steady", ctrl: "time", val: 20 * 60, intensity: "easy", label: "Core" }],
   "strength_accessory_25min": [{ kind: "steady", ctrl: "time", val: 25 * 60, intensity: "easy", label: "Accessory" }]
