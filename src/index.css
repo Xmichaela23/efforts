@@ -98,7 +98,7 @@
   .mobile-main-content {
     grid-row: 2;
     /* Deterministic height: viewport minus header and bottom bar */
-    height: calc(100dvh - var(--header-h) - var(--tabbar-h) - env(safe-area-inset-bottom));
+    height: calc(100dvh - var(--header-h) - var(--tabbar-h));
     overflow: hidden;
     /* preserve safe area padding for bottom gestures */
     padding-bottom: env(safe-area-inset-bottom);
