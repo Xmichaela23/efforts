@@ -140,15 +140,19 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setFriendlyDesc(out);
         }
 
-        // Prefer computed.total_duration_seconds
+        // NO FALLBACKS - DIE IF NO COMPUTED DATA
         const comp: any = (workout as any).computed || null;
-        let secs: any = comp ? comp.total_duration_seconds : null;
+        if (!comp || !comp.total_duration_seconds || comp.total_duration_seconds <= 0) {
+          console.error('🚨 NO COMPUTED DATA FOR WORKOUT:', workout.id, workout);
+          throw new Error(`Workout ${workout.id} has no computed data - baker failed!`);
+        }
+        
+        let secs = comp.total_duration_seconds;
         if (typeof secs === 'string') secs = parseInt(secs, 10);
         if (typeof secs === 'number' && isFinite(secs) && secs > 0) {
           setResolvedDuration(Math.round(secs / 60));
-        } else if (!workout.duration) {
-          const est = estimateMinutesFromDescription((workout as any).rendered_description || workout.description);
-          if (est > 0) setResolvedDuration(est);
+        } else {
+          throw new Error(`Invalid duration: ${secs}`);
         }
       } catch {
         setFriendlyDesc(stripCodes(workout.description));
@@ -260,7 +264,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       <div className="space-y-4">
         {/* Template System - No Fallbacks */}
         <WorkoutDetailView
-          computed={workout.computed || { total_duration_seconds: 0, steps: [] }}
+                          computed={workout.computed || (() => { throw new Error(`No computed data for workout ${workout.id}`) })()}
           baselines={{
             fiveK_pace_sec_per_mi: (workout as any).fiveK_pace_sec_per_mi,
             easy_pace_sec_per_mi: (workout as any).easy_pace_sec_per_mi,

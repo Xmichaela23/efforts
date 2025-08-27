@@ -491,6 +491,60 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         };
         const rows: any[] = [];
         const planExportHints: any = (planData as any)?.export_hints || (data as any)?.export_hints || null;
+        
+        // Bake the entire plan first with user baselines
+        let bakedPlan: any = null;
+        if (userBaselines) {
+          try {
+            // Convert pace strings to seconds per mile for the baker
+            const toSecPerMi = (pace: string | null | undefined): number | null => {
+              if (!pace) return null;
+              const txt = String(pace).trim();
+              let m = txt.match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
+              if (m) {
+                const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+                const unit = m[3].toLowerCase();
+                if (unit === 'mi') return sec;
+                if (unit === 'km') return Math.round(sec * 1.60934);
+                return sec;
+              }
+              m = txt.match(/^(\d+):(\d{2})$/);
+              if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
+              return null;
+            };
+
+            const baselinesTemplate = {
+              fiveK_pace_sec_per_mi: toSecPerMi(userBaselines.performanceNumbers?.fiveK),
+              easy_pace_sec_per_mi: toSecPerMi(userBaselines.performanceNumbers?.easyPace),
+              tenK_pace_sec_per_mi: null,
+              mp_pace_sec_per_mi: null,
+              ftp: typeof userBaselines.performanceNumbers?.ftp === 'number' ? userBaselines.performanceNumbers.ftp : null,
+              swim_pace_per_100_sec: userBaselines.performanceNumbers?.swimPace100 ? (()=>{ 
+                const [mm,ss] = String(userBaselines.performanceNumbers.swimPace100).split(':').map((x:string)=>parseInt(x,10)); 
+                return (mm||0)*60+(ss||0); 
+              })() : null,
+              easy_from_5k_multiplier: 1.30
+            };
+
+            const workoutPlan = {
+              name: data.name,
+              description: data.description,
+              duration_weeks: data.duration_weeks,
+              swim_unit: data.swim_unit || 'yd',
+              baselines_template: baselinesTemplate,
+              tolerances: planExportHints,
+              export_hints: planExportHints,
+              sessions_by_week: sessionsByWeek
+            } as any;
+            
+            console.log('🔍 DEBUG - Baking entire plan with baselines:', workoutPlan);
+            bakedPlan = augmentPlan(workoutPlan);
+            console.log('🔍 DEBUG - Baked plan result:', bakedPlan);
+          } catch (bakeError) {
+            console.error('❌ Plan baking failed:', bakeError);
+          }
+        }
+        
         Object.keys(sessionsByWeek).forEach((wkKey) => {
           const weekNum = parseInt(wkKey, 10);
           const sessions = sessionsByWeek[wkKey] || [];
@@ -535,108 +589,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               targetsSummary = undefined;
             }
 
-            // Try to use plan baker to generate detailed computed data with steps
+            // Get computed data from the baked plan
             let computedData: any = {
               normalization_version: 'v2',
               total_duration_seconds: totalSeconds,
               targets_summary: targetsSummary || {},
             };
 
-            // If we have steps_preset, try to bake the workout to get detailed steps
-            if (Array.isArray(s?.steps_preset) && s.steps_preset.length > 0 && userBaselines) {
-              try {
-                // DEBUG: Log what we're getting from userBaselines
-                console.log('🔍 DEBUG - userBaselines:', userBaselines);
-                console.log('🔍 DEBUG - performanceNumbers:', userBaselines.performanceNumbers);
-                console.log('🔍 DEBUG - fiveK:', userBaselines.performanceNumbers?.fiveK);
-                console.log('🔍 DEBUG - easyPace:', userBaselines.performanceNumbers?.easyPace);
-                console.log('🔍 DEBUG - ftp:', userBaselines.performanceNumbers?.ftp);
-
-                // Convert pace strings to seconds per mile for the baker (same pattern as PlanSelect.tsx)
-                const toSecPerMi = (pace: string | null | undefined): number | null => {
-                  if (!pace) return null;
-                  const txt = String(pace).trim();
-                  // Accept 7:43, 7:43/mi, 4:45/km
-                  let m = txt.match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
-                  if (m) {
-                    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-                    const unit = m[3].toLowerCase();
-                    if (unit === 'mi') return sec;
-                    if (unit === 'km') return Math.round(sec * 1.60934);
-                    return sec;
-                  }
-                  m = txt.match(/^(\d+):(\d{2})$/); // no unit → assume /mi
-                  if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
-                  return null;
+            if (bakedPlan && bakedPlan.sessions_by_week && bakedPlan.sessions_by_week[weekNum]) {
+              const bakedSession = bakedPlan.sessions_by_week[weekNum].find((bs: any) => 
+                bs.day === s.day && bs.discipline === s.discipline
+              );
+              
+              if (bakedSession && bakedSession.computed) {
+                computedData = {
+                  normalization_version: 'v2',
+                  total_duration_seconds: bakedSession.computed.total_seconds || totalSeconds,
+                  steps: bakedSession.computed.steps || [],
+                  total_hmmss: bakedSession.computed.total_hmmss || '0:00'
                 };
-
-                // Create proper baselines template with actual values
-                const baselinesTemplate = {
-                  fiveK_pace_sec_per_mi: toSecPerMi(userBaselines.performanceNumbers?.fiveK),
-                  easy_pace_sec_per_mi: toSecPerMi(userBaselines.performanceNumbers?.easyPace),
-                  tenK_pace_sec_per_mi: null, // Baker will calculate this from 5K
-                  mp_pace_sec_per_mi: null,   // Baker will calculate this from 5K
-                  ftp: typeof userBaselines.performanceNumbers?.ftp === 'number' ? userBaselines.performanceNumbers.ftp : null,
-                  swim_pace_per_100_sec: userBaselines.performanceNumbers?.swimPace100 ? (()=>{ 
-                    const [mm,ss] = String(userBaselines.performanceNumbers.swimPace100).split(':').map((x:string)=>parseInt(x,10)); 
-                    return (mm||0)*60+(ss||0); 
-                  })() : null,
-                  easy_from_5k_multiplier: 1.30
-                };
-
-                // DEBUG: Log what we're sending to the baker
-                console.log('🔍 DEBUG - baselinesTemplate:', baselinesTemplate);
-
-                // Create a minimal plan structure for the baker
-                const workoutPlan = {
-                  name: 'temp',
-                  description: '',
-                  duration_weeks: 1,
-                  swim_unit: 'yd' as const,
-                  baselines_template: baselinesTemplate,
-                  tolerances: undefined,
-                  export_hints: null,
-                  sessions_by_week: {
-                    '1': [{
-                      day: s.day || 'Monday',
-                      discipline: mappedType as 'run' | 'bike' | 'swim',
-                      description: s.description || '',
-                      steps_preset: s.steps_preset,
-                      workout_spec: {
-                        units: (mappedType === 'swim' ? 'yd' : 'mi') as 'mi' | 'yd',
-                        steps: [],
-                        targets: {}
-                      }
-                    }]
-                  }
-                } as any; // Type assertion to bypass complex type checking
-
-                // DEBUG: Log what we're sending to augmentPlan
-                console.log('🔍 DEBUG - workoutPlan:', workoutPlan);
-
-                // Bake the plan to get computed workout data
-                const bakedPlan = augmentPlan(workoutPlan);
-                const bakedSession = bakedPlan.sessions_by_week['1'][0];
-                
-                // DEBUG: Log what the baker returned
-                console.log('🔍 DEBUG - bakedPlan:', bakedPlan);
-                console.log('🔍 DEBUG - bakedSession:', bakedSession);
-                console.log('🔍 DEBUG - computed:', bakedSession.computed);
-                
-                if (bakedSession.computed) {
-                  computedData = {
-                    ...computedData,
-                    total_duration_seconds: bakedSession.computed.total_seconds || totalSeconds,
-                    steps: bakedSession.computed.steps || [],
-                    total_hmmss: bakedSession.computed.total_hmmss
-                  };
-                  console.log('🔍 DEBUG - Final computedData:', computedData);
-                } else {
-                  console.log('🔍 DEBUG - No computed data from baker!');
-                }
-              } catch (bakeError) {
-                console.error('❌ Plan baking failed:', bakeError);
-                // Keep the basic computed data if baking fails
+                console.log('🔍 DEBUG - Found baked session:', bakedSession.day, bakedSession.discipline, computedData);
               }
             }
 
