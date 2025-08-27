@@ -31,6 +31,10 @@ const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
         return <Clock className="h-4 w-4 text-gray-600" />;
       case 'cooldown':
         return <Play className="h-4 w-4 text-red-600" />;
+      case 'option':
+        return <Target className="h-4 w-4 text-purple-600" />;
+      case 'alternative':
+        return <Target className="h-4 w-4 text-orange-600" />;
       default:
         return <Target className="h-4 w-4 text-gray-600" />;
     }
@@ -70,9 +74,17 @@ const WorkoutExecutionView: React.FC<WorkoutExecutionViewProps> = ({
               {getStepIcon(step.type)}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-700">
-                {step.description}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm text-gray-700">
+                  {step.description}
+                </p>
+                {step.isOptional && (
+                  <span className="text-xs px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded-full">Optional</span>
+                )}
+                {step.isAlternative && (
+                  <span className="text-xs px-1.5 py-0.5 bg-orange-100 text-orange-800 rounded-full">Alternative</span>
+                )}
+              </div>
             </div>
           </div>
         ))}

@@ -35,6 +35,10 @@ const WorkoutDetailView: React.FC<WorkoutDetailViewProps> = ({
         return <Clock className="h-4 w-4 text-gray-600" />;
       case 'cooldown':
         return <Play className="h-4 w-4 text-red-600" />;
+      case 'option':
+        return <Target className="h-4 w-4 text-purple-600" />;
+      case 'alternative':
+        return <Target className="h-4 w-4 text-orange-600" />;
       default:
         return <Target className="h-4 w-4 text-gray-600" />;
     }
@@ -50,6 +54,10 @@ const WorkoutDetailView: React.FC<WorkoutDetailViewProps> = ({
         return 'border-l-gray-200 bg-gray-50';
       case 'cooldown':
         return 'border-l-red-200 bg-red-50';
+      case 'option':
+        return 'border-l-purple-200 bg-purple-50';
+      case 'alternative':
+        return 'border-l-orange-200 bg-orange-50';
       default:
         return 'border-l-gray-200 bg-gray-50';
     }
@@ -82,6 +90,12 @@ const WorkoutDetailView: React.FC<WorkoutDetailViewProps> = ({
                   <span className="font-medium text-gray-900">{step.description}</span>
                   {step.repeats && (
                     <span className="text-sm text-gray-500">({step.repeats} reps)</span>
+                  )}
+                  {step.isOptional && (
+                    <span className="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full">Optional</span>
+                  )}
+                  {step.isAlternative && (
+                    <span className="text-xs px-2 py-1 bg-orange-100 text-orange-800 rounded-full">Alternative</span>
                   )}
                 </div>
                 

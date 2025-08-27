@@ -8,6 +8,7 @@ export interface WorkoutComputed {
   total_duration_seconds: number;
   steps: Array<{
     kind?: string;
+    intensity?: string;
     ctrl?: 'time' | 'distance';
     seconds?: number;
     pace_sec_per_mi?: number;
@@ -50,13 +51,15 @@ export interface WorkoutDisplay {
 }
 
 export interface WorkoutStep {
-  type: 'warmup' | 'main' | 'recovery' | 'cooldown';
+  type: 'warmup' | 'main' | 'recovery' | 'cooldown' | 'option' | 'alternative';
   description: string;
   duration?: string;
   target?: string;
   range?: string;
   recovery?: string;
   repeats?: number;
+  isOptional?: boolean;
+  isAlternative?: boolean;
 }
 
 // Helper functions for formatting
@@ -91,6 +94,38 @@ function formatDistanceRange(distance: number, units: string): string {
   if (units === 'm') return `${Math.round(distance)} m`;
   if (units === 'yd') return `${Math.round(distance)} yd`;
   return `${distance} ${units}`;
+}
+
+// Helper function to parse workout descriptions for optional workouts and alternatives
+function parseWorkoutOptions(description: string): {
+  mainWorkout: string;
+  alternatives: string[];
+  isOptional: boolean;
+} {
+  const isOptional = description.toLowerCase().includes('(optional)') || description.toLowerCase().includes('optional');
+  
+  // Split by "Alternative:" or "OR" to separate main workout from alternatives
+  const alternativeSeparators = ['Alternative:', 'OR', 'Alternative -', 'Alternative -'];
+  let mainWorkout = description;
+  let alternatives: string[] = [];
+  
+  for (const separator of alternativeSeparators) {
+    if (description.includes(separator)) {
+      const parts = description.split(separator);
+      mainWorkout = parts[0].trim();
+      alternatives = parts.slice(1).map(alt => alt.trim()).filter(alt => alt.length > 0);
+      break;
+    }
+  }
+  
+  // Clean up main workout (remove optional tag)
+  mainWorkout = mainWorkout.replace(/\(optional\)/i, '').trim();
+  
+  return {
+    mainWorkout,
+    alternatives,
+    isOptional
+  };
 }
 
 // Helper function to parse strength workout descriptions with inline rest times
@@ -170,12 +205,42 @@ export function generateDetailedWorkoutTemplate(
 
   // Handle case where there's no computed data - show minimal info
   if (!computed.steps || computed.steps.length === 0) {
+    // Check if this is an optional workout or has alternatives
+    if (description) {
+      const options = parseWorkoutOptions(description);
+      const steps: WorkoutStep[] = [];
+      
+      // Add main workout
+      if (options.mainWorkout) {
+        steps.push({
+          type: 'main',
+          description: options.mainWorkout,
+          isOptional: options.isOptional
+        });
+      }
+      
+      // Add alternatives
+      options.alternatives.forEach(alt => {
+        steps.push({
+          type: 'alternative',
+          description: alt,
+          isAlternative: true
+        });
+      });
+      
+      return {
+        title: `${workoutType}${options.isOptional ? ' (Optional)' : ''}`,
+        totalDuration: 'Duration not specified',
+        steps
+      };
+    }
+    
     return {
       title: workoutType,
       totalDuration: 'Duration not specified',
       steps: [{
         type: 'main',
-        description: description || 'Workout details not available'
+        description: 'Workout details not available'
       }]
     };
   }
@@ -188,9 +253,9 @@ export function generateDetailedWorkoutTemplate(
   let recoveryDescription = '';
 
   // Analyze computed steps to build workout structure
-  const warmupSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('wu') || s.label?.toLowerCase().includes('warm'));
-  const cooldownSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('cd') || s.label?.toLowerCase().includes('cool'));
-  const mainSteps = computed.steps.filter(s => s.kind === 'work' && !s.label?.toLowerCase().includes('wu') && !s.label?.toLowerCase().includes('cd'));
+  const warmupSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('wu') || s.label?.toLowerCase().includes('warm') || s.label === 'WU');
+  const cooldownSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('cd') || s.label?.toLowerCase().includes('cool') || s.label === 'CD');
+  const mainSteps = computed.steps.filter(s => s.kind === 'work' && !s.label?.toLowerCase().includes('wu') && !s.label?.toLowerCase().includes('cd') && s.label !== 'WU' && s.label !== 'CD');
   const recoverySteps = computed.steps.filter(s => s.kind === 'recovery');
 
   // Generate title
@@ -210,12 +275,26 @@ export function generateDetailedWorkoutTemplate(
   // Add warmup step
   if (warmupSteps.length > 0) {
     const wu = warmupSteps[0];
+    let target, range;
+    
+    // Handle bike workouts (power-based)
+    if (wu.target_watts) {
+      target = `@ ${wu.target_watts}W`;
+      range = wu.power_range ? `Range: ${wu.power_range.lower}–${wu.power_range.upper}W` : undefined;
+    }
+    // Handle run workouts (pace-based)
+    else if (wu.pace_sec_per_mi) {
+      const isJog = wu.label === 'jog' || wu.intensity === 'easy';
+      target = `@ ${formatPace(wu.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+      range = wu.pace_range ? `Range: ${formatPace(wu.pace_range.lower)} – ${formatPace(wu.pace_range.upper)}` : undefined;
+    }
+    
     steps.push({
       type: 'warmup',
       description: `Warm-Up`,
       duration: formatTime(wu.seconds),
-      target: wu.pace_sec_per_mi ? `@ ${formatPace(wu.pace_sec_per_mi)}` : undefined,
-      range: wu.pace_range ? `Range: ${formatPace(wu.pace_range.lower)} – ${formatPace(wu.pace_range.upper)}` : undefined
+      target,
+      range
     });
   }
 
@@ -227,16 +306,38 @@ export function generateDetailedWorkoutTemplate(
     if (firstMain.ctrl === 'distance' && firstMain.original_units) {
       mainSetDescription = `${formatDistanceRange(firstMain.original_val || 0, firstMain.original_units)}`;
       
-      if (firstMain.pace_sec_per_mi) {
-        mainSetTarget = `@ ${formatPace(firstMain.pace_sec_per_mi)}`;
-        mainSetRange = `Range: ${formatPace(firstMain.pace_range?.lower || firstMain.pace_sec_per_mi)} – ${formatPace(firstMain.pace_range?.upper || firstMain.pace_sec_per_mi)}`;
+      // Handle bike workouts (power-based)
+      if (firstMain.target_watts) {
+        mainSetTarget = `@ ${firstMain.target_watts}W`;
+        mainSetRange = firstMain.power_range ? `Range: ${firstMain.power_range.lower}–${firstMain.power_range.upper}W` : undefined;
+      }
+      // Handle run workouts (pace-based)
+      else if (firstMain.pace_sec_per_mi) {
+        const isJog = firstMain.label === 'jog' || firstMain.intensity === 'easy';
+        mainSetTarget = `@ ${formatPace(firstMain.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+        mainSetRange = firstMain.pace_range ? `Range: ${formatPace(firstMain.pace_range?.lower || firstMain.pace_sec_per_mi)} – ${formatPace(firstMain.pace_range?.upper || firstMain.pace_sec_per_mi)}` : undefined;
       }
     }
 
     // Add recovery info
     if (recoverySteps.length > 0) {
       const recovery = recoverySteps[0];
-      recoveryDescription = `${formatTime(recovery.seconds)} @ ${formatPace(recovery.pace_sec_per_mi || baselines.easy_pace_sec_per_mi || 0)}`;
+      let recoveryTarget = '';
+      
+      // Handle bike recovery (power-based)
+      if (recovery.target_watts) {
+        recoveryTarget = ` @ ${recovery.target_watts}W`;
+      }
+      // Handle run recovery (pace-based)
+      else if (recovery.pace_sec_per_mi) {
+        recoveryTarget = ` @ ${formatPace(recovery.pace_sec_per_mi)}`;
+      }
+      // Fallback to easy pace for runs
+      else if (baselines.easy_pace_sec_per_mi) {
+        recoveryTarget = ` @ ${formatPace(baselines.easy_pace_sec_per_mi)}`;
+      }
+      
+      recoveryDescription = `${formatTime(recovery.seconds)}${recoveryTarget}`;
     }
 
     steps.push({
@@ -252,18 +353,32 @@ export function generateDetailedWorkoutTemplate(
   // Add cooldown step
   if (cooldownSteps.length > 0) {
     const cd = cooldownSteps[0];
+    let target, range;
+    
+    // Handle bike workouts (power-based)
+    if (cd.target_watts) {
+      target = `@ ${cd.target_watts}W`;
+      range = cd.power_range ? `Range: ${cd.power_range.lower}–${cd.power_range.upper}W` : undefined;
+    }
+    // Handle run workouts (pace-based)
+    else if (cd.pace_sec_per_mi) {
+      const isJog = cd.label === 'jog' || cd.intensity === 'easy';
+      target = `@ ${formatPace(cd.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+      range = cd.pace_range ? `Range: ${formatPace(cd.pace_range.lower)} – ${formatPace(cd.pace_range.upper)}` : undefined;
+    }
+    
     steps.push({
       type: 'cooldown',
       description: `Cool-Down`,
       duration: formatTime(cd.seconds),
-      target: cd.pace_sec_per_mi ? `@ ${formatPace(cd.pace_sec_per_mi)}` : undefined,
-      range: cd.pace_range ? `Range: ${formatPace(cd.pace_range.lower)} – ${formatPace(cd.pace_range.upper)}` : undefined
+      target,
+      range
     });
   }
 
   return {
     title,
-    totalDuration: `~${Math.round(computed.total_duration_seconds / 60)} min`,
+    totalDuration: formatDuration(computed.total_duration_seconds),
     steps
   };
 }
@@ -280,7 +395,39 @@ export function generateSummaryWorkoutTemplate(
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
 
-  const mainSteps = computed.steps.filter(s => s.kind === 'work' && !s.label?.toLowerCase().includes('wu') && !s.label?.toLowerCase().includes('cd'));
+  // Handle case where there's no computed data but we have a description
+  if (!computed.steps || computed.steps.length === 0) {
+    if (description) {
+      const options = parseWorkoutOptions(description);
+      const steps: WorkoutStep[] = [];
+      
+      // Add main workout
+      if (options.mainWorkout) {
+        steps.push({
+          type: 'main',
+          description: options.mainWorkout,
+          isOptional: options.isOptional
+        });
+      }
+      
+      // Add alternatives
+      options.alternatives.forEach(alt => {
+        steps.push({
+          type: 'alternative',
+          description: alt,
+          isAlternative: true
+        });
+      });
+      
+      return {
+        title: `${workoutType}${options.isOptional ? ' (Optional)' : ''}`,
+        totalDuration: 'Duration not specified',
+        steps
+      };
+    }
+  }
+
+  const mainSteps = computed.steps.filter(s => s.kind === 'work' && !s.label?.toLowerCase().includes('wu') && !s.label?.toLowerCase().includes('cd') && s.label !== 'WU' && s.label !== 'CD');
   const recoverySteps = computed.steps.filter(s => s.kind === 'recovery');
   
   let title = workoutType;
@@ -297,9 +444,10 @@ export function generateSummaryWorkoutTemplate(
       
       if (firstMain.pace_sec_per_mi) {
         const targetTime = formatTime(firstMain.seconds);
+        const isJog = firstMain.label === 'jog' || firstMain.intensity === 'easy';
         const range = firstMain.pace_range ? 
           ` (${formatTime(firstMain.pace_range.lower)}–${formatTime(firstMain.pace_range.upper)})` : '';
-        mainDescription = `@ ${formatPace(firstMain.pace_sec_per_mi)} — ${targetTime} per rep${range}`;
+        mainDescription = `@ ${formatPace(firstMain.pace_sec_per_mi)}${isJog ? ' (jog)' : ''} — ${targetTime} per rep${range}`;
       }
     }
   }
@@ -308,16 +456,17 @@ export function generateSummaryWorkoutTemplate(
   if (recoverySteps.length > 0) {
     const recovery = recoverySteps[0];
     const recoveryTime = formatTime(recovery.seconds);
+    const isJog = recovery.label === 'jog' || recovery.intensity === 'easy';
     const recoveryPace = recovery.pace_sec_per_mi ? 
-      ` @ ${formatPace(recovery.pace_sec_per_mi)}` : '';
+      ` @ ${formatPace(recovery.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}` : '';
     const recoveryRange = recovery.pace_range ? 
       ` (${formatPace(recovery.pace_range.lower)}–${formatPace(recovery.pace_range.upper)})` : '';
     recoveryDescription = `Recovery ${recoveryTime}${recoveryPace}${recoveryRange}`;
   }
 
   // Build structure summary
-  const hasWarmup = computed.steps.some(s => s.label?.toLowerCase().includes('wu'));
-  const hasCooldown = computed.steps.some(s => s.label?.toLowerCase().includes('cd'));
+  const hasWarmup = computed.steps.some(s => s.label?.toLowerCase().includes('wu') || s.label === 'WU');
+  const hasCooldown = computed.steps.some(s => s.label?.toLowerCase().includes('cd') || s.label === 'CD');
   const structureParts = [];
   if (hasWarmup) structureParts.push('Warm-up');
   if (mainSteps.length > 0) structureParts.push('Intervals');
@@ -346,32 +495,89 @@ export function generateExecutionTemplate(
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
 
+  // Handle case where there's no computed data but we have a description
+  if (!computed.steps || computed.steps.length === 0) {
+    if (description) {
+      const options = parseWorkoutOptions(description);
+      const steps: WorkoutStep[] = [];
+      
+      // Add main workout
+      if (options.mainWorkout) {
+        steps.push({
+          type: 'main',
+          description: options.mainWorkout,
+          isOptional: options.isOptional
+        });
+      }
+      
+      // Add alternatives
+      options.alternatives.forEach(alt => {
+        steps.push({
+          type: 'alternative',
+          description: alt,
+          isAlternative: true
+        });
+      });
+      
+      return {
+        title: `${workoutType}${options.isOptional ? ' (Optional)' : ''}`,
+        totalDuration: 'Duration not specified',
+        steps
+      };
+    }
+  }
+
   const steps: WorkoutStep[] = [];
   
   // Add warmup
-  const warmupSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('wu') || s.label?.toLowerCase().includes('warm'));
+  const warmupSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('wu') || s.label?.toLowerCase().includes('warm') || s.label === 'WU');
   if (warmupSteps.length > 0) {
     const wu = warmupSteps[0];
-    const warmupPace = wu.pace_sec_per_mi ? ` @ ${formatPace(wu.pace_sec_per_mi)}` : '';
-    const warmupRange = wu.pace_range ? ` (${formatPace(wu.pace_range.lower)}–${formatPace(wu.pace_range.upper)})` : '';
+    let warmupTarget = '';
+    let warmupRange = '';
+    
+    // Handle bike workouts (power-based)
+    if (wu.target_watts) {
+      warmupTarget = ` @ ${wu.target_watts}W`;
+      warmupRange = wu.power_range ? ` (${wu.power_range.lower}–${wu.power_range.upper}W)` : '';
+    }
+    // Handle run workouts (pace-based)
+    else if (wu.pace_sec_per_mi) {
+      const isJog = wu.label === 'jog' || wu.intensity === 'easy';
+      warmupTarget = ` @ ${formatPace(wu.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+      warmupRange = wu.pace_range ? ` (${formatPace(wu.pace_range.lower)}–${formatPace(wu.pace_range.upper)})` : '';
+    }
+    
     steps.push({
       type: 'warmup',
-      description: `Warm-up ${formatTime(wu.seconds)}${warmupPace}${warmupRange}`
+      description: `Warm-up ${formatTime(wu.seconds)}${warmupTarget}${warmupRange}`
     });
   }
 
   // Add main set
-  const mainSteps = computed.steps.filter(s => s.kind === 'work' && !s.label?.toLowerCase().includes('wu') && !s.label?.toLowerCase().includes('cd'));
+  const mainSteps = computed.steps.filter(s => s.kind === 'work' && !s.label?.toLowerCase().includes('wu') && !s.label?.toLowerCase().includes('cd') && s.label !== 'WU' && s.label !== 'CD');
   if (mainSteps.length > 0) {
     const firstMain = mainSteps[0];
     if (firstMain.ctrl === 'distance' && firstMain.original_units) {
       const distance = formatDistanceRange(firstMain.original_val || 0, firstMain.original_units);
-      const mainPace = firstMain.pace_sec_per_mi ? ` @ ${formatPace(firstMain.pace_sec_per_mi)}` : '';
-      const mainRange = firstMain.pace_range ? ` (${formatPace(firstMain.pace_range.lower)}–${formatPace(firstMain.pace_range.upper)})` : '';
+      let mainTarget = '';
+      let mainRange = '';
+      
+      // Handle bike workouts (power-based)
+      if (firstMain.target_watts) {
+        mainTarget = ` @ ${firstMain.target_watts}W`;
+        mainRange = firstMain.power_range ? ` (${firstMain.power_range.lower}–${firstMain.power_range.upper}W)` : '';
+      }
+      // Handle run workouts (pace-based)
+      else if (firstMain.pace_sec_per_mi) {
+        const isJog = firstMain.label === 'jog' || firstMain.intensity === 'easy';
+        mainTarget = ` @ ${formatPace(firstMain.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+        mainRange = firstMain.pace_range ? ` (${formatPace(firstMain.pace_range.lower)}–${formatPace(firstMain.pace_range.upper)})` : '';
+      }
       
       steps.push({
         type: 'main',
-        description: `${mainSteps.length} × ${distance}${mainPace}${mainRange}`
+        description: `${mainSteps.length} × ${distance}${mainTarget}${mainRange}`
       });
     }
   }
@@ -380,30 +586,54 @@ export function generateExecutionTemplate(
   const recoverySteps = computed.steps.filter(s => s.kind === 'recovery');
   if (recoverySteps.length > 0) {
     const recovery = recoverySteps[0];
-    const recoveryPace = recovery.pace_sec_per_mi ? ` @ ${formatPace(recovery.pace_sec_per_mi)}` : '';
-    const recoveryRange = recovery.pace_range ? ` (${formatPace(recovery.pace_range.lower)}–${formatPace(recovery.pace_range.upper)})` : '';
+    let recoveryTarget = '';
+    let recoveryRange = '';
+    
+    // Handle bike recovery (power-based)
+    if (recovery.target_watts) {
+      recoveryTarget = ` @ ${recovery.target_watts}W`;
+      recoveryRange = recovery.power_range ? ` (${recovery.power_range.lower}–${recovery.power_range.upper}W)` : '';
+    }
+    // Handle run recovery (pace-based)
+    else if (recovery.pace_sec_per_mi) {
+      const isJog = recovery.label === 'jog' || recovery.intensity === 'easy';
+      recoveryTarget = ` @ ${formatPace(recovery.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+      recoveryRange = recovery.pace_range ? ` (${formatPace(recovery.pace_range.lower)}–${formatPace(recovery.pace_range.upper)})` : '';
+    }
     
     steps.push({
       type: 'recovery',
-      description: `• with ${formatTime(recovery.seconds)}${recoveryPace}${recoveryRange}`
+      description: `• with ${formatTime(recovery.seconds)}${recoveryTarget}${recoveryRange}`
     });
   }
 
   // Add cooldown
-  const cooldownSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('cd') || s.label?.toLowerCase().includes('cool'));
+  const cooldownSteps = computed.steps.filter(s => s.label?.toLowerCase().includes('cd') || s.label?.toLowerCase().includes('cool') || s.label === 'CD');
   if (cooldownSteps.length > 0) {
     const cd = cooldownSteps[0];
-    const cooldownPace = cd.pace_sec_per_mi ? ` @ ${formatPace(cd.pace_sec_per_mi)}` : '';
-    const cooldownRange = cd.pace_range ? ` (${formatPace(cd.pace_range.lower)}–${formatPace(cd.pace_range.upper)})` : '';
+    let cooldownTarget = '';
+    let cooldownRange = '';
+    
+    // Handle bike workouts (power-based)
+    if (cd.target_watts) {
+      cooldownTarget = ` @ ${cd.target_watts}W`;
+      cooldownRange = cd.power_range ? ` (${cd.power_range.lower}–${cd.power_range.upper}W)` : '';
+    }
+    // Handle run workouts (pace-based)
+    else if (cd.pace_sec_per_mi) {
+      const isJog = cd.label === 'jog' || cd.intensity === 'easy';
+      cooldownTarget = ` @ ${formatPace(cd.pace_sec_per_mi)}${isJog ? ' (jog)' : ''}`;
+      cooldownRange = cd.pace_range ? ` (${formatPace(cd.pace_range.lower)}–${formatPace(cd.pace_range.upper)})` : '';
+    }
     
     steps.push({
       type: 'cooldown',
-      description: `Cool-down ${formatTime(cd.seconds)}${cooldownPace}${cooldownRange}`
+      description: `Cool-down ${formatTime(cd.seconds)}${cooldownTarget}${cooldownRange}`
     });
   }
 
   return {
-    title: `${workoutType} (planned) — ~${Math.round(computed.total_duration_seconds / 60)} min`,
+    title: `${workoutType} (planned)`,
     totalDuration: formatDuration(computed.total_duration_seconds),
     steps
   };
@@ -487,7 +717,7 @@ export function generateStrengthWorkoutTemplate(
 
   return {
     title: workoutType,
-    totalDuration: `~${Math.round(computed.total_duration_seconds / 60)} min`,
+    totalDuration: formatDuration(computed.total_duration_seconds),
     steps
   };
 }
