@@ -451,10 +451,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="space-y-1">
                       {/* Title and Duration Row */}
                       <div className="flex items-center justify-between">
-                        <div className="font-medium text-sm" style={{ color: getDisciplineColor(workout.type) }}>
+                        <div className="font-medium text-base text-gray-900">
                           {workout.name || getDisplaySport(workout)}
                           {workout.workout_status === 'planned' && (
-                            <span className="text-xs ml-2" style={{ color: '#999' }}>(planned)</span>
+                            <span className="text-xs ml-2 text-gray-500">(planned)</span>
                           )}
                         </div>
                         <div className="flex items-center gap-2 text-xs">

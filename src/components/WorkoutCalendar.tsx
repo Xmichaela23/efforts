@@ -9,6 +9,7 @@ import AllEffortsDropdown from './AllEffortsDropdown';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { getDisciplineColor as getHexColor } from '@/lib/utils';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { generateWorkoutDisplay } from '@/utils/workoutCodes';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -58,46 +59,44 @@ export default function WorkoutCalendar({
 }: WorkoutCalendarProps) {
   const { workouts } = useAppContext();
   const { plannedWorkouts } = usePlannedWorkouts();
-  const [currentDate, setCurrentDate] = useState(new Date());
+  const [currentWeek, setCurrentWeek] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   // Calendar stays simple; no baselines or summaries needed here
 
-  const navigateMonth = (direction: number) => {
-    setCurrentDate(prev => {
+  const navigateWeek = (direction: number) => {
+    setCurrentWeek(prev => {
       const newDate = new Date(prev);
-      newDate.setMonth(prev.getMonth() + direction);
+      newDate.setDate(prev.getDate() + (direction * 7));
       return newDate;
     });
   };
 
-  const getDaysInMonth = () => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+  const getDaysInWeek = () => {
+    const year = currentWeek.getFullYear();
+    const month = currentWeek.getMonth();
+    const day = currentWeek.getDate();
     
-    const firstDay = new Date(year, month, 1);
-    const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
+    // Get the start of the current week (Sunday)
+    const startOfWeek = new Date(currentWeek);
+    startOfWeek.setDate(day - currentWeek.getDay());
     
     const days = [];
     
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      days.push(null);
-    }
-    
-    for (let day = 1; day <= daysInMonth; day++) {
-      days.push(day);
+    for (let i = 0; i < 7; i++) {
+      const weekDay = new Date(startOfWeek);
+      weekDay.setDate(startOfWeek.getDate() + i);
+      days.push(weekDay);
     }
     
     return days;
   };
 
-  const getWorkoutsForDate = (day: number) => {
-    if (!day) return [];
+  const getWorkoutsForDate = (date: Date) => {
+    if (!date) return [];
     
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(day).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
     // 🔧 FIXED: Apply same filtering logic as TodaysEffort - show both planned AND completed
@@ -125,16 +124,16 @@ export default function WorkoutCalendar({
     return filtered;
   };
 
-  const handleDateClick = (day: number, event: React.MouseEvent | React.TouchEvent) => {
-    if (!day) return;
+  const handleDateClick = (date: Date, event: React.MouseEvent | React.TouchEvent) => {
+    if (!date) return;
     
     // Prevent event from bubbling up to parent handlers
     event.preventDefault();
     event.stopPropagation();
     
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(day).padStart(2, '0');
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     
     // quiet calendar cell click logs
@@ -151,23 +150,21 @@ export default function WorkoutCalendar({
     // Do not auto-open logger. User selects date, then opens logger from the Log menu.
   };
 
-  const isToday = (day: number) => {
+  const isToday = (date: Date) => {
     const today = new Date();
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
     
     return (
-      day === today.getDate() &&
-      month === today.getMonth() &&
-      year === today.getFullYear()
+      date.getDate() === today.getDate() &&
+      date.getMonth() === today.getMonth() &&
+      date.getFullYear() === today.getFullYear()
     );
   };
 
-  const isSelected = (day: number) => {
-    if (!day || !selectedDate) return false;
-    const year = currentDate.getFullYear();
-    const month = String(currentDate.getMonth() + 1).padStart(2, '0');
-    const dayStr = String(day).padStart(2, '0');
+  const isSelected = (date: Date) => {
+    if (!date || !selectedDate) return false;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${dayStr}`;
     return dateStr === selectedDate;
   };
@@ -208,7 +205,7 @@ export default function WorkoutCalendar({
     }
   };
 
-  const days = getDaysInMonth();
+  const weekDays = getDaysInWeek();
 
   return (
     <div className="w-full">
@@ -219,16 +216,16 @@ export default function WorkoutCalendar({
           <div className="flex items-center justify-center gap-6 mb-4">
             <Button 
               className="bg-transparent text-muted-foreground border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]" 
-              onClick={() => navigateMonth(-1)}
+              onClick={() => navigateWeek(-1)}
             >
               <ChevronLeft className="h-5 w-5" strokeWidth={2.5} />
             </Button>
             <h3 className="text-lg sm:text-xl font-semibold mx-4 min-w-[180px] text-center" style={{fontFamily: 'Inter, sans-serif'}}>
-              {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
+              Week of {weekDays[0]?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} - {weekDays[6]?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </h3>
             <Button 
               className="bg-transparent text-muted-foreground border-none hover:bg-gray-100 hover:text-black p-3 transition-all duration-150 min-h-[44px] min-w-[44px]"
-              onClick={() => navigateMonth(1)}
+              onClick={() => navigateWeek(1)}
             >
               <ChevronRight className="h-5 w-5" strokeWidth={2.5} />
             </Button>
@@ -243,47 +240,57 @@ export default function WorkoutCalendar({
             ))}
           </div>
 
-          {/* Calendar grid - edge-to-edge immersive design */}
+          {/* Week grid - edge-to-edge immersive design */}
           <div className="grid gap-1 grid-cols-7">
-            {days.map((day, index) => {
-              const dayWorkouts = day ? getWorkoutsForDate(day) : [];
+            {weekDays.map((date, index) => {
+              const dayWorkouts = date ? getWorkoutsForDate(date) : [];
               
               return (
                 <button
                   key={index}
                   className={`
-                    w-full h-20 p-2 transition-all duration-100 rounded-lg
+                    w-full h-24 p-2 transition-all duration-100 rounded-lg
                     flex flex-col items-center justify-start
                     min-h-[44px] touch-manipulation select-none
-                    ${day ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
-                    ${day && isToday(day) ? 'bg-gray-100 border-gray-200' : ''}
-                    ${day && isSelected(day) ? 'bg-gray-200 border-gray-300' : ''}
+                    ${date ? 'bg-white hover:bg-gray-100 active:bg-gray-200 border border-transparent hover:border-gray-200' : 'bg-gray-50 cursor-default'}
+                    ${date && isToday(date) ? 'bg-gray-100 border-gray-200' : ''}
+                    ${date && isSelected(date) ? 'bg-gray-200 border-gray-300' : ''}
                   `}
-                  onClick={(e) => day && handleDateClick(day, e)}
-                  disabled={!day}
+                  onClick={(e) => date && handleDateClick(date, e)}
+                  disabled={!date}
                   type="button"
                 >
-                  {day && (
+                  {date && (
                     <>
                       {/* Date number - clean styling */}
                       <div className="text-sm font-medium mb-1 w-6 h-6 flex items-center justify-center text-foreground" style={{fontFamily: 'Inter, sans-serif'}}>
-                        {day}
+                        {date.getDate()}
                       </div>
                       
-                      {/* Discipline names */}
+                      {/* Workout codes using new system */}
                       {dayWorkouts.length > 0 && (
-                        <div className="flex flex-wrap justify-center items-center gap-1 mt-auto">
-                          {dayWorkouts.slice(0, 2).map((workout, idx) => {
-                            const hex = getHexColor(workout.type);
+                        <div className="flex flex-col justify-center items-center gap-1 mt-auto w-full">
+                          {dayWorkouts.slice(0, 3).map((workout, idx) => {
+                            const workoutDisplay = generateWorkoutDisplay(workout);
+                            const isCompleted = workout.workout_status === 'completed';
+                            
                             return (
-                              <span key={workout.id || idx} className={`text-[10px] font-medium`} style={{ color: hex }}>
-                                {getDisplayLabel(workout)}
+                              <span 
+                                key={workout.id || idx} 
+                                className={`text-xs font-medium px-1 py-0.5 rounded ${
+                                  isCompleted 
+                                    ? 'text-gray-600 bg-gray-100' 
+                                    : 'text-gray-900 bg-blue-100'
+                                }`}
+                              >
+                                {workoutDisplay}
+                                {isCompleted && <span className="ml-1">✓</span>}
                               </span>
                             );
                           })}
-                          {dayWorkouts.length > 2 && (
-                            <div className="text-[10px] text-muted-foreground font-medium leading-none">
-                              +{dayWorkouts.length - 2}
+                          {dayWorkouts.length > 3 && (
+                            <div className="text-xs text-muted-foreground font-medium leading-none">
+                              +{dayWorkouts.length - 3}
                             </div>
                           )}
                         </div>
