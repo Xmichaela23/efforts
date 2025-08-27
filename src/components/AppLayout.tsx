@@ -601,7 +601,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
         </div>
       </header>
 
-      <main className="mobile-main-content pb-14">
+      <main className="mobile-main-content pb-0">
         <div className="w-full px-2">
           {showPlanBuilder ? (
             <div className="pt-1">

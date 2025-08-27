@@ -64,6 +64,9 @@ export default function WorkoutCalendar({
   plannedWorkouts = []
 }: WorkoutCalendarProps) {
   const [referenceDate, setReferenceDate] = useState<Date>(new Date());
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchStartT, setTouchStartT] = useState<number | null>(null);
 
   // Convert workouts to calendar events
   const events = useMemo(() => {
@@ -135,12 +138,41 @@ export default function WorkoutCalendar({
   )} ${weekEnd.getDate()}`;
 
   return (
-    <div className="w-full max-w-md mx-auto flex flex-col">
+    <div
+      className="w-full max-w-md mx-auto flex flex-col"
+      onTouchStart={(e) => {
+        const t = e.changedTouches[0];
+        setTouchStartX(t.clientX);
+        setTouchStartY(t.clientY);
+        setTouchStartT(Date.now());
+      }}
+      onTouchEnd={(e) => {
+        try {
+          if (touchStartX == null || touchStartY == null || touchStartT == null) return;
+          const t = e.changedTouches[0];
+          const dx = t.clientX - touchStartX;
+          const dy = t.clientY - touchStartY;
+          const dt = Date.now() - touchStartT;
+          // Quick horizontal swipe: threshold ~50px, vertical drift small, duration < 500ms
+          if (Math.abs(dx) > 50 && Math.abs(dy) < 40 && dt < 600) {
+            if (dx < 0) {
+              handleNextWeek(addDays(weekEnd, 1));
+            } else {
+              handlePrevWeek(addDays(weekStart, -1));
+            }
+          }
+        } finally {
+          setTouchStartX(null);
+          setTouchStartY(null);
+          setTouchStartT(null);
+        }
+      }}
+    >
       {/* Header with week range and navigation */}
       <div className="flex items-center justify-between mb-1">
         <button
           aria-label="Previous week"
-          className="px-2 py-1 hover:bg-zinc-100"
+          className="px-3 py-2 min-w-10 rounded hover:bg-zinc-100 active:bg-zinc-200"
           onClick={() => handlePrevWeek(addDays(weekStart, -1))}
         >
           ‹
@@ -148,7 +180,7 @@ export default function WorkoutCalendar({
         <h2 className="text-base font-medium">Week of {rangeLabel}</h2>
         <button
           aria-label="Next week"
-          className="px-2 py-1 hover:bg-zinc-100"
+          className="px-3 py-2 min-w-10 rounded hover:bg-zinc-100 active:bg-zinc-200"
           onClick={() => handleNextWeek(addDays(weekEnd, 1))}
         >
           ›
@@ -168,20 +200,20 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "w-full h-44 border border-gray-200 p-2 flex items-start justify-start",
+                "w-full h-44 border border-gray-200 p-2 flex flex-col justify-between items-stretch",
                 isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
-              {/* Left side: Date */}
-              <div className="flex flex-col items-start mr-3">
-                <div className="text-xs tracking-wide text-gray-500 mb-1">
-                  {weekdayFmt.format(d).toUpperCase()}
+              {/* Top row: Day + Date inline */}
+              <div className="flex items-baseline justify-start">
+                <div className="text-[11px] tracking-wide text-gray-900 font-medium uppercase">
+                  {weekdayFmt.format(d)}
                 </div>
-                <div className="text-sm font-medium">{d.getDate()}</div>
+                <div className="ml-2 text-sm text-gray-500">{d.getDate()}</div>
               </div>
 
-              {/* Right side: Event labels - room for multiple workouts */}
-              <div className="flex flex-col gap-1 items-start flex-1">
+              {/* Bottom area: Event labels anchored at bottom */}
+              <div className="flex flex-col gap-1 items-start">
                 {items.length === 0 ? (
                   <span className="text-xs text-gray-400">&nbsp;</span>
                 ) : (
