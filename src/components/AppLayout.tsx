@@ -22,6 +22,7 @@ import PlansDropdown from './PlansDropdown';
 import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
+import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -40,6 +41,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     addPlan,
     deletePlan
   } = useAppContext();
+  
+  const { plannedWorkouts } = usePlannedWorkouts();
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
@@ -694,6 +697,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onOpenPlanBuilder={handleOpenPlanBuilder}
                   currentPlans={currentPlans}
                   completedPlans={completedPlans}
+                  plannedWorkouts={plannedWorkouts}
                 />
               </div>
             </div>

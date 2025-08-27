@@ -165,7 +165,7 @@ export default function WorkoutCalendar({
               key={key}
               onClick={() => handleDayClick(d)}
               className={[
-                "w-full h-32 border border-gray-200 p-3 flex items-start justify-start",
+                "w-full h-40 border border-gray-200 p-3 flex items-start justify-start",
                 isToday ? "bg-gray-100" : "bg-white hover:bg-gray-50",
               ].join(" ")}
             >
