@@ -155,16 +155,13 @@
     padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); /* lowered further by ~10px */
     height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px));
     background: hsl(var(--card));
-    border-top: 1px solid hsl(var(--border));
+    border-top: 0; /* let calendar provide the shared bottom frame */
     box-shadow: 0 -2px 6px rgba(0,0,0,0.03);
     display: flex;
     align-items: center;
   }
 
-  /* 🧩 Calendar frame alignment: remove bottom border on last row */
-  .mobile-calendar > :nth-last-child(-n+3) {
-    border-bottom-width: 0;
-  }
+  /* 🧩 Calendar frame alignment: show all grid lines; calendar provides bottom frame */
 }
 
 /* Hide scrollbar for Chrome, Safari and Opera */
