@@ -113,10 +113,31 @@ function fitAndAlign() {
   });
 }
 
+function revealMainWithFallback() {
+  let attempts = 0;
+  const maxAttempts = 12; // ~1.2s total
+  const tryReveal = () => {
+    attempts++;
+    const el = document.querySelector('.mobile-main-content') as HTMLElement | null;
+    if (el) {
+      el.style.opacity = '1';
+      return;
+    }
+    if (attempts < maxAttempts) setTimeout(tryReveal, 100);
+  };
+  tryReveal();
+}
+
 applyRuntimeLayoutOverrides();
 // Earlier trigger on DOM ready
-document.addEventListener('DOMContentLoaded', () => setTimeout(fitAndAlign, 0));
-window.addEventListener('load', () => setTimeout(fitAndAlign, 0));
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(fitAndAlign, 0);
+  revealMainWithFallback();
+});
+window.addEventListener('load', () => {
+  setTimeout(fitAndAlign, 0);
+  revealMainWithFallback();
+});
 window.addEventListener('resize', () => setTimeout(fitAndAlign, 0));
 window.addEventListener('orientationchange', () => setTimeout(fitAndAlign, 120));
 
