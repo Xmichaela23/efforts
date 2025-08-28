@@ -10,7 +10,8 @@ function applyRuntimeLayoutOverrides() {
       const style = document.createElement('style');
       style.id = styleId;
       style.textContent = `
-      :root { --todays-h: 12rem; --cal-cell-h: 9.4rem; }
+      /* Pre-seed final targets to avoid first-paint jump */
+      :root { --todays-h: 12rem; --cal-cell-h: 150px; }
       .mobile-tabbar {
         padding-top: 8px !important;
         padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;
@@ -86,7 +87,9 @@ function alignFrameLine() {
     const current = raw.endsWith('px') ? parseFloat(raw) : raw.endsWith('rem') ? parseFloat(raw) * 16 : parseFloat(raw);
     if (!isFinite(current)) return false;
 
-    const next = Math.max(118, Math.min(current + gap, 150));
+    // Light correction only: cap delta to ±6px to avoid visible jumps
+    const delta = Math.max(-6, Math.min(gap, 6));
+    const next = Math.max(118, Math.min(current + delta, 150));
     document.documentElement.style.setProperty('--cal-cell-h', `${next}px`);
     const els = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
     els.forEach((el) => { el.style.height = `${next}px`; el.style.minHeight = `${next}px`; });
@@ -95,18 +98,11 @@ function alignFrameLine() {
   } catch { return false; }
 }
 
-// Wrap fit & align in one pass with retries
+// Single immediate pass to avoid multi-step visual adjustments
 function fitAndAlign() {
   fitLayout();
-  let attempts = 0;
-  const maxAttempts = 15; // ~3s total if 200ms step
-  const tick = () => {
-    attempts++;
-    const done = alignFrameLine();
-    if (!done && attempts < maxAttempts) setTimeout(tick, 200);
-  };
-  // initial and delayed tries
-  setTimeout(tick, 0);
+  // Align once shortly after layout to catch fonts/metrics
+  setTimeout(() => { alignFrameLine(); }, 0);
 }
 
 applyRuntimeLayoutOverrides();
