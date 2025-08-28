@@ -1,10 +1,12 @@
 import React, { useState, useMemo } from 'react';
-import { generateWorkoutDisplay } from '../utils/workoutCodes';
+// import { generateWorkoutDisplay } from '../utils/workoutCodes';
+import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
 
 export type CalendarEvent = {
   date: string | Date;
   label: string;
   href?: string;
+  provider?: string;
 };
 
 interface WorkoutCalendarProps {
@@ -49,6 +51,14 @@ function resolveDate(input: string | Date) {
   return new Date(y, (m ?? 1) - 1, d ?? 1);
 }
 
+function providerPriority(w: any): number {
+  const p = (w?.provider || '').toLowerCase();
+  if (!p || p === 'manual' || p === 'workouts') return 3;
+  if (p === 'garmin') return 2;
+  if (p === 'strava') return 1;
+  return 0;
+}
+
 export default function WorkoutCalendar({
   onAddEffort,
   onSelectType,
@@ -75,10 +85,10 @@ export default function WorkoutCalendar({
       ...(Array.isArray(plannedWorkouts) ? plannedWorkouts : []),
     ];
 
-    return all
+    // Build raw events with consistent labels
+    const raw = all
       .filter((w: any) => {
         if (!w || !w.date) return false;
-        
         const today = new Date().toLocaleDateString('en-CA');
         if (w.date >= today) {
           const isPlanned = w.workout_status === 'planned' || !w.workout_status;
@@ -88,16 +98,51 @@ export default function WorkoutCalendar({
           return true;
         }
       })
-      .map((workout: any) => {
-        const workoutDisplay = generateWorkoutDisplay(workout);
-        const isCompleted = workout.workout_status === 'completed';
-        
+      .map((w: any) => {
+        const miles = normalizeDistanceMiles(w);
+        const milesText = miles != null ? formatMilesShort(miles, 1) : '';
+        const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
+        const labelBase = [t, milesText].filter(Boolean).join(' ');
+        const isCompleted = w.workout_status === 'completed';
         return {
-          date: workout.date,
-          label: `${workoutDisplay}${isCompleted ? ' ✓' : ''}`,
-          href: `#${workout.id}`
-        };
+          date: w.date,
+          label: `${labelBase}${isCompleted ? ' ✓' : ''}`,
+          href: `#${w.id}`,
+          provider: w.provider || '',
+          _sigType: t,
+          _sigMiles: miles != null ? Math.round(miles * 10) / 10 : -1, // 1dp signature
+          _src: w,
+        } as any;
       });
+
+    // Dedupe: same day + type + ~same miles → keep best provider
+    const byDay = new Map<string, any[]>();
+    for (const ev of raw) {
+      const key = String(ev.date);
+      if (!byDay.has(key)) byDay.set(key, []);
+      byDay.get(key)!.push(ev);
+    }
+
+    const deduped: CalendarEvent[] = [];
+    for (const [day, list] of byDay.entries()) {
+      const buckets = new Map<string, any>();
+      for (const ev of list) {
+        const bKey = `${ev._sigType}|${ev._sigMiles}`;
+        const existing = buckets.get(bKey);
+        if (!existing) {
+          buckets.set(bKey, ev);
+        } else {
+          // keep higher priority
+          const keep = providerPriority(ev._src) >= providerPriority(existing._src) ? ev : existing;
+          buckets.set(bKey, keep);
+        }
+      }
+      for (const kept of buckets.values()) {
+        deduped.push({ date: day, label: kept.label, href: kept.href, provider: kept.provider });
+      }
+    }
+
+    return deduped;
   }, [workouts, plannedWorkouts]);
 
   const handleDayClick = (day: Date) => {
