@@ -13,11 +13,11 @@ function applyRuntimeLayoutOverrides() {
       :root { --todays-h: 12rem; --cal-cell-h: 9.4rem; }
       .mobile-tabbar {
         padding-top: 8px !important;
-        padding-bottom: max(env(safe-area-inset-bottom) - 12px, 0px) !important;
-        height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) !important;
+        padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;
+        height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) !important;
       }
       .mobile-main-content {
-        height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)) !important;
+        height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)) !important;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
       }
