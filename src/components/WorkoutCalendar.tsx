@@ -88,6 +88,16 @@ export default function WorkoutCalendar({
   const { rows: plannedWeekRows } = usePlannedRange(fromISO, toISO);
   const { rows: workoutsWeekRows } = useWorkoutsRange(fromISO, toISO);
 
+  // Prefetch previous and next weeks to warm caches
+  const prevStart = addDays(weekStart, -7);
+  const prevEnd = addDays(prevStart, 6);
+  const nextStart = addDays(weekStart, 7);
+  const nextEnd = addDays(nextStart, 6);
+  usePlannedRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
+  usePlannedRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
+  useWorkoutsRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
+  useWorkoutsRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
+
   // Convert workouts to calendar events
   const events = useMemo(() => {
     const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : (Array.isArray(plannedWorkouts) ? plannedWorkouts : []);

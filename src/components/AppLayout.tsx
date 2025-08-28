@@ -39,7 +39,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     completedPlans,
     detailedPlans,
     addPlan,
-    deletePlan
+    deletePlan,
+    loadProviderData,
   } = useAppContext();
   
   const { plannedWorkouts } = usePlannedWorkouts();
@@ -94,6 +95,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       }
     }
   }, [selectedWorkout?.id]);
+
+  // Load provider data on demand when Completed tab is opened
+  useEffect(() => {
+    if (activeTab === 'completed' && typeof loadProviderData === 'function') {
+      loadProviderData();
+    }
+  }, [activeTab]);
 
   // When navigated from PlanSelect with state { openPlans: true, focusPlanId }
   useEffect(() => {

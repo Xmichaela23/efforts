@@ -115,6 +115,7 @@ interface AppContextType {
   addWorkout: (workout: Omit<Workout, 'id'>) => Promise<any>;
   updateWorkout: (id: string, updates: Partial<Workout>) => Promise<any>;
   deleteWorkout: (id: string) => Promise<void>;
+  loadProviderData?: () => Promise<void> | void;
   useImperial: boolean;
   toggleUnits: () => void;
   currentPlans: Plan[];
@@ -140,6 +141,7 @@ const defaultAppContext: AppContextType = {
   addWorkout: async () => {},
   updateWorkout: async () => {},
   deleteWorkout: async () => {},
+  loadProviderData: async () => {},
   useImperial: true,
   toggleUnits: () => {},
   currentPlans: [],
@@ -170,6 +172,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addWorkout,
     updateWorkout,
     deleteWorkout,
+    loadProviderData,
   } = useWorkouts(); // No more { sessionReady: ready } prop!
 
   const [currentPlans, setCurrentPlans] = useState<Plan[]>([]);
@@ -707,6 +710,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addWorkout,
         updateWorkout,
         deleteWorkout,
+        loadProviderData,
         useImperial,
         toggleUnits: () => setUseImperial(prev => !prev),
         currentPlans,

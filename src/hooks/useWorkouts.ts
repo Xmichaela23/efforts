@@ -1559,6 +1559,7 @@ export const useWorkouts = () => {
     getWorkoutsForDate,
     getWorkoutsByType,
     refetch: fetchWorkouts,
+    loadProviderData: () => fetchWorkouts(true),
     importGarminActivities, // 🆕 FIXED: Export the Garmin import function with proper user mapping
   };
 };
