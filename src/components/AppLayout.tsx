@@ -693,7 +693,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   onEditEffort={handleEditEffort}
                 />
                 <div className="flex-1 overflow-hidden">
-                  <div className="h-full overflow-auto">
+                  <div className="h-full overflow-hidden">
                     <WorkoutCalendar
                    onAddEffort={() => handleAddEffort('run')}
                    onSelectType={handleSelectEffortType}
