@@ -231,3 +231,24 @@
     transition: transform 0.35s cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 }
+
+@media (display-mode: standalone) {
+  /* PWA-only: raise labels slightly and trim bottom inset a bit more */
+  .mobile-tabbar {
+    padding-top: 6px; /* lift labels */
+    padding-bottom: max(env(safe-area-inset-bottom) - 16px, 0px);
+    height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 16px, 0px));
+  }
+  :root {
+    --todays-h: 10.75rem;
+    --cal-cell-h: 8.9rem;
+  }
+}
+
+@media not all and (display-mode: standalone) {
+  /* Browser-only: make cells a touch shorter and slightly reduce Today's Effort to guarantee no scroll */
+  :root {
+    --cal-cell-h: 8.5rem;
+    --todays-h: 10.5rem;
+  }
+}
