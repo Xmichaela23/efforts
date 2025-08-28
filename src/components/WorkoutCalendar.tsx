@@ -61,6 +61,17 @@ function providerPriority(w: any): number {
   return 0;
 }
 
+function deriveProvider(w: any): string {
+  const id = String(w?.id || '');
+  const name = String(w?.friendly_name || w?.name || '').toLowerCase();
+  const p = String(w?.provider || '').toLowerCase();
+  if (p) return p;
+  if (w?.isGarminImported || w?.garmin_activity_id || id.startsWith('garmin_') || name.includes('garmin')) return 'garmin';
+  if (w?.strava_data || w?.strava_activity_id || id.startsWith('strava_')) return 'strava';
+  if (w?.source === 'training_plan') return 'workouts';
+  return 'workouts';
+}
+
 export default function WorkoutCalendar({
   onAddEffort,
   onSelectType,
@@ -101,11 +112,22 @@ export default function WorkoutCalendar({
   // Convert workouts to calendar events
   const events = useMemo(() => {
     const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : (Array.isArray(plannedWorkouts) ? plannedWorkouts : []);
-    const wk = (workoutsWeekRows && workoutsWeekRows.length > 0) ? workoutsWeekRows : (Array.isArray(workouts) ? workouts : []);
-    const all = [
-      ...wk,
-      ...planned,
-    ];
+
+    // Always merge DB range rows with provider rows from app state for this week
+    const wkDb = Array.isArray(workoutsWeekRows) ? workoutsWeekRows : [];
+    const wkStateProvider = (Array.isArray(workouts) ? workouts : [])
+      .filter((w: any) => {
+        if (!w || !w.date) return false;
+        // Only include provider-origin rows (avoid duplicating DB rows)
+        const id = String(w.id || '');
+        const isProvider = id.startsWith('garmin_') || id.startsWith('strava_') || !!w.isGarminImported || !!w.strava_data || !!w.garmin_activity_id || !!w.strava_activity_id;
+        if (!isProvider) return false;
+        return w.date >= fromISO && w.date <= toISO;
+      })
+      .map((w: any) => ({ ...w, provider: deriveProvider(w) }));
+
+    const wkCombined = [...wkDb, ...wkStateProvider];
+    const all = [ ...wkCombined, ...planned ];
 
     // Build raw events with consistent labels
     const raw = all
@@ -130,7 +152,7 @@ export default function WorkoutCalendar({
           date: w.date,
           label: `${labelBase}${isCompleted ? ' ✓' : ''}`,
           href: `#${w.id}`,
-          provider: w.provider || '',
+          provider: w.provider || deriveProvider(w),
           _sigType: t,
           _sigMiles: miles != null ? Math.round(miles * 10) / 10 : -1, // 1dp signature
           _src: w,
