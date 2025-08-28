@@ -13,11 +13,11 @@ export default function PlansCatalogPage() {
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full px-4">
             <div className="flex items-center gap-3">
-              <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</Button>
+              <Button onClick={safeBack} variant="ghost" className="h-8 leading-none text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</Button>
             </div>
             <div className="flex items-center gap-2">
-              <Button onClick={() => navigate('/plans/admin')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">Admin</Button>
-              <Button onClick={() => navigate('/')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</Button>
+              <Button onClick={() => navigate('/plans/admin')} variant="ghost" className="h-8 leading-none text-sm font-medium text-gray-700 hover:bg-gray-50">Admin</Button>
+              <Button onClick={() => navigate('/')} variant="ghost" className="h-8 leading-none text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</Button>
             </div>
           </div>
         </div>
