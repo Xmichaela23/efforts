@@ -31,8 +31,8 @@
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --todays-h: 10.6rem; /* universal */
-    --cal-cell-h: 8.6rem; /* universal */
+    --todays-h: 12rem; /* universal (approved) */
+    --cal-cell-h: 9.4rem; /* starting value; runtime caps at 150px */
   }
 }
 
