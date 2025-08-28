@@ -386,7 +386,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   if (loading || plannedLoading) {
     return (
-      <div className="w-full h-24 flex items-center justify-center" style={{fontFamily: 'Inter, sans-serif'}}>
+      <div className="w-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>
         <p className="text-muted-foreground text-sm">Loading...</p>
       </div>
     );
