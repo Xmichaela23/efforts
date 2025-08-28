@@ -22,7 +22,7 @@ export default function PlansAdminImport() {
           <div className="flex items-center justify-between h-16 w-full px-4">
             <div className="flex items-center gap-3">
               <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</Button>
-              <h1 className="text-2xl font-bold">Admin: Publish Template</h1>
+              <h1 className="text-2xl font-bold">Admin</h1>
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={() => navigate('/plans/catalog')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">Catalog</Button>
