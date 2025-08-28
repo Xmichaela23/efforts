@@ -150,8 +150,7 @@ export const useWorkouts = () => {
   // Rate limiting for reverse geocoding (max 1 request per second)
   let lastGeocodingRequest = 0;
 
-  // Generate a simple location-based title without external geocoding (avoids CORS/429)
-  const generateLocationTitle = async (lat: number | null, lng: number | null, activityType: string) => {
+  const generateLocationTitleSync = (lat: number | null, lng: number | null, activityType: string) => {
     if (!lat || !lng) return null;
     const label = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
     const formattedType = activityType === 'ride' ? 'Cycling' :
@@ -178,7 +177,7 @@ export const useWorkouts = () => {
     }
   };
 
-  const fetchWorkouts = async () => {
+  const fetchWorkouts = async (includeProviders: boolean = false) => {
     try {
       // Show the global spinner only on first load
       if (!hasLoadedRef.current) {
@@ -195,14 +194,8 @@ export const useWorkouts = () => {
         }
       }
 
-      if (!user) {
-        setWorkouts([]);
-        setLoading(false);
-        return;
-      }
+      if (!user) { setWorkouts([]); setLoading(false); return; }
 
-      // 🔧 FIXED: Fetch BOTH workouts table AND Garmin activities to show all workouts
-      
       // Step 1: Fetch manual/planned workouts from workouts table (bounded window to avoid timeouts)
       const todayIso = new Date().toISOString().slice(0, 10);
       const lookbackIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 30 days
@@ -215,16 +208,13 @@ export const useWorkouts = () => {
         .order("date", { ascending: false })
         .limit(200);
 
-      if (manualError) {
-        console.error("❌ Supabase error fetching manual workouts:", manualError);
-        throw manualError;
-      }
+      if (manualError) { throw manualError; }
 
       // Manual workouts found
 
-      // Step 2: Fetch Garmin activities (if user has Garmin connection)
+      // Step 2: Fetch Garmin activities (if user has Garmin connection) — optionally deferred
       let garminWorkouts: any[] = [];
-      try {
+      if (includeProviders) try {
         // Try device_connections first; fall back to legacy user_connections
         let garminUserId: string | null = null;
         {
@@ -256,9 +246,8 @@ export const useWorkouts = () => {
             .limit(50);
 
           if (!garminError && garminActivities) {
-            
-            // Transform Garmin activities to workout format
-            garminWorkouts = await Promise.all(garminActivities.map(async (activity) => {
+            // Transform Garmin activities to workout format (sync labels)
+            garminWorkouts = garminActivities.map((activity) => {
               // Map activity type from Garmin to our workout types
               const getWorkoutType = (activityType: string): "run" | "ride" | "swim" | "strength" | "walk" => {
                 const type = activityType?.toLowerCase() || '';
@@ -284,10 +273,9 @@ export const useWorkouts = () => {
                 return d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
               })();
               
-              // Generate location-based title using the existing function
-              const locationTitle = await generateLocationTitle(
-                activity.starting_latitude, 
-                activity.starting_longitude, 
+              const locationTitle = generateLocationTitleSync(
+                activity.starting_latitude,
+                activity.starting_longitude,
                 workoutType
               );
 
@@ -411,7 +399,7 @@ export const useWorkouts = () => {
                   pool_length: activity.pool_length
                 }
               };
-            }));
+            });
           }
         }
       } catch (garminError) {
@@ -420,7 +408,7 @@ export const useWorkouts = () => {
 
       // Step 2b: Fetch Strava activities saved by webhook/importer (if connected)
       let stravaWorkouts: any[] = [];
-      try {
+      if (includeProviders) try {
         const { data: stravaRows, error: stravaErr } = await supabase
           .from('strava_activities')
           .select('*')
@@ -431,7 +419,7 @@ export const useWorkouts = () => {
           .limit(200);
 
         if (!stravaErr && Array.isArray(stravaRows)) {
-          stravaWorkouts = await Promise.all(stravaRows.map(async (row: any) => {
+          stravaWorkouts = stravaRows.map((row: any) => {
             const a = row.activity_data || {};
             const sportType = (a.sport_type || a.type || '').toLowerCase();
             const getWorkoutType = (t: string): "run" | "ride" | "swim" | "strength" | "walk" => {
@@ -446,11 +434,7 @@ export const useWorkouts = () => {
             const iso = a.start_date || a.start_date_local || new Date().toISOString();
             const date = String(iso).split('T')[0];
             const startLatLng = Array.isArray(a.start_latlng) ? a.start_latlng : null;
-            const locationTitle = await generateLocationTitle(
-              startLatLng?.[0] ?? null,
-              startLatLng?.[1] ?? null,
-              type
-            );
+            const locationTitle = generateLocationTitleSync(startLatLng?.[0] ?? null, startLatLng?.[1] ?? null, type);
             return {
               id: `strava_${row.strava_id || a.id}`,
               name: a.name || locationTitle || `Strava ${type}`,
@@ -474,18 +458,16 @@ export const useWorkouts = () => {
               provider_sport: sportType,
               strava_data: { original_activity: a },
             };
-          }));
+          });
         }
       } catch (e) {
         console.log('⚠️ Error fetching Strava activities (continuing):', e);
       }
 
       // Step 3: Merge all sources and remove duplicates (keep simple for now)
-      const allWorkouts = [
-        ...(manualWorkouts || []),
-        ...garminWorkouts,
-        ...stravaWorkouts,
-      ];
+      const allWorkouts = includeProviders
+        ? [ ...(manualWorkouts || []), ...garminWorkouts, ...stravaWorkouts ]
+        : [ ...(manualWorkouts || []) ];
       
       // Show all workouts including Garmin (removed duplicate filter)
       const uniqueWorkouts = allWorkouts;
@@ -741,9 +723,10 @@ export const useWorkouts = () => {
 
   // 🔄 Fetch workouts when auth is ready
   useEffect(() => {
-    if (authReady) {
-      fetchWorkouts();
-    }
+    if (!authReady) return;
+    fetchWorkouts(false); // fast first paint
+    const id = window.setTimeout(() => fetchWorkouts(true), 1200); // defer providers
+    return () => window.clearTimeout(id);
   }, [authReady]);
 
   // 🧲 Background Strava backfill (recent days) is disabled by default to avoid function errors on app load.
@@ -802,17 +785,13 @@ export const useWorkouts = () => {
   // ⏱️ Polling + focus refresh as a safety net if realtime is disabled on the table
   useEffect(() => {
     if (!authReady) return;
-    const onFocus = () => fetchWorkouts();
-    window.addEventListener('visibilitychange', onFocus);
-    window.addEventListener('focus', onFocus);
-    const interval = setInterval(() => {
-      fetchWorkouts();
-    }, 30000); // 30s
-    return () => {
-      window.removeEventListener('visibilitychange', onFocus);
-      window.removeEventListener('focus', onFocus);
-      clearInterval(interval);
+    let t: number | null = null;
+    const onFocus = () => {
+      if (t) window.clearTimeout(t);
+      t = window.setTimeout(() => fetchWorkouts(true), 800);
     };
+    window.addEventListener('focus', onFocus);
+    return () => { if (t) window.clearTimeout(t); window.removeEventListener('focus', onFocus); };
   }, [authReady]);
 
   // 🆕 FIXED FUNCTION: Import Garmin activities to workouts table with proper user mapping
@@ -907,7 +886,7 @@ export const useWorkouts = () => {
 
           // Transform garmin_activities data to workout format
           const workoutType = getWorkoutType(activity.activity_type);
-          const locationTitle = await generateLocationTitle(
+          const locationTitle = generateLocationTitleSync(
             activity.starting_latitude, 
             activity.starting_longitude, 
             workoutType
