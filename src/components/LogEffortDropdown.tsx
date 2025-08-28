@@ -35,6 +35,8 @@ const LogEffortDropdown: React.FC<LogEffortDropdownProps> = ({ onSelectType }) =
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
+        side="top"
+        sideOffset={10}
         className="bg-white border border-gray-200 shadow-xl"
         style={{borderRadius: '12px', padding: '8px', minWidth: '180px'}}
       >

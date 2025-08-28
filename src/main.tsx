@@ -69,38 +69,44 @@ function fitLayout() {
 
 function alignFrameLine() {
   try {
-    const grid = document.querySelector('.mobile-calendar') as HTMLElement | null;
+    const cells = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
     const tabbar = document.querySelector('.mobile-tabbar') as HTMLElement | null;
-    if (!grid || !tabbar) return;
+    if (!cells || cells.length === 0 || !tabbar) return false;
 
-    const gridRect = grid.getBoundingClientRect();
-    const tabRect = tabbar.getBoundingClientRect();
-    // Positive gap means grid ends above the tabbar; negative means overlap
-    const desiredCushion = 2; // small visual breathing room
-    const gap = (tabRect.top - gridRect.bottom) - desiredCushion;
+    const last = cells[cells.length - 1];
+    const bottom = last.getBoundingClientRect().bottom;
+    const tabTop = tabbar.getBoundingClientRect().top;
 
-    if (Math.abs(gap) <= 1) return; // already aligned
+    const desiredCushion = 2; // px
+    const gap = (tabTop - bottom) - desiredCushion; // positive means space remaining
 
-    const docStyle = getComputedStyle(document.documentElement);
-    const raw = docStyle.getPropertyValue('--cal-cell-h').trim();
+    if (Math.abs(gap) <= 1) return true; // aligned
+
+    const raw = getComputedStyle(document.documentElement).getPropertyValue('--cal-cell-h').trim();
     const current = raw.endsWith('px') ? parseFloat(raw) : raw.endsWith('rem') ? parseFloat(raw) * 16 : parseFloat(raw);
-    if (!isFinite(current)) return;
+    if (!isFinite(current)) return false;
 
-    // Nudge by the exact gap, but clamp to sane limits
-    const next = Math.max(118, Math.min(current + gap, 300));
+    const next = Math.max(118, Math.min(current + gap, 320));
     document.documentElement.style.setProperty('--cal-cell-h', `${next}px`);
-  } catch {}
+    const els = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
+    els.forEach((el) => { el.style.height = `${next}px`; el.style.minHeight = `${next}px`; });
+
+    return Math.abs(gap) <= 1;
+  } catch { return false; }
 }
 
-// Wrap fit & align in one pass
+// Wrap fit & align in one pass with retries
 function fitAndAlign() {
   fitLayout();
-  // Allow layout to settle, then align precisely
-  requestAnimationFrame(() => {
-    alignFrameLine();
-    // One more pass if still off after styles apply
-    setTimeout(alignFrameLine, 50);
-  });
+  let attempts = 0;
+  const maxAttempts = 15; // ~3s total if 200ms step
+  const tick = () => {
+    attempts++;
+    const done = alignFrameLine();
+    if (!done && attempts < maxAttempts) setTimeout(tick, 200);
+  };
+  // initial and delayed tries
+  setTimeout(tick, 0);
 }
 
 applyRuntimeLayoutOverrides();
