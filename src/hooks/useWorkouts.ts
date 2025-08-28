@@ -465,8 +465,10 @@ export const useWorkouts = () => {
       }
 
       // Step 3: Merge all sources and remove duplicates (keep simple for now)
+      // Do not merge raw Strava provider rows to avoid duplicates.
+      // Strava activities are now normalized into the workouts table.
       const allWorkouts = includeProviders
-        ? [ ...(manualWorkouts || []), ...garminWorkouts, ...stravaWorkouts ]
+        ? [ ...(manualWorkouts || []), ...garminWorkouts ]
         : [ ...(manualWorkouts || []) ];
       
       // Show all workouts including Garmin (removed duplicate filter)

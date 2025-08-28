@@ -562,9 +562,12 @@ async function createWorkoutFromStravaActivity(userId: string, activityData: any
       provider_sport: activityData.sport_type || activityData.type || null,
     };
 
-    const { error } = await supabase.from('workouts').insert(row);
-    if (error) console.error(`❌ Error creating workout for Strava activity ${activityData.id}:`, error);
-    else console.log(`✅ Created workout for Strava activity ${activityData.id}`);
+    // Idempotent write on (user_id, strava_activity_id)
+    const { error } = await supabase
+      .from('workouts')
+      .upsert(row, { onConflict: 'user_id,strava_activity_id' });
+    if (error) console.error(`❌ Upsert workout for Strava activity ${activityData.id} failed:`, error);
+    else console.log(`✅ Upserted workout for Strava activity ${activityData.id}`);
   } catch (error) {
     console.error(`❌ Error in createWorkoutFromStravaActivity:`, error);
   }

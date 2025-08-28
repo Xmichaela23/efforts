@@ -629,8 +629,11 @@ Deno.serve(async (req) => {
         const row = await convertStravaToWorkout(detailedActivity, userId, currentAccessToken);
         if (!row.user_id || !row.name || !row.type) { skipped++; continue; }
 
-        const { error } = await supabase.from('workouts').insert(row);
-        if (error) { console.error('Insert error:', error); skipped++; continue; }
+        // Idempotent write on (user_id, strava_activity_id)
+        const { error } = await supabase
+          .from('workouts')
+          .upsert(row, { onConflict: 'user_id,strava_activity_id' });
+        if (error) { console.error('Upsert error:', error); skipped++; continue; }
 
         existing.add(a.id);
         imported++;
