@@ -32,7 +32,7 @@
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
     --todays-h: 12rem; /* universal (approved) */
-    --cal-cell-h: 9.4rem; /* starting value; runtime caps at 150px */
+    --cal-cell-h: 150px; /* pre-seed final target to avoid jump */
   }
 }
 
@@ -101,9 +101,9 @@
   .mobile-main-content {
     grid-row: 2;
     /* Use the exact same tabbar expression to align calendar bottom frame universally */
-    height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)); /* fallback */
-    height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)); /* Safari stable */
-    height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)); /* Modern browsers */
+    height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); /* fallback */
+    height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); /* Safari stable */
+    height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); /* Modern browsers */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0;
@@ -240,11 +240,11 @@
 
 /* Make PWA and browser blocks match the universal values to avoid divergence */
 @media (display-mode: standalone) {
-  .mobile-tabbar { padding-top: 8px; padding-bottom: max(env(safe-area-inset-bottom) - 12px, 0px); height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)); }
-  :root { --todays-h: 10.6rem; --cal-cell-h: 8.6rem; }
-  .mobile-main-content { height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)); height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)); height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top)); }
+  .mobile-tabbar { padding-top: 8px; padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)); }
+  :root { --todays-h: 12rem; --cal-cell-h: 150px; }
+  .mobile-main-content { height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); }
 }
 
 @media not all and (display-mode: standalone) {
-  :root { --todays-h: 10.6rem; --cal-cell-h: 8.6rem; }
+  :root { --todays-h: 12rem; --cal-cell-h: 150px; }
 }

@@ -21,6 +21,8 @@ function applyRuntimeLayoutOverrides() {
         height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)) !important;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
+        opacity: 0;
+        transition: opacity 140ms ease;
       }
       `;
       document.head.appendChild(style);
@@ -102,10 +104,18 @@ function alignFrameLine() {
 function fitAndAlign() {
   fitLayout();
   // Align once shortly after layout to catch fonts/metrics
-  setTimeout(() => { alignFrameLine(); }, 0);
+  requestAnimationFrame(() => {
+    alignFrameLine();
+    try {
+      const main = document.querySelector('.mobile-main-content') as HTMLElement | null;
+      if (main) main.style.opacity = '1';
+    } catch {}
+  });
 }
 
 applyRuntimeLayoutOverrides();
+// Earlier trigger on DOM ready
+document.addEventListener('DOMContentLoaded', () => setTimeout(fitAndAlign, 0));
 window.addEventListener('load', () => setTimeout(fitAndAlign, 0));
 window.addEventListener('resize', () => setTimeout(fitAndAlign, 0));
 window.addEventListener('orientationchange', () => setTimeout(fitAndAlign, 120));
