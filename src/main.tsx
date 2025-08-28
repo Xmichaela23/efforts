@@ -42,7 +42,6 @@ function fitLayout() {
     const mainH = Math.max(0, vh - headerH - tabbarH);
     main.style.height = `${mainH}px`;
 
-    // Compute available height from top of grid to bottom of main, minus grid padding/borders/gaps
     const mainRect = main.getBoundingClientRect();
     const gridRect = grid.getBoundingClientRect();
     const topOffset = Math.max(0, gridRect.top - mainRect.top);
@@ -53,14 +52,18 @@ function fitLayout() {
     const padBottom = parseFloat(cs.paddingBottom || '0');
     const borderTop = parseFloat(cs.borderTopWidth || '0');
     const borderBottom = parseFloat(cs.borderBottomWidth || '0');
-    const rowGap = parseFloat((cs as any).rowGap || cs.gap || '0');
+    const gap = parseFloat((cs as any).rowGap || (cs as any).gap || '0');
 
-    // Our grid is 1 row, so subtract padding, borders, and a tiny cushion
-    remaining -= (padTop + padBottom + borderTop + borderBottom + rowGap + 2);
+    remaining -= (padTop + padBottom + borderTop + borderBottom + gap + 2);
 
-    // Final clamp
-    const desiredCell = Math.max(118, Math.min(remaining, 280));
+    // Apply directly to cells to bypass any CSS fallback
+    const desiredCell = Math.max(118, Math.min(remaining, 300));
     document.documentElement.style.setProperty('--cal-cell-h', `${desiredCell}px`);
+    const cells = document.querySelectorAll('.mobile-calendar-cell') as NodeListOf<HTMLElement>;
+    cells.forEach((el) => {
+      el.style.height = `${desiredCell}px`;
+      el.style.minHeight = `${desiredCell}px`;
+    });
   } catch {}
 }
 
