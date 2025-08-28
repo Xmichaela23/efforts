@@ -233,15 +233,20 @@
 }
 
 @media (display-mode: standalone) {
-  /* PWA-only: raise labels slightly and trim bottom inset a bit more */
+  /* PWA-only: raise labels and ensure shared frame line */
   .mobile-tabbar {
-    padding-top: 6px; /* lift labels */
-    padding-bottom: max(env(safe-area-inset-bottom) - 16px, 0px);
-    height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 16px, 0px));
+    padding-top: 8px; /* lift labels a bit more */
+    padding-bottom: max(env(safe-area-inset-bottom) - 12px, 0px);
+    height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px));
   }
   :root {
     --todays-h: 10.75rem;
     --cal-cell-h: 8.9rem;
+  }
+  .mobile-main-content {
+    height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top));
+    height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top));
+    height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 12px, 0px)) - env(safe-area-inset-top));
   }
 }
 
