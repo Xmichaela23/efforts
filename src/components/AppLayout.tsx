@@ -474,14 +474,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const handlePlanDeleted = async (planId: string) => {
     try {
       const planWorkouts = workouts?.filter(w => {
-        const matchesId = w.planId === planId;
         const matchesPattern = w.name && (
           w.name.includes('Week 1') ||
           w.name.includes('Week 2') ||
           w.name.includes('Week 3') ||
           w.name.includes('Week 4')
         );
-        return matchesId || matchesPattern;
+        return matchesPattern;
       }) || [];
 
       for (const workout of planWorkouts) {
@@ -696,20 +695,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 <div className="flex-1 overflow-hidden">
                   <div className="h-full overflow-auto">
                     <WorkoutCalendar
-                  onAddEffort={handleAddEffort}
-                  onSelectType={handleSelectEffortType}
-                  onSelectWorkout={handleEditEffort}
-                  onViewCompleted={handleViewCompleted}
-                  onEditEffort={handleEditEffort}
-                  onDateSelect={handleDateSelect}
-                  onSelectRoutine={handleSelectRoutine}
-                  onSelectDiscipline={handleSelectDiscipline}
+                   onAddEffort={() => handleAddEffort('run')}
+                   onSelectType={handleSelectEffortType}
+                   onSelectWorkout={handleEditEffort}
+                   onViewCompleted={handleViewCompleted}
+                   onEditEffort={handleEditEffort}
+                   onDateSelect={handleDateSelect}
+                   onSelectRoutine={handleSelectRoutine}
                   onOpenPlanBuilder={handleOpenPlanBuilder}
-                  currentPlans={currentPlans}
-                  completedPlans={completedPlans}
-                  workouts={workouts}
-                  plannedWorkouts={plannedWorkouts}
-                    />
+                />
                   </div>
                 </div>
               </div>

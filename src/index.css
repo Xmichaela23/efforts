@@ -31,8 +31,8 @@
     /* Deterministic layout variables */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --todays-h: 9rem; /* give Today's Effort a bit more space */
-    --cal-cell-h: 11rem; /* reduce cell height slightly across the board */
+    --todays-h: 11rem; /* emphasize Today's Effort */
+    --cal-cell-h: 8.75rem; /* shorter cells so bottom row never clips */
   }
 }
 
@@ -98,10 +98,10 @@
   /* 🚨 MOBILE MAIN CONTENT - Scrollable area */
   .mobile-main-content {
     grid-row: 2;
-    /* Deterministic height: viewport minus header and bottom bar */
-    height: calc(100vh - var(--header-h) - var(--tabbar-h)); /* fallback */
-    height: calc(100svh - var(--header-h) - var(--tabbar-h)); /* Safari stable */
-    height: calc(100dvh - var(--header-h) - var(--tabbar-h)); /* Modern browsers */
+    /* Deterministic height: viewport minus header and bottom bar (exact same expression as tabbar) */
+    height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 14px, 0px)) - env(safe-area-inset-top)); /* fallback */
+    height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 14px, 0px)) - env(safe-area-inset-top)); /* Safari stable */
+    height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 14px, 0px)) - env(safe-area-inset-top)); /* Modern browsers */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 0; /* content should touch the tab bar frame */
@@ -148,8 +148,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
-    padding-bottom: env(safe-area-inset-bottom);
+    height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 14px, 0px));
+    padding-bottom: max(env(safe-area-inset-bottom) - 14px, 0px);
     background: hsl(var(--card));
     border-top: 1px solid hsl(var(--border));
     box-shadow: 0 -2px 6px rgba(0,0,0,0.03);
