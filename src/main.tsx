@@ -21,8 +21,6 @@ function applyRuntimeLayoutOverrides() {
         height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)) !important;
         overflow-y: auto;
         -webkit-overflow-scrolling: touch;
-        opacity: 0;
-        transition: opacity 140ms ease;
       }
       `;
       document.head.appendChild(style);
@@ -106,37 +104,18 @@ function fitAndAlign() {
   // Align once shortly after layout to catch fonts/metrics
   requestAnimationFrame(() => {
     alignFrameLine();
-    try {
-      const main = document.querySelector('.mobile-main-content') as HTMLElement | null;
-      if (main) main.style.opacity = '1';
-    } catch {}
   });
 }
 
-function revealMainWithFallback() {
-  let attempts = 0;
-  const maxAttempts = 12; // ~1.2s total
-  const tryReveal = () => {
-    attempts++;
-    const el = document.querySelector('.mobile-main-content') as HTMLElement | null;
-    if (el) {
-      el.style.opacity = '1';
-      return;
-    }
-    if (attempts < maxAttempts) setTimeout(tryReveal, 100);
-  };
-  tryReveal();
-}
+// Removed opacity gating to avoid blank view on slow devices
 
 applyRuntimeLayoutOverrides();
 // Earlier trigger on DOM ready
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(fitAndAlign, 0);
-  revealMainWithFallback();
 });
 window.addEventListener('load', () => {
   setTimeout(fitAndAlign, 0);
-  revealMainWithFallback();
 });
 window.addEventListener('resize', () => setTimeout(fitAndAlign, 0));
 window.addEventListener('orientationchange', () => setTimeout(fitAndAlign, 120));
