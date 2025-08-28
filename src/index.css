@@ -93,6 +93,8 @@
     background: hsl(var(--card) / 0.3);
     backdrop-filter: blur(8px);
     z-index: 40;
+    /* Avoid notch/status bar overlap in PWA */
+    padding-top: env(safe-area-inset-top);
   }
   
   /* 🚨 MOBILE MAIN CONTENT - Scrollable area */
@@ -157,6 +159,11 @@
     box-shadow: 0 -2px 6px rgba(0,0,0,0.03);
     display: flex;
     align-items: center;
+  }
+
+  /* 🧩 Calendar frame alignment: remove bottom border on last row */
+  .mobile-calendar > :nth-last-child(-n+3) {
+    border-bottom-width: 0;
   }
 }
 
