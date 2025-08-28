@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
+import { usePlannedRange } from '@/hooks/usePlannedRange';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -78,11 +79,19 @@ export default function WorkoutCalendar({
   const [touchStartY, setTouchStartY] = useState<number | null>(null);
   const [touchStartT, setTouchStartT] = useState<number | null>(null);
 
+  // Week bounds for planned fetch
+  const weekStart = startOfWeek(referenceDate);
+  const weekEnd = addDays(weekStart, 6);
+  const fromISO = toDateOnlyString(weekStart);
+  const toISO = toDateOnlyString(weekEnd);
+  const { rows: plannedWeekRows } = usePlannedRange(fromISO, toISO);
+
   // Convert workouts to calendar events
   const events = useMemo(() => {
+    const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : (Array.isArray(plannedWorkouts) ? plannedWorkouts : []);
     const all = [
       ...(Array.isArray(workouts) ? workouts : []),
-      ...(Array.isArray(plannedWorkouts) ? plannedWorkouts : []),
+      ...planned,
     ];
 
     // Build raw events with consistent labels
@@ -132,7 +141,6 @@ export default function WorkoutCalendar({
         if (!existing) {
           buckets.set(bKey, ev);
         } else {
-          // keep higher priority
           const keep = providerPriority(ev._src) >= providerPriority(existing._src) ? ev : existing;
           buckets.set(bKey, keep);
         }
@@ -143,7 +151,7 @@ export default function WorkoutCalendar({
     }
 
     return deduped;
-  }, [workouts, plannedWorkouts]);
+  }, [workouts, plannedWorkouts, plannedWeekRows, fromISO, toISO]);
 
   const handleDayClick = (day: Date) => {
     const dateStr = toDateOnlyString(day);
@@ -160,9 +168,7 @@ export default function WorkoutCalendar({
     setReferenceDate(newRef);
   };
 
-  const weekStart = startOfWeek(referenceDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-  const weekEnd = addDays(weekStart, 6);
 
   // Map events by date (YYYY-MM-DD)
   const map = new Map<string, CalendarEvent[]>();
