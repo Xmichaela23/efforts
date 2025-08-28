@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
 import { usePlannedRange } from '@/hooks/usePlannedRange';
+import { useWorkoutsRange } from '@/hooks/useWorkoutsRange';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -85,12 +86,14 @@ export default function WorkoutCalendar({
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
   const { rows: plannedWeekRows } = usePlannedRange(fromISO, toISO);
+  const { rows: workoutsWeekRows } = useWorkoutsRange(fromISO, toISO);
 
   // Convert workouts to calendar events
   const events = useMemo(() => {
     const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : (Array.isArray(plannedWorkouts) ? plannedWorkouts : []);
+    const wk = (workoutsWeekRows && workoutsWeekRows.length > 0) ? workoutsWeekRows : (Array.isArray(workouts) ? workouts : []);
     const all = [
-      ...(Array.isArray(workouts) ? workouts : []),
+      ...wk,
       ...planned,
     ];
 
@@ -151,7 +154,7 @@ export default function WorkoutCalendar({
     }
 
     return deduped;
-  }, [workouts, plannedWorkouts, plannedWeekRows, fromISO, toISO]);
+  }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
   const handleDayClick = (day: Date) => {
     const dateStr = toDateOnlyString(day);
