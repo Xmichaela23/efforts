@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import PlanCatalog from '@/components/PlanCatalog';
 
 export default function PlansCatalogPage() {
@@ -12,12 +13,11 @@ export default function PlansCatalogPage() {
         <div className="w-full">
           <div className="flex items-center justify-between h-16 w-full px-4">
             <div className="flex items-center gap-3">
-              <button onClick={safeBack} className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</button>
-              <h1 className="text-2xl font-bold">Select a Plan</h1>
+              <Button onClick={safeBack} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">← Back</Button>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => navigate('/plans/admin')} className="text-sm font-medium text-gray-700 hover:bg-gray-50">Admin</button>
-              <button onClick={() => navigate('/')} className="text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</button>
+              <Button onClick={() => navigate('/plans/admin')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">Admin</Button>
+              <Button onClick={() => navigate('/')} variant="ghost" className="text-sm font-medium text-gray-700 hover:bg-gray-50">Dashboard</Button>
             </div>
           </div>
         </div>
