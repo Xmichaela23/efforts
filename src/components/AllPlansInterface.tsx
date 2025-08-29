@@ -474,6 +474,55 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     }
   };
 
+  // Ensure week materialized on selection change
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!selectedPlanDetail || !selectedPlanDetail.id || !selectedWeek) return;
+        // If week has no rows yet, bake & insert just this week
+        const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
+        await ensureWeekMaterialized(String(selectedPlanDetail.id), Number(selectedWeek));
+        // Reload plan detail rows from DB to reflect any newly inserted sessions
+        try {
+          const commonSelect = '*';
+          const { data: byLink } = await supabase
+            .from('planned_workouts')
+            .select(commonSelect)
+            .eq('training_plan_id', selectedPlanDetail.id)
+            .order('week_number', { ascending: true })
+            .order('day_number', { ascending: true });
+          if (Array.isArray(byLink) && byLink.length) {
+            // Merge into existing selectedPlanDetail.weeks similar to normalize above
+            const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
+            const byWeek: Record<number, any[]> = {};
+            for (const w of byLink) {
+              const wk = (w as any).week_number || 1;
+              const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
+              const computed = (w as any).computed || {};
+              const renderedDesc = (w as any).rendered_description || (w as any).description || '';
+              const totalSeconds = computed.total_duration_seconds;
+              const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
+              const workout = {
+                id: (w as any).id,
+                name: (w as any).name || 'Session',
+                type: (w as any).type,
+                description: renderedDesc,
+                duration,
+                day: dayName,
+                computed
+              };
+              byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
+            }
+            const clone = { ...selectedPlanDetail } as any;
+            const weeksOut: any[] = Object.keys(byWeek).map(n => parseInt(n,10)).sort((a,b)=>a-b).map(wn => ({ weekNumber: wn, title: `Week ${wn}`, focus: '', workouts: byWeek[wn] }));
+            clone.weeks = weeksOut;
+            setSelectedPlanDetail(clone);
+          }
+        } catch {}
+      } catch {}
+    })();
+  }, [selectedPlanDetail?.id, selectedWeek]);
+
   const handleWorkoutClick = (workout: any) => {
     setSelectedWorkout(workout);
     setWorkoutViewMode('summary'); // Reset to summary when opening workout

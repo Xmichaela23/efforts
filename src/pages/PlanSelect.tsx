@@ -582,9 +582,10 @@ export default function PlanSelect() {
       const rows: any[] = [];
       // Use baselines loaded above to resolve tokens to concrete paces/power
       const unitsPref = (baselines?.units === 'metric' || baselines?.units === 'imperial') ? baselines.units : 'imperial';
-      Object.keys(payload.sessions_by_week || {}).forEach((wkKey) => {
-        const weekNum = parseInt(wkKey, 10);
-        const sessions = (payload.sessions_by_week as any)[wkKey] || [];
+      // Only materialize Week 1 on acceptance. Future weeks bake on demand.
+      const wkKey = '1';
+      const weekNum = 1;
+      const sessions = (payload.sessions_by_week as any)[wkKey] || [];
         (sessions as any[]).forEach((s: any, idx: number) => {
           const dow = dayIndex[s.day] || 1;
           const date = addDays(startDate, (weekNum - 1) * 7 + (dow - 1));
@@ -720,7 +721,7 @@ export default function PlanSelect() {
             units: unitsPref
           });
         });
-      });
+      
 
       if (rows.length) {
         const { error: pwErr } = await supabase.from('planned_workouts').insert(rows);
