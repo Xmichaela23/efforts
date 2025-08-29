@@ -1394,7 +1394,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         <div key={day} className="border border-gray-200 rounded">
                           <div className="px-3 py-2 text-sm font-medium">{day}</div>
                           <div className="px-3 pb-3 space-y-3">
-                            {groups[day].filter((w:any)=>w.workout_status!=='optional').map((workout: any, index: number) => (
+                            {groups[day].filter((w:any)=>!(Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'))).map((workout: any, index: number) => (
                               <div
                                 key={workout.id || `workout-${day}-${index}`}
                                 onClick={() => handleWorkoutClick(workout)}

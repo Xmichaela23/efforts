@@ -56,15 +56,19 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         }
         const { data, error } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,workout_status,steps_preset,description,duration,computed,week_number,day_number,training_plan_id')
+          .select('id,name,type,date,workout_status,steps_preset,description,duration,computed,week_number,day_number,training_plan_id,tags')
           .eq('user_id', user.id)
-          .neq('workout_status', 'optional')
           .gte('date', fromISO)
           .lte('date', toISO)
           .order('date', { ascending: true });
         if (error) throw error;
         if (cancelled) return;
-        const safe = Array.isArray(data) ? data : [];
+        const safeAll = Array.isArray(data) ? data : [];
+        // Filter out optional-tagged planned rows (they appear only after activation when tag is removed)
+        const safe = safeAll.filter((w: any) => {
+          const tags: any[] = Array.isArray((w as any).tags) ? (w as any).tags : [];
+          return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+        });
         setRows(safe);
         const payload = { ts: Date.now(), rows: safe };
         memoryCache.set(key, payload);
