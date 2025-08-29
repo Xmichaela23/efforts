@@ -597,13 +597,21 @@ export default function PlanSelect() {
           else if (rawType === 'swim') mappedType = 'swim';
           else if (rawType === 'strength') mappedType = 'strength';
           const cleanedDesc = String(s.description || '');
-          // Derive duration from description/tokens using user baselines when not explicitly provided
-          const derivedMinutes = computeDurationMinutes(cleanedDesc);
+          // Prefer deterministic normalizer so WU/CD/recoveries are counted and targets render
+          let normMinutes = 0;
+          let renderedFromNorm: string | undefined = undefined;
+          try {
+            const norm = normalizePlannedSession(s, { performanceNumbers: pnObj }, payload.export_hints || {});
+            normMinutes = Math.max(0, Math.round((norm?.durationMinutes || 0)));
+            renderedFromNorm = (norm?.friendlySummary || '').trim() || undefined;
+          } catch {}
+          // Fallback: heuristic description-based duration
+          const derivedMinutes = normMinutes || computeDurationMinutes(cleanedDesc);
           const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : derivedMinutes;
           const nameGuess = s.name || (mappedType === 'strength' ? 'Strength' : mappedType === 'ride' ? 'Ride' : mappedType === 'swim' ? 'Swim' : 'Run');
 
-          let rendered: string | undefined = cleanedDesc;
-          let totalSeconds = Math.max(0, Math.round(durationVal * 60));
+          let rendered: string | undefined = renderedFromNorm || cleanedDesc;
+          let totalSeconds = Math.max(0, Math.round((normMinutes || durationVal) * 60));
           let computedSteps: any[] | undefined;
           const bakedSess = baked?.sessions_by_week?.[wkKey]?.[idx];
           if (bakedSess?.computed?.total_seconds) {

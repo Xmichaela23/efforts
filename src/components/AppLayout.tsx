@@ -357,14 +357,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (workout.workout_status === 'completed') {
       setSelectedWorkout(workout);
     } else if (workout.workout_status === 'planned') {
-      // Planned workout: jump into Plans view focused on its plan/week
-      if (workout.training_plan_id) {
-        setFocusPlanId(String(workout.training_plan_id));
-        setFocusWeek(typeof workout.week_number === 'number' ? workout.week_number : undefined);
-        setShowAllPlans(true);
-        return;
-      }
+      // Planned workout: open in UnifiedWorkoutView on Planned sub-tab
+      setShowAllPlans(false);
       setSelectedWorkout(workout);
+      setActiveTab('planned');
     } else {
       // For other workout types, show in summary
       setDateWorkouts([workout]);
