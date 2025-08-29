@@ -431,32 +431,40 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (restSeconds > 0) {
         totalMin += Math.round(restSeconds / 60);
       }
-      // Build friendly swim summary with drills/pull/kick/aerobic details
-      const drillNames: string[] = [];
+      // Build friendly swim summary with drills/pull/kick/aerobic details, including rest heuristics
+      const drillDetails: string[] = [];
       const pulls: string[] = [];
       const kicks: string[] = [];
       const aerobics: string[] = [];
       steps.forEach((t) => {
         const s = String(t).toLowerCase();
-        let m = s.match(/swim_drills_\d+x\d+(yd|m)_([a-z0-9]+)/i);
+        let m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9]+)/i);
         if (m) {
-          drillNames.push(m[2]);
+          const reps = parseInt(m[1],10); const dist = parseInt(m[2],10); const name = m[4];
+          let r = 15; if (/singlearm/.test(name)) r = 20; if (/scullfront/.test(name)) r = 15;
+          drillDetails.push(`${name} ${reps}x${dist} @ :${r}r`);
           return;
         }
+        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i);
+        if (m) { const reps=parseInt(m[1],10), dist=parseInt(m[2],10); drillDetails.push(`${reps}x${dist} @ :15r`); return; }
         m = s.match(/swim_pull_(\d+)x(\d+)(yd|m)/i);
-        if (m) { pulls.push(`${m[1]}x${m[2]}`); return; }
+        if (m) { pulls.push(`${m[1]}x${m[2]} @ :20r`); return; }
         m = s.match(/swim_pull_(\d+)(yd|m)/i);
         if (m) { pulls.push(`${m[1]}`); return; }
         m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i);
-        if (m) { kicks.push(`${m[1]}x${m[2]}`); return; }
+        if (m) { kicks.push(`${m[1]}x${m[2]} @ :25r`); return; }
         m = s.match(/swim_kick_(\d+)(yd|m)/i);
         if (m) { kicks.push(`${m[1]}`); return; }
         m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i);
-        if (m) { aerobics.push(`${m[1]}x${m[2]}`); return; }
+        if (m) {
+          const reps = parseInt(m[1],10); const dist = parseInt(m[2],10);
+          let r = 15; if (dist >= 400) r = 35; else if (dist >= 200) r = 22;
+          aerobics.push(`${reps}x${dist} @ :${r}r`);
+          return; }
       });
       const swimParts: string[] = [];
       if (wuDist > 0) swimParts.push(`WU ${wuDist}`);
-      if (drillNames.length) swimParts.push(`Drills: ${Array.from(new Set(drillNames)).join(', ')}`);
+      if (drillDetails.length) swimParts.push(`Drills: ${Array.from(new Set(drillDetails)).join(', ')}`);
       if (pulls.length) swimParts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
       if (kicks.length) swimParts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
       if (aerobics.length) swimParts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);

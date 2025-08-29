@@ -338,6 +338,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           };
           const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (center: number, tol: number) => `${text} — target ${Math.round((center*(1-tol))*ftp)}–${Math.round((center*(1+tol))*ftp)} W`; if (t.includes('vo2')) return add(1.10, pTolVO2); if (t.includes('threshold')) return add(0.98, pTolSS); if (t.includes('sweet spot')) return add(0.91, pTolSS); if (t.includes('zone 2') || t.includes('endurance')) return add(0.68, 0.05); return text; };
 
+          const parseMaybeJson = (v: any) => {
+            if (v == null) return v;
+            if (typeof v === 'string') {
+              try { return JSON.parse(v); } catch { return v; }
+            }
+            return v;
+          };
           for (const w of mat) {
             const wk = w.week_number || 1;
             const dayName = numToDay[w.day_number as number] || w.day || '';
@@ -347,6 +354,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const renderedDesc = w.rendered_description || w.description || '';
             const totalSeconds = computed.total_duration_seconds;
             const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof w.duration === 'number' ? w.duration : 0);
+            const tags = (() => {
+              const t = (w as any).tags;
+              if (Array.isArray(t)) return t;
+              const pj = parseMaybeJson(t);
+              return Array.isArray(pj) ? pj : [];
+            })();
             
             const workout = {
               id: w.id,
@@ -357,7 +370,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
               completed: false,
-              tags: Array.isArray((w as any).tags) ? (w as any).tags : [],
+              tags,
               // Pass through computed data for PlannedWorkoutView
               computed: computed,
               rendered_description: renderedDesc,
@@ -445,6 +458,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
                 day: s.day,
                 completed: false,
+                tags: Array.isArray((s as any).tags) ? (s as any).tags : [],
               } as any;
               if ((s.discipline || mappedType) === 'swim' && Array.isArray((s as any).steps) && (s as any).steps.length > 0) {
                 base.intervals = (s as any).steps.map((st: any) => ({ effortLabel: st.effort || st.stroke || 'Swim', duration: 0 }));
