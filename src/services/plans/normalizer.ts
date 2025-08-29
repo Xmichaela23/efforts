@@ -44,7 +44,7 @@ const parsePace = (p: string) => {
 function resolvePaceToken(token: string, baselines: Baselines): string | null {
   const pn: any = baselines?.performanceNumbers || {};
   const fiveK_pace: string | undefined = pn.fiveK_pace || pn.fiveKPace;
-  const easy: string | undefined = pn.easyPace;
+  const easy: string | undefined = pn.easyPace || pn.easy_pace;
   if (token.includes('5kpace') && fiveK_pace) return fiveK_pace;
   if (token.includes('easypace') && easy) return easy;
   return null;
@@ -317,7 +317,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const unit = swimTech[2].toLowerCase();
     // Parse per‑100 pace from baselines.performanceNumbers.swimPace100 (e.g., "1:40")
     const pn: any = (baselines as any)?.performanceNumbers || {};
-    const sp100 = pn.swimPace100 as string | number | undefined;
+    const sp100 = (pn.swimPace100 ?? pn.swim_pace_per_100_sec) as string | number | undefined;
     const parseMmss = (v: any): number | null => {
       if (typeof v === 'number') return v;
       if (typeof v !== 'string') return null;
