@@ -1651,7 +1651,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           </div>
                                           <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>
                                         </div>
-                                        <Button size="sm" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout);}}>
+                                        <Button size="sm" variant="outline" className="border-gray-300" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout);}}>
                                           {activatingId===workout.id? 'Adding…':'Add to week'}
                                         </Button>
                                       </div>

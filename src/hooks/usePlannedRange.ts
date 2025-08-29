@@ -67,7 +67,10 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         const safeAll = Array.isArray(data) ? data : [];
         // Filter out optional-tagged planned rows (they appear only after activation when tag is removed)
         const safe = safeAll.filter((w: any) => {
-          const tags: any[] = Array.isArray((w as any).tags) ? (w as any).tags : [];
+          const raw = (w as any).tags;
+          let tags: any[] = [];
+          if (Array.isArray(raw)) tags = raw;
+          else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
           return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
         });
         setRows(safe);
