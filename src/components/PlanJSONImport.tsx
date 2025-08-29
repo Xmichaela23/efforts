@@ -76,6 +76,23 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       }
       out.sessions_by_week[wk] = outWeek;
     }
+    // Sanitize export_hints: keep only whitelisted keys
+    if (out.export_hints && typeof out.export_hints === 'object') {
+      const eh = out.export_hints as any;
+      const keep: any = {};
+      const allow = new Set([
+        'pace_tolerance_quality',
+        'pace_tolerance_easy',
+        'power_tolerance_SS_thr',
+        'power_tolerance_VO2'
+      ]);
+      for (const k of Object.keys(eh)) {
+        if (allow.has(k)) keep[k] = eh[k];
+      }
+      out.export_hints = Object.keys(keep).length ? keep : undefined;
+      if (!out.export_hints) delete out.export_hints;
+    }
+
     // Remove authoring-only fields not present in schema
     delete out.defaults;
     return out;
