@@ -1564,41 +1564,42 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         ) : (
           <>
             {selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 && (
-              <div className="flex items-center gap-6 overflow-x-auto py-4">
-                {selectedPlanDetail.weeks.map((week: any) => (
-                  <button
-                    key={week.weekNumber}
-                    onClick={() => setSelectedWeek(week.weekNumber)}
-                    className={`whitespace-nowrap pb-2 transition-colors ${selectedWeek === week.weekNumber ? 'text-black border-b-2 border-black font-medium' : 'text-gray-600 hover:text-black'}`}
-                  >
-                    Week {week.weekNumber}
-                    {week.weekNumber === selectedPlanDetail.currentWeek && (
-                      <span className="ml-2 text-xs text-blue-600">Current</span>
-                    )}
-                  </button>
-                ))}
+              <div className="flex items-center gap-4 overflow-x-auto py-3">
+                {selectedPlanDetail.weeks.map((week: any) => {
+                  const isSelected = selectedWeek === week.weekNumber;
+                  const isCurrent = week.weekNumber === selectedPlanDetail.currentWeek;
+                  return (
+                    <button
+                      key={week.weekNumber}
+                      onClick={() => setSelectedWeek(week.weekNumber)}
+                      className={`whitespace-nowrap px-2 py-1 rounded ${isSelected ? 'bg-gray-100 text-black' : 'text-gray-700 hover:text-black'}`}
+                    >
+                      {isSelected ? (
+                        <span className="flex items-center gap-2 text-sm">
+                          <span>Week {week.weekNumber}</span>
+                          <span className="text-gray-500">•</span>
+                          <span>{formatDuration(getWeeklyVolume(currentWeekData))}</span>
+                          <span className="text-gray-500">•</span>
+                          <span>{(currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length} workouts</span>
+                          {isCurrent && <span className="ml-2 text-xs text-blue-600">Current</span>}
+                        </span>
+                      ) : (
+                        <span className="text-sm">Week {week.weekNumber}</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
 
             {currentWeekData && (
-              <div className="border border-gray-200 rounded-lg">
-                <div className="p-6 border-b border-gray-200">
-                  <h2 className="text-xl font-bold mb-2">
-                    Week {currentWeekData.weekNumber}: {currentWeekData.title}
+              <div className="">
+                <div className="pb-2">
+                  <h2 className="text-lg font-semibold">
+                    Week {currentWeekData.weekNumber}
                   </h2>
-                  <p className="text-gray-600 mb-4">{currentWeekData.focus}</p>
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      {formatDuration(getWeeklyVolume(currentWeekData))} total
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Target className="h-4 w-4" />
-                      {currentWeekData.workouts ? currentWeekData.workouts.filter((w: any) => w.type !== 'rest').length : 0} workouts
-                    </div>
-                  </div>
                 </div>
-                <div className="p-6">
+                <div className="">
                   <div className="space-y-4">
                     {(() => {
                       const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
