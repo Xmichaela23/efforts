@@ -490,12 +490,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     }
   };
 
-  async function activateOptional(rowId: string) {
+  async function activateOptional(workout: any) {
     try {
+      const rowId = workout.id as string;
       setActivatingId(rowId);
+      const existingTags: string[] = Array.isArray(workout.tags) ? workout.tags : [];
+      const newTags = existingTags.filter((t: string) => String(t).toLowerCase() !== 'optional');
       await supabase
         .from('planned_workouts')
-        .update({ workout_status: 'planned' })
+        .update({ tags: newTags })
         .eq('id', rowId);
       // Soft refresh by bumping selectedWeek state
       setSelectedWeek(w => w);
@@ -1431,7 +1434,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                               <div className="mt-3">
                                 <div className="text-xs font-medium text-gray-700 mb-1">Optional sessions — select one supplemental session to add to week</div>
                                 <div className="space-y-2">
-                                  {groups[day].filter((w:any)=>w.workout_status==='optional').map((workout:any, idx:number)=> (
+                                  {groups[day].filter((w:any)=>Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')).map((workout:any, idx:number)=> (
                                     <div key={workout.id || `opt-${day}-${idx}`} className="p-3 rounded border border-dashed">
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
@@ -1444,7 +1447,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           </div>
                                           <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>
                                         </div>
-                                        <Button size="sm" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout.id);}}>
+                                        <Button size="sm" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout);}}>
                                           {activatingId===workout.id? 'Adding…':'Add to week'}
                                         </Button>
                                       </div>

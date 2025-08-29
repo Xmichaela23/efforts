@@ -30,7 +30,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const dateWorkoutsMemo = useMemo(() => {
     const allWorkouts = [...(workouts || []), ...(plannedWorkouts || [])];
-    return allWorkouts.filter((w: any) => w.date === activeDate);
+    return allWorkouts.filter((w: any) => w.date === activeDate && !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
   }, [workouts, plannedWorkouts, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
