@@ -122,7 +122,16 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const plus = im[5];
     const restA = im[6] ? parseInt(im[6], 10) : 0;
     const restB = im[7] ? parseInt(im[7], 10) : restA;
-    const restEach = restA ? Math.round((restA + restB) / 2) : 0;
+    let restEach = restA ? Math.round((restA + restB) / 2) : 0;
+    if (!restEach) {
+      // Fallback: detect rest minutes from the raw token when regex misses
+      const restAlt = tokenStr.match(/interval_[^\s]*?_r(\d+)(?:-(\d+))?min/i);
+      if (restAlt) {
+        const a = parseInt(restAlt[1], 10);
+        const b = restAlt[2] ? parseInt(restAlt[2], 10) : a;
+        restEach = Math.round((a + b) / 2);
+      }
+    }
 
     let pace = resolvePaceToken(paceTag, baselines) || '';
     pace = applyOffset(pace, plus || undefined);
@@ -279,12 +288,18 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     }
   }
 
-  // Endurance bike
-  const bend = tokenStr.match(/bike_endurance_(\d+)min/i);
-  if (bend) {
-    const mins = parseInt(bend[1], 10);
-    totalMin += mins;
-    summaryParts.push(`Endurance ${mins} min (Z2)`);
+  // Endurance bike (single or multiple blocks)
+  const bendAll = tokenStr.match(/bike_endurance_(\d+)min/gi);
+  if (bendAll) {
+    let sum = 0;
+    bendAll.forEach((m) => {
+      const mm = m.match(/(\d+)min/i);
+      if (mm) sum += parseInt(mm[1], 10);
+    });
+    if (sum > 0) {
+      totalMin += sum;
+      summaryParts.push(`Endurance ${sum} min (Z2)`);
+    }
   }
 
   // Long run blocks (e.g., longrun_150min_...)
@@ -333,10 +348,11 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     };
     const per100Sec = parseMmss(pn.swimPace100);
     if (per100Sec != null) {
-      let swimYards = 0;
-      const toYards = (count: number, unit: string) => {
-        // Treat 100m ≈ 100yd for UI simplicity; authoring uses yd here
-        return count; // keep units-consistent with baseline per-100 "units"
+      let swimDistance = 0;
+      let unitSeen: 'yd' | 'm' = 'yd';
+      const addDistance = (count: number, unit: string) => {
+        unitSeen = (unit?.toLowerCase() === 'm') ? 'm' : unitSeen;
+        swimDistance += count;
       };
 
       steps.forEach((t) => {
@@ -344,37 +360,42 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         // WU/CD distances like swim_warmup_200yd_easy, swim_cooldown_200yd
         let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
         if (m) {
-          swimYards += toYards(parseInt(m[1], 10), m[2]);
+          addDistance(parseInt(m[1], 10), m[2]);
           return;
         }
-        // Drills with reps×dist: swim_drills_4x50yd_*
+        // Drills with reps×dist: swim_drills_4x50yd_* or 2x100yd variants
         m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_[a-z0-9]+/i);
         if (m) {
-          swimYards += parseInt(m[1], 10) * toYards(parseInt(m[2], 10), m[3]);
+          addDistance(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]);
+          return;
+        }
+        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i);
+        if (m) {
+          addDistance(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]);
           return;
         }
         // Pull/Kick variants: swim_pull_2x100yd, swim_kick_2x100yd
         m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
         if (m) {
-          swimYards += parseInt(m[2], 10) * toYards(parseInt(m[3], 10), m[4]);
+          addDistance(parseInt(m[2], 10) * parseInt(m[3], 10), m[4]);
           return;
         }
         // Single-distance pull/kick: swim_pull_300yd_steady
         m = s.match(/swim_(pull|kick)_(\d+)(yd|m)(?:_[a-z]+)?/i);
         if (m) {
-          swimYards += toYards(parseInt(m[2], 10), m[3]);
+          addDistance(parseInt(m[2], 10), m[3]);
           return;
         }
         // Aerobic sets: swim_aerobic_4x200yd_easy
         m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)_[a-z]+/i);
         if (m) {
-          swimYards += parseInt(m[1], 10) * toYards(parseInt(m[2], 10), m[3]);
+          addDistance(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]);
           return;
         }
       });
 
-      if (swimYards > 0) {
-        const segments = Math.max(1, Math.round(swimYards / 100));
+      if (swimDistance > 0) {
+        const segments = Math.max(1, Math.round(swimDistance / 100));
         const minutes = Math.round((segments * per100Sec) / 60);
         totalMin += minutes;
       }
@@ -407,6 +428,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (kicks.length) swimParts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
       if (aerobics.length) swimParts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
       if (swimParts.length) summaryParts.push(swimParts.join(' • '));
+      if (swimDistance > 0) summaryParts.push(`Total ${swimDistance}${unitSeen}`);
     }
   } catch {}
 
