@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 
 type PlannedRow = {
   user_id: string;
@@ -73,6 +74,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   if (planErr || !plan) throw planErr || new Error('Plan not found');
 
   const sessionsByWeek = (plan as any).sessions_by_week || {};
+  const planDefaults = (plan as any)?.defaults || DEFAULTS_FALLBACK;
   const weekSessions: any[] = sessionsByWeek[String(weekNumber)] || [];
   if (!Array.isArray(weekSessions) || weekSessions.length === 0) return { inserted: 0 };
 
@@ -126,7 +128,15 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
 
   // 7) Build rows
   const rows: PlannedRow[] = [];
-  for (const s of weekSessions) {
+  for (const s0 of weekSessions) {
+    // Expand swim DSL to steps_preset if present
+    let s = { ...s0 } as any;
+    try {
+      if ((!Array.isArray(s.steps_preset) || s.steps_preset.length === 0) && String(s.discipline||'').toLowerCase()==='swim') {
+        const steps = expandSession({ discipline: 'swim', main: (s as any).main, extra: (s as any).extra, steps_preset: (s as any).steps_preset }, planDefaults);
+        if (Array.isArray(steps) && steps.length) s.steps_preset = steps;
+      }
+    } catch {}
     const dow = dayIndex[(s.day as string) || 'Monday'] || 1;
     const date = addDays(startDate, (weekNumber - 1) * 7 + (dow - 1));
     const rawType = String(s.discipline || s.type || '').toLowerCase();

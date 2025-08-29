@@ -4,6 +4,7 @@ import { getLibraryPlan } from '@/services/LibraryPlans';
 import { supabase } from '@/lib/supabase';
 import { useAppContext } from '@/contexts/AppContext';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 import { augmentPlan } from '@/services/plans/tools/plan_bake_and_compute';
 
 function computeNextMonday(): string {
@@ -448,15 +449,24 @@ export default function PlanSelect() {
 
         return Math.max(0, Math.round(totalMin));
       };
+      // Expand any swim DSL (main/extra) to steps_preset using plan defaults
+      const planDefaults = (libPlan.template?.defaults as any) || DEFAULTS_FALLBACK;
       for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) {
         const outWeek: any[] = [];
         for (const s of sessions as any[]) {
+          let expanded = { ...s } as any;
+          try {
+            if ((!Array.isArray(expanded.steps_preset) || expanded.steps_preset.length === 0) && String(expanded.discipline||'').toLowerCase()==='swim') {
+              const steps = expandSession({ discipline: 'swim', main: (expanded as any).main, extra: (expanded as any).extra, steps_preset: (expanded as any).steps_preset }, planDefaults);
+              if (Array.isArray(steps) && steps.length) expanded.steps_preset = steps;
+            }
+          } catch {}
           let desc = String(s.description||'');
           if (desc) desc = resolvePaces(desc);
           if (desc) desc = resolveStrength(desc);
           const isBikeText = /\b(bike|ride|cycling)\b/i.test(String(s.discipline||s.type||''));
           if (desc && isBikeText) desc = mapBike(desc);
-          const copy = { ...s, description: desc };
+          const copy = { ...expanded, description: desc };
           outWeek.push(copy);
         }
         (mapped.sessions_by_week as any)[wk] = outWeek;
@@ -747,7 +757,7 @@ export default function PlanSelect() {
       }
 
       try { await refreshPlans?.(); } catch {}
-      navigate('/', { state: { openPlans: true } });
+      navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });
     } catch (e: any) {
       setError(e?.message ? String(e.message) : JSON.stringify(e));
     }

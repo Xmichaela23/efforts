@@ -272,6 +272,92 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     summaryParts.push(`Long run ${mins} min`);
   }
 
+  // Swim technique blocks: swim_technique_1200yd or swim_technique_1500m
+  const swimTech = tokenStr.match(/swim_technique_(\d+)(yd|m)\b/i);
+  if (swimTech) {
+    const dist = parseInt(swimTech[1], 10);
+    const unit = swimTech[2].toLowerCase();
+    // Parse per‑100 pace from baselines.performanceNumbers.swimPace100 (e.g., "1:40")
+    const pn: any = (baselines as any)?.performanceNumbers || {};
+    const sp100 = pn.swimPace100 as string | number | undefined;
+    const parseMmss = (v: any): number | null => {
+      if (typeof v === 'number') return v;
+      if (typeof v !== 'string') return null;
+      const m = v.match(/(\d+):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const per100Sec = parseMmss(sp100);
+    // If no swim baseline, do NOT fallback — leave duration unspecified
+    if (per100Sec != null) {
+      const segments = Math.max(1, Math.round(dist / 100));
+      const minutes = Math.round((segments * per100Sec) / 60);
+      totalMin += minutes;
+    }
+    summaryParts.push(`Swim technique ${dist}${unit}`);
+  }
+
+  // General swim distance-based tokens (WU/CD, drills, pull, kick, aerobic)
+  // Compute duration from user swimPace100 baseline. No fallback if missing.
+  try {
+    const pn: any = (baselines as any)?.performanceNumbers || {};
+    const parseMmss = (v: any): number | null => {
+      if (typeof v === 'number') return v;
+      if (typeof v !== 'string') return null;
+      const m = v.match(/(\d+):(\d{2})/);
+      if (!m) return null;
+      return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+    };
+    const per100Sec = parseMmss(pn.swimPace100);
+    if (per100Sec != null) {
+      let swimYards = 0;
+      const toYards = (count: number, unit: string) => {
+        // Treat 100m ≈ 100yd for UI simplicity; authoring uses yd here
+        return count; // keep units-consistent with baseline per-100 "units"
+      };
+
+      steps.forEach((t) => {
+        const s = t.toLowerCase();
+        // WU/CD distances like swim_warmup_200yd_easy, swim_cooldown_200yd
+        let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
+        if (m) {
+          swimYards += toYards(parseInt(m[1], 10), m[2]);
+          return;
+        }
+        // Drills with reps×dist: swim_drills_4x50yd_*
+        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_[a-z0-9]+/i);
+        if (m) {
+          swimYards += parseInt(m[1], 10) * toYards(parseInt(m[2], 10), m[3]);
+          return;
+        }
+        // Pull/Kick variants: swim_pull_2x100yd, swim_kick_2x100yd
+        m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
+        if (m) {
+          swimYards += parseInt(m[2], 10) * toYards(parseInt(m[3], 10), m[4]);
+          return;
+        }
+        // Single-distance pull/kick: swim_pull_300yd_steady
+        m = s.match(/swim_(pull|kick)_(\d+)(yd|m)(?:_[a-z]+)?/i);
+        if (m) {
+          swimYards += toYards(parseInt(m[2], 10), m[3]);
+          return;
+        }
+        // Aerobic sets: swim_aerobic_4x200yd_easy
+        m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)_[a-z]+/i);
+        if (m) {
+          swimYards += parseInt(m[1], 10) * toYards(parseInt(m[2], 10), m[3]);
+          return;
+        }
+      });
+
+      if (swimYards > 0) {
+        const segments = Math.max(1, Math.round(swimYards / 100));
+        const minutes = Math.round((segments * per100Sec) / 60);
+        totalMin += minutes;
+      }
+    }
+  } catch {}
+
   // Strength single-block time (e.g., strength_main_50min)
   const strengthMain = tokenStr.match(/strength_main_(\d+)min/i);
   if (strengthMain) {

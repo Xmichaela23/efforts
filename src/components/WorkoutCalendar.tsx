@@ -111,12 +111,21 @@ function derivePlannedCellLabel(w: any): string | null {
       return `SM ${durStr}`.trim();
     }
 
-    // STRENGTH
+    // STRENGTH (apply mixed rule priority: Compounds > Accessory > Core)
     if (type === 'strength') {
-      if (/core/.test(txt)) return `STG-CORE ${durStr}`.trim();
-      if (/chin|row|pull|lunge|accessor/i.test(txt)) return `STG-ACC ${durStr}`.trim();
-      if (/squat|deadlift|bench|ohp/.test(txt)) return `STG-CMP ${durStr}`.trim();
-      return `STG ${durStr}`.trim();
+      // Prefer minutes from steps token strength_main_XXmin over row.duration (which may reflect multi-session day totals)
+      const mmTok = steps.join(' ').toLowerCase().match(/strength_main_(\d+)min/);
+      const minsFromSteps = mmTok ? parseInt(mmTok[1], 10) : undefined;
+      const effMins = (typeof minsFromSteps === 'number' && minsFromSteps > 0)
+        ? `${minsFromSteps}m`
+        : durStr;
+      const hasCompound = /squat|deadlift|bench|ohp/.test(txt);
+      const hasAccessory = /chin|row|pull|lunge|accessor/i.test(txt);
+      const hasCore = /core/.test(txt);
+      if (hasCompound) return `STG-CMP ${effMins}`.trim();
+      if (hasAccessory) return `STG-ACC ${effMins}`.trim();
+      if (hasCore) return `STG-CORE ${effMins}`.trim();
+      return `STG ${effMins}`.trim();
     }
 
     return null;

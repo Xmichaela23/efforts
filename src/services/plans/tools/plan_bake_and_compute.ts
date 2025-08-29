@@ -533,9 +533,14 @@ const PRESET_MAP: Record<string, Step[]> = {
   "swim_warmup_200yd_easy": [{ kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "WU" }],
   "swim_warmup_300yd_easy": [{ kind: "steady", ctrl: "distance", val: 300, intensity: "easy", label: "WU" }],
   "swim_cooldown_200yd_easy": [{ kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "CD" }],
+  "swim_cooldown_300yd_easy": [{ kind: "steady", ctrl: "distance", val: 300, intensity: "easy", label: "CD" }],
+  // new 400yd WU/CD tokens
+  "swim_warmup_400yd_easy": [{ kind: "steady", ctrl: "distance", val: 400, intensity: "easy", label: "WU" }],
+  "swim_cooldown_400yd_easy": [{ kind: "steady", ctrl: "distance", val: 400, intensity: "easy", label: "CD" }],
   
   "swim_endurance_1500yd_easy": [{ kind: "steady", ctrl: "distance", val: 1500, intensity: "easy", label: "endurance" }],
   "swim_endurance_2000yd_easy": [{ kind: "steady", ctrl: "distance", val: 2000, intensity: "easy", label: "endurance" }],
+  "swim_endurance_800yd_easy": [{ kind: "steady", ctrl: "distance", val: 800, intensity: "easy", label: "endurance" }],
   
   "swim_intervals_6x100yd_threshold_R30s": [
     { kind: "repeat", times: 6, of: [
@@ -560,15 +565,110 @@ const PRESET_MAP: Record<string, Step[]> = {
       { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "single arm drill" }
     ]}
   ],
+  "swim_drills_4x50yd_fist": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "fist drill" }
+    ]}
+  ],
+  "swim_drills_4x50yd_fingertipdrag": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "fingertip drag" }
+    ]}
+  ],
+  "swim_drills_4x50yd_616": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "6-1-6 drill" }
+    ]}
+  ],
   "swim_drills_4x50yd_scull": [
     { kind: "repeat", times: 4, of: [
       { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "sculling drill" }
+    ]}
+  ],
+  // front-scull variant
+  "swim_drills_4x50yd_scullfront": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "scull-front" }
     ]}
   ],
   "swim_drills_4x50yd_kick": [
     { kind: "repeat", times: 4, of: [
       { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "kick drill" }
     ]}
+  ],
+  // zipper & doggy-paddle variants
+  "swim_drills_4x50yd_zipper": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "zipper drill" }
+    ]}
+  ],
+  "swim_drills_4x50yd_doggypaddle": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "doggy paddle" }
+    ]}
+  ],
+  // 2x50 variants
+  "swim_drills_2x50yd_catchup": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "catch-up drill" }
+    ]}
+  ],
+  "swim_drills_2x50yd_singlearm": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "single arm drill" }
+    ]}
+  ],
+  "swim_drills_2x50yd_fist": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "fist drill" }
+    ]}
+  ],
+  "swim_drills_2x50yd_fingertipdrag": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "fingertip drag" }
+    ]}
+  ],
+  "swim_drills_2x50yd_616": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "6-1-6 drill" }
+    ]}
+  ],
+  // scullfront variants
+  "swim_drills_2x100yd_scullfront": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "distance", val: 100, intensity: "easy", label: "scull-front" }
+    ]}
+  ],
+  "swim_drills_1x100yd_scullfront": [
+    { kind: "repeat", times: 1, of: [
+      { kind: "work", ctrl: "distance", val: 100, intensity: "easy", label: "scull-front" }
+    ]}
+  ],
+  // Kick / Pull 4x50 variants
+  "swim_kick_4x50yd": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "kick" }
+    ]}
+  ],
+  "swim_pull_4x50yd": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 50, intensity: "easy", label: "pull" }
+    ]}
+  ],
+  // Aerobic sets
+  "swim_aerobic_4x200yd_easy": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 200, intensity: "easy", label: "aerobic" }
+    ]}
+  ],
+  "swim_aerobic_4x500yd_easy": [
+    { kind: "repeat", times: 4, of: [
+      { kind: "work", ctrl: "distance", val: 500, intensity: "easy", label: "aerobic" }
+    ]}
+  ],
+  // Pull steady 300
+  "swim_pull_300yd_steady": [
+    { kind: "steady", ctrl: "distance", val: 300, intensity: "easy", label: "pull" }
   ],
 
   // Missing swim tokens that are in the user's plan
@@ -588,6 +688,13 @@ const PRESET_MAP: Record<string, Step[]> = {
       { kind: "work", ctrl: "distance", val: 100, intensity: "easy", label: "kick" }
     ]},
     { kind: "steady", ctrl: "distance", val: 200, intensity: "easy", label: "easy" }
+  ],
+  // Simple wrappers: technique blocks as steady easy distance if no detailed drills provided
+  "swim_technique_1500yd": [
+    { kind: "steady", ctrl: "distance", val: 1500, intensity: "easy", label: "technique" }
+  ],
+  "swim_technique_2000yd": [
+    { kind: "steady", ctrl: "distance", val: 2000, intensity: "easy", label: "technique" }
   ],
   "cooldown_swim_easy_10min": [{ kind: "steady", ctrl: "time", val: 10 * 60, intensity: "easy", label: "CD" }],
 
