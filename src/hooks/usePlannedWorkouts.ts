@@ -285,6 +285,15 @@ export const usePlannedWorkouts = () => {
     fetchPlannedWorkouts();
   }, [fetchPlannedWorkouts]);
 
+  // Refresh when other views broadcast invalidation
+  useEffect(() => {
+    const handler = () => {
+      fetchPlannedWorkouts();
+    };
+    window.addEventListener('planned:invalidate', handler);
+    return () => window.removeEventListener('planned:invalidate', handler);
+  }, [fetchPlannedWorkouts]);
+
   return {
     plannedWorkouts,
     loading,

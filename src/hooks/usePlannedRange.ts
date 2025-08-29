@@ -30,6 +30,7 @@ export function usePlannedRange(fromISO: string, toISO: string) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [invalidateTs, setInvalidateTs] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +81,23 @@ export function usePlannedRange(fromISO: string, toISO: string) {
       }
     })();
     return () => { cancelled = true; };
+  }, [fromISO, toISO, invalidateTs]);
+
+  useEffect(() => {
+    const handler = async () => {
+      // Clear caches for this window and refetch
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const key = cacheKey(user.id, fromISO, toISO);
+          memoryCache.delete(key);
+          localStorage.removeItem(`plannedRange:${key}`);
+        }
+      } catch {}
+      setInvalidateTs(Date.now());
+    };
+    window.addEventListener('planned:invalidate', handler);
+    return () => window.removeEventListener('planned:invalidate', handler);
   }, [fromISO, toISO]);
 
   return { rows, loading, error };

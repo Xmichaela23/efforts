@@ -314,8 +314,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           };
           const resolvePaces = (text: string) => {
             let out = text || '';
-            if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK));
-            if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace));
+            if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
+            if (easyPace) out = out.split('{easy_pace}').join(String(easyPace));
             // Compute offsets like 7:43/mi + 0:45/mi → 8:28/mi
             out = out.replace(/(\d+:\d{2})\/(mi|km)\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
               if (u1 !== u2) return m;
@@ -416,8 +416,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const ftp: number | null = (bl?.performanceNumbers?.ftp || null) as any;
               const resolvePaces = (text: string) => {
                 let out = text || '';
-                if (fiveK) out = out.replaceAll('{5k_pace}', String(fiveK));
-                if (easyPace) out = out.replaceAll('{easy_pace}', String(easyPace));
+                if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
+                if (easyPace) out = out.split('{easy_pace}').join(String(easyPace));
                 // Compute offsets
                 out = out.replace(/(\d+:\d{2}\/(mi|km))\s*([+\-−])\s*(\d+:\d{2})\/(mi|km)/g, (m, base, u1, sign, t, u2) => {
                   if (u1 !== u2) return m; const off = `${sign}${t}/${u1}`; return ((): string => {
@@ -550,10 +550,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       }
 
       // Activate: remove optional tag from selected
-      const newTags = existingTags.filter((t: string) => String(t).toLowerCase() !== optTag);
+      let newTags = existingTags.filter((t: string) => String(t).toLowerCase() !== optTag);
+      if (!newTags.map((t:string)=>t.toLowerCase()).includes('opt_active')) newTags = [...newTags, 'opt_active'];
       await supabase.from('planned_workouts').update({ tags: newTags }).eq('id', rowId);
+      // Local immediate update to reduce layout shift
+      try {
+        if (selectedPlanDetail && selectedPlanDetail.weeks) {
+          const clone = { ...selectedPlanDetail } as any;
+          clone.weeks = (clone.weeks || []).map((wk: any) => {
+            const workouts = (wk.workouts || []).map((w: any) => {
+              if (w.id === rowId) {
+                const t = Array.isArray(w.tags) ? w.tags : [];
+                const filtered = t.filter((x: string)=>String(x).toLowerCase()!==optTag);
+                const hasOptActive = filtered.map((x:string)=>x.toLowerCase()).includes('opt_active');
+                return { ...w, tags: hasOptActive ? filtered : [...filtered, 'opt_active'] };
+              }
+              return w;
+            });
+            return { ...wk, workouts };
+          });
+          setSelectedPlanDetail(clone);
+        }
+      } catch {}
 
-      // XOR swap: if this workout carries xor tag, hide Tuesday swim by adding optional
+      // XOR swap: if this workout carries xor tag, hide the counterpart (swim ↔ ride)
       if (lower.includes(xorTag)) {
         const wkStart = startOfWeek(workout.date);
         const end = new Date(wkStart); end.setDate(end.getDate()+6); const wkEnd = toDateOnly(end.toISOString().slice(0,10));
@@ -563,17 +583,105 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           .eq('training_plan_id', workout.training_plan_id)
           .gte('date', wkStart)
           .lte('date', wkEnd);
-        const swims = (weekRows||[]).filter((r:any)=> String(r.type).toLowerCase()==='swim' && Array.isArray(r.tags) && r.tags.map((t:string)=>t.toLowerCase()).includes(xorTag));
-        for (const sw of swims) {
-          const tgs = Array.isArray(sw.tags) ? sw.tags : [];
+        const chosenType = String(workout.type).toLowerCase();
+        const otherType = chosenType === 'swim' ? 'ride' : 'swim';
+        const others = (weekRows||[]).filter((r:any)=> String(r.type).toLowerCase()===otherType && Array.isArray(r.tags) && r.tags.map((t:string)=>t.toLowerCase()).includes(xorTag));
+        for (const o of others) {
+          const tgs = Array.isArray(o.tags) ? o.tags : [];
           if (!tgs.map((t:string)=>t.toLowerCase()).includes(optTag)) {
-            await supabase.from('planned_workouts').update({ tags: [...tgs, 'optional'] }).eq('id', sw.id);
+            await supabase.from('planned_workouts').update({ tags: [...tgs, 'optional'] }).eq('id', o.id);
           }
         }
-        try { (window as any).toast?.({ title: 'Quality selected', description: spec.ui_text?.notifications?.xor_applied }); } catch {}
+        // Update local state for XOR-swapped counterparts
+        try {
+          if (selectedPlanDetail && selectedPlanDetail.weeks) {
+            const clone = { ...selectedPlanDetail } as any;
+            clone.weeks = (clone.weeks || []).map((wk: any) => {
+              const workouts = (wk.workouts || []).map((w: any) => {
+                const tgs = Array.isArray(w.tags) ? w.tags : [];
+                const lowerTags = tgs.map((x:string)=>x.toLowerCase());
+                if (String(w.type).toLowerCase()===otherType && lowerTags.includes(xorTag) && !lowerTags.includes(optTag)) {
+                  return { ...w, tags: [...tgs, 'optional'] };
+                }
+                return w;
+              });
+              return { ...wk, workouts };
+            });
+            setSelectedPlanDetail(clone);
+          }
+        } catch {}
+        try { (window as any).toast?.({ title: 'Selection applied', description: spec.ui_text?.notifications?.xor_applied }); } catch {}
       }
-      // Soft refresh by bumping selectedWeek state
-      setSelectedWeek(w => w);
+      // Broadcast to other views (Today, Calendar) to refresh
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    } finally {
+      setActivatingId(null);
+    }
+  }
+
+  async function deactivateOptional(workout: any) {
+    try {
+      const rowId = workout.id as string;
+      setActivatingId(rowId);
+      // Add optional back; remove opt_active
+      const existingTags: string[] = Array.isArray(workout.tags) ? workout.tags : [];
+      let next = existingTags.filter((t:string)=>t.toLowerCase()!=='opt_active');
+      if (!next.map((t:string)=>t.toLowerCase()).includes('optional')) next = [...next, 'optional'];
+      await supabase.from('planned_workouts').update({ tags: next }).eq('id', rowId);
+      // Local update
+      try {
+        if (selectedPlanDetail && selectedPlanDetail.weeks) {
+          const clone = { ...selectedPlanDetail } as any;
+          clone.weeks = (clone.weeks || []).map((wk: any) => {
+            const workouts = (wk.workouts || []).map((w: any) => {
+              if (w.id === rowId) {
+                const t = Array.isArray(w.tags) ? w.tags : [];
+                const noActive = t.filter((x:string)=>x.toLowerCase()!=='opt_active');
+                return noActive.map((x:string)=>x.toLowerCase()).includes('optional') ? { ...w, tags: noActive } : { ...w, tags: [...noActive, 'optional'] };
+              }
+              return w;
+            });
+            return { ...wk, workouts };
+          });
+          setSelectedPlanDetail(clone);
+        }
+      } catch {}
+      // XOR reverse: If this row carries xor tag, unhide the counterpart (remove optional)
+      try {
+        const spec: any = optionalUiSpec as any;
+        const xorTag = String(spec?.logic?.xor_tag || 'xor:swim_or_quality_bike').toLowerCase();
+        const optTag = String(spec?.logic?.optional_tag || 'optional').toLowerCase();
+        const tz = spec?.logic?.week_boundary?.timezone || 'America/Los_Angeles';
+        const toDateOnly = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { timeZone: tz });
+        const startOfWeek = (iso: string) => {
+          const d = new Date(iso + 'T00:00:00');
+          const day = new Date(d.toLocaleString('en-US', { timeZone: tz })).getDay();
+          const mondayOffset = (day === 0 ? -6 : 1 - day);
+          const base = new Date(d);
+          base.setDate(base.getDate() + mondayOffset);
+          return toDateOnly(base.toISOString().slice(0,10));
+        };
+        const tagsLower = (Array.isArray(workout.tags)? workout.tags:[]).map((t:string)=>t.toLowerCase());
+        if (tagsLower.includes(xorTag)) {
+          const wkStart = startOfWeek(workout.date);
+          const end = new Date(wkStart); end.setDate(end.getDate()+6); const wkEnd = toDateOnly(end.toISOString().slice(0,10));
+          const { data: weekRows } = await supabase
+            .from('planned_workouts')
+            .select('id,type,tags')
+            .eq('training_plan_id', workout.training_plan_id)
+            .gte('date', wkStart)
+            .lte('date', wkEnd);
+          const chosenType = String(workout.type).toLowerCase();
+          const otherType = chosenType === 'swim' ? 'ride' : 'swim';
+          const others = (weekRows||[]).filter((r:any)=> String(r.type).toLowerCase()===otherType && Array.isArray(r.tags) && r.tags.map((t:string)=>t.toLowerCase()).includes(xorTag));
+          for (const o of others) {
+            const tgs = Array.isArray(o.tags) ? o.tags : [];
+            const cleaned = tgs.filter((t:string)=>t.toLowerCase()!==optTag);
+            await supabase.from('planned_workouts').update({ tags: cleaned }).eq('id', o.id);
+          }
+        }
+      } catch {}
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
     } finally {
       setActivatingId(null);
     }
@@ -814,9 +922,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   const getWeeklyVolume = (week: any) => {
     if (!week || !week.workouts) return 0;
-    return week.workouts.reduce((total: number, workout: any) => {
-      return total + (workout.duration || 0);
-    }, 0);
+    return week.workouts
+      .filter((w: any) => {
+        const tags = Array.isArray(w?.tags) ? w.tags.map((t: string) => t.toLowerCase()) : [];
+        // Exclude optional until activated; activated rows have 'opt_active' and no 'optional'
+        return !tags.includes('optional');
+      })
+      .reduce((total: number, workout: any) => total + (workout.duration || 0), 0);
   };
 
   // Export selected plan to Markdown (all weeks)
@@ -871,13 +983,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   // Day View Rendering with Summary/Edit modes
   if (currentView === 'day' && selectedWorkout) {
-    const intervals = selectedWorkout.intervals || [];
+    const isStrengthWorkout = String(selectedWorkout?.type || '').toLowerCase() === 'strength';
+    const strengthExercises = Array.isArray((selectedWorkout as any).strength_exercises) ? (selectedWorkout as any).strength_exercises : [];
+    const intervals = Array.isArray((selectedWorkout as any).intervals) ? (selectedWorkout as any).intervals : [];
     const totalTime = intervals.reduce((sum: number, interval: any) => sum + (interval.duration || 0), 0);
 
     // SUMMARY MODE - Clean workout overview
     if (workoutViewMode === 'summary') {
       return (
-        <div key={selectedWorkout?.id} className="min-h-screen bg-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+        <div key={selectedWorkout?.id} className="min-h-screen bg-white overflow-x-hidden" style={{ fontFamily: 'Inter, sans-serif', touchAction: 'pan-y', overscrollBehaviorX: 'contain' }}>
           <main className="max-w-4xl mx-auto px-4 py-6">
             <div className="flex justify-between items-center mb-6">
               <button onClick={handleBackToWeek} className="text-gray-600 hover:text-black transition-colors">
@@ -982,10 +1096,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               <h2 className="text-xl font-semibold text-gray-900 mb-4">Plan Context</h2>
               <p className="text-gray-700 leading-relaxed">
                 This workout is part of your Week {selectedWeek} training in the {selectedPlanDetail?.name} plan.
-                {isStrengthWorkout 
-                  ? ' This strength session supports your primary training by building the muscular foundation needed for improved performance and injury prevention.'
-                  : ' This endurance session builds your aerobic capacity and prepares you for the demands of your goal event.'
-                }
               </p>
             </div>
           </main>
@@ -995,7 +1105,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
     // EDIT MODE - Full workout builder interface
     return (
-      <div className="min-h-screen bg-white" style={{ fontFamily: 'Inter, sans-serif' }}>
+      <div className="min-h-screen bg-white overflow-x-hidden" style={{ fontFamily: 'Inter, sans-serif', touchAction: 'pan-y', overscrollBehaviorX: 'contain' }}>
         <main className="max-w-7xl mx-auto px-3 py-2">
           <div className="flex justify-between items-center mb-6">
             <button
@@ -1025,7 +1135,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </div>
 
           {/* STRENGTH WORKOUT DISPLAY */}
-          {isStrengthWorkout && strengthExercises.length > 0 && (
+          {Array.isArray(strengthExercises) && strengthExercises.length > 0 && (
             <div className="space-y-4 mb-6">
               {strengthExercises.map((exercise: any, index: number) => (
                 <div key={exercise.id || index} className="space-y-4 p-4 border border-gray-200 rounded-lg">
@@ -1096,7 +1206,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           )}
 
           {/* ENDURANCE WORKOUT DISPLAY */}
-          {!isStrengthWorkout && intervals.length > 0 && (
+          {Array.isArray(intervals) && intervals.length > 0 && (
             <div className="space-y-4 mb-6">
               {intervals.map((interval: any, index: number) => (
                 <div key={interval.id || index} className="space-y-4 p-4 border border-gray-200 rounded-lg">
@@ -1511,6 +1621,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                       </div>
                                       <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
                                     </div>
+                                    {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
+                                      <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
+                                        {activatingId===workout.id? 'Removing…':'Remove'}
+                                      </Button>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -1568,7 +1683,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   // Plans List View
   return (
-    <div className="space-y-6" style={{fontFamily: 'Inter, sans-serif'}}>
+    <div className="space-y-6 overflow-x-hidden" style={{fontFamily: 'Inter, sans-serif', touchAction: 'pan-y', overscrollBehaviorX: 'contain'}}>
       <div className="flex items-center justify-between">
         <button onClick={onClose} className="flex items-center gap-2 p-0 h-auto text-gray-600 hover:text-black transition-colors">
           <ArrowLeft className="h-4 w-4" />
