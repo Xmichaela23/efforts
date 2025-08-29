@@ -350,6 +350,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     if (per100Sec != null) {
       let swimDistance = 0;
       let unitSeen: 'yd' | 'm' = 'yd';
+      let wuDist = 0;
+      let cdDist = 0;
       const addDistance = (count: number, unit: string) => {
         unitSeen = (unit?.toLowerCase() === 'm') ? 'm' : unitSeen;
         swimDistance += count;
@@ -360,7 +362,9 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         // WU/CD distances like swim_warmup_200yd_easy, swim_cooldown_200yd
         let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
         if (m) {
-          addDistance(parseInt(m[1], 10), m[2]);
+          const dist = parseInt(m[1], 10);
+          addDistance(dist, m[2]);
+          if (/warmup/i.test(s)) wuDist += dist; else cdDist += dist;
           return;
         }
         // Drills with reps×dist: swim_drills_4x50yd_* or 2x100yd variants
@@ -423,10 +427,12 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         if (m) { aerobics.push(`${m[1]}x${m[2]}`); return; }
       });
       const swimParts: string[] = [];
+      if (wuDist > 0) swimParts.push(`WU ${wuDist}`);
       if (drillNames.length) swimParts.push(`Drills: ${Array.from(new Set(drillNames)).join(', ')}`);
       if (pulls.length) swimParts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
       if (kicks.length) swimParts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
       if (aerobics.length) swimParts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+      if (cdDist > 0) swimParts.push(`CD ${cdDist}`);
       if (swimParts.length) summaryParts.push(swimParts.join(' • '));
       if (swimDistance > 0) summaryParts.push(`Total ${swimDistance}${unitSeen}`);
     }
@@ -558,8 +564,11 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     }
   } catch {}
 
+  const isOptional = (Array.isArray((session || {}).tags) && (session.tags as any[]).some(t => String(t).toLowerCase() === 'optional')) || /\[optional\]/i.test(String(session?.description || ''));
+  const finalSummary = summaryParts.filter(Boolean).join(' • ');
+
   return {
-    friendlySummary: summaryParts.filter(Boolean).join(' • '),
+    friendlySummary: isOptional && finalSummary ? `Optional — ${finalSummary}` : finalSummary,
     durationMinutes: totalMin,
     primaryTarget: primary,
   };
