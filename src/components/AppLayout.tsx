@@ -687,6 +687,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onUpdateWorkout={handleUpdateWorkout}
                 onClose={handleBackToDashboard}
                 onDelete={handleDeleteWorkout}
+                initialTab={activeTab as any}
               />
             </div>
           ) : (

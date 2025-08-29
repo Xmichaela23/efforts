@@ -90,13 +90,21 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     return Math.round((a + b) / 2);
   };
 
-  // Warmup / Cooldown
+  // Warmup / Cooldown (include easy pace where available)
   steps.forEach((t) => {
     const lower = t.toLowerCase();
     if (lower.startsWith('warmup')) {
       const minutes = addRangeMin(lower);
       totalMin += minutes;
-      summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
+      // Easy pace with tolerance
+      const easy = resolvePaceToken('easypace', baselines);
+      if (easy) {
+        const rng = paceRange(easy, hE);
+        const p = parsePace(easy)!;
+        summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''} @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`.trim());
+      } else {
+        summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
+      }
     }
   });
 
@@ -291,13 +299,20 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     summaryParts.push(`${reps} × ${secsEach}s with ${rest}s easy`);
   }
 
-  // Cooldown
+  // Cooldown (include easy pace where available)
   steps.forEach((t) => {
     const lower = t.toLowerCase();
     if (lower.startsWith('cooldown')) {
       const minutes = addRangeMin(lower);
       totalMin += minutes;
-      summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
+      const easy = resolvePaceToken('easypace', baselines);
+      if (easy) {
+        const rng = paceRange(easy, hE);
+        const p = parsePace(easy)!;
+        summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''} @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`.trim());
+      } else {
+        summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
+      }
     }
   });
 

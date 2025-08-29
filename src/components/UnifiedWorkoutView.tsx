@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
@@ -13,13 +13,15 @@ interface UnifiedWorkoutViewProps {
   onClose: () => void;
   onUpdateWorkout?: (workoutId: string, updates: any) => void;
   onDelete?: (workoutId: string) => void;
+  initialTab?: 'planned' | 'summary' | 'completed';
 }
 
 const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   workout,
   onClose,
   onUpdateWorkout,
-  onDelete
+  onDelete,
+  initialTab
 }) => {
   if (!workout) {
     return (
@@ -31,7 +33,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   const { deletePlannedWorkout } = usePlannedWorkouts();
   const isCompleted = workout.workout_status === 'completed';
-  const [activeTab, setActiveTab] = useState(isCompleted ? 'completed' : 'planned');
+  const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
+
+  // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
+  useEffect(() => {
+    const desired = initialTab || (isCompleted ? 'completed' : 'planned');
+    setActiveTab(desired);
+  }, [initialTab, isCompleted, workout?.id]);
 
   const getWorkoutType = () => {
     console.log('🔍 getWorkoutType debug:', {
