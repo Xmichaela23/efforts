@@ -24,11 +24,38 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
     const defaults = (plan?.defaults as any) || DEFAULTS_FALLBACK;
     const sbw = plan?.sessions_by_week || {};
     const out: any = { ...plan, sessions_by_week: {} };
+
+    // Simple macro alias expander
+    const expandMacro = (macro: string): string[] | null => {
+      const m = String(macro || '').trim();
+      switch (m) {
+        case '@RUN_INT_6x400_5k_R2':
+          return ['warmup_run_quality_12min','interval_6x400m_5kpace_R2min','cooldown_easy_10min'];
+        case '@BK_VO2_6x3_R3':
+          return ['warmup_bike_quality_15min_fastpedal','bike_vo2_6x3min_R3min','cooldown_bike_easy_10min'];
+        case '@BK_THR_4x8_R5':
+          return ['warmup_bike_quality_15min_fastpedal','bike_thr_4x8min_R5min','cooldown_bike_easy_10min'];
+        case '@SWIM_TECH_1200_DEFAULT':
+          return ['swim_warmup_200yd_easy','swim_drills_4x50yd_catchup','swim_drills_4x50yd_singlearm','swim_pull_2x100yd','swim_kick_2x100yd','swim_cooldown_200yd_easy'];
+        default:
+          return null;
+      }
+    };
     for (const [wk, sessions] of Object.entries<any>(sbw)) {
       const outWeek: any[] = [];
       for (const s0 of (sessions as any[])) {
         const s = { ...s0 } as any;
         const disc = String(s.discipline || s.type || '').toLowerCase();
+        // Macro expansion (author convenience)
+        const explicitMacro = typeof s.macro === 'string' ? s.macro : undefined;
+        const descMacro = (!explicitMacro && typeof s.description === 'string' && /^@/.test(s.description.trim())) ? s.description.trim() : undefined;
+        const macroSrc = explicitMacro || descMacro;
+        if ((!Array.isArray(s.steps_preset) || s.steps_preset.length === 0) && macroSrc) {
+          const steps = expandMacro(macroSrc);
+          if (steps && steps.length) {
+            s.steps_preset = steps;
+          }
+        }
         // Only apply DSL expansion for swim; other disciplines may be added later
         if (disc === 'swim') {
           try {
@@ -43,6 +70,8 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
           delete s.override_wu;
           delete s.override_cd;
         }
+        // Remove macro field/marker from sessions
+        delete s.macro;
         outWeek.push(s);
       }
       out.sessions_by_week[wk] = outWeek;

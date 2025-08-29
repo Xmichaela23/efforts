@@ -42,10 +42,10 @@ const parsePace = (p: string) => {
 };
 
 function resolvePaceToken(token: string, baselines: Baselines): string | null {
-  const pn = baselines?.performanceNumbers || {};
-  const fiveK: string | undefined = (pn.fiveK_pace || pn.fiveKPace || pn.fiveK) as any;
-  const easy: string | undefined = pn.easyPace as any;
-  if (token.includes('5kpace') && fiveK) return fiveK;
+  const pn: any = baselines?.performanceNumbers || {};
+  const fiveK_pace: string | undefined = pn.fiveK_pace || pn.fiveKPace;
+  const easy: string | undefined = pn.easyPace;
+  if (token.includes('5kpace') && fiveK_pace) return fiveK_pace;
   if (token.includes('easypace') && easy) return easy;
   return null;
 }
@@ -90,21 +90,22 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     return Math.round((a + b) / 2);
   };
 
-  // Warmup / Cooldown (include easy pace where available)
+  // Warmup / Cooldown (include easy pace where available for RUN only)
   steps.forEach((t) => {
     const lower = t.toLowerCase();
     if (lower.startsWith('warmup')) {
       const minutes = addRangeMin(lower);
       totalMin += minutes;
-      // Easy pace with tolerance
-      const easy = resolvePaceToken('easypace', baselines);
-      if (easy) {
-        const rng = paceRange(easy, hE);
-        const p = parsePace(easy)!;
-        summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''} @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`.trim());
-      } else {
-        summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
+      if (String(session?.discipline || '').toLowerCase() === 'run') {
+        const easy = resolvePaceToken('easypace', baselines);
+        if (easy) {
+          const rng = paceRange(easy, hE);
+          const p = parsePace(easy)!;
+          summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''} @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`.trim());
+          return;
+        }
       }
+      summaryParts.push(`Warm‑up ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
     }
   });
 
@@ -154,7 +155,18 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
 
     const restMin = restEach * Math.max(0, reps - 1);
     totalMin += Math.round(workMin + restMin);
-    summaryParts.push(`${mainText}${restEach ? ` w ${restEach} min jog` : ''}`);
+    if (restEach) {
+      const easy = resolvePaceToken('easypace', baselines);
+      if (easy) {
+        const p = parsePace(easy)!;
+        const rng = paceRange(easy, hE);
+        summaryParts.push(`${mainText} w ${restEach} min jog @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`);
+      } else {
+        summaryParts.push(`${mainText} w ${restEach} min jog`);
+      }
+    } else {
+      summaryParts.push(mainText);
+    }
   }
 
   // Cruise intervals like cruise_4x1_5mi_5kpace_plus10s_R3min
@@ -192,7 +204,18 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         totalMin += rmin * Math.max(0, reps - 1);
       }
     }
-    summaryParts.push(`${mainText}${rmin ? ` with ${mmss(rmin * 60)} jog rest` : ''}`);
+    if (rmin) {
+      const easy = resolvePaceToken('easypace', baselines);
+      if (easy) {
+        const p = parsePace(easy)!;
+        const rng = paceRange(easy, hE);
+        summaryParts.push(`${mainText} with ${mmss(rmin * 60)} jog @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`);
+      } else {
+        summaryParts.push(`${mainText} with ${mmss(rmin * 60)} jog rest`);
+      }
+    } else {
+      summaryParts.push(mainText);
+    }
   }
 
   // Tempo like tempo_4mi_5kpace_plus45s
@@ -355,6 +378,35 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         const minutes = Math.round((segments * per100Sec) / 60);
         totalMin += minutes;
       }
+      // Build friendly swim summary with drills/pull/kick/aerobic details
+      const drillNames: string[] = [];
+      const pulls: string[] = [];
+      const kicks: string[] = [];
+      const aerobics: string[] = [];
+      steps.forEach((t) => {
+        const s = String(t).toLowerCase();
+        let m = s.match(/swim_drills_\d+x\d+(yd|m)_([a-z0-9]+)/i);
+        if (m) {
+          drillNames.push(m[2]);
+          return;
+        }
+        m = s.match(/swim_pull_(\d+)x(\d+)(yd|m)/i);
+        if (m) { pulls.push(`${m[1]}x${m[2]}`); return; }
+        m = s.match(/swim_pull_(\d+)(yd|m)/i);
+        if (m) { pulls.push(`${m[1]}`); return; }
+        m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i);
+        if (m) { kicks.push(`${m[1]}x${m[2]}`); return; }
+        m = s.match(/swim_kick_(\d+)(yd|m)/i);
+        if (m) { kicks.push(`${m[1]}`); return; }
+        m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i);
+        if (m) { aerobics.push(`${m[1]}x${m[2]}`); return; }
+      });
+      const swimParts: string[] = [];
+      if (drillNames.length) swimParts.push(`Drills: ${Array.from(new Set(drillNames)).join(', ')}`);
+      if (pulls.length) swimParts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+      if (kicks.length) swimParts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+      if (aerobics.length) swimParts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+      if (swimParts.length) summaryParts.push(swimParts.join(' • '));
     }
   } catch {}
 
@@ -383,23 +435,34 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const rest = parseInt(speed[3], 10);
     const totalSecs = reps * secsEach + Math.max(0, reps - 1) * rest;
     totalMin += Math.round(totalSecs / 60);
-    summaryParts.push(`${reps} × ${secsEach}s with ${rest}s easy`);
+    {
+      const easy = resolvePaceToken('easypace', baselines);
+      if (easy) {
+        const p = parsePace(easy)!;
+        const rng = paceRange(easy, hE);
+        summaryParts.push(`${reps} × ${secsEach}s with ${rest}s easy @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`);
+      } else {
+        summaryParts.push(`${reps} × ${secsEach}s with ${rest}s easy`);
+      }
+    }
   }
 
-  // Cooldown (include easy pace where available)
+  // Cooldown (include easy pace where available for RUN only)
   steps.forEach((t) => {
     const lower = t.toLowerCase();
     if (lower.startsWith('cooldown')) {
       const minutes = addRangeMin(lower);
       totalMin += minutes;
-      const easy = resolvePaceToken('easypace', baselines);
-      if (easy) {
-        const rng = paceRange(easy, hE);
-        const p = parsePace(easy)!;
-        summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''} @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`.trim());
-      } else {
-        summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
+      if (String(session?.discipline || '').toLowerCase() === 'run') {
+        const easy = resolvePaceToken('easypace', baselines);
+        if (easy) {
+          const rng = paceRange(easy, hE);
+          const p = parsePace(easy)!;
+          summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''} @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`.trim());
+          return;
+        }
       }
+      summaryParts.push(`Cool‑down ${lower.match(/(\d{1,3}(?:\s*(?:–|-|to)\s*\d{1,3})?\s*min)/)?.[1] || ''}`.trim());
     }
   });
 
@@ -414,7 +477,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
   if (steps.length > 0) {
     steps.forEach((t) => {
       const lower = t.toLowerCase();
-      if (/(^interval_|^tempo_|^cruise_|^bike_.*\dx\d+min|^bike_endurance_|^warmup|^cooldown)/.test(lower)) return;
+      if (/(^interval_|^tempo_|^cruise_|^bike_.*\dx\d+min|^bike_endurance_|^warmup|^cooldown|^longrun_)/.test(lower)) return;
       const mins = lower.match(/(\d{1,3})\s*min/);
       if (mins) totalMin += parseInt(mins[1], 10);
     });
@@ -438,7 +501,18 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         const workMin = (reps * milesEach * baseSec) / 60;
         const restMin = restEach * Math.max(0, reps - 1);
         totalMin += Math.round(workMin + restMin);
-        summaryParts.push(`${reps} × ${meters} m @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]})${restEach?` w ${restEach} min jog`:''}`.trim());
+        if (restEach) {
+          const easy = resolvePaceToken('easypace', baselines);
+          if (easy) {
+            const p = parsePace(easy)!;
+            const erng = paceRange(easy, hE);
+            summaryParts.push(`${reps} × ${meters} m @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]}) w ${restEach} min jog @ ${mmss(p.seconds)}/${p.unit} (${erng[0]}–${erng[1]})`);
+          } else {
+            summaryParts.push(`${reps} × ${meters} m @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]}) w ${restEach} min jog`);
+          }
+        } else {
+          summaryParts.push(`${reps} × ${meters} m @ ${mmss(baseSec)}/${unit} (${rng[0]}–${rng[1]})`);
+        }
         primary = { type: 'pace', value: `${mmss(baseSec)}/${unit}`, range: rng };
       }
       // Tempo fallback
