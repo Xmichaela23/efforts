@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { validateUniversalPlan } from '@/services/plans/UniversalPlanValidator';
 import { publishLibraryPlan } from '@/services/LibraryPlans';
+import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 
 export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
   const [tab, setTab] = useState<'paste'|'upload'|'url'>('paste');
@@ -17,10 +18,44 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
   const [longRideDay, setLongRideDay] = useState<string>('Saturday');
   const [includeStrength, setIncludeStrength] = useState<boolean>(true);
 
+  function preprocessForSchema(input: any) {
+    // Deep copy to avoid mutating caller input
+    const plan = JSON.parse(JSON.stringify(input || {}));
+    const defaults = (plan?.defaults as any) || DEFAULTS_FALLBACK;
+    const sbw = plan?.sessions_by_week || {};
+    const out: any = { ...plan, sessions_by_week: {} };
+    for (const [wk, sessions] of Object.entries<any>(sbw)) {
+      const outWeek: any[] = [];
+      for (const s0 of (sessions as any[])) {
+        const s = { ...s0 } as any;
+        const disc = String(s.discipline || s.type || '').toLowerCase();
+        // Only apply DSL expansion for swim; other disciplines may be added later
+        if (disc === 'swim') {
+          try {
+            if ((!Array.isArray(s.steps_preset) || s.steps_preset.length === 0) && (s.main || s.extra)) {
+              const steps = expandSession({ discipline: 'swim', main: s.main, extra: s.extra, steps_preset: s.steps_preset }, defaults);
+              if (Array.isArray(steps) && steps.length) s.steps_preset = steps;
+            }
+          } catch {}
+          // Strip DSL fields so schema doesn't flag additional properties
+          delete s.main;
+          delete s.extra;
+          delete s.override_wu;
+          delete s.override_cd;
+        }
+        outWeek.push(s);
+      }
+      out.sessions_by_week[wk] = outWeek;
+    }
+    return out;
+  }
+
   async function handleValidate(input: any) {
     setError(null);
     setPlanPreview(null);
-    const res = validateUniversalPlan(input);
+    // Preprocess DSL (e.g., swim main/extra) → steps_preset and strip unsupported fields
+    const cleaned = preprocessForSchema(input);
+    const res = validateUniversalPlan(cleaned);
     if (!res.ok) {
       setError(res.errors);
       return;
