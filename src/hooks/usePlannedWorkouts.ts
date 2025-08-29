@@ -76,8 +76,8 @@ export const usePlannedWorkouts = () => {
           training_plan_id: workout.training_plan_id,
           week_number: workout.week_number,
           day_number: workout.day_number,
-          // pass-through for normalizer
-          // @ts-ignore allow dynamic fields
+          // expose for optional activation UI
+          // @ts-ignore
           steps_preset: stepsPreset,
           // @ts-ignore
           export_hints: exportHints,

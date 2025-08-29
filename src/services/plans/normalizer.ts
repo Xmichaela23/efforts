@@ -446,6 +446,44 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     summaryParts.push(`Strength ${mins} min`);
   }
 
+  // Strength derived duration from description when no explicit minutes token
+  if (!strengthMain && String(session?.discipline || '').toLowerCase() === 'strength') {
+    const desc: string = String(session?.description || '');
+    const exercises = desc.split(/;+/).map(s => s.trim()).filter(Boolean);
+    let derivedSeconds = 0;
+    const isCompound = (line: string): boolean => /(squat|deadlift|bench|ohp|overhead\s*press|barbell\s*row|weighted\s*pull[- ]?up)/i.test(line);
+    const parseRestSec = (line: string): number => {
+      const m1 = line.match(/rest\s*(\d{1,3})\s*[-–]\s*(\d{1,3})\s*min/i);
+      if (m1) return Math.round(((parseInt(m1[1],10)+parseInt(m1[2],10))/2) * 60);
+      const m2 = line.match(/rest\s*(\d{1,3})\s*[-–]\s*(\d{1,3})\s*s/i);
+      if (m2) return Math.round((parseInt(m2[1],10)+parseInt(m2[2],10))/2);
+      const m3 = line.match(/rest\s*(\d{1,3})\s*min/i);
+      if (m3) return parseInt(m3[1],10)*60;
+      const m4 = line.match(/rest\s*(\d{1,3})\s*s/i);
+      if (m4) return parseInt(m4[1],10);
+      // default rests: compounds 120s, accessories 75s
+      return isCompound(line) ? 120 : 75;
+    };
+    const parseSetsReps = (line: string): { sets: number; reps: number } | null => {
+      const m = line.match(/(\d+)x(\d+)/i);
+      if (m) return { sets: parseInt(m[1],10), reps: parseInt(m[2],10) };
+      const s = line.match(/(\d+)x\s*amrap/i);
+      if (s) return { sets: parseInt(s[1],10), reps: 8 }; // assume ~8 reps per AMRAP set
+      return null;
+    };
+    exercises.forEach((ex) => {
+      const sr = parseSetsReps(ex);
+      if (!sr) return;
+      const tempoPerRep = isCompound(ex) ? 4 : 3; // seconds per rep
+      const workSec = sr.sets * sr.reps * tempoPerRep;
+      const restSec = Math.max(0, sr.sets - 1) * parseRestSec(ex);
+      derivedSeconds += workSec + restSec;
+    });
+    if (derivedSeconds > 0) {
+      totalMin += Math.round(derivedSeconds / 60);
+    }
+  }
+
   // Strides (e.g., strides_6x20s)
   const strides = tokenStr.match(/strides_(\d+)x(\d+)s/i);
   if (strides) {

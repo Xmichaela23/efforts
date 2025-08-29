@@ -209,6 +209,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
   const [planStatus, setPlanStatus] = useState<string>('active');
   const [viewMode, setViewMode] = useState<'summary' | 'adjustments'>('summary');
+  const [activatingId, setActivatingId] = useState<string | null>(null);
   
   // Add workout edit mode state
   const [workoutViewMode, setWorkoutViewMode] = useState<'summary' | 'edit'>('summary');
@@ -488,6 +489,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       alert('Plan details are not available. Please try again.');
     }
   };
+
+  async function activateOptional(rowId: string) {
+    try {
+      setActivatingId(rowId);
+      await supabase
+        .from('planned_workouts')
+        .update({ workout_status: 'planned' })
+        .eq('id', rowId);
+      // Soft refresh by bumping selectedWeek state
+      setSelectedWeek(w => w);
+    } finally {
+      setActivatingId(null);
+    }
+  }
 
   // Auto-open a plan if requested by parent (e.g., from Today's Effort click)
   useEffect(() => {
@@ -1376,7 +1391,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         <div key={day} className="border border-gray-200 rounded">
                           <div className="px-3 py-2 text-sm font-medium">{day}</div>
                           <div className="px-3 pb-3 space-y-3">
-                            {groups[day].map((workout: any, index: number) => (
+                            {groups[day].filter((w:any)=>w.workout_status!=='optional').map((workout: any, index: number) => (
                               <div
                                 key={workout.id || `workout-${day}-${index}`}
                                 onClick={() => handleWorkoutClick(workout)}
@@ -1412,6 +1427,32 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 )}
                               </div>
                             ))}
+                            {groups[day].some((w:any)=>w.workout_status==='optional') && (
+                              <div className="mt-3">
+                                <div className="text-xs font-medium text-gray-700 mb-1">Optional sessions — select one supplemental session to add to week</div>
+                                <div className="space-y-2">
+                                  {groups[day].filter((w:any)=>w.workout_status==='optional').map((workout:any, idx:number)=> (
+                                    <div key={workout.id || `opt-${day}-${idx}`} className="p-3 rounded border border-dashed">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1">
+                                          <div className="font-medium flex items-center gap-2">
+                                            <span>{workout.name || (workout.type||'Session')}</span>
+                                            {typeof workout.duration==='number' && (
+                                              <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(workout.duration)}</span>
+                                            )}
+                                            <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500">Optional</span>
+                                          </div>
+                                          <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>
+                                        </div>
+                                        <Button size="sm" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout.id);}}>
+                                          {activatingId===workout.id? 'Adding…':'Add to week'}
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ));

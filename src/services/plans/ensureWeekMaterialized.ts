@@ -157,6 +157,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
 
     const durationVal = typeof s.duration === 'number' && Number.isFinite(s.duration) ? s.duration : (totalSeconds ? Math.round(totalSeconds/60) : 0);
 
+    const isOptional = Array.isArray(s?.tags) ? s.tags.some((t: any) => String(t).toLowerCase()==='optional') : /\[optional\]/i.test(String(s?.description||''));
     rows.push({
       user_id: user.id,
       training_plan_id: plan.id,
@@ -168,7 +169,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       name: s.name || (mappedType === 'strength' ? 'Strength' : s.type || 'Session'),
       description: s.description || '',
       duration: durationVal,
-      workout_status: 'planned',
+      workout_status: (isOptional ? 'optional' : 'planned') as any,
       source: 'training_plan',
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,

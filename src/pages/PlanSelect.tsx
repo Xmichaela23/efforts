@@ -729,6 +729,7 @@ export default function PlanSelect() {
             } catch {}
           }
 
+          const isOptional = Array.isArray(s?.tags) ? s.tags.some((t: any) => String(t).toLowerCase()==='optional') : /\[optional\]/i.test(String(s?.description||''));
           rows.push({
             user_id: user.id,
             training_plan_id: planRow.id,
@@ -740,7 +741,7 @@ export default function PlanSelect() {
             name: nameGuess,
             description: cleanedDesc,
             duration: durationVal,
-            workout_status: 'planned',
+            workout_status: (isOptional ? 'optional' : 'planned'),
             source: 'training_plan',
             steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
             export_hints: payload.export_hints || null,
