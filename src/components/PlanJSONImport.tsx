@@ -47,6 +47,8 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       }
       out.sessions_by_week[wk] = outWeek;
     }
+    // Remove authoring-only fields not present in schema
+    delete out.defaults;
     return out;
   }
 
