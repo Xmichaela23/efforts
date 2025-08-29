@@ -140,19 +140,19 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setFriendlyDesc(out);
         }
 
-        // NO FALLBACKS - DIE IF NO COMPUTED DATA
-        const comp: any = (workout as any).computed || null;
-        if (!comp || !comp.total_duration_seconds || comp.total_duration_seconds <= 0) {
-          console.error('🚨 NO COMPUTED DATA FOR WORKOUT:', workout.id, workout);
-          throw new Error(`Workout ${workout.id} has no computed data - baker failed!`);
-        }
-        
-        let secs = comp.total_duration_seconds;
+        // Safe duration resolution: prefer computed, else fall back to authored duration/estimate
+        const comp: any = (workout as any).computed || {};
+        let secs: any = comp.total_duration_seconds;
         if (typeof secs === 'string') secs = parseInt(secs, 10);
-        if (typeof secs === 'number' && isFinite(secs) && secs > 0) {
+        if (!(typeof secs === 'number' && isFinite(secs) && secs > 0)) {
+          if (typeof workout.duration === 'number' && isFinite(workout.duration) && workout.duration > 0) {
+            secs = workout.duration * 60;
+          } else {
+            secs = estimateMinutesFromDescription(friendlyDesc || workout.description) * 60;
+          }
+        }
+        if (typeof secs === 'number' && isFinite(secs) && secs >= 0) {
           setResolvedDuration(Math.round(secs / 60));
-        } else {
-          throw new Error(`Invalid duration: ${secs}`);
         }
       } catch {
         setFriendlyDesc(stripCodes(workout.description));
@@ -262,9 +262,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       )}
 
       <div className="space-y-4">
-        {/* Template System - No Fallbacks */}
+        {/* Template System - Safe computed pass-through */}
         <WorkoutDetailView
-                          computed={workout.computed || (() => { throw new Error(`No computed data for workout ${workout.id}`) })()}
+          computed={(() => { const c: any = (workout as any).computed || {}; return { steps: Array.isArray(c.steps) ? c.steps : [], total_duration_seconds: (typeof c.total_duration_seconds==='number'?c.total_duration_seconds: (typeof workout.duration==='number'?workout.duration*60:0)) }; })()}
           baselines={{
             fiveK_pace_sec_per_mi: (workout as any).fiveK_pace_sec_per_mi,
             easy_pace_sec_per_mi: (workout as any).easy_pace_sec_per_mi,
