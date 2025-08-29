@@ -11,6 +11,8 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
 import PlannedWorkoutView from './PlannedWorkoutView';
 import WorkoutSummaryView from './WorkoutSummaryView';
+// @ts-ignore
+import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 
 // Helpers for normalizing minimal JSON sessions into legacy view expectations
 function cleanSessionDescription(text: string): string {
@@ -509,12 +511,67 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     try {
       const rowId = workout.id as string;
       setActivatingId(rowId);
+      const spec: any = optionalUiSpec as any;
+      const L = spec.logic || {};
+      const qTag = String(L.quality_tag || 'bike_intensity').toLowerCase();
+      const optTag = String(L.optional_tag || 'optional').toLowerCase();
+      const xorTag = String(L.xor_tag || 'xor:swim_or_quality_bike').toLowerCase();
+      const weeklyCap = Number(L.weekly_quality_cap || 1);
+      const tz = L.week_boundary?.timezone || 'America/Los_Angeles';
+      const toDateOnly = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { timeZone: tz });
+      const startOfWeek = (iso: string) => {
+        const d = new Date(iso + 'T00:00:00');
+        const day = new Date(d.toLocaleString('en-US', { timeZone: tz })).getDay();
+        const mondayOffset = (day === 0 ? -6 : 1 - day);
+        const base = new Date(d);
+        base.setDate(base.getDate() + mondayOffset);
+        return toDateOnly(base.toISOString().slice(0,10));
+      };
+
       const existingTags: string[] = Array.isArray(workout.tags) ? workout.tags : [];
-      const newTags = existingTags.filter((t: string) => String(t).toLowerCase() !== 'optional');
-      await supabase
-        .from('planned_workouts')
-        .update({ tags: newTags })
-        .eq('id', rowId);
+      const lower = existingTags.map((t:string)=>t.toLowerCase());
+
+      // weekly cap for quality bikes
+      if (String(workout.type).toLowerCase()==='ride' && lower.includes(qTag)) {
+        const wkStart = startOfWeek(workout.date);
+        const end = new Date(wkStart); end.setDate(end.getDate()+6); const wkEnd = toDateOnly(end.toISOString().slice(0,10));
+        const { data: weekRows } = await supabase
+          .from('planned_workouts')
+          .select('id,type,tags,date')
+          .eq('training_plan_id', workout.training_plan_id)
+          .gte('date', wkStart)
+          .lte('date', wkEnd);
+        const countQual = (weekRows||[]).filter((r:any)=> String(r.type).toLowerCase()==='ride' && Array.isArray(r.tags) && r.tags.map((t:string)=>t.toLowerCase()).includes(qTag) && !r.tags.map((t:string)=>t.toLowerCase()).includes(optTag)).length;
+        if (countQual >= weeklyCap) {
+          try { (window as any).toast?.({ title: 'Weekly limit reached', description: spec.ui_text?.notifications?.weekly_limit_reached }); } catch {}
+          setSelectedWeek(w=>w);
+          return;
+        }
+      }
+
+      // Activate: remove optional tag from selected
+      const newTags = existingTags.filter((t: string) => String(t).toLowerCase() !== optTag);
+      await supabase.from('planned_workouts').update({ tags: newTags }).eq('id', rowId);
+
+      // XOR swap: if this workout carries xor tag, hide Tuesday swim by adding optional
+      if (lower.includes(xorTag)) {
+        const wkStart = startOfWeek(workout.date);
+        const end = new Date(wkStart); end.setDate(end.getDate()+6); const wkEnd = toDateOnly(end.toISOString().slice(0,10));
+        const { data: weekRows } = await supabase
+          .from('planned_workouts')
+          .select('id,type,tags')
+          .eq('training_plan_id', workout.training_plan_id)
+          .gte('date', wkStart)
+          .lte('date', wkEnd);
+        const swims = (weekRows||[]).filter((r:any)=> String(r.type).toLowerCase()==='swim' && Array.isArray(r.tags) && r.tags.map((t:string)=>t.toLowerCase()).includes(xorTag));
+        for (const sw of swims) {
+          const tgs = Array.isArray(sw.tags) ? sw.tags : [];
+          if (!tgs.map((t:string)=>t.toLowerCase()).includes(optTag)) {
+            await supabase.from('planned_workouts').update({ tags: [...tgs, 'optional'] }).eq('id', sw.id);
+          }
+        }
+        try { (window as any).toast?.({ title: 'Quality selected', description: spec.ui_text?.notifications?.xor_applied }); } catch {}
+      }
       // Soft refresh by bumping selectedWeek state
       setSelectedWeek(w => w);
     } finally {

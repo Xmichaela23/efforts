@@ -1,0 +1,97 @@
+{
+  "version": "optional-ui-spec.v1.1",
+  "last_updated": "2025-08-29T21:38:10.922578Z",
+  "contract_note": "This file defines UI copy and deterministic rules for optional workouts. It is NOT part of plan export_hints (which is whitelisted).",
+  "logic": {
+    "weekly_quality_cap": 1,
+    "spacing_before_long_day_hours_min": 24,
+    "spacing_before_long_day_hours_preferred": 48,
+    "xor_tag": "xor:swim_or_quality_bike",
+    "quality_tag": "bike_intensity",
+    "recovery_tag": "recovery",
+    "optional_tag": "optional",
+    "long_run_tag": "long_run",
+    "long_ride_tag": "long_ride",
+    "strength_lower_tag": "strength_lower",
+    "tuesday_quality_slot": true,
+    "auto_swap_swim_when_quality_selected": true,
+    "week_boundary": {
+      "start_day": "Monday",
+      "end_day": "Sunday",
+      "timezone": "America/Los_Angeles",
+      "date_granularity": "date-only"
+    },
+    "enforcement_order_on_select": [
+      "weekly_quality_cap",
+      "spacing_guard",
+      "xor_swap"
+    ],
+    "spacing_against": [
+      "long_run",
+      "long_ride"
+    ],
+    "fallback_quality_slot": {
+      "primary": "Tuesday",
+      "strategy": "nearest_valid_before_long_day",
+      "min_hours_before_long_day": 24
+    },
+    "xor_swap_idempotent": true,
+    "xor_swap_reversible": true,
+    "xor_reverse_behavior": "reselecting_swim_restores_swim_hides_bike"
+  },
+  "ui_text": {
+    "cards": [
+      {
+        "id": "recovery_spin_card",
+        "match": {
+          "discipline": "bike",
+          "require_tags_all": ["optional", "recovery"],
+          "require_tags_any": []
+        },
+        "title": "Recovery Spin (Optional)",
+        "subtitle": "Z1 only, 30–40 min. Always safe to add."
+      },
+      {
+        "id": "quality_bike_card",
+        "match": {
+          "discipline": "bike",
+          "require_tags_all": ["optional", "bike_intensity"],
+          "require_tags_any": []
+        },
+        "title": "Quality Bike (Optional – Hard)",
+        "subtitle": "Counts as your one hard bike this week. Pick this or Tuesday Swim (not both)."
+      }
+    ],
+    "pair_hint": {
+      "id": "pick_one_hint",
+      "trigger": { "same_day": true, "xor_tag_present": true },
+      "text": "Choose one: Recovery or Quality. Selecting Quality replaces Tuesday Swim."
+    },
+    "notifications": {
+      "weekly_limit_reached": "You already have a quality ride this week. We kept your recovery spin.",
+      "too_close_to_long_day": "That hard ride is within 24h of your long run. We moved it to Tuesday.",
+      "xor_applied": "Quality Bike selected. Tuesday Swim hidden for this week."
+    },
+    "tooltip_short": "We cap hard bike sessions at 1/week and keep them 24–48h from long efforts to protect recovery and performance.",
+    "settings": {
+      "quality_ride_limit_label": "Quality ride limit",
+      "quality_ride_limit_value": 1,
+      "spacing_guard_label": "Spacing guard (min hours before long run/ride)",
+      "spacing_guard_value": 24
+    }
+  },
+  "implementation_notes": {
+    "selection_rules": [
+      "Enforcement order on select: apply weekly_quality_cap first, then spacing_guard, then xor_swap.",
+      "Selecting a session that matches bike_intensity counts against weekly_quality_cap.",
+      "If user selects a second bike_intensity in the same week, keep the first, drop the second, and show notifications.weekly_limit_reached.",
+      "If a selected bike_intensity violates spacing_before_long_day_hours_min relative to long_run/long_ride, re-slot it to Tuesday (tuesday_quality_slot) and show notifications.too_close_to_long_day.",
+      "If xor_tag is present on the Tuesday swim and a bike_intensity is selected, auto-swap: enable bike, hide swim, show notifications.xor_applied.",
+      "XOR swap is idempotent and reversible: reselecting the swim restores it and hides the bike.",
+      "If Tuesday is unavailable, move quality bike to the nearest day that is ≥24h before long run/ride."
+    ],
+    "matching_notes": "Use match.require_tags_all/any to map cards. Discipline is 'bike' for rides. Tags derive from session.tags in the plan JSON."
+  }
+}
+
+
