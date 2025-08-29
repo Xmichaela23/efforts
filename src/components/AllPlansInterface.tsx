@@ -413,7 +413,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const round = (w: number) => Math.round(w / 5) * 5;
               const resolveStrength = (text: string) => { const pn = bl?.performanceNumbers || {}; const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any; return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; }); };
               const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
-              const description = resolveStrength(mapBike(resolvePaces(cleanSessionDescription(rawDesc))));
+              const description = (() => {
+                const base = resolveStrength(mapBike(resolvePaces(cleanSessionDescription(rawDesc))));
+                // If the session is optional, keep the authored context alongside summary
+                if (Array.isArray((s as any).tags) && (s as any).tags.includes('optional')) {
+                  const authored = cleanSessionDescription(rawDesc);
+                  if (authored && !base.toLowerCase().includes(authored.toLowerCase())) {
+                    return `${base} — ${authored}`.trim();
+                  }
+                }
+                return base;
+              })();
               const discipline = (s.discipline || inferDisciplineFromText(rawDesc)) as any;
               const mappedType = discipline === 'bike' ? 'ride' : discipline;
               const extracted = extractTypeFromText(rawDesc);

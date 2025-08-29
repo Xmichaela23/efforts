@@ -610,7 +610,15 @@ export default function PlanSelect() {
           const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : derivedMinutes;
           const nameGuess = s.name || (mappedType === 'strength' ? 'Strength' : mappedType === 'ride' ? 'Ride' : mappedType === 'swim' ? 'Swim' : 'Run');
 
-          let rendered: string | undefined = renderedFromNorm || cleanedDesc;
+          // Prefer authored details for strength; otherwise use normalized summary
+          let rendered: string | undefined = mappedType === 'strength' ? cleanedDesc : (renderedFromNorm || cleanedDesc);
+          // For optional alternates, preserve helpful authored notes alongside summary
+          if (mappedType !== 'strength' && renderedFromNorm && /\boptional\b/i.test(cleanedDesc)) {
+            const extra = cleanedDesc.replace(/\[optional\]\s*/i, '').trim();
+            if (extra && !rendered?.toLowerCase().includes(extra.toLowerCase())) {
+              rendered = `${renderedFromNorm} — ${extra}`.trim();
+            }
+          }
           let totalSeconds = Math.max(0, Math.round((normMinutes || durationVal) * 60));
           let computedSteps: any[] | undefined;
           const bakedSess = baked?.sessions_by_week?.[wkKey]?.[idx];
