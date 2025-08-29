@@ -352,6 +352,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       let unitSeen: 'yd' | 'm' = 'yd';
       let wuDist = 0;
       let cdDist = 0;
+      let restSeconds = 0; // accumulate rests between swim reps/sets
       const addDistance = (count: number, unit: string) => {
         unitSeen = (unit?.toLowerCase() === 'm') ? 'm' : unitSeen;
         swimDistance += count;
@@ -368,20 +369,36 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
           return;
         }
         // Drills with reps×dist: swim_drills_4x50yd_* or 2x100yd variants
-        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_[a-z0-9]+/i);
+        m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9]+)/i);
         if (m) {
-          addDistance(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]);
+          const reps = parseInt(m[1], 10);
+          const distEach = parseInt(m[2], 10);
+          const drillName = m[4];
+          addDistance(reps * distEach, m[3]);
+          // Default rest heuristics per drill
+          let restEach = 15; // seconds between 50s
+          if (/singlearm/.test(drillName)) restEach = 20;
+          if (/scullfront/.test(drillName)) restEach = distEach >= 100 ? 15 : 15;
+          restSeconds += Math.max(0, reps - 1) * restEach;
           return;
         }
         m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i);
         if (m) {
           addDistance(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]);
+          // Generic drill: assume :15r between reps
+          const reps = parseInt(m[1], 10);
+          restSeconds += Math.max(0, reps - 1) * 15;
           return;
         }
         // Pull/Kick variants: swim_pull_2x100yd, swim_kick_2x100yd
         m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
         if (m) {
-          addDistance(parseInt(m[2], 10) * parseInt(m[3], 10), m[4]);
+          const reps = parseInt(m[2], 10);
+          const distEach = parseInt(m[3], 10);
+          addDistance(reps * distEach, m[4]);
+          // Rest defaults: pull 100s @ :20r, kick 100s @ :25r
+          const restEach = m[1] === 'pull' ? 20 : 25;
+          restSeconds += Math.max(0, reps - 1) * restEach;
           return;
         }
         // Single-distance pull/kick: swim_pull_300yd_steady
@@ -393,7 +410,15 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         // Aerobic sets: swim_aerobic_4x200yd_easy
         m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)_[a-z]+/i);
         if (m) {
-          addDistance(parseInt(m[1], 10) * parseInt(m[2], 10), m[3]);
+          const reps = parseInt(m[1], 10);
+          const distEach = parseInt(m[2], 10);
+          addDistance(reps * distEach, m[3]);
+          // Rest defaults based on distance
+          let restEach = 15;
+          if (distEach >= 400) restEach = 35; // :30–:40r → ~35s
+          else if (distEach >= 200) restEach = 22; // :20–:25r → ~22s
+          else restEach = 15; // 100s @ :15r
+          restSeconds += Math.max(0, reps - 1) * restEach;
           return;
         }
       });
@@ -402,6 +427,9 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         const segments = Math.max(1, Math.round(swimDistance / 100));
         const minutes = Math.round((segments * per100Sec) / 60);
         totalMin += minutes;
+      }
+      if (restSeconds > 0) {
+        totalMin += Math.round(restSeconds / 60);
       }
       // Build friendly swim summary with drills/pull/kick/aerobic details
       const drillNames: string[] = [];

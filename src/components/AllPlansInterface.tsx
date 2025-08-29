@@ -357,6 +357,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
               day: dayName,
               completed: false,
+              tags: Array.isArray((w as any).tags) ? (w as any).tags : [],
               // Pass through computed data for PlannedWorkoutView
               computed: computed,
               rendered_description: renderedDesc,
