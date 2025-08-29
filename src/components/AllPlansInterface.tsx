@@ -621,6 +621,18 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const renderedDesc = (w as any).rendered_description || (w as any).description || '';
               const totalSeconds = computed.total_duration_seconds;
               const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
+              // Parse tags which may arrive as JSON string or array
+              const rawTags: any = (w as any).tags;
+              let tags: string[] = [];
+              if (Array.isArray(rawTags)) {
+                tags = rawTags;
+              } else if (typeof rawTags === 'string') {
+                try {
+                  const parsed = JSON.parse(rawTags);
+                  if (Array.isArray(parsed)) tags = parsed;
+                } catch {}
+              }
+
               const workout = {
                 id: (w as any).id,
                 name: (w as any).name || 'Session',
@@ -628,7 +640,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 description: renderedDesc,
                 duration,
                 day: dayName,
-                computed
+                computed,
+                tags
               };
               byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
             }
