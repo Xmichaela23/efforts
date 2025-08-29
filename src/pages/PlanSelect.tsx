@@ -597,7 +597,9 @@ export default function PlanSelect() {
           else if (rawType === 'swim') mappedType = 'swim';
           else if (rawType === 'strength') mappedType = 'strength';
           const cleanedDesc = String(s.description || '');
-          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
+          // Derive duration from description/tokens using user baselines when not explicitly provided
+          const derivedMinutes = computeDurationMinutes(cleanedDesc);
+          const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : derivedMinutes;
           const nameGuess = s.name || (mappedType === 'strength' ? 'Strength' : mappedType === 'ride' ? 'Ride' : mappedType === 'swim' ? 'Swim' : 'Run');
 
           let rendered: string | undefined = cleanedDesc;

@@ -72,6 +72,57 @@ function deriveProvider(w: any): string {
   return 'workouts';
 }
 
+// Derive calendar-cell abbreviation + duration (minutes) for planned workouts
+function derivePlannedCellLabel(w: any): string | null {
+  try {
+    if (!w || w.workout_status !== 'planned') return null;
+    const steps: string[] = Array.isArray(w.steps_preset) ? w.steps_preset : [];
+    const txt = String(w.description || '').toLowerCase();
+    const type = String(w.type || '').toLowerCase();
+    const secs = Number(w?.computed?.total_duration_seconds) || (typeof w.duration === 'number' ? w.duration * 60 : 0);
+    const mins = secs > 0 ? Math.round(secs / 60) : (typeof w.duration === 'number' ? w.duration : 0);
+    const durStr = mins > 0 ? `${mins}m` : '';
+
+    const has = (pat: RegExp) => steps.some(s => pat.test(s)) || pat.test(txt);
+
+    // RUN
+    if (type === 'run') {
+      if (has(/longrun_/i) || /long\b/.test(txt)) return `RN-LR ${durStr}`.trim();
+      if (has(/tempo_/i)) return `RN-TMP ${durStr}`.trim();
+      if (has(/interval_/i) && has(/5kpace|10kpace|rep|vo2/i)) return `RN-INT-VO2 ${durStr}`.trim();
+      if (has(/speed_|strides_/i)) return `RN-INT-SP ${durStr}`.trim();
+      if (has(/hill|hills?/i)) return `RN-INT-HL ${durStr}`.trim();
+      return `RN ${durStr}`.trim();
+    }
+
+    // BIKE
+    if (type === 'ride' || type === 'bike') {
+      if (has(/bike_vo2_/i)) return `BK-INT-VO2 ${durStr}`.trim();
+      if (has(/bike_thr_/i)) return `BK-THR ${durStr}`.trim();
+      if (has(/bike_ss_/i)) return `BK-SS ${durStr}`.trim();
+      if (has(/endurance|z2|long\s*ride/i)) return `BK-LR ${durStr}`.trim();
+      return `BK ${durStr}`.trim();
+    }
+
+    // SWIM
+    if (type === 'swim') {
+      if (has(/swim_intervals_/i)) return `SM-INT ${durStr}`.trim();
+      if (has(/technique|drill|drills|swim_drills_/i)) return `SM-DRL ${durStr}`.trim();
+      return `SM ${durStr}`.trim();
+    }
+
+    // STRENGTH
+    if (type === 'strength') {
+      if (/core/.test(txt)) return `STG-CORE ${durStr}`.trim();
+      if (/chin|row|pull|lunge|accessor/i.test(txt)) return `STG-ACC ${durStr}`.trim();
+      if (/squat|deadlift|bench|ohp/.test(txt)) return `STG-CMP ${durStr}`.trim();
+      return `STG ${durStr}`.trim();
+    }
+
+    return null;
+  } catch { return null; }
+}
+
 export default function WorkoutCalendar({
   onAddEffort,
   onSelectType,
@@ -145,8 +196,9 @@ export default function WorkoutCalendar({
       .map((w: any) => {
         const miles = normalizeDistanceMiles(w);
         const milesText = miles != null ? formatMilesShort(miles, 1) : '';
+        const plannedLabel = derivePlannedCellLabel(w);
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
-        const labelBase = [t, milesText].filter(Boolean).join(' ');
+        const labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
         const isCompleted = w.workout_status === 'completed';
         return {
           date: w.date,

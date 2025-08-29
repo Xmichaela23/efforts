@@ -183,6 +183,9 @@ interface AllPlansInterfaceProps {
   completedPlans?: Plan[];
   detailedPlans?: any;
   onSelectWorkout?: (workout: any) => void;
+  // Optional: auto-open a specific plan and week when mounting
+  focusPlanId?: string;
+  focusWeek?: number;
 }
 
 const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({ 
@@ -193,7 +196,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   currentPlans = [],
   completedPlans = [],
   detailedPlans = {},
-  onSelectWorkout
+  onSelectWorkout,
+  focusPlanId,
+  focusWeek
 }) => {
   const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const { loadUserBaselines } = useAppContext();
@@ -473,6 +478,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       alert('Plan details are not available. Please try again.');
     }
   };
+
+  // Auto-open a plan if requested by parent (e.g., from Today's Effort click)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (focusPlanId && !selectedPlanDetail) {
+          await handlePlanClick(focusPlanId);
+          if (typeof focusWeek === 'number' && focusWeek > 0) {
+            setSelectedWeek(focusWeek);
+          }
+        }
+      } catch {}
+    })();
+  }, [focusPlanId, focusWeek]);
 
   // Ensure week materialized on selection change
   useEffect(() => {

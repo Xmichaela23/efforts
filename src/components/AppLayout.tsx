@@ -49,6 +49,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showMobilityLogger, setShowMobilityLogger] = useState(false);
   const [showAllPlans, setShowAllPlans] = useState(false);
+  const [focusPlanId, setFocusPlanId] = useState<string | undefined>(undefined);
+  const [focusWeek, setFocusWeek] = useState<number | undefined>(undefined);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
@@ -355,7 +357,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (workout.workout_status === 'completed') {
       setSelectedWorkout(workout);
     } else if (workout.workout_status === 'planned') {
-      // For planned workouts, open in UnifiedWorkoutView with Planned tab
+      // Planned workout: jump into Plans view focused on its plan/week
+      if (workout.training_plan_id) {
+        setFocusPlanId(String(workout.training_plan_id));
+        setFocusWeek(typeof workout.week_number === 'number' ? workout.week_number : undefined);
+        setShowAllPlans(true);
+        return;
+      }
       setSelectedWorkout(workout);
     } else {
       // For other workout types, show in summary
@@ -637,6 +645,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onSelectWorkout={(w) => {
                   setSelectedWorkout(w);
                 }}
+                focusPlanId={focusPlanId}
+                focusWeek={focusWeek}
               />
             </div>
           ) : showStrengthLogger ? (
