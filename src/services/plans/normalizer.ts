@@ -543,7 +543,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
   if (steps.length > 0) {
     steps.forEach((t) => {
       const lower = t.toLowerCase();
-      if (/(^interval_|^tempo_|^cruise_|^bike_.*\dx\d+min|^bike_endurance_|^warmup|^cooldown|^longrun_)/.test(lower)) return;
+      if (/(^interval_|^tempo_|^cruise_|^bike_.*\dx\d+min|^bike_endurance_|^warmup|^cooldown|^longrun_|^strength_main_)/.test(lower)) return;
       const mins = lower.match(/(\d{1,3})\s*min/);
       if (mins) totalMin += parseInt(mins[1], 10);
     });

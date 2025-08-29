@@ -1430,7 +1430,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 )}
                               </div>
                             ))}
-                            {groups[day].some((w:any)=>w.workout_status==='optional') && (
+                            {groups[day].some((w:any)=>Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')) && (
                               <div className="mt-3">
                                 <div className="text-xs font-medium text-gray-700 mb-1">Optional sessions — select one supplemental session to add to week</div>
                                 <div className="space-y-2">
@@ -1440,9 +1440,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                         <div className="flex-1">
                                           <div className="font-medium flex items-center gap-2">
                                             <span>{workout.name || (workout.type||'Session')}</span>
-                                            {typeof workout.duration==='number' && (
-                                              <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(workout.duration)}</span>
-                                            )}
+                                            {(() => {
+                                              const sec = workout?.computed?.total_duration_seconds;
+                                              const min = (typeof sec === 'number' && sec > 0) ? Math.round(sec/60) : (typeof workout.duration === 'number' ? workout.duration : null);
+                                              return (typeof min === 'number') ? (
+                                                <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(min)}</span>
+                                              ) : null;
+                                            })()}
                                             <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500">Optional</span>
                                           </div>
                                           <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>

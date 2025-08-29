@@ -43,7 +43,13 @@ export const usePlannedWorkouts = () => {
       }
 
       // Transform the data to match our PlannedWorkout interface
-      const transformedWorkouts: PlannedWorkout[] = (data || []).map(workout => {
+      const transformedWorkouts: PlannedWorkout[] = (data || [])
+        // Filter out optional-tagged planned until user activates (optional tag removed)
+        .filter((w: any) => {
+          const tags: any[] = Array.isArray((w as any).tags) ? (w as any).tags : [];
+          return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+        })
+        .map(workout => {
         // Normalize JSONB fields that may come back as strings
         const parseMaybeJson = (v: any) => {
           if (v == null) return v;
