@@ -222,6 +222,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [isProcessingAdjustment, setIsProcessingAdjustment] = useState(false);
   const [adjustmentsUsed, setAdjustmentsUsed] = useState(0);
   const [adjustmentLimit] = useState(3);
+  const [showPlanDesc, setShowPlanDesc] = useState(false);
 
   const handlePlanClick = async (planId: string) => {
     let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
@@ -1363,9 +1364,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </button>
             )}
 
-            <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
-              Download
-            </button>
+            <div className="hidden sm:block">
+              <button onClick={() => exportPlanToMarkdown(selectedPlanDetail)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+                Download
+              </button>
+            </div>
+            <div className="sm:hidden">
+              <button onClick={() => setShowPlanDesc((v:any)=>!v)} className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
+                Info
+              </button>
+            </div>
             
             <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
               <Edit className="h-4 w-4" />
@@ -1374,7 +1382,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-2 text-red-600 hover:text-red-800 transition-colors">
+                <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors">
                   Delete
                 </button>
               </AlertDialogTrigger>
@@ -1400,8 +1408,23 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           <div className="p-6 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">{selectedPlanDetail.name}</h1>
-                <p className="text-gray-600 mt-1">{selectedPlanDetail.description}</p>
+                <div className="flex items-center gap-2">
+                  <h1
+                    className="font-semibold leading-tight text-base sm:text-xl"
+                    style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+                  >
+                    {selectedPlanDetail.name}
+                  </h1>
+                  <button
+                    className="text-xs text-gray-600 underline decoration-dotted hover:text-black"
+                    onClick={() => setShowPlanDesc((v:any)=>!v)}
+                  >
+                    {showPlanDesc ? 'Hide details' : 'Show details'}
+                  </button>
+                </div>
+                {showPlanDesc && (
+                  <p className="text-gray-600 mt-1 text-sm leading-relaxed">{selectedPlanDetail.description}</p>
+                )}
               </div>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${planStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                 {planStatus}

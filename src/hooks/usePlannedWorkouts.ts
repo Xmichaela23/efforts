@@ -70,6 +70,12 @@ export const usePlannedWorkouts = () => {
         const computed = parseMaybeJson((workout as any).computed) || null;
         const rendered = (workout as any).rendered_description || undefined;
         const units = (workout as any).units || undefined;
+        const parsedTags = (() => {
+          const raw = (workout as any).tags;
+          if (Array.isArray(raw)) return raw as any[];
+          if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) return p; } catch {} }
+          return [] as any[];
+        })();
 
         return {
           id: workout.id,
@@ -85,6 +91,9 @@ export const usePlannedWorkouts = () => {
           training_plan_id: workout.training_plan_id,
           week_number: workout.week_number,
           day_number: workout.day_number,
+          // expose tags for UI filters
+          // @ts-ignore
+          tags: parsedTags,
           // expose for optional activation UI
           // @ts-ignore
           steps_preset: stepsPreset,
