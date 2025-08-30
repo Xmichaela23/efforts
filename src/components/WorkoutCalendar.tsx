@@ -188,9 +188,17 @@ export default function WorkoutCalendar({
 
     const wkCombined = [...wkDb, ...wkStateProvider];
     const all = [ ...wkCombined, ...planned ];
+    // Filter out planned optionals defensively (tags may be JSON string or array)
+    const allFiltered = all.filter((w: any) => {
+      const raw = (w as any).tags;
+      let tags: any[] = [];
+      if (Array.isArray(raw)) tags = raw;
+      else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
+      return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+    });
 
     // Build raw events with consistent labels
-    const raw = all
+    const raw = allFiltered
       .filter((w: any) => {
         if (!w || !w.date) return false;
         const today = new Date().toLocaleDateString('en-CA');

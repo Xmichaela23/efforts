@@ -1382,7 +1382,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <button className="flex items-center gap-2 px-3 py-2 border border-gray-300 rounded text-gray-700 hover:bg-gray-50 transition-colors">
+                <button className="flex items-center gap-2 px-3 py-2 text-gray-600 hover:text-black transition-colors">
                   Delete
                 </button>
               </AlertDialogTrigger>
