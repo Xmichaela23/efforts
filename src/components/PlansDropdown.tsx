@@ -32,8 +32,8 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    // Navigate to weekly planner (current week) with focus
-    navigate('/plans', { state: { openPlans: true, focusPlanId: planId } });
+    // Open weekly planner in-place via state (avoids missing /plans route)
+    navigate('.', { state: { openPlans: true, focusPlanId: planId } });
   };
 
   const handleAllPlans = (e: React.MouseEvent) => {
