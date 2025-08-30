@@ -32,8 +32,8 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    // Navigate directly to weekly planner for this plan (current week)
-    navigate(`/plans/${planId}`);
+    // Navigate to weekly planner with focus on this plan (current week)
+    navigate('/plans', { state: { focusPlanId: planId } });
   };
 
   const handleAllPlans = (e: React.MouseEvent) => {
@@ -70,7 +70,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
         side="top"
         sideOffset={10}
         className="bg-white border border-gray-200 shadow-xl"
-        style={{borderRadius: '12px', padding: '8px', minWidth: '200px'}}
+        style={{borderRadius: '12px', padding: '8px', minWidth: '260px', maxWidth: '320px'}}
       >
         {/* Removed the Planned Workouts item to avoid duplication below the plan */}
 
@@ -82,10 +82,10 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
                 key={plan.id}
                 onClick={(e) => handlePlanSelect(e, plan.id)}
                 className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '10px 12px', minHeight: '56px'}}
+                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '10px 12px', minHeight: '56px', maxWidth: '296px'}}
               >
                 <span className="text-xs text-gray-500 mb-0.5">Current plan</span>
-                <span className="font-medium leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                <span className="font-medium leading-snug whitespace-normal break-words" style={{ overflow: 'hidden', maxWidth: '280px' }}>
                   {plan.name}
                 </span>
                 <span className="text-xs text-gray-500 mt-0.5">Week {plan.currentWeek || 1}</span>

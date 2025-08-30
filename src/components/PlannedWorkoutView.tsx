@@ -2,6 +2,7 @@ import React from 'react';
 import { Clock } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
+import { normalizePlannedSession } from '@/services/plans/normalizer';
 
 export interface PlannedWorkout {
   id: string;
@@ -40,6 +41,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 }) => {
   const [friendlyDesc, setFriendlyDesc] = React.useState<string | undefined>(undefined);
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
+  const [stepLines, setStepLines] = React.useState<string[] | null>(null);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -152,6 +154,23 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         }
         if (typeof secs === 'number' && isFinite(secs) && secs >= 0) {
           setResolvedDuration(Math.round(secs / 60));
+        }
+
+        // Build vertical step lines: prefer computed.steps; else try normalizer with steps_preset
+        const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
+        if (computedSteps.length > 0) {
+          setStepLines(flattenSteps(computedSteps));
+        } else {
+          try {
+            const stepsPreset = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+            if (stepsPreset.length > 0) {
+              const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', (await supabase.auth.getUser()).data.user?.id).single();
+              const pn: any = (data as any)?.performance_numbers || {};
+              const norm = normalizePlannedSession({ steps_preset: stepsPreset, discipline: (workout as any).type }, { performanceNumbers: pn }, (workout as any).export_hints || {});
+              const c = Array.isArray(norm.computedSteps) ? norm.computedSteps : (Array.isArray((norm as any).steps) ? (norm as any).steps : []);
+              if (Array.isArray(c) && c.length > 0) setStepLines(flattenSteps(c));
+            }
+          } catch {}
         }
       } catch {
         setFriendlyDesc(stripCodes(workout.description));
@@ -321,8 +340,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         {/* Vertical step list */}
         <div className="rounded border border-gray-200 bg-gray-50 p-3">
           {(() => {
-            const steps: any[] = ((workout as any).computed && Array.isArray((workout as any).computed.steps)) ? (workout as any).computed.steps : [];
-            const lines = flattenSteps(steps);
+            const lines = Array.isArray(stepLines) ? stepLines : [];
             if (lines.length === 0) {
               return (
                 <div className="text-sm text-gray-700">{friendlyDesc || stripCodes(workout.description)}</div>
