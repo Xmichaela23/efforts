@@ -659,8 +659,10 @@ export default function PlanSelect() {
           // Prefer deterministic normalizer so WU/CD/recoveries are counted and targets render
           let normMinutes = 0;
           let renderedFromNorm: string | undefined = undefined;
+          let normObj: any | undefined = undefined;
           try {
             const norm = normalizePlannedSession(s, { performanceNumbers: pnObj }, payload.export_hints || {});
+            normObj = norm;
             normMinutes = Math.max(0, Math.round((norm?.durationMinutes || 0)));
             renderedFromNorm = (norm?.friendlySummary || '').trim() || undefined;
           } catch {}
@@ -794,6 +796,31 @@ export default function PlanSelect() {
           }
 
           const isOptional = Array.isArray(s?.tags) ? s.tags.some((t: any) => String(t).toLowerCase()==='optional') : /\[optional\]/i.test(String(s?.description||''));
+          const buildIntervalsFromComputed = (steps?: any[]): any[] | undefined => {
+            if (!Array.isArray(steps) || steps.length === 0) return undefined;
+            const toMeters = (val: number, unit?: string) => {
+              const u = String(unit || '').toLowerCase();
+              if (u === 'm') return Math.floor(val);
+              if (u === 'yd') return Math.floor(val * 0.9144);
+              if (u === 'mi') return Math.floor(val * 1609.34);
+              return Math.floor(val || 0);
+            };
+            return steps.map((st: any) => {
+              const ctrl = String(st?.ctrl || '').toLowerCase();
+              const label = String(st?.label || st?.effortLabel || '').trim();
+              const kind = String(st?.kind || '').toLowerCase();
+              if (kind === 'strength') {
+                return { kind: 'strength', effortLabel: label, reps: Number(st?.reps||0), weight: Number(st?.weight||0) };
+              }
+              if (ctrl === 'distance') {
+                return { effortLabel: label, distanceMeters: toMeters(Number(st?.meters || st?.distanceMeters || st?.original_val || 0), st?.original_units) };
+              }
+              return { effortLabel: label, duration: Math.max(1, Math.floor(Number(st?.seconds || st?.duration || 0))) };
+            });
+          };
+          const intervalsFromBaker = buildIntervalsFromComputed(computedSteps);
+          const intervalsFromNorm = buildIntervalsFromComputed((Array.isArray((normObj as any)?.computedSteps) ? (normObj as any).computedSteps : Array.isArray((normObj as any)?.steps) ? (normObj as any).steps : undefined));
+
           rows.push({
             user_id: user.id,
             training_plan_id: planRow.id,
@@ -812,7 +839,8 @@ export default function PlanSelect() {
             export_hints: payload.export_hints || null,
             rendered_description: rendered,
             computed: { normalization_version: 'v2', total_duration_seconds: totalSeconds, steps: computedSteps },
-            units: unitsPref
+            units: unitsPref,
+            intervals: Array.isArray(s.intervals) && s.intervals.length ? s.intervals : (intervalsFromBaker?.length ? intervalsFromBaker : (intervalsFromNorm?.length ? intervalsFromNorm : undefined))
           });
         });
       

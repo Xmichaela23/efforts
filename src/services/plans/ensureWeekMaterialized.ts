@@ -194,6 +194,32 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       if (mappedType === 'swim') return 'Swim';
       return 'Session';
     })();
+    // Build Garmin-ready intervals from normalized or baked steps when present
+    const buildIntervalsFromComputed = (steps?: any[]): any[] | undefined => {
+      if (!Array.isArray(steps) || steps.length === 0) return undefined;
+      const toMeters = (val: number, unit?: string) => {
+        const u = String(unit || '').toLowerCase();
+        if (u === 'm') return Math.floor(val);
+        if (u === 'yd') return Math.floor(val * 0.9144);
+        if (u === 'mi') return Math.floor(val * 1609.34);
+        return Math.floor(val || 0);
+      };
+      return steps.map((st: any) => {
+        const ctrl = String(st?.ctrl || '').toLowerCase();
+        const label = String(st?.label || st?.effortLabel || '').trim();
+        const kind = String(st?.kind || '').toLowerCase();
+        if (kind === 'strength') {
+          return { kind: 'strength', effortLabel: label, reps: Number(st?.reps||0), weight: Number(st?.weight||0) };
+        }
+        if (ctrl === 'distance') {
+          return { effortLabel: label, distanceMeters: toMeters(Number(st?.meters || st?.distanceMeters || st?.original_val || 0), st?.original_units) };
+        }
+        return { effortLabel: label, duration: Math.max(1, Math.floor(Number(st?.seconds || st?.duration || 0))) };
+      });
+    };
+
+    const intervalsFromNorm = buildIntervalsFromComputed(undefined); // placeholder: we only have norm summary here
+
     rows.push({
       user_id: user.id,
       training_plan_id: plan.id,
@@ -214,7 +240,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       computed: { normalization_version: 'v2', total_duration_seconds: totalSeconds },
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
-      intervals: Array.isArray(s.intervals) ? s.intervals : undefined,
+      intervals: Array.isArray(s.intervals) && s.intervals.length ? s.intervals : intervalsFromNorm,
       strength_exercises: Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined,
     });
   }

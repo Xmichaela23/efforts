@@ -77,6 +77,11 @@ serve(async (req) => {
       return json({ error: 'Workout not found' }, 404)
     }
 
+    // Strict: must have materialized intervals (no fallbacks)
+    if (!Array.isArray((workout as any).intervals) || (workout as any).intervals.length === 0) {
+      return json({ error: 'Workout is not materialized for Garmin (intervals missing)' }, 422)
+    }
+
     // Fetch user's Garmin tokens
     const { data: conn, error: connErr } = await supabase
       .from('user_connections')
@@ -183,7 +188,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     if (Array.isArray(interval?.segments) && interval?.repeatCount && interval.repeatCount > 0) {
       for (let r = 0; r < Number(interval.repeatCount); r += 1) {
         for (const seg of interval.segments) {
-          const sIntensity = mapEffortToIntensity(String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim())
+          const sIntensity = mapEffortToIntensity(String((seg?.effortLabel ?? interval?.effortLabel) || '').trim())
           const sMeters = Number(seg?.distanceMeters)
           const sSeconds = Number(seg?.duration)
           if (!(Number.isFinite(sMeters) && sMeters > 0) && !(Number.isFinite(sSeconds) && sSeconds > 0)) {
@@ -194,7 +199,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             stepId,
             stepOrder: stepId,
             intensity: sIntensity,
-            description: String(seg?.effortLabel ?? interval?.effortLabel ?? '').trim() || undefined,
+            description: String(((seg?.effortLabel ?? interval?.effortLabel) || '')).trim() || undefined,
             durationType: (Number.isFinite(sMeters) && sMeters > 0) ? 'DISTANCE' : 'TIME',
             durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? Math.floor(sMeters) : Math.floor(sSeconds)
           }
