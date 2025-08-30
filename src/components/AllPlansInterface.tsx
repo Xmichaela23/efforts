@@ -1699,7 +1699,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                       ftp: (workout as any).ftp,
                                       swim_pace_per_100_sec: (workout as any).swim_pace_per_100_sec
                                     }}
-                                    workoutType={workout.name || 'Session'}
+                                    workoutType={(() => { const nm=(workout.name||''); const t=(workout.type||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); const contains=(s:string)=>lower.includes(s.toLowerCase()); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/interval|\d+x\d+/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}
                                     description={workout.rendered_description || workout.description}
                                     compact={true}
                                   />
@@ -1707,7 +1707,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1">
                                       <div className="font-medium flex items-center gap-2">
-                                        <span>{workout.name}</span>
+                                        <span>{(() => { const nm=(workout.name||''); const t=(workout.type||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); const contains=(s:string)=>lower.includes(s.toLowerCase()); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/interval|\d+x\d+/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
                                         {typeof workout.duration === 'number' && (
                                           <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">
                                             {formatDuration(workout.duration)}
@@ -1727,14 +1727,14 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                             ))}
                             {groups[day].some((w:any)=>Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')) && (
                               <div className="mt-3">
-                                <div className="text-xs font-medium text-gray-700 mb-1">Optional sessions — select one supplemental session to add to week</div>
+                                <div className="text-xs font-medium text-gray-700 mb-1">Optional</div>
                                 <div className="space-y-2">
                                   {groups[day].filter((w:any)=>Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')).map((workout:any, idx:number)=> (
                                     <div key={workout.id || `opt-${day}-${idx}`} className="p-3 rounded border border-dashed">
                                       <div className="flex items-start justify-between gap-3">
                                         <div className="flex-1">
                                           <div className="font-medium flex items-center gap-2">
-                                            <span>{workout.name || (workout.type||'Session')}</span>
+                                            <span>{(() => { const t=(workout.type||''); const nm=(workout.name||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/interval|\d+x\d+/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
                                             {(() => {
                                               const sec = workout?.computed?.total_duration_seconds;
                                               const min = (typeof sec === 'number' && sec > 0) ? Math.round(sec/60) : (typeof workout.duration === 'number' ? workout.duration : null);
@@ -1748,7 +1748,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               const lower = tags.map(t=>t.toLowerCase());
                                               const optKindTag = tags.find(t => t.toLowerCase().startsWith('opt_kind:')) || '';
                                               const optKind = optKindTag ? optKindTag.split(':')[1] : '';
-                                              const xorTag = tags.find(t => t.toLowerCase().startsWith('xor:')) || '';
                                               const badges: string[] = [];
                                               // opt_kind label
                                               if (optKind) {
@@ -1763,7 +1762,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               // discipline-aware hints
                                               if (lower.includes('bike_intensity') || lower.includes('hard_run')) badges.push('Quality');
                                               if (lower.includes('long_run') || lower.includes('long_ride')) badges.push('Long');
-                                              // Do not show XOR badge; behavior is enforced by activation logic
                                               return badges.length ? (
                                                 <span className="ml-1.5 flex flex-wrap gap-1">
                                                   {badges.map((b, i) => (
@@ -1774,6 +1772,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                             })()}
                                           </div>
                                           <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>
+                                          {(() => {
+                                            const planUi: any = (selectedPlanDetail as any)?.ui_text || (selectedPlanDetail as any)?.template?.ui_text || {};
+                                            const copy = (planUi?.opt_kind_copy || {}) as Record<string,string>;
+                                            const fallback: Record<string,string> = {
+                                              choice: 'Alternate quality — maintains intensity',
+                                              recovery: 'Active recovery — supports adaptation',
+                                              technique: 'Technique focus — maintains efficiency',
+                                              long_endurance: 'Extended endurance — builds durability'
+                                            };
+                                            const tags: string[] = Array.isArray(workout?.tags) ? (workout.tags as any[]).map((t:any)=>String(t).toLowerCase()) : [];
+                                            const kind = (tags.find(t=>t.startsWith('opt_kind:'))||'').split(':')[1] || '';
+                                            const txt = (copy[kind] || fallback[kind] || '').trim();
+                                            return txt ? (<div className="text-xs text-gray-500 mt-1">{txt}</div>) : null;
+                                          })()}
                                         </div>
                                         <Button size="sm" variant="outline" className="border-gray-300" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout);}}>
                                           {activatingId===workout.id? 'Adding…':'Add to week'}
