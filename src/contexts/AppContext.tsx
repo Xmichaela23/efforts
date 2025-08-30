@@ -638,6 +638,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               rendered_description: rendered,
               computed: computedData,
               units: unitsPref,
+              // Persist authored tags (optional/xor/opt_kind/etc.) for UI grouping/activation
+              tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
             };
             if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
             if (Array.isArray(s.intervals)) row.intervals = s.intervals;
