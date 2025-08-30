@@ -142,7 +142,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     const rawType = String(s.discipline || s.type || '').toLowerCase();
     let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
     if (rawType === 'run') mappedType = 'run';
-    else if (rawType === 'bike' || rawType === 'ride') mappedType = 'ride';
+    else if (rawType === 'bike' || rawType === 'ride' || rawType === 'cycling') mappedType = 'ride';
     else if (rawType === 'swim') mappedType = 'swim';
     else if (rawType === 'strength') mappedType = 'strength';
 
@@ -158,6 +158,22 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     const durationVal = typeof s.duration === 'number' && Number.isFinite(s.duration) ? s.duration : (totalSeconds ? Math.round(totalSeconds/60) : 0);
 
     const isOptional = Array.isArray(s?.tags) ? s.tags.some((t: any) => String(t).toLowerCase()==='optional') : /\[optional\]/i.test(String(s?.description||''));
+    // Derive non-generic name from discipline and steps where possible
+    const nameFromDiscipline = (() => {
+      if (s.name) return String(s.name);
+      if (mappedType === 'strength') return 'Strength';
+      if (mappedType === 'ride') {
+        const toks = Array.isArray(s?.steps_preset) ? s.steps_preset.join(' ').toLowerCase() : '';
+        if (/bike_vo2|vo2/.test(toks) || /vo2/.test(String(s.description||'').toLowerCase())) return 'Ride — VO2';
+        if (/bike_thr|threshold/.test(toks) || /threshold/.test(String(s.description||'').toLowerCase())) return 'Ride — Threshold';
+        if (/bike_ss|sweet\s*spot/.test(toks) || /sweet\s*spot/.test(String(s.description||'').toLowerCase())) return 'Ride — Sweet Spot';
+        if (/endurance|z1|z2/.test(toks) || /endurance|spin|z2/i.test(String(s.description||''))) return 'Ride — Endurance';
+        return 'Ride';
+      }
+      if (mappedType === 'run') return 'Run';
+      if (mappedType === 'swim') return 'Swim';
+      return 'Session';
+    })();
     rows.push({
       user_id: user.id,
       training_plan_id: plan.id,
@@ -166,7 +182,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       day_number: dow,
       date,
       type: mappedType,
-      name: s.name || (mappedType === 'strength' ? 'Strength' : s.type || 'Session'),
+      name: nameFromDiscipline,
       description: s.description || '',
       duration: durationVal,
       workout_status: 'planned' as any,

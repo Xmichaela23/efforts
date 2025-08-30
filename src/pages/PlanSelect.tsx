@@ -52,6 +52,8 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
     const ia = dayIndex(a); const ib = dayIndex(b); if (ia<0||ib<0) return 9999; const diff = Math.abs(ib-ia); const min = Math.min(diff, 7-diff); return min*24;
   };
   const cloneSessions = (arr: any[]) => arr.map(s => ({ ...s, tags: Array.isArray(s.tags)?[...s.tags]:[], _origDay: s.day }));
+  const isOptional = (s: any) => Array.isArray(s?.tags) && s.tags.some((t: any) => String(t).toLowerCase()==='optional');
+  const hasXor = (s: any) => Array.isArray(s?.tags) && s.tags.some((t: any) => /^xor:/i.test(String(t)));
   const isIntervals = (s: any) => /interval|cruise|1mi|800m/i.test(String(s.description||''));
   const isTempo = (s: any) => /tempo|mp\b/i.test(String(s.description||''));
   const ensureTag = (s: any, t: string) => { if (!Array.isArray(s.tags)) s.tags=[]; if (!s.tags.includes(t)) s.tags.push(t); };
@@ -83,12 +85,14 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
     // Infer missing tags
     s.forEach(inferTags);
     // Pin long days
+    // Pin long days to user-chosen anchors (defaults now come from authored days)
     const lr = findByTag(s,'long_run'); if (lr) moveTo(lr, prefs.longRunDay);
     const lrd = findByTag(s,'long_ride'); if (lrd) moveTo(lrd, prefs.longRideDay);
 
     // Bike intensity vs long ride
     const bike = findByTag(s,'bike_intensity');
-    if (bike) {
+    // Universal rule: do NOT move optional/XOR intensity bikes during remap.
+    if (bike && !isOptional(bike) && !hasXor(bike)) {
       if (prefs.longRideDay === 'Saturday') {
         if (canPlace(s,bike,'Tuesday')) moveTo(bike,'Tuesday');
         else if (wednesdayRunIsAerobic(s) && canPlace(s,bike,'Wednesday')) moveTo(bike,'Wednesday');
@@ -113,7 +117,7 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
     }
 
     // Hard runs vs long run
-    const hardRuns = s.filter(x => hasTag(x,'hard_run'));
+    const hardRuns = s.filter(x => hasTag(x,'hard_run') && !isOptional(x) && !hasXor(x));
     for (const hr of hardRuns) {
       if (longRun && hoursBetween(hr.day,longRun.day) < 24) {
         if (isIntervals(hr) && canPlace(s,hr,'Monday')) { moveTo(hr,'Monday'); emitNote(notesByWeek, wk, 'Intervals moved to Monday to maintain 24h before long run.'); }
@@ -127,7 +131,8 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
 
     // Final same-day collisions
     for (const d of DAYS) {
-      const dayHard = s.filter(x => x.day===d && isHard(x));
+      // Do not use optionals/XOR to trigger same-day collision moves
+      const dayHard = s.filter(x => x.day===d && isHard(x) && !isOptional(x) && !hasXor(x));
       if (dayHard.length > 1) {
         const priority = ['long_run','strength_lower','hard_run','bike_intensity','long_ride'];
         const hasBike = dayHard.some(x=>hasTag(x,'bike_intensity'));
@@ -171,8 +176,9 @@ export default function PlanSelect() {
   const [error, setError] = useState<string|null>(null);
   const [libPlan, setLibPlan] = useState<any|null>(null);
   const [startDate, setStartDate] = useState<string>('');
-  const [longRunDay, setLongRunDay] = useState<string>('Sunday');
-  const [longRideDay, setLongRideDay] = useState<string>('Saturday');
+  // Default to authored anchors; we will set these after loading the plan
+  const [longRunDay, setLongRunDay] = useState<string>('');
+  const [longRideDay, setLongRideDay] = useState<string>('');
   const [showPreview, setShowPreview] = useState<boolean>(true);
   const [baselines, setBaselines] = useState<any|null>(null);
   const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -266,6 +272,17 @@ export default function PlanSelect() {
         const p = await getLibraryPlan(id);
         if (!p) { setError('Plan not found'); setLoading(false); return; }
         setLibPlan(p);
+        // Initialize default anchors from authored JSON (first occurrence each week)
+        try {
+          const sbw = p?.template?.sessions_by_week || {};
+          const w1 = sbw?.['1'] || [];
+          const findDay = (tag: string, fallback: string) => {
+            const sess = (w1 as any[]).find(s => Array.isArray(s?.tags) && s.tags.includes(tag));
+            return (sess && sess.day) ? String(sess.day) : fallback;
+          };
+          setLongRunDay(prev => prev || findDay('long_run', 'Sunday'));
+          setLongRideDay(prev => prev || findDay('long_ride', 'Saturday'));
+        } catch {}
         setStartDate(computeNextMonday());
         setLoading(false);
       } catch (e: any) {
@@ -618,7 +635,22 @@ export default function PlanSelect() {
           // Fallback: heuristic description-based duration
           const derivedMinutes = normMinutes || computeDurationMinutes(cleanedDesc);
           const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : derivedMinutes;
-          const nameGuess = s.name || (mappedType === 'strength' ? 'Strength' : mappedType === 'ride' ? 'Ride' : mappedType === 'swim' ? 'Swim' : 'Run');
+          // Derive a non-generic name when possible
+          const nameGuess = (() => {
+            if (s.name) return String(s.name);
+            if (mappedType === 'strength') return 'Strength';
+            if (mappedType === 'ride') {
+              const toks = Array.isArray(s?.steps_preset) ? s.steps_preset.join(' ').toLowerCase() : '';
+              if (/bike_vo2|vo2/.test(toks) || /vo2/.test(String(s.description||'').toLowerCase())) return 'Ride — VO2';
+              if (/bike_thr|threshold/.test(toks) || /threshold/.test(String(s.description||'').toLowerCase())) return 'Ride — Threshold';
+              if (/bike_ss|sweet\s*spot/.test(toks) || /sweet\s*spot/.test(String(s.description||'').toLowerCase())) return 'Ride — Sweet Spot';
+              if (/endurance|z1|z2/.test(toks) || /endurance|spin|z2/i.test(String(s.description||''))) return 'Ride — Endurance';
+              return 'Ride';
+            }
+            if (mappedType === 'run') return 'Run';
+            if (mappedType === 'swim') return 'Swim';
+            return 'Session';
+          })();
 
           // Prefer authored details for strength; otherwise use normalized summary
           let rendered: string | undefined = mappedType === 'strength' ? cleanedDesc : (renderedFromNorm || cleanedDesc);

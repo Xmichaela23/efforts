@@ -613,6 +613,40 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         } catch {}
         try { (window as any).toast?.({ title: 'Selection applied', description: spec.ui_text?.notifications?.xor_applied }); } catch {}
       }
+      // Post-activation spacing: if activating this optional creates a hard-day collision, move the ACTIVATED optional (never core)
+      try {
+        const spec: any = optionalUiSpec as any;
+        const L = spec.logic || {};
+        const qTag = String(L.quality_tag || 'bike_intensity').toLowerCase();
+        const optTag = String(L.optional_tag || 'optional').toLowerCase();
+        const tz = L.week_boundary?.timezone || 'America/Los_Angeles';
+        const toDateOnly = (iso: string) => new Date(iso + 'T00:00:00').toLocaleDateString('en-CA', { timeZone: tz });
+        const startOfWeek = (iso: string) => {
+          const d = new Date(iso + 'T00:00:00');
+          const day = new Date(d.toLocaleString('en-US', { timeZone: tz })).getDay();
+          const mondayOffset = (day === 0 ? -6 : 1 - day);
+          const base = new Date(d);
+          base.setDate(base.getDate() + mondayOffset);
+          return toDateOnly(base.toISOString().slice(0,10));
+        };
+        const wkStart = startOfWeek(workout.date);
+        const end = new Date(wkStart); end.setDate(end.getDate()+6); const wkEnd = toDateOnly(end.toISOString().slice(0,10));
+        const { data: weekRows } = await supabase
+          .from('planned_workouts')
+          .select('id,day_number,tags')
+          .eq('training_plan_id', workout.training_plan_id)
+          .gte('date', wkStart)
+          .lte('date', wkEnd);
+        const isHard = (r: any) => {
+          const tags = Array.isArray(r?.tags) ? r.tags.map((t:string)=>t.toLowerCase()) : [];
+          return tags.includes('long_run') || tags.includes('hard_run') || tags.includes(qTag) || tags.includes('strength_lower') || tags.includes('long_ride');
+        };
+        const sameDayHardCore = (weekRows||[]).some((r:any)=> r.id!==workout.id && Number(r.day_number)===Number(workout.day_number) && isHard(r) && !(Array.isArray(r.tags)&&r.tags.map((t:string)=>t.toLowerCase()).includes(optTag)));
+        if (sameDayHardCore) {
+          const nextDay = Math.min(7, Number(workout.day_number || 1) + 1);
+          await supabase.from('planned_workouts').update({ day_number: nextDay }).eq('id', workout.id);
+        }
+      } catch {}
       // Broadcast to other views (Today, Calendar) to refresh
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
     } finally {
