@@ -472,6 +472,26 @@ export default function PlanSelect() {
         const outWeek: any[] = [];
         for (const s of sessions as any[]) {
           let expanded = { ...s } as any;
+          // Authoring sugar → tags: optional_kind, xor_key
+          try {
+            const addTag = (arr: string[], t: string) => { if (!arr.map(x=>x.toLowerCase()).includes(t.toLowerCase())) arr.push(t); };
+            const tags: string[] = Array.isArray(expanded?.tags) ? [...expanded.tags] : [];
+            if (expanded.optional_kind) {
+              addTag(tags, 'optional');
+              addTag(tags, `opt_kind:${String(expanded.optional_kind)}`);
+              const disc = String(expanded.discipline || expanded.type || '').toLowerCase();
+              if (String(expanded.optional_kind).toLowerCase()==='intensity') {
+                if (disc==='ride' || disc==='bike' || disc==='cycling') addTag(tags, 'bike_intensity');
+                if (disc==='run') addTag(tags, 'hard_run');
+              }
+            }
+            if (expanded.xor_key) {
+              addTag(tags, `xor:${String(expanded.xor_key)}`);
+            }
+            if (tags.length) expanded.tags = tags;
+            delete (expanded as any).optional_kind;
+            delete (expanded as any).xor_key;
+          } catch {}
           try {
             if ((!Array.isArray(expanded.steps_preset) || expanded.steps_preset.length === 0) && String(expanded.discipline||'').toLowerCase()==='swim') {
               const steps = expandSession({ discipline: 'swim', main: (expanded as any).main, extra: (expanded as any).extra, steps_preset: (expanded as any).steps_preset }, planDefaults);

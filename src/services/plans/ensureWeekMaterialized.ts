@@ -131,6 +131,26 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   for (const s0 of weekSessions) {
     // Expand swim DSL to steps_preset if present
     let s = { ...s0 } as any;
+    // Authoring sugar → tags: optional_kind, xor_key
+    try {
+      const addTag = (arr: string[], t: string) => { if (!arr.map(x=>x.toLowerCase()).includes(t.toLowerCase())) arr.push(t); };
+      const tags: string[] = Array.isArray(s?.tags) ? [...s.tags] : [];
+      if (s.optional_kind) {
+        addTag(tags, 'optional');
+        addTag(tags, `opt_kind:${String(s.optional_kind)}`);
+        const disc = String(s.discipline || s.type || '').toLowerCase();
+        if (String(s.optional_kind).toLowerCase()==='intensity') {
+          if (disc==='ride' || disc==='bike' || disc==='cycling') addTag(tags, 'bike_intensity');
+          if (disc==='run') addTag(tags, 'hard_run');
+        }
+      }
+      if (s.xor_key) {
+        addTag(tags, `xor:${String(s.xor_key)}`);
+      }
+      if (tags.length) s.tags = tags;
+      delete (s as any).optional_kind;
+      delete (s as any).xor_key;
+    } catch {}
     try {
       if ((!Array.isArray(s.steps_preset) || s.steps_preset.length === 0) && String(s.discipline||'').toLowerCase()==='swim') {
         const steps = expandSession({ discipline: 'swim', main: (s as any).main, extra: (s as any).extra, steps_preset: (s as any).steps_preset }, planDefaults);
