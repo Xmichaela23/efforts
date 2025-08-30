@@ -32,10 +32,8 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
   const handlePlanSelect = (e: React.MouseEvent, planId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('Selected plan:', planId);
-    if (onSelectRoutine) {
-      onSelectRoutine(planId);
-    }
+    // Navigate directly to weekly planner for this plan (current week)
+    navigate(`/plans/${planId}`);
   };
 
   const handleAllPlans = (e: React.MouseEvent) => {
@@ -84,10 +82,13 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
                 key={plan.id}
                 onClick={(e) => handlePlanSelect(e, plan.id)}
                 className="flex flex-col items-start hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '50px'}}
+                style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '10px 12px', minHeight: '56px'}}
               >
-                <span className="text-xs text-gray-500 mb-1">Current:</span>
-                <span className="font-medium">{plan.name} - Wk {plan.currentWeek}</span>
+                <span className="text-xs text-gray-500 mb-0.5">Current plan</span>
+                <span className="font-medium leading-snug" style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                  {plan.name}
+                </span>
+                <span className="text-xs text-gray-500 mt-0.5">Week {plan.currentWeek || 1}</span>
               </DropdownMenuItem>
             ))}
             
@@ -133,19 +134,7 @@ const PlansDropdown: React.FC<PlansDropdownProps> = ({
           <span>Select a plan (catalog)</span>
         </DropdownMenuItem>
 
-        {/* Show All Plans if there are any plans or as fallback */}
-        {(currentPlans.length > 0 || completedPlans.length > 0) && (
-          <DropdownMenuSeparator className="my-2" />
-        )}
-        
-        <DropdownMenuItem
-          onClick={handleAllPlans}
-          className="flex items-center justify-between hover:bg-gray-50 text-gray-700 hover:text-gray-900 transition-colors duration-150 rounded-lg cursor-pointer"
-          style={{fontFamily: 'Inter, sans-serif', fontWeight: 500, padding: '12px 16px', minHeight: '44px'}}
-        >
-          <span>{currentPlans.length === 0 && completedPlans.length === 0 ? 'Current Plans' : 'View Current Plans'}</span>
-          <ArrowRight className="h-4 w-4" />
-        </DropdownMenuItem>
+        {/* Removed View Current Plans entry per design */}
       </DropdownMenuContent>
     </DropdownMenu>
   );

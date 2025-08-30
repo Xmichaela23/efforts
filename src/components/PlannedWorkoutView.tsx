@@ -1,8 +1,7 @@
 import React from 'react';
-import { Clock, Target, Dumbbell, MapPin, Info } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { supabase } from '@/lib/supabase';
-import WorkoutDetailView from './WorkoutDetailView';
 
 export interface PlannedWorkout {
   id: string;
@@ -180,26 +179,72 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     }
   };
 
-  const getTargetSuffix = (interval: any) => {
-    const target = interval?.paceTarget || interval?.powerTarget || interval?.bpmTarget || interval?.cadenceTarget;
-    return target ? ` at ${target}` : '';
+  const secTo = (s?: number | null) => {
+    if (typeof s !== 'number' || !isFinite(s) || s <= 0) return '';
+    const mm = Math.floor(s / 60);
+    const ss = Math.round(s % 60);
+    return `${mm}:${String(ss).padStart(2,'0')}`;
   };
 
-  const formatRepeatSummary = (segments: any[]) => {
-    if (!Array.isArray(segments) || segments.length === 0) return '';
-    return segments
-      .map((seg: any) => `${seg.time || ''} ${seg.effortLabel || ''}${getTargetSuffix(seg)}`.trim())
-      .join(' + ');
+  const paceRangeStr = (obj: any) => {
+    try {
+      if (obj?.pace_range && typeof obj.pace_range.lower === 'number' && typeof obj.pace_range.upper === 'number') {
+        return `${secTo(obj.pace_range.lower)}–${secTo(obj.pace_range.upper)}`;
+      }
+      if (typeof obj?.pace_sec_per_mi === 'number') return `${secTo(obj.pace_sec_per_mi)}`;
+    } catch {}
+    return undefined;
   };
 
-  const formatIntervalLine = (interval: any, index: number) => {
-    if (Array.isArray(interval?.segments) && interval?.repeatCount) {
-      const inner = formatRepeatSummary(interval.segments);
-      return `${interval.repeatCount}x — (${inner})`;
+  const distStr = (obj: any) => {
+    if (typeof obj?.distance_m === 'number' && obj.distance_m > 0) return `${Math.round(obj.distance_m)}m`;
+    if (typeof obj?.distance === 'string' && obj.distance.trim()) return obj.distance;
+    return undefined;
+  };
+
+  const timeStr = (obj: any) => {
+    if (typeof obj?.durationSeconds === 'number' && obj.durationSeconds > 0) return secTo(obj.durationSeconds);
+    if (typeof obj?.time === 'string' && obj.time.trim()) return obj.time;
+    return undefined;
+  };
+
+  const isRestLike = (obj: any) => {
+    const label = String(obj?.effortLabel || obj?.intensity || '').toLowerCase();
+    return label.includes('rest') || label.includes('recovery');
+  };
+
+  const flattenSteps = (stepsRaw: any[] | undefined): string[] => {
+    if (!Array.isArray(stepsRaw) || stepsRaw.length === 0) return [];
+    const lines: string[] = [];
+    const pushSeg = (seg: any) => {
+      const d = distStr(seg);
+      const t = timeStr(seg);
+      const pr = paceRangeStr(seg);
+      if (isRestLike(seg)) {
+        lines.push(`1 × ${t || d || 'rest'} rest`);
+      } else if (d || t) {
+        lines.push(`1 × ${(d || t)}${pr ? ` @ ${pr}` : ''}`.trim());
+      }
+    };
+    for (const st of stepsRaw) {
+      if (Array.isArray(st?.segments) && typeof st?.repeatCount === 'number' && st.repeatCount > 0) {
+        for (let r = 0; r < st.repeatCount; r++) {
+          for (const seg of st.segments) pushSeg(seg);
+        }
+      } else {
+        pushSeg(st);
+      }
     }
-    const label = interval.effortLabel || `Segment ${index + 1}`;
-    const time = interval.time || '';
-    return `${label} — ${time}${getTargetSuffix(interval)}`.trim();
+    return lines;
+  };
+
+  const deriveFocus = () => {
+    const txt = String(workout.rendered_description || workout.description || '').toLowerCase();
+    if (/vo2|vo₂/.test(txt)) return 'VO2 Max';
+    if (/tempo|threshold|thr\b/.test(txt)) return 'Tempo';
+    if (/drill|technique/.test(txt)) return 'Drills';
+    if (/long|endurance|z2/.test(txt)) return 'Endurance';
+    return 'Planned';
   };
 
   if (compact) {
@@ -261,29 +306,41 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         </div>
       )}
 
-      <div className="space-y-4">
-        {/* Template System - Safe computed pass-through */}
-        <WorkoutDetailView
-          computed={(() => { const c: any = (workout as any).computed || {}; return { steps: Array.isArray(c.steps) ? c.steps : [], total_duration_seconds: (typeof c.total_duration_seconds==='number'?c.total_duration_seconds: (typeof workout.duration==='number'?workout.duration*60:0)) }; })()}
-          baselines={{
-            fiveK_pace_sec_per_mi: (workout as any).fiveK_pace_sec_per_mi,
-            easy_pace_sec_per_mi: (workout as any).easy_pace_sec_per_mi,
-            ftp: (workout as any).ftp,
-            swim_pace_per_100_sec: (workout as any).swim_pace_per_100_sec,
-            // Strength 1RMs
-            squat: (workout as any).squat,
-            bench: (workout as any).bench,
-            deadlift: (workout as any).deadlift,
-            overheadPress1RM: (workout as any).overheadPress1RM,
-            barbellRow: (workout as any).barbellRow
-          }}
-          workoutType={getWorkoutTypeLabel(workout.type)}
-          description={workout.rendered_description || workout.description}
-        />
+      <div className="space-y-3">
+        {/* Planned pill and title */}
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] uppercase tracking-wide text-gray-500">Planned</span>
+          <div className="text-sm text-gray-500">
+            {resolvedDuration ? `${resolvedDuration} min` : (typeof workout.duration==='number'?`${workout.duration} min`: '')}
+          </div>
+        </div>
+        <h3 className="text-base font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
+          {getWorkoutTypeLabel(workout.type)} — {deriveFocus()}
+        </h3>
+
+        {/* Vertical step list */}
+        <div className="rounded border border-gray-200 bg-gray-50 p-3">
+          {(() => {
+            const steps: any[] = ((workout as any).computed && Array.isArray((workout as any).computed.steps)) ? (workout as any).computed.steps : [];
+            const lines = flattenSteps(steps);
+            if (lines.length === 0) {
+              return (
+                <div className="text-sm text-gray-700">{friendlyDesc || stripCodes(workout.description)}</div>
+              );
+            }
+            return (
+              <ul className="list-none space-y-1">
+                {lines.map((ln, i) => (
+                  <li key={i} className="text-sm text-gray-900">{ln}</li>
+                ))}
+              </ul>
+            );
+          })()}
+        </div>
 
         {/* Action Buttons */}
         {(onEdit || onComplete || onDelete || true) && (
-          <div className="flex gap-2 pt-2">
+          <div className="flex gap-3 mt-6 pt-3 border-t border-gray-200">
             {/* Send to Garmin */}
             {['run','ride','swim','strength'].includes(workout.type) && (
               <SendToGarminButton workoutId={workout.id} disabled={workout.workout_status === 'sent_to_garmin'} />
@@ -291,7 +348,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors border border-blue-200 rounded hover:bg-blue-50"
+                className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors"
               >
                 Edit
               </button>
@@ -299,7 +356,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onComplete && workout.workout_status === 'planned' && (
               <button
                 onClick={onComplete}
-                className="px-3 py-1.5 text-sm text-green-600 hover:text-green-700 transition-colors border border-green-200 rounded hover:bg-green-50"
+                className="px-3 py-1.5 text-sm text-green-600 hover:text-green-700 transition-colors"
               >
                 Mark Complete
               </button>
@@ -307,7 +364,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onDelete && (
               <button
                 onClick={onDelete}
-                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 transition-colors border border-red-200 rounded hover:bg-red-50"
+                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 transition-colors"
               >
                 Delete
               </button>

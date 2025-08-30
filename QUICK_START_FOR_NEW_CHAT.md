@@ -1,14 +1,29 @@
 # Efforts — Quick Start
 
-## 🚀 **Current Status: LIVE & WORKING**
+## 🚀 **Status: LIVE & WORKING**
 
-The app is deployed and functioning. Current focus is on deterministic, user‑friendly plan rendering and reliable data ingestion.
+Plan JSON import and on‑demand week materialization are implemented. Optional toggles/XOR, Today/Calendar filtering, and Strava “never disconnect” are live.
 
-## 🎯 **Current Focus**
+## 🧭 Assistant Brief (cold‑start context)
 
-- Deterministic normalizer across Today / Plan Detail / Full Plan
-- Reliable Strava webhook ingestion via CLI deploy
-- JSON plug‑and‑play templates using `steps_preset` + `export_hints`
+- What this app is: training plans and workouts (React + Supabase + Edge Functions)
+- Core rules: client‑side baking, week‑by‑week materialization, idempotent UPSERTs (no delete/replace)
+- Optional logic: sessions tagged `optional` are hidden until activated; XOR swaps (swim ↔ quality bike)
+- Durations: computed from `steps_preset` via the normalizer; totals exclude `optional` until activated
+- Calendar/Today: show only non‑optional planned rows; calendar uses compact abbreviations
+- Data model: `plans`, `planned_workouts`, `library_plans`, `workouts`, `user_baselines`, `device_connections`
+- Important files: `AllPlansInterface.tsx`, `TodaysEffort.tsx`, `services/plans/normalizer.ts`, `ensureWeekMaterialized.ts`, `services/plans/plan_dsl.ts`
+- Authoring: import JSON → validate with `universal_plan.schema.json` → DSL/macros expanded → store
+- Strava: auto‑rotate refresh_token + proactive refresh; webhook ingests activities into `workouts`
+- Constraints: avoid heavy SQL; keep baking client‑side or Edge; use UPSERT; tags may arrive as JSON strings
+
+## ✅ **Highlights**
+
+- Plan import: validate with `universal_plan.schema.json`, expand Swim DSL/macros, strip author‑only fields
+- Client‑side bake: materialize Week 1 on accept; later weeks on view; idempotent UPSERT
+- Optional workouts: toggle in week view; XOR (swim ↔ quality bike); Today/Calendar hide `optional`
+- Summaries: calendar cell abbreviations; strength/swim durations computed accurately
+- Strava: automatic token rotation and proactive refresh in Edge Functions
 
 ## 🏗️ **Key Components**
 
@@ -54,20 +69,14 @@ supabase functions list --project-ref yyriamwvtvzlkumqrvpm | cat
 
 ## 📚 **Essential Files**
 
-- **`README.md`** - Run/deploy instructions and project status
-- **`PLAN_AUTHORING.md`** - How to write JSON plans
-- **Schema**: `src/services/plans/contracts/universal_plan.schema.json`
+- **`README.md`** — Run/deploy instructions and project status
+- **`PLAN_AUTHORING.md`** — How to write JSON plans (tokens, DSL/macros)
+- **Schema** — `src/services/plans/contracts/universal_plan.schema.json`
 
 ## ✍️ **Authoring Plans (Plug‑and‑Play)**
 
-- See `PLAN_AUTHORING.md` for token grammar and `export_hints`. The normalizer renders friendly summaries and computes duration automatically.
-
-## ⚠️ **Important Notes**
-
-- Keep UI friendly: no raw tokens; show resolved targets + total duration
-- Test webhook flows after deploying edge functions
+See `PLAN_AUTHORING.md` for token grammar and `export_hints`. The normalizer renders friendly summaries and computes durations.
 
 ---
 
-**Status**: ✅ **Production Ready**
-**Focus**: Deterministic plan rendering, reliable Strava ingestion, plug‑and‑play templates
+**Status**: ✅ Production Ready
