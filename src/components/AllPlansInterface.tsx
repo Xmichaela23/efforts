@@ -1706,6 +1706,36 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                             <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500">Optional</span>
+                                            {(() => {
+                                              const tags: string[] = Array.isArray(workout?.tags) ? (workout.tags as any[]).map((t:any)=>String(t)) : [];
+                                              const lower = tags.map(t=>t.toLowerCase());
+                                              const optKindTag = tags.find(t => t.toLowerCase().startsWith('opt_kind:')) || '';
+                                              const optKind = optKindTag ? optKindTag.split(':')[1] : '';
+                                              const xorTag = tags.find(t => t.toLowerCase().startsWith('xor:')) || '';
+                                              const badges: string[] = [];
+                                              // opt_kind label
+                                              if (optKind) {
+                                                const label = optKind === 'choice' ? 'Choose one'
+                                                  : optKind === 'intensity' ? 'Intensity'
+                                                  : optKind === 'recovery' ? 'Recovery'
+                                                  : optKind === 'technique' ? 'Technique'
+                                                  : optKind === 'long_endurance' ? 'Long endurance'
+                                                  : '';
+                                                if (label) badges.push(label);
+                                              }
+                                              // discipline-aware hints
+                                              if (lower.includes('bike_intensity') || lower.includes('hard_run')) badges.push('Quality');
+                                              if (lower.includes('long_run') || lower.includes('long_ride')) badges.push('Long');
+                                              // XOR indicator
+                                              if (xorTag) badges.push('XOR');
+                                              return badges.length ? (
+                                                <span className="ml-1.5 flex flex-wrap gap-1">
+                                                  {badges.map((b, i) => (
+                                                    <span key={i} className="px-1.5 py-0.5 text-[10px] rounded bg-blue-50 border border-blue-200 text-blue-700">{b}</span>
+                                                  ))}
+                                                </span>
+                                              ) : null;
+                                            })()}
                                           </div>
                                           <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>
                                         </div>
