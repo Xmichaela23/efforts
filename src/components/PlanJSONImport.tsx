@@ -93,8 +93,24 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       if (!out.export_hints) delete out.export_hints;
     }
 
+    // Inject weekly optional header (from ui_text.optional_header) into notes_by_week while keeping schema clean
+    try {
+      const header: string | undefined = (plan?.ui_text && typeof plan.ui_text.optional_header === 'string') ? String(plan.ui_text.optional_header) : undefined;
+      if (header && header.trim().length > 0) {
+        const weekKeys = Object.keys(out.sessions_by_week || {});
+        if (!out.notes_by_week || typeof out.notes_by_week !== 'object') out.notes_by_week = {};
+        for (const wk of weekKeys) {
+          const arr: string[] = Array.isArray(out.notes_by_week[wk]) ? [...out.notes_by_week[wk]] : [];
+          if (arr[0] !== header) arr.unshift(header);
+          out.notes_by_week[wk] = arr;
+        }
+      }
+    } catch {}
+
     // Remove authoring-only fields not present in schema
     delete out.defaults;
+    // ui_text is not part of schema; strip for validation (we will reattach after validate)
+    delete out.ui_text;
     return out;
   }
 
@@ -128,6 +144,12 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       else if (hasSwim && !hasRun && !hasRide) setDiscipline('swim');
       else if (hasStrength && !hasRun && !hasRide && !hasSwim) setDiscipline('strength');
       else setDiscipline('run');
+    } catch {}
+    // Reattach authoring UI text (if present) for storage/display; not used for validation
+    try {
+      if (input && typeof input === 'object' && input.ui_text) {
+        (res.plan as any).ui_text = JSON.parse(JSON.stringify(input.ui_text));
+      }
     } catch {}
     setPlanPreview(res.plan);
   }

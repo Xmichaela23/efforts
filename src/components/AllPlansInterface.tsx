@@ -446,7 +446,35 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const mappedType = discipline === 'bike' ? 'ride' : discipline;
               const extracted = extractTypeFromText(rawDesc);
               const typeName = s.type || extracted || '';
-              const name = discipline === 'strength' ? 'Strength' : [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
+              const lowerText = String(rawDesc || '').toLowerCase();
+              const lowerSteps = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.join(' ').toLowerCase() : '';
+              const tagsLower: string[] = Array.isArray((s as any).tags) ? (s as any).tags.map((t: any) => String(t).toLowerCase()) : [];
+              const hasTag = (t: string) => tagsLower.includes(t.toLowerCase());
+              const contains = (needle: string) => lowerText.includes(needle.toLowerCase()) || lowerSteps.includes(needle.toLowerCase());
+              const buildName = (): string => {
+                if (discipline === 'strength') return 'Strength';
+                if (mappedType === 'ride') {
+                  if (hasTag('long_ride')) return 'Ride — Long Ride';
+                  if (contains('vo2')) return 'Ride — VO2';
+                  if (contains('threshold') || contains('thr_')) return 'Ride — Threshold';
+                  if (contains('sweet spot') || /\bss(p)?\b/.test(lowerText) || contains('ss_')) return 'Ride — Sweet Spot';
+                  if (contains('recovery')) return 'Ride — Recovery';
+                  if (contains('endurance') || contains('z2')) return 'Ride — Endurance';
+                  return 'Ride';
+                }
+                if (mappedType === 'run') {
+                  if (hasTag('long_run')) return 'Run — Long Run';
+                  if (contains('tempo')) return 'Run — Tempo';
+                  if (contains('interval') || /\b\d+x\d+/.test(lowerText)) return 'Run — Intervals';
+                  return 'Run';
+                }
+                if (mappedType === 'swim') {
+                  if (hasTag('opt_kind:technique') || contains('technique') || contains('drills')) return 'Swim — Technique';
+                  return 'Swim — Endurance';
+                }
+                return [capitalize(mappedType), typeName].filter(Boolean).join(' ').trim() || 'Session';
+              };
+              const name = buildName();
               const stepsSummary = summarizeSteps((s as any).steps_preset);
               const stepsPreset = (s as any).steps_preset as string[] | undefined;
               const estFromSteps = estimateMinutesFromSteps(stepsPreset);
@@ -472,7 +500,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             weeksOut.push({
               weekNumber: w,
               title: `Week ${w}`,
-              focus: Array.isArray(notesByWeek[w]) ? (notesByWeek[w][0] || '') : '',
+              header: Array.isArray(notesByWeek[w]) ? (notesByWeek[w][0] || '') : '',
+              focus: Array.isArray(notesByWeek[w]) ? (notesByWeek[w][1] || '') : '',
               workouts,
             });
           }
@@ -1605,7 +1634,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             })()}
 
             {currentWeekData && (
-              <div className="text-sm text-gray-700 px-1 pb-2">
+              <div className="text-sm text-gray-700 px-1 pb-1">
                 {(() => {
                   const focusText = String(currentWeekData.focus || '').toLowerCase();
                   const stage = /taper/.test(focusText)
@@ -1628,6 +1657,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                     </span>
                   );
                 })()}
+              </div>
+            )}
+
+            {currentWeekData?.header && (
+              <div className="px-1 pb-3 text-sm text-gray-700">
+                {currentWeekData.header}
               </div>
             )}
 
