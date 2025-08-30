@@ -11,6 +11,18 @@
     "duration_weeks": { "type": "integer", "minimum": 1 },
     "plan_type": { "type": "string" },
     "swim_unit": { "type": "string", "enum": ["yd","m"] },
+    "ui_text": {
+      "type": "object",
+      "properties": {
+        "optional_header": { "type": "string" },
+        "opt_kind_copy": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "defaults": { "type": "object", "additionalProperties": true },
     "sessions_by_week": {
       "type": "object",
       "propertyNames": { "pattern": "^[1-9][0-9]*$" },
@@ -51,6 +63,11 @@
         "duration": { "type": "number", "minimum": 0 },
         "intensity": { "type": ["string","object"] },
         "description": { "type": "string" },
+        "main": { "type": "string" },
+        "extra": { "type": "string" },
+        "override_wu": { "type": "string" },
+        "override_cd": { "type": "string" },
+        "macro": { "type": "string" },
         "intervals": {
           "type": "array",
           "items": { "type": ["string","object"] }
