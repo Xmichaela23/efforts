@@ -1336,6 +1336,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     );
   }
 
+  // Fast-path: when focusing a plan, render a lightweight loading state instead of the list
+  if (currentView === 'detail' && !selectedPlanDetail) {
+    return (
+      <div className="p-4 text-sm text-gray-600">
+        Loading plan…
+      </div>
+    );
+  }
+
   // Plan Detail View
   if (currentView === 'detail' && selectedPlanDetail) {
     const progress = selectedPlanDetail.duration ? Math.round((selectedPlanDetail.currentWeek / selectedPlanDetail.duration) * 100) : 0;
