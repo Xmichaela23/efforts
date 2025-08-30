@@ -1405,33 +1405,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
 
         <div className="border border-gray-200 rounded-lg">
-          <div className="p-6 border-b border-gray-200">
+          <div className="p-4 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <h1
                     className="font-semibold leading-tight text-base sm:text-xl"
                     style={{ display: '-webkit-box', WebkitLineClamp: 2 as any, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
                   >
                     {selectedPlanDetail.name}
                   </h1>
-                  <button
-                    className="text-xs text-gray-600 underline decoration-dotted hover:text-black"
-                    onClick={() => setShowPlanDesc((v:any)=>!v)}
-                  >
-                    {showPlanDesc ? 'Hide details' : 'Show details'}
-                  </button>
                 </div>
                 {showPlanDesc && (
                   <p className="text-gray-600 mt-1 text-sm leading-relaxed">{selectedPlanDetail.description}</p>
                 )}
               </div>
-              <span className={`px-3 py-1 rounded-full text-sm font-medium ${planStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
-                {planStatus}
-              </span>
             </div>
           </div>
-          <div className="p-4">
+          <div className="p-3">
             {/* Compact, single-line stats */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3">
               <span>
@@ -1459,22 +1450,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </div>
         </div>
 
-        {selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 && (
-          <div className="flex items-center gap-8 border-b border-gray-200">
-            <button
-              onClick={() => setViewMode('summary')}
-              className={`pb-3 transition-colors ${viewMode === 'summary' ? 'text-black border-b-2 border-black' : 'text-gray-600 hover:text-black'}`}
-            >
-              Summary
-            </button>
-            <button
-              onClick={() => setViewMode('adjustments')}
-              className={`pb-3 transition-colors ${viewMode === 'adjustments' ? 'text-black border-b-2 border-black' : 'text-gray-600 hover:text-black'}`}
-            >
-              Ask for adjustments
-            </button>
-          </div>
-        )}
+        {/* Removed Summary/Adjustments tabs for a tighter header */}
 
         {viewMode === 'adjustments' ? (
           <div className="space-y-6">
