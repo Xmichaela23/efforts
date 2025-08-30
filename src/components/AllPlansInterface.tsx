@@ -1405,7 +1405,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         </div>
 
         <div className="border border-gray-200 rounded-lg">
-          <div className="p-4 border-b border-gray-200">
+          <div className="p-3 border-b border-gray-200">
             <div className="flex items-center justify-between">
               <div>
                 <div className="flex items-center gap-1">
@@ -1422,7 +1422,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </div>
             </div>
           </div>
-          <div className="p-3">
+          <div className="p-2">
             {/* Compact, single-line stats */}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-600 mb-3">
               <span>
@@ -1543,7 +1543,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const totalWeeks = selectedPlanDetail.duration || selectedPlanDetail.duration_weeks || (selectedPlanDetail.weeks ? selectedPlanDetail.weeks.length : 0);
               const nums = Array.from({ length: Math.max(0, Number(totalWeeks) || 0) }, (_, i) => i + 1);
               return nums.length > 0 ? (
-                <div className="flex items-center gap-3 overflow-x-auto py-2">
+                <div className="flex items-center gap-2 overflow-x-auto py-1">
                   {nums.map((wn: number) => {
                     const isSelected = selectedWeek === wn;
                     const isCurrent = wn === (selectedPlanDetail.currentWeek || 0);
@@ -1553,18 +1553,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         onClick={() => setSelectedWeek(wn)}
                         className={`whitespace-nowrap px-2 py-1 rounded ${isSelected ? 'bg-gray-100 text-black' : 'text-gray-700 hover:text-black'}`}
                       >
-                        {isSelected ? (
-                          <span className="flex items-center gap-2 text-sm">
-                            <span>Week {wn}</span>
-                            <span className="text-gray-500">•</span>
-                            <span>{formatDuration(getWeeklyVolume(currentWeekData))}</span>
-                            <span className="text-gray-500">•</span>
-                            <span>{(currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length} workouts</span>
-                            {isCurrent && <span className="ml-2 text-xs text-blue-600">Current</span>}
-                          </span>
-                        ) : (
-                          <span className="text-sm">Week {wn}</span>
-                        )}
+                        <span className="text-sm">Week {wn}</span>
                       </button>
                     );
                   })}
@@ -1573,7 +1562,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             })()}
 
             {currentWeekData && (
-              <div className="text-xs text-gray-600 px-1 pb-2">
+              <div className="text-sm text-gray-700 px-1 pb-2">
                 {(() => {
                   const focusText = String(currentWeekData.focus || '').toLowerCase();
                   const stage = /taper/.test(focusText)
@@ -1587,7 +1576,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   const isCur = selectedWeek === (selectedPlanDetail.currentWeek || 0);
                   return (
                     <span>
-                      {stage} • {formatDuration(getWeeklyVolume(currentWeekData))} • {count} workouts
+                      <span className="font-medium">{stage}</span>
+                      <span className="text-gray-400"> • </span>
+                      <span className="font-medium">{formatDuration(getWeeklyVolume(currentWeekData))}</span>
+                      <span className="text-gray-400"> • </span>
+                      <span>{count} workouts</span>
                       {isCur ? <span className="ml-2 text-blue-600">Current</span> : null}
                     </span>
                   );
