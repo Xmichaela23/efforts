@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -30,6 +30,7 @@ interface AppLayoutProps {
 
 const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     workouts,
     loading,
@@ -105,18 +106,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [activeTab]);
 
-  // When navigated from PlanSelect with state { openPlans: true, focusPlanId, focusWeek }
+  // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek }
   useEffect(() => {
-    const navState = (window.history.state && (window.history.state as any).usr) || (window as any).navigation?.state || {};
-    const openPlans = navState?.openPlans;
-    if (openPlans) {
+    const state: any = (location && location.state) || {};
+    if (state.openPlans) {
       setShowAllPlans(true);
-      if (navState?.focusPlanId) setFocusPlanId(navState.focusPlanId);
-      if (navState?.focusWeek) setFocusWeek(navState.focusWeek);
-      // Clear the flag so refreshes don't keep reopening
-      try { window.history.replaceState({ ...window.history.state, usr: {} }, ''); } catch {}
+      if (state.focusPlanId) setFocusPlanId(state.focusPlanId);
+      if (state.focusWeek) setFocusWeek(state.focusWeek);
+      // Clear state to avoid re-opening on back/refresh
+      try { navigate(location.pathname, { replace: true, state: {} }); } catch {}
     }
-  }, []);
+  }, [location]);
 
 
 
