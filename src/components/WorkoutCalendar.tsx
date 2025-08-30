@@ -27,10 +27,12 @@ interface WorkoutCalendarProps {
 }
 
 function startOfWeek(date: Date) {
+  // Anchor weeks to Monday
   const d = new Date(date);
-  const day = d.getDay(); // 0=Sun
+  const day = d.getDay(); // 0=Sun, 1=Mon, ... 6=Sat
   d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - day);
+  const diff = (day + 6) % 7; // Sun->6, Mon->0, Tue->1, ...
+  d.setDate(d.getDate() - diff);
   return d;
 }
 
