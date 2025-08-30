@@ -205,7 +205,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
-  const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>('list');
+  const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
   const [selectedPlanDetail, setSelectedPlanDetail] = useState<any>(null);
   const [selectedWeek, setSelectedWeek] = useState<number>(1);
   const [selectedWorkout, setSelectedWorkout] = useState<any>(null);
@@ -693,10 +693,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     (async () => {
       try {
         if (focusPlanId && !selectedPlanDetail) {
+          // Show detail immediately to avoid list flash
+          setCurrentView('detail');
           await handlePlanClick(focusPlanId);
-          if (typeof focusWeek === 'number' && focusWeek > 0) {
-            setSelectedWeek(focusWeek);
-          }
+          if (typeof focusWeek === 'number' && focusWeek > 0) setSelectedWeek(focusWeek);
         }
       } catch {}
     })();
