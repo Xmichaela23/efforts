@@ -1660,11 +1660,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               </div>
             )}
 
-            {currentWeekData?.header && (
-              <div className="px-1 pb-3 text-sm text-gray-700">
-                {currentWeekData.header}
-              </div>
-            )}
+            {(() => {
+              const byWeekNotes: any = (selectedPlanDetail as any)?.notes_by_week || {};
+              const headerText: string = Array.isArray(byWeekNotes?.[selectedWeek]) ? (byWeekNotes?.[selectedWeek]?.[0] || '') : (currentWeekData?.header || '');
+              return headerText ? (
+                <div className="px-1 pb-3 text-sm text-gray-700">{headerText}</div>
+              ) : null;
+            })()}
 
             {currentWeekData && (
               <div className="">
@@ -1761,8 +1763,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               // discipline-aware hints
                                               if (lower.includes('bike_intensity') || lower.includes('hard_run')) badges.push('Quality');
                                               if (lower.includes('long_run') || lower.includes('long_ride')) badges.push('Long');
-                                              // XOR indicator
-                                              if (xorTag) badges.push('XOR');
+                                              // Do not show XOR badge; behavior is enforced by activation logic
                                               return badges.length ? (
                                                 <span className="ml-1.5 flex flex-wrap gap-1">
                                                   {badges.map((b, i) => (
