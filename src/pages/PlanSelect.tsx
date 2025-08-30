@@ -78,6 +78,18 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
   const out: any = { ...plan, sessions_by_week: {} };
   if (plan && plan.notes_by_week) out.notes_by_week = plan.notes_by_week;
   const notesByWeek: Record<string,string[]> = { ...(out.notes_by_week||{}) };
+  // Ensure weekly header from ui_text is present at notes_by_week[w][0]
+  try {
+    const header: string | undefined = (plan?.ui_text && typeof plan.ui_text.optional_header === 'string') ? String(plan.ui_text.optional_header) : undefined;
+    if (header && header.trim().length > 0) {
+      const weekKeys = Object.keys(plan?.sessions_by_week || {});
+      for (const wk of weekKeys) {
+        const arr: string[] = Array.isArray(notesByWeek[wk]) ? [...notesByWeek[wk]] : [];
+        if (arr[0] !== header) arr.unshift(header);
+        notesByWeek[wk] = arr;
+      }
+    }
+  } catch {}
 
   for (const [wk, sessions] of Object.entries<any>(plan.sessions_by_week || {})) {
     const s = cloneSessions(sessions as any[]);
