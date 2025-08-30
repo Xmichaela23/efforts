@@ -1539,42 +1539,64 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           </div>
         ) : (
           <>
-            {selectedPlanDetail.weeks && selectedPlanDetail.weeks.length > 0 && (
-              <div className="flex items-center gap-4 overflow-x-auto py-3">
-                {selectedPlanDetail.weeks.map((week: any) => {
-                  const isSelected = selectedWeek === week.weekNumber;
-                  const isCurrent = week.weekNumber === selectedPlanDetail.currentWeek;
+            {(() => {
+              const totalWeeks = selectedPlanDetail.duration || selectedPlanDetail.duration_weeks || (selectedPlanDetail.weeks ? selectedPlanDetail.weeks.length : 0);
+              const nums = Array.from({ length: Math.max(0, Number(totalWeeks) || 0) }, (_, i) => i + 1);
+              return nums.length > 0 ? (
+                <div className="flex items-center gap-3 overflow-x-auto py-2">
+                  {nums.map((wn: number) => {
+                    const isSelected = selectedWeek === wn;
+                    const isCurrent = wn === (selectedPlanDetail.currentWeek || 0);
+                    return (
+                      <button
+                        key={wn}
+                        onClick={() => setSelectedWeek(wn)}
+                        className={`whitespace-nowrap px-2 py-1 rounded ${isSelected ? 'bg-gray-100 text-black' : 'text-gray-700 hover:text-black'}`}
+                      >
+                        {isSelected ? (
+                          <span className="flex items-center gap-2 text-sm">
+                            <span>Week {wn}</span>
+                            <span className="text-gray-500">•</span>
+                            <span>{formatDuration(getWeeklyVolume(currentWeekData))}</span>
+                            <span className="text-gray-500">•</span>
+                            <span>{(currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length} workouts</span>
+                            {isCurrent && <span className="ml-2 text-xs text-blue-600">Current</span>}
+                          </span>
+                        ) : (
+                          <span className="text-sm">Week {wn}</span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : null;
+            })()}
+
+            {currentWeekData && (
+              <div className="text-xs text-gray-600 px-1 pb-2">
+                {(() => {
+                  const focusText = String(currentWeekData.focus || '').toLowerCase();
+                  const stage = /taper/.test(focusText)
+                    ? 'Taper'
+                    : /deload|recovery/.test(focusText)
+                    ? 'Deload'
+                    : /peak/.test(focusText)
+                    ? 'Peak'
+                    : 'Build';
+                  const count = (currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length;
+                  const isCur = selectedWeek === (selectedPlanDetail.currentWeek || 0);
                   return (
-                    <button
-                      key={week.weekNumber}
-                      onClick={() => setSelectedWeek(week.weekNumber)}
-                      className={`whitespace-nowrap px-2 py-1 rounded ${isSelected ? 'bg-gray-100 text-black' : 'text-gray-700 hover:text-black'}`}
-                    >
-                      {isSelected ? (
-                        <span className="flex items-center gap-2 text-sm">
-                          <span>Week {week.weekNumber}</span>
-                          <span className="text-gray-500">•</span>
-                          <span>{formatDuration(getWeeklyVolume(currentWeekData))}</span>
-                          <span className="text-gray-500">•</span>
-                          <span>{(currentWeekData?.workouts || []).filter((w:any)=>w.type!=='rest').length} workouts</span>
-                          {isCurrent && <span className="ml-2 text-xs text-blue-600">Current</span>}
-                        </span>
-                      ) : (
-                        <span className="text-sm">Week {week.weekNumber}</span>
-                      )}
-                    </button>
+                    <span>
+                      {stage} • {formatDuration(getWeeklyVolume(currentWeekData))} • {count} workouts
+                      {isCur ? <span className="ml-2 text-blue-600">Current</span> : null}
+                    </span>
                   );
-                })}
+                })()}
               </div>
             )}
 
             {currentWeekData && (
               <div className="">
-                <div className="pb-2">
-                  <h2 className="text-lg font-semibold">
-                    Week {currentWeekData.weekNumber}
-                  </h2>
-                </div>
                 <div className="">
                   <div className="space-y-4">
                     {(() => {
