@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
@@ -49,9 +49,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
   const [showMobilityLogger, setShowMobilityLogger] = useState(false);
-  const [showAllPlans, setShowAllPlans] = useState(false);
-  const [focusPlanId, setFocusPlanId] = useState<string | undefined>(undefined);
-  const [focusWeek, setFocusWeek] = useState<number | undefined>(undefined);
+  const initialRouteState: any = (location && location.state) || {};
+  const [showAllPlans, setShowAllPlans] = useState<boolean>(!!initialRouteState.openPlans);
+  const [focusPlanId, setFocusPlanId] = useState<string | undefined>(initialRouteState.focusPlanId);
+  const [focusWeek, setFocusWeek] = useState<number | undefined>(initialRouteState.focusWeek);
   const [showStrengthPlans, setShowStrengthPlans] = useState(false);
   const [showPlanBuilder, setShowPlanBuilder] = useState(false);
   const [showImportPage, setShowImportPage] = useState(false);
@@ -107,7 +108,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   }, [activeTab]);
 
   // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek }
-  useEffect(() => {
+  useLayoutEffect(() => {
     const state: any = (location && location.state) || {};
     if (state.openPlans) {
       setShowAllPlans(true);
