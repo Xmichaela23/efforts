@@ -92,7 +92,7 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     // Find the user in our system by Strava ID
     const { data: userConnection, error: connectionError } = await supabase
       .from('device_connections')
-      .select('user_id, connection_data, access_token')
+      .select('user_id, connection_data, access_token, refresh_token, expires_at')
       .eq('provider', 'strava')
       .eq('provider_user_id', ownerId.toString())
       .single();
@@ -105,8 +105,12 @@ async function handleActivityCreated(activityId: number, ownerId: number) {
     const userId = userConnection.user_id;
     const connectionData = userConnection.connection_data || {};
     let accessToken = connectionData.access_token || (userConnection as any).access_token;
+    const expiresAtIso = (userConnection as any).expires_at as string | null;
+    const expiresAt = expiresAtIso ? Math.floor(new Date(expiresAtIso).getTime() / 1000) : (connectionData.expires_at as number | undefined);
 
-    if (!accessToken) {
+    // Proactive pre-expiry refresh (skew 10 minutes)
+    const nowSec = Math.floor(Date.now() / 1000);
+    if ((typeof expiresAt === 'number' && expiresAt - nowSec < 600) || !accessToken) {
       // Try to refresh using stored refresh_token
       const refreshed = await refreshStravaAccessToken(userId);
       if (refreshed) accessToken = refreshed;
@@ -261,11 +265,11 @@ async function refreshStravaAccessToken(userId: string): Promise<string | null> 
   try {
     const { data: conn } = await supabase
       .from('device_connections')
-      .select('connection_data')
+      .select('connection_data, refresh_token')
       .eq('user_id', userId)
       .eq('provider', 'strava')
       .single();
-    const refreshToken = conn?.connection_data?.refresh_token;
+    const refreshToken = conn?.connection_data?.refresh_token || (conn as any)?.refresh_token;
     if (!refreshToken) {
       console.warn('⚠️ Missing Strava refresh_token for user', userId);
       return null;
@@ -293,10 +297,17 @@ async function refreshStravaAccessToken(userId: string): Promise<string | null> 
     const tokenJson = await tokenResp.json();
     const newAccess = tokenJson.access_token;
     const newRefresh = tokenJson.refresh_token || refreshToken;
-    // Persist
+    const expiresAtIso = new Date((tokenJson.expires_at || 0) * 1000).toISOString();
+    // Persist atomically (update top-level columns and JSON mirror)
     const { error: upErr } = await supabase
       .from('device_connections')
-      .update({ connection_data: { ...(conn?.connection_data || {}), access_token: newAccess, refresh_token: newRefresh, expires_at: tokenJson.expires_at } })
+      .update({
+        access_token: newAccess,
+        refresh_token: newRefresh,
+        expires_at: expiresAtIso,
+        connection_data: { ...(conn?.connection_data || {}), access_token: newAccess, refresh_token: newRefresh, expires_at: tokenJson.expires_at },
+        updated_at: new Date().toISOString(),
+      })
       .eq('user_id', userId)
       .eq('provider', 'strava');
     if (upErr) {
