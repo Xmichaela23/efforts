@@ -367,6 +367,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const pj = parseMaybeJson(t);
               return Array.isArray(pj) ? pj : [];
             })();
+            // Optional view-scoped overrides and expansion specs (JSONB or string)
+            const displayOverrides = parseMaybeJson((w as any).display_overrides) || null;
+            const expandSpec = parseMaybeJson((w as any).expand_spec) || null;
+            const paceAnnotation = (w as any).pace_annotation || null;
             
             const workout = {
               id: w.id,
@@ -385,6 +389,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               steps_preset: Array.isArray(stepsPresetParsed) ? stepsPresetParsed : null,
               export_hints: typeof exportHintsParsed === 'object' && exportHintsParsed ? exportHintsParsed : null,
               intervals: Array.isArray(intervalsParsed) ? intervalsParsed : null,
+              display_overrides: displayOverrides,
+              expand_spec: expandSpec,
+              pace_annotation: paceAnnotation,
             };
             byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
           }

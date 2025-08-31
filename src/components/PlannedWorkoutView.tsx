@@ -191,6 +191,36 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setStepLines(flattenSteps(computedSteps));
         } else {
           // Try tokens first when available (authoritative for per-rep layout)
+          // If JSON supplies display_overrides.expand for this view, or expand_spec, honor it first
+          const wantUnpack = (() => {
+            try {
+              const ov = (workout as any).display_overrides;
+              if (ov && typeof ov === 'object' && String(ov.planned_detail || ov.planned) === 'unpack') return true;
+              return Boolean((workout as any).expand_spec);
+            } catch { return false; }
+          })();
+          if (wantUnpack) {
+            const expanded = expandFromSpec(
+              (workout as any).expand_spec,
+              String((workout as any).type||''),
+              ((workout as any).export_hints || {}),
+              (perfNumbers || {}),
+              String((workout as any).pace_annotation || 'inline')
+            );
+            if (expanded.length) {
+              // Prepend/append WU/CD from tokens if available, without duplicating
+              const tokenLinesWUCD = interpretTokensPerRep(
+                (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
+                String((workout as any).type || ''),
+                ((workout as any).export_hints || {}),
+                (perfNumbers || {})
+              ).filter((s)=>/^(Warm‑up|Cool‑down)\s/i.test(s));
+              const warm = tokenLinesWUCD.filter((s)=>/^Warm‑up\s/i.test(s));
+              const cool = tokenLinesWUCD.filter((s)=>/^Cool‑down\s/i.test(s));
+              setStepLines([...(warm||[]), ...expanded, ...(cool||[])]);
+              return;
+            }
+          }
           const tokenLines = interpretTokensPerRep(
             (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
             String((workout as any).type || ''),
@@ -233,6 +263,49 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       case 'sent_to_garmin': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
+  };
+
+  // Expand per-rep lines from compact JSON spec (expand_spec)
+  const expandFromSpec = (spec: any, discipline: string, exportHints: any, perf: any, annotation: string): string[] => {
+    if (!spec || typeof spec !== 'object') return [];
+    const out: string[] = [];
+    const type = String(discipline||'').toLowerCase();
+    const reps = Number(spec.reps) || 0;
+    if (reps <= 0) return out; // hard fail closed
+    const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
+    const tolQual = typeof exportHints?.pace_tolerance_quality==='number' ? exportHints.pace_tolerance_quality : 0.04;
+    const fivek = String(perf?.fiveK_pace || perf?.fiveKPace || perf?.fiveK || '').trim() || undefined;
+    const easy = String(perf?.easyPace || perf?.easy_pace || '').trim() || undefined;
+    const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+    const parsePace = (p?: string): { sec:number, unit:'mi'|'km' } | null => { if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any }; };
+    const resolveTarget = (t?: string) => {
+      if (!t) return undefined as string|undefined;
+      let raw = t;
+      if (fivek) raw = raw.split('{5k_pace}').join(String(fivek));
+      if (easy) raw = raw.split('{easy_pace}').join(String(easy));
+      const p = parsePace(raw);
+      if (!p) return t; // show verbatim token when baselines are missing or unparsable
+      const tol = /easy/i.test(String(t)) ? tolEasy : tolQual;
+      const lo = `${mmss(p.sec*(1-tol))}/${p.unit}`; const hi = `${mmss(p.sec*(1+tol))}/${p.unit}`;
+      return `${mmss(p.sec)}/${p.unit} (${lo}–${hi})`;
+    };
+    const work = spec.work || {};
+    const rest = spec.rest || {};
+    const idPrefix = typeof spec.id_prefix === 'string' && spec.id_prefix.trim().length>0 ? String(spec.id_prefix).trim() : '';
+    const workTarget = resolveTarget(work.target);
+    const restTarget = resolveTarget(rest.target);
+    for (let i=0;i<reps;i+=1){
+      const repNum = i+1;
+      const workId = idPrefix ? `${idPrefix}-rep${repNum}-work` : '';
+      if (typeof work.distance_m === 'number') out.push(`1 × ${Math.round(work.distance_m)} m${annotation==='inline' && workTarget?` @ ${workTarget}`:''}${workId?` // ${workId}`:''}`);
+      else if (typeof work.time_s === 'number') out.push(`1 × ${mmss(work.time_s)}${annotation==='inline' && workTarget?` @ ${workTarget}`:''}${workId?` // ${workId}`:''}`);
+      if (i<reps-1){
+        const restId = idPrefix ? `${idPrefix}-rep${repNum}-rest` : '';
+        if (typeof rest.time_s === 'number') out.push(`1 × ${mmss(rest.time_s)} rest${annotation==='inline' && restTarget?` @ ${restTarget}`:''}${restId?` // ${restId}`:''}`);
+        else if (typeof rest.distance_m === 'number') out.push(`1 × ${Math.round(rest.distance_m)} m rest${annotation==='inline' && restTarget?` @ ${restTarget}`:''}${restId?` // ${restId}`:''}`);
+      }
+    }
+    return out;
   };
 
   // Final fallback: expand grouped text (e.g., "6 × 400 m @ 7:43/mi … w 2 min jog …") into per-rep lines
