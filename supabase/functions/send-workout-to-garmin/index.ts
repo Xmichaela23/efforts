@@ -144,6 +144,35 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const sport = mapWorkoutType(workout.type)
   const steps: GarminStep[] = []
   let stepId = 1
+  // Use computed per-rep targets when available to guarantee PACE ranges per interval
+  const computedSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : []
+  let flatIdx = 0
+
+  const applyComputedTargetIfMissing = (step: GarminStep) => {
+    try {
+      const cs = computedSteps[flatIdx]
+      if (!cs) return
+      // Only apply when step has no explicit target
+      const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
+      if (hasTarget) return
+      // RUNNING pace from computed pace_range / pace_sec_per_mi
+      if (sport === 'RUNNING' && (typeof cs?.pace_sec_per_mi === 'number' || cs?.pace_range)) {
+        const secPerMi: number | undefined = typeof cs.pace_sec_per_mi === 'number' ? cs.pace_sec_per_mi : undefined
+        const range = cs?.pace_range as { lower?: number; upper?: number } | undefined
+        // Convert pace (sec/mi) to speed (m/s)
+        const toSpeed = (sec: number) => 1609.34 / sec
+        step.targetType = 'PACE'
+        step.targetValueType = 'PACE'
+        if (range && typeof range.lower === 'number' && typeof range.upper === 'number') {
+          step.targetValueLow = toSpeed(range.upper) // slower pace → lower speed
+          step.targetValueHigh = toSpeed(range.lower) // faster pace → higher speed
+        } else if (typeof secPerMi === 'number') {
+          // Expand single pace using export tolerances (done later by Garmin, but set center if needed)
+          step.targetValue = toSpeed(secPerMi)
+        }
+      }
+    } catch {}
+  }
 
   const intervals = Array.isArray(workout.intervals) ? workout.intervals : []
 
@@ -204,8 +233,11 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? Math.floor(sMeters) : Math.floor(sSeconds)
           }
           applyTargets(step, seg, interval)
+          // Try to apply computed per-rep target if none attached
+          applyComputedTargetIfMissing(step)
           steps.push(step)
           stepId += 1
+          flatIdx += 1
         }
       }
       continue
@@ -228,8 +260,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       durationValue: (Number.isFinite(meters) && meters > 0) ? Math.floor(meters) : Math.floor(seconds)
     }
     applyTargets(step, interval)
+    applyComputedTargetIfMissing(step)
     steps.push(step)
     stepId += 1
+    flatIdx += 1
   }
 
   return {

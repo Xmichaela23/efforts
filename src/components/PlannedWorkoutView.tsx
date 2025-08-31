@@ -190,7 +190,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         if (computedSteps.length > 0) {
           setStepLines(flattenSteps(computedSteps));
         } else if (intervalLines.length > 0) {
-          setStepLines(intervalLines);
+          const hasTargets = intervalLines.some((s) => /@\s*\d/.test(s) || /@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s));
+          if (hasTargets) setStepLines(intervalLines);
+          else {
+            const lines = interpretTokensPerRep(
+              Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
+              String((workout as any).type || ''),
+              (workout as any).export_hints || {},
+              perfNumbers || {}
+            );
+            if (lines && lines.length) setStepLines(lines); else setStepLines(intervalLines);
+          }
         } else {
             try {
               const lines = interpretTokensPerRep(
