@@ -304,7 +304,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               </div>
               <div>
                 <h3 className="text-lg font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
-                  {workout.name || (workout as any).focus || 'Planned Workout'}
+                  {(() => {
+                    const n = String(workout.name || '').trim();
+                    if (n) return n;
+                    return `${getWorkoutTypeLabel(workout.type)} — ${deriveFocus()}`;
+                  })()}
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <span>{formatDate(workout.date)}</span>
