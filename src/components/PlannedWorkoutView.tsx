@@ -222,11 +222,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               return;
             }
           }
+          const perfObj = (perfNumbers || {});
           const tokenLines = interpretTokensPerRep(
             (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
             String((workout as any).type || ''),
             ((workout as any).export_hints || {}),
-            (perfNumbers || {})
+            perfObj
           );
           if (tokenLines && tokenLines.length) {
             setStepLines(tokenLines);
@@ -234,7 +235,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             const hasTargets = intervalLines.some((s) => /@\s*\d/.test(s) || /@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s));
             if (hasTargets) setStepLines(intervalLines);
             else {
-              const uiSynth = synthesizeFromIntervals((workout as any).intervals, String((workout as any).type||''), ((workout as any).export_hints || {}), (perfNumbers || {}));
+              const uiSynth = synthesizeFromIntervals((workout as any).intervals, String((workout as any).type||''), ((workout as any).export_hints || {}), perfObj);
               if (uiSynth && uiSynth.length) setStepLines(uiSynth);
               else setStepLines(intervalLines);
             }
@@ -244,7 +245,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               String((workout as any).rendered_description || (workout as any).description || ''),
               String((workout as any).type || ''),
               ((workout as any).export_hints || {}),
-              (perfNumbers || {})
+              perfObj
             );
             if (expanded.length) setStepLines(expanded);
           }

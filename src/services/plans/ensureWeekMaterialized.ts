@@ -102,6 +102,63 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         }
       }
 
+      // Helper: annotate/enrich intervals with targets from baselines/hints
+      const annotateIntervals = (intervals: any[] | undefined, type: string, hints: any | undefined, perf: any | undefined): any[] | undefined => {
+        if (!Array.isArray(intervals) || intervals.length === 0) return intervals;
+        const tolEasy = (hints && typeof hints.pace_tolerance_easy==='number') ? hints.pace_tolerance_easy : 0.06;
+        const tolQual = (hints && typeof hints.pace_tolerance_quality==='number') ? hints.pace_tolerance_quality : 0.04;
+        const pTolSS = (hints && typeof hints.power_tolerance_SS_thr==='number') ? hints.power_tolerance_SS_thr : 0.05;
+        const pTolVO2 = (hints && typeof hints.power_tolerance_VO2==='number') ? hints.power_tolerance_VO2 : 0.10;
+        const easyPaceTxt: string | undefined = perf?.easyPace || perf?.easy_pace;
+        const fivekPaceTxt: string | undefined = perf?.fiveK_pace || perf?.fiveKPace || perf?.fiveK;
+        const ftp: number | undefined = typeof perf?.ftp === 'number' ? perf.ftp : undefined;
+        const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+        const parsePace = (p?: string): { sec: number | null, unit?: 'mi'|'km' } => {
+          if (!p) return { sec: null };
+          const m = String(p).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+          if (!m) return { sec: null };
+          return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+        };
+        const formatPace = (sec:number, unit:'mi'|'km') => `${mmss(sec)}/${unit}`;
+        const clone = (obj:any)=> JSON.parse(JSON.stringify(obj));
+        const out: any[] = [];
+        const isRun = String(type||'').toLowerCase()==='run';
+        const isRide = String(type||'').toLowerCase()==='ride';
+        for (const it of intervals){
+          const item = clone(it);
+          const lab = String(item?.effortLabel||'').toLowerCase();
+          const isWU = /warm\s*up/.test(lab); const isCD = /cool\s*down/.test(lab); const isRest = /rest|recovery/.test(lab);
+          if (isRun){
+            const baseTxt = isRest ? (easyPaceTxt || fivekPaceTxt) : (fivekPaceTxt || easyPaceTxt);
+            const p = parsePace(baseTxt);
+            if (p.sec && p.unit){
+              const tol = isRest || isWU || isCD ? tolEasy : tolQual;
+              item.paceTarget = formatPace(p.sec, p.unit);
+              item.pace_range = { lower: Math.round(p.sec*(1-tol)), upper: Math.round(p.sec*(1+tol)), unit: p.unit };
+              // If distance-only rep, compute duration for convenience
+              if (typeof item.distanceMeters === 'number' && !item.duration){
+                const miles = Number(item.distanceMeters)/1609.34;
+                item.duration = Math.max(1, Math.round(miles * p.sec));
+              }
+            }
+          } else if (isRide && ftp){
+            // If it looks like an intensity block, set a center and range from hints
+            const isVo2 = /vo2/.test(lab) || (typeof item?.effortLabel==='string' && /hard/.test(lab));
+            const isThr = /thr|threshold/.test(lab);
+            const isSS = /ss|sweet\s*spot/.test(lab);
+            const center = isVo2 ? 1.10 : isThr ? 0.98 : isSS ? 0.91 : undefined;
+            const tol = isVo2 ? pTolVO2 : pTolSS;
+            if (center && tol){
+              const lo = Math.round(ftp * (center*(1-tol)));
+              const hi = Math.round(ftp * (center*(1+tol)));
+              item.power_range = { lower: lo, upper: hi };
+            }
+          }
+          out.push(item);
+        }
+        return out;
+      };
+
       // Upgrade: populate computed.steps when missing by synthesizing from intervals
       const parsePace = (p?: string): { secPerMi: number | null } => {
         if (!p) return { secPerMi: null };
@@ -246,6 +303,13 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
           }
         }
+        // Always ensure intervals carry targets when possible
+        try {
+          const enriched = annotateIntervals(row.intervals, row.type, row.export_hints, perfNumbersUpgrade);
+          if (Array.isArray(enriched) && enriched.length) {
+            await supabase.from('planned_workouts').update({ intervals: enriched }).eq('id', row.id);
+          }
+        } catch {}
       }
     } catch {}
     // We upgraded existing rows where needed; nothing to insert
