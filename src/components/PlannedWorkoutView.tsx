@@ -151,7 +151,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setResolvedDuration(Math.round(secs / 60));
         }
 
-        // Build vertical step lines: prefer computed.steps; else tokens; else intervals
+        // Build vertical step lines: prefer computed.steps; else tokens; else intervals; else expand grouped text
         const intervalLines = (() => {
           try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
             const arr = (workout as any).intervals as any[];
@@ -207,6 +207,15 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               if (uiSynth && uiSynth.length) setStepLines(uiSynth);
               else setStepLines(intervalLines);
             }
+          } else {
+            // Last resort: explode grouped text like "6 × 400 m @ 7:43/mi … w 2 min jog …"
+            const expanded = expandGroupedFromText(
+              String((workout as any).rendered_description || (workout as any).description || ''),
+              String((workout as any).type || ''),
+              ((workout as any).export_hints || {}),
+              (perfNumbers || {})
+            );
+            if (expanded.length) setStepLines(expanded);
           }
         }
       } catch {
@@ -224,6 +233,36 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       case 'sent_to_garmin': return 'bg-indigo-100 text-indigo-800 border-indigo-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
+  };
+
+  // Final fallback: expand grouped text (e.g., "6 × 400 m @ 7:43/mi … w 2 min jog …") into per-rep lines
+  const expandGroupedFromText = (text: string, discipline: string, exportHints: any, perf: any): string[] => {
+    const out: string[] = [];
+    const type = String(discipline||'').toLowerCase();
+    if (!text || !/\b(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|mi)\b/i.test(text)) return out;
+    const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
+    const tolQual = typeof exportHints?.pace_tolerance_quality==='number' ? exportHints.pace_tolerance_quality : 0.04;
+    const fivek = String(perf?.fiveK_pace || perf?.fiveKPace || perf?.fiveK || '').trim() || undefined;
+    const easy = String(perf?.easyPace || perf?.easy_pace || '').trim() || undefined;
+    const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+    const parsePace = (p?: string): { sec:number, unit:'mi'|'km' } | null => { if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any }; };
+    const m = text.match(/\b(\d+)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(m|mi)\b.*?(?:@\s*(\d+:\d{2}\s*\/\s*(?:mi|km)))?/i);
+    if (!m) return out;
+    const reps = parseInt(m[1],10);
+    const per = parseFloat(m[2]);
+    const unit = String(m[3]||'m').toLowerCase();
+    const paceStr = m[4] || (type==='run' ? (fivek || easy || '') : '');
+    const p = type==='run' ? parsePace(paceStr) : null;
+    const tol = tolQual;
+    const rng = p ? (()=>{ const lo=`${mmss(p.sec*(1-tol))}/${p.unit}`; const hi=`${mmss(p.sec*(1+tol))}/${p.unit}`; return `${mmss(p.sec)}/${p.unit} (${lo}–${hi})`; })() : undefined;
+    // optional rest like "w 2 min jog" or "R 2min"
+    const restMatch = text.match(/(?:w|with|\bR\b)\s*(\d+)\s*(?:min|minutes)/i);
+    const restMin = restMatch ? parseInt(restMatch[1],10) : 0;
+    for (let r=0; r<reps; r+=1) {
+      out.push(`1 × ${unit==='mi'?per:`${Math.round(per)} m`}${rng?` @ ${rng}`:''}`);
+      if (r<reps-1 && restMin>0) out.push(`1 × ${restMin}:00 rest`);
+    }
+    return out;
   };
 
   const getSourceColor = (source?: string) => {
