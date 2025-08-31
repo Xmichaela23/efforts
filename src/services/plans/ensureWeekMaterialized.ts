@@ -222,8 +222,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       const steps: string[] = Array.isArray(stepsPreset) ? stepsPreset.map((t:any)=>String(t)) : [];
       if (steps.length === 0) return undefined;
       const out: any[] = [];
-      const pushWU = (min: number) => { if (min>0) out.push({ effortLabel: 'warm up', duration: Math.max(1, Math.round(min*60)) }); };
-      const pushCD = (min: number) => { if (min>0) out.push({ effortLabel: 'cool down', duration: Math.max(1, Math.round(min*60)) }); };
+      const fivekPace: string | undefined = (() => {
+        try { return String((perfNumbers?.fiveK_pace || (perfNumbers as any)?.fiveKPace) || '').trim() || undefined; } catch { return undefined; }
+      })();
+      const easyPace: string | undefined = (() => {
+        try { return String((perfNumbers?.easyPace || (perfNumbers as any)?.easy_pace) || '').trim() || undefined; } catch { return undefined; }
+      })();
+      const ftp: number = (() => { try { return Number((perfNumbers as any)?.ftp || 0) || 0; } catch { return 0; }})();
+      const isRun = String(discipline||'').toLowerCase()==='run';
+      const isRide = String(discipline||'').toLowerCase()==='ride';
+      const pushWU = (min: number) => { if (min>0) out.push({ effortLabel: 'warm up', duration: Math.max(1, Math.round(min*60)), ...(isRun && easyPace ? { paceTarget: easyPace } : {}) }); };
+      const pushCD = (min: number) => { if (min>0) out.push({ effortLabel: 'cool down', duration: Math.max(1, Math.round(min*60)), ...(isRun && easyPace ? { paceTarget: easyPace } : {}) }); };
       const toMeters = (milesOrMeters: number, unit: 'm'|'mi'|'yd'|'km'='m') => {
         if (unit==='mi') return Math.floor(milesOrMeters*1609.34);
         if (unit==='yd') return Math.floor(milesOrMeters*0.9144);
@@ -243,14 +252,39 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       });
 
       // Interval blocks e.g., interval_6x800m_5kpace_R2min
-      const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_[^\s]+(?:_r(\d+)(?:-(\d+))?min)?/i);
+      const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?min)?/i);
       if (iv) {
         const reps = parseInt(iv[1],10);
         const each = parseFloat(iv[2]);
         const unit = (iv[3]||'m').toLowerCase() as 'm'|'mi';
-        const restA = iv[4]?parseInt(iv[4],10):0; const restB = iv[5]?parseInt(iv[5],10):restA; const restSec = Math.round(((restA||0)+(restB||0))/2)*60;
+        const paceTag = String(iv[4]||'');
+        const plusTok = String(iv[5]||'');
+        const restA = iv[6]?parseInt(iv[6],10):0; const restB = iv[7]?parseInt(iv[7],10):restA; const restSec = Math.round(((restA||0)+(restB||0))/2)*60;
+        // Resolve run pace if applicable
+        const paceForIntervals = (() => {
+          if (!isRun) return undefined;
+          let base = undefined as string | undefined;
+          if (/5kpace/i.test(paceTag) && fivekPace) base = fivekPace;
+          else if (/easy/i.test(paceTag) && easyPace) base = easyPace;
+          else base = fivekPace || easyPace;
+          if (!base) return undefined;
+          if (plusTok) {
+            const m = plusTok.match(/plus(\d+)(?::(\d{2}))?/i);
+            if (m) {
+              const add = (parseInt(m[1],10) * 60) + (m[2]?parseInt(m[2],10):0);
+              const mmss = (sec:number)=>{ const mm=Math.floor(sec/60); const ss=sec%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+              const parsed = base.match(/(\d+):(\d{2})\/(mi|km)/i);
+              if (parsed) {
+                const baseSec = parseInt(parsed[1],10)*60+parseInt(parsed[2],10);
+                const unitTxt = parsed[3];
+                base = `${mmss(baseSec+add)}/${unitTxt}`;
+              }
+            }
+          }
+          return base;
+        })();
         for (let r=0;r<reps;r+=1){
-          out.push({ effortLabel: 'interval', distanceMeters: toMeters(unit==='mi'?each:each, unit) });
+          out.push({ effortLabel: 'interval', distanceMeters: toMeters(unit==='mi'?each:each, unit), ...(paceForIntervals ? { paceTarget: paceForIntervals } : {}) });
           if (r<reps-1 && restSec>0) out.push({ effortLabel: 'rest', duration: restSec });
         }
       }
@@ -259,7 +293,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i);
       if (tm) {
         const miles = parseFloat(tm[1]);
-        out.push({ effortLabel: 'tempo', distanceMeters: toMeters(miles, 'mi') });
+        const paceForTempo = isRun ? (fivekPace || easyPace) : undefined;
+        out.push({ effortLabel: 'tempo', distanceMeters: toMeters(miles, 'mi'), ...(paceForTempo ? { paceTarget: paceForTempo } : {}) });
       }
 
       // Strides e.g., strides_6x20s
@@ -272,9 +307,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       // Bike sets e.g., bike_vo2_6x3min_R3min, bike_thr_4x8min_R5min, bike_ss_2x20min_R6min
       const bike = tokenStr.match(/bike_(vo2|thr|ss)_(\d+)x(\d+)min(?:_r(\d+)min)?/i);
       if (bike) {
+        const kind = (bike[1]||'').toLowerCase();
         const reps=parseInt(bike[2],10); const minEach=parseInt(bike[3],10); const rmin=bike[4]?parseInt(bike[4],10):0;
+        const powerForKind = (() => {
+          if (!isRide || !ftp) return undefined;
+          if (kind==='vo2') return Math.round(ftp*1.10);
+          if (kind==='thr') return Math.round(ftp*0.98);
+          if (kind==='ss') return Math.round(ftp*0.91);
+          return undefined;
+        })();
         for (let r=0;r<reps;r+=1){
-          out.push({ effortLabel: 'interval', duration: minEach*60 });
+          out.push({ effortLabel: 'interval', duration: minEach*60, ...(powerForKind ? { powerTarget: `${powerForKind}W` } : {}) });
           if (r<reps-1 && rmin>0) out.push({ effortLabel: 'rest', duration: rmin*60 });
         }
       }
@@ -285,7 +328,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
 
       // Long run blocks e.g., longrun_90min...
       const lr = tokenStr.match(/longrun_(\d+)min/i);
-      if (lr) out.push({ effortLabel: 'long run', duration: parseInt(lr[1],10)*60 });
+      if (lr) out.push({ effortLabel: 'long run', duration: parseInt(lr[1],10)*60, ...(isRun && easyPace ? { paceTarget: easyPace } : {}) });
 
       // Swim simple translation from tokens expanded earlier (distances only)
       if (String(discipline||'').toLowerCase()==='swim'){
