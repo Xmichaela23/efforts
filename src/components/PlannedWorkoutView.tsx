@@ -152,7 +152,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
             const arr = (workout as any).intervals as any[];
             const lines: string[] = [];
-            const fmtPace = (p?: string) => (p && /(mi|km)$/.test(p)) ? ` @ ${p}` : '';
+            const fmtPace = (p?: string) => (p && /(mi|km)$/i.test(p)) ? ` @ ${p}` : '';
             const fmtDist = (m?: number) => {
               const v = Number(m || 0); if (!v || !Number.isFinite(v)) return undefined;
               if (Math.abs(v - Math.round(v/1609.34)*1609.34) < 1) return `${Math.round(v/1609.34)} mi`;
@@ -163,7 +163,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             const pushOne = (o:any) => {
               const raw = String(o?.effortLabel||'').trim();
               const label = raw.toLowerCase();
-              const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget);
+              const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget || o?.pace || '');
               // Explicit WU/CD labels seen from baker/export/authoring
               if (label==='wu' || /warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(label)) {
                 const base = t || d; if (base) { lines.push(`Warm‑up ${base}${pace}`.trim()); return; }
@@ -290,7 +290,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     const pushSeg = (seg: any) => {
       const d = distStr(seg);
       const t = timeStr(seg);
-      const pr = paceRangeStr(seg);
+      const pr = paceRangeStr(seg) || (typeof seg?.paceTarget === 'string' ? seg.paceTarget : undefined);
       const pw = powerRangeStr(seg);
       const sp = swimPer100Str(seg);
       if (isRestLike(seg)) {
@@ -433,7 +433,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 
         {/* Action Buttons (minimal, lower on page) */}
         {(onEdit || onComplete || true) && (
-          <div className="flex gap-6 mt-32 pt-10 pb-24">
+          <div className="flex gap-6 mt-40 pt-12 pb-36">
             {/* Send to Garmin */}
             {['run','ride','swim','strength'].includes(workout.type) && (
               <SendToGarminButton workoutId={workout.id} disabled={workout.workout_status === 'sent_to_garmin'} />
