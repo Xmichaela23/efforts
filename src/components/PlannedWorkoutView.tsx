@@ -165,10 +165,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const label = raw.toLowerCase();
               const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget);
               // Explicit WU/CD labels seen from baker/export/authoring
-              if (label==='wu' || /warm\s*-?\s*up/.test(label)) {
+              if (label==='wu' || /warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(label)) {
                 const base = t || d; if (base) { lines.push(`Warm‑up ${base}${pace}`.trim()); return; }
               }
-              if (label==='cd' || /cool\s*-?\s*down/.test(label)) {
+              if (label==='cd' || /cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(label)) {
                 const base = t || d; if (base) { lines.push(`Cool‑down ${base}${pace}`.trim()); return; }
               }
               // Rest-like blocks
@@ -381,8 +381,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             }
             // Ensure warm-up first, then main, cooldown last
             const reordered = (() => {
-              const isCool = (s: string) => /cool\s*-?\s*down/i.test(s);
-              const isWarm = (s: string) => /warm\s*-?\s*up/i.test(s);
+              const isCool = (s: string) => /cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(s);
+              const isWarm = (s: string) => /warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(s);
               const warm: string[] = [];
               const cool: string[] = [];
               const main: string[] = [];
@@ -405,7 +405,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 
         {/* Action Buttons (minimal, lower on page) */}
         {(onEdit || onComplete || onDelete || true) && (
-          <div className="flex gap-4 mt-10 pt-4">
+          <div className="flex gap-4 mt-20 pt-8">
             {/* Send to Garmin */}
             {['run','ride','swim','strength'].includes(workout.type) && (
               <SendToGarminButton workoutId={workout.id} disabled={workout.workout_status === 'sent_to_garmin'} />
