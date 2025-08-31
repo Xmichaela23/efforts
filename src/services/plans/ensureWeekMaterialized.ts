@@ -55,7 +55,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   // 1) If rows already exist for this week, upgrade any that are missing intervals
   const { data: existing, error: existErr } = await supabase
     .from('planned_workouts')
-    .select('id, type, steps_preset, intervals')
+    .select('id, type, steps_preset, intervals, computed')
     .eq('training_plan_id', planId)
     .eq('week_number', weekNumber);
   if (!existErr && Array.isArray(existing) && existing.length > 0) {
@@ -99,6 +99,96 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         const derived = deriveFromTokens(row?.steps_preset as any[], row?.type as string);
         if (Array.isArray(derived) && derived.length) {
           await supabase.from('planned_workouts').update({ intervals: derived as any }).eq('id', row.id);
+        }
+      }
+
+      // Upgrade: populate computed.steps when missing by synthesizing from intervals
+      const parsePace = (p?: string): { secPerMi: number | null } => {
+        if (!p) return { secPerMi: null };
+        const m = String(p).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+        if (!m) return { secPerMi: null };
+        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+        const unit = m[3].toLowerCase();
+        return { secPerMi: unit === 'mi' ? sec : Math.round(sec * 1.60934) };
+      };
+      const buildComputedFromIntervals = (intervals: any[] | undefined, type: string, hints?: any) => {
+        if (!Array.isArray(intervals) || intervals.length===0) return undefined;
+        const tolEasy = (hints && typeof hints.pace_tolerance_easy==='number') ? hints.pace_tolerance_easy : 0.06;
+        const tolQual = (hints && typeof hints.pace_tolerance_quality==='number') ? hints.pace_tolerance_quality : 0.04;
+        const steps: any[] = [];
+        const toMiles = (meters: number) => meters / 1609.34;
+        for (const it of intervals) {
+          if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0) {
+            for (let r=0;r<Number(it.repeatCount);r+=1){
+              for (const sg of it.segments) {
+                const kind = (String(sg?.effortLabel||'interval').toLowerCase().includes('rest')||String(sg?.effortLabel||'').toLowerCase().includes('recovery'))?'recovery':'work';
+                if (typeof sg?.duration === 'number' && sg.duration>0) {
+                  const base: any = { index: steps.length, kind, ctrl: 'time', seconds: Math.max(1, Math.floor(sg.duration)) };
+                  if (String(type).toLowerCase()==='run' && typeof sg?.paceTarget==='string') {
+                    const { secPerMi } = parsePace(sg.paceTarget);
+                    if (secPerMi) {
+                      base.pace_sec_per_mi = secPerMi;
+                      const tol = kind==='recovery' ? tolEasy : tolQual;
+                      base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
+                    }
+                  }
+                  steps.push(base);
+                } else if (typeof sg?.distanceMeters === 'number' && sg.distanceMeters>0) {
+                  const miles = toMiles(Number(sg.distanceMeters));
+                  const base: any = { index: steps.length, kind, ctrl: 'distance', seconds: 0, original_val: Number(sg.distanceMeters), original_units: 'm' };
+                  if (String(type).toLowerCase()==='run' && typeof sg?.paceTarget==='string') {
+                    const { secPerMi } = parsePace(sg.paceTarget);
+                    if (secPerMi) {
+                      base.pace_sec_per_mi = secPerMi;
+                      const tol = kind==='recovery' ? tolEasy : tolQual;
+                      base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
+                      base.seconds = Math.max(1, Math.round(miles * secPerMi));
+                    }
+                  }
+                  steps.push(base);
+                }
+              }
+            }
+          } else {
+            const kind = (String(it?.effortLabel||'interval').toLowerCase().includes('rest')||String(it?.effortLabel||'').toLowerCase().includes('recovery'))?'recovery':'work';
+            if (typeof it?.duration === 'number' && it.duration>0) {
+              const base: any = { index: steps.length, kind, ctrl: 'time', seconds: Math.max(1, Math.floor(it.duration)) };
+              if (String(type).toLowerCase()==='run' && typeof it?.paceTarget==='string') {
+                const { secPerMi } = parsePace(it.paceTarget);
+                if (secPerMi) {
+                  base.pace_sec_per_mi = secPerMi;
+                  const tol = kind==='recovery' ? tolEasy : tolQual;
+                  base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
+                }
+              }
+              steps.push(base);
+            } else if (typeof it?.distanceMeters === 'number' && it.distanceMeters>0) {
+              const miles = toMiles(Number(it.distanceMeters));
+              const base: any = { index: steps.length, kind, ctrl: 'distance', seconds: 0, original_val: Number(it.distanceMeters), original_units: 'm' };
+              if (String(type).toLowerCase()==='run' && typeof it?.paceTarget==='string') {
+                const { secPerMi } = parsePace(it.paceTarget);
+                if (secPerMi) {
+                  base.pace_sec_per_mi = secPerMi;
+                  const tol = kind==='recovery' ? tolEasy : tolQual;
+                  base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
+                  base.seconds = Math.max(1, Math.round(miles * secPerMi));
+                }
+              }
+              steps.push(base);
+            }
+          }
+        }
+        return steps.length ? steps : undefined;
+      };
+
+      for (const row of existing as any[]) {
+        const hasSteps = row?.computed && Array.isArray(row.computed.steps) && row.computed.steps.length>0;
+        if (!hasSteps) {
+          const steps = buildComputedFromIntervals(row.intervals, row.type, undefined);
+          if (Array.isArray(steps) && steps.length) {
+            const nextComputed = { ...(row.computed||{}), normalization_version: 'v2', steps };
+            await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
+          }
         }
       }
     } catch {}
