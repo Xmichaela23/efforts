@@ -42,6 +42,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const [friendlyDesc, setFriendlyDesc] = React.useState<string | undefined>(undefined);
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
   const [stepLines, setStepLines] = React.useState<string[] | null>(null);
+  const [fallbackPace, setFallbackPace] = React.useState<string | undefined>(undefined);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -116,6 +117,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           const pn: any = (data as any)?.performance_numbers || {};
           const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
           const easy = pn.easyPace || null;
+          setFallbackPace(easy || fiveK || undefined);
           let out = raw || '';
           if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
           if (easy) out = out.split('{easy_pace}').join(String(easy));
@@ -444,7 +446,18 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 else if (isCool(l)) cool.push(l);
                 else main.push(l);
               });
-              return [...warm, ...main, ...cool];
+              let out = [...warm, ...main, ...cool];
+              // If no line has a target, append a fallback target to non-rest, non-WU/CD lines
+              if (!out.some(s => /@\s*\d/.test(s))){
+                const workoutTarget = formatPrimaryTarget((workout as any).computed) || fallbackPace;
+                if (workoutTarget) {
+                  out = out.map((s) => {
+                    if (/warm|cool|rest/i.test(s)) return s;
+                    return `${s} @ ${workoutTarget}`.trim();
+                  });
+                }
+              }
+              return out;
             })();
             return (
               <ul className="list-none space-y-1">
