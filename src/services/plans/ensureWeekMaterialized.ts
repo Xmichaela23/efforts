@@ -52,14 +52,59 @@ function computeStartDateFromWeek1Anchor(anchorDate: string, anchorDayNumber: nu
 }
 
 export async function ensureWeekMaterialized(planId: string, weekNumber: number): Promise<{ inserted: number }>{
-  // 1) If rows already exist for this week, no-op
+  // 1) If rows already exist for this week, upgrade any that are missing intervals
   const { data: existing, error: existErr } = await supabase
     .from('planned_workouts')
-    .select('id')
+    .select('id, type, steps_preset, intervals')
     .eq('training_plan_id', planId)
-    .eq('week_number', weekNumber)
-    .limit(1);
-  if (!existErr && Array.isArray(existing) && existing.length > 0) return { inserted: 0 };
+    .eq('week_number', weekNumber);
+  if (!existErr && Array.isArray(existing) && existing.length > 0) {
+    try {
+      // Helper to derive intervals from tokens for upgrades (same rules as inserts below)
+      const deriveFromTokens = (stepsPreset?: any[], discipline?: string) => {
+        const steps: string[] = Array.isArray(stepsPreset) ? stepsPreset.map((t:any)=>String(t)) : [];
+        if (steps.length === 0) return undefined as any[] | undefined;
+        const out: any[] = [];
+        const fivek: string | undefined = (()=>{ try { return String(({} as any)).trim(); } catch { return undefined; }})();
+        // We don't have perfNumbers yet at this point of function; they are loaded later.
+        // To keep upgrades simple without extra queries, build distance/time-only steps here.
+        const tokenStr = steps.join(' ').toLowerCase();
+        const toMeters = (n:number, unit:'m'|'mi'|'yd'|'km'='m') => unit==='mi'?Math.floor(n*1609.34):unit==='yd'?Math.floor(n*0.9144):unit==='km'?Math.floor(n*1000):Math.floor(n);
+        // Warmup/Cooldown
+        steps.forEach((t)=>{ const s=String(t).toLowerCase(); let m=s.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/); if(m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; out.push({ effortLabel:'warm up', duration: Math.max(1, Math.round(((a+b)/2)*60)) }); }
+          m=s.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/); if(m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; out.push({ effortLabel:'cool down', duration: Math.max(1, Math.round(((a+b)/2)*60)) }); }
+        });
+        const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)/i);
+        if (iv){ const reps=parseInt(iv[1],10); const each=parseFloat(iv[2]); const unit=(iv[3]||'m').toLowerCase() as 'm'|'mi';
+          const r = tokenStr.match(/_r(\d+)(?:-(\d+))?min/i); const ra=r?parseInt(r[1],10):0; const rb=r&&r[2]?parseInt(r[2],10):ra; const restSec=Math.round(((ra||0)+(rb||0))/2)*60;
+          for(let k=0;k<reps;k+=1){ out.push({ effortLabel:'interval', distanceMeters: toMeters(each, unit) }); if (k<reps-1 && restSec>0) out.push({ effortLabel:'rest', duration: restSec }); }
+        }
+        const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i); if (tm){ out.push({ effortLabel:'tempo', distanceMeters: toMeters(parseFloat(tm[1]), 'mi') }); }
+        const st = tokenStr.match(/strides_(\d+)x(\d+)s/i); if (st){ const reps=parseInt(st[1],10); const secEach=parseInt(st[2],10); for(let r=0;r<reps;r+=1) out.push({ effortLabel:'interval', duration: secEach }); }
+        const bike = tokenStr.match(/bike_(vo2|thr|ss)_(\d+)x(\d+)min(?:_r(\d+)min)?/i); if (bike){ const reps=parseInt(bike[2],10); const minEach=parseInt(bike[3],10); const rmin=bike[4]?parseInt(bike[4],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'interval', duration:minEach*60 }); if (r<reps-1 && rmin>0) out.push({ effortLabel:'rest', duration:rmin*60 }); } }
+        const bend = tokenStr.match(/bike_endurance_(\d+)min/i); if (bend){ out.push({ effortLabel:'endurance', duration: parseInt(bend[1],10)*60 }); }
+        const lr = tokenStr.match(/longrun_(\d+)min/i); if (lr){ out.push({ effortLabel:'long run', duration: parseInt(lr[1],10)*60 }); }
+        if (String(discipline||'').toLowerCase()==='swim'){
+          steps.forEach((t)=>{ const s=String(t).toLowerCase(); let m=s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m){ const dist=parseInt(m[1],10); const u=(m[2]||'yd').toLowerCase() as any; out.push({ effortLabel: /warmup/i.test(s)?'warm up':'cool down', distanceMeters: toMeters(dist, u) }); return; }
+            m=s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'drill', distanceMeters: toMeters(each, u) }); return; }
+            m=s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: m[1]==='pull'?'pull':'kick', distanceMeters: toMeters(each, u) }); return; }
+            m=s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'aerobic', distanceMeters: toMeters(each, u) }); return; }
+          });
+        }
+        return out.length ? out : undefined;
+      };
+
+      const missing = existing.filter((r:any)=> !Array.isArray(r?.intervals) || r.intervals.length === 0);
+      for (const row of missing) {
+        const derived = deriveFromTokens(row?.steps_preset as any[], row?.type as string);
+        if (Array.isArray(derived) && derived.length) {
+          await supabase.from('planned_workouts').update({ intervals: derived as any }).eq('id', row.id);
+        }
+      }
+    } catch {}
+    // We upgraded existing rows where needed; nothing to insert
+    return { inserted: 0 };
+  }
 
   // 2) Auth user
   const { data: { user } } = await supabase.auth.getUser();
