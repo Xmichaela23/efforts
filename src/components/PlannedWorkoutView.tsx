@@ -181,13 +181,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             return lines;
           })() : []; } catch { return []; }
         })();
-        if (intervalLines.length > 0) {
+        const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
+        if (computedSteps.length > 0) {
+          setStepLines(flattenSteps(computedSteps));
+        } else if (intervalLines.length > 0) {
           setStepLines(intervalLines);
         } else {
-          const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
-          if (computedSteps.length > 0) {
-            setStepLines(flattenSteps(computedSteps));
-          } else {
             try {
               const stepsPreset = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
               if (stepsPreset.length > 0) {
@@ -198,7 +197,6 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 if (Array.isArray(c) && c.length > 0) setStepLines(flattenSteps(c));
               }
             } catch {}
-          }
         }
       } catch {
         setFriendlyDesc(stripCodes(workout.description));
@@ -243,6 +241,32 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     return undefined;
   };
 
+  const powerRangeStr = (obj: any) => {
+    try {
+      if (obj?.power_range && typeof obj.power_range.lower === 'number' && typeof obj.power_range.upper === 'number') {
+        return `${obj.power_range.lower}–${obj.power_range.upper} W`;
+      }
+      if (typeof obj?.target_watts === 'number') return `${obj.target_watts} W`;
+    } catch {}
+    return undefined;
+  };
+
+  const swimPer100Str = (obj: any) => {
+    try {
+      if (obj?.swim_pace_range_per_100) {
+        const lo = obj.swim_pace_range_per_100.lower;
+        const hi = obj.swim_pace_range_per_100.upper;
+        if (typeof lo === 'number' && typeof hi === 'number') {
+          return `${secTo(lo)}–${secTo(hi)}`;
+        }
+      }
+      if (typeof obj?.swim_pace_sec_per_100 === 'number') {
+        return `${secTo(obj.swim_pace_sec_per_100)}`;
+      }
+    } catch {}
+    return undefined;
+  };
+
   const distStr = (obj: any) => {
     if (typeof obj?.distance_m === 'number' && obj.distance_m > 0) return `${Math.round(obj.distance_m)}m`;
     if (typeof obj?.distance === 'string' && obj.distance.trim()) return obj.distance;
@@ -267,10 +291,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const d = distStr(seg);
       const t = timeStr(seg);
       const pr = paceRangeStr(seg);
+      const pw = powerRangeStr(seg);
+      const sp = swimPer100Str(seg);
       if (isRestLike(seg)) {
         lines.push(`1 × ${t || d || 'rest'} rest`);
       } else if (d || t) {
-        lines.push(`1 × ${(d || t)}${pr ? ` @ ${pr}` : ''}`.trim());
+        // Prefer discipline-specific targets
+        const target = pw || (sp ? `${sp}/100` : pr);
+        lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}`.trim());
       }
     };
     for (const st of stepsRaw) {
