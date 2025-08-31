@@ -151,7 +151,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setResolvedDuration(Math.round(secs / 60));
         }
 
-        // Build vertical step lines: prefer intervals; else computed.steps; else interpret tokens per-rep
+        // Build vertical step lines: prefer computed.steps; else tokens; else intervals
         const intervalLines = (() => {
           try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
             const arr = (workout as any).intervals as any[];
@@ -189,32 +189,25 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
         if (computedSteps.length > 0) {
           setStepLines(flattenSteps(computedSteps));
-        } else if (intervalLines.length > 0) {
-          const hasTargets = intervalLines.some((s) => /@\s*\d/.test(s) || /@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s));
-          if (hasTargets) setStepLines(intervalLines);
-          else {
-            const uiSynth = synthesizeFromIntervals((workout as any).intervals, String((workout as any).type||''), (workout as any).export_hints || {}, perfNumbers||{});
-            if (uiSynth && uiSynth.length) setStepLines(uiSynth);
+        } else {
+          // Try tokens first when available (authoritative for per-rep layout)
+          const tokenLines = interpretTokensPerRep(
+            (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
+            String((workout as any).type || ''),
+            ((workout as any).export_hints || {}),
+            (perfNumbers || {})
+          );
+          if (tokenLines && tokenLines.length) {
+            setStepLines(tokenLines);
+          } else if (intervalLines.length > 0) {
+            const hasTargets = intervalLines.some((s) => /@\s*\d/.test(s) || /@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s));
+            if (hasTargets) setStepLines(intervalLines);
             else {
-              const lines = interpretTokensPerRep(
-                Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
-                String((workout as any).type || ''),
-                (workout as any).export_hints || {},
-                perfNumbers || {}
-              );
-              if (lines && lines.length) setStepLines(lines); else setStepLines(intervalLines);
+              const uiSynth = synthesizeFromIntervals((workout as any).intervals, String((workout as any).type||''), ((workout as any).export_hints || {}), (perfNumbers || {}));
+              if (uiSynth && uiSynth.length) setStepLines(uiSynth);
+              else setStepLines(intervalLines);
             }
           }
-        } else {
-            try {
-              const lines = interpretTokensPerRep(
-                Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
-                String((workout as any).type || ''),
-                (workout as any).export_hints || {},
-                perfNumbers || {}
-              );
-              if (lines && lines.length) setStepLines(lines);
-            } catch {}
         }
       } catch {
         setFriendlyDesc(stripCodes(workout.description));
@@ -503,6 +496,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     const easy = String(perf?.easyPace || perf?.easy_pace || '').trim() || undefined;
     const parsePace = (p?: string): { sec:number, unit:'mi'|'km' } | null => { if (!p) return null; const m=String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any }; };
     const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+    const parseTimeStr = (val: any): number | null => {
+      if (typeof val === 'number') return val;
+      if (typeof val === 'string') {
+        const m = val.match(/^(\d+):(\d{2})$/);
+        if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
+      }
+      return null;
+    };
     const out: string[] = [];
     const pushOne = (lab: string, meters?: number, seconds?: number) => {
       const isRest = /rest|recovery/i.test(lab);
@@ -524,9 +525,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     };
     for (const it of intervals){
       if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0){
-        for (let r=0;r<Number(it.repeatCount);r+=1){ for (const sg of it.segments){ pushOne(String(sg?.effortLabel||it?.effortLabel||'interval'), Number(sg?.distanceMeters)||0, Number(sg?.duration)||0); } }
+        for (let r=0;r<Number(it.repeatCount);r+=1){ for (const sg of it.segments){ const dur = (parseTimeStr((sg as any).time) ?? Number(sg?.duration)) || 0; pushOne(String(sg?.effortLabel||it?.effortLabel||'interval'), Number(sg?.distanceMeters)||0, dur); } }
       } else {
-        pushOne(String(it?.effortLabel||'interval'), Number(it?.distanceMeters)||0, Number(it?.duration)||0);
+        const dur = (parseTimeStr((it as any).time) ?? Number(it?.duration)) || 0;
+        pushOne(String(it?.effortLabel||'interval'), Number(it?.distanceMeters)||0, dur);
       }
     }
     return out;
