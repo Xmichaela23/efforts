@@ -43,6 +43,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
   const [stepLines, setStepLines] = React.useState<string[] | null>(null);
   const [fallbackPace, setFallbackPace] = React.useState<string | undefined>(undefined);
+  const [perfNumbers, setPerfNumbers] = React.useState<any | undefined>(undefined);
   
   const formatDate = (dateString: string) => {
     const date = new Date(dateString + 'T00:00:00');
@@ -115,6 +116,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           if (!user) { setFriendlyDesc(stripCodes(raw)); return; }
           const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
           const pn: any = (data as any)?.performance_numbers || {};
+          setPerfNumbers(pn);
           const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
           const easy = pn.easyPace || null;
           setFallbackPace(easy || fiveK || undefined);
@@ -149,7 +151,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setResolvedDuration(Math.round(secs / 60));
         }
 
-        // Build vertical step lines: prefer intervals; else computed.steps; else try normalizer with steps_preset
+        // Build vertical step lines: prefer intervals; else computed.steps; else interpret tokens per-rep
         const intervalLines = (() => {
           try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
             const arr = (workout as any).intervals as any[];
@@ -191,14 +193,13 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setStepLines(intervalLines);
         } else {
             try {
-              const stepsPreset = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-              if (stepsPreset.length > 0) {
-                const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', (await supabase.auth.getUser()).data.user?.id).single();
-                const pn: any = (data as any)?.performance_numbers || {};
-                const norm = normalizePlannedSession({ steps_preset: stepsPreset, discipline: (workout as any).type }, { performanceNumbers: pn }, (workout as any).export_hints || {});
-                const c = Array.isArray((norm as any).steps) ? (norm as any).steps : [];
-                if (Array.isArray(c) && c.length > 0) setStepLines(flattenSteps(c));
-              }
+              const lines = interpretTokensPerRep(
+                Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [],
+                String((workout as any).type || ''),
+                (workout as any).export_hints || {},
+                perfNumbers || {}
+              );
+              if (lines && lines.length) setStepLines(lines);
             } catch {}
         }
       } catch {
@@ -357,6 +358,47 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       }
     }
     return lines;
+  };
+
+  // UI-only interpreter for steps_preset → per-rep lines with targets
+  const interpretTokensPerRep = (stepsPreset: string[], discipline: string, exportHints: any, perf: any): string[] => {
+    if (!Array.isArray(stepsPreset) || stepsPreset.length===0) return [];
+    const out: string[] = [];
+    const type = String(discipline||'').toLowerCase();
+    const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
+    const tolQual = typeof exportHints?.pace_tolerance_quality==='number' ? exportHints.pace_tolerance_quality : 0.04;
+    const fivek = String(perf?.fiveK_pace || perf?.fiveKPace || perf?.fiveK || '').trim() || undefined;
+    const easy = String(perf?.easyPace || perf?.easy_pace || '').trim() || undefined;
+    const parsePace = (p?: string): { sec:number, unit:'mi'|'km' } | null => {
+      if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+    };
+    const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+    const toMeters = (n:number, unit:'m'|'mi'|'yd'|'km'='m') => unit==='mi'?Math.floor(n*1609.34):unit==='yd'?Math.floor(n*0.9144):unit==='km'?Math.floor(n*1000):Math.floor(n);
+    const tokenStr = stepsPreset.join(' ').toLowerCase();
+    const pushWU = (min:number) => { if (min>0){ const base = parsePace(easy || fivek); const rng = base?` @ ${mmss(base.sec)}/${base.unit} (${mmss(base.sec*(1-tolEasy))}/${base.unit}–${mmss(base.sec*(1+tolEasy))}/${base.unit})`:''; out.push(`Warm‑up ${min}:00${rng}`.trim()); }};
+    const pushCD = (min:number) => { if (min>0){ const base = parsePace(easy || fivek); const rng = base?` @ ${mmss(base.sec)}/${base.unit} (${mmss(base.sec*(1-tolEasy))}/${base.unit}–${mmss(base.sec*(1+tolEasy))}/${base.unit})`:''; out.push(`Cool‑down ${min}:00${rng}`.trim()); }};
+    // Warmup/Cooldown
+    stepsPreset.forEach((t)=>{ const s=t.toLowerCase(); let m=s.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/); if(m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushWU(Math.round((a+b)/2)); }
+      m=s.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/); if(m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushCD(Math.round((a+b)/2)); }});
+    // Intervals run
+    const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?min)?/i);
+    if (iv && type==='run'){
+      const reps=parseInt(iv[1],10); const each=parseFloat(iv[2]); const unit=(iv[3]||'m').toLowerCase() as 'm'|'mi'; const tag=String(iv[4]||''); const plusTok=String(iv[5]||''); const ra=iv[6]?parseInt(iv[6],10):0; const rb=iv[7]?parseInt(iv[7],10):ra; const rest=Math.round(((ra||0)+(rb||0))/2);
+      let baseTxt = /5kpace/i.test(tag) ? (fivek||easy) : /easy/i.test(tag) ? (easy||fivek) : (fivek||easy);
+      if (baseTxt && plusTok){ const m = plusTok.match(/plus(\d+)(?::(\d{2}))?/i); if(m){ const add=(parseInt(m[1],10)*60)+(m[2]?parseInt(m[2],10):0); const p=parsePace(baseTxt); if(p){ baseTxt = `${mmss(p.sec+add)}/${p.unit}`; } } }
+      const p = parsePace(baseTxt || '');
+      for(let r=0;r<reps;r+=1){
+        if (p){ const lo = `${mmss(p.sec*(1-tolQual))}/${p.unit}`; const hi = `${mmss(p.sec*(1+tolQual))}/${p.unit}`; out.push(`1 × ${unit==='mi'?each:`${Math.round(each)} m`} @ ${mmss(p.sec)}/${p.unit} (${lo}–${hi})`); } else { out.push(`1 × ${unit==='mi'?each:`${Math.round(each)} m`}`); }
+        if (r<reps-1 && rest>0) out.push(`1 × ${rest}:00 rest`);
+      }
+    }
+    // Tempo
+    const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i);
+    if (tm && type==='run'){
+      const miles=parseFloat(tm[1]); const p=parsePace(fivek || easy || ''); if (p){ const lo = `${mmss(p.sec*(1-tolQual))}/${p.unit}`; const hi = `${mmss(p.sec*(1+tolQual))}/${p.unit}`; out.push(`1 × ${miles} mi @ ${mmss(p.sec)}/${p.unit} (${lo}–${hi})`);} else out.push(`1 × ${miles} mi`);
+    }
+    // Strength/ride/swim can be extended similarly; for now we handle run intervals where issue appears.
+    return out;
   };
 
   const deriveFocus = () => {
