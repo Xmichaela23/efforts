@@ -161,9 +161,20 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             };
             const fmtTime = (s?: number) => { const n=Number(s||0); if(!n||!Number.isFinite(n)) return undefined; const mm=Math.floor(n/60), ss=Math.round(n%60); return `${mm}:${String(ss).padStart(2,'0')}`; };
             const pushOne = (o:any) => {
-              const label = String(o?.effortLabel||'').toLowerCase();
-              if (label.includes('rest') || label.includes('jog') || label.includes('easy')) { const t=fmtTime(o?.duration); lines.push(`1 × ${t ? `${t} ${o?.effortLabel ? o.effortLabel : ''}`.trim() : 'rest'}`); return; }
+              const raw = String(o?.effortLabel||'').trim();
+              const label = raw.toLowerCase();
               const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget);
+              // Explicit WU/CD labels seen from baker/export/authoring
+              if (label==='wu' || /warm\s*-?\s*up/.test(label)) {
+                const base = t || d; if (base) { lines.push(`Warm‑up ${base}${pace}`.trim()); return; }
+              }
+              if (label==='cd' || /cool\s*-?\s*down/.test(label)) {
+                const base = t || d; if (base) { lines.push(`Cool‑down ${base}${pace}`.trim()); return; }
+              }
+              // Rest-like blocks
+              if (label.includes('rest') || label.includes('recovery') || label.includes('jog') || label.includes('easy')) {
+                const tt=fmtTime(o?.duration); lines.push(`1 × ${tt ? `${tt} rest` : 'rest'}`.trim()); return;
+              }
               if (d) lines.push(`1 × ${d}${pace}`.trim()); else if (t) lines.push(`1 × ${t}${pace}`.trim());
             };
             for (const it of arr) { if (Array.isArray(it?.segments) && it?.repeatCount && it.repeatCount>0) { for(let r=0;r<Number(it.repeatCount);r+=1){ for(const seg of it.segments) pushOne(seg);} } else pushOne(it); }
@@ -359,8 +370,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           {getWorkoutTypeLabel(workout.type)} — {deriveFocus()}
         </h3>
 
-        {/* Vertical step list */}
-        <div className="rounded border border-gray-200 bg-gray-50 p-3">
+        {/* Vertical step list (minimal, no color panel) */}
+        <div className="p-1">
           {(() => {
             const lines = Array.isArray(stepLines) ? stepLines : [];
             if (lines.length === 0) {
@@ -368,9 +379,23 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 <div className="text-sm text-gray-700">{friendlyDesc || stripCodes(workout.description)}</div>
               );
             }
+            // Ensure warm-up first, then main, cooldown last
+            const reordered = (() => {
+              const isCool = (s: string) => /cool\s*-?\s*down/i.test(s);
+              const isWarm = (s: string) => /warm\s*-?\s*up/i.test(s);
+              const warm: string[] = [];
+              const cool: string[] = [];
+              const main: string[] = [];
+              lines.forEach(l => {
+                if (isWarm(l)) warm.push(l);
+                else if (isCool(l)) cool.push(l);
+                else main.push(l);
+              });
+              return [...warm, ...main, ...cool];
+            })();
             return (
               <ul className="list-none space-y-1">
-                {lines.map((ln, i) => (
+                {reordered.map((ln, i) => (
                   <li key={i} className="text-sm text-gray-900">{ln}</li>
                 ))}
               </ul>
@@ -378,9 +403,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           })()}
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons (minimal, lower on page) */}
         {(onEdit || onComplete || onDelete || true) && (
-          <div className="flex gap-3 mt-6 pt-3 border-t border-gray-200">
+          <div className="flex gap-4 mt-10 pt-4">
             {/* Send to Garmin */}
             {['run','ride','swim','strength'].includes(workout.type) && (
               <SendToGarminButton workoutId={workout.id} disabled={workout.workout_status === 'sent_to_garmin'} />
@@ -388,7 +413,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                className="px-0 py-0 text-sm text-blue-600 hover:text-blue-700 transition-colors"
               >
                 Edit
               </button>
@@ -396,7 +421,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onComplete && workout.workout_status === 'planned' && (
               <button
                 onClick={onComplete}
-                className="px-3 py-1.5 text-sm text-green-600 hover:text-green-700 transition-colors"
+                className="px-0 py-0 text-sm text-green-600 hover:text-green-700 transition-colors"
               >
                 Mark Complete
               </button>
@@ -404,7 +429,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onDelete && (
               <button
                 onClick={onDelete}
-                className="px-3 py-1.5 text-sm text-red-600 hover:text-red-700 transition-colors"
+                className="px-0 py-0 text-sm text-red-600 hover:text-red-700 transition-colors"
               >
                 Delete
               </button>
@@ -444,10 +469,10 @@ const SendToGarminButton: React.FC<{ workoutId: string; disabled?: boolean }> = 
     <button
       disabled={disabled || isSending}
       onClick={handleSend}
-      className={`px-3 py-1.5 text-sm border rounded transition-colors ${
+      className={`px-0 py-0 text-sm transition-colors ${
         disabled || isSending
-          ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-          : 'text-indigo-600 hover:text-indigo-700 border-indigo-200 hover:bg-indigo-50'
+          ? 'text-gray-400 cursor-not-allowed'
+          : 'text-indigo-600 hover:text-indigo-700'
       }`}
     >
       {isSending ? 'Sending…' : 'Send to Garmin'}
