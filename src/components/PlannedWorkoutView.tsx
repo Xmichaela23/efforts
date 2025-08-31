@@ -1,6 +1,6 @@
 import React from 'react';
 import { Clock } from 'lucide-react';
-import { getDisciplineColor } from '@/lib/utils';
+// Intentionally avoid discipline-specific colors in Planned view for a clean look
 import { supabase } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 
@@ -63,16 +63,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     }
   };
 
-  const getWorkoutTypeColor = (type: string) => {
-    switch (type) {
-      case 'run': return 'bg-green-100 text-green-800 border-green-200';
-      case 'ride': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'swim': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'strength': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'walk': return 'bg-green-100 text-green-100 text-green-800 border-green-200';
-      default: return 'bg-green-100 text-green-800 border-green-200';
-    }
-  };
+  const getWorkoutTypeColor = (_type: string) => 'bg-gray-100 text-gray-800 border-gray-200';
 
   const getWorkoutTypeLabel = (type: string) => {
     switch (type) {
@@ -156,21 +147,47 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setResolvedDuration(Math.round(secs / 60));
         }
 
-        // Build vertical step lines: prefer computed.steps; else try normalizer with steps_preset
-        const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
-        if (computedSteps.length > 0) {
-          setStepLines(flattenSteps(computedSteps));
+        // Build vertical step lines: prefer intervals; else computed.steps; else try normalizer with steps_preset
+        const intervalLines = (() => {
+          try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
+            const arr = (workout as any).intervals as any[];
+            const lines: string[] = [];
+            const fmtPace = (p?: string) => (p && /(mi|km)$/.test(p)) ? ` @ ${p}` : '';
+            const fmtDist = (m?: number) => {
+              const v = Number(m || 0); if (!v || !Number.isFinite(v)) return undefined;
+              if (Math.abs(v - Math.round(v/1609.34)*1609.34) < 1) return `${Math.round(v/1609.34)} mi`;
+              if (v % 1000 === 0) return `${Math.round(v/1000)} km`;
+              return `${Math.round(v)} m`;
+            };
+            const fmtTime = (s?: number) => { const n=Number(s||0); if(!n||!Number.isFinite(n)) return undefined; const mm=Math.floor(n/60), ss=Math.round(n%60); return `${mm}:${String(ss).padStart(2,'0')}`; };
+            const pushOne = (o:any) => {
+              const label = String(o?.effortLabel||'').toLowerCase();
+              if (label.includes('rest') || label.includes('jog') || label.includes('easy')) { const t=fmtTime(o?.duration); lines.push(`1 × ${t ? `${t} ${o?.effortLabel ? o.effortLabel : ''}`.trim() : 'rest'}`); return; }
+              const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget);
+              if (d) lines.push(`1 × ${d}${pace}`.trim()); else if (t) lines.push(`1 × ${t}${pace}`.trim());
+            };
+            for (const it of arr) { if (Array.isArray(it?.segments) && it?.repeatCount && it.repeatCount>0) { for(let r=0;r<Number(it.repeatCount);r+=1){ for(const seg of it.segments) pushOne(seg);} } else pushOne(it); }
+            return lines;
+          })() : []; } catch { return []; }
+        })();
+        if (intervalLines.length > 0) {
+          setStepLines(intervalLines);
         } else {
-          try {
-            const stepsPreset = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-            if (stepsPreset.length > 0) {
-              const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', (await supabase.auth.getUser()).data.user?.id).single();
-              const pn: any = (data as any)?.performance_numbers || {};
-              const norm = normalizePlannedSession({ steps_preset: stepsPreset, discipline: (workout as any).type }, { performanceNumbers: pn }, (workout as any).export_hints || {});
-              const c = Array.isArray(norm.computedSteps) ? norm.computedSteps : (Array.isArray((norm as any).steps) ? (norm as any).steps : []);
-              if (Array.isArray(c) && c.length > 0) setStepLines(flattenSteps(c));
-            }
-          } catch {}
+          const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
+          if (computedSteps.length > 0) {
+            setStepLines(flattenSteps(computedSteps));
+          } else {
+            try {
+              const stepsPreset = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+              if (stepsPreset.length > 0) {
+                const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', (await supabase.auth.getUser()).data.user?.id).single();
+                const pn: any = (data as any)?.performance_numbers || {};
+                const norm = normalizePlannedSession({ steps_preset: stepsPreset, discipline: (workout as any).type }, { performanceNumbers: pn }, (workout as any).export_hints || {});
+                const c = Array.isArray(norm.computedSteps) ? norm.computedSteps : (Array.isArray((norm as any).steps) ? (norm as any).steps : []);
+                if (Array.isArray(c) && c.length > 0) setStepLines(flattenSteps(c));
+              }
+            } catch {}
+          }
         }
       } catch {
         setFriendlyDesc(stripCodes(workout.description));
@@ -258,10 +275,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   };
 
   const deriveFocus = () => {
-    const txt = String(workout.rendered_description || workout.description || '').toLowerCase();
-    if (/vo2|vo₂/.test(txt)) return 'VO2 Max';
+    const txt = String(workout.name || workout.rendered_description || workout.description || '').toLowerCase();
+    if (/interval/.test(txt) || /\b\d+x\d+/.test(txt)) return 'Intervals';
+    if (/vo2|vo₂/.test(txt)) return 'VO2';
     if (/tempo|threshold|thr\b/.test(txt)) return 'Tempo';
-    if (/drill|technique/.test(txt)) return 'Drills';
+    if (/drill|technique/.test(txt)) return 'Technique';
     if (/long|endurance|z2/.test(txt)) return 'Endurance';
     return 'Planned';
   };
