@@ -267,6 +267,29 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     return undefined;
   };
 
+  // Format workout-level primary target from computed.targets_summary
+  const formatPrimaryTarget = (computedAny: any): string | undefined => {
+    try {
+      const ts = computedAny?.targets_summary;
+      if (!ts || typeof ts !== 'object') return undefined;
+      if (ts.power && (typeof ts.power.value === 'number' || ts.power.range)) {
+        if (ts.power.range && Array.isArray(ts.power.range)) {
+          const [lo, hi] = ts.power.range as [number, number];
+          if (Number.isFinite(lo) && Number.isFinite(hi)) return `${lo}–${hi} W`;
+        }
+        if (typeof ts.power.value === 'number') return `${Math.round(ts.power.value)} W`;
+      }
+      if (ts.pace && (typeof ts.pace.value === 'string' || ts.pace.range)) {
+        if (ts.pace.range && Array.isArray(ts.pace.range)) {
+          const [a, b] = ts.pace.range as [string, string];
+          if (a && b) return `${a}–${b}`;
+        }
+        if (typeof ts.pace.value === 'string') return ts.pace.value;
+      }
+    } catch {}
+    return undefined;
+  };
+
   const distStr = (obj: any) => {
     if (typeof obj?.distance_m === 'number' && obj.distance_m > 0) return `${Math.round(obj.distance_m)}m`;
     if (typeof obj?.distance === 'string' && obj.distance.trim()) return obj.distance;
@@ -287,6 +310,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const flattenSteps = (stepsRaw: any[] | undefined): string[] => {
     if (!Array.isArray(stepsRaw) || stepsRaw.length === 0) return [];
     const lines: string[] = [];
+    const workoutLevelTarget: string | undefined = formatPrimaryTarget((workout as any).computed);
     const pushSeg = (seg: any) => {
       const d = distStr(seg);
       const t = timeStr(seg);
@@ -297,7 +321,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         lines.push(`1 × ${t || d || 'rest'} rest`);
       } else if (d || t) {
         // Prefer discipline-specific targets
-        const target = pw || (sp ? `${sp}/100` : pr);
+        const target = pw || (sp ? `${sp}/100` : pr) || workoutLevelTarget;
         lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}`.trim());
       }
     };
