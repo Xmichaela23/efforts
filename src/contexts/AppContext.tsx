@@ -618,6 +618,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               }
             }
 
+            // Derive a friendly title for device/UI consistency
+            const tokensJoined = Array.isArray(s?.steps_preset) ? s.steps_preset.join(' ').toLowerCase() : String(s?.description||'').toLowerCase();
+            const title = (() => {
+              if (mappedType === 'strength') return 'Strength';
+              if (mappedType === 'swim') return 'Swim — Technique';
+              if (mappedType === 'ride') {
+                if (/bike_vo2|\bvo2\b/.test(tokensJoined)) return 'Ride — VO2';
+                if (/bike_thr|threshold/.test(tokensJoined)) return 'Ride — Threshold';
+                if (/bike_ss|sweet\s*spot/.test(tokensJoined)) return 'Ride — Sweet Spot';
+                if (/endurance|z1|z2/.test(tokensJoined)) return 'Ride — Endurance';
+                return 'Ride';
+              }
+              if (mappedType === 'run') {
+                if (/interval_|\b6x|\b8x|\b10x|\b400m|\b800m|\b1mi/.test(tokensJoined)) return 'Run — Intervals';
+                if (/tempo_/.test(tokensJoined)) return 'Run — Tempo';
+                if (/longrun_/.test(tokensJoined)) return 'Run — Long';
+                return 'Run';
+              }
+              return 'Session';
+            })();
+
             const row: any = {
               user_id: user?.id,
               training_plan_id: data.id,
@@ -626,7 +647,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               day_number: dow,
               date,
               type: mappedType,
-              name: s.name || (mappedType === 'strength' ? 'Strength' : s.type || 'Session'),
+              name: s.name || title,
               description: s.description || '',
               duration: durationVal,
               workout_status: 'planned',

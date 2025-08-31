@@ -226,17 +226,22 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     // Derive non-generic name from discipline and steps where possible
     const nameFromDiscipline = (() => {
       if (s.name) return String(s.name);
+      const toks = Array.isArray(s?.steps_preset) ? s.steps_preset.join(' ').toLowerCase() : String(s?.description||'').toLowerCase();
       if (mappedType === 'strength') return 'Strength';
+      if (mappedType === 'swim') return 'Swim — Technique';
       if (mappedType === 'ride') {
-        const toks = Array.isArray(s?.steps_preset) ? s.steps_preset.join(' ').toLowerCase() : '';
-        if (/bike_vo2|vo2/.test(toks) || /vo2/.test(String(s.description||'').toLowerCase())) return 'Ride — VO2';
-        if (/bike_thr|threshold/.test(toks) || /threshold/.test(String(s.description||'').toLowerCase())) return 'Ride — Threshold';
-        if (/bike_ss|sweet\s*spot/.test(toks) || /sweet\s*spot/.test(String(s.description||'').toLowerCase())) return 'Ride — Sweet Spot';
-        if (/endurance|z1|z2/.test(toks) || /endurance|spin|z2/i.test(String(s.description||''))) return 'Ride — Endurance';
+        if (/bike_vo2|\bvo2\b/.test(toks)) return 'Ride — VO2';
+        if (/bike_thr|threshold/.test(toks)) return 'Ride — Threshold';
+        if (/bike_ss|sweet\s*spot/.test(toks)) return 'Ride — Sweet Spot';
+        if (/endurance|z1|z2/.test(toks)) return 'Ride — Endurance';
         return 'Ride';
       }
-      if (mappedType === 'run') return 'Run';
-      if (mappedType === 'swim') return 'Swim';
+      if (mappedType === 'run') {
+        if (/interval_|\b6x|\b8x|\b10x|\b400m|\b800m|\b1mi/.test(toks)) return 'Run — Intervals';
+        if (/tempo_/.test(toks)) return 'Run — Tempo';
+        if (/longrun_/.test(toks)) return 'Run — Long';
+        return 'Run';
+      }
       return 'Session';
     })();
     // Build Garmin-ready intervals from either baked/normalized steps or token presets
