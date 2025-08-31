@@ -196,7 +196,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', (await supabase.auth.getUser()).data.user?.id).single();
                 const pn: any = (data as any)?.performance_numbers || {};
                 const norm = normalizePlannedSession({ steps_preset: stepsPreset, discipline: (workout as any).type }, { performanceNumbers: pn }, (workout as any).export_hints || {});
-                const c = Array.isArray(norm.computedSteps) ? norm.computedSteps : (Array.isArray((norm as any).steps) ? (norm as any).steps : []);
+                const c = Array.isArray((norm as any).steps) ? (norm as any).steps : [];
                 if (Array.isArray(c) && c.length > 0) setStepLines(flattenSteps(c));
               }
             } catch {}
@@ -314,6 +314,15 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     if (!Array.isArray(stepsRaw) || stepsRaw.length === 0) return [];
     const lines: string[] = [];
     const workoutLevelTarget: string | undefined = formatPrimaryTarget((workout as any).computed);
+    const hints: any = (workout as any)?.export_hints || {};
+    const tolEasy = typeof hints.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
+    const tolQual = typeof hints.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
+    const parsePace = (txt: string): { sec: number; unit: 'mi'|'km' } | null => {
+      const m = String(txt).trim().match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+      if (!m) return null;
+      return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+    };
+    const mmss = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
     const pushSeg = (seg: any) => {
       const d = distStr(seg);
       const t = timeStr(seg);
@@ -324,7 +333,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         lines.push(`1 × ${t || d || 'rest'} rest`);
       } else if (d || t) {
         // Prefer discipline-specific targets
-        const target = pw || (sp ? `${sp}/100` : pr) || workoutLevelTarget;
+        let target = pw || (sp ? `${sp}/100` : pr) || workoutLevelTarget;
+        // Ensure pace shows with range when we have a single pace value
+        if (target && typeof target === 'string' && /\d+:\d{2}\s*\/\s*(mi|km)/i.test(target) && !/\(/.test(target)) {
+          const p = parsePace(target);
+          if (p) {
+            const tol = tolQual; // work step
+            const lo = `${mmss(p.sec*(1-tol))}/${p.unit}`;
+            const hi = `${mmss(p.sec*(1+tol))}/${p.unit}`;
+            target = `${mmss(p.sec)}/${p.unit} (${lo}–${hi})`;
+          }
+        }
         lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}`.trim());
       }
     };
