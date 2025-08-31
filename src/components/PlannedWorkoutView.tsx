@@ -287,11 +287,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   if (compact) {
     return (
       <div className="flex items-center gap-3 p-3 hover:bg-gray-50 transition-colors rounded">
-        <div className="text-xs font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
+        <div className="text-xs font-semibold">
           {getWorkoutTypeIcon(workout.type)}
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-sm truncate" style={{ color: getDisciplineColor(workout.type) }}>
+          <h4 className="font-medium text-sm truncate">
             {workout.name || (workout as any).focus || 'Planned Workout'}
           </h4>
           <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -317,11 +317,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <div className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="text-sm font-bold" style={{ color: getDisciplineColor(workout.type) }}>
+              <div className="text-sm font-bold">
                 {getWorkoutTypeIcon(workout.type)}
               </div>
               <div>
-                <h3 className="text-lg font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
+                <h3 className="text-lg font-semibold">
                   {(() => {
                     const n = String(workout.name || '').trim();
                     if (n) return n;
