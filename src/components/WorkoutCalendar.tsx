@@ -81,7 +81,30 @@ function derivePlannedCellLabel(w: any): string | null {
     const steps: string[] = Array.isArray(w.steps_preset) ? w.steps_preset : [];
     const txt = String(w.description || '').toLowerCase();
     const type = String(w.type || '').toLowerCase();
-    const secs = Number(w?.computed?.total_duration_seconds) || (typeof w.duration === 'number' ? w.duration * 60 : 0);
+    // Robust duration resolution: computed > sum(computed.steps) > sum(intervals) > duration field
+    const comp: any = w?.computed || {};
+    let secs = 0;
+    const ts = Number(comp?.total_duration_seconds);
+    if (Number.isFinite(ts) && ts > 0) secs = ts;
+    if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
+      try {
+        secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
+      } catch {}
+    }
+    if (secs <= 0 && Array.isArray(w?.intervals) && w.intervals.length > 0) {
+      try {
+        const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
+          if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
+            const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
+            return acc + segSum * Number(it.repeatCount);
+          }
+          return acc + (Number(it?.duration) || 0);
+        }, 0);
+        const sInt = sumIntervals(w.intervals);
+        if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
+      } catch {}
+    }
+    if (secs <= 0 && typeof w.duration === 'number') secs = Math.max(0, Math.round(w.duration * 60));
     const mins = secs > 0 ? Math.round(secs / 60) : (typeof w.duration === 'number' ? w.duration : 0);
     const durStr = mins > 0 ? `${mins}m` : '';
 

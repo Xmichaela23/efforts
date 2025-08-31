@@ -152,7 +152,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
             const arr = (workout as any).intervals as any[];
             const lines: string[] = [];
-            const fmtPace = (p?: string) => (p && /(mi|km)$/i.test(p)) ? ` @ ${p}` : '';
+            const defaultTarget = formatPrimaryTarget(comp);
+            const fmtPace = (p?: string) => (p && String(p).trim().length > 0) ? ` @ ${p}` : '';
             const fmtDist = (m?: number) => {
               const v = Number(m || 0); if (!v || !Number.isFinite(v)) return undefined;
               if (Math.abs(v - Math.round(v/1609.34)*1609.34) < 1) return `${Math.round(v/1609.34)} mi`;
@@ -163,7 +164,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             const pushOne = (o:any) => {
               const raw = String(o?.effortLabel||'').trim();
               const label = raw.toLowerCase();
-              const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget || o?.pace || '');
+              const d=fmtDist(o?.distanceMeters); const t=fmtTime(o?.duration); const pace=fmtPace(o?.paceTarget || o?.pace || defaultTarget);
               // Explicit WU/CD labels seen from baker/export/authoring
               if (label==='wu' || /warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(label)) {
                 const base = t || d; if (base) { lines.push(`Warm‑up ${base}${pace}`.trim()); return; }
