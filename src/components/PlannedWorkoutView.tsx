@@ -404,8 +404,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         </div>
 
         {/* Action Buttons (minimal, lower on page) */}
-        {(onEdit || onComplete || onDelete || true) && (
-          <div className="flex gap-4 mt-20 pt-8">
+        {(onEdit || onComplete || true) && (
+          <div className="flex gap-6 mt-32 pt-10 pb-24">
             {/* Send to Garmin */}
             {['run','ride','swim','strength'].includes(workout.type) && (
               <SendToGarminButton workoutId={workout.id} disabled={workout.workout_status === 'sent_to_garmin'} />
@@ -413,7 +413,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onEdit && (
               <button
                 onClick={onEdit}
-                className="px-0 py-0 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                className="px-0 py-0 text-sm text-gray-900 hover:underline"
               >
                 Edit
               </button>
@@ -421,17 +421,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {onComplete && workout.workout_status === 'planned' && (
               <button
                 onClick={onComplete}
-                className="px-0 py-0 text-sm text-green-600 hover:text-green-700 transition-colors"
+                className="px-0 py-0 text-sm text-gray-900 hover:underline"
               >
                 Mark Complete
-              </button>
-            )}
-            {onDelete && (
-              <button
-                onClick={onDelete}
-                className="px-0 py-0 text-sm text-red-600 hover:text-red-700 transition-colors"
-              >
-                Delete
               </button>
             )}
           </div>
@@ -472,7 +464,7 @@ const SendToGarminButton: React.FC<{ workoutId: string; disabled?: boolean }> = 
       className={`px-0 py-0 text-sm transition-colors ${
         disabled || isSending
           ? 'text-gray-400 cursor-not-allowed'
-          : 'text-indigo-600 hover:text-indigo-700'
+          : 'text-gray-900 hover:underline'
       }`}
     >
       {isSending ? 'Sending…' : 'Send to Garmin'}
