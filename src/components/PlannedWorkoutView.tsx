@@ -355,7 +355,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             {resolvedDuration ? `${resolvedDuration} min` : (typeof workout.duration==='number'?`${workout.duration} min`: '')}
           </div>
         </div>
-        <h3 className="text-base font-semibold" style={{ color: getDisciplineColor(workout.type) }}>
+        <h3 className="text-base font-semibold">
           {getWorkoutTypeLabel(workout.type)} — {deriveFocus()}
         </h3>
 
