@@ -23,6 +23,7 @@ import PlanBuilder from './PlanBuilder';
 import FitFileImporter from './FitFileImporter';
 import TrainingBaselines from './TrainingBaselines';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import PullToRefresh from './PullToRefresh';
 
 interface AppLayoutProps {
   onLogout?: () => void;
@@ -539,6 +540,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   const currentWorkout = dateWorkouts[currentWorkoutIndex];
 
+  const handleGlobalRefresh = async () => {
+    try {
+      // Prefer a data refresh via provider hook if available
+      if (typeof loadProviderData === 'function') {
+        await Promise.resolve(loadProviderData());
+      }
+      // Light UI refresh: re-navigate to current route to trigger hooks
+      navigate(location.pathname, { replace: true });
+    } catch {
+      // Fallback: full reload
+      try { location.reload(); } catch {}
+    }
+  };
+
   return (
     <div className="mobile-app-container">
       <header className="mobile-header">
@@ -615,6 +630,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       </header>
 
       <main className="mobile-main-content">
+        <PullToRefresh onRefresh={handleGlobalRefresh}>
         <div className="w-full px-2">
           {showPlanBuilder ? (
             <div className="pt-1">
@@ -721,6 +737,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             </div>
           )}
         </div>
+        </PullToRefresh>
       </main>
 
       {/* Bottom Navigation Tab Bar - Instagram style */}
