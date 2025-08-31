@@ -658,12 +658,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 const pushWU = (min: number) => { if (min>0) out.push({ effortLabel: 'warm up', duration: Math.max(1, Math.round(min*60)) }); };
                 const pushCD = (min: number) => { if (min>0) out.push({ effortLabel: 'cool down', duration: Math.max(1, Math.round(min*60)) }); };
                 const toMeters = (n:number, unit:'m'|'mi'|'yd'|'km'='m') => unit==='mi'?Math.floor(n*1609.34):unit==='yd'?Math.floor(n*0.9144):unit==='km'?Math.floor(n*1000):Math.floor(n);
+                let wuMin = 0; let cdMin = 0;
                 steps.forEach((t:string)=>{
                   const lower = String(t).toLowerCase();
                   let m = lower.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
-                  if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; const avg=Math.round((a+b)/2); out.push({ effortLabel:'warm up', duration: Math.max(1, avg*60), ...(isRun && easy ? { paceTarget: easy } : {}) }); }
+                  if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; wuMin = Math.max(wuMin, Math.round((a+b)/2)); }
                   m = lower.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
-                  if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; const avg=Math.round((a+b)/2); out.push({ effortLabel:'cool down', duration: Math.max(1, avg*60), ...(isRun && easy ? { paceTarget: easy } : {}) }); }
+                  if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; cdMin = Math.max(cdMin, Math.round((a+b)/2)); }
                 });
                 const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?/i);
                 if (iv){ const reps=parseInt(iv[1],10); const each=parseFloat(iv[2]); const unit=(iv[3]||'m').toLowerCase() as 'm'|'mi'; const paceTag=String(iv[4]||''); const plusTok=String(iv[5]||'');
@@ -696,6 +697,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                     m=s2.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'aerobic', distanceMeters: toMeters(each, u) }); return; }
                   });
                 }
+                if (wuMin>0) out.unshift({ effortLabel:'warm up', duration: Math.max(1, wuMin*60), ...(isRun && easy ? { paceTarget: easy } : {}) });
+                if (cdMin>0) out.push({ effortLabel:'cool down', duration: Math.max(1, cdMin*60), ...(isRun && easy ? { paceTarget: easy } : {}) });
                 if (out.length) row.intervals = out;
               } catch {}
             }

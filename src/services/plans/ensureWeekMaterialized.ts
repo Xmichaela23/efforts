@@ -276,8 +276,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       const ftp: number = (() => { try { return Number((perfNumbers as any)?.ftp || 0) || 0; } catch { return 0; }})();
       const isRun = String(discipline||'').toLowerCase()==='run';
       const isRide = String(discipline||'').toLowerCase()==='ride';
-      const pushWU = (min: number) => { if (min>0) out.push({ effortLabel: 'warm up', duration: Math.max(1, Math.round(min*60)), ...(isRun && easyPace ? { paceTarget: easyPace } : {}) }); };
-      const pushCD = (min: number) => { if (min>0) out.push({ effortLabel: 'cool down', duration: Math.max(1, Math.round(min*60)), ...(isRun && easyPace ? { paceTarget: easyPace } : {}) }); };
+      let wuMin = 0; let cdMin = 0;
       const toMeters = (milesOrMeters: number, unit: 'm'|'mi'|'yd'|'km'='m') => {
         if (unit==='mi') return Math.floor(milesOrMeters*1609.34);
         if (unit==='yd') return Math.floor(milesOrMeters*0.9144);
@@ -291,10 +290,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       steps.forEach((t) => {
         const s = t.toLowerCase();
         let m = s.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
-        if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushWU(Math.round((a+b)/2)); }
+        if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; wuMin = Math.max(wuMin, Math.round((a+b)/2)); }
         m = s.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
-        if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushCD(Math.round((a+b)/2)); }
+        if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; cdMin = Math.max(cdMin, Math.round((a+b)/2)); }
       });
+      // Add warm-up at the start later; cooldown will be appended at the end
 
       // Interval blocks e.g., interval_6x800m_5kpace_R2min
       const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?min)?/i);
@@ -390,6 +390,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         });
       }
 
+      if (wuMin>0) out.unshift({ effortLabel:'warm up', duration: Math.max(1, Math.round(wuMin*60)), ...(isRun && easyPace ? { paceTarget: easyPace } : {}) });
+      if (cdMin>0) out.push({ effortLabel:'cool down', duration: Math.max(1, Math.round(cdMin*60)), ...(isRun && easyPace ? { paceTarget: easyPace } : {}) });
       return out.length ? out : undefined;
     };
 
