@@ -643,6 +643,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             };
             if (s.intensity && typeof s.intensity === 'object') row.intensity = s.intensity;
             if (Array.isArray(s.intervals)) row.intervals = s.intervals;
+            // If no authored intervals, derive basic exportable intervals from tokens
+            if (!row.intervals || (Array.isArray(row.intervals) && row.intervals.length===0)) {
+              try {
+                const steps: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=>String(t)) : [];
+                const tokenStr = steps.join(' ').toLowerCase();
+                const out: any[] = [];
+                const pushWU = (min: number) => { if (min>0) out.push({ effortLabel: 'warm up', duration: Math.max(1, Math.round(min*60)) }); };
+                const pushCD = (min: number) => { if (min>0) out.push({ effortLabel: 'cool down', duration: Math.max(1, Math.round(min*60)) }); };
+                const toMeters = (n:number, unit:'m'|'mi'|'yd'|'km'='m') => unit==='mi'?Math.floor(n*1609.34):unit==='yd'?Math.floor(n*0.9144):unit==='km'?Math.floor(n*1000):Math.floor(n);
+                steps.forEach((t:string)=>{
+                  const lower = String(t).toLowerCase();
+                  let m = lower.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
+                  if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushWU(Math.round((a+b)/2)); }
+                  m = lower.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
+                  if (m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushCD(Math.round((a+b)/2)); }
+                });
+                const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)/i);
+                if (iv){ const reps=parseInt(iv[1],10); const each=parseFloat(iv[2]); const unit=(iv[3]||'m').toLowerCase() as 'm'|'mi';
+                  // rest detection
+                  const r = tokenStr.match(/_r(\d+)(?:-(\d+))?min/i); const restA=r?parseInt(r[1],10):0; const restB=r&&r[2]?parseInt(r[2],10):restA; const restSec=Math.round(((restA||0)+(restB||0))/2)*60;
+                  for(let k=0;k<reps;k+=1){ out.push({ effortLabel:'interval', distanceMeters: toMeters(each, unit) }); if (k<reps-1 && restSec>0) out.push({ effortLabel:'rest', duration: restSec }); }
+                }
+                const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i);
+                if (tm){ out.push({ effortLabel:'tempo', distanceMeters: toMeters(parseFloat(tm[1]), 'mi') }); }
+                const st = tokenStr.match(/strides_(\d+)x(\d+)s/i);
+                if (st){ const reps=parseInt(st[1],10); const secEach=parseInt(st[2],10); for(let r=0;r<reps;r+=1) out.push({ effortLabel:'interval', duration: secEach }); }
+                const bike = tokenStr.match(/bike_(vo2|thr|ss)_(\d+)x(\d+)min(?:_r(\d+)min)?/i);
+                if (bike){ const reps=parseInt(bike[2],10); const minEach=parseInt(bike[3],10); const rmin=bike[4]?parseInt(bike[4],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'interval', duration:minEach*60 }); if (r<reps-1 && rmin>0) out.push({ effortLabel:'rest', duration:rmin*60 }); } }
+                const bend = tokenStr.match(/bike_endurance_(\d+)min/i); if (bend){ out.push({ effortLabel:'endurance', duration: parseInt(bend[1],10)*60 }); }
+                const lr = tokenStr.match(/longrun_(\d+)min/i); if (lr){ out.push({ effortLabel:'long run', duration: parseInt(lr[1],10)*60 }); }
+                if (String(mappedType).toLowerCase()==='swim'){
+                  steps.forEach((t:string)=>{ const s2=t.toLowerCase(); let m = s2.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m){ out.push({ effortLabel: /warmup/i.test(s2)?'warm up':'cool down', distanceMeters: toMeters(parseInt(m[1],10), m[2].toLowerCase() as any) }); return; }
+                    m=s2.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'drill', distanceMeters: toMeters(each, u) }); return; }
+                    m=s2.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: m[1]==='pull'?'pull':'kick', distanceMeters: toMeters(each, u) }); return; }
+                    m=s2.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'aerobic', distanceMeters: toMeters(each, u) }); return; }
+                  });
+                }
+                if (out.length) row.intervals = out;
+              } catch {}
+            }
             if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
 
             rows.push(row);

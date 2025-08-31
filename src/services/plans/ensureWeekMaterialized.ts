@@ -194,7 +194,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       if (mappedType === 'swim') return 'Swim';
       return 'Session';
     })();
-    // Build Garmin-ready intervals from normalized or baked steps when present
+    // Build Garmin-ready intervals from either baked/normalized steps or token presets
     const buildIntervalsFromComputed = (steps?: any[]): any[] | undefined => {
       if (!Array.isArray(steps) || steps.length === 0) return undefined;
       const toMeters = (val: number, unit?: string) => {
@@ -218,7 +218,94 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       });
     };
 
-    const intervalsFromNorm = buildIntervalsFromComputed(undefined); // placeholder: we only have norm summary here
+    const buildIntervalsFromTokens = (stepsPreset?: any[], discipline?: string): any[] | undefined => {
+      const steps: string[] = Array.isArray(stepsPreset) ? stepsPreset.map((t:any)=>String(t)) : [];
+      if (steps.length === 0) return undefined;
+      const out: any[] = [];
+      const pushWU = (min: number) => { if (min>0) out.push({ effortLabel: 'warm up', duration: Math.max(1, Math.round(min*60)) }); };
+      const pushCD = (min: number) => { if (min>0) out.push({ effortLabel: 'cool down', duration: Math.max(1, Math.round(min*60)) }); };
+      const toMeters = (milesOrMeters: number, unit: 'm'|'mi'|'yd'|'km'='m') => {
+        if (unit==='mi') return Math.floor(milesOrMeters*1609.34);
+        if (unit==='yd') return Math.floor(milesOrMeters*0.9144);
+        if (unit==='km') return Math.floor(milesOrMeters*1000);
+        return Math.floor(milesOrMeters);
+      };
+
+      const tokenStr = steps.join(' ').toLowerCase();
+
+      // Warmup/Cooldown tokens
+      steps.forEach((t) => {
+        const s = t.toLowerCase();
+        let m = s.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
+        if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushWU(Math.round((a+b)/2)); }
+        m = s.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
+        if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; pushCD(Math.round((a+b)/2)); }
+      });
+
+      // Interval blocks e.g., interval_6x800m_5kpace_R2min
+      const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_[^\s]+(?:_r(\d+)(?:-(\d+))?min)?/i);
+      if (iv) {
+        const reps = parseInt(iv[1],10);
+        const each = parseFloat(iv[2]);
+        const unit = (iv[3]||'m').toLowerCase() as 'm'|'mi';
+        const restA = iv[4]?parseInt(iv[4],10):0; const restB = iv[5]?parseInt(iv[5],10):restA; const restSec = Math.round(((restA||0)+(restB||0))/2)*60;
+        for (let r=0;r<reps;r+=1){
+          out.push({ effortLabel: 'interval', distanceMeters: toMeters(unit==='mi'?each:each, unit) });
+          if (r<reps-1 && restSec>0) out.push({ effortLabel: 'rest', duration: restSec });
+        }
+      }
+
+      // Tempo blocks e.g., tempo_4mi_...
+      const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i);
+      if (tm) {
+        const miles = parseFloat(tm[1]);
+        out.push({ effortLabel: 'tempo', distanceMeters: toMeters(miles, 'mi') });
+      }
+
+      // Strides e.g., strides_6x20s
+      const st = tokenStr.match(/strides_(\d+)x(\d+)s/i);
+      if (st) {
+        const reps = parseInt(st[1],10); const secEach = parseInt(st[2],10);
+        for (let r=0;r<reps;r+=1) out.push({ effortLabel: 'interval', duration: secEach });
+      }
+
+      // Bike sets e.g., bike_vo2_6x3min_R3min, bike_thr_4x8min_R5min, bike_ss_2x20min_R6min
+      const bike = tokenStr.match(/bike_(vo2|thr|ss)_(\d+)x(\d+)min(?:_r(\d+)min)?/i);
+      if (bike) {
+        const reps=parseInt(bike[2],10); const minEach=parseInt(bike[3],10); const rmin=bike[4]?parseInt(bike[4],10):0;
+        for (let r=0;r<reps;r+=1){
+          out.push({ effortLabel: 'interval', duration: minEach*60 });
+          if (r<reps-1 && rmin>0) out.push({ effortLabel: 'rest', duration: rmin*60 });
+        }
+      }
+
+      // Endurance bike single block e.g., bike_endurance_50min...
+      const bend = tokenStr.match(/bike_endurance_(\d+)min/i);
+      if (bend) out.push({ effortLabel: 'endurance', duration: parseInt(bend[1],10)*60 });
+
+      // Long run blocks e.g., longrun_90min...
+      const lr = tokenStr.match(/longrun_(\d+)min/i);
+      if (lr) out.push({ effortLabel: 'long run', duration: parseInt(lr[1],10)*60 });
+
+      // Swim simple translation from tokens expanded earlier (distances only)
+      if (String(discipline||'').toLowerCase()==='swim'){
+        steps.forEach((t)=>{
+          const s = String(t).toLowerCase();
+          let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
+          if (m){ const dist=parseInt(m[1],10); const u=(m[2]||'yd').toLowerCase() as any; out.push({ effortLabel: /warmup/i.test(s)?'warm up':'cool down', distanceMeters: toMeters(dist, u) }); return; }
+          m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i);
+          if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: 'drill', distanceMeters: toMeters(each, u) }); return; }
+          m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
+          if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: m[1]==='pull'?'pull':'kick', distanceMeters: toMeters(each, u) }); return; }
+          m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i);
+          if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: 'aerobic', distanceMeters: toMeters(each, u) }); return; }
+        });
+      }
+
+      return out.length ? out : undefined;
+    };
+
+    const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);
 
     rows.push({
       user_id: user.id,
