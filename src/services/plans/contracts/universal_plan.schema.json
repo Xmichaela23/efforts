@@ -60,6 +60,7 @@
         "day": { "type": "string", "enum": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] },
         "discipline": { "type": "string", "enum": ["run","bike","ride","swim","strength","brick","walk"] },
         "type": { "type": "string" },
+        "name": { "type": "string" },
         "duration": { "type": "number", "minimum": 0 },
         "intensity": { "type": ["string","object"] },
         "description": { "type": "string" },
