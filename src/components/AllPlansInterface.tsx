@@ -466,6 +466,51 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const tagsLower: string[] = Array.isArray((s as any).tags) ? (s as any).tags.map((t: any) => String(t).toLowerCase()) : [];
               const hasTag = (t: string) => tagsLower.includes(t.toLowerCase());
               const contains = (needle: string) => lowerText.includes(needle.toLowerCase()) || lowerSteps.includes(needle.toLowerCase());
+              // Parse view/expansion hints encoded in tags (schema-safe)
+              const parseExpandSpecFromTags = () => {
+                const rawTags: string[] = Array.isArray((s as any).tags) ? (s as any).tags.map((t:any)=>String(t)) : [];
+                const out: any = {};
+                const idPrefixTag = rawTags.find(t=>/^idprefix:/i.test(String(t)));
+                if (idPrefixTag) out.id_prefix = String(idPrefixTag.split(':')[1]||'').trim();
+                const expandTag = rawTags.find(t=>/^expand:/i.test(String(t)));
+                if (expandTag){
+                  // expand:reps=6;work=400m;rest=120s;omit_last_rest=1
+                  const body = expandTag.split(':')[1] || '';
+                  const parts = body.split(';');
+                  for (const p of parts){
+                    const [k,v] = p.split('=');
+                    const key = String(k||'').trim().toLowerCase();
+                    const val = String(v||'').trim().toLowerCase();
+                    if (!key) continue;
+                    if (key === 'reps') out.reps = Number(val);
+                    if (key === 'omit_last_rest') out.omit_last_rest = (val==='1' || val==='true');
+                    if (key === 'work'){
+                      if (/^\d+\s*s$/.test(val)) { out.work = { time_s: Number(val.replace(/\D/g,'')) }; }
+                      else if (/^\d+\s*m$/.test(val)) { out.work = { distance_m: Number(val.replace(/\D/g,'')) }; }
+                      else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1609.34) }; }
+                      else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1000) }; }
+                    }
+                    if (key === 'rest'){
+                      if (/^\d+\s*s$/.test(val)) { out.rest = { time_s: Number(val.replace(/\D/g,'')) }; }
+                      else if (/^\d+\s*m$/.test(val)) { out.rest = { distance_m: Number(val.replace(/\D/g,'')) }; }
+                      else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1609.34) }; }
+                      else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1000) }; }
+                    }
+                  }
+                }
+                return (out.reps && (out.work || out.rest)) ? out : null;
+              };
+              const parseDisplayOverridesFromTags = () => {
+                const rawTags: string[] = Array.isArray((s as any).tags) ? (s as any).tags.map((t:any)=>String(t)) : [];
+                const view = rawTags.find(t=>/^view:/i.test(t));
+                const pace = rawTags.find(t=>/^pace_annotation:/i.test(t));
+                const ov: any = {};
+                if (view && String(view.split(':')[1]||'').toLowerCase()==='unpack') ov.planned_detail = 'unpack';
+                const pa = pace ? String(pace.split(':')[1]||'').toLowerCase() : '';
+                return { overrides: Object.keys(ov).length?ov:null, pace_annotation: pa||null };
+              };
+              const { overrides: displayOverridesFromTags, pace_annotation: paceAnnoFromTags } = parseDisplayOverridesFromTags();
+              const expandSpecFromTags = parseExpandSpecFromTags();
               const buildName = (): string => {
                 if (discipline === 'strength') return 'Strength';
                 if (mappedType === 'ride') {
@@ -505,6 +550,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 day: s.day,
                 completed: false,
                 tags: Array.isArray((s as any).tags) ? (s as any).tags : [],
+                // View hints parsed from tags (schema-safe)
+                display_overrides: displayOverridesFromTags,
+                expand_spec: expandSpecFromTags,
+                pace_annotation: paceAnnoFromTags || undefined,
               } as any;
               if ((s.discipline || mappedType) === 'swim' && Array.isArray((s as any).steps) && (s as any).steps.length > 0) {
                 base.intervals = (s as any).steps.map((st: any) => ({ effortLabel: st.effort || st.stroke || 'Swim', duration: 0 }));
