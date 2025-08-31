@@ -357,6 +357,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const renderedDesc = w.rendered_description || w.description || '';
             const totalSeconds = computed.total_duration_seconds;
             const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof w.duration === 'number' ? w.duration : 0);
+            // Parse steps_preset/export_hints/intervals which may be JSON strings
+            const stepsPresetParsed = parseMaybeJson((w as any).steps_preset);
+            const exportHintsParsed = parseMaybeJson((w as any).export_hints);
+            const intervalsParsed = parseMaybeJson((w as any).intervals);
             const tags = (() => {
               const t = (w as any).tags;
               if (Array.isArray(t)) return t;
@@ -367,7 +371,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             const workout = {
               id: w.id,
               name: w.name || 'Session',
-              type: w.type,
+              type: (String((w as any).type).toLowerCase() === 'bike' ? 'ride' : (w as any).type) as any,
               description: renderedDesc || resolveStrength(mapBike(resolvePaces(w.description || ''))),
               duration,
               intensity: typeof w.intensity === 'string' ? w.intensity : undefined,
@@ -377,6 +381,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               // Pass through computed data for PlannedWorkoutView
               computed: computed,
               rendered_description: renderedDesc,
+              // Provide raw structures to Planned view so it can derive targets per-rep
+              steps_preset: Array.isArray(stepsPresetParsed) ? stepsPresetParsed : null,
+              export_hints: typeof exportHintsParsed === 'object' && exportHintsParsed ? exportHintsParsed : null,
+              intervals: Array.isArray(intervalsParsed) ? intervalsParsed : null,
             };
             byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
           }
@@ -804,16 +812,23 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   if (Array.isArray(parsed)) tags = parsed;
                 } catch {}
               }
+              // Parse steps_preset/export_hints/intervals (may be JSON strings)
+              const stepsPresetParsed = (() => { const v=(w as any).steps_preset; if (Array.isArray(v)) return v; try { return JSON.parse(v); } catch { return null; }})();
+              const exportHintsParsed = (() => { const v=(w as any).export_hints; if (v && typeof v === 'object') return v; try { return JSON.parse(v); } catch { return null; }})();
+              const intervalsParsed = (() => { const v=(w as any).intervals; if (Array.isArray(v)) return v; try { return JSON.parse(v); } catch { return null; }})();
 
               const workout = {
                 id: (w as any).id,
                 name: (w as any).name || 'Session',
-                type: (w as any).type,
+                type: (String((w as any).type).toLowerCase()==='bike' ? 'ride' : (w as any).type) as any,
                 description: renderedDesc,
                 duration,
                 day: dayName,
                 computed,
-                tags
+                tags,
+                steps_preset: Array.isArray(stepsPresetParsed) ? stepsPresetParsed : null,
+                export_hints: typeof exportHintsParsed === 'object' && exportHintsParsed ? exportHintsParsed : null,
+                intervals: Array.isArray(intervalsParsed) ? intervalsParsed : null,
               };
               byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
             }
