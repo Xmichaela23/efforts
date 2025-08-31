@@ -205,7 +205,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               String((workout as any).type||''),
               ((workout as any).export_hints || {}),
               (perfNumbers || {}),
-              String((workout as any).pace_annotation || 'inline')
+              String((workout as any).pace_annotation || 'inline'),
+              (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[]))
             );
             if (expanded.length) {
               // Prepend/append WU/CD from tokens if available, without duplicating
@@ -266,7 +267,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   };
 
   // Expand per-rep lines from compact JSON spec (expand_spec)
-  const expandFromSpec = (spec: any, discipline: string, exportHints: any, perf: any, annotation: string): string[] => {
+  const expandFromSpec = (spec: any, discipline: string, exportHints: any, perf: any, annotation: string, stepsPreset?: string[]): string[] => {
     if (!spec || typeof spec !== 'object') return [];
     const out: string[] = [];
     const type = String(discipline||'').toLowerCase();
@@ -278,7 +279,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     const easy = String(perf?.easyPace || perf?.easy_pace || '').trim() || undefined;
     const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
     const parsePace = (p?: string): { sec:number, unit:'mi'|'km' } | null => { if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any }; };
-    const resolveTarget = (t?: string) => {
+    // Derive default targets from tokens if not provided in spec
+    const tokensJoined = Array.isArray(stepsPreset) ? stepsPreset.join(' ').toLowerCase() : '';
+    const defaultWorkToken = /5kpace|10kpace|tempo|interval/.test(tokensJoined) ? '{5k_pace}' : undefined;
+    const defaultRestToken = /rest|recovery|easy/.test(tokensJoined) ? '{easy_pace}' : '{easy_pace}';
+    const resolveTarget = (t?: string, phase: 'work'|'rest'='work') => {
       if (!t) return undefined as string|undefined;
       let raw = t;
       if (fivek) raw = raw.split('{5k_pace}').join(String(fivek));
@@ -292,8 +297,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     const work = spec.work || {};
     const rest = spec.rest || {};
     const idPrefix = typeof spec.id_prefix === 'string' && spec.id_prefix.trim().length>0 ? String(spec.id_prefix).trim() : '';
-    const workTarget = resolveTarget(work.target);
-    const restTarget = resolveTarget(rest.target);
+    const workTarget = resolveTarget(work.target || defaultWorkToken, 'work');
+    const restTarget = resolveTarget(rest.target || defaultRestToken, 'rest');
     for (let i=0;i<reps;i+=1){
       const repNum = i+1;
       const workId = idPrefix ? `${idPrefix}-rep${repNum}-work` : '';
@@ -752,18 +757,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 else if (isCool(l)) cool.push(l);
                 else main.push(l);
               });
-              let out = [...warm, ...main, ...cool];
-              // If no line has a target, append a fallback target to non-rest, non-WU/CD lines
-              if (!out.some(s => /@\s*\d/.test(s))){
-                const workoutTarget = formatPrimaryTarget((workout as any).computed) || fallbackPace;
-                if (workoutTarget) {
-                  out = out.map((s) => {
-                    if (/warm|cool|rest/i.test(s)) return s;
-                    return `${s} @ ${workoutTarget}`.trim();
-                  });
-                }
-              }
-              return out;
+              const out = [...warm, ...main, ...cool];
+              // Ensure every main rep has a target; don't rely on a global hasTarget check (WU/CD may already have targets)
+              const workoutTarget = formatPrimaryTarget((workout as any).computed) || fallbackPace;
+              const needsTarget = (s: string) => !/warm|cool|rest/i.test(s) && !/@\s*\d|@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s);
+              return out.map((s) => (needsTarget(s) && workoutTarget) ? `${s} @ ${workoutTarget}`.trim() : s);
             })();
             return (
               <ul className="list-none space-y-1">

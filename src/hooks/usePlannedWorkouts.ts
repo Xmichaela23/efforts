@@ -76,6 +76,51 @@ export const usePlannedWorkouts = () => {
           if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) return p; } catch {} }
           return [] as any[];
         })();
+        // Parse view/expansion hints from DB columns (preferred) or from tags (schema-safe)
+        const displayOverrides = parseMaybeJson((workout as any).display_overrides) || null;
+        const expandSpecDb = parseMaybeJson((workout as any).expand_spec) || null;
+        const paceAnnotationDb = (workout as any).pace_annotation || null;
+        const parseExpandSpecFromTags = (tagsArr: string[]) => {
+          const out: any = {};
+          const idPrefixTag = tagsArr.find(t=>/^idprefix:/i.test(String(t)));
+          if (idPrefixTag) out.id_prefix = String(idPrefixTag.split(':')[1]||'').trim();
+          const expandTag = tagsArr.find(t=>/^expand:/i.test(String(t)));
+          if (expandTag){
+            const body = expandTag.split(':')[1] || '';
+            const parts = body.split(';');
+            for (const p of parts){
+              const [k,v] = p.split('=');
+              const key = String(k||'').trim().toLowerCase();
+              const val = String(v||'').trim().toLowerCase();
+              if (!key) continue;
+              if (key === 'reps') out.reps = Number(val);
+              if (key === 'omit_last_rest') out.omit_last_rest = (val==='1' || val==='true');
+              if (key === 'work'){
+                if (/^\d+\s*s$/.test(val)) { out.work = { time_s: Number(val.replace(/\D/g,'')) }; }
+                else if (/^\d+\s*m$/.test(val)) { out.work = { distance_m: Number(val.replace(/\D/g,'')) }; }
+                else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1609.34) }; }
+                else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1000) }; }
+              }
+              if (key === 'rest'){
+                if (/^\d+\s*s$/.test(val)) { out.rest = { time_s: Number(val.replace(/\D/g,'')) }; }
+                else if (/^\d+\s*m$/.test(val)) { out.rest = { distance_m: Number(val.replace(/\D/g,'')) }; }
+                else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1609.34) }; }
+                else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1000) }; }
+              }
+            }
+          }
+          return (out.reps && (out.work || out.rest)) ? out : null;
+        };
+        const parseDisplayOverridesFromTags = (tagsArr: string[]) => {
+          const view = tagsArr.find(t=>/^view:/i.test(String(t)));
+          const pace = tagsArr.find(t=>/^pace_annotation:/i.test(String(t)));
+          const ov: any = {};
+          if (view && String(view.split(':')[1]||'').toLowerCase()==='unpack') ov.planned_detail = 'unpack';
+          const pa = pace ? String(pace.split(':')[1]||'').toLowerCase() : '';
+          return { overrides: Object.keys(ov).length?ov:null, pace_annotation: pa||null };
+        };
+        const { overrides: displayOverridesFromTags, pace_annotation: paceAnnoFromTags } = parseDisplayOverridesFromTags(parsedTags.map(String));
+        const expandSpecFromTags = parseExpandSpecFromTags(parsedTags.map(String));
 
         return {
           id: workout.id,
@@ -105,6 +150,13 @@ export const usePlannedWorkouts = () => {
           computed,
           // @ts-ignore
           units,
+          // View hints (DB columns take precedence over tag-encoded hints)
+          // @ts-ignore
+          display_overrides: displayOverrides || displayOverridesFromTags || null,
+          // @ts-ignore
+          expand_spec: expandSpecDb || expandSpecFromTags || null,
+          // @ts-ignore
+          pace_annotation: paceAnnotationDb || paceAnnoFromTags || null,
         } as any;
       });
 
