@@ -1,6 +1,8 @@
 import { supabase } from '@/lib/supabase';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
+import { expand } from './expander';
+import { resolveTargets, totalDurationSeconds } from './targets';
 
 type PlannedRow = {
   user_id: string;
@@ -297,10 +299,22 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       for (const row of existing as any[]) {
         const hasSteps = row?.computed && Array.isArray(row.computed.steps) && row.computed.steps.length>0;
         if (!hasSteps) {
-          const steps = buildComputedFromIntervals(row.intervals, row.type, row.export_hints, perfNumbersUpgrade);
-          if (Array.isArray(steps) && steps.length) {
-            const nextComputed = { ...(row.computed||{}), normalization_version: 'v2', steps };
-            await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
+          let wrote = false;
+          try {
+            if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
+              const atomic = expand(row.steps_preset as any[], undefined, row.tags as any);
+              const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {});
+              const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
+              await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
+              wrote = true;
+            }
+          } catch {}
+          if (!wrote) {
+            const steps = buildComputedFromIntervals(row.intervals, row.type, row.export_hints, perfNumbersUpgrade);
+            if (Array.isArray(steps) && steps.length) {
+              const nextComputed = { ...(row.computed||{}), normalization_version: 'v2', steps };
+              await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
+            }
           }
         }
         // Always ensure intervals carry targets when possible
@@ -610,6 +624,14 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       return out.length ? out : undefined;
     };
 
+    // Expand + resolve to computed steps (preferred path)
+    let computedStepsV3: any[] | undefined = undefined;
+    try {
+      const atomic = expand(Array.isArray((s as any).steps_preset) ? (s as any).steps_preset : [], (s as any).main, (s as any).tags);
+      const resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {});
+      if (Array.isArray(resolved) && resolved.length) computedStepsV3 = resolved as any[];
+    } catch {}
+
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);
 
     rows.push({
@@ -629,10 +651,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
       rendered_description: rendered,
-      computed: { normalization_version: 'v2', total_duration_seconds: totalSeconds },
+      computed: computedStepsV3 && computedStepsV3.length ? { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurationSeconds(computedStepsV3 as any) } : { normalization_version: 'v2', total_duration_seconds: totalSeconds },
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
-      intervals: Array.isArray(s.intervals) && s.intervals.length ? s.intervals : intervalsFromNorm,
+      intervals: computedStepsV3 && computedStepsV3.length ? (buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers) || intervalsFromNorm) : (Array.isArray(s.intervals) && s.intervals.length ? s.intervals : intervalsFromNorm),
       strength_exercises: Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined,
     });
   }
