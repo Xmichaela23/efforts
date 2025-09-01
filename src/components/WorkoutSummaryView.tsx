@@ -63,4 +63,4 @@ const WorkoutSummaryView: React.FC<WorkoutSummaryViewProps> = ({
 
 export default WorkoutSummaryView;
 
-export default WorkoutSummaryView;
+ 

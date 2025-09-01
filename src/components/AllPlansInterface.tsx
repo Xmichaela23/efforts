@@ -11,6 +11,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
 import PlannedWorkoutView from './PlannedWorkoutView';
 import WorkoutSummaryView from './WorkoutSummaryView';
+import UnifiedWorkoutView from './UnifiedWorkoutView';
 // @ts-ignore
 import optionalUiSpec from '@/services/plans/optional-ui-spec.json';
 
@@ -906,7 +907,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
   const handleWorkoutClick = (workout: any) => {
     setSelectedWorkout(workout);
-    setWorkoutViewMode('summary'); // Reset to summary when opening workout
+    setWorkoutViewMode('summary');
     setCurrentView('day');
   };
 
@@ -1121,6 +1122,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Day View via unified modal (Planned tab)
+  if (currentView === 'day' && selectedWorkout) {
+    return (
+      <div className="min-h-screen bg-white">
+        <UnifiedWorkoutView
+          workout={selectedWorkout}
+          initialTab="planned"
+          onClose={() => { setCurrentView('detail'); setSelectedWorkout(null); }}
+        />
+      </div>
+    );
+  }
 
   // Day View Rendering with Summary/Edit modes
   if (currentView === 'day' && selectedWorkout) {
