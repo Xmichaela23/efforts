@@ -31,20 +31,20 @@ export const PRESETS: Record<string, Preset> = {
   interval_6x1mi_5kpace_R2min: { kind: 'interval', reps: 6, work: { dist_m: 1609, target: '{5k_pace}' }, rest: { duration_s: 120 } },
 
   // Cruise intervals
-  cruise_4x1_5mi_5kpace_plus0:10_R3min: { kind: 'interval', reps: 4, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
-  cruise_5x1_5mi_5kpace_plus0:10_R3min: { kind: 'interval', reps: 5, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
-  cruise_3x2mi_5kpace_plus0:15_R3min: { kind: 'interval', reps: 3, work: { dist_m: 3219, target: '{5k_pace}+0:15' }, rest: { duration_s: 180 } },
-  cruise_4x2mi_5kpace_plus0:15_R3min: { kind: 'interval', reps: 4, work: { dist_m: 3219, target: '{5k_pace}+0:15' }, rest: { duration_s: 180 } },
-  cruise_2x3mi_5kpace_plus0:20_R3min: { kind: 'interval', reps: 2, work: { dist_m: 4828, target: '{5k_pace}+0:20' }, rest: { duration_s: 180 } },
+  'cruise_4x1_5mi_5kpace_plus0:10_R3min': { kind: 'interval', reps: 4, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
+  'cruise_5x1_5mi_5kpace_plus0:10_R3min': { kind: 'interval', reps: 5, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
+  'cruise_3x2mi_5kpace_plus0:15_R3min': { kind: 'interval', reps: 3, work: { dist_m: 3219, target: '{5k_pace}+0:15' }, rest: { duration_s: 180 } },
+  'cruise_4x2mi_5kpace_plus0:15_R3min': { kind: 'interval', reps: 4, work: { dist_m: 3219, target: '{5k_pace}+0:15' }, rest: { duration_s: 180 } },
+  'cruise_2x3mi_5kpace_plus0:20_R3min': { kind: 'interval', reps: 2, work: { dist_m: 4828, target: '{5k_pace}+0:20' }, rest: { duration_s: 180 } },
 
   // Tempo
-  tempo_4mi_5kpace_plus0:45: { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+0:45' },
-  tempo_5mi_5kpace_plus0:45: { kind: 'tempo', dist_m: 8047, target: '{5k_pace}+0:45' },
-  tempo_6mi_5kpace_plus0:40: { kind: 'tempo', dist_m: 9656, target: '{5k_pace}+0:40' },
-  tempo_7mi_5kpace_plus0:40: { kind: 'tempo', dist_m: 11265, target: '{5k_pace}+0:40' },
-  tempo_7mi_5kpace_plus0:35: { kind: 'tempo', dist_m: 11265, target: '{5k_pace}+0:35' },
-  tempo_8mi_5kpace_plus0:35: { kind: 'tempo', dist_m: 12875, target: '{5k_pace}+0:35' },
-  tempo_4mi_5kpace_plus1:00: { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+1:00' },
+  'tempo_4mi_5kpace_plus0:45': { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+0:45' },
+  'tempo_5mi_5kpace_plus0:45': { kind: 'tempo', dist_m: 8047, target: '{5k_pace}+0:45' },
+  'tempo_6mi_5kpace_plus0:40': { kind: 'tempo', dist_m: 9656, target: '{5k_pace}+0:40' },
+  'tempo_7mi_5kpace_plus0:40': { kind: 'tempo', dist_m: 11265, target: '{5k_pace}+0:40' },
+  'tempo_7mi_5kpace_plus0:35': { kind: 'tempo', dist_m: 11265, target: '{5k_pace}+0:35' },
+  'tempo_8mi_5kpace_plus0:35': { kind: 'tempo', dist_m: 12875, target: '{5k_pace}+0:35' },
+  'tempo_4mi_5kpace_plus1:00': { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+1:00' },
 
   // Long runs
   longrun_90min_easypace_last10steady: { kind: 'longrun', duration_s: 90 * 60, target: '{easy_pace}' },
