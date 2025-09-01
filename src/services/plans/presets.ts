@@ -74,7 +74,7 @@ export const PRESETS: Record<string, Preset> = {
   bike_ss_2x20min_R6min: { kind: 'interval', reps: 2, work: { duration_s: 1200, target: '{sweetspot_power}' }, rest: { duration_s: 360 } },
   bike_ss_2x22min_R6min: { kind: 'interval', reps: 2, work: { duration_s: 1320, target: '{sweetspot_power}' }, rest: { duration_s: 360 } },
   bike_ss_2x25min_R6min: { kind: 'interval', reps: 2, work: { duration_s: 1500, target: '{sweetspot_power}' }, rest: { duration_s: 360 } },
-  bike_endurance_50min_Z1-2_cad85-95: { kind: 'steady', duration_s: 50 * 60, target: 'Z1-2' },
+  'bike_endurance_50min_Z1-2_cad85-95': { kind: 'steady', duration_s: 50 * 60, target: 'Z1-2' },
   bike_endurance_50min_Z1: { kind: 'steady', duration_s: 50 * 60, target: 'Z1' },
   bike_endurance_120min_Z2: { kind: 'steady', duration_s: 120 * 60, target: 'Z2' },
   bike_endurance_150min_Z2: { kind: 'steady', duration_s: 150 * 60, target: 'Z2' },
