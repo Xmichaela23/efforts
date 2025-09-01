@@ -455,6 +455,41 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const pr = paceRangeStr(seg) || (typeof seg?.paceTarget === 'string' ? seg.paceTarget : undefined);
       const pw = powerRangeStr(seg);
       const sp = swimPer100Str(seg);
+      // For run distance reps, derive a per-rep time range from pace
+      const deriveRunTimeRange = (): string | undefined => {
+        try {
+          if (!d) return undefined;
+          // extract numeric meters from d when formatted like "400m" or "0.5 mi"
+          let meters = 0;
+          const md = String(d).trim().toLowerCase();
+          if (/mi\b/.test(md)) {
+            const m = md.match(/([\d\.]+)/);
+            if (m) meters = parseFloat(m[1]) * 1609.34;
+          } else if (/km\b/.test(md)) {
+            const m = md.match(/([\d\.]+)/);
+            if (m) meters = parseFloat(m[1]) * 1000;
+          } else {
+            const m = md.match(/(\d+)/);
+            if (m) meters = parseFloat(m[1]);
+          }
+          if (!meters || !Number.isFinite(meters)) return undefined;
+          // pace seconds per mile if available
+          const baseSec = typeof seg?.pace_sec_per_mi === 'number' ? seg.pace_sec_per_mi : undefined;
+          const rng = seg?.pace_range && typeof seg.pace_range.lower === 'number' && typeof seg.pace_range.upper === 'number'
+            ? { lo: seg.pace_range.lower, hi: seg.pace_range.upper }
+            : undefined;
+          const miles = meters / 1609.34;
+          const fmt = (s:number) => { const x=Math.round(s); const mm=Math.floor(x/60); const ss=x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+          if (rng) {
+            return `${fmt(rng.lo * miles)}–${fmt(rng.hi * miles)}`;
+          }
+          if (typeof baseSec === 'number' && isFinite(baseSec)) {
+            const tol = 0.04; // quality default
+            return `${fmt(baseSec*(1-tol)*miles)}–${fmt(baseSec*(1+tol)*miles)}`;
+          }
+        } catch {}
+        return undefined;
+      };
       if (isRestLike(seg)) {
         lines.push(`1 × ${t || d || 'rest'} rest`);
       } else if (d || t) {
@@ -470,7 +505,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             target = `${mmss(p.sec)}/${p.unit} (${lo}–${hi})`;
           }
         }
-        lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}`.trim());
+        const timeAnn = (!t && d && pr) ? deriveRunTimeRange() : undefined;
+        lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}${timeAnn ? ` — ${timeAnn}` : ''}`.trim());
       }
     };
     for (const st of stepsRaw) {
