@@ -1761,19 +1761,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 onClick={() => handleWorkoutClick(workout)}
                                 className={`p-4 rounded-lg border transition-colors cursor-pointer ${workout.type === 'rest' ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-200 hover:border-gray-300'}`}
                               >
-                                {workout.computed && workout.computed.steps && workout.computed.total_duration_seconds ? (
-                                  <WorkoutSummaryView
-                                    computed={workout.computed}
-                                    baselines={{
-                                      fiveK_pace_sec_per_mi: (workout as any).fiveK_pace_sec_per_mi,
-                                      easy_pace_sec_per_mi: (workout as any).easy_pace_sec_per_mi,
-                                      ftp: (workout as any).ftp,
-                                      swim_pace_per_100_sec: (workout as any).swim_pace_per_100_sec
-                                    }}
-                                    workoutType={(() => { const nm=(workout.name||''); const t=(workout.type||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}
-                                    description={workout.rendered_description || workout.description}
-                                    compact={true}
-                                  />
+                                {false ? (
+                                  <></>
                                 ) : (
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1">
