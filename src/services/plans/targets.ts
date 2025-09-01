@@ -32,6 +32,8 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
   for (const st of steps) {
     const rs: ResolvedStep = { ...st } as any;
     const isRest = rs.type==='interval_rest' || /rest/i.test(String((rs as any).cue||''));
+    const isWarm = rs.type==='warmup';
+    const isCool = rs.type==='cooldown';
     // Pace resolution for run-like steps
     if (rs.target && /\{.*pace.*\}/i.test(rs.target)) {
       const token = rs.target;
@@ -66,6 +68,26 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
         rs.target_value = `${center} W`;
         rs.target_low = `${lo} W`;
         rs.target_high = `${hi} W`;
+      }
+    }
+    // If no explicit target token, provide sensible defaults for runs
+    if (!rs.target_value && (isRest || isWarm || isCool || rs.type==='steady' || rs.type==='interval_work')) {
+      const ptxt = isRest || isWarm || isCool ? (easy || fivek) : (fivek || easy);
+      const p = parsePace(ptxt);
+      if (p.sec && p.unit) {
+        const tol = (isRest || isWarm || isCool || rs.type==='steady') ? tolEasy : tolQual;
+        rs.target_value = `${mmss(p.sec)}/${p.unit}`;
+        rs.target_low = `${mmss(p.sec*(1-tol))}/${p.unit}`;
+        rs.target_high = `${mmss(p.sec*(1+tol))}/${p.unit}`;
+      }
+    }
+    // If distance_m present and we have a pace, derive duration_s to fix totals
+    if (typeof (rs as any).distance_m === 'number' && (rs as any).distance_m > 0 && !rs.duration_s) {
+      const pref = rs.target_value || (isRest || isWarm || isCool ? (easy || fivek) : (fivek || easy));
+      const pp = parsePace(pref);
+      if (pp.sec) {
+        const miles = Number((rs as any).distance_m) / 1609.34;
+        rs.duration_s = Math.max(1, Math.round(miles * pp.sec));
       }
     }
     out.push(rs);
