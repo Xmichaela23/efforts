@@ -1841,7 +1841,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                           </div>
-                                          <div className="text-sm text-gray-600 mt-1">{workout.rendered_description || workout.description}</div>
+                                          {/* Planned weekly subtitle: always show grouped description; avoid step-derived text */}
+                                          <div className="text-sm text-gray-600 mt-1">{(workout.rendered_description || workout.description)}</div>
                                           {(() => {
                                             const planUi: any = (selectedPlanDetail as any)?.ui_text || (selectedPlanDetail as any)?.template?.ui_text || {};
                                             const copy = (planUi?.opt_kind_copy || {}) as Record<string,string>;

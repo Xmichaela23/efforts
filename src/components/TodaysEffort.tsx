@@ -447,15 +447,56 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       : 'bg-white border border-gray-200'
                   }`}
                 >
-                  {workout.workout_status === 'planned' && workout.computed && workout.computed.steps && workout.computed.total_duration_seconds ? (
-                    <WorkoutExecutionView
-                      computed={workout.computed}
-                      baselines={baselines?.performanceNumbers || {}}
-                      workoutType={workout.name || getDisplaySport(workout)}
-                      description={workout.rendered_description || workout.description}
-                      showStatus={false}
-                      className="p-0"
-                    />
+                  {/* Planned: always show grouped description; execution view only on drill-in */}
+                  {true ? (
+                    <div className="space-y-1">
+                      {/* Title and Duration Row */}
+                      <div className="flex items-center justify-between">
+                        <div className="font-medium text-base text-gray-900">
+                          {(() => {
+                            const type = String(workout.type || '').toLowerCase();
+                            const desc = String(workout.rendered_description || workout.description || '').toLowerCase();
+                            const steps = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+                            if (type === 'strength') {
+                              if (/squat|deadlift|bench|ohp/.test(desc)) return 'Strength — Compounds';
+                              if (/chin|row|pull|lunge|accessor/i.test(desc)) return 'Strength — Accessory';
+                              if (/core/.test(desc)) return 'Strength — Core';
+                              return 'Strength';
+                            }
+                            if (type === 'run') {
+                              const joined = steps.join(' ').toLowerCase();
+                              if (/longrun_/.test(joined) || /\blong\b/.test(desc)) return 'Run — Long';
+                              if (/tempo/.test(desc)) return 'Run — Tempo';
+                              if (/(intervals?)/.test(desc) || /(\d+)\s*[x×]\s*(\d+)/.test(desc)) return 'Run — Intervals';
+                              return 'Run';
+                            }
+                            if (type === 'ride') {
+                              const joined = steps.join(' ').toLowerCase();
+                              if (/bike_vo2_/.test(joined) || /vo2/.test(desc)) return 'Ride — VO2';
+                              if (/bike_thr_/.test(joined) || /threshold/.test(desc)) return 'Ride — Threshold';
+                              if (/bike_ss_/.test(joined) || /sweet\s*spot|\bss\b/.test(desc)) return 'Ride — Sweet Spot';
+                              if (/bike_endurance_/.test(joined) || /endurance|z2/.test(desc)) return 'Ride — Endurance';
+                              return 'Ride';
+                            }
+                            if (type === 'swim') {
+                              if (/drill|technique|swim_drills_|swim_technique_/.test(desc)) return 'Swim — Drills';
+                              return 'Swim';
+                            }
+                            return workout.name || getDisplaySport(workout);
+                          })()}
+                          {workout.workout_status === 'planned' && (
+                            <span className="text-xs ml-2 text-gray-500">(planned)</span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                          <span className="text-muted-foreground">{formatRichWorkoutDisplay(workout).duration}</span>
+                        </div>
+                      </div>
+                      {/* Grouped description only */}
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span>{stripCodes(workout.rendered_description || workout.description)}</span>
+                      </div>
+                    </div>
                   ) : (
                     <div className="space-y-1">
                       {/* Title and Duration Row */}
