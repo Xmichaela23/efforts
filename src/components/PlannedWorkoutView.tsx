@@ -198,10 +198,25 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         if (computedSteps.length > 0) {
           setStepLines(flattenSteps(computedSteps));
         } else {
-          // Per-workout backfill: if we have intervals but no computed, synthesize computed and persist
+          // Per-workout backfill: if we have tokens (preferred) or intervals but no computed, synthesize computed and persist
           try {
+            const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
             const intervalsRaw: any[] | undefined = Array.isArray((workout as any).intervals) ? (workout as any).intervals : undefined;
-            if (intervalsRaw && intervalsRaw.length > 0) {
+            if (stepsPresetArr && stepsPresetArr.length > 0) {
+              // Use centralized expander + resolver for accurate targets and durations
+              const { expand } = await import('@/services/plans/expander');
+              const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
+              const atomic: any[] = expand(stepsPresetArr, (workout as any).main, (workout as any).tags);
+              const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}));
+              if (Array.isArray(resolved) && resolved.length) {
+                setStepLines(flattenSteps(resolved));
+                try {
+                  const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
+                  await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', (workout as any).id);
+                } catch {}
+                return;
+              }
+            } else if (intervalsRaw && intervalsRaw.length > 0) {
               const hints = (workout as any).export_hints || {};
               const perfObj = (perfNumbers || {});
               // Build minimal computed-style steps mirroring ensureWeekMaterialized logic
