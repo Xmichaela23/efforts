@@ -524,6 +524,27 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     };
     const mmss = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
     const pushSeg = (seg: any) => {
+      // v3 schema: { type, duration_s?, distance_m?, target_value?, target_low?, target_high? }
+      if (typeof seg?.type === 'string' && (typeof seg?.duration_s === 'number' || typeof seg?.distance_m === 'number')) {
+        const kind = String(seg.type).toLowerCase();
+        const isRestV3 = kind === 'interval_rest' || /rest/.test(kind);
+        const isWarmV3 = kind === 'warmup';
+        const isCoolV3 = kind === 'cooldown';
+        const base = typeof seg?.distance_m === 'number' && seg.distance_m > 0
+          ? `${Math.round(seg.distance_m)}m`
+          : (typeof seg?.duration_s === 'number' && seg.duration_s > 0 ? secTo(seg.duration_s) : undefined);
+        const trg = (() => {
+          if (seg?.target_value && seg?.target_low && seg?.target_high) {
+            return `${seg.target_value} (${seg.target_low}–${seg.target_high})`;
+          }
+          return undefined;
+        })();
+        if (base) {
+          const label = isWarmV3 ? 'Warm‑up' : isCoolV3 ? 'Cool‑down' : (isRestV3 ? '' : '');
+          lines.push(`${label ? label + ' ' : ''}1 × ${base}${trg ? ` @ ${trg}` : ''}${isRestV3 ? ' rest' : ''}`.trim());
+        }
+        return;
+      }
       const d = distStr(seg);
       const t = timeStr(seg);
       const pr = paceRangeStr(seg) || (typeof seg?.paceTarget === 'string' ? seg.paceTarget : undefined);
