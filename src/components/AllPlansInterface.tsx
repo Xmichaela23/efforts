@@ -212,6 +212,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [planStatus, setPlanStatus] = useState<string>('active');
   const [viewMode, setViewMode] = useState<'summary' | 'adjustments'>('summary');
   const [activatingId, setActivatingId] = useState<string | null>(null);
+  // Gate weekly render while week is being materialized/refetched to avoid flicker
+  const [weekLoading, setWeekLoading] = useState<boolean>(false);
   
   // Add workout edit mode state
   const [workoutViewMode, setWorkoutViewMode] = useState<'summary' | 'edit'>('summary');
@@ -835,6 +837,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       try {
         if (!selectedPlanDetail || !selectedPlanDetail.id || !selectedWeek) return;
         // If week has no rows yet, bake & insert just this week
+        setWeekLoading(true);
         const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
         await ensureWeekMaterialized(String(selectedPlanDetail.id), Number(selectedWeek));
         // Reload plan detail rows from DB to reflect any newly inserted sessions
@@ -895,6 +898,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           }
         } catch {}
       } catch {}
+      finally {
+        setWeekLoading(false);
+      }
     })();
   }, [selectedPlanDetail?.id, selectedWeek]);
 
@@ -1739,7 +1745,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               ) : null;
             })()}
 
-            {currentWeekData && (
+            {currentWeekData && !weekLoading && (
               <div className="">
                 <div className="">
                   <div className="space-y-4">
@@ -1863,6 +1869,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                   </div>
                 </div>
               </div>
+            )}
+            {weekLoading && (
+              <div className="p-3 text-sm text-gray-500">Loading…</div>
             )}
 
             {(!selectedPlanDetail.weeks || selectedPlanDetail.weeks.length === 0) && (
