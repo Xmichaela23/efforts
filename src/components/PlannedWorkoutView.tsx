@@ -106,20 +106,28 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   React.useEffect(() => {
     (async () => {
       try {
-        // Prefer server-rendered friendly text if present
+        // Always load baselines for target annotations
+        let pn: any = {};
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const resp = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
+            pn = (resp as any)?.data?.performance_numbers || {};
+            setPerfNumbers(pn);
+            const fiveK0 = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
+            const easy0 = pn.easyPace || null;
+            setFallbackPace(easy0 || fiveK0 || undefined);
+          }
+        } catch {}
+
+        // Friendly copy: prefer server-rendered, else author text with baseline tokens resolved
         const storedText = (workout as any).rendered_description;
         if (typeof storedText === 'string' && storedText.trim().length > 0) {
           setFriendlyDesc(storedText);
         } else {
           const raw = workout.description || '';
-          const { data: { user } } = await supabase.auth.getUser();
-          if (!user) { setFriendlyDesc(stripCodes(raw)); return; }
-          const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
-          const pn: any = (data as any)?.performance_numbers || {};
-          setPerfNumbers(pn);
           const fiveK = pn.fiveK_pace || pn.fiveKPace || pn.fiveK || null;
-          const easy = pn.easyPace || null;
-          setFallbackPace(easy || fiveK || undefined);
+          const easy = pn.easyPace || pn.easy_pace || null;
           let out = raw || '';
           if (fiveK) out = out.split('{5k_pace}').join(String(fiveK));
           if (easy) out = out.split('{easy_pace}').join(String(easy));
@@ -190,6 +198,72 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         if (computedSteps.length > 0) {
           setStepLines(flattenSteps(computedSteps));
         } else {
+          // Per-workout backfill: if we have intervals but no computed, synthesize computed and persist
+          try {
+            const intervalsRaw: any[] | undefined = Array.isArray((workout as any).intervals) ? (workout as any).intervals : undefined;
+            if (intervalsRaw && intervalsRaw.length > 0) {
+              const hints = (workout as any).export_hints || {};
+              const perfObj = (perfNumbers || {});
+              // Build minimal computed-style steps mirroring ensureWeekMaterialized logic
+              const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+              const parsePace = (p?: string): { sec: number | null, unit?: 'mi'|'km' } => {
+                if (!p) return { sec: null } as any;
+                const m = String(p).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+                if (!m) return { sec: null } as any;
+                return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+              };
+              const tolEasy = typeof hints.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06;
+              const tolQual = typeof hints.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04;
+              const easyTxt: string | undefined = perfObj?.easyPace || perfObj?.easy_pace;
+              const fivekTxt: string | undefined = perfObj?.fiveK_pace || perfObj?.fiveKPace || perfObj?.fiveK;
+              const deriveRunPace = (isRest:boolean) => {
+                const base = isRest ? (easyTxt || fivekTxt) : (fivekTxt || easyTxt);
+                const p = parsePace(base);
+                return p?.sec ? { sec: p.sec, unit: (p.unit||'mi') as any } : null;
+              };
+              const toMiles = (m:number)=> Number(m)/1609.34;
+              const stepsSynth: any[] = [];
+              for (const it of intervalsRaw) {
+                const lab = String(it?.effortLabel||'').toLowerCase();
+                const isRest = /rest|recovery/.test(lab);
+                if (typeof it?.duration === 'number' && it.duration>0) {
+                  const base: any = { kind: isRest?'recovery':'work', ctrl: 'time', seconds: Math.max(1, Math.floor(it.duration)) };
+                  if ((workout as any).type === 'run') {
+                    const p = parsePace((it as any).paceTarget) || (deriveRunPace(isRest) as any);
+                    if (p?.sec) {
+                      base.pace_sec_per_mi = p.sec;
+                      const tol = isRest ? tolEasy : tolQual;
+                      base.pace_range = { lower: Math.round(p.sec*(1-tol)), upper: Math.round(p.sec*(1+tol)) };
+                    }
+                  }
+                  stepsSynth.push(base);
+                } else if (typeof it?.distanceMeters === 'number' && it.distanceMeters>0) {
+                  const miles = toMiles(Number(it.distanceMeters));
+                  const base: any = { kind: isRest?'recovery':'work', ctrl: 'distance', original_val: Number(it.distanceMeters), original_units: 'm' };
+                  if ((workout as any).type === 'run') {
+                    const p = parsePace((it as any).paceTarget) || (deriveRunPace(isRest) as any);
+                    if (p?.sec) {
+                      base.pace_sec_per_mi = p.sec;
+                      const tol = isRest ? tolEasy : tolQual;
+                      base.pace_range = { lower: Math.round(p.sec*(1-tol)), upper: Math.round(p.sec*(1+tol)) };
+                      base.seconds = Math.max(1, Math.round(miles * p.sec));
+                    }
+                  }
+                  stepsSynth.push(base);
+                }
+              }
+              if (stepsSynth.length) {
+                setStepLines(flattenSteps(stepsSynth));
+                // Persist computed + enriched intervals
+                try {
+                  const enriched = synthesizeFromIntervals(intervalsRaw, String((workout as any).type||''), hints, perfObj);
+                  const nextComputed = { normalization_version: 'v2', steps: stepsSynth, total_duration_seconds: Number((workout as any)?.computed?.total_duration_seconds)||undefined } as any;
+                  await supabase.from('planned_workouts').update({ computed: nextComputed, intervals: (Array.isArray(enriched)&&enriched.length)?intervalsRaw:intervalsRaw }).eq('id', (workout as any).id);
+                } catch {}
+                return;
+              }
+            }
+          } catch {}
           // Try tokens first when available (authoritative for per-rep layout)
           // If JSON supplies display_overrides.expand for this view, or expand_spec, honor it first
           const wantUnpack = (() => {
