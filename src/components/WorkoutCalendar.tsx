@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
 import { usePlannedRange } from '@/hooks/usePlannedRange';
@@ -287,30 +288,55 @@ export default function WorkoutCalendar({
   const handleDayClick = async (day: Date) => {
     const dateStr = toDateOnlyString(day);
     // On any day click, ensure that week is materialized, then invalidate caches
-    try {
-      const wkStart = startOfWeek(day);
-      const wkEnd = addDays(wkStart, 6);
-      // Try to load plan id from current plans; if multiple, skip materialize
-      const activePlan = Array.isArray(currentPlans) && currentPlans.length > 0 ? currentPlans[0] : null;
-      if (activePlan && activePlan.id) {
-        const weekNumber = Math.floor((resolveDate(dateStr).getTime() - resolveDate(toDateOnlyString(wkStart)).getTime()) / (1000*60*60*24)) < 7 ? undefined : undefined;
-        // Lazy import to avoid bundle bloat
-        const mod = await import('@/services/plans/ensureWeekMaterialized');
-        await mod.ensureWeekMaterialized(String(activePlan.id), undefined as any);
-      }
-    } catch {}
+    try { await ensureWeekForDate(day); } catch {}
     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
     if (onDateSelect) onDateSelect(dateStr);
   };
 
-  const handlePrevWeek = (newRef: Date) => {
+  const handlePrevWeek = async (newRef: Date) => {
     setReferenceDate(newRef);
+    try { await ensureWeekForDate(newRef); } catch {}
     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
   };
 
-  const handleNextWeek = (newRef: Date) => {
+  const handleNextWeek = async (newRef: Date) => {
     setReferenceDate(newRef);
+    try { await ensureWeekForDate(newRef); } catch {}
     try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+  };
+
+  // Helper: compute Week 1 start from an anchor row
+  const computeWeek1Start = (anchorDate: string, anchorDayNumber: number | null) => {
+    const dn = typeof anchorDayNumber === 'number' && anchorDayNumber >= 1 && anchorDayNumber <= 7 ? anchorDayNumber : 1;
+    const parts = String(anchorDate).split('-').map((x) => parseInt(x, 10));
+    const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+    base.setDate(base.getDate() - (dn - 1));
+    return new Date(base.getFullYear(), base.getMonth(), base.getDate());
+  };
+
+  // Ensure week materialized for a date based on active plan
+  const ensureWeekForDate = async (d: Date) => {
+    try {
+      const activePlan = Array.isArray(currentPlans) && currentPlans.length > 0 ? currentPlans[0] : null;
+      if (!activePlan || !activePlan.id) return;
+      // Find Week 1 anchor
+      const { data: w1 } = await supabase
+        .from('planned_workouts')
+        .select('date, day_number')
+        .eq('training_plan_id', activePlan.id)
+        .eq('week_number', 1)
+        .order('day_number', { ascending: true })
+        .limit(1);
+      if (!Array.isArray(w1) || w1.length === 0) return;
+      const anchor = w1[0] as any;
+      const w1Start = computeWeek1Start(String(anchor.date), Number(anchor.day_number));
+      const tgtStart = startOfWeek(d);
+      const diffDays = Math.round((resolveDate(toDateOnlyString(tgtStart)).getTime() - resolveDate(toDateOnlyString(w1Start)).getTime()) / (1000 * 60 * 60 * 24));
+      const weekNumber = Math.floor(diffDays / 7) + 1;
+      if (!Number.isFinite(weekNumber) || weekNumber < 1) return;
+      const mod = await import('@/services/plans/ensureWeekMaterialized');
+      await mod.ensureWeekMaterialized(String(activePlan.id), weekNumber);
+    } catch {}
   };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
