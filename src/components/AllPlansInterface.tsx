@@ -901,6 +901,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       } catch {}
       finally {
         setWeekLoading(false);
+        // Invalidate calendar/planned range caches after week materializes
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       }
     })();
   }, [selectedPlanDetail?.id, selectedWeek]);
@@ -1130,6 +1132,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         <UnifiedWorkoutView
           workout={selectedWorkout}
           initialTab="planned"
+          origin="weekly"
           onClose={() => { setCurrentView('detail'); setSelectedWorkout(null); }}
         />
       </div>

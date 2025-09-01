@@ -14,6 +14,7 @@ interface UnifiedWorkoutViewProps {
   onUpdateWorkout?: (workoutId: string, updates: any) => void;
   onDelete?: (workoutId: string) => void;
   initialTab?: 'planned' | 'summary' | 'completed';
+  origin?: 'today' | 'weekly' | 'other';
 }
 
 const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
@@ -21,7 +22,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   onClose,
   onUpdateWorkout,
   onDelete,
-  initialTab
+  initialTab,
+  origin = 'other'
 }) => {
   if (!workout) {
     return (
@@ -181,7 +183,16 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onClose}
+          onClick={() => {
+            try {
+              if (origin === 'today') {
+                window.dispatchEvent(new CustomEvent('nav:back:today'));
+              } else if (origin === 'weekly') {
+                window.dispatchEvent(new CustomEvent('nav:back:weekly'));
+              }
+            } catch {}
+            onClose();
+          }}
           className="h-8 w-8 p-0"
         >
           <X className="h-4 w-4" />

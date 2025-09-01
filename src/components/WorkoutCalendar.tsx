@@ -265,7 +265,9 @@ export default function WorkoutCalendar({
     for (const [day, list] of byDay.entries()) {
       const buckets = new Map<string, any>();
       for (const ev of list) {
-        const bKey = `${ev._sigType}|${ev._sigMiles}`;
+        const isPlanned = String(ev.provider || '').toLowerCase() === 'workouts';
+        // Do not merge distinct planned rows; key them by id. Still dedupe provider-origin events.
+        const bKey = isPlanned ? `planned|${String(ev._src?.id || ev.href || '')}` : `${ev._sigType}|${ev._sigMiles}`;
         const existing = buckets.get(bKey);
         if (!existing) {
           buckets.set(bKey, ev);
@@ -282,19 +284,33 @@ export default function WorkoutCalendar({
     return deduped;
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
-  const handleDayClick = (day: Date) => {
+  const handleDayClick = async (day: Date) => {
     const dateStr = toDateOnlyString(day);
-    if (onDateSelect) {
-      onDateSelect(dateStr);
-    }
+    // On any day click, ensure that week is materialized, then invalidate caches
+    try {
+      const wkStart = startOfWeek(day);
+      const wkEnd = addDays(wkStart, 6);
+      // Try to load plan id from current plans; if multiple, skip materialize
+      const activePlan = Array.isArray(currentPlans) && currentPlans.length > 0 ? currentPlans[0] : null;
+      if (activePlan && activePlan.id) {
+        const weekNumber = Math.floor((resolveDate(dateStr).getTime() - resolveDate(toDateOnlyString(wkStart)).getTime()) / (1000*60*60*24)) < 7 ? undefined : undefined;
+        // Lazy import to avoid bundle bloat
+        const mod = await import('@/services/plans/ensureWeekMaterialized');
+        await mod.ensureWeekMaterialized(String(activePlan.id), undefined as any);
+      }
+    } catch {}
+    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    if (onDateSelect) onDateSelect(dateStr);
   };
 
   const handlePrevWeek = (newRef: Date) => {
     setReferenceDate(newRef);
+    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
   };
 
   const handleNextWeek = (newRef: Date) => {
     setReferenceDate(newRef);
+    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
   };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
