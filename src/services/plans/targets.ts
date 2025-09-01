@@ -17,6 +17,14 @@ export function parsePace(txt?: string): { sec: number|null, unit?: 'mi'|'km' } 
   return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
 }
 
+function coerceUnit(txt?: string, fallbackUnit: 'mi'|'km' = 'mi'): string | undefined {
+  if (!txt) return undefined;
+  const s = String(txt).trim();
+  if (/\/(mi|km)/i.test(s)) return s;
+  if (/^\d+:\d{2}$/.test(s)) return `${s}/${fallbackUnit}`;
+  return s;
+}
+
 function mmss(sec: number) { const x=Math.max(1,Math.round(sec)); const m=Math.floor(x/60); const s=x%60; return `${m}:${String(s).padStart(2,'0')}`; }
 
 export type ResolvedStep = AtomicStep & { target_value?: string; target_low?: string; target_high?: string };
@@ -25,8 +33,8 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
   const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
   const tolQual = typeof exportHints?.pace_tolerance_quality==='number' ? exportHints.pace_tolerance_quality : 0.04;
   const ftp: number|undefined = typeof (baselines as any)?.ftp === 'number' ? (baselines as any).ftp : undefined;
-  const fivek = baselines.fiveK_pace || baselines.fiveKPace || baselines.fiveK;
-  const easy = baselines.easyPace || baselines.easy_pace;
+  const fivek = coerceUnit(baselines.fiveK_pace || baselines.fiveKPace || baselines.fiveK, 'mi');
+  const easy = coerceUnit(baselines.easyPace || baselines.easy_pace, 'mi');
 
   const out: ResolvedStep[] = [];
   for (const st of steps) {
