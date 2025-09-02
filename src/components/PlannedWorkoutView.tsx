@@ -415,6 +415,21 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workout.id]);
 
+  // Derive swim yard total from rendered step lines as a fallback
+  React.useEffect(() => {
+    try {
+      if (String((workout as any).type||'').toLowerCase() !== 'swim') return;
+      const lines = Array.isArray(stepLines) ? stepLines : [];
+      let yards = 0;
+      for (const s of lines) {
+        const m = String(s).match(/(\d+)\s*yd\b/i);
+        if (m) yards += parseInt(m[1], 10) || 0;
+      }
+      if (yards > 0) setTotalYards(yards);
+    } catch {}
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepLines, workout.id]);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'planned': return 'bg-blue-100 text-blue-800 border-blue-200';
