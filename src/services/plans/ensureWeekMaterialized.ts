@@ -478,7 +478,39 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         if (u === 'mi') return Math.floor(val * 1609.34);
         return Math.floor(val || 0);
       };
-      return steps.map((st: any) => {
+      const parsePace = (txt?: string): { sec: number|null, unit?: 'mi'|'km' } => {
+        if (!txt) return { sec: null } as any;
+        const m = String(txt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+        if (!m) return { sec: null } as any;
+        return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+      };
+      const reorder = (arr: any[]) => {
+        const warm = arr.filter(s => s.type === 'warmup');
+        const cool = arr.filter(s => s.type === 'cooldown');
+        const rest = arr.filter(s => s.type === 'interval_rest');
+        const work = arr.filter(s => s.type !== 'warmup' && s.type !== 'cooldown' && s.type !== 'interval_rest');
+        return [...warm, ...work.flatMap((w,i)=> [w, rest[i]]).filter(Boolean), ...cool];
+      };
+      const v3 = steps.every(st => (st && typeof st.type === 'string' && (typeof st.duration_s === 'number' || typeof st.distance_m === 'number')));
+      const source = v3 ? reorder(steps) : steps;
+      return source.map((st: any) => {
+        if (v3) {
+          const t = String(st.type).toLowerCase();
+          const isRest = t === 'interval_rest';
+          const effortLabel = t === 'warmup' ? 'warm up' : t === 'cooldown' ? 'cool down' : isRest ? 'rest' : 'interval';
+          const base: any = { effortLabel };
+          if (typeof st.distance_m === 'number' && st.distance_m > 0) base.distanceMeters = Math.floor(st.distance_m);
+          if (typeof st.duration_s === 'number' && st.duration_s > 0) base.duration = Math.max(1, Math.floor(st.duration_s));
+          // map pace targets
+          const p = parsePace(st.target_value);
+          const lo = parsePace(st.target_low);
+          const hi = parsePace(st.target_high);
+          if (p.sec && p.unit) base.paceTarget = `${Math.floor(p.sec/60)}:${String(p.sec%60).padStart(2,'0')}/${p.unit}`;
+          if (lo.sec && hi.sec) base.pace_range = { lower: lo.sec, upper: hi.sec };
+          // map power range if present via string like '210 W' is kept as cue by function
+          return base;
+        }
+        // legacy v2 mapping
         const ctrl = String(st?.ctrl || '').toLowerCase();
         const label = String(st?.label || st?.effortLabel || '').trim();
         const kind = String(st?.kind || '').toLowerCase();
