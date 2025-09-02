@@ -92,3 +92,38 @@ export function getPreset(token: string): Preset | undefined {
 }
 
 
+// Swim catalogs (drills and equipment modifiers) — yards-first semantics
+export type SwimCatalogEntry = {
+  type: 'swim_drill' | 'swim_pull' | 'swim_kick' | 'swim_aerobic';
+  label: string;
+  cue: string;
+  is_drill?: boolean;
+  equipment?: string;
+  aliases?: string[];
+};
+
+export const SWIM_CATALOG: Record<string, SwimCatalogEntry> = {
+  catchup: { type: 'swim_drill', label: 'Drill — Catch-up', cue: 'Touch hands in front; long glide', is_drill: true, equipment: 'none', aliases: [] },
+  singlearm: { type: 'swim_drill', label: 'Drill — Single Arm', cue: 'One arm swims, other arm forward', is_drill: true, equipment: 'none', aliases: ['single_arm'] },
+  fist: { type: 'swim_drill', label: 'Drill — Fist Swim', cue: 'Closed fists to feel forearm catch', is_drill: true, equipment: 'none', aliases: [] },
+  scullfront: { type: 'swim_drill', label: 'Drill — Scull (Front)', cue: 'Small figure-8 at front of stroke', is_drill: true, equipment: 'none', aliases: ['scull_front','front_scull'] },
+  zipper: { type: 'swim_drill', label: 'Drill — Zipper', cue: 'Drag thumb up side; high elbow recov.', is_drill: true, equipment: 'none', aliases: [] },
+  '616': { type: 'swim_drill', label: 'Drill — 6-1-6', cue: '6 kicks on side, 1 stroke, switch', is_drill: true, equipment: 'snorkel (optional)', aliases: ['six_one_six'] },
+  doggypaddle: { type: 'swim_drill', label: 'Drill — Doggy Paddle', cue: 'Short strokes, head neutral', is_drill: true, equipment: 'none', aliases: ['dog_paddle'] },
+  fingertipdrag: { type: 'swim_drill', label: 'Drill — Fingertip Drag', cue: 'Lightly drag fingertips; high elbow', is_drill: true, equipment: 'none', aliases: ['fingertip_drag'] },
+  pull: { type: 'swim_pull', label: 'Pull', cue: 'Pull buoy, paddles optional', is_drill: false, equipment: 'pull buoy', aliases: [] },
+  kick: { type: 'swim_kick', label: 'Kick', cue: 'Flutter kick, streamline or board', is_drill: false, equipment: 'kickboard (optional fins)', aliases: [] },
+  aerobic: { type: 'swim_aerobic', label: 'Aerobic', cue: 'Easy aerobic swim', is_drill: false, equipment: 'none', aliases: [] }
+};
+
+export type SwimEquipModifier = { type: 'equipment_modifier'; label: string; cue: string; equipment: string };
+
+export const SWIM_EQUIPMENT_MODS: Record<string, SwimEquipModifier> = {
+  fins: { type: 'equipment_modifier', label: 'Fins', cue: 'Wear fins', equipment: 'fins' },
+  paddles: { type: 'equipment_modifier', label: 'Paddles', cue: 'Hand paddles', equipment: 'paddles' },
+  snorkel: { type: 'equipment_modifier', label: 'Snorkel', cue: 'Center-mount snorkel', equipment: 'snorkel' },
+  buoy: { type: 'equipment_modifier', label: 'Pull Buoy', cue: 'Buoy between legs', equipment: 'pull buoy' },
+  board: { type: 'equipment_modifier', label: 'Kickboard', cue: 'Kick with board', equipment: 'kickboard' }
+};
+
+

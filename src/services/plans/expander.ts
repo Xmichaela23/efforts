@@ -1,9 +1,11 @@
-import { getPreset, PRESETS, Preset } from './presets';
+import { getPreset, PRESETS, Preset, SWIM_CATALOG, SWIM_EQUIPMENT_MODS } from './presets';
 
 export type AtomicStep =
   | { id: string; type: 'warmup'|'cooldown'|'steady'; duration_s?: number; distance_m?: number; target?: string; cue?: string }
   | { id: string; type: 'interval_work'|'interval_rest'; duration_s?: number; distance_m?: number; target?: string; cue?: string }
-  | { id: string; type: 'strength_work'|'strength_rest'; exercise?: string; set?: number; reps?: number|string; intensity?: string; rest_s?: number };
+  | { id: string; type: 'strength_work'|'strength_rest'; exercise?: string; set?: number; reps?: number|string; intensity?: string; rest_s?: number }
+  // Swim enriched
+  | { id: string; type: 'swim_drill'|'swim_pull'|'swim_kick'|'swim_aerobic'|'swim_warmup'|'swim_cooldown'; label?: string; distance_yd?: number; authored_unit?: 'yd'; rest_s?: number; equipment?: string; cue?: string };
 
 export interface ExpandOptions {
   idPrefix?: string;
@@ -86,26 +88,33 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     }
   }
 
-  // Swim main DSL → atomic blocks
+  // Swim main DSL → atomic blocks (yards-first semantics)
   if (typeof swimMain === 'string' && swimMain.trim()) {
     const parts = swimMain.split(';').map(s => s.trim()).filter(Boolean);
     for (const part of parts) {
       const m1 = part.match(/^drills\(([^)]+)\)$/i);
       if (m1) {
         const drills = m1[1].split(',').map(x=>x.trim());
-        for (const d of drills) out.push({ id: makeId(idPrefix, ['swim','drill',d]), type: 'steady', distance_m: undefined, cue: `drill:${d}` });
+        for (const d of drills) {
+          const cat = SWIM_CATALOG[d.toLowerCase()] || { type: 'swim_drill', label: 'Drill', cue: '', is_drill: true, equipment: 'none' } as any;
+          out.push({ id: makeId(idPrefix, ['swim','drill',d]), type: 'swim_drill', label: cat.label, distance_yd: 50, authored_unit: 'yd', rest_s: d.toLowerCase()==='catchup'?15: d.toLowerCase()==='singlearm'?20: undefined, equipment: cat.equipment, cue: cat.cue });
+        }
         continue;
       }
-      const m2 = part.match(/^(pull|kick)(\d+)x(\d+)$/i);
+      const m2 = part.match(/^(pull|kick)(\d+)x(\d+)(?:\(([^)]+)\))?$/i);
       if (m2) {
-        const reps = Number(m2[2]); const each = Number(m2[3]);
-        for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim', m2[1].toLowerCase(), String(i).padStart(2,'0')]), type: 'steady', distance_m: each, cue: m2[1].toLowerCase() });
+        const reps = Number(m2[2]); const each = Number(m2[3]); const mods = String(m2[4]||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+        const base = SWIM_CATALOG[m2[1].toLowerCase()];
+        const equip = [base?.equipment].concat(mods.map(m=>SWIM_EQUIPMENT_MODS[m]?.equipment).filter(Boolean) as string[]).filter(Boolean).join(', ').replace(/,\s*,/g, ', ').trim();
+        for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim', m2[1].toLowerCase(), String(i).padStart(2,'0')]), type: (base?.type || 'swim_aerobic') as any, label: base?.label || (m2[1].toLowerCase()==='pull'?'Pull':'Kick'), distance_yd: each, authored_unit: 'yd', equipment: equip||undefined });
         continue;
       }
-      const m3 = part.match(/^aerobic\((\d+)x(\d+)\)$/i);
+      const m3 = part.match(/^aerobic\((\d+)x(\d+)(?:@(?:(\d+))?r)?(?:,([^\)]+))?\)$/i);
       if (m3) {
-        const reps = Number(m3[1]); const each = Number(m3[2]);
-        for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','aerobic', String(i).padStart(2,'0')]), type: 'steady', distance_m: each, cue: 'aerobic' });
+        const reps = Number(m3[1]); const each = Number(m3[2]); const rest = m3[3]?Number(m3[3]):undefined; const mods = String(m3[4]||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+        const base = SWIM_CATALOG['aerobic'];
+        const equip = [base?.equipment].concat(mods.map(m=>SWIM_EQUIPMENT_MODS[m]?.equipment).filter(Boolean) as string[]).filter(Boolean).join(', ').replace(/,\s*,/g, ', ').trim();
+        for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','aerobic', String(i).padStart(2,'0')]), type: 'swim_aerobic', label: base?.label || 'Aerobic', distance_yd: each, authored_unit: 'yd', rest_s: rest?rest:undefined, equipment: equip||undefined });
         continue;
       }
     }

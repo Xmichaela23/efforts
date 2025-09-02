@@ -571,6 +571,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         const typeLower = String((workout as any).type||'').toLowerCase();
         const isSwim = typeLower === 'swim';
         const base = (() => {
+          // Prefer authored yards from enriched swim steps
+          if (isSwim && typeof (seg as any).distance_yd === 'number' && (seg as any).distance_yd > 0) {
+            const yd = Math.round((seg as any).distance_yd / 25) * 25;
+            return `${yd} yd`;
+          }
           if (typeof seg?.distance_m === 'number' && seg.distance_m > 0) {
             if (isSwim) {
               const yd = Math.round(seg.distance_m / 0.9144 / 25) * 25; // nearest 25 yd
@@ -591,6 +596,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             if (isRestV3) return '';
             if (isSwim) {
               const cue = String(seg?.cue||'');
+              const labelPref = (seg as any).label as string | undefined;
+              if (labelPref && labelPref.trim()) return labelPref.trim();
               if (/drill:/.test(cue)) return `Drill — ${cue.split(':')[1]}`;
               if (/pull/i.test(cue)) return 'Pull';
               if (/kick/i.test(cue)) return 'Kick';
@@ -599,7 +606,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             return '';
           })();
           const prefix = label ? label + ' ' : '';
-          lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${isRestV3 ? ' rest' : ''}`.trim());
+          const equipment = isSwim ? (String((seg as any).equipment||'').trim()) : '';
+          const restAnn = isRestV3 ? ' rest' : ((isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) ? ` @ 0:${String((seg as any).rest_s).padStart(2,'0')}r` : '');
+          const equipAnn = equipment ? ` — ${equipment}` : '';
+          lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${restAnn}${equipAnn}`.trim());
         }
         return;
       }

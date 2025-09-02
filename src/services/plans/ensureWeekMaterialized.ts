@@ -491,15 +491,21 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         const work = arr.filter(s => s.type !== 'warmup' && s.type !== 'cooldown' && s.type !== 'interval_rest');
         return [...warm, ...work.flatMap((w,i)=> [w, rest[i]]).filter(Boolean), ...cool];
       };
-      const v3 = steps.every(st => (st && typeof st.type === 'string' && (typeof st.duration_s === 'number' || typeof st.distance_m === 'number')));
+      const v3 = steps.every(st => (st && typeof st.type === 'string' && (typeof st.duration_s === 'number' || typeof st.distance_m === 'number' || typeof (st as any).distance_yd === 'number')));
       const source = v3 ? reorder(steps) : steps;
-      return source.map((st: any) => {
+      return source.flatMap((st: any) => {
         if (v3) {
           const t = String(st.type).toLowerCase();
           const isRest = t === 'interval_rest';
-          const effortLabel = t === 'warmup' ? 'warm up' : t === 'cooldown' ? 'cool down' : isRest ? 'rest' : (String(mappedType).toLowerCase()==='swim' && st.cue ? st.cue : 'interval');
+          let effortLabel = t === 'warmup' ? 'warm up' : t === 'cooldown' ? 'cool down' : isRest ? 'rest' : (String(mappedType).toLowerCase()==='swim' && st.cue ? st.cue : 'interval');
+          if (String(mappedType).toLowerCase()==='swim') {
+            const lbl = String((st as any).label || '').trim();
+            const eq = String((st as any).equipment || '').trim();
+            if (lbl) effortLabel = eq ? `${lbl} — ${eq}` : lbl;
+          }
           const base: any = { effortLabel };
           if (typeof st.distance_m === 'number' && st.distance_m > 0) base.distanceMeters = Math.floor(st.distance_m);
+          if (typeof st.distance_yd === 'number' && st.distance_yd > 0) base.distanceMeters = Math.floor(st.distance_yd * 0.9144);
           if (typeof st.duration_s === 'number' && st.duration_s > 0) base.duration = Math.max(1, Math.floor(st.duration_s));
           // map pace targets
           const p = parsePace(st.target_value);
@@ -507,8 +513,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const hi = parsePace(st.target_high);
           if (p.sec && p.unit) base.paceTarget = `${Math.floor(p.sec/60)}:${String(p.sec%60).padStart(2,'0')}/${p.unit}`;
           if (lo.sec && hi.sec) base.pace_range = { lower: lo.sec, upper: hi.sec };
-          // map power range if present via string like '210 W' is kept as cue by function
-          return base;
+          const arr = [base];
+          if (String(mappedType).toLowerCase()==='swim' && typeof (st as any).rest_s === 'number' && (st as any).rest_s>0) arr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) });
+          return arr;
         }
         // legacy v2 mapping
         const ctrl = String(st?.ctrl || '').toLowerCase();
