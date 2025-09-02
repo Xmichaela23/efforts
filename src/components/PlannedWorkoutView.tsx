@@ -1069,6 +1069,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <h3 className="text-base font-semibold">
           {getWorkoutTypeLabel(workout.type)} — {deriveFocus()}
         </h3>
+        {String((workout as any).type||'').toLowerCase()==='swim' && typeof (totalYardsMemo||totalYards)==='number' && (totalYardsMemo||totalYards)!>0 && (
+          <div className="text-sm text-gray-500">Total {(totalYardsMemo||totalYards)} yd</div>
+        )}
 
         {/* Vertical step list (minimal, no color panel) */}
         <div className="p-1">
