@@ -419,7 +419,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     };
     update();
     el.addEventListener('scroll', update, { passive: true } as any);
-    const ro = new (window as any).ResizeObserver?.(update);
+    const RO: any = (window as any).ResizeObserver;
+    const ro = RO ? new RO(update) : null;
     if (ro) ro.observe(el);
     return () => { el.removeEventListener('scroll', update); if (ro) ro.disconnect(); };
   }, [displayWorkouts.length]);
