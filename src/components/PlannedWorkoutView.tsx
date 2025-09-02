@@ -562,8 +562,21 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           ? `${seg.target_value} (${seg.target_low}–${seg.target_high})`
           : undefined;
         if (base) {
-          const label = isWarmV3 ? 'Warm‑up' : isCoolV3 ? 'Cool‑down' : (isRestV3 ? '' : '');
-          lines.push(`${label ? label + ' ' : ''}1 × ${base}${trg ? ` @ ${trg}` : ''}${isRestV3 ? ' rest' : ''}`.trim());
+          const label = (() => {
+            if (isWarmV3) return 'Warm‑up';
+            if (isCoolV3) return 'Cool‑down';
+            if (isRestV3) return '';
+            if (isSwim) {
+              const cue = String(seg?.cue||'');
+              if (/drill:/.test(cue)) return `Drill — ${cue.split(':')[1]}`;
+              if (/pull/i.test(cue)) return 'Pull';
+              if (/kick/i.test(cue)) return 'Kick';
+              if (/aerobic/i.test(cue)) return 'Aerobic';
+            }
+            return '';
+          })();
+          const prefix = label ? label + ' ' : '';
+          lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${isRestV3 ? ' rest' : ''}`.trim());
         }
         return;
       }
