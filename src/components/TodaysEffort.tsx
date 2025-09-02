@@ -30,12 +30,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const dateWorkoutsMemo = useMemo(() => {
     const allWorkouts = [...(workouts || []), ...(plannedWorkouts || [])];
-    return allWorkouts.filter((w: any) => w.date === activeDate && !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
+    return allWorkouts.filter((w: any) => w.date === activeDate);
   }, [workouts, plannedWorkouts, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
-    setDisplayWorkouts(dateWorkoutsMemo);
+    // Split into activated (no 'optional') and optional
+    const activated = dateWorkoutsMemo.filter((w:any)=> !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
+    const optionals = dateWorkoutsMemo.filter((w:any)=> Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'));
+    setDisplayWorkouts([...activated, ...optionals]);
   }, [dateWorkoutsMemo]);
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
@@ -259,6 +262,16 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     };
     
     return { discipline, duration, metrics: getMetrics() };
+  };
+
+  const activateOptional = async (w: any) => {
+    try {
+      const t: string[] = Array.isArray(w?.tags) ? w.tags : [];
+      const next = t.filter((x:string)=> x.toLowerCase() !== 'optional');
+      await fetch('/api/activate-optional', { method: 'POST', body: JSON.stringify({ id: w.id, tags: next }) }).catch(()=>{});
+      try { const { supabase } = await import('@/lib/supabase'); await supabase.from('planned_workouts').update({ tags: next }).eq('id', w.id); } catch {}
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    } catch {}
   };
 
   // Get discipline name
