@@ -955,16 +955,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const miles=parseFloat(tmLegacy[1]); const p=parsePace(fivek || easy || ''); if (p){ const lo = `${mmss(p.sec*(1-tolQual))}/${p.unit}`; const hi = `${mmss(p.sec*(1+tolQual))}/${p.unit}`; out.push(`1 × ${miles} mi @ ${mmss(p.sec)}/${p.unit} (${lo}–${hi})`);} else out.push(`1 × ${miles} mi`);
     }
 
-    // Swim tokens → labeled per-rep lines (yards-first)
+    // Swim tokens → labeled per-rep lines (yards-first, with rests/equipment)
     if (type==='swim'){
+      const addRest = (key:string) => key==='catchup'? '0:15' : key==='singlearm'||key==='single_arm'? '0:20' : undefined;
       // Warmup/Cooldown distance
       stepsPreset.forEach((t)=>{ const s=t.toLowerCase(); let m=s.match(/swim_(warmup|cooldown)_(\d+)(yd|m)/i); if(m){ const dist=parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase(); const yd = unit==='m'? Math.round(dist/0.9144/25)*25 : Math.round(dist/25)*25; out.push(`${m[1].toLowerCase()==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd`);} });
       // Drills with specific names
       const swimDrillRe=/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i;
-      stepsPreset.forEach((t)=>{ const m=t.match(swimDrillRe); if(m){ const reps=parseInt(m[1],10); const each=parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase(); const key=(m[4]||'').toLowerCase(); const label = key==='catchup'?'Drill — Catch-up': key==='singlearm'||key==='single_arm'?'Drill — Single Arm': key==='fist'?'Drill — Fist Swim': key==='scullfront'||key==='front_scull'?'Drill — Scull (Front)': key==='fingertipdrag'||key==='fingertip_drag'?'Drill — Fingertip Drag': key==='zipper'?'Drill — Zipper': key==='doggypaddle'||key==='dog_paddle'?'Drill — Doggy Paddle': key==='616'||key==='six_one_six'?'Drill — 6-1-6':'Drill'; const yd= unit==='m'? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25; for(let r=0;r<reps;r+=1){ out.push(`${label} 1 × ${yd} yd`);} } });
+      stepsPreset.forEach((t)=>{ const m=t.match(swimDrillRe); if(m){ const reps=parseInt(m[1],10); const each=parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase(); const key=(m[4]||'').toLowerCase(); const label = key==='catchup'?'Catch-up': key==='singlearm'||key==='single_arm'?'Single Arm': key==='fist'?'Fist Swim': key==='scullfront'||key==='front_scull'?'Scull (Front)': key==='fingertipdrag'||key==='fingertip_drag'?'Fingertip Drag': key==='zipper'?'Zipper': key==='doggypaddle'||key==='dog_paddle'?'Doggy Paddle': key==='616'||key==='six_one_six'?'6-1-6':'Drill'; const equip = (key==='scullfront' || key==='616') ? ' — snorkel (opt)' : ''; const yd= unit==='m'? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25; for(let r=0;r<reps;r+=1){ out.push(`${label} 1 × ${yd} yd${equip}`); const rs=addRest(key); if(rs) out.push(`Rest ${rs}`);} } });
       // Pull/Kick blocks
       const swimPKRe=/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i;
-      stepsPreset.forEach((t)=>{ const m=t.match(swimPKRe); if(m){ const kind=(m[1]||'').toLowerCase(); const reps=parseInt(m[2],10); const each=parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase(); const yd= unit==='m'? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25; const label = kind==='pull'?'Pull':'Kick'; for(let r=0;r<reps;r+=1){ out.push(`${label} 1 × ${yd} yd`);} } });
+      stepsPreset.forEach((t)=>{ const m=t.match(swimPKRe); if(m){ const kind=(m[1]||'').toLowerCase(); const reps=parseInt(m[2],10); const each=parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase(); const yd= unit==='m'? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25; const label = kind==='pull'?'Pull — buoy':'Kick — board'; for(let r=0;r<reps;r+=1){ out.push(`${label} 1 × ${yd} yd`);} } });
       // Aerobic blocks
       const swimAerRe=/swim_aerobic_(\d+)x(\d+)(yd|m)/i;
       stepsPreset.forEach((t)=>{ const m=t.match(swimAerRe); if(m){ const reps=parseInt(m[1],10); const each=parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase(); const yd= unit==='m'? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25; for(let r=0;r<reps;r+=1){ out.push(`Aerobic 1 × ${yd} yd`);} } });
