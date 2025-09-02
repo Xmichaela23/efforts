@@ -1010,14 +1010,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           // Map swim cues to labels (fallback heuristic). Prefer specific drill name.
           const raw = String(lab || '').toLowerCase();
           const drillName = (() => {
-            if (/catchup/.test(raw)) return 'Drill — Catch-up';
-            if (/singlearm|single_arm/.test(raw)) return 'Drill — Single Arm';
-            if (/fist/.test(raw)) return 'Drill — Fist Swim';
-            if (/scullfront|front_scull/.test(raw)) return 'Drill — Scull (Front)';
-            if (/fingertipdrag|fingertip_drag/.test(raw)) return 'Drill — Fingertip Drag';
-            if (/zipper/.test(raw)) return 'Drill — Zipper';
-            if (/doggypaddle|dog_paddle/.test(raw)) return 'Drill — Doggy Paddle';
-            if (/\b616\b|six_one_six/.test(raw)) return 'Drill — 6-1-6';
+            if (/catchup/.test(raw)) return 'Catch-up';
+            if (/singlearm|single_arm/.test(raw)) return 'Single Arm';
+            if (/fist/.test(raw)) return 'Fist Swim';
+            if (/scullfront|front_scull/.test(raw)) return 'Scull (Front)';
+            if (/fingertipdrag|fingertip_drag/.test(raw)) return 'Fingertip Drag';
+            if (/zipper/.test(raw)) return 'Zipper';
+            if (/doggypaddle|dog_paddle/.test(raw)) return 'Doggy Paddle';
+            if (/\b616\b|six_one_six/.test(raw)) return '6-1-6';
             return null;
           })();
           const prefix = drillName || (/pull/.test(raw) ? 'Pull' : /kick/.test(raw) ? 'Kick' : /aerobic/.test(raw) ? 'Aerobic' : /warm\s*up/.test(raw) ? 'Warm‑up' : /cool\s*down/.test(raw) ? 'Cool‑down' : '');
