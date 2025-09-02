@@ -113,7 +113,8 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       if (m3) {
         const reps = Number(m3[1]); const each = Number(m3[2]); const rest = m3[3]?Number(m3[3]):undefined; const mods = String(m3[4]||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
         const base = SWIM_CATALOG['aerobic'];
-        const equip = [base?.equipment].concat(mods.map(m=>SWIM_EQUIPMENT_MODS[m]?.equipment).filter(Boolean) as string[]).filter(Boolean).join(', ').replace(/,\s*,/g, ', ').trim();
+        // aerobic default equipment: none; only explicit modifiers apply
+        const equip = mods.map(m=>SWIM_EQUIPMENT_MODS[m]?.equipment).filter(Boolean).join(', ').trim();
         for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','aerobic', String(i).padStart(2,'0')]), type: 'swim_aerobic', label: base?.label || 'Aerobic', distance_yd: each, authored_unit: 'yd', rest_s: rest?rest:undefined, equipment: equip||undefined });
         continue;
       }

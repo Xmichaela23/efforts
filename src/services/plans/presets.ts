@@ -112,7 +112,7 @@ export const SWIM_CATALOG: Record<string, SwimCatalogEntry> = {
   doggypaddle: { type: 'swim_drill', label: 'Drill — Doggy Paddle', cue: 'Short strokes, head neutral', is_drill: true, equipment: 'none', aliases: ['dog_paddle'] },
   fingertipdrag: { type: 'swim_drill', label: 'Drill — Fingertip Drag', cue: 'Lightly drag fingertips; high elbow', is_drill: true, equipment: 'none', aliases: ['fingertip_drag'] },
   pull: { type: 'swim_pull', label: 'Pull', cue: 'Pull buoy, paddles optional', is_drill: false, equipment: 'pull buoy', aliases: [] },
-  kick: { type: 'swim_kick', label: 'Kick', cue: 'Flutter kick, streamline or board', is_drill: false, equipment: 'kickboard (optional fins)', aliases: [] },
+  kick: { type: 'swim_kick', label: 'Kick', cue: 'Flutter kick, streamline or board', is_drill: false, equipment: 'kickboard', aliases: [] },
   aerobic: { type: 'swim_aerobic', label: 'Aerobic', cue: 'Easy aerobic swim', is_drill: false, equipment: 'none', aliases: [] }
 };
 
