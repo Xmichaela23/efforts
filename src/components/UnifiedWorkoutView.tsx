@@ -172,11 +172,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <div>
             <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
             <p className="text-sm text-muted-foreground">
-              {new Date(workout.date + 'T00:00:00').toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric'
-              })}
+              {(() => {
+                try {
+                  const ds = String(workout.date || '').trim();
+                  if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+                    const d = new Date(ds + 'T00:00:00');
+                    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                  }
+                  const dn = Number((workout as any)?.day_number);
+                  if (dn >= 1 && dn <= 7) {
+                    const long = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+                    return long[dn - 1];
+                  }
+                } catch {}
+                return 'Planned';
+              })()}
             </p>
           </div>
         </div>

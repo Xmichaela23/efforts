@@ -46,12 +46,30 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const [perfNumbers, setPerfNumbers] = React.useState<any | undefined>(undefined);
   
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString + 'T00:00:00');
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric'
-    });
+    try {
+      const ds = String(dateString || '').trim();
+      if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
+        const date = new Date(ds + 'T00:00:00');
+        if (!isNaN(date.getTime())) {
+          return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+          });
+        }
+      }
+      // Fallback: show weekday from day_number or generic label
+      try {
+        const dn = Number((workout as any)?.day_number);
+        if (dn >= 1 && dn <= 7) {
+          const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+          return weekdays[dn - 1];
+        }
+      } catch {}
+      return 'Planned';
+    } catch {
+      return 'Planned';
+    }
   };
 
   const getWorkoutTypeIcon = (type: string) => {
@@ -166,8 +184,13 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             const lines: string[] = [];
             const defaultTarget = formatPrimaryTarget(comp);
             const fmtPace = (p?: string) => (p && String(p).trim().length > 0) ? ` @ ${p}` : '';
+            const isSwim = String((workout as any).type || '').toLowerCase() === 'swim';
             const fmtDist = (m?: number) => {
               const v = Number(m || 0); if (!v || !Number.isFinite(v)) return undefined;
+              if (isSwim) {
+                const yd = Math.round(v / 0.9144 / 25) * 25; // nearest 25 yd
+                return `${yd} yd`;
+              }
               if (Math.abs(v - Math.round(v/1609.34)*1609.34) < 1) return `${Math.round(v/1609.34)} mi`;
               if (v % 1000 === 0) return `${Math.round(v/1000)} km`;
               return `${Math.round(v)} m`;
@@ -956,7 +979,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 Edit
               </button>
             )}
-            {onComplete && workout.workout_status === 'planned' && (
+            {onComplete && (workout.workout_status === 'planned' || !workout.workout_status || workout.workout_status === 'in_progress') && (
               <button
                 onClick={onComplete}
                 className="px-0 py-0 text-sm text-gray-900 hover:underline"
