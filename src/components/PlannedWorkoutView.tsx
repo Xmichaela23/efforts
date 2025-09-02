@@ -838,22 +838,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         }
         if (type==='swim'){
           const yd = Math.round(Number(meters) / 0.9144 / 25) * 25;
-          // Map swim cues to labels
-          const label = String(lab || '').toLowerCase();
-          const prefix = (() => {
-            if (/drill:/.test(label)) {
-              const d = label.split('drill:')[1] || '';
-              const proper = d.replace(/(^|[_\-\s])(\w)/g, (_m, a, b) => (a?' ':'') + String(b).toUpperCase());
-              return `Drill — ${proper}`;
-            }
-            if (/pull/.test(label)) return 'Pull';
-            if (/kick/.test(label)) return 'Kick';
-            if (/aerobic/.test(label)) return 'Aerobic';
-            if (/warm\s*up/.test(label)) return 'Warm‑up';
-            if (/cool\s*down/.test(label)) return 'Cool‑down';
-            return '';
-          })();
-        
+          // Map swim cues to labels (fallback heuristic)
+          const raw = String(lab || '').toLowerCase();
+          const hasDrillToken = /drill|catchup|singlearm|fist|scull|zipper|doggypaddle|fingertip/.test(raw);
+          const prefix = hasDrillToken ? 'Drill' : /pull/.test(raw) ? 'Pull' : /kick/.test(raw) ? 'Kick' : /aerobic/.test(raw) ? 'Aerobic' : /warm\s*up/.test(raw) ? 'Warm‑up' : /cool\s*down/.test(raw) ? 'Cool‑down' : '';
           out.push(`${prefix ? `${prefix} ` : ''}1 × ${yd} yd`.trim());
           return;
         }
