@@ -191,26 +191,30 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         out.push(base)
       }
       const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.floor(yd * 0.9144) : undefined
+      // Collect to enforce order: warmups → main (work + embedded rests) → interval_rest → cooldowns
+      const warmArr: any[] = []
+      const mainArr: any[] = []
+      const explicitRestArr: any[] = []
+      const coolArr: any[] = []
       for (const st of steps) {
         const t = String(st?.type || '').toLowerCase()
         const isRest = t === 'interval_rest' || /rest/.test(t)
         if (isRest) {
           const sec = Number((st as any)?.duration_s || (st as any)?.rest_s || 0)
-          out.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
+          explicitRestArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
           continue
         }
         let label = String((st as any)?.label || '').trim()
+        // Strip leading "Drill — " prefix if present
+        if (label) label = label.replace(/^Drill\s*[—-]\s*/i, '').trim()
         if (!label && isSwim) {
           const cue = String((st as any)?.cue || '').toLowerCase()
           if (/drill:/.test(cue)) {
             const nm = (cue.split(':')[1] || '').replace(/_/g,' ')
             label = nm.charAt(0).toUpperCase() + nm.slice(1)
-          }
-          else if (/pull/.test(cue)) label = 'Pull'
+          } else if (/pull/.test(cue)) label = 'Pull'
           else if (/kick/.test(cue)) label = 'Kick'
           else if (/aerobic/.test(cue)) label = 'Aerobic'
-          else if (t === 'warmup') label = 'warm up'
-          else if (t === 'cooldown') label = 'cool down'
         }
         if (isSwim) {
           const equip = String((st as any)?.equipment || '').trim()
@@ -224,13 +228,21 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           ? Math.floor((st as any).distance_m)
           : toMetersFromYd((st as any)?.distance_yd)
         const seconds = typeof (st as any)?.duration_s === 'number' && (st as any).duration_s > 0 ? Math.floor((st as any).duration_s) : undefined
-        pushWork(label || (isSwim ? 'interval' : 'interval'), meters, seconds)
-        // Append explicit rest after work if rest_s present
-        if (typeof (st as any)?.rest_s === 'number' && (st as any).rest_s > 0) {
-          out.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
+        // Route warmup/cooldown explicitly so Garmin ordering is correct
+        if (t === 'warmup') {
+          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+        } else if (t === 'cooldown') {
+          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+        } else {
+          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          // Append explicit rest after work if rest_s present
+          if (typeof (st as any)?.rest_s === 'number' && (st as any).rest_s > 0) {
+            explicitRestArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
+          }
         }
       }
-      return out.length ? out : (Array.isArray((workout as any).intervals) ? (workout as any).intervals : [])
+      const ordered = [...warmArr, ...mainArr, ...explicitRestArr, ...coolArr]
+      return ordered.length ? ordered : (Array.isArray((workout as any).intervals) ? (workout as any).intervals : [])
     } catch {
       return Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
     }
