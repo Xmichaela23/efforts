@@ -405,25 +405,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     );
   }
 
-  // Horizontal scroll cue state
-  const scrollerRef = React.useRef<HTMLDivElement | null>(null);
-  const [showLeftCue, setShowLeftCue] = React.useState(false);
-  const [showRightCue, setShowRightCue] = React.useState(false);
-  React.useEffect(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const update = () => {
-      const max = el.scrollWidth - el.clientWidth;
-      setShowLeftCue(el.scrollLeft > 2);
-      setShowRightCue(el.scrollLeft < max - 2);
-    };
-    update();
-    el.addEventListener('scroll', update, { passive: true } as any);
-    const RO: any = (window as any).ResizeObserver;
-    const ro = RO ? new RO(update) : null;
-    if (ro) ro.observe(el);
-    return () => { el.removeEventListener('scroll', update); if (ro) ro.disconnect(); };
-  }, [displayWorkouts.length]);
+  // (Reverted) no horizontal scroll state
 
   return (
     <div className="w-full flex-shrink-0 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>
@@ -442,16 +424,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         </div>
       </div>
 
-      {/* Content area - horizontal snap scroller with edge cues */}
-      <div className="relative flex-1">
-        {/* left/right gradient cues */}
-        {showLeftCue && (
-          <div className="pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-white to-transparent" />
-        )}
-        {showRightCue && (
-          <div className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-white to-transparent" />
-        )}
-        <div ref={scrollerRef} className="h-full overflow-x-auto overflow-y-hidden overscroll-contain scrollbar-hide px-3 pb-2 snap-x snap-mandatory">
+      {/* Content area - scrolls vertically (reverted) */}
+      <div className="flex-1 overflow-auto overscroll-contain scrollbar-hide">
+        <div className="px-3 pb-2">
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
@@ -465,9 +440,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </p>
           </div>
         ) : (
-          // Compact workout display - horizontal cards with snap
-          <div className="min-w-full h-full">
-            <div className="flex gap-2 items-stretch">
+          // Compact workout display - vertical list (reverted)
+          <div className="">
+            <div className="space-y-1">
               {displayWorkouts.map((workout) => (
                 <button
                   key={workout.id}
@@ -480,7 +455,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     }
                     onEditEffort && onEditEffort(w);
                   }}
-                  className={`w-[280px] sm:w-[320px] flex-none snap-start text-left p-2 rounded-md transition-colors hover:bg-gray-50 ${
+                  className={`w-full text-left p-1.5 rounded-md transition-colors hover:bg-gray-50 ${
                     workout.workout_status === 'completed' 
                       ? 'bg-green-50' 
                       : workout.workout_status === 'planned'
@@ -493,7 +468,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                     <div className="space-y-1">
                       {/* Title and Duration Row */}
                       <div className="flex items-center justify-between">
-                        <div className="font-medium text-sm sm:text-base text-gray-900">
+                        <div className="font-medium text-base text-gray-900">
                           {(() => {
                             const type = String(workout.type || '').toLowerCase();
                             const desc = String(workout.rendered_description || workout.description || '').toLowerCase();
