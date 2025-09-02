@@ -54,8 +54,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const accFromSteps = (arr:any[]): number => {
         let y = 0; if (!Array.isArray(arr)) return 0;
         for (const s of arr) {
-          if (typeof (s as any)?.distance_yd === 'number') y += Number((s as any).distance_yd);
-          else if (typeof (s as any)?.distance_m === 'number') y += Number((s as any).distance_m) / 0.9144;
+          if (typeof (s as any)?.distance_yd === 'number') {
+            y += Math.round(Number((s as any).distance_yd) / 25) * 25;
+          } else if (typeof (s as any)?.distance_m === 'number') {
+            const yd = Number((s as any).distance_m) / 0.9144;
+            y += Math.round(yd / 25) * 25;
+          }
           if (Array.isArray((s as any)?.segments)) y += accFromSteps((s as any).segments);
         }
         return y;
@@ -64,21 +68,23 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       // 2) intervals if computed is empty
       if (!yards) {
         const intervalsSrc: any[] = Array.isArray((workout as any).intervals) ? (workout as any).intervals : [];
-        let meters = 0;
         const accIntervals = (it:any) => {
           if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0) {
-            for (let r=0;r<Number(it.repeatCount);r+=1) for (const sg of it.segments) if (typeof sg?.distanceMeters==='number') meters += Number(sg.distanceMeters);
-          } else if (typeof it?.distanceMeters==='number') meters += Number(it.distanceMeters);
+            for (let r=0;r<Number(it.repeatCount);r+=1) for (const sg of it.segments) if (typeof sg?.distanceMeters==='number') {
+              const yd = Number(sg.distanceMeters) / 0.9144; yards += Math.round(yd/25)*25;
+            }
+          } else if (typeof it?.distanceMeters==='number') {
+            const yd = Number(it.distanceMeters) / 0.9144; yards += Math.round(yd/25)*25;
+          }
         };
         for (const it of intervalsSrc) accIntervals(it);
-        yards = meters / 0.9144;
       }
       // 3) rendered lines fallback
       if (!yards) {
         const lines = Array.isArray(stepLines) ? stepLines : [];
-        for (const s of lines) { const m = String(s).match(/(\d+)\s*yd\b/i); if (m) yards += parseInt(m[1],10)||0; }
+        for (const s of lines) { const m = String(s).match(/(\d+)\s*yd\b/i); if (m) yards += Math.round(parseInt(m[1],10)/25)*25 || 0; }
       }
-      const rounded = Math.round(yards / 25) * 25;
+      const rounded = Math.round(Number(yards||0) / 25) * 25;
       return rounded>0 ? rounded : undefined;
     } catch { return undefined; }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,10 +207,50 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setFriendlyDesc(out);
         }
 
-        // Safe duration resolution: prefer computed, else fall back to authored duration/estimate
+        // Safe duration resolution: prefer computed, else derive from baselines (swim), else fall back to authored duration/estimate
         const comp: any = (workout as any).computed || {};
         let secs: any = comp.total_duration_seconds;
         if (typeof secs === 'string') secs = parseInt(secs, 10);
+        // Swim baseline-driven duration when missing
+        if (!(typeof secs === 'number' && isFinite(secs) && secs > 0) && String((workout as any).type||'').toLowerCase()==='swim') {
+          const parse100 = (txt?: string): number | null => {
+            if (!txt) return null; const m = String(txt).trim().match(/(\d+):(\d{2})/); if (!m) return null; return parseInt(m[1],10)*60 + parseInt(m[2],10);
+          };
+          const pace100 = parse100((pn as any)?.swimPace100 || (pn as any)?.swim_pace_100 || (pn as any)?.swim || '');
+          const sumFromSteps = (arr:any[]): number => {
+            if (!Array.isArray(arr)) return 0; let s=0;
+            for (const st of arr) {
+              if (typeof st?.duration_s === 'number') s += Math.max(0, Math.round(st.duration_s));
+              else if (typeof (st as any)?.distance_yd === 'number' && pace100) s += Math.round(((st as any).distance_yd/100) * pace100);
+              else if (typeof (st as any)?.distance_m === 'number' && pace100) s += Math.round((((st as any).distance_m/0.9144)/100) * pace100);
+              if (typeof (st as any)?.rest_s === 'number') s += Math.max(0, Math.round((st as any).rest_s));
+              if (Array.isArray((st as any)?.segments)) s += sumFromSteps((st as any).segments);
+            }
+            return s;
+          };
+          let swimSec = sumFromSteps(Array.isArray(comp?.steps)?comp.steps:[]);
+          if (!swimSec && Array.isArray((workout as any).intervals) && pace100) {
+            for (const it of (workout as any).intervals) {
+              if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0) {
+                for (let r=0;r<Number(it.repeatCount);r+=1) {
+                  for (const sg of it.segments) {
+                    if (typeof sg?.duration === 'number') swimSec += Math.round(sg.duration);
+                    else if (typeof sg?.distanceMeters === 'number') {
+                      const yd = Number(sg.distanceMeters)/0.9144; swimSec += Math.round((yd/100)*pace100);
+                    }
+                  }
+                }
+              } else {
+                if (typeof it?.duration === 'number') swimSec += Math.round(it.duration);
+                else if (typeof it?.distanceMeters === 'number') { const yd = Number(it.distanceMeters)/0.9144; swimSec += Math.round((yd/100)*pace100); }
+              }
+            }
+          }
+          if (!swimSec && pace100 && typeof totalYardsMemo==='number' && totalYardsMemo>0) {
+            swimSec = Math.round((totalYardsMemo/100) * pace100);
+          }
+          if (swimSec>0) secs = swimSec;
+        }
         if (!(typeof secs === 'number' && isFinite(secs) && secs > 0)) {
           if (typeof workout.duration === 'number' && isFinite(workout.duration) && workout.duration > 0) {
             secs = workout.duration * 60;
