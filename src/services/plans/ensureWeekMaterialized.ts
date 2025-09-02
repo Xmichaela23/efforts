@@ -303,7 +303,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           try {
             if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
               const atomic = expand(row.steps_preset as any[], undefined, row.tags as any);
-              const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {});
+              const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type);
               const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
               await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
               wrote = true;
@@ -660,7 +660,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     let computedStepsV3: any[] | undefined = undefined;
     try {
       const atomic = expand(Array.isArray((s as any).steps_preset) ? (s as any).steps_preset : [], (s as any).main, (s as any).tags);
-      const resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {});
+      const resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {}, mappedType);
       if (Array.isArray(resolved) && resolved.length) computedStepsV3 = resolved as any[];
     } catch {}
 

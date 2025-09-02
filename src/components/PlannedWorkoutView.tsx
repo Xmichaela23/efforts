@@ -207,7 +207,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const { expand } = await import('@/services/plans/expander');
               const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
               const atomic: any[] = expand(stepsPresetArr, (workout as any).main, (workout as any).tags);
-              const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}));
+              const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
               if (Array.isArray(resolved) && resolved.length) {
                 setStepLines(flattenSteps(resolved));
                 try {

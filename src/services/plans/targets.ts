@@ -29,7 +29,7 @@ function mmss(sec: number) { const x=Math.max(1,Math.round(sec)); const m=Math.f
 
 export type ResolvedStep = AtomicStep & { target_value?: string; target_low?: string; target_high?: string };
 
-export function resolveTargets(steps: AtomicStep[], baselines: Baselines, exportHints: any): ResolvedStep[] {
+export function resolveTargets(steps: AtomicStep[], baselines: Baselines, exportHints: any, discipline?: string): ResolvedStep[] {
   const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
   const tolQual = typeof exportHints?.pace_tolerance_quality==='number' ? exportHints.pace_tolerance_quality : 0.04;
   const ftp: number|undefined = typeof (baselines as any)?.ftp === 'number' ? (baselines as any).ftp : undefined;
@@ -79,7 +79,7 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
       }
     }
     // If no explicit target token, provide sensible defaults for runs
-    if (!rs.target_value && (isRest || isWarm || isCool || rs.type==='steady' || rs.type==='interval_work')) {
+    if (discipline === 'run' && !rs.target_value && (isRest || isWarm || isCool || rs.type==='steady' || rs.type==='interval_work')) {
       const ptxt = isRest || isWarm || isCool ? (easy || fivek) : (fivek || easy);
       const p = parsePace(ptxt);
       if (p.sec && p.unit) {
@@ -90,7 +90,7 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
       }
     }
     // If distance_m present and we have a pace, derive duration_s to fix totals
-    if (typeof (rs as any).distance_m === 'number' && (rs as any).distance_m > 0 && !rs.duration_s) {
+    if (discipline === 'run' && typeof (rs as any).distance_m === 'number' && (rs as any).distance_m > 0 && !rs.duration_s) {
       const pref = rs.target_value || (isRest || isWarm || isCool ? (easy || fivek) : (fivek || easy));
       const pp = parsePace(pref);
       if (pp.sec) {
