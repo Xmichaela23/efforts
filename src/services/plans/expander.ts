@@ -96,17 +96,26 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       if (m1) {
         const drills = m1[1].split(',').map(x=>x.trim());
         for (const d of drills) {
-          const cat = SWIM_CATALOG[d.toLowerCase()] || { type: 'swim_drill', label: 'Drill', cue: '', is_drill: true, equipment: 'none' } as any;
-          out.push({ id: makeId(idPrefix, ['swim','drill',d]), type: 'swim_drill', label: cat.label, distance_yd: 50, authored_unit: 'yd', rest_s: d.toLowerCase()==='catchup'?15: d.toLowerCase()==='singlearm'?20: undefined, equipment: cat.equipment, cue: cat.cue });
+          // Support: name@15r(mod1,mod2)
+          const dm = d.match(/^([a-z0-9_]+)(?:@(\d+)r)?(?:\(([^)]+)\))?$/i);
+          const name = (dm?.[1] || d).toLowerCase();
+          const rest = dm?.[2] ? Number(dm[2]) : undefined;
+          const mods = (dm?.[3] || '').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+          const cat = SWIM_CATALOG[name] || { type: 'swim_drill', label: 'Drill', cue: '', is_drill: true, equipment: 'none' } as any;
+          const equipMods = mods.map(m=>SWIM_EQUIPMENT_MODS[m]?.equipment).filter(Boolean) as string[];
+          const equipParts = [cat.equipment, ...equipMods].filter(Boolean);
+          const equip = equipParts.join(', ').trim() || undefined;
+          const defaultRest = name==='catchup'?15: name==='singlearm'?20: undefined;
+          out.push({ id: makeId(idPrefix, ['swim','drill',name]), type: 'swim_drill', label: cat.label, distance_yd: 50, authored_unit: 'yd', rest_s: typeof rest==='number'?rest: defaultRest, equipment: equip, cue: cat.cue });
         }
         continue;
       }
-      const m2 = part.match(/^(pull|kick)(\d+)x(\d+)(?:\(([^)]+)\))?$/i);
+      const m2 = part.match(/^(pull|kick)(\d+)x(\d+)(?:@(\d+)r)?(?:\(([^)]+)\))?$/i);
       if (m2) {
-        const reps = Number(m2[2]); const each = Number(m2[3]); const mods = String(m2[4]||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
+        const reps = Number(m2[2]); const each = Number(m2[3]); const rest = m2[4]?Number(m2[4]):undefined; const mods = String(m2[5]||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
         const base = SWIM_CATALOG[m2[1].toLowerCase()];
         const equip = [base?.equipment].concat(mods.map(m=>SWIM_EQUIPMENT_MODS[m]?.equipment).filter(Boolean) as string[]).filter(Boolean).join(', ').replace(/,\s*,/g, ', ').trim();
-        for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim', m2[1].toLowerCase(), String(i).padStart(2,'0')]), type: (base?.type || 'swim_aerobic') as any, label: base?.label || (m2[1].toLowerCase()==='pull'?'Pull':'Kick'), distance_yd: each, authored_unit: 'yd', equipment: equip||undefined });
+        for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim', m2[1].toLowerCase(), String(i).padStart(2,'0')]), type: (base?.type || 'swim_aerobic') as any, label: base?.label || (m2[1].toLowerCase()==='pull'?'Pull':'Kick'), distance_yd: each, authored_unit: 'yd', equipment: equip||undefined, rest_s: rest });
         continue;
       }
       const m3 = part.match(/^aerobic\((\d+)x(\d+)(?:@(?:(\d+))?r)?(?:,([^\)]+))?\)$/i);
