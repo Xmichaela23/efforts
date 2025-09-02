@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
 const mem = new Map<string, { ts: number; rows: any[] }>();
-const TTL = 24 * 60 * 60 * 1000; // 24h
+const TTL = (import.meta.env?.DEV ? 5 : 24) * 60 * 60 * 1000; // dev 5h, prod 24h
+const APP_VER = String((import.meta as any)?.env?.VITE_CACHE_VER || 'v3');
+const CACHE_DISABLED = String((import.meta as any)?.env?.VITE_DEBUG_DISABLE_CACHE || '') === '1';
 
 function key(userId: string, from: string, to: string) {
-  return `${userId}|${from}|${to}`;
+  return `${APP_VER}|${userId}|${from}|${to}`;
 }
 
 function read(keyStr: string) {
@@ -36,9 +38,9 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { setRows([]); setLoading(false); return; }
         const k = key(user.id, fromISO, toISO);
-        const m = mem.get(k);
+        const m = !CACHE_DISABLED ? mem.get(k) : null;
         if (m && Date.now() - m.ts <= TTL) { setRows(m.rows); setLoading(false); return; }
-        const s = read(k);
+        const s = !CACHE_DISABLED ? read(k) : null;
         if (s) { setRows(s.rows); setLoading(false); }
         const { data, error } = await supabase
           .from('workouts')

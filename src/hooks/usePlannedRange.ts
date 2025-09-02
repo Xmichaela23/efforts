@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 
-// Simple in-memory cache keyed by from|to
+// Simple in-memory cache keyed by ver|user|from|to
 const memoryCache = new Map<string, { ts: number; rows: any[] }>();
-const TTL_MS = 24 * 60 * 60 * 1000; // 24h
+// Short TTL in dev, longer in prod
+const TTL_MS = (import.meta.env?.DEV ? 5 : 24) * 60 * 60 * 1000;
+const APP_VER = String((import.meta as any)?.env?.VITE_CACHE_VER || 'v3');
+const CACHE_DISABLED = String((import.meta as any)?.env?.VITE_DEBUG_DISABLE_CACHE || '') === '1';
 
 function cacheKey(userId: string, from: string, to: string) {
-  return `${userId}|${from}|${to}`;
+  return `${APP_VER}|${userId}|${from}|${to}`;
 }
 
 function readStorage(key: string): { ts: number; rows: any[] } | null {
@@ -36,25 +39,26 @@ export function usePlannedRange(fromISO: string, toISO: string) {
     let cancelled = false;
     (async () => {
       try {
-        setLoading(true);
+        if (!readStorage(cacheKey('', fromISO, toISO))) setLoading(true);
         setError(null);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { setRows([]); setLoading(false); return; }
         const key = cacheKey(user.id, fromISO, toISO);
         // memory cache
-        const mem = memoryCache.get(key);
+        const mem = !CACHE_DISABLED ? memoryCache.get(key) : null;
         if (mem && Date.now() - mem.ts <= TTL_MS) {
           setRows(mem.rows);
           setLoading(false);
           return;
         }
         // localStorage cache
-        const stor = readStorage(key);
+        const stor = !CACHE_DISABLED ? readStorage(key) : null;
         if (stor) {
           setRows(stor.rows);
           setLoading(false);
           // revalidate in background
         }
+        // Revalidate (SWR)
         const { data, error } = await supabase
           .from('planned_workouts')
           .select('id,name,type,date,workout_status,steps_preset,description,duration,computed,week_number,day_number,training_plan_id,tags')
