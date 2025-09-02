@@ -562,8 +562,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     };
     const mmss = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
     const pushSeg = (seg: any) => {
-      // v3 schema: { type, duration_s?, distance_m?, target_value?, target_low?, target_high? }
-      if (typeof seg?.type === 'string' && (typeof seg?.duration_s === 'number' || typeof seg?.distance_m === 'number')) {
+      // v3 schema: { type, duration_s?, distance_m? | distance_yd?, target_value?, target_low?, target_high? }
+      if (typeof seg?.type === 'string' && (typeof seg?.duration_s === 'number' || typeof seg?.distance_m === 'number' || typeof (seg as any)?.distance_yd === 'number')) {
         const kind = String(seg.type).toLowerCase();
         const isRestV3 = kind === 'interval_rest' || /rest/.test(kind);
         const isWarmV3 = kind === 'warmup';
@@ -838,10 +838,20 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         }
         if (type==='swim'){
           const yd = Math.round(Number(meters) / 0.9144 / 25) * 25;
-          // Map swim cues to labels (fallback heuristic)
+          // Map swim cues to labels (fallback heuristic). Prefer specific drill name.
           const raw = String(lab || '').toLowerCase();
-          const hasDrillToken = /drill|catchup|singlearm|fist|scull|zipper|doggypaddle|fingertip/.test(raw);
-          const prefix = hasDrillToken ? 'Drill' : /pull/.test(raw) ? 'Pull' : /kick/.test(raw) ? 'Kick' : /aerobic/.test(raw) ? 'Aerobic' : /warm\s*up/.test(raw) ? 'Warm‑up' : /cool\s*down/.test(raw) ? 'Cool‑down' : '';
+          const drillName = (() => {
+            if (/catchup/.test(raw)) return 'Drill — Catch-up';
+            if (/singlearm|single_arm/.test(raw)) return 'Drill — Single Arm';
+            if (/fist/.test(raw)) return 'Drill — Fist Swim';
+            if (/scullfront|front_scull/.test(raw)) return 'Drill — Scull (Front)';
+            if (/fingertipdrag|fingertip_drag/.test(raw)) return 'Drill — Fingertip Drag';
+            if (/zipper/.test(raw)) return 'Drill — Zipper';
+            if (/doggypaddle|dog_paddle/.test(raw)) return 'Drill — Doggy Paddle';
+            if (/\b616\b|six_one_six/.test(raw)) return 'Drill — 6-1-6';
+            return null;
+          })();
+          const prefix = drillName || (/pull/.test(raw) ? 'Pull' : /kick/.test(raw) ? 'Kick' : /aerobic/.test(raw) ? 'Aerobic' : /warm\s*up/.test(raw) ? 'Warm‑up' : /cool\s*down/.test(raw) ? 'Cool‑down' : '');
           out.push(`${prefix ? `${prefix} ` : ''}1 × ${yd} yd`.trim());
           return;
         }
