@@ -151,6 +151,27 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
         (res.plan as any).ui_text = JSON.parse(JSON.stringify(input.ui_text));
       }
     } catch {}
+    // Reattach swim DSL fields (main/extra) per-session so we preserve advanced cues (rests/equipment)
+    try {
+      const rawSBW = (input && typeof input === 'object') ? (input.sessions_by_week || {}) : {};
+      const outSBW = (res.plan && typeof res.plan === 'object') ? (res.plan.sessions_by_week || {}) : {};
+      for (const wk of Object.keys(outSBW)) {
+        const rawWeek: any[] = Array.isArray(rawSBW[wk]) ? rawSBW[wk] : [];
+        const outWeek: any[] = Array.isArray(outSBW[wk]) ? outSBW[wk] : [];
+        for (let i=0; i<outWeek.length; i+=1) {
+          const rawSess = rawWeek[i];
+          const outSess = outWeek[i];
+          if (!rawSess || !outSess) continue;
+          const disc = String(rawSess.discipline || rawSess.type || '').toLowerCase();
+          if (disc === 'swim') {
+            if (typeof rawSess.main === 'string' && rawSess.main.trim().length>0) outSess.main = String(rawSess.main);
+            if (typeof rawSess.extra === 'string' && rawSess.extra.trim().length>0) outSess.extra = String(rawSess.extra);
+          }
+        }
+        outSBW[wk] = outWeek;
+      }
+      (res.plan as any).sessions_by_week = outSBW;
+    } catch {}
     setPlanPreview(res.plan);
   }
 
