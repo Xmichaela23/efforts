@@ -45,6 +45,44 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const [fallbackPace, setFallbackPace] = React.useState<string | undefined>(undefined);
   const [perfNumbers, setPerfNumbers] = React.useState<any | undefined>(undefined);
   const [totalYards, setTotalYards] = React.useState<number | undefined>(undefined);
+
+  const totalYardsMemo = React.useMemo(() => {
+    try {
+      if (String((workout as any).type||'').toLowerCase() !== 'swim') return undefined;
+      // 1) computed steps
+      const compSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      const accFromSteps = (arr:any[]): number => {
+        let y = 0; if (!Array.isArray(arr)) return 0;
+        for (const s of arr) {
+          if (typeof (s as any)?.distance_yd === 'number') y += Number((s as any).distance_yd);
+          else if (typeof (s as any)?.distance_m === 'number') y += Number((s as any).distance_m) / 0.9144;
+          if (Array.isArray((s as any)?.segments)) y += accFromSteps((s as any).segments);
+        }
+        return y;
+      };
+      let yards = accFromSteps(compSteps);
+      // 2) intervals if computed is empty
+      if (!yards) {
+        const intervalsSrc: any[] = Array.isArray((workout as any).intervals) ? (workout as any).intervals : [];
+        let meters = 0;
+        const accIntervals = (it:any) => {
+          if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0) {
+            for (let r=0;r<Number(it.repeatCount);r+=1) for (const sg of it.segments) if (typeof sg?.distanceMeters==='number') meters += Number(sg.distanceMeters);
+          } else if (typeof it?.distanceMeters==='number') meters += Number(it.distanceMeters);
+        };
+        for (const it of intervalsSrc) accIntervals(it);
+        yards = meters / 0.9144;
+      }
+      // 3) rendered lines fallback
+      if (!yards) {
+        const lines = Array.isArray(stepLines) ? stepLines : [];
+        for (const s of lines) { const m = String(s).match(/(\d+)\s*yd\b/i); if (m) yards += parseInt(m[1],10)||0; }
+      }
+      const rounded = Math.round(yards / 25) * 25;
+      return rounded>0 ? rounded : undefined;
+    } catch { return undefined; }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stepLines, (workout as any)?.computed, (workout as any)?.intervals, (workout as any)?.id]);
   
   const formatDate = (dateString: string) => {
     try {
@@ -1025,7 +1063,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           <span className="text-[10px] uppercase tracking-wide text-gray-500">Planned</span>
           <div className="text-sm text-gray-500">
             {resolvedDuration ? `${resolvedDuration} min` : (typeof workout.duration==='number'?`${workout.duration} min`: '')}
-            {String((workout as any).type||'').toLowerCase()==='swim' && typeof totalYards==='number' && totalYards>0 ? ` • ${totalYards} yd` : ''}
+            {String((workout as any).type||'').toLowerCase()==='swim' && typeof (totalYardsMemo||totalYards)==='number' && (totalYardsMemo||totalYards)!>0 ? ` • ${(totalYardsMemo||totalYards)} yd` : ''}
           </div>
         </div>
         <h3 className="text-base font-semibold">
