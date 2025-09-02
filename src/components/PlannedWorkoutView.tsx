@@ -743,7 +743,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const cue = String(seg?.cue||'');
               const labelPref = (seg as any).label as string | undefined;
               if (labelPref && labelPref.trim()) return labelPref.trim();
-              if (/drill:/.test(cue)) return `Drill — ${cue.split(':')[1]}`;
+              if (/drill:/.test(cue)) return String(cue.split(':')[1] || '').replace(/_/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase());
               if (/pull/i.test(cue)) return 'Pull';
               if (/kick/i.test(cue)) return 'Kick';
               if (/aerobic/i.test(cue)) return 'Aerobic';
@@ -752,9 +752,18 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           })();
           const prefix = label ? label + ' ' : '';
           const equipment = isSwim ? (String((seg as any).equipment||'').trim()) : '';
-          const restAnn = isRestV3 ? ' rest' : ((isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) ? ` @ 0:${String((seg as any).rest_s).padStart(2,'0')}r` : '');
-          const equipAnn = equipment ? ` — ${equipment}` : '';
-          lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${restAnn}${equipAnn}`.trim());
+          const abbrEquip = equipment
+            .replace(/pull buoy/ig,'buoy')
+            .replace(/kickboard/ig,'board')
+            .replace(/\(optional\)/ig,'(opt)');
+          const equipAnn = abbrEquip ? ` — ${abbrEquip}` : '';
+          lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
+          // Show explicit rest after the work step when rest_s present
+          if (isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) {
+            const rs = Math.max(1, Math.round((seg as any).rest_s));
+            const rmm = Math.floor(rs/60); const rss = rs%60;
+            lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
+          }
         }
         return;
       }

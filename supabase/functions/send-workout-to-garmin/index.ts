@@ -202,7 +202,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         let label = String((st as any)?.label || '').trim()
         if (!label && isSwim) {
           const cue = String((st as any)?.cue || '').toLowerCase()
-          if (/drill:/.test(cue)) label = 'Drill — ' + cue.split(':')[1]
+          if (/drill:/.test(cue)) {
+            const nm = (cue.split(':')[1] || '').replace(/_/g,' ')
+            label = nm.charAt(0).toUpperCase() + nm.slice(1)
+          }
           else if (/pull/.test(cue)) label = 'Pull'
           else if (/kick/.test(cue)) label = 'Kick'
           else if (/aerobic/.test(cue)) label = 'Aerobic'
@@ -211,7 +214,11 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         }
         if (isSwim) {
           const equip = String((st as any)?.equipment || '').trim()
-          if (equip) label = label ? `${label} — ${equip}` : equip
+          const abbr = equip
+            .replace(/pull buoy/ig,'buoy')
+            .replace(/kickboard/ig,'board')
+            .replace(/\(optional\)/ig,'(opt)')
+          if (abbr) label = label ? `${label} — ${abbr}` : abbr
         }
         const meters = typeof (st as any)?.distance_m === 'number' && (st as any).distance_m > 0
           ? Math.floor((st as any).distance_m)
