@@ -202,11 +202,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           try {
             const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
             const intervalsRaw: any[] | undefined = Array.isArray((workout as any).intervals) ? (workout as any).intervals : undefined;
-            if (stepsPresetArr && stepsPresetArr.length > 0) {
+            if ((stepsPresetArr && stepsPresetArr.length > 0) || (workout as any).main) {
               // Use centralized expander + resolver for accurate targets and durations
               const { expand } = await import('@/services/plans/expander');
               const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
-              const atomic: any[] = expand(stepsPresetArr, (workout as any).main, (workout as any).tags);
+              const atomic: any[] = expand(stepsPresetArr || [], (workout as any).main, (workout as any).tags);
               const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
               if (Array.isArray(resolved) && resolved.length) {
                 setStepLines(flattenSteps(resolved));
