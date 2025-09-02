@@ -545,15 +545,22 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         const isRestV3 = kind === 'interval_rest' || /rest/.test(kind);
         const isWarmV3 = kind === 'warmup';
         const isCoolV3 = kind === 'cooldown';
-        const base = typeof seg?.distance_m === 'number' && seg.distance_m > 0
-          ? `${Math.round(seg.distance_m)}m`
-          : (typeof seg?.duration_s === 'number' && seg.duration_s > 0 ? secTo(seg.duration_s) : undefined);
-        const trg = (() => {
-          if (seg?.target_value && seg?.target_low && seg?.target_high) {
-            return `${seg.target_value} (${seg.target_low}–${seg.target_high})`;
+        const typeLower = String((workout as any).type||'').toLowerCase();
+        const isSwim = typeLower === 'swim';
+        const base = (() => {
+          if (typeof seg?.distance_m === 'number' && seg.distance_m > 0) {
+            if (isSwim) {
+              const yd = Math.round(seg.distance_m / 0.9144 / 25) * 25; // nearest 25 yd
+              return `${yd} yd`;
+            }
+            return `${Math.round(seg.distance_m)}m`;
           }
+          if (typeof seg?.duration_s === 'number' && seg.duration_s > 0) return secTo(seg.duration_s);
           return undefined;
         })();
+        const trg = (!isSwim && seg?.target_value && seg?.target_low && seg?.target_high)
+          ? `${seg.target_value} (${seg.target_low}–${seg.target_high})`
+          : undefined;
         if (base) {
           const label = isWarmV3 ? 'Warm‑up' : isCoolV3 ? 'Cool‑down' : (isRestV3 ? '' : '');
           lines.push(`${label ? label + ' ' : ''}1 × ${base}${trg ? ` @ ${trg}` : ''}${isRestV3 ? ' rest' : ''}`.trim());
@@ -908,7 +915,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               // Ensure every main rep has a target; don't rely on a global hasTarget check (WU/CD may already have targets)
               const workoutTarget = formatPrimaryTarget((workout as any).computed) || fallbackPace;
               const needsTarget = (s: string) => !/warm|cool|rest/i.test(s) && !/@\s*\d|@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s);
-              return out.map((s) => (needsTarget(s) && workoutTarget) ? `${s} @ ${workoutTarget}`.trim() : s);
+              const isSwim = String((workout as any).type||'').toLowerCase()==='swim';
+              return out.map((s) => (needsTarget(s) && workoutTarget && !isSwim) ? `${s} @ ${workoutTarget}`.trim() : s);
             })();
             return (
               <ul className="list-none space-y-1">

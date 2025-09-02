@@ -497,7 +497,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         if (v3) {
           const t = String(st.type).toLowerCase();
           const isRest = t === 'interval_rest';
-          const effortLabel = t === 'warmup' ? 'warm up' : t === 'cooldown' ? 'cool down' : isRest ? 'rest' : 'interval';
+          const effortLabel = t === 'warmup' ? 'warm up' : t === 'cooldown' ? 'cool down' : isRest ? 'rest' : (String(mappedType).toLowerCase()==='swim' && st.cue ? st.cue : 'interval');
           const base: any = { effortLabel };
           if (typeof st.distance_m === 'number' && st.distance_m > 0) base.distanceMeters = Math.floor(st.distance_m);
           if (typeof st.duration_s === 'number' && st.duration_s > 0) base.duration = Math.max(1, Math.floor(st.duration_s));
