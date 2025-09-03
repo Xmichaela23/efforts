@@ -683,33 +683,28 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             .filter(s=>s.length>0 && s.toLowerCase()!=='none')
             .map(s=>s.replace(/pull buoy/ig,'buoy').replace(/kickboard/ig,'board').replace(/\(optional\)/ig,'(opt)'));
           const abbrEquipList = Array.from(new Set(equipmentList));
-          // Equipment formatting: drills show (optional: ...); pull/kick/aerobic suppress equipment
+          // Equipment formatting rules (universal):
+          // - Drills: show optional list "(optional: ... )"
+          // - Pull: show required gear "— buoy" when present
+          // - Kick: show required gear "— board" when present
+          // - Aerobic and others: suppress equipment
           const isDrillLabel = /^Drill\b/.test(label);
-          const equipAnn = (isSwim && isDrillLabel && abbrEquipList.length>0)
-            ? ` (optional: ${abbrEquipList.join(' or ')})`
-            : '';
+          const isPullKind = kind === 'swim_pull';
+          const isKickKind = kind === 'swim_kick';
+          const hasBuoy = abbrEquipList.includes('buoy');
+          const hasBoard = abbrEquipList.includes('board');
+          const equipAnn = (() => {
+            if (isSwim && isDrillLabel && abbrEquipList.length>0) return ` (optional: ${abbrEquipList.join(' or ')})`;
+            if (isPullKind && hasBuoy) return ' — buoy';
+            if (isKickKind && hasBoard) return ' — board';
+            return '';
+          })();
           lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
-          // Rest only if next segment has the same label (avoid trailing rest)
+          // Always show swim rest when present to indicate gear transitions if needed
           if (isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) {
-            const nextLabel = (() => {
-              if (!nextSeg) return '';
-              const nk = String(nextSeg?.type||'').toLowerCase();
-              if (nk==='warmup' || nk==='swim_warmup') return 'Warm‑up';
-              if (nk==='cooldown' || nk==='swim_cooldown') return 'Cool‑down';
-              const cue = String(nextSeg?.cue||'');
-              const pref = (nextSeg as any).label as string | undefined;
-              if (pref && pref.trim()) return pref.trim();
-              if (/drill:/.test(cue)) return String(cue.split(':')[1] || '').replace(/_/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase());
-              if (/pull/i.test(cue)) return 'Pull';
-              if (/kick/i.test(cue)) return 'Kick';
-              if (/aerobic/i.test(cue)) return 'Aerobic';
-              return '';
-            })();
-            if (nextLabel && nextLabel === label) {
-              const rs = Math.max(1, Math.round((seg as any).rest_s));
-              const rmm = Math.floor(rs/60); const rss = rs%60;
-              lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
-            }
+            const rs = Math.max(1, Math.round((seg as any).rest_s));
+            const rmm = Math.floor(rs/60); const rss = rs%60;
+            lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
           }
         }
         return;

@@ -175,16 +175,8 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','drill',key,String(i).padStart(2,'0')]), type: 'swim_drill', label: cat.label, distance_yd: ydEach, authored_unit: 'yd', rest_s: rest, equipment: equip, cue: cat.cue });
       continue;
     }
-    // swim pull/kick blocks like swim_pull_2x100yd
-    m = t.match(/^swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
-    if (m) {
-      const kind = m[1].toLowerCase(); const reps = parseInt(m[2],10); const each = parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase();
-      const base = SWIM_CATALOG[kind];
-      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
-      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: (base?.type || (kind==='pull'?'swim_pull':'swim_kick')) as any, label: base?.label || (kind==='pull'?'Pull':'Kick'), distance_yd: ydEach, authored_unit: 'yd', equipment: base?.equipment });
-      continue;
-    }
     // swim pull/kick/aerobic new: swim_(pull|kick|aerobic)_<reps>x<dist>(yd|m)_r<rest>[_equip...]
+    // Parse this before legacy so suffixes aren't swallowed
     m = t.match(/^swim_(pull|kick|aerobic)_(\d+)x(\d+)(yd|m)_r(\d+)(?:_(.+))?$/i);
     if (m) {
       const kind = m[1].toLowerCase(); const reps = parseInt(m[2],10); const each = parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase(); const rest = parseInt(m[5],10);
@@ -197,6 +189,15 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       const typeMap: any = { pull: 'swim_pull', kick: 'swim_kick', aerobic: 'swim_aerobic' };
       const label = base?.label || (kind==='pull'?'Pull': kind==='kick'?'Kick':'Aerobic');
       for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: typeMap[kind], label, distance_yd: ydEach, authored_unit: 'yd', equipment: equip, rest_s: rest });
+      continue;
+    }
+    // swim pull/kick legacy like swim_pull_2x100yd (anchor at end to avoid swallowing modern tokens)
+    m = t.match(/^swim_(pull|kick)_(\d+)x(\d+)(yd|m)$/i);
+    if (m) {
+      const kind = m[1].toLowerCase(); const reps = parseInt(m[2],10); const each = parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase();
+      const base = SWIM_CATALOG[kind];
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: (base?.type || (kind==='pull'?'swim_pull':'swim_kick')) as any, label: base?.label || (kind==='pull'?'Pull':'Kick'), distance_yd: ydEach, authored_unit: 'yd', equipment: base?.equipment });
       continue;
     }
     // swim aerobic blocks like swim_aerobic_6x100yd
