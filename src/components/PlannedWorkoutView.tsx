@@ -631,7 +631,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     };
     const mmss = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
     const workoutType = String((workout as any).type||'').toLowerCase();
-    const pushSeg = (seg: any) => {
+    const pushSeg = (seg: any, nextSeg?: any) => {
       // v3 schema: { type, duration_s?, distance_m? | distance_yd?, target_value?, target_low?, target_high? }
       if (typeof seg?.type === 'string' && (typeof seg?.duration_s === 'number' || typeof seg?.distance_m === 'number' || typeof (seg as any)?.distance_yd === 'number')) {
         const kind = String(seg.type).toLowerCase();
@@ -682,14 +682,34 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             .map(s=>s.trim())
             .filter(s=>s.length>0 && s.toLowerCase()!=='none')
             .map(s=>s.replace(/pull buoy/ig,'buoy').replace(/kickboard/ig,'board').replace(/\(optional\)/ig,'(opt)'));
-          const abbrEquip = Array.from(new Set(equipmentList)).join(', ');
-          const equipAnn = abbrEquip ? ` — ${abbrEquip}` : '';
+          const abbrEquipList = Array.from(new Set(equipmentList));
+          // Equipment formatting: drills show (optional: ...); pull/kick/aerobic suppress equipment
+          const isDrillLabel = /^Drill\b/.test(label);
+          const equipAnn = (isSwim && isDrillLabel && abbrEquipList.length>0)
+            ? ` (optional: ${abbrEquipList.join(' or ')})`
+            : '';
           lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
-          // Show explicit rest after the work step when rest_s present
+          // Rest only if next segment has the same label (avoid trailing rest)
           if (isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) {
-            const rs = Math.max(1, Math.round((seg as any).rest_s));
-            const rmm = Math.floor(rs/60); const rss = rs%60;
-            lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
+            const nextLabel = (() => {
+              if (!nextSeg) return '';
+              const nk = String(nextSeg?.type||'').toLowerCase();
+              if (nk==='warmup' || nk==='swim_warmup') return 'Warm‑up';
+              if (nk==='cooldown' || nk==='swim_cooldown') return 'Cool‑down';
+              const cue = String(nextSeg?.cue||'');
+              const pref = (nextSeg as any).label as string | undefined;
+              if (pref && pref.trim()) return pref.trim();
+              if (/drill:/.test(cue)) return String(cue.split(':')[1] || '').replace(/_/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase());
+              if (/pull/i.test(cue)) return 'Pull';
+              if (/kick/i.test(cue)) return 'Kick';
+              if (/aerobic/i.test(cue)) return 'Aerobic';
+              return '';
+            })();
+            if (nextLabel && nextLabel === label) {
+              const rs = Math.max(1, Math.round((seg as any).rest_s));
+              const rmm = Math.floor(rs/60); const rss = rs%60;
+              lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
+            }
           }
         }
         return;
@@ -776,7 +796,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         const eqRaw = String((seg as any)?.equipment||'').trim();
         const eqList = eqRaw.split(',').map(s=>s.trim()).filter(s=>s.length>0 && s.toLowerCase()!=='none')
           .map(s=>s.replace(/pull buoy/ig,'buoy').replace(/kickboard/ig,'board').replace(/\(optional\)/ig,'(opt)'));
-        const eq = Array.from(new Set(eqList)).join(', ');
+        const eq = /^Drill\b/.test(label) ? Array.from(new Set(eqList)).join(', ') : '';
         items.push({ label, yards: yd, equipment: eq });
       };
       for (const st of stepsRaw) {
@@ -805,14 +825,21 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       return lines;
     }
 
+    // Flatten segments to decide rest placement based on the next step label
+    const flatSegs: any[] = [];
     for (const st of stepsRaw) {
       if (Array.isArray(st?.segments) && typeof st?.repeatCount === 'number' && st.repeatCount > 0) {
         for (let r = 0; r < st.repeatCount; r++) {
-          for (const seg of st.segments) pushSeg(seg);
+          for (const seg of st.segments) flatSegs.push(seg);
         }
       } else {
-        pushSeg(st);
+        flatSegs.push(st);
       }
+    }
+    for (let i=0;i<flatSegs.length;i+=1){
+      const cur = flatSegs[i];
+      const nxt = i+1<flatSegs.length ? flatSegs[i+1] : undefined;
+      pushSeg(cur, nxt);
     }
     return lines;
   };
