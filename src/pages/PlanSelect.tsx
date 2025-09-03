@@ -737,7 +737,15 @@ export default function PlanSelect() {
               .sort((a: any,b: any)=>parseInt(a,10)-parseInt(b,10))
               .map((wk: string) => {
                 const sess = (libPlan.template.sessions_by_week[wk]||[]).slice().sort(byDay);
-                const mins = sess.reduce((t: number, s: any)=>t+(typeof s.duration==='number'?s.duration:0),0);
+                // Derive minutes for week header using normalizer where possible
+                const planDefaults = (libPlan.template?.defaults as any) || DEFAULTS_FALLBACK;
+                const mins = sess.reduce((t: number, s: any)=>{
+                  try {
+                    const norm = normalizePlannedSession(s, { performanceNumbers: (baselines?.performance_numbers || {}) }, libPlan.template?.export_hints || {});
+                    if (typeof norm?.durationMinutes === 'number' && isFinite(norm.durationMinutes)) return t + Math.max(0, Math.round(norm.durationMinutes));
+                  } catch {}
+                  return t + (typeof s.duration==='number'?s.duration:0);
+                },0);
                 return (
                   <div key={wk} className="border rounded p-2">
                     <div className="flex items-center justify-between">
@@ -752,7 +760,35 @@ export default function PlanSelect() {
                           .filter(Boolean)
                           .join(' ')
                           .trim();
-                        const label = s.description ? cleanDesc(s.description) : fallback;
+                        // Swim preview: expand DSL/tokens to friendly summary with WU/CD
+                        const swimPreview = (() => {
+                          try {
+                            const disc = String(s.discipline||s.type||'').toLowerCase();
+                            if (disc !== 'swim') return undefined;
+                            const steps = expandSession({ discipline: 'swim', main: (s as any).main, extra: (s as any).extra, steps_preset: (s as any).steps_preset }, planDefaults);
+                            if (!Array.isArray(steps) || steps.length===0) return undefined;
+                            const ydFrom = (count:number, each:number, unit:string) => {
+                              const yd = unit.toLowerCase()==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25; return { count, each: yd };
+                            };
+                            let wu=0, cd=0, pull={count:0,each:0}, kick={count:0,each:0}, aerobic={count:0,each:0};
+                            steps.forEach((t:string)=>{
+                              const s1=t.toLowerCase();
+                              let m=s1.match(/^swim_warmup_(\d+)(yd|m)/i); if(m){ wu = m[2].toLowerCase()==='m' ? Math.round(parseInt(m[1],10)/0.9144/25)*25 : parseInt(m[1],10); return; }
+                              m=s1.match(/^swim_cooldown_(\d+)(yd|m)/i); if(m){ cd = m[2].toLowerCase()==='m' ? Math.round(parseInt(m[1],10)/0.9144/25)*25 : parseInt(m[1],10); return; }
+                              m=s1.match(/^swim_pull_(\d+)x(\d+)(yd|m)/i); if(m){ const v=ydFrom(parseInt(m[1],10),parseInt(m[2],10),m[3]); pull=v; return; }
+                              m=s1.match(/^swim_kick_(\d+)x(\d+)(yd|m)/i); if(m){ const v=ydFrom(parseInt(m[1],10),parseInt(m[2],10),m[3]); kick=v; return; }
+                              m=s1.match(/^swim_aerobic_(\d+)x(\d+)(yd|m)/i); if(m){ const v=ydFrom(parseInt(m[1],10),parseInt(m[2],10),m[3]); aerobic=v; return; }
+                            });
+                            const parts: string[] = [];
+                            if (wu>0) parts.push(`Warm‑up ${wu} yd`);
+                            if (pull.count>0) parts.push(`Pull ${pull.count} × ${pull.each} yd — buoy`);
+                            if (kick.count>0) parts.push(`Kick ${kick.count} × ${kick.each} yd — board`);
+                            if (aerobic.count>0) parts.push(`Aerobic ${aerobic.count} × ${aerobic.each} yd`);
+                            if (cd>0) parts.push(`Cool‑down ${cd} yd`);
+                            return parts.join(' • ');
+                          } catch { return undefined; }
+                        })();
+                        const label = swimPreview || (s.description ? cleanDesc(s.description) : fallback);
                         return (
                           <div key={i} className="text-xs text-gray-700">
                             <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}

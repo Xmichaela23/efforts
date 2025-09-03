@@ -751,8 +751,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}${timeAnn ? ` — ${timeAnn}` : ''}`.trim());
       }
     };
-    // Compact swim rendering: group identical reps and include WU/CD
-    if (workoutType === 'swim') {
+    // Compact swim rendering: group identical reps and include WU/CD (only in compact contexts)
+    if (workoutType === 'swim' && compact) {
       type SwimItem = { label: string; yards: number; equipment: string };
       const items: SwimItem[] = [];
       const pushIf = (seg: any) => {
