@@ -279,7 +279,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     let totalSeconds = 0;
     try {
       const norm = normalizePlannedSession(s, { performanceNumbers: perfNumbers }, exportHints || {});
-      rendered = (norm.friendlySummary || rendered).trim();
+      // Preserve authored text for strength; otherwise use friendly summary when available
+      if (mappedType !== 'strength') rendered = (norm.friendlySummary || rendered).trim();
       totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
@@ -564,6 +565,41 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       return out;
     };
     const computedTargets = deriveTargetColumns(computedStepsV3, mappedType);
+    // For swims, build a concise grouped summary for cards (Today/Weekly)
+    if (mappedType === 'swim' && Array.isArray(computedStepsV3) && computedStepsV3.length>0) {
+      try {
+        type Key = { label: string; each: number; rest?: number };
+        const sum: Record<string,{count:number,each:number,rest?:number}> = {};
+        let wu=0, cd=0;
+        for (const st of computedStepsV3 as any[]) {
+          const kind = String(st?.type||'').toLowerCase();
+          const yd = typeof (st as any)?.distance_yd === 'number' ? Math.round((st as any).distance_yd/25)*25 : (typeof (st as any)?.distance_m === 'number' ? Math.round((st as any).distance_m/0.9144/25)*25 : 0);
+          if (kind==='swim_warmup' || kind==='warmup') { wu += yd; continue; }
+          if (kind==='swim_cooldown' || kind==='cooldown') { cd += yd; continue; }
+          if (yd>0) {
+            const label = (String((st as any).label||'').trim() || 'Set').replace(/\s+/g,' ');
+            const rest = typeof (st as any)?.rest_s === 'number' ? Math.max(0, Math.round((st as any).rest_s)) : undefined;
+            const k = `${label}|${yd}|${rest||0}`;
+            if (!sum[k]) sum[k] = { count: 0, each: yd, rest };
+            sum[k].count += 1;
+          }
+        }
+        const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+        const parts: string[] = [];
+        if (wu>0) parts.push(`WU ${wu}`);
+        // Keep a stable order: Pull, Kick, Aerobic, then drills/others
+        const keys = Object.entries(sum);
+        const order = (k:string)=>/pull\|/i.test(k)?1:/kick\|/i.test(k)?2:/aerobic\|/i.test(k)?3:4;
+        keys.sort((a,b)=>order(a[0])-order(b[0]));
+        for (const [,v] of keys) {
+          const [label] = (Object.keys(sum).find(k=>sum[k]===v)||'Set|0|0').split('|');
+          const restStr = typeof v.rest==='number' && v.rest>0 ? ` @ ${mmss(v.rest)}r` : '';
+          parts.push(`${label} ${v.count}×${v.each}${restStr}`);
+        }
+        if (cd>0) parts.push(`CD ${cd}`);
+        if (parts.length) rendered = parts.join(' • ');
+      } catch {}
+    }
     const totalDurSeconds = computedStepsV3 && computedStepsV3.length ? totalDurationSeconds(computedStepsV3 as any) : 0;
 
     // STRICT: require computedStepsV3; if missing, fail fast for this session
