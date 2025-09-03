@@ -834,7 +834,6 @@ export default function PlanSelect() {
             duration: durationVal,
             workout_status: 'planned',
             source: 'training_plan',
-            main: (s as any).main || undefined,
             tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
             steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
             export_hints: payload.export_hints || null,
