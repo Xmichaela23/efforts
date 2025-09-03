@@ -506,7 +506,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     let computedStepsV3: any[] | undefined = undefined;
     try {
       const atomic = expand(Array.isArray((s as any).steps_preset) ? (s as any).steps_preset : [], (s as any).main, (s as any).tags);
-      const resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {}, mappedType);
+      let resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {}, mappedType) as any[];
+      // Ensure swim warm‑up/cool‑down are present so totals include them
+      if (mappedType === 'swim') {
+        const hasWU = Array.isArray(resolved) && resolved.some(st => /warmup|swim_warmup/i.test(String(st?.type)) || /warm/i.test(String((st as any)?.label||'')));
+        const hasCD = Array.isArray(resolved) && resolved.some(st => /cooldown|swim_cooldown/i.test(String(st?.type)) || /cool/i.test(String((st as any)?.label||'')));
+        const parseYd = (tok?: string): number | null => { try { const m = String(tok||'').match(/_(\d+)(yd|m)/i); if (!m) return null; const n = parseInt(m[1],10); return (m[2].toLowerCase()==='m') ? Math.round(n/0.9144/25)*25 : n; } catch { return null; } };
+        const wuToken = (planDefaults as any)?.swim?.wu; const cdToken = (planDefaults as any)?.swim?.cd;
+        const wuYd = parseYd(wuToken) || 0; const cdYd = parseYd(cdToken) || 0;
+        if (!hasWU && wuYd > 0) resolved = [{ type: 'swim_warmup', label: 'Warm‑up', distance_yd: wuYd }, ...(resolved||[])];
+        if (!hasCD && cdYd > 0) resolved = [...(resolved||[]), { type: 'swim_cooldown', label: 'Cool‑down', distance_yd: cdYd }];
+      }
       if (Array.isArray(resolved) && resolved.length) computedStepsV3 = resolved as any[];
     } catch {}
 
