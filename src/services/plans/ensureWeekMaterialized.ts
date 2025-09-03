@@ -608,8 +608,31 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               drillSpecs.push(`${name} ${reps}×${dist} @ :${r}r`);
             }
           }
-          if (drillSpecs.length) parts.push(`Drills: ${Array.from(new Set(drillSpecs)).join(', ')}`);
-          else if (drillLines.length) parts.push(`Drills: ${Array.from(new Set(drillLines)).join(', ')}`);
+          if (drillSpecs.length) {
+            parts.push(`Drills: ${Array.from(new Set(drillSpecs)).join(', ')}`);
+          } else if (drillLines.length) {
+            parts.push(`Drills: ${Array.from(new Set(drillLines)).join(', ')}`);
+          } else {
+            // Fallback: parse main DSL e.g., drills(catchup@15r(board),singlearm@20r)
+            try {
+              const main: string = String((s as any).main || '');
+              const m = main.match(/drills\(([^)]+)\)/i);
+              if (m) {
+                const body = m[1];
+                const items = body.split(',').map(x=>x.trim()).filter(Boolean);
+                const parsed: string[] = [];
+                for (const it of items) {
+                  const name = String(it.split('@')[0]||'').replace(/_/g,' ');
+                  const restM = it.match(/@(\d+)r/i);
+                  const equipM = it.match(/\(([^)]+)\)/);
+                  const rest = restM ? ` @ :${restM[1]}r` : '';
+                  const equip = equipM ? ` — ${equipM[1]}` : '';
+                  if (name) parsed.push(`${name} 4×50${rest}${equip}`.trim());
+                }
+                if (parsed.length) parts.push(`Drills: ${Array.from(new Set(parsed)).join(', ')}`);
+              }
+            } catch {}
+          }
         } catch {}
         // Keep a stable order: Pull, Kick, Aerobic, then drills/others
         const keys = Object.entries(sum);
