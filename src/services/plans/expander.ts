@@ -88,6 +88,54 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     }
   }
 
+  // Generic parsing for new deterministic tokens (run/bike with rNN seconds)
+  for (const token of steps) {
+    const t = String(token).toLowerCase();
+    // Run intervals: interval_<reps>x<dist>(m|mi)_<paceTag>[_plusMM:SS]_r<restSeconds>
+    let m = t.match(/^interval_(\d+)x(\d+)(m|mi)_([a-z0-9_]+?)(?:_plus(\d{1,2}:\d{2}))?_r(\d+)$/i);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const distNum = parseInt(m[2], 10);
+      const unit = (m[3]||'m').toLowerCase();
+      const paceTag = (m[4]||'').toLowerCase();
+      const plus = m[5] ? m[5] : undefined;
+      const rest = parseInt(m[6], 10);
+      const dist_m = unit === 'mi' ? Math.round(distNum * 1609) : distNum;
+      const mapped = paceTag.replace('pace', '_pace');
+      const target = `{${mapped}}${plus?`+${plus}`:''}`;
+      const idPrefixLocal = `${idPrefix}-${token}`;
+      pushInterval(reps, { dist_m, target }, { duration_s: rest });
+      continue;
+    }
+    // Cruise intervals: cruise_<reps>x<distMi>mi_<paceTag>[_plusMM:SS]_r<restSeconds>
+    m = t.match(/^cruise_(\d+)x([0-9_.]+)mi_([a-z0-9_]+?)(?:_plus(\d{1,2}:\d{2}))?_r(\d+)$/i);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const distStr = (m[2]||'').replace('_', '.');
+      const miles = Number(distStr);
+      const dist_m = Math.round(miles * 1609);
+      const paceTag = (m[3]||'').toLowerCase();
+      const plus = m[4] ? m[4] : undefined;
+      const rest = parseInt(m[5], 10);
+      const mapped = paceTag.replace('pace', '_pace');
+      const target = `{${mapped}}${plus?`+${plus}`:''}`;
+      pushInterval(reps, { dist_m, target }, { duration_s: rest });
+      continue;
+    }
+    // Bike intervals: bike_(vo2|thr|ss)_<reps>x<minutes>min_r<restSeconds>
+    m = t.match(/^bike_(vo2|thr|ss)_(\d+)x(\d+)min_r(\d+)$/i);
+    if (m) {
+      const kind = m[1].toLowerCase();
+      const reps = parseInt(m[2], 10);
+      const minutes = parseInt(m[3], 10);
+      const rest = parseInt(m[4], 10);
+      const work_s = minutes * 60;
+      const target = kind === 'vo2' ? '{VO2_power}' : kind === 'thr' ? '{threshold_power}' : '{sweetspot_power}';
+      pushInterval(reps, { duration_s: work_s, target }, { duration_s: rest });
+      continue;
+    }
+  }
+
   // Also parse swim tokens from steps_preset when present (fallback when swimMain is absent)
   for (const token of steps) {
     const t = String(token).toLowerCase();
@@ -101,7 +149,7 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       out.push({ id: makeId(idPrefix, ['swim', kind]), type: kind==='warmup'?'swim_warmup':'swim_cooldown', label: kind==='warmup'?'Warm‑up':'Cool‑down', distance_yd: yd, authored_unit: 'yd' });
       continue;
     }
-    // swim drills like swim_drills_4x50yd_catchup
+    // swim drills legacy like swim_drills_4x50yd_catchup
     m = t.match(/^swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
     if (m) {
       const reps = parseInt(m[1],10); const each = parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase(); const key=(m[4]||'').toLowerCase();
@@ -111,6 +159,22 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','drill',key,String(i).padStart(2,'0')]), type: 'swim_drill', label: cat.label, distance_yd: ydEach, authored_unit: 'yd', rest_s: defaultRest, equipment: cat.equipment, cue: cat.cue });
       continue;
     }
+    // swim drills new: swim_drill_<name>_<reps>x<dist>(yd|m)_r<rest>[_equip...]
+    m = t.match(/^swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)_r(\d+)(?:_(.+))?$/i);
+    if (m) {
+      const key = (m[1]||'').toLowerCase();
+      const reps = parseInt(m[2],10);
+      const each = parseInt(m[3],10);
+      const unit = (m[4]||'yd').toLowerCase();
+      const rest = parseInt(m[5],10);
+      const equipSuffix = (m[6]||'').split('_').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      const cat = SWIM_CATALOG[key] || { type: 'swim_drill', label: 'Drill', cue: '', equipment: 'none' } as any;
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      const equipFromMods = equipSuffix.map(e => SWIM_EQUIPMENT_MODS[e]?.equipment).filter(Boolean) as string[];
+      const equip = [cat.equipment, ...equipFromMods].filter(Boolean).join(', ').trim() || undefined;
+      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','drill',key,String(i).padStart(2,'0')]), type: 'swim_drill', label: cat.label, distance_yd: ydEach, authored_unit: 'yd', rest_s: rest, equipment: equip, cue: cat.cue });
+      continue;
+    }
     // swim pull/kick blocks like swim_pull_2x100yd
     m = t.match(/^swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
     if (m) {
@@ -118,6 +182,21 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       const base = SWIM_CATALOG[kind];
       const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
       for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: (base?.type || (kind==='pull'?'swim_pull':'swim_kick')) as any, label: base?.label || (kind==='pull'?'Pull':'Kick'), distance_yd: ydEach, authored_unit: 'yd', equipment: base?.equipment });
+      continue;
+    }
+    // swim pull/kick/aerobic new: swim_(pull|kick|aerobic)_<reps>x<dist>(yd|m)_r<rest>[_equip...]
+    m = t.match(/^swim_(pull|kick|aerobic)_(\d+)x(\d+)(yd|m)_r(\d+)(?:_(.+))?$/i);
+    if (m) {
+      const kind = m[1].toLowerCase(); const reps = parseInt(m[2],10); const each = parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase(); const rest = parseInt(m[5],10);
+      const mods = (m[6]||'').split('_').map(s=>s.trim().toLowerCase()).filter(Boolean);
+      const base = SWIM_CATALOG[kind];
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      const equipFromMods = mods.map(e=>SWIM_EQUIPMENT_MODS[e]?.equipment).filter(Boolean) as string[];
+      const baseEquip = base?.equipment ? [base.equipment] : [];
+      const equip = [...baseEquip, ...equipFromMods].filter(Boolean).join(', ').trim() || undefined;
+      const typeMap: any = { pull: 'swim_pull', kick: 'swim_kick', aerobic: 'swim_aerobic' };
+      const label = base?.label || (kind==='pull'?'Pull': kind==='kick'?'Kick':'Aerobic');
+      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: typeMap[kind], label, distance_yd: ydEach, authored_unit: 'yd', equipment: equip, rest_s: rest });
       continue;
     }
     // swim aerobic blocks like swim_aerobic_6x100yd
