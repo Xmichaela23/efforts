@@ -209,6 +209,37 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     }
   }
 
+  // Parse strength tokens (st_*) into v3 steps so materializer has computedStepsV3
+  for (const token of steps) {
+    const t = String(token).toLowerCase();
+    // Warmup/Cooldown minutes: st_wu_8, st_cool_5
+    let m = t.match(/^st_(wu|cool)_(\d{1,3})$/i);
+    if (m) {
+      const kind = m[1].toLowerCase();
+      const minutes = parseInt(m[2], 10);
+      out.push({ id: makeId(idPrefix, ['strength', kind]), type: 'strength_work', exercise: kind==='wu'?'warmup':'cooldown', set: 1, reps: 1, intensity: undefined, rest_s: undefined, duration_s: Math.max(1, minutes*60) } as any);
+      continue;
+    }
+    // Main/accessory/core: st_main_back_squat_5x5_@pct70_rest150, st_acc_barbell_row_4x6_rest75, st_core_rollouts_3x15_rest45
+    m = t.match(/^st_(main|acc|core)_([a-z0-9_]+)_(\d+)x(\d+|amrap)(?:_@pct(\d+))?(?:_rest(\d+))?(?:_rir\d+)?$/i);
+    if (m) {
+      const group = m[1].toLowerCase();
+      const exercise = (m[2]||'').replace(/_/g, ' ');
+      const sets = parseInt(m[3], 10);
+      const repsTxt = (m[4]||'').toLowerCase();
+      const reps = repsTxt === 'amrap' ? 'AMRAP' : parseInt(repsTxt, 10);
+      const pct = m[5] ? `${parseInt(m[5],10)}%1RM` : undefined;
+      const rest = m[6] ? parseInt(m[6], 10) : undefined;
+      for (let sIdx=1; sIdx<=sets; sIdx+=1) {
+        out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'set', String(sIdx).padStart(2,'0')]), type: 'strength_work', exercise, set: sIdx, reps, intensity: pct, rest_s: rest, duration_s: 0 } as any);
+        if (typeof rest === 'number' && rest>0) {
+          out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'rest', String(sIdx).padStart(2,'0')]), type: 'strength_rest', rest_s: rest, duration_s: rest } as any);
+        }
+      }
+      continue;
+    }
+  }
+
   // Swim main DSL → atomic blocks (yards-first semantics)
   if (typeof swimMain === 'string' && swimMain.trim()) {
     const parts = swimMain.split(';').map(s => s.trim()).filter(Boolean);
