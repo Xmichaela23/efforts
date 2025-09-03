@@ -136,6 +136,8 @@ export const usePlannedWorkouts = () => {
           training_plan_id: workout.training_plan_id,
           week_number: workout.week_number,
           day_number: workout.day_number,
+          // @ts-ignore preserve swim DSL for self-heal expansion
+          main: (workout as any).main || undefined,
           // expose tags for UI filters
           // @ts-ignore
           tags: parsedTags,

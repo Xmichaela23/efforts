@@ -834,11 +834,12 @@ export default function PlanSelect() {
             duration: durationVal,
             workout_status: 'planned',
             source: 'training_plan',
+            main: (s as any).main || undefined,
             tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
             steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
             export_hints: payload.export_hints || null,
             rendered_description: rendered,
-            computed: { normalization_version: 'v2', total_duration_seconds: totalSeconds, steps: computedSteps },
+            computed: { normalization_version: 'v3', total_duration_seconds: totalSeconds, steps: computedSteps },
             units: unitsPref,
             intervals: Array.isArray(s.intervals) && s.intervals.length ? s.intervals : (intervalsFromBaker?.length ? intervalsFromBaker : (intervalsFromNorm?.length ? intervalsFromNorm : undefined))
           });
