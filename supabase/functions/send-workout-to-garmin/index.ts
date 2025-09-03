@@ -191,6 +191,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         out.push(base)
       }
       const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.floor(yd * 0.9144) : undefined
+      const lengthsFromYd = (yd?: number) => (yd && yd > 0) ? Math.max(1, Math.round(yd / 25)) : undefined
       // Collect to enforce order: warmups → main (work + embedded rests) → interval_rest → cooldowns
       const warmArr: any[] = []
       const mainArr: any[] = []
@@ -230,11 +231,14 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         const seconds = typeof (st as any)?.duration_s === 'number' && (st as any).duration_s > 0 ? Math.floor((st as any).duration_s) : undefined
         // Route warmup/cooldown explicitly so Garmin ordering is correct
         if (t === 'warmup') {
-          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          const lengths = isSwim ? lengthsFromYd((st as any)?.distance_yd) : undefined
+          warmArr.push({ effortLabel: 'warm up', ...(isSwim && lengths ? { lengths } : {}), ...(typeof meters==='number' && meters>0 && !lengths ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
         } else if (t === 'cooldown') {
-          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          const lengths = isSwim ? lengthsFromYd((st as any)?.distance_yd) : undefined
+          coolArr.push({ effortLabel: 'cool down', ...(isSwim && lengths ? { lengths } : {}), ...(typeof meters==='number' && meters>0 && !lengths ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
         } else {
-          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          const lengths = isSwim ? lengthsFromYd((st as any)?.distance_yd) : undefined
+          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(isSwim && lengths ? { lengths } : {}), ...(typeof meters==='number' && meters>0 && !lengths ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
           // Append explicit rest after work if rest_s present
           if (typeof (st as any)?.rest_s === 'number' && (st as any).rest_s > 0) {
             explicitRestArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
@@ -318,8 +322,9 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     // Simple single step
     const intensity = mapEffortToIntensity(String(interval?.effortLabel ?? '').trim())
     const meters = Number(interval?.distanceMeters)
+    const lengths = Number((interval as any)?.lengths)
     const seconds = Number(interval?.duration)
-    if (!(Number.isFinite(meters) && meters > 0) && !(Number.isFinite(seconds) && seconds > 0)) {
+    if (!(Number.isFinite(meters) && meters > 0) && !(Number.isFinite(seconds) && seconds > 0) && !(Number.isFinite(lengths) && lengths > 0)) {
       throw new Error('Invalid interval: must include distanceMeters>0 or duration>0')
     }
     const step: GarminStep = {
@@ -328,8 +333,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       stepOrder: stepId,
       intensity,
       description: String(interval?.effortLabel ?? '').trim() || undefined,
-      durationType: (Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME',
-      durationValue: (Number.isFinite(meters) && meters > 0) ? Math.floor(meters) : Math.floor(seconds)
+      durationType: (Number.isFinite(lengths) && lengths > 0) ? 'LENGTH' : ((Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME'),
+      durationValue: (Number.isFinite(lengths) && lengths > 0) ? Math.floor(lengths) : ((Number.isFinite(meters) && meters > 0) ? Math.floor(meters) : Math.floor(seconds))
     }
     applyTargets(step, interval)
     applyComputedTargetIfMissing(step)
