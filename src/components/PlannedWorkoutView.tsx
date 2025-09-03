@@ -630,13 +630,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
     };
     const mmss = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+    const workoutType = String((workout as any).type||'').toLowerCase();
     const pushSeg = (seg: any) => {
       // v3 schema: { type, duration_s?, distance_m? | distance_yd?, target_value?, target_low?, target_high? }
       if (typeof seg?.type === 'string' && (typeof seg?.duration_s === 'number' || typeof seg?.distance_m === 'number' || typeof (seg as any)?.distance_yd === 'number')) {
         const kind = String(seg.type).toLowerCase();
         const isRestV3 = kind === 'interval_rest' || /rest/.test(kind);
-        const isWarmV3 = kind === 'warmup';
-        const isCoolV3 = kind === 'cooldown';
+        const isWarmV3 = kind === 'warmup' || kind === 'swim_warmup';
+        const isCoolV3 = kind === 'cooldown' || kind === 'swim_cooldown';
         const typeLower = String((workout as any).type||'').toLowerCase();
         const isSwim = typeLower === 'swim';
         const base = (() => {
@@ -750,6 +751,56 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         lines.push(`1 × ${(d || t)}${target ? ` @ ${target}` : ''}${timeAnn ? ` — ${timeAnn}` : ''}`.trim());
       }
     };
+    // Compact swim rendering: group identical reps and include WU/CD
+    if (workoutType === 'swim') {
+      type SwimItem = { label: string; yards: number; equipment: string };
+      const items: SwimItem[] = [];
+      const pushIf = (seg: any) => {
+        const kind = String(seg?.type||'').toLowerCase();
+        const isWU = kind==='swim_warmup' || kind==='warmup';
+        const isCD = kind==='swim_cooldown' || kind==='cooldown';
+        const yd = (typeof (seg as any)?.distance_yd === 'number')
+          ? Math.round((seg as any).distance_yd/25)*25
+          : (typeof (seg as any)?.distance_m === 'number' ? Math.round((seg as any).distance_m/0.9144/25)*25 : 0);
+        if (isWU || isCD) {
+          if (yd>0) items.push({ label: isWU?'Warm‑up':'Cool‑down', yards: yd, equipment: '' });
+          return;
+        }
+        // only group work-like swim steps
+        if (!/swim_/.test(kind)) return;
+        if (yd<=0) return;
+        const labelPref = (seg as any)?.label ? String((seg as any).label).trim() : '';
+        const label = labelPref || 'Set';
+        const eq = String((seg as any)?.equipment||'').trim()
+          .replace(/pull buoy/ig,'buoy').replace(/kickboard/ig,'board').replace(/\(optional\)/ig,'(opt)');
+        items.push({ label, yards: yd, equipment: eq });
+      };
+      for (const st of stepsRaw) {
+        if (Array.isArray(st?.segments) && typeof st?.repeatCount === 'number' && st.repeatCount > 0) {
+          for (let r=0;r<st.repeatCount;r++) for (const seg of st.segments) pushIf(seg);
+        } else { pushIf(st); }
+      }
+      // Group consecutive identical items
+      let i = 0;
+      while (i < items.length) {
+        const a = items[i];
+        // Warm‑up/Cool‑down emit as single lines
+        if (a.label==='Warm‑up' || a.label==='Cool‑down') {
+          lines.push(`${a.label} 1 × ${a.yards} yd`);
+          i += 1; continue;
+        }
+        let count = 1; let j = i+1;
+        while (j < items.length) {
+          const b = items[j];
+          if (a.label===b.label && a.yards===b.yards && a.equipment===b.equipment) { count += 1; j += 1; } else break;
+        }
+        const equipAnn = a.equipment ? ` — ${a.equipment}` : '';
+        lines.push(`${a.label} ${count} × ${a.yards} yd${equipAnn}`.trim());
+        i = j;
+      }
+      return lines;
+    }
+
     for (const st of stepsRaw) {
       if (Array.isArray(st?.segments) && typeof st?.repeatCount === 'number' && st.repeatCount > 0) {
         for (let r = 0; r < st.repeatCount; r++) {
