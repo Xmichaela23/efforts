@@ -660,6 +660,18 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const yd = Math.round(seg.distance_m / 0.9144 / 25) * 25; // nearest 25 yd
               return `${yd} yd`;
             }
+            // For runs, prefer miles instead of meters
+            const isRun = typeLower === 'run';
+            if (isRun) {
+              const miles = seg.distance_m / 1609.34;
+              const fmt = (n:number) => {
+                const nearInt = Math.abs(n - Math.round(n)) < 1e-6;
+                if (nearInt) return String(Math.round(n));
+                // Show 2 decimals for <1 mi reps (e.g., 0.25 mi), else 1 decimal
+                return n < 1 ? n.toFixed(2) : (Math.round(n * 10) / 10).toFixed(1);
+              };
+              return `${fmt(miles)} mi`;
+            }
             return `${Math.round(seg.distance_m)}m`;
           }
           if (typeof seg?.duration_s === 'number' && seg.duration_s > 0) return secTo(seg.duration_s);

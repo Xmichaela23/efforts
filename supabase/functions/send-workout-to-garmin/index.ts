@@ -223,7 +223,13 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             .replace(/pull buoy/ig,'buoy')
             .replace(/kickboard/ig,'board')
             .replace(/\(optional\)/ig,'(opt)')
-          if (abbr) label = label ? `${label} — ${abbr}` : abbr
+          // Include per-rep yards explicitly so users see "1 × 100 yd"
+          const yd = typeof (st as any)?.distance_yd === 'number' && (st as any).distance_yd > 0
+            ? Math.max(25, Math.round((st as any).distance_yd / 25) * 25)
+            : undefined
+          const yardText = yd ? `1 × ${yd} yd` : undefined
+          const baseLab = label || 'Interval'
+          label = [baseLab, yardText, abbr].filter(Boolean).join(' — ')
         }
         const meters = typeof (st as any)?.distance_m === 'number' && (st as any).distance_m > 0
           ? Math.floor((st as any).distance_m)
