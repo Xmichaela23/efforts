@@ -1257,6 +1257,29 @@ const SendToGarminButton: React.FC<{ workoutId: string; disabled?: boolean }> = 
         alert('Please sign in');
         return;
       }
+      // Pre-flight: ensure computed.steps exist with pace/power ranges
+      try {
+        const wr = await supabase.from('planned_workouts').select('*').eq('id', workoutId).single();
+        const workoutRow: any = (wr as any)?.data || {};
+        const hasComputed = Array.isArray(workoutRow?.computed?.steps) && workoutRow.computed.steps.length > 0;
+        if (!hasComputed) {
+          const stepsPresetArr: string[] | undefined = Array.isArray(workoutRow?.steps_preset) ? workoutRow.steps_preset : undefined;
+          const swimMain: string | undefined = typeof workoutRow?.main === 'string' ? workoutRow.main : undefined;
+          if ((stepsPresetArr && stepsPresetArr.length > 0) || swimMain) {
+            const [{ expand }, { resolveTargets, totalDurationSeconds }] = await Promise.all([
+              import('@/services/plans/expander'),
+              import('@/services/plans/targets')
+            ]);
+            // Load user baselines for target resolution
+            const pnResp = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
+            const perf = (pnResp as any)?.data?.performance_numbers || {};
+            const atomic: any[] = expand(stepsPresetArr || [], swimMain, (workoutRow as any).tags);
+            const resolved: any[] = resolveTargets(atomic as any, (perf || {}), ((workoutRow as any).export_hints || {}), String((workoutRow as any).type||'').toLowerCase());
+            const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
+            await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', workoutId);
+          }
+        }
+      } catch {}
       const { error } = await supabase.functions.invoke('send-workout-to-garmin', {
         body: { workoutId, userId: user.id }
       });
