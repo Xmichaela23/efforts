@@ -123,39 +123,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         // PLANNED: Prefer precomputed friendly text if present
         const storedText = (workout as any).rendered_description;
         if (typeof storedText === 'string' && storedText.trim().length > 0) {
-          // If stored text lacks target info, append from computed
-          try {
-            const comp: any = (workout as any).computed || {};
-            const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
-            const hasTarget = /@\s*\d+:\d{2}|target\s+\d+|\(\d+:\d{2}\//.test(storedText);
-            if (!hasTarget && steps.length) {
-              const secTo = (s: number) => { const x = Math.max(1, Math.round(s)); const mm = Math.floor(x/60); const ss = x%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
-              let suffix = '';
-              if (workout.type === 'run') {
-                const st = steps.find(s => typeof s.pace_sec_per_mi==='number' && (s.kind==='work' || s.intensity==='tempo'));
-                if (st) {
-                  const base = `${secTo(st.pace_sec_per_mi)}/mi`;
-                  const rng = st.pace_range ? ` (${secTo(st.pace_range.lower)}/mi–${secTo(st.pace_range.upper)}/mi)` : '';
-                  suffix = ` @ ${base}${rng}`;
-                }
-              } else if (workout.type === 'ride') {
-                const st = steps.find(s => typeof s.target_watts==='number' || s.power_range);
-                if (st) {
-                  const rng = st.power_range ? `${st.power_range.lower}–${st.power_range.upper} W` : `${st.target_watts} W`;
-                  suffix = ` — target ${rng}`;
-                }
-              } else if (workout.type === 'swim') {
-                const st = steps.find(s => typeof s.swim_pace_sec_per_100==='number' || s.swim_pace_range_per_100);
-                if (st) {
-                  const unit = '100yd';
-                  const base = typeof st.swim_pace_sec_per_100==='number' ? secTo(st.swim_pace_sec_per_100) : undefined;
-                  const rng = st.swim_pace_range_per_100 ? ` (${secTo(st.swim_pace_range_per_100.lower)}–${secTo(st.swim_pace_range_per_100.upper)}/${unit})` : (base?`/${unit}`:'');
-                  suffix = ` @ ${base || ''}${rng}`;
-                }
-              }
-              if (suffix) return [truncate((storedText + ' ' + suffix).replace(/\s+/g,' ').trim(), 200)];
-            }
-          } catch {}
+          // Planned cards should reflect the pre-rendered text only
           return [truncate(storedText, 200)];
         }
         // No stored text → do not synthesize from fallbacks anymore

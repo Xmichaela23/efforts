@@ -137,7 +137,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       try {
         const uid = (existing as any[])[0]?.user_id;
         if (uid) {
-          const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).single();
+          const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', uid).maybeSingle();
           perfNumbersUpgrade = ub?.performance_numbers || {};
         }
       } catch {}
@@ -191,7 +191,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   try {
     const catalogId = (plan as any)?.config?.catalog_id;
     if (catalogId) {
-      const lib = await supabase.from('library_plans').select('template').eq('id', catalogId).single();
+      const lib = await supabase.from('library_plans').select('template').eq('id', catalogId).maybeSingle();
       exportHints = (lib.data?.template?.export_hints || null);
     }
   } catch {}
@@ -227,7 +227,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   let perfNumbers: any = {};
   let unitsPref: 'imperial' | 'metric' = 'imperial';
   try {
-    const { data: ub } = await supabase.from('user_baselines').select('units, performance_numbers').eq('user_id', user.id).single();
+    const { data: ub } = await supabase.from('user_baselines').select('units, performance_numbers').eq('user_id', user.id).maybeSingle();
     if (ub) {
       unitsPref = (ub.units === 'metric' || ub.units === 'imperial') ? ub.units : 'imperial';
       perfNumbers = ub.performance_numbers || {};
