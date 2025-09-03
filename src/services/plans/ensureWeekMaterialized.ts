@@ -57,7 +57,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   // 1) If rows already exist for this week, upgrade any that are missing intervals
   const { data: existing, error: existErr } = await supabase
     .from('planned_workouts')
-    .select('id, user_id, type, steps_preset, export_hints, intervals, computed, main, tags')
+    .select('id, user_id, type, steps_preset, export_hints, intervals, computed, tags')
     .eq('training_plan_id', planId)
     .eq('week_number', weekNumber);
   if (!existErr && Array.isArray(existing) && existing.length > 0) {
@@ -301,8 +301,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         if (!hasSteps) {
           let wrote = false;
           try {
-            if ((Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) || (row as any)?.main) {
-              const atomic = expand((row.steps_preset as any[]) || [], (row as any).main, row.tags as any);
+            if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
+              const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
               const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type);
               const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
               await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
