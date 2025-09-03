@@ -571,6 +571,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         type Key = { label: string; each: number; rest?: number };
         const sum: Record<string,{count:number,each:number,rest?:number}> = {};
         let wu=0, cd=0;
+        const drillLines: string[] = [];
         for (const st of computedStepsV3 as any[]) {
           const kind = String(st?.type||'').toLowerCase();
           const yd = typeof (st as any)?.distance_yd === 'number' ? Math.round((st as any).distance_yd/25)*25 : (typeof (st as any)?.distance_m === 'number' ? Math.round((st as any).distance_m/0.9144/25)*25 : 0);
@@ -583,10 +584,33 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             if (!sum[k]) sum[k] = { count: 0, each: yd, rest };
             sum[k].count += 1;
           }
+          // Some drill steps may be duration-only in computed; retain their names via label
+          if (!yd) {
+            const lbl = String((st as any).label||'').trim();
+            if (lbl) drillLines.push(lbl);
+          }
         }
         const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
         const parts: string[] = [];
         if (wu>0) parts.push(`WU ${wu}`);
+        // Prefer explicit drills from tokens when available to show names like "catchup"/"singlearm"
+        try {
+          const stepsTok: string[] = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset : [];
+          const drillSpecs: string[] = [];
+          const restDefault = (name:string, each:number)=> name==='singlearm'||name==='single_arm'?20:15;
+          for (const t of stepsTok) {
+            const m = String(t).toLowerCase().match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
+            if (m) {
+              const reps = parseInt(m[1],10);
+              const dist = parseInt(m[2],10);
+              const name = String(m[4]||'').replace(/_/g,' ');
+              const r = restDefault(name, dist);
+              drillSpecs.push(`${name} ${reps}×${dist} @ :${r}r`);
+            }
+          }
+          if (drillSpecs.length) parts.push(`Drills: ${Array.from(new Set(drillSpecs)).join(', ')}`);
+          else if (drillLines.length) parts.push(`Drills: ${Array.from(new Set(drillLines)).join(', ')}`);
+        } catch {}
         // Keep a stable order: Pull, Kick, Aerobic, then drills/others
         const keys = Object.entries(sum);
         const order = (k:string)=>/pull\|/i.test(k)?1:/kick\|/i.test(k)?2:/aerobic\|/i.test(k)?3:4;
