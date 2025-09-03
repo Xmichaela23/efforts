@@ -62,47 +62,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     .eq('week_number', weekNumber);
   if (!existErr && Array.isArray(existing) && existing.length > 0) {
     try {
-      // Helper to derive intervals from tokens for upgrades (same rules as inserts below)
-      const deriveFromTokens = (stepsPreset?: any[], discipline?: string) => {
-        const steps: string[] = Array.isArray(stepsPreset) ? stepsPreset.map((t:any)=>String(t)) : [];
-        if (steps.length === 0) return undefined as any[] | undefined;
-        const out: any[] = [];
-        const fivek: string | undefined = (()=>{ try { return String(({} as any)).trim(); } catch { return undefined; }})();
-        // We don't have perfNumbers yet at this point of function; they are loaded later.
-        // To keep upgrades simple without extra queries, build distance/time-only steps here.
-        const tokenStr = steps.join(' ').toLowerCase();
-        const toMeters = (n:number, unit:'m'|'mi'|'yd'|'km'='m') => unit==='mi'?Math.floor(n*1609.34):unit==='yd'?Math.floor(n*0.9144):unit==='km'?Math.floor(n*1000):Math.floor(n);
-        // Warmup/Cooldown
-        steps.forEach((t)=>{ const s=String(t).toLowerCase(); let m=s.match(/warmup.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/); if(m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; out.push({ effortLabel:'warm up', duration: Math.max(1, Math.round(((a+b)/2)*60)) }); }
-          m=s.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/); if(m){ const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; out.push({ effortLabel:'cool down', duration: Math.max(1, Math.round(((a+b)/2)*60)) }); }
-        });
-        const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)/i);
-        if (iv){ const reps=parseInt(iv[1],10); const each=parseFloat(iv[2]); const unit=(iv[3]||'m').toLowerCase() as 'm'|'mi';
-          const r = tokenStr.match(/_r(\d+)(?:-(\d+))?min/i); const ra=r?parseInt(r[1],10):0; const rb=r&&r[2]?parseInt(r[2],10):ra; const restSec=Math.round(((ra||0)+(rb||0))/2)*60;
-          for(let k=0;k<reps;k+=1){ out.push({ effortLabel:'interval', distanceMeters: toMeters(each, unit) }); if (k<reps-1 && restSec>0) out.push({ effortLabel:'rest', duration: restSec }); }
-        }
-        const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i); if (tm){ out.push({ effortLabel:'tempo', distanceMeters: toMeters(parseFloat(tm[1]), 'mi') }); }
-        const st = tokenStr.match(/strides_(\d+)x(\d+)s/i); if (st){ const reps=parseInt(st[1],10); const secEach=parseInt(st[2],10); for(let r=0;r<reps;r+=1) out.push({ effortLabel:'interval', duration: secEach }); }
-        const bike = tokenStr.match(/bike_(vo2|thr|ss)_(\d+)x(\d+)min(?:_r(\d+)min)?/i); if (bike){ const reps=parseInt(bike[2],10); const minEach=parseInt(bike[3],10); const rmin=bike[4]?parseInt(bike[4],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'interval', duration:minEach*60 }); if (r<reps-1 && rmin>0) out.push({ effortLabel:'rest', duration:rmin*60 }); } }
-        const bend = tokenStr.match(/bike_endurance_(\d+)min/i); if (bend){ out.push({ effortLabel:'endurance', duration: parseInt(bend[1],10)*60 }); }
-        const lr = tokenStr.match(/longrun_(\d+)min/i); if (lr){ out.push({ effortLabel:'long run', duration: parseInt(lr[1],10)*60 }); }
-        if (String(discipline||'').toLowerCase()==='swim'){
-          steps.forEach((t)=>{ const s=String(t).toLowerCase(); let m=s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m){ const dist=parseInt(m[1],10); const u=(m[2]||'yd').toLowerCase() as any; out.push({ effortLabel: /warmup/i.test(s)?'warm up':'cool down', distanceMeters: toMeters(dist, u) }); return; }
-            m=s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'drill', distanceMeters: toMeters(each, u) }); return; }
-            m=s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: m[1]==='pull'?'pull':'kick', distanceMeters: toMeters(each, u) }); return; }
-            m=s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel:'aerobic', distanceMeters: toMeters(each, u) }); return; }
-          });
-        }
-        return out.length ? out : undefined;
-      };
-
-      const missing = existing.filter((r:any)=> !Array.isArray(r?.intervals) || r.intervals.length === 0);
-      for (const row of missing) {
-        const derived = deriveFromTokens(row?.steps_preset as any[], row?.type as string);
-        if (Array.isArray(derived) && derived.length) {
-          await supabase.from('planned_workouts').update({ intervals: derived as any }).eq('id', row.id);
-        }
-      }
+      // STRICT: Do not derive placeholder intervals anymore; upgrades must compute targets or fail
 
       // Helper: annotate/enrich intervals with targets from baselines/hints
       const annotateIntervals = (intervals: any[] | undefined, type: string, hints: any | undefined, perf: any | undefined): any[] | undefined => {
@@ -161,7 +121,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         return out;
       };
 
-      // Upgrade: populate computed.steps when missing by synthesizing from intervals
+      // Upgrade: populate computed.steps strictly from tokens (no synthesis from intervals). If tokens missing → fail
       const parsePace = (p?: string): { secPerMi: number | null } => {
         if (!p) return { secPerMi: null };
         const m = String(p).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
@@ -170,121 +130,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         const unit = m[3].toLowerCase();
         return { secPerMi: unit === 'mi' ? sec : Math.round(sec * 1.60934) };
       };
-      const buildComputedFromIntervals = (intervals: any[] | undefined, type: string, hints: any | undefined, perf: any | undefined) => {
-        if (!Array.isArray(intervals) || intervals.length===0) return undefined;
-        const tolEasy = (hints && typeof hints.pace_tolerance_easy==='number') ? hints.pace_tolerance_easy : 0.06;
-        const tolQual = (hints && typeof hints.pace_tolerance_quality==='number') ? hints.pace_tolerance_quality : 0.04;
-        const steps: any[] = [];
-        const toMiles = (meters: number) => meters / 1609.34;
-        const easyPaceTxt: string | undefined = perf?.easyPace || perf?.easy_pace;
-        const fivekPaceTxt: string | undefined = perf?.fiveK_pace || perf?.fiveKPace || perf?.fiveK;
-        const mmss = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-        const parsePace = (p?: string): { secPerMi: number | null, unit?: 'mi'|'km' } => {
-          if (!p) return { secPerMi: null };
-          const m = String(p).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
-          if (!m) return { secPerMi: null };
-          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-          const unit = m[3].toLowerCase();
-          return { secPerMi: unit==='mi' ? sec : Math.round(sec*1.60934), unit: unit as any };
-        };
-        const deriveRunPace = (kind: 'work'|'recovery'): { secPerMi: number | null, unit: 'mi'|'km' } => {
-          const base = kind==='recovery' ? (easyPaceTxt || fivekPaceTxt) : (fivekPaceTxt || easyPaceTxt);
-          const p = parsePace(base);
-          return { secPerMi: p.secPerMi, unit: (p.unit || 'mi') as any };
-        };
-        for (const it of intervals) {
-          if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0) {
-            for (let r=0;r<Number(it.repeatCount);r+=1){
-              for (const sg of it.segments) {
-                const kind = (String(sg?.effortLabel||'interval').toLowerCase().includes('rest')||String(sg?.effortLabel||'').toLowerCase().includes('recovery'))?'recovery':'work';
-                if (typeof sg?.duration === 'number' && sg.duration>0) {
-                  const base: any = { index: steps.length, kind, ctrl: 'time', seconds: Math.max(1, Math.floor(sg.duration)) };
-                  if (String(type).toLowerCase()==='run' && typeof sg?.paceTarget==='string') {
-                    const { secPerMi } = parsePace(sg.paceTarget);
-                    if (secPerMi) {
-                      base.pace_sec_per_mi = secPerMi;
-                      const tol = kind==='recovery' ? tolEasy : tolQual;
-                      base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
-                    }
-                  } else if (String(type).toLowerCase()==='run') {
-                    const p = deriveRunPace(kind);
-                    if (p.secPerMi) {
-                      base.pace_sec_per_mi = p.secPerMi;
-                      const tol = kind==='recovery' ? tolEasy : tolQual;
-                      base.pace_range = { lower: Math.round(p.secPerMi*(1-tol)), upper: Math.round(p.secPerMi*(1+tol)) };
-                    }
-                  }
-                  steps.push(base);
-                } else if (typeof sg?.distanceMeters === 'number' && sg.distanceMeters>0) {
-                  const miles = toMiles(Number(sg.distanceMeters));
-                  const base: any = { index: steps.length, kind, ctrl: 'distance', seconds: 0, original_val: Number(sg.distanceMeters), original_units: 'm' };
-                  if (String(type).toLowerCase()==='run' && typeof sg?.paceTarget==='string') {
-                    const { secPerMi } = parsePace(sg.paceTarget);
-                    if (secPerMi) {
-                      base.pace_sec_per_mi = secPerMi;
-                      const tol = kind==='recovery' ? tolEasy : tolQual;
-                      base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
-                      base.seconds = Math.max(1, Math.round(miles * secPerMi));
-                    }
-                  } else if (String(type).toLowerCase()==='run') {
-                    const p = deriveRunPace(kind);
-                    if (p.secPerMi) {
-                      base.pace_sec_per_mi = p.secPerMi;
-                      const tol = kind==='recovery' ? tolEasy : tolQual;
-                      base.pace_range = { lower: Math.round(p.secPerMi*(1-tol)), upper: Math.round(p.secPerMi*(1+tol)) };
-                      base.seconds = Math.max(1, Math.round(miles * p.secPerMi));
-                    }
-                  }
-                  steps.push(base);
-                }
-              }
-            }
-          } else {
-            const kind = (String(it?.effortLabel||'interval').toLowerCase().includes('rest')||String(it?.effortLabel||'').toLowerCase().includes('recovery'))?'recovery':'work';
-            if (typeof it?.duration === 'number' && it.duration>0) {
-              const base: any = { index: steps.length, kind, ctrl: 'time', seconds: Math.max(1, Math.floor(it.duration)) };
-              if (String(type).toLowerCase()==='run' && typeof it?.paceTarget==='string') {
-                const { secPerMi } = parsePace(it.paceTarget);
-                if (secPerMi) {
-                  base.pace_sec_per_mi = secPerMi;
-                  const tol = kind==='recovery' ? tolEasy : tolQual;
-                  base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
-                }
-              } else if (String(type).toLowerCase()==='run') {
-                const p = deriveRunPace(kind);
-                if (p.secPerMi) {
-                  base.pace_sec_per_mi = p.secPerMi;
-                  const tol = kind==='recovery' ? tolEasy : tolQual;
-                  base.pace_range = { lower: Math.round(p.secPerMi*(1-tol)), upper: Math.round(p.secPerMi*(1+tol)) };
-                }
-              }
-              steps.push(base);
-            } else if (typeof it?.distanceMeters === 'number' && it.distanceMeters>0) {
-              const miles = toMiles(Number(it.distanceMeters));
-              const base: any = { index: steps.length, kind, ctrl: 'distance', seconds: 0, original_val: Number(it.distanceMeters), original_units: 'm' };
-              if (String(type).toLowerCase()==='run' && typeof it?.paceTarget==='string') {
-                const { secPerMi } = parsePace(it.paceTarget);
-                if (secPerMi) {
-                  base.pace_sec_per_mi = secPerMi;
-                  const tol = kind==='recovery' ? tolEasy : tolQual;
-                  base.pace_range = { lower: Math.round(secPerMi*(1-tol)), upper: Math.round(secPerMi*(1+tol)) };
-                  base.seconds = Math.max(1, Math.round(miles * secPerMi));
-                }
-              } else if (String(type).toLowerCase()==='run') {
-                const p = deriveRunPace(kind);
-                if (p.secPerMi) {
-                  base.pace_sec_per_mi = p.secPerMi;
-                  const tol = kind==='recovery' ? tolEasy : tolQual;
-                  base.pace_range = { lower: Math.round(p.secPerMi*(1-tol)), upper: Math.round(p.secPerMi*(1+tol)) };
-                  base.seconds = Math.max(1, Math.round(miles * p.secPerMi));
-                }
-              }
-              steps.push(base);
-            }
-          }
-        }
-        return steps.length ? steps : undefined;
-      };
+      // remove buildComputedFromIntervals fallback entirely (strict mode)
 
       // Load baselines once (single user per plan)
       let perfNumbersUpgrade: any = {};
@@ -299,22 +145,15 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       for (const row of existing as any[]) {
         const hasSteps = row?.computed && Array.isArray(row.computed.steps) && row.computed.steps.length>0;
         if (!hasSteps) {
-          let wrote = false;
-          try {
+          // STRICT: Only compute from tokens with targets; if tokens absent, surface failure
             if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
               const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
               const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type);
+            if (!Array.isArray(resolved) || resolved.length === 0) throw new Error('Materialization failed: no resolvable steps');
               const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
               await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
-              wrote = true;
-            }
-          } catch {}
-          if (!wrote) {
-            const steps = buildComputedFromIntervals(row.intervals, row.type, row.export_hints, perfNumbersUpgrade);
-            if (Array.isArray(steps) && steps.length) {
-              const nextComputed = { ...(row.computed||{}), normalization_version: 'v2', steps };
-              await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
-            }
+          } else {
+            throw new Error('Materialization failed: steps_preset missing on existing row');
           }
         }
         // Always ensure intervals carry targets when possible
@@ -673,6 +512,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
 
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);
 
+    // STRICT: require computedStepsV3; if missing, fail fast for this session
+    if (!computedStepsV3 || computedStepsV3.length === 0) {
+      throw new Error(`Materialization failed: could not compute steps for ${String(s.name||s.description||'session')}`);
+    }
     rows.push({
       user_id: user.id,
       training_plan_id: plan.id,
@@ -691,10 +534,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
       rendered_description: rendered,
-      computed: computedStepsV3 && computedStepsV3.length ? { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurationSeconds(computedStepsV3 as any) } : { normalization_version: 'v2', total_duration_seconds: totalSeconds },
+      computed: { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurationSeconds(computedStepsV3 as any) },
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
-      intervals: computedStepsV3 && computedStepsV3.length ? (buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers) || intervalsFromNorm) : (Array.isArray(s.intervals) && s.intervals.length ? s.intervals : intervalsFromNorm),
+      intervals: (buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers) || intervalsFromNorm),
       strength_exercises: Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined,
     });
   }

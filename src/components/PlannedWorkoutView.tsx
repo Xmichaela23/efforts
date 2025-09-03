@@ -324,70 +324,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 } catch {}
                 return;
               }
-            } else if (intervalsRaw && intervalsRaw.length > 0) {
-              const hints = (workout as any).export_hints || {};
-              const perfObj = (perfNumbers || {});
-              // Build minimal computed-style steps mirroring ensureWeekMaterialized logic
-              const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-              const parsePace = (p?: string): { sec: number | null, unit?: 'mi'|'km' } => {
-                if (!p) return { sec: null } as any;
-                const m = String(p).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
-                if (!m) return { sec: null } as any;
-                return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
-              };
-              const tolEasy = typeof hints.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06;
-              const tolQual = typeof hints.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04;
-              const easyTxt: string | undefined = perfObj?.easyPace || perfObj?.easy_pace;
-              const fivekTxt: string | undefined = perfObj?.fiveK_pace || perfObj?.fiveKPace || perfObj?.fiveK;
-              const deriveRunPace = (isRest:boolean) => {
-                const base = isRest ? (easyTxt || fivekTxt) : (fivekTxt || easyTxt);
-                const p = parsePace(base);
-                return p?.sec ? { sec: p.sec, unit: (p.unit||'mi') as any } : null;
-              };
-              const toMiles = (m:number)=> Number(m)/1609.34;
-              const stepsSynth: any[] = [];
-              for (const it of intervalsRaw) {
-                const lab = String(it?.effortLabel||'').toLowerCase();
-                const isRest = /rest|recovery/.test(lab);
-                if (typeof it?.duration === 'number' && it.duration>0) {
-                  const base: any = { kind: isRest?'recovery':'work', ctrl: 'time', seconds: Math.max(1, Math.floor(it.duration)) };
-                  if ((workout as any).type === 'run') {
-                    const p = parsePace((it as any).paceTarget) || (deriveRunPace(isRest) as any);
-                    if (p?.sec) {
-                      base.pace_sec_per_mi = p.sec;
-                      const tol = isRest ? tolEasy : tolQual;
-                      base.pace_range = { lower: Math.round(p.sec*(1-tol)), upper: Math.round(p.sec*(1+tol)) };
-                    }
-                  }
-                  stepsSynth.push(base);
-                } else if (typeof it?.distanceMeters === 'number' && it.distanceMeters>0) {
-                  const miles = toMiles(Number(it.distanceMeters));
-                  const base: any = { kind: isRest?'recovery':'work', ctrl: 'distance', original_val: Number(it.distanceMeters), original_units: 'm' };
-                  if ((workout as any).type === 'run') {
-                    const p = parsePace((it as any).paceTarget) || (deriveRunPace(isRest) as any);
-                    if (p?.sec) {
-                      base.pace_sec_per_mi = p.sec;
-                      const tol = isRest ? tolEasy : tolQual;
-                      base.pace_range = { lower: Math.round(p.sec*(1-tol)), upper: Math.round(p.sec*(1+tol)) };
-                      base.seconds = Math.max(1, Math.round(miles * p.sec));
-                    }
-                  }
-                  stepsSynth.push(base);
-                }
-              }
-              if (stepsSynth.length) {
-                setStepLines(flattenSteps(stepsSynth));
-                // Persist computed + enriched intervals
-                try {
-                  const enriched = synthesizeFromIntervals(intervalsRaw, String((workout as any).type||''), hints, perfObj);
-                  const nextComputed = { normalization_version: 'v2', steps: stepsSynth, total_duration_seconds: Number((workout as any)?.computed?.total_duration_seconds)||undefined } as any;
-                  await supabase.from('planned_workouts').update({ computed: nextComputed, intervals: (Array.isArray(enriched)&&enriched.length)?intervalsRaw:intervalsRaw }).eq('id', (workout as any).id);
-                } catch {}
-                return;
-              }
             }
           } catch {}
-          // Try tokens first when available (authoritative for per-rep layout)
+          // STRICT UI: Only show if we can render tokens or computed; otherwise show a clear not-materialized message
           // If JSON supplies display_overrides.expand for this view, or expand_spec, honor it first
           const wantUnpack = (() => {
             try {
@@ -428,23 +367,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           );
           if (tokenLines && tokenLines.length) {
             setStepLines(tokenLines);
-          } else if (intervalLines.length > 0) {
-            const hasTargets = intervalLines.some((s) => /@\s*\d/.test(s) || /@\s*\d+:\d{2}\s*\/\s*(mi|km)/i.test(s));
-            if (hasTargets) setStepLines(intervalLines);
-            else {
-              const uiSynth = synthesizeFromIntervals((workout as any).intervals, String((workout as any).type||''), ((workout as any).export_hints || {}), perfObj);
-              if (uiSynth && uiSynth.length) setStepLines(uiSynth);
-              else setStepLines(intervalLines);
-            }
           } else {
-            // Last resort: explode grouped text like "6 × 400 m @ 7:43/mi … w 2 min jog …"
-            const expanded = expandGroupedFromText(
-              String((workout as any).rendered_description || (workout as any).description || ''),
-              String((workout as any).type || ''),
-              ((workout as any).export_hints || {}),
-              perfObj
-            );
-            if (expanded.length) setStepLines(expanded);
+            setStepLines(["Not materialized — open from Plans/Calendar to bake details."]);
           }
         }
       } catch {
