@@ -88,6 +88,48 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     }
   }
 
+  // Also parse swim tokens from steps_preset when present (fallback when swimMain is absent)
+  for (const token of steps) {
+    const t = String(token).toLowerCase();
+    // swim warmup/cooldown distance
+    let m = t.match(/^swim_(warmup|cooldown)_(\d+)(yd|m)(?:_[a-z0-9_]+)?$/i);
+    if (m) {
+      const kind = m[1].toLowerCase();
+      const dist = parseInt(m[2],10);
+      const unit = (m[3]||'yd').toLowerCase();
+      const yd = unit==='m' ? Math.round(dist/0.9144/25)*25 : Math.round(dist/25)*25;
+      out.push({ id: makeId(idPrefix, ['swim', kind]), type: kind==='warmup'?'swim_warmup':'swim_cooldown', label: kind==='warmup'?'Warm‑up':'Cool‑down', distance_yd: yd, authored_unit: 'yd' });
+      continue;
+    }
+    // swim drills like swim_drills_4x50yd_catchup
+    m = t.match(/^swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
+    if (m) {
+      const reps = parseInt(m[1],10); const each = parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase(); const key=(m[4]||'').toLowerCase();
+      const cat = SWIM_CATALOG[key] || { type: 'swim_drill', label: 'Drill', cue: '', equipment: 'none' } as any;
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      const defaultRest = key==='catchup'?15: key==='singlearm'||key==='single_arm'?20: undefined;
+      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','drill',key,String(i).padStart(2,'0')]), type: 'swim_drill', label: cat.label, distance_yd: ydEach, authored_unit: 'yd', rest_s: defaultRest, equipment: cat.equipment, cue: cat.cue });
+      continue;
+    }
+    // swim pull/kick blocks like swim_pull_2x100yd
+    m = t.match(/^swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
+    if (m) {
+      const kind = m[1].toLowerCase(); const reps = parseInt(m[2],10); const each = parseInt(m[3],10); const unit=(m[4]||'yd').toLowerCase();
+      const base = SWIM_CATALOG[kind];
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: (base?.type || (kind==='pull'?'swim_pull':'swim_kick')) as any, label: base?.label || (kind==='pull'?'Pull':'Kick'), distance_yd: ydEach, authored_unit: 'yd', equipment: base?.equipment });
+      continue;
+    }
+    // swim aerobic blocks like swim_aerobic_6x100yd
+    m = t.match(/^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_[a-z0-9_]+)?$/i);
+    if (m) {
+      const reps = parseInt(m[1],10); const each = parseInt(m[2],10); const unit=(m[3]||'yd').toLowerCase();
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','aerobic',String(i).padStart(2,'0')]), type: 'swim_aerobic', label: SWIM_CATALOG['aerobic']?.label || 'Aerobic', distance_yd: ydEach, authored_unit: 'yd' });
+      continue;
+    }
+  }
+
   // Swim main DSL → atomic blocks (yards-first semantics)
   if (typeof swimMain === 'string' && swimMain.trim()) {
     const parts = swimMain.split(';').map(s => s.trim()).filter(Boolean);
