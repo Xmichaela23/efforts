@@ -640,6 +640,15 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         const isCoolV3 = kind === 'cooldown' || kind === 'swim_cooldown';
         const typeLower = String((workout as any).type||'').toLowerCase();
         const isSwim = typeLower === 'swim';
+        // Standalone V3 rest (e.g., swim_rest_rNN): render "Rest mm:ss" and return
+        if (isRestV3 && isSwim) {
+          const sec = typeof seg?.duration_s === 'number' ? seg.duration_s : (seg as any)?.rest_s;
+          if (typeof sec === 'number' && sec>0) {
+            const rmm = Math.floor(sec/60); const rss = sec%60;
+            lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
+            return;
+          }
+        }
         const base = (() => {
           // Prefer authored yards from enriched swim steps
           if (isSwim && typeof (seg as any).distance_yd === 'number' && (seg as any).distance_yd > 0) {
@@ -682,7 +691,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             .map(s=>s.trim())
             .filter(s=>s.length>0 && s.toLowerCase()!=='none')
             .map(s=>s.replace(/pull buoy/ig,'buoy').replace(/kickboard/ig,'board').replace(/\(optional\)/ig,'(opt)'));
-          const abbrEquipList = Array.from(new Set(equipmentList));
+          let abbrEquipList = Array.from(new Set(equipmentList));
           // Equipment formatting rules (universal):
           // - Drills: show optional list "(optional: ... )"
           // - Pull: show required gear "— buoy" when present
@@ -693,6 +702,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           const isKickKind = kind === 'swim_kick';
           const hasBuoy = abbrEquipList.includes('buoy');
           const hasBoard = abbrEquipList.includes('board');
+          // For drills, always show canonical optional gear regardless of token
+          if (isDrillLabel) {
+            const low = label.toLowerCase();
+            if (low.includes('single arm')) {
+              if (!abbrEquipList.includes('fins')) abbrEquipList.push('fins');
+              if (!abbrEquipList.includes('board')) abbrEquipList.push('board');
+            }
+            if (low.includes('catch-up')) {
+              if (!abbrEquipList.includes('board')) abbrEquipList.push('board');
+            }
+          }
           const equipAnn = (() => {
             if (isSwim && isDrillLabel && abbrEquipList.length>0) return ` (optional: ${abbrEquipList.join(' or ')})`;
             if (isPullKind && hasBuoy) return ' — buoy';
@@ -700,11 +720,27 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             return '';
           })();
           lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
-          // Always show swim rest when present to indicate gear transitions if needed
+          // Show rests only between reps (never after the last in a block)
           if (isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) {
-            const rs = Math.max(1, Math.round((seg as any).rest_s));
-            const rmm = Math.floor(rs/60); const rss = rs%60;
-            lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
+            const nextLabel = (() => {
+              if (!nextSeg) return '';
+              const nk = String(nextSeg?.type||'').toLowerCase();
+              if (nk==='warmup' || nk==='swim_warmup') return 'Warm‑up';
+              if (nk==='cooldown' || nk==='swim_cooldown') return 'Cool‑down';
+              const cue = String(nextSeg?.cue||'');
+              const pref = (nextSeg as any).label as string | undefined;
+              if (pref && pref.trim()) return pref.trim();
+              if (/drill:/.test(cue)) return String(cue.split(':')[1] || '').replace(/_/g,' ').replace(/\b\w/g,(m)=>m.toUpperCase());
+              if (/pull/i.test(cue)) return 'Pull';
+              if (/kick/i.test(cue)) return 'Kick';
+              if (/aerobic/i.test(cue)) return 'Aerobic';
+              return '';
+            })();
+            if (nextLabel && nextLabel === label) {
+              const rs = Math.max(1, Math.round((seg as any).rest_s));
+              const rmm = Math.floor(rs/60); const rss = rs%60;
+              lines.push(`Rest ${rmm}:${String(rss).padStart(2,'0')}`);
+            }
           }
         }
         return;
