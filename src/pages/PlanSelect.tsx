@@ -619,11 +619,12 @@ export default function PlanSelect() {
       const insertPayload: any = { ...payload, user_id: user.id };
       delete insertPayload.start_date;
       delete insertPayload.export_hints;
-      const { data: planRow, error: planErr } = await supabase
+      const planInsert = await supabase
         .from('plans')
         .insert([insertPayload])
-        .select()
-        .single();
+        .select();
+      const planRow = Array.isArray((planInsert as any).data) ? (planInsert as any).data[0] : (planInsert as any).data;
+      const planErr = (planInsert as any).error;
       if (planErr) throw planErr;
 
       // Strict: materialize Week 1 via the same baker used for later weeks

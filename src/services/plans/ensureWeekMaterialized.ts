@@ -560,6 +560,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     if (!computedStepsV3 || computedStepsV3.length === 0) {
       throw new Error(`Materialization failed: could not compute steps for ${String(s.name||s.description||'session')}`);
     }
+    // Only include columns that exist in planned_workouts
     rows.push({
       user_id: user.id,
       training_plan_id: plan.id,
@@ -573,14 +574,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       duration: durationVal,
       workout_status: 'planned' as any,
       source: 'training_plan',
-      main: (s as any).main || undefined,
       tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
       rendered_description: rendered,
       computed: { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurSeconds },
-      normalization_version: 'v3',
-      total_duration_seconds: totalDurSeconds,
       primary_target_type: (computedTargets as any).primary_target_type,
       pace_value: (computedTargets as any).pace_value,
       pace_low: (computedTargets as any).pace_low,
