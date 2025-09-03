@@ -208,6 +208,13 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim','aerobic',String(i).padStart(2,'0')]), type: 'swim_aerobic', label: SWIM_CATALOG['aerobic']?.label || 'Aerobic', distance_yd: ydEach, authored_unit: 'yd' });
       continue;
     }
+    // explicit swim rest between blocks: swim_rest_r<seconds>
+    m = t.match(/^swim_rest_r(\d+)$/i);
+    if (m) {
+      const rest = parseInt(m[1], 10);
+      out.push({ id: makeId(idPrefix, ['swim','rest', String(rest)]), type: 'interval_rest', duration_s: rest });
+      continue;
+    }
   }
 
   // Parse strength tokens (st_*) into v3 steps so materializer has computedStepsV3
