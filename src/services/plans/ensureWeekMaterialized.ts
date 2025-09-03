@@ -512,6 +512,50 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
 
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);
 
+    // Derive primary target columns and equipment list from computed steps
+    const deriveTargetColumns = (steps: any[] | undefined, discipline: 'run'|'ride'|'swim'|'strength') => {
+      const out: any = { primary_target_type: 'none' };
+      if (!Array.isArray(steps) || steps.length === 0) return out;
+      const paceRe = /(\d+):(\d{2})\/(mi|km)/i;
+      const wattRe = /(\d+)\s*w/i;
+      const pick = steps.find(st => typeof (st as any)?.target_value === 'string' || typeof (st as any)?.target_low === 'string' || typeof (st as any)?.target_high === 'string');
+      if (pick) {
+        const tv = String((pick as any).target_value || '');
+        const tl = String((pick as any).target_low || '');
+        const th = String((pick as any).target_high || '');
+        const pm = tv.match(paceRe);
+        const pl = tl.match(paceRe);
+        const ph = th.match(paceRe);
+        const wm = tv.match(wattRe);
+        const wl = tl.match(wattRe);
+        const wh = th.match(wattRe);
+        if (pm || pl || ph) {
+          out.primary_target_type = 'pace';
+          out.pace_value = pm ? pm[0] : undefined;
+          out.pace_low = pl ? pl[0] : undefined;
+          out.pace_high = ph ? ph[0] : undefined;
+        } else if (wm || wl || wh) {
+          out.primary_target_type = 'power';
+          out.power_target_watts = wm ? parseInt(wm[1], 10) : undefined;
+          out.power_low = wl ? parseInt(wl[1], 10) : undefined;
+          out.power_high = wh ? parseInt(wh[1], 10) : undefined;
+        }
+      }
+      // equipment aggregation (swim segments carry equipment)
+      try {
+        const eq = new Set<string>();
+        for (const st of steps) {
+          const raw = String((st as any)?.equipment || '').trim();
+          if (!raw) continue;
+          raw.split(',').map(x=>x.trim()).filter(Boolean).forEach(x=>eq.add(x.replace(/\s+/g,' ').toLowerCase()));
+        }
+        if (eq.size > 0) out.equipment = Array.from(eq);
+      } catch {}
+      return out;
+    };
+    const computedTargets = deriveTargetColumns(computedStepsV3, mappedType);
+    const totalDurSeconds = computedStepsV3 && computedStepsV3.length ? totalDurationSeconds(computedStepsV3 as any) : 0;
+
     // STRICT: require computedStepsV3; if missing, fail fast for this session
     if (!computedStepsV3 || computedStepsV3.length === 0) {
       throw new Error(`Materialization failed: could not compute steps for ${String(s.name||s.description||'session')}`);
@@ -534,7 +578,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
       rendered_description: rendered,
-      computed: { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurationSeconds(computedStepsV3 as any) },
+      computed: { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurSeconds },
+      normalization_version: 'v3',
+      total_duration_seconds: totalDurSeconds,
+      primary_target_type: (computedTargets as any).primary_target_type,
+      pace_value: (computedTargets as any).pace_value,
+      pace_low: (computedTargets as any).pace_low,
+      pace_high: (computedTargets as any).pace_high,
+      power_target_watts: (computedTargets as any).power_target_watts,
+      power_low: (computedTargets as any).power_low,
+      power_high: (computedTargets as any).power_high,
+      equipment: (computedTargets as any).equipment || null,
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
       intervals: (buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers) || intervalsFromNorm),
