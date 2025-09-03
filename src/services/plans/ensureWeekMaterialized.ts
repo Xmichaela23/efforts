@@ -664,7 +664,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       type: mappedType,
       name: nameFromDiscipline,
       description: s.description || '',
-      duration: durationVal,
+      duration: totalDurSeconds>0 ? Math.round(totalDurSeconds/60) : durationVal,
       workout_status: 'planned' as any,
       source: 'training_plan',
       tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
