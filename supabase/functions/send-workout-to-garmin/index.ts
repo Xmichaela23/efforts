@@ -116,10 +116,15 @@ serve(async (req) => {
       })
     }
 
-    // Mark as sent
+    // Mark as sent and persist Garmin IDs for linking completed activities
     await supabase
       .from('planned_workouts')
-      .update({ workout_status: 'sent_to_garmin', updated_at: new Date().toISOString() })
+      .update({
+        workout_status: 'sent_to_garmin',
+        garmin_workout_id: sendResult.workoutId,
+        garmin_schedule_id: scheduleResult?.scheduleId ?? null,
+        updated_at: new Date().toISOString()
+      })
       .eq('id', workoutId)
 
     return json({ success: true, garminWorkoutId: sendResult.workoutId, scheduled: scheduleResult?.success ?? false, scheduleError: scheduleResult?.error })
@@ -233,6 +238,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       const out: any[] = []
       const typeLower = String((workout as any).type || '').toLowerCase()
       const isSwim = typeLower === 'swim'
+      const isRun = typeLower === 'run'
       const pushWork = (lab: string, meters?: number, seconds?: number) => {
         const base: any = {}
         base.effortLabel = lab
@@ -285,11 +291,11 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         const seconds = typeof (st as any)?.duration_s === 'number' && (st as any).duration_s > 0 ? Math.floor((st as any).duration_s) : undefined
         // Route warmup/cooldown explicitly so Garmin ordering is correct
         if (t === 'warmup') {
-          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...((!isRun && typeof seconds==='number' && seconds>0) || (typeof meters!=='number' || !(meters>0)) ? { duration: seconds } : {}) })
         } else if (t === 'cooldown') {
-          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...((!isRun && typeof seconds==='number' && seconds>0) || (typeof meters!=='number' || !(meters>0)) ? { duration: seconds } : {}) })
         } else {
-          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...((!isRun && typeof seconds==='number' && seconds>0) || (typeof meters!=='number' || !(meters>0)) ? { duration: seconds } : {}) })
           // Append rest immediately after work if rest_s present
           if (typeof (st as any)?.rest_s === 'number' && (st as any).rest_s > 0) {
             mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
@@ -346,7 +352,8 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         for (const seg of interval.segments) {
           const sIntensity = mapEffortToIntensity(String((seg?.effortLabel ?? interval?.effortLabel) || '').trim())
           const sMeters = Number(seg?.distanceMeters)
-          const sSeconds = Number(seg?.duration)
+          // For RUNNING distance steps, suppress duration to avoid confusing time on device
+          const sSeconds = (isRun && Number(seg?.distanceMeters) > 0) ? NaN : Number(seg?.duration)
           if (!(Number.isFinite(sMeters) && sMeters > 0) && !(Number.isFinite(sSeconds) && sSeconds > 0)) {
             throw new Error('Invalid segment: must include distanceMeters>0 or duration>0')
           }
@@ -397,8 +404,40 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     stepId += 1
   }
 
-  // Validation: ensure RUN exports carry SPEED ranges for all work reps
+  // Post-pass: convert RUN distance work steps to TIME using computed pace (keep SPEED targets for alerts)
   if (sport === 'RUNNING') {
+    let workRepIdx = 0
+    const mid = (a: number, b: number) => (a + b) / 2
+    const mpsFromSecPerMi = (sec: number) => 1609.34 / Math.max(1, sec)
+    for (const s of steps) {
+      const isWork = s.intensity !== 'REST' && s.intensity !== 'RECOVERY'
+      if (s.durationType === 'DISTANCE' && isWork) {
+        let mps: number | undefined
+        const low = (s as any).targetValueLow
+        const high = (s as any).targetValueHigh
+        if (s.targetType === 'SPEED' && isFinite(low) && isFinite(high)) {
+          mps = mid(Number(low), Number(high))
+        } else {
+          const cs = computedSteps?.[workRepIdx]
+          if (cs?.pace_range?.lower && cs?.pace_range?.upper) {
+            mps = mpsFromSecPerMi(mid(Number(cs.pace_range.lower), Number(cs.pace_range.upper)))
+          } else if (typeof cs?.pace_sec_per_mi === 'number') {
+            mps = mpsFromSecPerMi(Number(cs.pace_sec_per_mi))
+          }
+        }
+        if (!mps) mps = mpsFromSecPerMi(570)
+        const meters = Math.max(1, s.durationValue || 0)
+        const secs = Math.round(meters / mps)
+        s.durationType = 'TIME'
+        s.durationValue = secs
+      }
+      if (isWork) workRepIdx += 1
+    }
+  }
+
+  // Validation: ensure RUN exports carry SPEED ranges for all work reps (optional via tag)
+  const requirePace = Array.isArray((workout as any)?.tags) && (workout as any).tags.includes('require_pace')
+  if (sport === 'RUNNING' && requirePace) {
     const anyWorkNoTarget = steps.some((s) => (
       s.type === 'WorkoutStep' &&
       s.intensity !== 'REST' && s.intensity !== 'RECOVERY' &&
@@ -413,12 +452,13 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   return {
     workoutName: workout.name,
     sport,
-    estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps),
+    estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps, computedSteps),
     segments: [
       {
         segmentOrder: 1,
         sport,
-        steps
+        steps,
+        estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps, computedSteps)
       }
     ]
   }
@@ -624,10 +664,55 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
   }
 }
 
-function estimateWorkoutSeconds(workout: PlannedWorkout, steps: GarminStep[]): number {
-  // Always compute from steps to avoid inflated durations from stale workout.duration
-  const sum = steps.reduce((acc, s) => acc + (s.durationType === 'TIME' ? (s.durationValue || 0) : 0), 0)
-  return sum > 0 ? sum : 0
+function estimateWorkoutSeconds(
+  workout: PlannedWorkout,
+  steps: GarminStep[],
+  computedSteps: any[] = []
+): number {
+  let total = 0;
+  let idx = 0;
+
+  // advance to the next *work* rep in computed (skip rests)
+  const nextWork = () => {
+    while (idx < computedSteps.length) {
+      const t = String(computedSteps[idx]?.type || '').toLowerCase();
+      if (!(t === 'interval_rest' || /rest/.test(t))) break;
+      idx += 1;
+    }
+    return computedSteps[idx];
+  };
+
+  const mid = (a: number, b: number) => (a + b) / 2;
+  const mpsFromSecPerMi = (sec: number) => 1609.34 / Math.max(1, sec);
+  const fallbackMps = mpsFromSecPerMi(570); // ~9:30/mi
+
+  for (const s of steps) {
+    if (s.durationType === 'TIME') {
+      total += Math.max(0, s.durationValue || 0);
+      if (s.intensity !== 'REST' && s.intensity !== 'RECOVERY') { nextWork(); idx += 1; }
+      continue;
+    }
+    if (s.durationType === 'DISTANCE') {
+      let mps: number | undefined;
+      if (
+        s.targetType === 'SPEED' &&
+        isFinite((s as any).targetValueLow) &&
+        isFinite((s as any).targetValueHigh)
+      ) {
+        mps = mid(Number((s as any).targetValueLow), Number((s as any).targetValueHigh));
+      } else {
+        const cs = nextWork();
+        if (cs?.pace_range?.lower && cs?.pace_range?.upper) {
+          mps = mpsFromSecPerMi(mid(Number(cs.pace_range.lower), Number(cs.pace_range.upper)));
+        } else if (typeof cs?.pace_sec_per_mi === 'number') {
+          mps = mpsFromSecPerMi(Number(cs.pace_sec_per_mi));
+        }
+      }
+      total += Math.max(1, s.durationValue || 0) / (mps || fallbackMps);
+      if (s.intensity !== 'REST' && s.intensity !== 'RECOVERY') idx += 1;
+    }
+  }
+  return Math.round(total);
 }
 
 async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promise<{ success: boolean; workoutId?: string; error?: string }> {
