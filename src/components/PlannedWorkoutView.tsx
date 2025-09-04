@@ -357,6 +357,47 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const oneRM = { squat: pn?.squat, bench: pn?.bench, deadlift: pn?.deadlift, overhead: pn?.overheadPress1RM || pn?.overhead || pn?.ohp } as any;
               const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; return 'squat'; };
               const calcWeight = (pct: number|undefined, lift: keyof typeof oneRM): number | null => { if (!pct || !oneRM[lift] || typeof oneRM[lift] !== 'number') return null; const rawW = Math.round((oneRM[lift] as number) * (pct/100)); return Math.round(rawW/5)*5; };
+              // Accessory estimation (initial: horizontal pull/rows; extendable for others)
+              const estimateAccessoryLoad = (exerciseName: string): string | undefined => {
+                try {
+                  const name = String(exerciseName || '').toLowerCase();
+                  const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+                  // 1) Horizontal Pull (Barbell Row, DB Row)
+                  if (name.includes('row')) {
+                    const bench = typeof oneRM.bench === 'number' ? oneRM.bench as number : undefined;
+                    const dead = typeof oneRM.deadlift === 'number' ? oneRM.deadlift as number : undefined;
+                    const est = bench ? bench * 0.95 : (dead ? dead * 0.55 : undefined);
+                    if (typeof est === 'number' && isFinite(est)) return `${round5(est)} lb`;
+                  }
+                  // 3) OHP fallback when missing explicit 1RM
+                  if ((name.includes('ohp') || name.includes('overhead')) && typeof oneRM.overhead !== 'number' && typeof oneRM.bench === 'number') {
+                    return `${round5((oneRM.bench as number) * 0.68)} lb`;
+                  }
+                  // 4) DB Bench: show per-hand
+                  if (name.includes('db') && name.includes('bench') && typeof oneRM.bench === 'number') {
+                    const each = Math.max(5, Math.round(((oneRM.bench as number) * 0.625 / 2)/5)*5);
+                    return `${each} lb each`;
+                  }
+                  // 5) Lunges / Split Squat
+                  if ((/lunge|split\s*squat/.test(name)) && typeof oneRM.squat === 'number') {
+                    const load = (oneRM.squat as number) * 0.35;
+                    if (name.includes('db')) {
+                      const each = Math.max(5, Math.round((load/2)/5)*5);
+                      return `${each} lb each`;
+                    }
+                    return `${round5(load)} lb`;
+                  }
+                  // 6) RDL
+                  if (/rdl|romanian/.test(name) && typeof oneRM.deadlift === 'number') {
+                    return `${round5((oneRM.deadlift as number) * 0.60)} lb`;
+                  }
+                  // 7) Hip Thrust / Glute Bridge
+                  if ((/hip\s*thrust|glute\s*bridge/.test(name)) && typeof oneRM.squat === 'number') {
+                    return `${round5((oneRM.squat as number) * 0.75)} lb`;
+                  }
+                } catch {}
+                return undefined;
+              };
               const expandOrParts = (text: string): string[] => { const parts = text.split(/\s+or\s+/i).map(s=>s.trim()).filter(Boolean); return parts.length>1 ? parts.map((p,i)=> i===0?p:`(or) ${p}`) : parts; };
               const parseRestNote = (text: string): string | undefined => { const m = text.match(/rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s)/i); if (!m) return undefined; return `${m[1]} ${m[2]}`.replace('--','–'); };
               const repeatWithRest = (name:string, sets:number, repsText:string, weightText?:string, restNote?:string) => { for (let i=0;i<Math.max(1, sets);i+=1) { lines.push(`${name} 1 × ${repsText}${weightText?` @ ${weightText}`:''}`.trim()); if (restNote && i<sets-1) lines.push(`Rest ${restNote}`); } };
@@ -384,7 +425,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                     const r2 = mr[4]?parseInt(mr[4],10):undefined;
                     const repsText = r2?`${r1}–${r2}`:`${r1}`;
                     const restNote = parseRestNote(seg);
-                    repeatWithRest(name, sets, `${repsText}`, undefined, restNote);
+                    const est = estimateAccessoryLoad(name);
+                    repeatWithRest(name, sets, `${repsText}`, est, restNote);
                     continue;
                   }
                   // AMRAP pattern e.g., Chin-Ups 3xAMRAP @RIR2
