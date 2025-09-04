@@ -112,7 +112,6 @@ useEffect(() => {
 
 // Debug disciplines
 useEffect(() => {
-  console.log('🔍 Current disciplines:', data.disciplines);
 }, [data.disciplines]);
 
 // NEW: Check for existing Strava token
@@ -164,9 +163,6 @@ const loadBaselines = async () => {
     
     const baselines = await loadUserBaselines();
     
-    console.log('Raw birthday from database:', baselines?.birthday);
-    console.log('Type of birthday:', typeof baselines?.birthday);
-    
     if (baselines) {
       setData(baselines);
       setLastUpdated(baselines.lastUpdated || null);
@@ -202,10 +198,7 @@ const handleSave = async () => {
 // NEW: Strava connection functions
 // Debug: Check environment variables on component load
 useEffect(() => {
-  console.log('=== ENVIRONMENT VARIABLES CHECK ===');
-  console.log('VITE_STRAVA_CLIENT_ID:', import.meta.env.VITE_STRAVA_CLIENT_ID);
-  console.log('VITE_STRAVA_CLIENT_SECRET exists:', !!import.meta.env.VITE_STRAVA_CLIENT_SECRET);
-  console.log('All VITE variables:', Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
+  
 }, []);
 
 const connectStrava = () => {
@@ -214,12 +207,7 @@ const connectStrava = () => {
   const scope = 'read,activity:read_all';
   
   // Debug: Check all environment variables
-  console.log('=== STRAVA DEBUG ===');
-  console.log('Client ID:', clientId);
-  console.log('Client ID type:', typeof clientId);
-  console.log('Client ID length:', clientId ? clientId.length : 'undefined');
-  console.log('All VITE env vars:', Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
-  console.log('Redirect URI:', redirectUri);
+  
   
   if (!clientId || clientId === 'undefined') {
     console.error('❌ STRAVA CLIENT ID IS UNDEFINED!');
@@ -229,7 +217,7 @@ const connectStrava = () => {
   
   const authUrl = `https://www.strava.com/oauth/authorize?client_id=${clientId}&redirect_uri=${redirectUri}&response_type=code&scope=${scope}`;
   
-  console.log('Auth URL:', authUrl);
+  
   
   // Open popup for OAuth
   const popup = window.open(
@@ -299,7 +287,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
       throw new Error('Code verifier not found');
     }
 
-    console.log('🔍 GARMIN DEBUG: Starting token exchange...');
+    
 
     // Get user session token
     const { createClient } = await import('@supabase/supabase-js');
@@ -333,7 +321,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
     }
 
     const tokenData = await tokenResponse.json();
-    console.log('🔍 GARMIN DEBUG: Token exchange successful, token starts with:', tokenData.access_token?.substring(0, 20) + '...');
+    
 
     // CRITICAL: Set both state and localStorage with the new token
     setGarminAccessToken(tokenData.access_token);
@@ -341,7 +329,7 @@ const handleGarminOAuthSuccess = async (code: string) => {
     localStorage.setItem('garmin_access_token', tokenData.access_token);
     setGarminMessage('Successfully connected to Garmin!');
 
-    console.log('🔍 GARMIN DEBUG: Token stored in state and localStorage');
+    
 
     // Clean up
     sessionStorage.removeItem('garmin_code_verifier');
@@ -411,7 +399,7 @@ const testGarminApi = async () => {
   try {
     setGarminMessage('Testing API call...');
     
-    console.log('🔍 GARMIN DEBUG: Using access token:', garminAccessToken.substring(0, 20) + '...');
+    
     
     // Try the user permissions endpoint using Supabase function
     const response = await fetch(`https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=/wellness-api/rest/user/permissions&token=${garminAccessToken}`, {
@@ -420,7 +408,7 @@ const testGarminApi = async () => {
       }
     });
 
-    console.log('🔍 GARMIN DEBUG: API response status:', response.status);
+    
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -430,7 +418,7 @@ const testGarminApi = async () => {
 
     const data = await response.json();
     setGarminMessage(`API test successful! Connected to Garmin - Permissions: ${JSON.stringify(data)}`);
-    console.log('🔍 GARMIN DEBUG: API success:', data);
+    
   } catch (error) {
     console.error('🔍 GARMIN DEBUG: API test error:', error);
     setGarminMessage(`API test failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

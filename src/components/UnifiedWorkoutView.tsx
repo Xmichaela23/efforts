@@ -44,35 +44,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   }, [initialTab, isCompleted, workout?.id]);
 
   const getWorkoutType = () => {
-    console.log('🔍 getWorkoutType debug:', {
-      'workout.type': workout.type,
-      'workout.activity_type': workout.activity_type,
-      'workout.name': workout.name
-    });
-
     // Handle Garmin activity types FIRST (more reliable than stored type)
     if (workout.activity_type) {
       const activityType = workout.activity_type.toLowerCase();
-      console.log('🔍 Processing activity_type:', activityType);
       
       if (activityType.includes('walking') || activityType.includes('walk')) {
-        console.log('✅ Detected WALKING');
         return 'walk';
       }
       if (activityType.includes('running') || activityType.includes('run')) {
-        console.log('✅ Detected RUNNING');
         return 'run';
       }
       if (activityType.includes('cycling') || activityType.includes('bike') || activityType.includes('ride')) {
-        console.log('✅ Detected CYCLING');
         return 'ride';
       }
       if (activityType.includes('swimming') || activityType.includes('swim')) {
-        console.log('✅ Detected SWIMMING');
         return 'swim';
       }
       if (activityType.includes('strength') || activityType.includes('weight')) {
-        console.log('✅ Detected STRENGTH');
         return 'strength';
       }
     }
@@ -86,23 +74,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     
     // Fallback logic for legacy names (only if no activity_type match)
     if (workout.name?.toLowerCase().includes('walk')) {
-      console.log('✅ Detected WALK from name');
       return 'walk';
     }
     if (workout.name?.toLowerCase().includes('run')) {
-      console.log('✅ Detected RUN from name');
       return 'run';
     }
     if (workout.name?.toLowerCase().includes('cycle') || workout.name?.toLowerCase().includes('ride')) {
-      console.log('✅ Detected CYCLE from name');
       return 'ride';
     }
     if (workout.name?.toLowerCase().includes('swim')) {
-      console.log('✅ Detected SWIM from name');
       return 'swim';
     }
     
-    console.log('⚠️ Defaulting to RIDE');
     return 'ride'; // default to ride for cycling files
   };
 
@@ -234,11 +217,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               showHeader={false}
               onEdit={() => {
                 // TODO: Implement edit functionality
-                console.log('Edit planned workout:', workout.id);
               }}
               onComplete={() => {
                 // TODO: Implement complete functionality
-                console.log('Mark workout as completed:', workout.id);
               }}
               onDelete={async () => {
                 if (confirm('Delete this planned workout? This action cannot be undone.')) {

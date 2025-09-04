@@ -169,7 +169,7 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
     for (const [wk, wkSessions] of Object.entries<any>(out.sessions_by_week || {})) {
       snapshot.weeks[wk] = (wkSessions as any[]).map(ss => ({ name: ss.name || ss.description || '', day: ss.day, tags: ss.tags }));
     }
-    console.debug('autoSpaceWeek snapshot', snapshot);
+    
   } catch {}
   return out;
 }
@@ -180,9 +180,7 @@ export default function PlanSelect() {
   const navigate = useNavigate();
   const { addPlan, loadUserBaselines, refreshPlans } = useAppContext();
   
-  // DEBUG: Check what we got from context
-  console.log('🔍 DEBUG - PlanSelect: loadUserBaselines from context:', loadUserBaselines);
-  console.log('🔍 DEBUG - PlanSelect: typeof loadUserBaselines:', typeof loadUserBaselines);
+  
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string|null>(null);
@@ -199,13 +197,8 @@ export default function PlanSelect() {
 
   // Load user baselines when component mounts
   useEffect(() => {
-    console.log('🔍 DEBUG - useEffect for baselines is running');
-    console.log('🔍 DEBUG - loadUserBaselines function:', loadUserBaselines);
-    
     // Only run if loadUserBaselines is a function
     if (typeof loadUserBaselines !== 'function') {
-      console.log('🔍 DEBUG - loadUserBaselines is not a function, trying direct DB call');
-      
       // Try direct database call as fallback
       (async () => {
         try {
@@ -213,15 +206,11 @@ export default function PlanSelect() {
           const { data: { user } } = await supabase.auth.getUser();
           if (user) {
             const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
-            console.log('🔍 DEBUG - Direct DB call result:', { data: !!data, error: error?.message });
             if (data) {
-              console.log('🔍 DEBUG - Direct DB data:', data);
-              console.log('🔍 DEBUG - Direct DB performance_numbers:', data.performance_numbers);
               setBaselines(data);
             }
           }
         } catch (e) {
-          console.error('🔍 DEBUG - Direct DB call failed:', e);
         }
       })();
       return;
@@ -229,49 +218,35 @@ export default function PlanSelect() {
     
     (async () => {
       try {
-        console.log('🔍 DEBUG - About to call loadUserBaselines');
-        console.log('🔍 DEBUG - Checking if user is authenticated...');
-        
         // Check auth status first
         const { supabase } = await import('@/lib/supabase');
         const { data: { user } } = await supabase.auth.getUser();
-        console.log('🔍 DEBUG - Auth check result:', { user: !!user, userId: user?.id });
         
         if (!user) {
-          console.log('🔍 DEBUG - No user found, loadUserBaselines will return null');
           setBaselines(null);
           return;
         }
         
         // Try loadUserBaselines first
         const b = await loadUserBaselines();
-        console.log('🔍 DEBUG - loadUserBaselines returned:', b);
         
         if (b) {
           setBaselines(b);
-          console.log('🔍 DEBUG - Loaded baselines on mount:', b);
         } else {
-          console.log('🔍 DEBUG - loadUserBaselines returned null, trying direct DB call');
           
           // Fallback: direct database call
           try {
             const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
-            console.log('🔍 DEBUG - Direct DB call result:', { data: !!data, error: error?.message });
             if (data) {
-              console.log('🔍 DEBUG - Direct DB data:', data);
-              console.log('🔍 DEBUG - Direct DB performance_numbers:', data.performance_numbers);
               setBaselines(data);
             } else {
-              console.log('🔍 DEBUG - No data found in database for user:', user.id);
               setBaselines(null);
             }
           } catch (e) {
-            console.error('🔍 DEBUG - Direct DB call failed:', e);
             setBaselines(null);
           }
         }
       } catch (e) {
-        console.error('🔍 DEBUG - Failed to load baselines:', e);
         setBaselines(null);
       }
     })();
@@ -320,9 +295,6 @@ export default function PlanSelect() {
       const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
       
       // Use baselines loaded on mount
-      console.log('🔍 DEBUG - PlanSelect baselines:', baselines);
-      console.log('🔍 DEBUG - baselines object keys:', baselines ? Object.keys(baselines) : 'null/undefined');
-      console.log('🔍 DEBUG - Raw baselines data:', baselines);
       
       const mapped = { ...remapped, sessions_by_week: {} as any };
       // Use stored paces from baselines (from assessment)
@@ -337,8 +309,7 @@ export default function PlanSelect() {
       const swimPace100 = pnObj.swimPace100 || null;
       const ftp = pnObj.ftp || null;
       
-      // DEBUG: Log what we extracted from baselines
-      console.log('🔍 DEBUG - Extracted values:', { fiveK, easyPace, swimPace100, ftp });
+      
       
       const oneRMs = { squat: pnObj.squat, bench: pnObj.bench, deadlift: pnObj.deadlift, overhead: pnObj.overheadPress1RM } as any;
       const parsePace = (p?: string|null) => { if (!p) return null; const m = p.match(/^(\d+):(\d{2})\/(mi|km)$/i); if (!m) return null; return { s: parseInt(m[1],10)*60+parseInt(m[2],10), u: m[3].toLowerCase() }; };
@@ -524,17 +495,14 @@ export default function PlanSelect() {
       // --- Translate with deterministic baker at import-time ---
       const toSecPerMi = (pace: string | null | undefined): number | null => {
         if (!pace) {
-          console.log('🔍 DEBUG - toSecPerMi: pace is falsy:', pace);
           return null;
         }
         const txt = String(pace).trim();
-        console.log('🔍 DEBUG - toSecPerMi: processing pace:', txt);
         // Accept 7:43, 7:43/mi, 4:45/km
         let m = txt.match(/^(\d+):(\d{2})\s*\/(mi|km)$/i);
         if (m) {
           const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
           const unit = m[3].toLowerCase();
-          console.log('🔍 DEBUG - toSecPerMi: matched with unit:', { sec, unit, original: txt });
           if (unit === 'mi') return sec;
           if (unit === 'km') return Math.round(sec * 1.60934);
           return sec;
@@ -542,10 +510,8 @@ export default function PlanSelect() {
         m = txt.match(/^(\d+):(\d{2})$/); // no unit → assume /mi
         if (m) {
           const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-          console.log('🔍 DEBUG - toSecPerMi: matched without unit:', { sec, original: txt });
           return sec;
         }
-        console.log('🔍 DEBUG - toSecPerMi: no pattern matched for:', txt);
         return null;
       };
 
@@ -572,13 +538,7 @@ export default function PlanSelect() {
       };
 
       let baked: any | null = null;
-      console.log('[baker] About to call augmentPlan with:', {
-        hasBaselines: !!planForAugment.baselines_template,
-        baselineKeys: Object.keys(planForAugment.baselines_template || {}),
-        hasSessions: !!planForAugment.sessions_by_week,
-        sessionCount: Object.keys(planForAugment.sessions_by_week || {}).length,
-        firstSession: planForAugment.sessions_by_week?.['1']?.[0]
-      });
+      
       
       // TEMPORARILY DISABLED - BAKER IS CRASHING SUPABASE
       // try { 
@@ -596,7 +556,7 @@ export default function PlanSelect() {
       //     stack: error.stack
       //   });
       //   }
-      console.log('🚨 BAKER TEMPORARILY DISABLED - PREVENTING SUPABASE CRASH');
+      
       baked = null;
       const payload = {
         name: libPlan.name,

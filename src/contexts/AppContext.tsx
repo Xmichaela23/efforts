@@ -315,10 +315,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const loadUserBaselines = async (): Promise<BaselineData | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('🔍 User auth check:', user ? `User ID: ${user.id}` : 'No user found');
       if (!user) return null;
       const { data, error } = await supabase.from('user_baselines').select('*').eq('user_id', user.id).single();
-      console.log('🔍 Database query result:', { data: !!data, error: error?.message });
       if (error && error.code !== 'PGRST116') throw error;
       if (!data) return null;
       
@@ -338,18 +336,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // If it's already a YYYY-MM-DD string, keep it as is
       }
       
-      console.log('🔍 Database data loaded:', data);
-      console.log('🔍 current_fitness from database:', data.current_fitness);
-      console.log('🔍 performance_numbers from database:', data.performance_numbers);
-      console.log('🔍 performance_numbers type:', typeof data.performance_numbers);
-      console.log('🔍 performance_numbers keys:', data.performance_numbers ? Object.keys(data.performance_numbers) : 'null/undefined');
-      console.log('🔍 age from database:', data.age);
-      console.log('🔍 birthday from database:', data.birthday);
+      
       
       // Calculate age from birthday if age is 0 or missing
       let calculatedAge = data.age || 0;
-      console.log('🔍 Original age from DB:', data.age);
-      console.log('🔍 Formatted birthday:', formattedBirthday);
+      
       
       if ((!data.age || data.age === 0) && formattedBirthday) {
         const birthDate = new Date(formattedBirthday);
@@ -359,10 +350,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
           calculatedAge--;
         }
-        console.log('🔍 Calculated age from birthday:', calculatedAge);
+        
       }
       
-      console.log('🔍 Final age being returned:', calculatedAge);
+      
 
       // Coerce unitless paces on read using the stored units preference
       const unitsSuffix = (data.units === 'metric') ? '/km' : '/mi';
@@ -544,7 +535,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             // console.log('🔍 DEBUG - Baking entire plan with baselines:', workoutPlan);
             // bakedPlan = augmentPlan(workoutPlan);
             // console.log('🔍 DEBUG - Baked plan result:', bakedPlan);
-            console.log('🚨 BAKER TEMPORARILY DISABLED - PREVENTING SUPABASE CRASH');
+            
             bakedPlan = null;
           } catch (bakeError) {
             console.error('❌ Plan baking failed:', bakeError);
@@ -614,7 +605,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                   steps: bakedSession.computed.steps || [],
                   total_hmmss: bakedSession.computed.total_hmmss || '0:00'
                 };
-                console.log('🔍 DEBUG - Found baked session:', bakedSession.day, bakedSession.discipline, computedData);
+                
               }
             }
 

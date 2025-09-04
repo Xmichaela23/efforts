@@ -144,13 +144,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   const handleUpdateWorkout = async (workoutId: string, updates: any) => {
-    console.log('Updating workout:', workoutId, updates);
   };
 
   const handleOpenPlanBuilder = () => {
-    console.log('🚀 handleOpenPlanBuilder called');
     setShowPlanBuilder(true);
-    console.log('✅ showPlanBuilder set to true');
     setShowSummary(false);
     setDateWorkouts([]);
     setCurrentWorkoutIndex(0);
@@ -194,13 +191,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   // 🔧 ENHANCED: Complete FIT data extraction - pass through ALL fields that FitFileImporter extracts
   const handleWorkoutsImported = (importedWorkouts: any[]) => {
-    console.log('📥 handleWorkoutsImported called with:', importedWorkouts);
-
     importedWorkouts.forEach(async (workout) => {
       try {
-        console.log('🔧 Processing workout with all fields:', workout.name);
-        console.log('🔍 Full workout object:', workout);
-
         const workoutToSave = {
           // CORE WORKOUT DATA
           name: workout.name,
@@ -286,36 +278,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           metrics: workout.metrics
         };
 
-        console.log('✅ Complete workout data being saved:', workoutToSave);
-        console.log('🆕 NEW FIELDS being saved:');
-        console.log(' Location:', { lat: workoutToSave.start_position_lat, lng: workoutToSave.start_position_long });
-        console.log(' Temperature:', workoutToSave.avg_temperature);
-        console.log(' Device:', workoutToSave.friendly_name);
-        console.log(' Total Work:', workoutToSave.total_work);
-        console.log(' VAM:', workoutToSave.avg_vam);
-        console.log(' Training Effects:', {
-          aerobic: workoutToSave.total_training_effect,
-          anaerobic: workoutToSave.total_anaerobic_effect
-        });
-        console.log(' User Profile:', {
-          age: workoutToSave.age,
-          weight: workoutToSave.weight,
-          height: workoutToSave.height
-        });
-        console.log(' Cycling Details:', {
-          left_right_balance: workoutToSave.left_right_balance,
-          pedal_smoothness: workoutToSave.avg_left_pedal_smoothness,
-          torque_effectiveness: workoutToSave.avg_left_torque_effectiveness
-        });
-
         await addWorkout(workoutToSave);
-        console.log('✅ Successfully imported workout with ALL metrics:', workout.name);
       } catch (error) {
         console.error('❌ Error importing workout:', error);
       }
     });
-
-    console.log(`✅ Successfully imported ${importedWorkouts.length} workouts with complete data`);
     setShowImportPage(false);
   };
 
@@ -440,7 +407,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   };
 
   const handleViewCompleted = () => {
-    console.log('View completed workouts');
   };
 
   const handleSelectRoutine = (routineId: string) => {

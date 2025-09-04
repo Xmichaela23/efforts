@@ -94,10 +94,7 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   };
 
   useEffect(() => {
-    console.log('🔄 WorkoutBuilder initialized with:', { existingWorkout, initialType, initialDate });
-    
     if (existingWorkout) {
-      console.log('📝 Loading existing workout into form');
       setCurrentWorkout(existingWorkout);
       
       setFormData({
@@ -119,7 +116,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         setStrengthExercises(existingWorkout.strength_exercises);
       }
     } else {
-      console.log('✨ Creating new workout for date:', initialDate || 'today');
       setCurrentWorkout(null);
       
       if (initialDate) {
@@ -320,8 +316,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
   };
 
   const handleSave = async (navigateAfterSave: boolean = false) => {
-    console.log('🚀 Save function called!');
-    
     try {
       const workoutTitle = formData.name.trim() || 
         `${formData.type.charAt(0).toUpperCase() + formData.type.slice(1)} - ${formData.date}`;
@@ -433,7 +427,6 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
               {/* FIXED: Use proper PlanBuilder instead of local modal */}
               <Button
                 onClick={() => {
-                  console.log('🎯 Build me a plan clicked - opening proper PlanBuilder');
                   if (onOpenPlanBuilder) {
                     onOpenPlanBuilder();
                   } else {
