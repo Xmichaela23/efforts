@@ -146,22 +146,20 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   let stepId = 1
   // Use computed per-rep targets when available to guarantee PACE ranges per interval
   const computedSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : []
-  let flatIdx = 0
+  let workRepIdx = 0
 
-  const applyComputedTargetIfMissing = (step: GarminStep) => {
+  const secPerMiToPaceStr = (sec: number): string => {
+    const m = Math.floor(sec / 60)
+    const s = Math.round(sec % 60)
+    const ss = String(s).padStart(2, '0')
+    return `${m}:${ss}/mi`
+  }
+
+  const applyComputedTargetIfMissing = (step: GarminStep, isRest: boolean) => {
     try {
-      // Align computed index to the next non-rest step so targets map to work reps
-      let idx = flatIdx
-      while (idx < computedSteps.length) {
-        const c = computedSteps[idx]
-        const ct = String(c?.type || '').toLowerCase()
-        if (!(ct === 'interval_rest' || /rest/.test(ct))) break
-        idx += 1
-      }
-      const cs = computedSteps[idx]
-      if (!cs) return
-      // Keep flatIdx in sync with the non-rest mapping
-      flatIdx = idx
+      if (isRest) return
+      const cs = computedSteps?.[workRepIdx]
+      if (!cs) { workRepIdx += 1; return }
       // Only apply when step has no explicit target
       const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
       if (hasTarget) return
@@ -171,14 +169,26 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         const range = cs?.pace_range as { lower?: number; upper?: number } | undefined
         // Convert pace (sec/mi) to speed (m/s)
         const toSpeed = (sec: number) => 1609.34 / sec
-        step.targetType = 'PACE'
-        step.targetValueType = 'PACE'
+        // Garmin expects SPEED target (m/s) for running targets
+        step.targetType = 'SPEED'
         if (range && typeof range.lower === 'number' && typeof range.upper === 'number') {
           step.targetValueLow = toSpeed(range.upper) // slower pace → lower speed
           step.targetValueHigh = toSpeed(range.lower) // faster pace → higher speed
         } else if (typeof secPerMi === 'number') {
-          // Expand single pace using export tolerances (done later by Garmin, but set center if needed)
-          step.targetValue = toSpeed(secPerMi)
+          // Prefer a range: widen around the single pace based on intensity/duration
+          const paceStr = secPerMiToPaceStr(secPerMi)
+          const widened = widenPaceToRangeMetersPerSecond(
+            paceStr,
+            step.intensity || '',
+            {
+              durationSec: (step.durationType === 'TIME' ? step.durationValue : undefined) as any,
+              distanceMeters: (step.durationType === 'DISTANCE' ? step.durationValue : undefined) as any
+            }
+          )
+          const center = toSpeed(secPerMi)
+          step.targetValueLow = widened ? widened.low : center * 0.97
+          step.targetValueHigh = widened ? widened.high : center * 1.03
+          delete (step as any).targetValue
         }
       }
       // CYCLING: apply POWER range from computed when available
@@ -195,19 +205,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         let high = parseW((cs as any)?.power_range?.upper ?? (cs as any)?.target_high)
         if (typeof low === 'number' && typeof high === 'number') {
           step.targetType = 'POWER'
-          step.targetValueType = 'POWER'
           step.targetValueLow = Math.round(low)
           step.targetValueHigh = Math.round(high)
         } else {
           const center = parseW((cs as any)?.target_watts ?? (cs as any)?.target_value)
           if (typeof center === 'number' && isFinite(center)) {
             step.targetType = 'POWER'
-            step.targetValueType = 'POWER'
             step.targetValueLow = Math.round(center * 0.95)
             step.targetValueHigh = Math.round(center * 1.05)
           }
         }
       }
+      workRepIdx += 1
     } catch {}
   }
 
@@ -223,22 +232,21 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       const pushWork = (lab: string, meters?: number, seconds?: number) => {
         const base: any = {}
         base.effortLabel = lab
-        if (typeof meters === 'number' && meters > 0) base.distanceMeters = Math.max(1, Math.floor(meters))
+        if (typeof meters === 'number' && meters > 0) base.distanceMeters = Math.max(1, Math.round(meters))
         else if (typeof seconds === 'number' && seconds > 0) base.duration = Math.max(1, Math.floor(seconds))
         out.push(base)
       }
-      const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.floor(yd * 0.9144) : undefined
-      // Collect to enforce order: warmups → main (work + embedded rests) → interval_rest → cooldowns
+      const toMetersFromYd = (yd?: number) => (yd && yd > 0) ? Math.round(yd * 0.9144) : undefined
+      // Collect in natural order: warmups → main (work interleaved with rests) → cooldowns
       const warmArr: any[] = []
       const mainArr: any[] = []
-      const explicitRestArr: any[] = []
       const coolArr: any[] = []
       for (const st of steps) {
         const t = String(st?.type || '').toLowerCase()
         const isRest = t === 'interval_rest' || /rest/.test(t)
         if (isRest) {
           const sec = Number((st as any)?.duration_s || (st as any)?.rest_s || 0)
-          explicitRestArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
+          mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor(sec || 1)) })
           continue
         }
         let label = String((st as any)?.label || '').trim()
@@ -268,23 +276,23 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           label = [baseLab, yardText, abbr].filter(Boolean).join(' — ')
         }
         const meters = typeof (st as any)?.distance_m === 'number' && (st as any).distance_m > 0
-          ? Math.floor((st as any).distance_m)
+          ? Math.round((st as any).distance_m)
           : toMetersFromYd((st as any)?.distance_yd)
         const seconds = typeof (st as any)?.duration_s === 'number' && (st as any).duration_s > 0 ? Math.floor((st as any).duration_s) : undefined
         // Route warmup/cooldown explicitly so Garmin ordering is correct
         if (t === 'warmup') {
-          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          warmArr.push({ effortLabel: 'warm up', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
         } else if (t === 'cooldown') {
-          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          coolArr.push({ effortLabel: 'cool down', ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
         } else {
-          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: meters } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
-          // Append explicit rest after work if rest_s present
+          mainArr.push({ effortLabel: (label || (isSwim ? 'interval' : 'interval')), ...(typeof meters==='number' && meters>0 ? { distanceMeters: Math.round(meters) } : {}), ...(typeof seconds==='number' && seconds>0 ? { duration: seconds } : {}) })
+          // Append rest immediately after work if rest_s present
           if (typeof (st as any)?.rest_s === 'number' && (st as any).rest_s > 0) {
-            explicitRestArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
+            mainArr.push({ effortLabel: 'rest', duration: Math.max(1, Math.floor((st as any).rest_s)) })
           }
         }
       }
-      const ordered = [...warmArr, ...mainArr, ...explicitRestArr, ...coolArr]
+      const ordered = [...warmArr, ...mainArr, ...coolArr]
       return ordered.length ? ordered : (Array.isArray((workout as any).intervals) ? (workout as any).intervals : [])
     } catch {
       return Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
@@ -307,7 +315,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         durationType: 'REPS',
         durationValue: Math.max(1, reps)
       }
-      step.exerciseName = label
+      // Omit exerciseName mapping (Garmin expects enum/id). Keep the label in description.
       if (weight > 0) step.weightValue = weight
       steps.push(step)
       stepId += 1
@@ -321,7 +329,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         stepOrder: stepId,
         intensity: 'REST',
         description: 'Rest',
-        durationType: 'TIME',
+        durationType: (sport === 'LAP_SWIMMING') ? 'FIXED_REST' : 'TIME',
         durationValue: Math.max(1, Math.floor(sec))
       }
       steps.push(step)
@@ -345,14 +353,16 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             intensity: sIntensity,
             description: String(((seg?.effortLabel ?? interval?.effortLabel) || '')).trim() || undefined,
             durationType: (Number.isFinite(sMeters) && sMeters > 0) ? 'DISTANCE' : 'TIME',
-            durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? Math.floor(sMeters) : Math.floor(sSeconds)
+            durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? Math.round(sMeters) : Math.floor(sSeconds)
+          }
+          if (sport === 'LAP_SWIMMING' && step.intensity === 'REST') {
+            step.durationType = 'FIXED_REST'
           }
           applyTargets(step, seg, interval)
           // Try to apply computed per-rep target if none attached
-          applyComputedTargetIfMissing(step)
+          applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
           steps.push(step)
           stepId += 1
-          flatIdx += 1
         }
       }
       continue
@@ -372,18 +382,21 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       intensity,
       description: String(interval?.effortLabel ?? '').trim() || undefined,
       durationType: (Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME',
-      durationValue: (Number.isFinite(meters) && meters > 0) ? Math.floor(meters) : Math.floor(seconds)
+      durationValue: (Number.isFinite(meters) && meters > 0) ? Math.round(meters) : Math.floor(seconds)
+    }
+    if (sport === 'LAP_SWIMMING' && step.intensity === 'REST') {
+      step.durationType = 'FIXED_REST'
     }
     applyTargets(step, interval)
-    applyComputedTargetIfMissing(step)
+    applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
     steps.push(step)
     stepId += 1
-    flatIdx += 1
   }
 
   return {
     workoutName: workout.name,
     sport,
+    estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps),
     segments: [
       {
         segmentOrder: 1,
@@ -529,61 +542,68 @@ function applyTargets(step: GarminStep, primary: any, fallback?: any) {
     const pace = String(src.paceTarget)
     const parsed = parsePaceToMetersPerSecond(pace)
     if (parsed) {
-      step.targetType = 'PACE'
-      step.targetValueType = 'PACE'
+      // Use SPEED (m/s) for Garmin run targets, always as a range
+      step.targetType = 'SPEED'
       if (parsed.low != null && parsed.high != null) {
         step.targetValueLow = parsed.low
         step.targetValueHigh = parsed.high
       } else if (parsed.value != null) {
-        // Expand single pace to a sensible range based on intensity
         const widened = widenPaceToRangeMetersPerSecond(pace, step.intensity || '', { durationSec: (step.durationType === 'TIME' ? step.durationValue : undefined) as any, distanceMeters: (step.durationType === 'DISTANCE' ? step.durationValue : undefined) as any })
-        if (widened) {
-          step.targetValueLow = widened.low
-          step.targetValueHigh = widened.high
-        } else {
-          step.targetValue = parsed.value
-        }
+        const v = parsed.value
+        step.targetValueLow = widened ? widened.low : v * 0.97
+        step.targetValueHigh = widened ? widened.high : v * 1.03
       }
+      delete (step as any).targetValue
+      delete (step as any).targetValueType
     }
     return
   }
   if (src?.powerTarget) {
     const pow = parseRangeNumber(String(src.powerTarget))
     step.targetType = 'POWER'
-    step.targetValueType = 'POWER'
     if (pow.low != null && pow.high != null) {
       step.targetValueLow = pow.low
       step.targetValueHigh = pow.high
     } else if (pow.value != null) {
       // Expand single wattage to ±5%
       const base = pow.value
-      step.targetValueLow = Math.round(base * 0.95)
-      step.targetValueHigh = Math.round(base * 1.05)
+      const band = Math.max(1, Math.round(base * 0.05))
+      step.targetValueLow = base - band
+      step.targetValueHigh = base + band
     }
+    delete (step as any).targetValue
+    delete (step as any).targetValueType
     return
   }
   if (src?.bpmTarget) {
     const hr = parseRangeNumber(String(src.bpmTarget))
     step.targetType = 'HEART_RATE'
-    step.targetValueType = 'HEART_RATE'
     if (hr.low != null && hr.high != null) {
       step.targetValueLow = hr.low
       step.targetValueHigh = hr.high
     } else if (hr.value != null) {
-      step.targetValue = hr.value
+      const base = hr.value
+      const band = Math.max(1, Math.round(base * 0.05))
+      step.targetValueLow = base - band
+      step.targetValueHigh = base + band
     }
+    delete (step as any).targetValueType
     return
   }
   if (src?.cadenceTarget) {
     const cad = parseRangeNumber(String(src.cadenceTarget))
     step.targetType = 'CADENCE'
-    step.targetValueType = 'CADENCE'
     if (cad.low != null && cad.high != null) {
       step.targetValueLow = cad.low
       step.targetValueHigh = cad.high
     } else if (cad.value != null) {
-      step.targetValue = cad.value
+      const base = cad.value
+      const band = Math.max(1, Math.round(base * 0.05))
+      step.targetValueLow = base - band
+      step.targetValueHigh = base + band
     }
+    delete (step as any).targetValue
+    delete (step as any).targetValueType
   }
 }
 

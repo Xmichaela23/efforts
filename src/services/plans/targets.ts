@@ -27,7 +27,14 @@ function coerceUnit(txt?: string, fallbackUnit: 'mi'|'km' = 'mi'): string | unde
 
 function mmss(sec: number) { const x=Math.max(1,Math.round(sec)); const m=Math.floor(x/60); const s=x%60; return `${m}:${String(s).padStart(2,'0')}`; }
 
-export type ResolvedStep = AtomicStep & { target_value?: string; target_low?: string; target_high?: string };
+export type ResolvedStep = AtomicStep & {
+  target_value?: string;
+  target_low?: string;
+  target_high?: string;
+  // Numeric fields used by exporters (e.g., Garmin) to attach targets reliably
+  pace_sec_per_mi?: number;
+  pace_range?: { lower: number; upper: number };
+};
 
 export function resolveTargets(steps: AtomicStep[], baselines: Baselines, exportHints: any, discipline?: string): ResolvedStep[] {
   const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
@@ -62,6 +69,10 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
         rs.target_value = `${mmss(p.sec)}/${p.unit}`;
         rs.target_low = `${mmss(p.sec*(1-tol))}/${p.unit}`;
         rs.target_high = `${mmss(p.sec*(1+tol))}/${p.unit}`;
+        // Provide numeric sec/mi for exporters
+        const secPerMi = p.unit === 'mi' ? p.sec : Math.round(p.sec * 1.60934);
+        rs.pace_sec_per_mi = secPerMi;
+        rs.pace_range = { lower: Math.round(secPerMi * (1 - tol)), upper: Math.round(secPerMi * (1 + tol)) };
       }
     }
     // Power resolution for bike
@@ -87,6 +98,10 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
         rs.target_value = `${mmss(p.sec)}/${p.unit}`;
         rs.target_low = `${mmss(p.sec*(1-tol))}/${p.unit}`;
         rs.target_high = `${mmss(p.sec*(1+tol))}/${p.unit}`;
+        // Numeric fields
+        const secPerMi = p.unit === 'mi' ? p.sec : Math.round(p.sec * 1.60934);
+        rs.pace_sec_per_mi = secPerMi;
+        rs.pace_range = { lower: Math.round(secPerMi * (1 - tol)), upper: Math.round(secPerMi * (1 + tol)) };
       }
     }
     // If distance_m present and we have a pace, derive duration_s to fix totals
