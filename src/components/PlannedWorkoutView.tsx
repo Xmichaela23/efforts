@@ -349,7 +349,42 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               else if (reps) repeatLines(name, 1, `${reps}`, weightStr);
               else lines.push(name);
             }
-            // Fallback A: derive from computed strength steps (preferred when present)
+            // Fallback A: parse description like "Deadlift 5×3 @75%" into lines with weights (uses rendered_description if present)
+            if (lines.length === 0) {
+              const raw = String((workout as any).rendered_description || workout.description || '').trim();
+              const segments = raw.split(/;+/).map(s=>s.trim()).filter(Boolean);
+              const pn = perfNumbers || {};
+              const oneRM = { squat: pn?.squat, bench: pn?.bench, deadlift: pn?.deadlift, overhead: pn?.overheadPress1RM || pn?.overhead || pn?.ohp } as any;
+              const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; return 'squat'; };
+              const calcWeight = (pct: number|undefined, lift: keyof typeof oneRM): number | null => { if (!pct || !oneRM[lift] || typeof oneRM[lift] !== 'number') return null; const rawW = Math.round((oneRM[lift] as number) * (pct/100)); return Math.round(rawW/5)*5; };
+              for (const seg of segments){
+                // With percent and optional explicit weight already in text
+                const mp = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
+                if (mp){
+                  const name = mp[1].trim().replace(/\s+/g,' ');
+                  const sets = parseInt(mp[2],10);
+                  const reps = parseInt(mp[3],10);
+                  const pct = parseInt(mp[4],10);
+                  // If an explicit weight like "— 110 lb" is present, use it; else compute from baselines
+                  const wm = seg.match(/—\s*(\d+)\s*lb/i);
+                  const weightTxt = wm ? `${wm[1]} lb` : (():string|undefined=>{ const key = liftOf(name); const w = calcWeight(pct, key); return w?`${w} lb`:undefined; })();
+                  repeatLines(name, sets, `${reps}`, weightTxt);
+                  continue;
+                }
+                // Without percent e.g., Row 4×6–8
+                const mr = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
+                if (mr){
+                  const name = mr[1].trim().replace(/\s+/g,' ');
+                  const sets = parseInt(mr[2],10);
+                  const r1 = parseInt(mr[3],10);
+                  const r2 = mr[4]?parseInt(mr[4],10):undefined;
+                  const repsText = r2?`${r1}–${r2}`:`${r1}`;
+                  repeatLines(name, sets, `${repsText}`);
+                }
+              }
+            }
+
+            // Fallback B: derive from computed strength steps (only if description/tokens didn’t yield lines)
             if (lines.length === 0 && Array.isArray(computedSteps) && computedSteps.length) {
               const pn = perfNumbers || {};
               const oneRM = {
@@ -375,6 +410,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               };
               const repsText = (r:any) => typeof r==='string'?r : (typeof r==='number'?String(r):'');
               const linesFromComputed: string[] = [];
+              const repeatInto = (arr: string[], label: string, sets: number, repsText: string, weightText?: string) => {
+                const base = weightText ? `${repsText} @ ${weightText}` : repsText;
+                for (let i=0;i<Math.max(1, sets);i+=1) {
+                  arr.push(`${label ? `${label} `: ''}1 × ${base}`.trim());
+                }
+              };
               for (const st of computedSteps as any[]) {
                 const t = String(st?.type||'').toLowerCase();
                 if (t==='strength_rest' && typeof st?.rest_s === 'number' && st.rest_s>0) {
@@ -386,9 +427,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 const key = nameToLift(exName);
                 const w = calcWeight(pct, key);
                 const reps = repsText(st?.reps);
-                const setCount = Number(st?.set) ? 1 : 1; // each entry is a set
-                repeatLines(exName.split(' ').map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(' '), setCount, reps || '');
-                if (w) { linesFromComputed[linesFromComputed.length-1] = `${linesFromComputed[linesFromComputed.length-1]} @ ${w} lb`; }
+                const setCount = 1; // each strength_work item represents one set
+                repeatInto(linesFromComputed, exName.split(' ').map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(' '), setCount, reps || '', w?`${w} lb`:undefined);
               }
               if (linesFromComputed.length) {
                 setStrengthLines(linesFromComputed);
@@ -397,43 +437,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               }
             }
 
-            // Fallback B: parse description like "Deadlift 5×3 @75%" into lines with weights
-            if (lines.length === 0) {
-              const raw = String((workout as any).rendered_description || workout.description || '').trim();
-              const segments = raw.split(/;+/).map(s=>s.trim()).filter(Boolean);
-              const liftOf = (txt:string): keyof typeof oneRM => {
-                const t = txt.toLowerCase();
-                if (t.includes('deadlift')) return 'deadlift';
-                if (t.includes('bench')) return 'bench';
-                if (t.includes('ohp') || t.includes('overhead')) return 'overhead';
-                if (t.includes('squat')) return 'squat';
-                return 'squat';
-              };
-              for (const seg of segments){
-                // With percent e.g., Squat 5×5 @70%
-                const mp = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
-                if (mp){
-                  const name = mp[1].trim().replace(/\s+/g,' ');
-                  const sets = parseInt(mp[2],10);
-                  const reps = parseInt(mp[3],10);
-                  const pct = parseInt(mp[4],10);
-                  const key = liftOf(name);
-                  const w = calcWeight(pct, key);
-                  repeatLines(name, sets, `${reps}`, w?`${w} lb`:undefined);
-                  continue;
-                }
-                // Without percent e.g., Barbell Row 4×6–8
-                const mr = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
-                if (mr){
-                  const name = mr[1].trim().replace(/\s+/g,' ');
-                  const sets = parseInt(mr[2],10);
-                  const r1 = parseInt(mr[3],10);
-                  const r2 = mr[4]?parseInt(mr[4],10):undefined;
-                  const repsText = r2?`${r1}–${r2}`:`${r1}`;
-                  repeatLines(name, sets, `${repsText}`);
-                }
-              }
-            }
+            
             // Fallback C: parse strength tokens from steps_preset
             if (lines.length === 0) {
               const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;

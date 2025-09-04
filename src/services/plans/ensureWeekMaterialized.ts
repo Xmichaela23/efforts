@@ -302,8 +302,41 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     let totalSeconds = 0;
     try {
       const norm = normalizePlannedSession(s, { performanceNumbers: perfNumbers }, exportHints || {});
-      // Prefer friendly summary (includes baseline-derived targets/weights) when available
+      // Prefer friendly summary when available
       rendered = (norm.friendlySummary || rendered).trim();
+      // Inject strength loads from user baselines when missing
+      if (mappedType === 'strength') {
+        try {
+          const perf: any = perfNumbers || {};
+          const oneRM = {
+            squat: typeof perf.squat === 'number' ? perf.squat : undefined,
+            bench: typeof perf.bench === 'number' ? perf.bench : undefined,
+            deadlift: typeof perf.deadlift === 'number' ? perf.deadlift : undefined,
+            overhead: typeof perf.overheadPress1RM === 'number' ? perf.overheadPress1RM : (typeof perf.overhead === 'number' ? perf.overhead : undefined),
+          } as Record<string, number | undefined>;
+          const liftKey = (text: string): keyof typeof oneRM => {
+            const t = text.toLowerCase();
+            if (t.includes('dead')) return 'deadlift';
+            if (t.includes('bench')) return 'bench';
+            if (t.includes('ohp') || t.includes('overhead') || t.includes('press')) return 'overhead';
+            return 'squat';
+          };
+          const addLoads = (txt: string): string => {
+            return txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
+              // If a weight is already present (e.g., "— 110 lb"), keep as-is
+              if (/\b\d+\s*lb\b/i.test(String(tail))) return m;
+              const pct = parseInt(String(pctStr), 10);
+              const key = liftKey(String(name));
+              const orm = oneRM[key];
+              if (!orm || !pct || !isFinite(orm)) return m;
+              const w = Math.round(orm * (pct/100));
+              const rounded = Math.round(w/5)*5;
+              return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
+            });
+          };
+          rendered = addLoads(rendered);
+        } catch {}
+      }
       totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
