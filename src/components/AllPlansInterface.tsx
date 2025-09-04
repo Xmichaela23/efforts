@@ -229,6 +229,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [showPlanDesc, setShowPlanDesc] = useState(false);
 
   const handlePlanClick = async (planId: string) => {
+    // Guard: if we already have this plan open in detail view, skip expensive re-load
+    if (selectedPlanDetail?.id === planId && currentView === 'detail') {
+      return;
+    }
     let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
 
     // Parse weeks if stored as JSON string
@@ -823,10 +827,24 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   useEffect(() => {
     (async () => {
       try {
-        if (focusPlanId && !selectedPlanDetail) {
+        // Guard: only auto-open once per mount
+        const openedRef = (useRef as any);
+        if (!('current' in openedRef)) { /* noop for TS */ }
+        // use local ref to gate auto-open
+      } catch {}
+    })();
+  }, []);
+
+  // Use a dedicated ref to gate auto-open so we don't re-trigger on state churn
+  const hasAutoOpenedRef = useRef<boolean>(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (focusPlanId && !selectedPlanDetail && !hasAutoOpenedRef.current) {
           // Show detail immediately to avoid list flash
           setCurrentView('detail');
           await handlePlanClick(focusPlanId);
+          hasAutoOpenedRef.current = true;
           if (typeof focusWeek === 'number' && focusWeek > 0) setSelectedWeek(focusWeek);
         }
       } catch {}
