@@ -558,6 +558,21 @@ export default function PlanSelect() {
       //   }
       
       baked = null;
+      // Align start to Monday of the selected week, but remember the exact selected date
+      const computeMondayOf = (iso: string): string => {
+        const parts = iso.split('-').map(x=>parseInt(x,10));
+        const d = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
+        const jsDow = d.getDay(); // 0=Sun..6=Sat
+        const daysFromMonday = (jsDow + 6) % 7; // Mon=0..Sun=6
+        const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+        const y = mon.getFullYear();
+        const m = String(mon.getMonth()+1).padStart(2,'0');
+        const dd = String(mon.getDate()).padStart(2,'0');
+        return `${y}-${m}-${dd}`;
+      };
+
+      const anchorMonday = computeMondayOf(startDate);
+
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
@@ -565,8 +580,10 @@ export default function PlanSelect() {
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
-        start_date: startDate,
-        config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id },
+        // Store Monday-of-week as the plan anchor so authored weekdays align
+        start_date: anchorMonday,
+        // Preserve the exact user-chosen date for Week 1 trimming
+        config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id, user_selected_start_date: startDate },
         weeks: [],
         sessions_by_week: mapped.sessions_by_week,
         notes_by_week: mapped.notes_by_week || {},
@@ -577,7 +594,6 @@ export default function PlanSelect() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('You must be signed in to save a plan.');
       const insertPayload: any = { ...payload, user_id: user.id };
-      delete insertPayload.start_date;
       delete insertPayload.export_hints;
       const planInsert = await supabase
         .from('plans')

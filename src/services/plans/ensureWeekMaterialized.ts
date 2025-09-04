@@ -196,10 +196,13 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     }
   } catch {}
 
-  // 5) Determine start_date from existing Week 1 rows
+  // 5) Determine anchor start_date and user-selected start day (may be mid-week)
   let startDate = (() => {
     try { return (plan as any).start_date as string; } catch { return undefined; }
   })() as string | undefined;
+  const userSelectedStartDate: string | undefined = (() => {
+    try { return (plan as any)?.config?.user_selected_start_date as string; } catch { return undefined; }
+  })();
   if (!startDate) {
     const { data: w1, error: w1Err } = await supabase
       .from('planned_workouts')
@@ -267,6 +270,16 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     } catch {}
     const dow = dayIndex[(s.day as string) || 'Monday'] || 1;
     const date = addDays(startDate, (weekNumber - 1) * 7 + (dow - 1));
+    // If this is Week 1 and the user selected a mid-week start, skip earlier days
+    if (weekNumber === 1 && userSelectedStartDate) {
+      const parts = userSelectedStartDate.split('-').map(x=>parseInt(x,10));
+      const sel = new Date(parts[0], (parts[1]||1)-1, parts[2]||1).getTime();
+      const dParts = date.split('-').map(x=>parseInt(x,10));
+      const cur = new Date(dParts[0], (dParts[1]||1)-1, dParts[2]||1).getTime();
+      if (cur < sel) {
+        continue; // do not materialize sessions before the chosen start date
+      }
+    }
     const rawType = String(s.discipline || s.type || '').toLowerCase();
     let mappedType: 'run'|'ride'|'swim'|'strength' = 'run';
     if (rawType === 'run') mappedType = 'run';
