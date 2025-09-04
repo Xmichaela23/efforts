@@ -96,8 +96,12 @@ serve(async (req) => {
 
     const garminPayload = convertWorkoutToGarmin(workout)
 
-    const sendResult = await sendToGarmin(garminPayload, conn.access_token)
+    let sendResult = await sendToGarmin(garminPayload, conn.access_token)
     if (!sendResult.success) {
+      // If validation guard triggered in convertWorkoutToGarmin
+      if (String(sendResult.error||'').includes('RUN_EXPORT_MISSING_TARGETS')) {
+        return json({ error: 'Workout requires per-rep run pace targets (materialize computed or provide paceTarget)' }, 422)
+      }
       return json({ error: 'Failed to send to Garmin', details: sendResult.error }, 502)
     }
 
@@ -391,6 +395,19 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
     steps.push(step)
     stepId += 1
+  }
+
+  // Validation: ensure RUN exports carry SPEED ranges for all work reps
+  if (sport === 'RUNNING') {
+    const anyWorkNoTarget = steps.some((s) => (
+      s.type === 'WorkoutStep' &&
+      s.intensity !== 'REST' && s.intensity !== 'RECOVERY' &&
+      (s.durationValue || 0) > 0 &&
+      !(s.targetType === 'SPEED' && s.targetValueLow != null && s.targetValueHigh != null)
+    ));
+    if (anyWorkNoTarget) {
+      throw new Error('RUN_EXPORT_MISSING_TARGETS');
+    }
   }
 
   return {

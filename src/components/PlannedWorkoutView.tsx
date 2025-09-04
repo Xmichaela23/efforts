@@ -1262,7 +1262,16 @@ const SendToGarminButton: React.FC<{ workoutId: string; disabled?: boolean }> = 
         const wr = await supabase.from('planned_workouts').select('*').eq('id', workoutId).single();
         const workoutRow: any = (wr as any)?.data || {};
         const hasComputed = Array.isArray(workoutRow?.computed?.steps) && workoutRow.computed.steps.length > 0;
-        if (!hasComputed) {
+        const typeLower = String(workoutRow?.type || '').toLowerCase();
+        const computedSteps: any[] = hasComputed ? (workoutRow?.computed?.steps as any[]) : [];
+        const runNeedsRanges = typeLower === 'run' && computedSteps.some((st:any) => {
+          const kind = String(st?.type || '').toLowerCase();
+          const isRest = kind === 'interval_rest' || /rest/.test(kind);
+          if (isRest) return false;
+          const pr = (st as any)?.pace_range;
+          return !(pr && typeof pr.lower === 'number' && typeof pr.upper === 'number');
+        });
+        if (!hasComputed || runNeedsRanges) {
           const stepsPresetArr: string[] | undefined = Array.isArray(workoutRow?.steps_preset) ? workoutRow.steps_preset : undefined;
           const swimMain: string | undefined = typeof workoutRow?.main === 'string' ? workoutRow.main : undefined;
           if ((stepsPresetArr && stepsPresetArr.length > 0) || swimMain) {
