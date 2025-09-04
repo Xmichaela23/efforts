@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { PlannedWorkout } from '@/components/PlannedWorkoutView';
 
@@ -6,6 +7,7 @@ export const usePlannedWorkouts = () => {
   const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Get current user
   const getCurrentUser = async () => {
@@ -169,6 +171,17 @@ export const usePlannedWorkouts = () => {
       setLoading(false);
     }
   }, []);
+
+  // React Query integration: keep cache warm and allow invalidation
+  const { refetch } = useQuery({
+    queryKey: ['planned', 'windowed'],
+    queryFn: fetchPlannedWorkouts,
+    // small stale window; avoid refetch on focus to keep UI snappy
+    staleTime: 1000 * 60 * 3,
+    cacheTime: 1000 * 60 * 15,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
 
   // Add a new planned workout
   const addPlannedWorkout = async (workoutData: Omit<PlannedWorkout, 'id'>) => {
@@ -345,7 +358,7 @@ export const usePlannedWorkouts = () => {
     }
   };
 
-  // Initialize on mount
+  // Initialize on mount (first fetch)
   useEffect(() => {
     fetchPlannedWorkouts();
   }, [fetchPlannedWorkouts]);
@@ -353,11 +366,12 @@ export const usePlannedWorkouts = () => {
   // Refresh when other views broadcast invalidation
   useEffect(() => {
     const handler = () => {
-      fetchPlannedWorkouts();
+      // use refetch to collaborate with React Query cache
+      refetch();
     };
     window.addEventListener('planned:invalidate', handler);
     return () => window.removeEventListener('planned:invalidate', handler);
-  }, [fetchPlannedWorkouts]);
+  }, [refetch, fetchPlannedWorkouts]);
 
   return {
     plannedWorkouts,
@@ -370,6 +384,6 @@ export const usePlannedWorkouts = () => {
     getPlannedWorkoutsForDate,
     getPlannedWorkoutsByType,
     getPlannedWorkoutsByStatus,
-    refresh: fetchPlannedWorkouts
+    refresh: async () => { await queryClient.invalidateQueries({ queryKey: ['planned'] }); await refetch(); }
   };
 };
