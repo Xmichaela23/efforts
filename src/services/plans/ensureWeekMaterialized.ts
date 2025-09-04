@@ -302,8 +302,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     let totalSeconds = 0;
     try {
       const norm = normalizePlannedSession(s, { performanceNumbers: perfNumbers }, exportHints || {});
-      // Preserve authored text for strength; otherwise use friendly summary when available
-      if (mappedType !== 'strength') rendered = (norm.friendlySummary || rendered).trim();
+      // Prefer friendly summary (includes baseline-derived targets/weights) when available
+      rendered = (norm.friendlySummary || rendered).trim();
       totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
