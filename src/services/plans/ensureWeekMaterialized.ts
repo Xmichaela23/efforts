@@ -197,12 +197,22 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   } catch {}
 
   // 5) Determine anchor start_date and user-selected start day (may be mid-week)
-  let startDate = (() => {
-    try { return (plan as any).start_date as string; } catch { return undefined; }
-  })() as string | undefined;
+  let startDate: string | undefined; // computed from user-selected date if provided
   const userSelectedStartDate: string | undefined = (() => {
     try { return (plan as any)?.config?.user_selected_start_date as string; } catch { return undefined; }
   })();
+  if (userSelectedStartDate) {
+    // Compute Monday of the selected date to anchor weekdays
+    const p = userSelectedStartDate.split('-').map(x=>parseInt(x,10));
+    const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
+    const jsDow = d.getDay(); // 0=Sun..6=Sat
+    const daysFromMonday = (jsDow + 6) % 7; // Mon=0..Sun=6
+    const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+    const y = mon.getFullYear();
+    const m = String(mon.getMonth()+1).padStart(2,'0');
+    const dd = String(mon.getDate()).padStart(2,'0');
+    startDate = `${y}-${m}-${dd}`;
+  }
   if (!startDate) {
     const { data: w1, error: w1Err } = await supabase
       .from('planned_workouts')

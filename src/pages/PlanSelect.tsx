@@ -580,9 +580,7 @@ export default function PlanSelect() {
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
-        // Store Monday-of-week as the plan anchor so authored weekdays align
-        start_date: anchorMonday,
-        // Preserve the exact user-chosen date for Week 1 trimming
+        // Preserve the exact user-chosen date for Week 1 trimming (anchor Monday derived at materialization time)
         config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id, user_selected_start_date: startDate },
         weeks: [],
         sessions_by_week: mapped.sessions_by_week,
