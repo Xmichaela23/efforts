@@ -347,6 +347,59 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 lines.push(name);
               }
             }
+            // Fallback: parse description like "Deadlift 5×3 @75%" into lines with weights
+            if (lines.length === 0) {
+              const raw = String((workout as any).rendered_description || workout.description || '').trim();
+              const segments = raw.split(/;+/).map(s=>s.trim()).filter(Boolean);
+              const liftOf = (txt:string): keyof typeof oneRM => {
+                const t = txt.toLowerCase();
+                if (t.includes('deadlift')) return 'deadlift';
+                if (t.includes('bench')) return 'bench';
+                if (t.includes('ohp') || t.includes('overhead')) return 'overhead';
+                if (t.includes('squat')) return 'squat';
+                return 'squat';
+              };
+              for (const seg of segments){
+                const m = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
+                if (m){
+                  const name = m[1].trim().replace(/\s+/g,' ');
+                  const sets = parseInt(m[2],10);
+                  const reps = parseInt(m[3],10);
+                  const pct = parseInt(m[4],10);
+                  const key = liftOf(name);
+                  const w = calcWeight(pct, key);
+                  lines.push(`${name} ${sets}×${reps}${w?` @ ${w} lb`:` @ ${pct}%`}`.trim());
+                }
+              }
+            }
+            // Fallback: parse strength tokens from steps_preset
+            if (lines.length === 0) {
+              const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
+              if (stepsPresetArr && stepsPresetArr.length) {
+                for (const t of stepsPresetArr) {
+                  const s = String(t).toLowerCase();
+                  // Examples supported:
+                  // strength_deadlift_5x3_75pct, strength_bench_4x5_70percent, strength_ohp_3x8_65%
+                  const m = s.match(/^strength_([a-z_]+)_(\d+)x(\d+).*?(\d{1,3})\s*(?:pct|percent|%)?/i);
+                  if (m) {
+                    const nameKey = m[1].replace(/_/g,' ');
+                    const sets = parseInt(m[2],10);
+                    const reps = parseInt(m[3],10);
+                    const pct = parseInt(m[4],10);
+                    const liftKey = (()=>{
+                      const n = nameKey.toLowerCase();
+                      if (n.includes('dead')) return 'deadlift';
+                      if (n.includes('bench')) return 'bench';
+                      if (n.includes('ohp') || n.includes('overhead') || n.includes('press')) return 'overhead';
+                      return 'squat';
+                    })() as keyof typeof oneRM;
+                    const w = calcWeight(pct, liftKey);
+                    const properName = nameKey.split(' ').map(x=>x.charAt(0).toUpperCase()+x.slice(1)).join(' ');
+                    lines.push(`${properName} ${sets}×${reps}${w?` @ ${w} lb`:` @ ${pct}%`}`.trim());
+                  }
+                }
+              }
+            }
             if (lines.length) {
               setStrengthLines(lines);
               setStepLines([]);
