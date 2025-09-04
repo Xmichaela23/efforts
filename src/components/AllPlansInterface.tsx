@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -215,6 +215,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [activatingId, setActivatingId] = useState<string | null>(null);
   // Gate weekly render while week is being materialized/refetched to avoid flicker
   const [weekLoading, setWeekLoading] = useState<boolean>(false);
+  const weekCacheRef = useRef<Map<string, any[]>>(new Map());
   
   // Add workout edit mode state
   const [workoutViewMode, setWorkoutViewMode] = useState<'summary' | 'edit'>('summary');
@@ -832,80 +833,85 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     })();
   }, [focusPlanId, focusWeek]);
 
-  // Ensure week materialized on selection change
+  // Ensure week materialized on selection change with in-memory week cache
   useEffect(() => {
     (async () => {
       try {
         if (!selectedPlanDetail || !selectedPlanDetail.id || !selectedWeek) return;
-        // If week has no rows yet, bake & insert just this week
+        const key = `${selectedPlanDetail.id}:${selectedWeek}`;
+        const cached = weekCacheRef.current.get(key);
+        if (cached && cached.length) {
+          const weeks = (selectedPlanDetail.weeks || []).map((wk: any) => (
+            wk.weekNumber === selectedWeek ? { ...wk, workouts: cached } : wk
+          ));
+          setSelectedPlanDetail((prev: any) => ({ ...prev, weeks }));
+          return;
+        }
+
         setWeekLoading(true);
         const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
         await ensureWeekMaterialized(String(selectedPlanDetail.id), Number(selectedWeek));
-        // Reload plan detail rows from DB to reflect any newly inserted sessions
-        try {
-          const commonSelect = '*';
-          const { data: byLink } = await supabase
-            .from('planned_workouts')
-            .select(commonSelect)
-            .eq('training_plan_id', selectedPlanDetail.id)
-            .order('week_number', { ascending: true })
-            .order('day_number', { ascending: true });
-          if (Array.isArray(byLink) && byLink.length) {
-            // Merge into existing selectedPlanDetail.weeks similar to normalize above
-            const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
-            const byWeek: Record<number, any[]> = {};
-            for (const w of byLink) {
-              const wk = (w as any).week_number || 1;
-              const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
-              const computed = (w as any).computed || {};
-              const renderedDesc = (w as any).rendered_description || (w as any).description || '';
-              const totalSeconds = computed.total_duration_seconds;
-              const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
-              // Parse tags which may arrive as JSON string or array
-              const rawTags: any = (w as any).tags;
-              let tags: string[] = [];
-              if (Array.isArray(rawTags)) {
-                tags = rawTags;
-              } else if (typeof rawTags === 'string') {
-                try {
-                  const parsed = JSON.parse(rawTags);
-                  if (Array.isArray(parsed)) tags = parsed;
-                } catch {}
-              }
-              // Parse steps_preset/export_hints/intervals (may be JSON strings)
-              const stepsPresetParsed = (() => { const v=(w as any).steps_preset; if (Array.isArray(v)) return v; try { return JSON.parse(v); } catch { return null; }})();
-              const exportHintsParsed = (() => { const v=(w as any).export_hints; if (v && typeof v === 'object') return v; try { return JSON.parse(v); } catch { return null; }})();
-              const intervalsParsed = (() => { const v=(w as any).intervals; if (Array.isArray(v)) return v; try { return JSON.parse(v); } catch { return null; }})();
-
-              const workout = {
-                id: (w as any).id,
-                name: (w as any).name || 'Session',
-                type: (String((w as any).type).toLowerCase()==='bike' ? 'ride' : (w as any).type) as any,
-                description: renderedDesc,
-                duration,
-                day: dayName,
-                computed,
-                tags,
-                steps_preset: Array.isArray(stepsPresetParsed) ? stepsPresetParsed : null,
-                export_hints: typeof exportHintsParsed === 'object' && exportHintsParsed ? exportHintsParsed : null,
-                intervals: Array.isArray(intervalsParsed) ? intervalsParsed : null,
-              };
-              byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
-            }
-            const clone = { ...selectedPlanDetail } as any;
-            const weeksOut: any[] = Object.keys(byWeek).map(n => parseInt(n,10)).sort((a,b)=>a-b).map(wn => ({ weekNumber: wn, title: `Week ${wn}`, focus: '', workouts: byWeek[wn] }));
-            clone.weeks = weeksOut;
-            setSelectedPlanDetail(clone);
-          }
-        } catch {}
+        const { data: rows } = await supabase
+          .from('planned_workouts')
+          .select('*')
+          .eq('training_plan_id', selectedPlanDetail.id)
+          .eq('week_number', selectedWeek)
+          .order('day_number', { ascending: true });
+        if (Array.isArray(rows)) {
+          const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
+          const normalized = rows.map((w: any) => {
+            const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
+            const computed = (w as any).computed || {};
+            const renderedDesc = (w as any).rendered_description || (w as any).description || '';
+            const totalSeconds = computed.total_duration_seconds;
+            const duration = totalSeconds ? Math.round(totalSeconds / 60) : (typeof (w as any).duration === 'number' ? (w as any).duration : 0);
+            const parseMaybeJson = (v: any) => { if (Array.isArray(v)) return v; if (v && typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; } };
+            const tags = (() => { const raw=(w as any).tags; if (Array.isArray(raw)) return raw; try { const p=JSON.parse(raw); return Array.isArray(p)?p:[]; } catch { return []; } })();
+            const steps_preset = parseMaybeJson((w as any).steps_preset) || null;
+            const export_hints = parseMaybeJson((w as any).export_hints) || null;
+            const intervals = parseMaybeJson((w as any).intervals) || [];
+            return { ...w, day: dayName, duration, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
+          });
+          weekCacheRef.current.set(key, normalized);
+          const weeks = (selectedPlanDetail.weeks || []).map((wk: any) => (
+            wk.weekNumber === selectedWeek ? { ...wk, workouts: normalized } : wk
+          ));
+          setSelectedPlanDetail((prev: any) => ({ ...prev, weeks }));
+        }
       } catch {}
       finally {
         setWeekLoading(false);
-        // Invalidate calendar/planned range caches after week materializes
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       }
     })();
   }, [selectedPlanDetail?.id, selectedWeek]);
+
+  // Pull-to-refresh signal from AppLayout: bust current week cache and reload
+  useEffect(() => {
+    const onPull = () => {
+      if (!selectedPlanDetail?.id || !selectedWeek) return;
+      const key = `${selectedPlanDetail.id}:${selectedWeek}`;
+      weekCacheRef.current.delete(key);
+      setWeekLoading(true);
+      // Let the materialize effect above run again naturally
+      setTimeout(() => setWeekLoading(false), 0);
+    };
+    window.addEventListener('nav:pullrefresh', onPull);
+    return () => window.removeEventListener('nav:pullrefresh', onPull);
+  }, [selectedPlanDetail?.id, selectedWeek]);
+
+  // Force refresh control for current week
+  const handleForceRefreshWeek = async () => {
+    if (!selectedPlanDetail?.id || !selectedWeek) return;
+    const key = `${selectedPlanDetail.id}:${selectedWeek}`;
+    weekCacheRef.current.delete(key);
+    setWeekLoading(true);
+    try {
+      const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
+      await ensureWeekMaterialized(String(selectedPlanDetail.id), Number(selectedWeek));
+    } catch {}
+    setWeekLoading(false);
+  };
 
   const handleWorkoutClick = (workout: any) => {
     setSelectedWorkout(workout);

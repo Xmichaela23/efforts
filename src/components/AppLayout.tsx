@@ -70,6 +70,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const providerFetchedRef = useRef<boolean>(false);
 
   useEffect(() => {
     if (selectedWorkout) {
@@ -101,12 +102,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     }
   }, [selectedWorkout?.id]);
 
-  // Load provider data on demand when Completed tab is opened
+  // Load provider data once per session when Completed tab is first opened
   useEffect(() => {
-    if (activeTab === 'completed' && typeof loadProviderData === 'function') {
+    if (
+      activeTab === 'completed' &&
+      typeof loadProviderData === 'function' &&
+      !providerFetchedRef.current
+    ) {
+      providerFetchedRef.current = true;
       loadProviderData();
     }
-  }, [activeTab]);
+  }, [activeTab, loadProviderData]);
 
   // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek }
   useLayoutEffect(() => {
@@ -546,7 +552,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       if (typeof loadProviderData === 'function') {
         await Promise.resolve(loadProviderData());
       }
-      // Light UI refresh: re-navigate to current route to trigger hooks
+      // Invalidate planned range caches and notify weekly to bust week cache
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('nav:pullrefresh')); } catch {}
+      // Light UI refresh: re-navigate to current route to trigger hooks where needed
       navigate(location.pathname, { replace: true });
     } catch {
       // Fallback: full reload
