@@ -42,6 +42,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const [friendlyDesc, setFriendlyDesc] = React.useState<string | undefined>(undefined);
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
   const [stepLines, setStepLines] = React.useState<string[] | null>(null);
+  const [strengthLines, setStrengthLines] = React.useState<string[] | null>(null);
   const [fallbackPace, setFallbackPace] = React.useState<string | undefined>(undefined);
   const [perfNumbers, setPerfNumbers] = React.useState<any | undefined>(undefined);
   const [totalYards, setTotalYards] = React.useState<number | undefined>(undefined);
@@ -262,7 +263,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           setResolvedDuration(Math.round(secs / 60));
         }
 
-        // Build vertical step lines: prefer computed.steps; else tokens; else intervals; else expand grouped text
+        // Build vertical step lines for non-strength; for strength, render sets × reps with 1RM weights
         const intervalLines = (() => {
           try { return Array.isArray((workout as any).intervals) ? ((): string[] => {
             const arr = (workout as any).intervals as any[];
@@ -303,6 +304,56 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           })() : []; } catch { return []; }
         })();
         const computedSteps = Array.isArray(comp?.steps) ? comp.steps : [];
+        const isStrength = String((workout as any).type||'').toLowerCase()==='strength';
+        if (isStrength) {
+          try {
+            // Show authored strength exercises when available
+            const exercises: any[] = Array.isArray((workout as any).strength_exercises) ? (workout as any).strength_exercises : [];
+            const pn = perfNumbers || {};
+            const oneRM = {
+              squat: pn?.squat,
+              bench: pn?.bench,
+              deadlift: pn?.deadlift,
+              overhead: pn?.overheadPress1RM || pn?.overhead || pn?.ohp,
+            } as any;
+            const calcWeight = (pct: number|undefined, lift: keyof typeof oneRM): number | null => {
+              if (!pct || !oneRM[lift] || typeof oneRM[lift] !== 'number') return null;
+              const raw = Math.round((oneRM[lift] as number) * (pct/100));
+              // Round to nearest 5 lb for practical loads
+              return Math.round(raw/5)*5;
+            };
+            const lines: string[] = [];
+            for (const ex of exercises) {
+              const name = String(ex?.name || '').trim() || 'Exercise';
+              const sets = Number(ex?.sets) || 0;
+              const reps = Number(ex?.reps) || 0;
+              const pct = typeof ex?.percent === 'number' ? ex.percent : (typeof ex?.percent === 'string' ? parseFloat(ex.percent) : undefined);
+              const lowerPct = typeof ex?.percent_low === 'number' ? ex.percent_low : (typeof ex?.percent_low === 'string' ? parseFloat(ex.percent_low) : undefined);
+              const liftKey = ((): keyof typeof oneRM => {
+                const n = name.toLowerCase();
+                if (n.includes('deadlift')) return 'deadlift';
+                if (n.includes('bench')) return 'bench';
+                if (n.includes('ohp') || n.includes('overhead')) return 'overhead';
+                return 'squat';
+              })();
+              const w = calcWeight(pct as any, liftKey);
+              const wl = calcWeight(lowerPct as any, liftKey);
+              const weightStr = w ? `${w} lb` : (wl ? `${wl}–${w || ''} lb` : undefined);
+              if (sets && reps) {
+                lines.push(`${name} ${sets}×${reps}${weightStr?` @ ${weightStr}`:''}`.trim());
+              } else if (reps) {
+                lines.push(`${name} ${reps} reps${weightStr?` @ ${weightStr}`:''}`.trim());
+              } else {
+                lines.push(name);
+              }
+            }
+            if (lines.length) {
+              setStrengthLines(lines);
+              setStepLines([]);
+              return; // strength rendering done
+            }
+          } catch {}
+        }
         if (computedSteps.length > 0) {
           setStepLines(flattenSteps(computedSteps));
         } else {
@@ -1181,7 +1232,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         {/* Vertical step list (minimal, no color panel) */}
         <div className="p-1">
           {(() => {
+            const strength = Array.isArray(strengthLines) ? strengthLines : [];
             const lines = Array.isArray(stepLines) ? stepLines : [];
+            if (strength.length > 0) {
+              return (
+                <ul className="list-none space-y-1">
+                  {strength.map((ln, i) => (
+                    <li key={i} className="text-sm text-gray-900">{ln}</li>
+                  ))}
+                </ul>
+              );
+            }
             if (lines.length === 0) {
               return (
                 <div className="text-sm text-gray-700">{friendlyDesc || stripCodes(workout.description)}</div>
