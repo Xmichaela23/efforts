@@ -357,34 +357,50 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const oneRM = { squat: pn?.squat, bench: pn?.bench, deadlift: pn?.deadlift, overhead: pn?.overheadPress1RM || pn?.overhead || pn?.ohp } as any;
               const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; return 'squat'; };
               const calcWeight = (pct: number|undefined, lift: keyof typeof oneRM): number | null => { if (!pct || !oneRM[lift] || typeof oneRM[lift] !== 'number') return null; const rawW = Math.round((oneRM[lift] as number) * (pct/100)); return Math.round(rawW/5)*5; };
-              for (const seg of segments){
-                // With percent and optional explicit weight already in text
-                const mp = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
-                if (mp){
-                  const name = mp[1].trim().replace(/\s+/g,' ');
-                  const sets = parseInt(mp[2],10);
-                  const reps = parseInt(mp[3],10);
-                  const pct = parseInt(mp[4],10);
-                  // If an explicit weight like "— 110 lb" is present, use it; else compute from baselines
-                  const wm = seg.match(/—\s*(\d+)\s*lb/i);
-                  const weightTxt = wm ? `${wm[1]} lb` : (():string|undefined=>{ const key = liftOf(name); const w = calcWeight(pct, key); return w?`${w} lb`:undefined; })();
-                  repeatLines(name, sets, `${reps}`, weightTxt);
-                  continue;
-                }
-                // Without percent e.g., Row 4×6–8
-                const mr = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
-                if (mr){
-                  const name = mr[1].trim().replace(/\s+/g,' ');
-                  const sets = parseInt(mr[2],10);
-                  const r1 = parseInt(mr[3],10);
-                  const r2 = mr[4]?parseInt(mr[4],10):undefined;
-                  const repsText = r2?`${r1}–${r2}`:`${r1}`;
-                  repeatLines(name, sets, `${repsText}`);
+              const expandOrParts = (text: string): string[] => { const parts = text.split(/\s+or\s+/i).map(s=>s.trim()).filter(Boolean); return parts.length>1 ? parts.map((p,i)=> i===0?p:`(or) ${p}`) : parts; };
+              const parseRestNote = (text: string): string | undefined => { const m = text.match(/rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s)/i); if (!m) return undefined; return `${m[1]} ${m[2]}`.replace('--','–'); };
+              const repeatWithRest = (name:string, sets:number, repsText:string, weightText?:string, restNote?:string) => { for (let i=0;i<Math.max(1, sets);i+=1) { lines.push(`${name} 1 × ${repsText}${weightText?` @ ${weightText}`:''}`.trim()); if (restNote && i<sets-1) lines.push(`Rest ${restNote}`); } };
+              for (const seg0 of segments){
+                for (const seg of expandOrParts(seg0)){
+                  // With percent and optional explicit weight already in text
+                  const mp = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
+                  if (mp){
+                    const name = mp[1].trim().replace(/\s+/g,' ');
+                    const sets = parseInt(mp[2],10);
+                    const reps = parseInt(mp[3],10);
+                    const pct = parseInt(mp[4],10);
+                    const wm = seg.match(/—\s*(\d+)\s*lb/i);
+                    const weightTxt = wm ? `${wm[1]} lb` : (():string|undefined=>{ const key = liftOf(name); const w = calcWeight(pct, key); return w?`${w} lb`:undefined; })();
+                    const restNote = parseRestNote(seg);
+                    repeatWithRest(name, sets, `${reps}`, weightTxt, restNote);
+                    continue;
+                  }
+                  // Without percent e.g., Row 4×6–8
+                  const mr = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
+                  if (mr){
+                    const name = mr[1].trim().replace(/\s+/g,' ');
+                    const sets = parseInt(mr[2],10);
+                    const r1 = parseInt(mr[3],10);
+                    const r2 = mr[4]?parseInt(mr[4],10):undefined;
+                    const repsText = r2?`${r1}–${r2}`:`${r1}`;
+                    const restNote = parseRestNote(seg);
+                    repeatWithRest(name, sets, `${repsText}`, undefined, restNote);
+                    continue;
+                  }
+                  // AMRAP pattern e.g., Chin-Ups 3xAMRAP @RIR2
+                  const ma = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*AMRAP/i);
+                  if (ma){
+                    const name = ma[1].trim().replace(/\s+/g,' ');
+                    const sets = parseInt(ma[2],10);
+                    const restNote = parseRestNote(seg);
+                    repeatWithRest(name, sets, 'AMRAP', undefined, restNote);
+                    continue;
+                  }
                 }
               }
             }
 
-            // Fallback B: derive from computed strength steps (only if description/tokens didn’t yield lines)
+            // Fallback B: derive from computed strength steps (only if description/tokens didn't yield lines)
             if (lines.length === 0 && Array.isArray(computedSteps) && computedSteps.length) {
               const pn = perfNumbers || {};
               const oneRM = {
