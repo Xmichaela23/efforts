@@ -163,6 +163,30 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             await supabase.from('planned_workouts').update({ intervals: enriched }).eq('id', row.id);
           }
         } catch {}
+
+        // Strength loads retrofit: if rendered_description has % but no load, inject user 1RM load
+        try {
+          const t = String(row?.type||'').toLowerCase();
+          let desc = String((row as any)?.rendered_description || (row as any)?.description || '').trim();
+          if (t==='strength' && desc) {
+            const injectLoads = (txt: string): string => {
+              return txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
+                if (/\b\d+\s*lb\b/i.test(String(tail))) return m; // already includes load
+                const pct = parseInt(String(pctStr), 10);
+                const lift = String(name||'').toLowerCase();
+                const orm = lift.includes('dead') ? (perfNumbersUpgrade?.deadlift) : lift.includes('bench') ? (perfNumbersUpgrade?.bench) : (lift.includes('ohp')||lift.includes('overhead')||lift.includes('press')) ? (perfNumbersUpgrade?.overheadPress1RM || perfNumbersUpgrade?.overhead) : perfNumbersUpgrade?.squat;
+                if (!orm || !pct || !isFinite(orm)) return m;
+                const rawW = Math.round(Number(orm) * (pct/100));
+                const rounded = Math.round(rawW/5)*5;
+                return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
+              });
+            };
+            const next = injectLoads(desc);
+            if (next !== desc) {
+              await supabase.from('planned_workouts').update({ rendered_description: next }).eq('id', row.id);
+            }
+          }
+        } catch {}
       }
     } catch {}
     // We upgraded existing rows where needed; nothing to insert
