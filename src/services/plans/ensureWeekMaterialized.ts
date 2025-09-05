@@ -57,7 +57,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   // 1) If rows already exist for this week, upgrade any that are missing intervals
   const { data: existing, error: existErr } = await supabase
     .from('planned_workouts')
-    .select('id, user_id, type, steps_preset, export_hints, intervals, computed, tags')
+    .select('id, user_id, type, steps_preset, export_hints, intervals, computed, tags, rendered_description, description')
     .eq('training_plan_id', planId)
     .eq('week_number', weekNumber);
   if (!existErr && Array.isArray(existing) && existing.length > 0) {

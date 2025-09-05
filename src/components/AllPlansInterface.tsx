@@ -452,7 +452,26 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 return out;
               };
               const round = (w: number) => Math.round(w / 5) * 5;
-              const resolveStrength = (text: string) => { const pn = bl?.performanceNumbers || {}; const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any; return String(text||'').replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => { const key = String(lift).toLowerCase(); let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined; if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`; }); };
+              const resolveStrength = (text: string) => {
+                const pn = bl?.performanceNumbers || {};
+                const oneRMs = { squat: pn.squat, bench: pn.bench, deadlift: pn.deadlift, overhead: pn.overheadPress1RM } as any;
+                let out = String(text||'');
+                // Main lifts with percent
+                out = out.replace(/(Squat|Back Squat|Bench|Bench Press|Deadlift|Overhead Press|OHP)[^@]*@\s*(\d+)%/gi, (m, lift, pct) => {
+                  const key = String(lift).toLowerCase();
+                  let orm: number|undefined = key.includes('squat')?oneRMs.squat : key.includes('bench')?oneRMs.bench : key.includes('deadlift')?oneRMs.deadlift : (key.includes('ohp')||key.includes('overhead'))?oneRMs.overhead : undefined;
+                  if (!orm) return m; const w = round(orm * (parseInt(pct,10)/100)); return `${m} — ${w} lb`;
+                });
+                // Accessory Rows without percent
+                out = out.replace(/\b(Barbell Row|BB Row|Row|DB Row|Dumbbell Row)\b(?![^—]*\blb\b)/gi, (m, label) => {
+                  const bench = typeof oneRMs.bench === 'number' ? oneRMs.bench as number : undefined;
+                  const dead = typeof oneRMs.deadlift === 'number' ? oneRMs.deadlift as number : undefined;
+                  const est = bench ? bench * 0.95 : (dead ? dead * 0.55 : undefined);
+                  if (typeof est !== 'number') return m;
+                  return `${label} — ${round(est)} lb`;
+                });
+                return out;
+              };
               const mapBike = (text: string) => { if (!ftp) return text; const t = (text||'').toLowerCase(); const add = (lo: number, hi: number) => `${text} — target ${Math.round(lo*ftp)}–${Math.round(hi*ftp)} W`; if (t.includes('vo2')) return add(1.06,1.20); if (t.includes('threshold')) return add(0.95,1.00); if (t.includes('sweet spot')) return add(0.88,0.94); if (t.includes('zone 2')) return add(0.60,0.75); return text; };
               const description = (() => {
                 const base = resolveStrength(mapBike(resolvePaces(cleanSessionDescription(rawDesc))));
