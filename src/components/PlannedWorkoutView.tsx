@@ -1703,7 +1703,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                     const calcW = (p?: number) => { if(!p||!oneRM[liftKey]||typeof oneRM[liftKey]!=='number') return undefined; const rw=Math.round((oneRM[liftKey] as number)*(p/100)); return `${Math.max(5, Math.round(rw/5)*5)} lb`; };
                                     const wt = calcW(pct);
                                     const arr: string[] = [];
-                                    for (let i=0;i<sets;i+=1){ arr.push(`${ex} 1 × ${reps}${wt?` @ ${wt}`:''}`.trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
+                                    for (let i=0;i<sets;i+=1){ arr.push((`${ex} 1 × ${reps}` + (wt ? (' @ ' + wt) : '')).trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
                                     group = arr;
                                   }
                                 } catch {}
@@ -1729,7 +1729,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                       const weightTxt = typeof base === 'number' ? `${round5(typeof pct==='number' ? base*(pct/100) : base)} lb` : undefined;
                                       const restNote = typeof restS === 'number' && isFinite(restS) ? `${restS} s` : undefined;
                                       const arr: string[] = [];
-                                      for (let i=0;i<Math.max(1, sets);i+=1){ arr.push(`Barbell Row 1 × ${reps}${weightTxt?` @ ${weightTxt}`:''}`.trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
+                                      for (let i=0;i<Math.max(1, sets);i+=1){ arr.push((`Barbell Row 1 × ${reps}` + (weightTxt ? (' @ ' + weightTxt) : '')).trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
                                       group = arr;
                                     }
                                   }
