@@ -184,7 +184,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                   ? (perfNumbersUpgrade?.overheadPress1RM || perfNumbersUpgrade?.overhead)
                   : perfNumbersUpgrade?.squat;
                 if (!orm || !pct || !isFinite(orm)) return m;
-                const rounded = round5(Number(orm) * (pct/100));
+                const proxy = lift.includes('row') ? Number(orm) * 0.95 : Number(orm);
+                const rounded = round5(proxy * (pct/100));
                 return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
               });
               // 2) Accessory Barbell/DB Row without explicit percent — estimate from Bench 1RM (95%), fallback DL 55%
