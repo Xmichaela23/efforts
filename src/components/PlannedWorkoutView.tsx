@@ -1720,7 +1720,29 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                         {(() => {
                           const name = b.name;
                           const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bench\s*press/g,'bench').replace(/back\s*squat/g,'squat').replace(/overhead\s*press|\bohp\b/g,'ohp').trim();
-                          const group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
+                          let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
+                          // Fallback: synthesize per-set lines from header when grouping not available (e.g., week one edge cases)
+                          if (!group.length) {
+                            try {
+                              const h = String(b.header);
+                              const m = h.match(/([A-Za-z\- \/]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*@\s*(\d{1,3})%)?.*?(?:rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s))?/i);
+                              if (m) {
+                                const ex = m[1].replace(/\s*\(.*?\)\s*$/,'').trim();
+                                const sets = parseInt(m[2],10);
+                                const reps = parseInt(m[3],10);
+                                const pct = m[4]?parseInt(m[4],10):undefined;
+                                const restNote = m[5] ? `${m[5]} ${m[6]}`.replace('--','–') : undefined;
+                                const perf = (perfNumbers||{}) as any;
+                                const oneRM = { squat: perf?.squat, bench: perf?.bench, deadlift: perf?.deadlift, overhead: perf?.overheadPress1RM || perf?.overhead || perf?.ohp } as any;
+                                const liftKey = (()=>{ const t=ex.toLowerCase(); if(/deadlift/.test(t)) return 'deadlift'; if(/bench/.test(t)) return 'bench'; if(/overhead|ohp/.test(t)) return 'overhead'; if(/row/.test(t)) return (oneRM?.bench? 'bench':'deadlift'); return 'squat'; })() as keyof typeof oneRM;
+                                const calcW = (p?: number) => { if(!p||!oneRM[liftKey]||typeof oneRM[liftKey]!=='number') return undefined; const rw=Math.round((oneRM[liftKey] as number)*(p/100)); return `${Math.max(5, Math.round(rw/5)*5)} lb`; };
+                                const wt = calcW(pct);
+                                const arr: string[] = [];
+                                for (let i=0;i<sets;i+=1){ arr.push(`${ex} 1 × ${reps}${wt?` @ ${wt}`:''}`.trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
+                                group = arr;
+                              }
+                            } catch {}
+                          }
                           if (!group.length) return null;
                           return (
                             <ul className="mt-1 ml-6 list-none space-y-1">
