@@ -361,6 +361,56 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               else if (reps) repeatLines(name, 1, `${reps}`, weightStr);
               else lines.push(name);
             }
+            // Ensure OR accessories (e.g., Barbell Row OR Pull-Ups) get per-set lines too
+            try {
+              const rawDesc = String((workout as any).rendered_description || workout.description || '').trim();
+              if (/\brow\b|pull\-?ups|chin\-?ups/i.test(rawDesc)) {
+                const segs = rawDesc.split(/;+/).map(s=>s.trim()).filter(Boolean);
+                const seenName = (nm:string) => lines.some(l => l.startsWith(`${nm} 1 ×`));
+                const parseRestNote = (text: string): string | undefined => { const m = text.match(/rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s)/i); if (!m) return undefined; return `${m[1]} ${m[2]}`.replace('--','–'); };
+                const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; if (t.includes('row')) return 'bench'; return 'squat'; };
+                const calcW = (pct: number|undefined, lift: keyof typeof oneRM): number | null => { if (!pct || !oneRM[lift] || typeof oneRM[lift] !== 'number') return null; const rw=Math.round((oneRM[lift] as number)*(pct/100)); return Math.round(rw/5)*5; };
+                const repeatWithRest = (name:string, sets:number, repsText:string, weightText?:string, restNote?:string) => { for (let i=0;i<Math.max(1, sets);i+=1) { lines.push(`${name} 1 × ${repsText}${weightText?` @ ${weightText}`:''}`.trim()); if (restNote && i<sets-1) lines.push(`Rest ${restNote}`); } };
+                for (const seg of segs) {
+                  // percent form
+                  const mp = seg.match(/([A-Za-z\- \/]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
+                  if (mp) {
+                    const name = mp[1].replace(/\s+/g,' ').replace(/\s*\(.*?\)\s*$/,'').trim();
+                    if (!seenName(name) && (/row|pull\-?ups|chin\-?ups/i.test(name))) {
+                      const sets = parseInt(mp[2],10);
+                      const reps = parseInt(mp[3],10);
+                      const pct = parseInt(mp[4],10);
+                      const key = /row/i.test(name) ? (oneRM?.bench ? 'bench' : 'deadlift') as any : liftOf(name);
+                      const w = calcW(pct, key);
+                      const restNote = parseRestNote(seg);
+                      repeatWithRest(name.replace(/\s+or\s+.*/i,''), sets, `${reps}`, w?`${w} lb`:undefined, restNote);
+                    }
+                    continue;
+                  }
+                  // non-percent e.g., 4x6
+                  const mr = seg.match(/([A-Za-z\- \/]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
+                  if (mr) {
+                    const name = mr[1].replace(/\s+/g,' ').replace(/\s*\(.*?\)\s*$/,'').trim();
+                    if (!seenName(name) && (/row|pull\-?ups|chin\-?ups/i.test(name))) {
+                      const sets = parseInt(mr[2],10);
+                      const r1 = parseInt(mr[3],10);
+                      const r2 = mr[4]?parseInt(mr[4],10):undefined;
+                      const repsText = r2?`${r1}–${r2}`:`${r1}`;
+                      const restNote = parseRestNote(seg);
+                      // Estimate row load from proxy when rows lack pct
+                      let est: string | undefined;
+                      if (/row/i.test(name)) {
+                        const bench = typeof oneRM?.bench==='number'?oneRM.bench:undefined;
+                        const dead = typeof oneRM?.deadlift==='number'?oneRM.deadlift:undefined;
+                        const base = typeof bench==='number'? bench*0.95 : (typeof dead==='number'? dead*0.55 : undefined);
+                        if (typeof base==='number' && isFinite(base)) est = `${Math.max(5, Math.round(base/5)*5)} lb`;
+                      }
+                      repeatWithRest(name.replace(/\s+or\s+.*/i,''), sets, `${repsText}`, est, restNote);
+                    }
+                  }
+                }
+              }
+            } catch {}
             // Fallback A: parse description like "Deadlift 5×3 @75%" into lines with weights (uses rendered_description if present)
             if (lines.length === 0) {
               const raw = String((workout as any).rendered_description || workout.description || '').trim();
