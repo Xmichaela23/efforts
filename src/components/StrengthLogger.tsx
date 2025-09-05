@@ -140,6 +140,48 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
+  // Per-set rest timers: key = `${exerciseId}-${setIndex}`
+  const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
+
+  const formatSeconds = (s: number) => {
+    const ss = Math.max(0, Math.floor(s));
+    const m = Math.floor(ss / 60);
+    const r = ss % 60;
+    return m > 0 ? `${m}:${String(r).padStart(2,'0')}` : `${r}s`;
+  };
+
+  const parseTimerInput = (raw: string): number | null => {
+    if (!raw) return null;
+    const txt = String(raw).trim().toLowerCase();
+    // mm:ss
+    const m1 = txt.match(/^(\d{1,2}):([0-5]?\d)$/);
+    if (m1) {
+      const min = parseInt(m1[1], 10);
+      const sec = parseInt(m1[2], 10);
+      return Math.min(1800, Math.max(0, min * 60 + sec));
+    }
+    // suffixes
+    const ms = txt.match(/^(\d{1,3})\s*m(in)?$/);
+    if (ms) return Math.min(1800, Math.max(0, parseInt(ms[1], 10) * 60));
+    const ss = txt.match(/^(\d{1,4})\s*s(ec)?$/);
+    if (ss) return Math.min(1800, Math.max(0, parseInt(ss[1], 10)));
+    // pure digits
+    if (/^\d{1,4}$/.test(txt)) {
+      const n = parseInt(txt, 10);
+      if (txt.length <= 2) return Math.min(1800, n); // seconds
+      if (txt.length === 3) {
+        const min = Math.floor(n / 100);
+        const sec = n % 100;
+        return Math.min(1800, min * 60 + Math.min(59, sec));
+      }
+      if (txt.length === 4) {
+        const min = Math.floor(n / 100);
+        const sec = n % 100;
+        return Math.min(1800, min * 60 + Math.min(59, sec));
+      }
+    }
+    return null;
+  };
 
   // Comprehensive exercise database
   const commonExercises = [
@@ -320,6 +362,48 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     setIsInitialized(true);
   }, [scheduledWorkout, workouts, plannedWorkouts, targetDate]);
+
+  // Ensure timers exist for current sets (default 90s)
+  useEffect(() => {
+    const next: { [key: string]: { seconds: number; running: boolean } } = { ...timers };
+    exercises.forEach(ex => {
+      ex.sets.forEach((_, idx) => {
+        const k = `${ex.id}-${idx}`;
+        if (!next[k]) next[k] = { seconds: 90, running: false };
+      });
+    });
+    // Remove timers for deleted sets
+    Object.keys(next).forEach(k => {
+      const [exId, idxStr] = k.split('-');
+      const ex = exercises.find(e => e.id === exId);
+      if (!ex || Number(idxStr) >= ex.sets.length) delete next[k];
+    });
+    if (JSON.stringify(next) !== JSON.stringify(timers)) setTimers(next);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exercises]);
+
+  // Tick timers
+  useEffect(() => {
+    const anyRunning = Object.values(timers).some(t => t.running && t.seconds > 0);
+    if (!anyRunning) return;
+    const id = window.setInterval(() => {
+      setTimers(prev => {
+        const copy: typeof prev = { ...prev };
+        Object.keys(copy).forEach(k => {
+          const t = copy[k];
+          if (t.running && t.seconds > 0) {
+            const ns = t.seconds - 1;
+            copy[k] = { ...t, seconds: ns };
+            if (ns === 0 && typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+              try { (navigator as any).vibrate?.(50); } catch {}
+            }
+          }
+        });
+        return copy;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [timers]);
 
   // Cleanup when component unmounts
   useEffect(() => {
@@ -644,6 +728,43 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               <div className="px-3 py-2">
                 {exercise.sets.map((set, setIndex) => (
                   <div key={setIndex} className="mb-2 last:mb-0">
+                    {/* Tiny rest timer above each set (tap to start/pause) */}
+                    <div className="flex items-center gap-2 mb-1 ml-8">
+                      <button
+                        onClick={() => {
+                          const key = `${exercise.id}-${setIndex}`;
+                          setTimers(prev => {
+                            const t = prev[key] || { seconds: 90, running: false };
+                            // If not running, treat tap as edit prompt; if running, pause
+                            if (!t.running) {
+                              const def = formatSeconds(t.seconds).replace('s','');
+                              const val = window.prompt('Rest time (e.g., 45, 130, 1:30)', def);
+                              const parsed = val ? parseTimerInput(val) : null;
+                              if (parsed !== null) {
+                                return { ...prev, [key]: { seconds: parsed, running: false } };
+                              }
+                              return prev;
+                            }
+                            return { ...prev, [key]: { ...t, running: false } };
+                          });
+                        }}
+                        onContextMenu={(e) => { e.preventDefault(); const key = `${exercise.id}-${setIndex}`; setTimers(prev => ({ ...prev, [key]: { seconds: 90, running: false } })); }}
+                        className="h-7 px-2 text-xs rounded-full border border-gray-300 text-gray-700 bg-white"
+                        aria-label="Rest timer"
+                      >
+                        {formatSeconds(timers[`${exercise.id}-${setIndex}`]?.seconds ?? 90)}
+                      </button>
+                      <button
+                        onClick={() => {
+                          const key = `${exercise.id}-${setIndex}`;
+                          setTimers(prev => ({ ...prev, [key]: { seconds: (prev[key]?.seconds ?? 90) || 90, running: true } }));
+                        }}
+                        className="h-7 px-2 text-xs rounded-full border border-gray-300 text-gray-600 bg-white"
+                        aria-label="Start rest timer"
+                      >
+                        Start
+                      </button>
+                    </div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
                       <Input
