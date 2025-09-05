@@ -1674,7 +1674,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                           </div>
                           {chosen && (() => {
                               // Show grouped per-set lines for this exercise automatically when selected
-                              const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bb\s*row|barbell\s*row/g,'row').replace(/db\s*row|dumbbell\s*row/g,'row').replace(/\s*\(.*?\)\s*$/,'').trim();
+                              const norm = (s:string)=>{
+                                let t = s.toLowerCase();
+                                t = t.replace(new RegExp('\\s+','g'),' ');
+                                t = t.replace(new RegExp('bb\\s*row|barbell\\s*row','g'),'row');
+                                t = t.replace(new RegExp('db\\s*row|dumbbell\\s*row','g'),'row');
+                                t = t.replace(new RegExp('\\s*\\(.*?\\)\\s*$'),'');
+                                return t.trim();
+                              };
                               const name = b.name;
                               let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
                               // Fallback synth from header when no grouped sets exist
@@ -1786,7 +1793,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                         </div>
                         {(() => {
                           const name = b.name;
-                          const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bench\s*press/g,'bench').replace(/back\s*squat/g,'squat').replace(/overhead\s*press|\bohp\b/g,'ohp').trim();
+                          const norm = (s:string)=>{
+                            let t = s.toLowerCase();
+                            t = t.replace(new RegExp('\\s+','g'),' ');
+                            t = t.replace(new RegExp('bench\\s*press','g'),'bench');
+                            t = t.replace(new RegExp('back\\s*squat','g'),'squat');
+                            t = t.replace(new RegExp('overhead\\s*press|\\bohp\\b','g'),'ohp');
+                            return t.trim();
+                          };
                           let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
                           // Fallback: synthesize per-set lines from header when grouping not available (e.g., week one edge cases)
                           if (!group.length) {
