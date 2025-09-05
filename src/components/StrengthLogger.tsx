@@ -511,15 +511,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
 
     if ((workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps)) {
-      const exs = parseFromComputed((workoutToLoad as any).computed);
+      const srcHdr = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
+      const orOpts = extractOrOptions(srcHdr);
+      let exs = parseFromComputed((workoutToLoad as any).computed);
+      if (orOpts && orOpts.length>1) {
+        // Suppress auto-prefill of any exercise that matches OR options; user must choose
+        const names = orOpts.map(o=>o.name.toLowerCase());
+        exs = exs.filter(e=>!names.includes(e.name.toLowerCase()));
+        setPendingOrOptions(orOpts);
+      }
       if (exs.length) {
         setExercises(exs);
-        // Also surface OR chooser from header text if present
-        try {
-          const srcHdr = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
-          const orOpts = extractOrOptions(srcHdr);
-          if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
-        } catch {}
         setIsInitialized(true);
         return;
       }
