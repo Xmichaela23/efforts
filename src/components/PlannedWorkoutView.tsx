@@ -1662,17 +1662,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>
                               {String(b.header).replace(new RegExp('\\s*—\\s*\\d+\\s*lb.*$','i'),'').trim()}
                             </div>
-                          </div>
-                          <div className="pt-0.5">
-                            <input
-                              type="radio"
-                              name={b.optionKey}
-                              checked={chosen}
-                              onChange={() => handleSelectOr(b.optionKey as string, b.id)}
-                              className="mt-0.5"
-                            />
-                          </div>
-                          {chosen && (() => {
+                            {chosen && (() => {
                               // Show grouped per-set lines for this exercise automatically when selected
                               const norm = (s:string)=>{
                                 let t = s.toLowerCase();
@@ -1740,7 +1730,18 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                   {group.map((ln, i) => (<li key={String(i)} className="text-sm text-gray-800">{ln}</li>))}
                                 </ul>
                               );
-                          })()}
+                            })()}
+                          </div>
+                          <div className="pt-0.5">
+                            <input
+                              type="radio"
+                              name={b.optionKey}
+                              checked={chosen}
+                              onChange={() => handleSelectOr(b.optionKey as string, b.id)}
+                              className="mt-0.5"
+                            />
+                          </div>
+                          
                         </div>
                       );
                     }
