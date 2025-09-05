@@ -142,6 +142,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [isInitialized, setIsInitialized] = useState(false);
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
+  const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
+  const [editingTimerValue, setEditingTimerValue] = useState<string>("");
 
   const formatSeconds = (s: number) => {
     const ss = Math.max(0, Math.floor(s));
@@ -729,27 +731,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 {exercise.sets.map((set, setIndex) => (
                   <div key={setIndex} className="mb-2 last:mb-0">
                     {/* Tiny rest timer above each set (tap to start/pause) */}
-                    <div className="flex items-center gap-2 mb-1 ml-8">
+                    <div className="flex items-center gap-2 mb-1 ml-8 relative">
                       <button
                         onClick={() => {
                           const key = `${exercise.id}-${setIndex}`;
-                          setTimers(prev => {
-                            const t = prev[key] || { seconds: 90, running: false };
-                            // If not running, treat tap as edit prompt; if running, pause
-                            if (!t.running) {
-                              const def = formatSeconds(t.seconds).replace('s','');
-                              const val = window.prompt('Rest time (e.g., 45, 130, 1:30)', def);
-                              const parsed = val ? parseTimerInput(val) : null;
-                              if (parsed !== null) {
-                                return { ...prev, [key]: { seconds: parsed, running: false } };
-                              }
-                              return prev;
-                            }
-                            return { ...prev, [key]: { ...t, running: false } };
-                          });
+                          const cur = timers[key]?.seconds ?? 90;
+                          const prefill = cur >= 60 ? `${Math.floor(cur/60)}:${String(cur%60).padStart(2,'0')}` : String(cur);
+                          setEditingTimerKey(key);
+                          setEditingTimerValue(prefill);
                         }}
                         onContextMenu={(e) => { e.preventDefault(); const key = `${exercise.id}-${setIndex}`; setTimers(prev => ({ ...prev, [key]: { seconds: 90, running: false } })); }}
-                        className="h-7 px-2 text-xs rounded-full border border-gray-300 text-gray-700 bg-white"
+                        className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-700 bg-white"
                         aria-label="Rest timer"
                       >
                         {formatSeconds(timers[`${exercise.id}-${setIndex}`]?.seconds ?? 90)}
@@ -759,11 +751,53 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                           const key = `${exercise.id}-${setIndex}`;
                           setTimers(prev => ({ ...prev, [key]: { seconds: (prev[key]?.seconds ?? 90) || 90, running: true } }));
                         }}
-                        className="h-7 px-2 text-xs rounded-full border border-gray-300 text-gray-600 bg-white"
+                        className="h-7 px-2 text-xs rounded-md border border-gray-300 text-gray-600 bg-white"
                         aria-label="Start rest timer"
                       >
                         Start
                       </button>
+
+                      {editingTimerKey === `${exercise.id}-${setIndex}` && (
+                        <div className="absolute top-8 left-0 bg-white border border-gray-200 shadow-lg rounded-sm p-2 z-50 w-40">
+                          <input
+                            type="tel"
+                            value={editingTimerValue}
+                            onChange={(e)=>setEditingTimerValue(e.target.value)}
+                            placeholder="mm:ss or 90"
+                            className="w-full h-8 px-2 border border-gray-300 text-sm"
+                          />
+                          <div className="flex items-center justify-between mt-2">
+                            <button
+                              onClick={() => {
+                                const parsed = parseTimerInput(editingTimerValue);
+                                if (parsed !== null) {
+                                  setTimers(prev => ({ ...prev, [editingTimerKey!]: { seconds: parsed, running: false } }));
+                                  setEditingTimerKey(null);
+                                }
+                              }}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded-sm"
+                            >
+                              Save
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (!editingTimerKey) return;
+                                setTimers(prev => ({ ...prev, [editingTimerKey]: { seconds: 0, running: false } }));
+                                setEditingTimerKey(null);
+                              }}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded-sm text-gray-600"
+                            >
+                              Clear
+                            </button>
+                            <button
+                              onClick={() => setEditingTimerKey(null)}
+                              className="text-xs px-2 py-1 border border-gray-300 rounded-sm"
+                            >
+                              Close
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
@@ -875,9 +909,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative bg-white px-3 pt-2 pb-2">
-          <div className="flex items-center border border-gray-200 bg-white">
-            <div className="pl-3 text-gray-400">
+        <div className="relative bg-white px-3 pt-1 pb-1">
+          <div className="relative flex items-center border border-gray-200 bg-white rounded-md">
+            <div className="pl-2 text-gray-400">
               <Search className="h-4 w-4" />
             </div>
             <Input
@@ -885,21 +919,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               value={currentExercise}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="h-10 text-sm border-gray-300"
+              className="h-9 text-sm border-gray-300 pr-9"
               style={{ fontSize: '16px' }}
             />
             {currentExercise && (
-              <Button 
+              <button
+                type="button"
                 onClick={handleAddClick}
-                className="h-10 px-3 bg-transparent hover:bg-transparent text-black"
+                className="absolute right-2 h-6 w-6 flex items-center justify-center text-gray-700 hover:text-gray-900"
+                aria-label="Add exercise"
               >
                 <Plus className="h-4 w-4" />
-              </Button>
+              </button>
             )}
           </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-14 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
+            <div className="absolute top-12 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
