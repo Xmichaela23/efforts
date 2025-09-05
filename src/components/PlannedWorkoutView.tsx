@@ -1585,23 +1585,17 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                               {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
                               {!on? ' — excluded' : ''}
                               {on && (
-                                <>
-                                  <button
-                                    onClick={() => toggleExpand(b.id)}
-                                    className="ml-2 text-xs text-gray-500 underline"
-                                  >{expandedBlocks[b.id] ? 'Hide sets' : 'Show sets'}</button>
-                                  <label className="ml-3 text-xs text-gray-600 inline-flex items-center gap-1">
-                                    <input
-                                      type="checkbox"
-                                      checked={done}
-                                      onChange={(e)=>handleCompleteOptional(b.optionKey as string, b.name, e.target.checked)}
-                                    />
-                                    Complete
-                                  </label>
-                                </>
+                                <label className="ml-3 text-xs text-gray-600 inline-flex items-center gap-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={done}
+                                    onChange={(e)=>handleCompleteOptional(b.optionKey as string, b.name, e.target.checked)}
+                                  />
+                                  Complete
+                                </label>
                               )}
                             </div>
-                            {on && expandedBlocks[b.id] && (() => {
+                            {on && (() => {
                               const name = b.name;
                               const group = groupedStrengthLines[name] || [];
                               if (!group.length) return null;
@@ -1620,12 +1614,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                         <div>
                           {/* Header shows only Lift @ XX% (strip loads); add expand */}
                           {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
-                          <button
-                            onClick={() => toggleExpand(b.id)}
-                            className="ml-2 text-xs text-gray-500 underline"
-                          >{expandedBlocks[b.id] ? 'Hide sets' : 'Show sets'}</button>
                         </div>
-                        {expandedBlocks[b.id] && (() => {
+                        {(() => {
                           const name = b.name;
                           const group = groupedStrengthLines[name] || [];
                           if (!group.length) return null;
