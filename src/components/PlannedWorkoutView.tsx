@@ -804,6 +804,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           let x = String(s || '').toLowerCase();
           x = x.replace(/bb\s*row|barbell\s*row/g, 'row');
           x = x.replace(/db\s*row|dumbbell\s*row/g, 'row');
+          x = x.replace(/bench\s*press/g, 'bench');
+          x = x.replace(/back\s*squat/g, 'squat');
+          x = x.replace(/overhead\s*press|\bohp\b/g, 'ohp');
           x = x.replace(/\s+/g, ' ').trim();
           return x;
         } catch { return String(s||'').toLowerCase().trim(); }
@@ -818,6 +821,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           groups[current].push(stripped);
           const key2 = normalize(current);
           if (!groups[key2]) groups[key2] = groups[current];
+          // also expose common aliases
+          const aliases: string[] = [];
+          const curN = key2;
+          if (curN==='bench') aliases.push('bench press');
+          if (curN==='squat') aliases.push('back squat');
+          if (curN==='ohp') aliases.push('overhead press');
+          if (curN==='row') aliases.push('barbell row','bb row','db row','dumbbell row');
+          for (const a of aliases) { if (!groups[a]) groups[a] = groups[current]; }
         } else if (/^Rest\b/i.test(String(ln))) {
           if (current) {
             if (!groups[current]) groups[current] = [];
@@ -1624,7 +1635,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                       const groupSel = orSelections[b.optionKey as string] || '';
                       const chosen = groupSel === b.id;
                       return (
-                        <div key={b.id} className="flex items-start gap-2">
+                        <div
+                          key={b.id}
+                          className="flex items-start gap-2 cursor-pointer"
+                          onClick={() => handleSelectOr(b.optionKey as string, b.id)}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); handleSelectOr(b.optionKey as string, b.id); } }}
+                        >
                           <input
                             type="radio"
                             name={b.optionKey}
@@ -1639,9 +1657,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             </div>
                             {chosen && (() => {
                               // Show grouped per-set lines for this exercise automatically when selected
-                              const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bb\s*row|barbell\s*row/g,'row').replace(/db\s*row|dumbbell\s*row/g,'row').trim();
+                              const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bb\s*row|barbell\s*row/g,'row').replace(/db\s*row|dumbbell\s*row/g,'row').replace(/\s*\(.*?\)\s*$/,'').trim();
                               const name = b.name;
-                              const group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || [];
+                              const group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
                               if (!group.length) return null;
                               return (
                                 <ul className="mt-1 ml-6 list-none space-y-1">
@@ -1701,7 +1719,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                         </div>
                         {(() => {
                           const name = b.name;
-                          const group = groupedStrengthLines[name] || [];
+                          const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bench\s*press/g,'bench').replace(/back\s*squat/g,'squat').replace(/overhead\s*press|\bohp\b/g,'ohp').trim();
+                          const group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
                           if (!group.length) return null;
                           return (
                             <ul className="mt-1 ml-6 list-none space-y-1">
