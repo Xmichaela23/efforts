@@ -1660,7 +1660,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                role="button" tabIndex={0}
                                onKeyDown={(e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); handleSelectOr(b.optionKey as string, b.id); } }}>
                             <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>
-                              {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
+                              {String(b.header).replace(new RegExp('\\s*—\\s*\\d+\\s*lb.*$','i'),'').trim()}
                             </div>
                           </div>
                           <div className="pt-0.5">
@@ -1749,7 +1749,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                           />
                           <div className="flex-1">
                             <div className={`text-sm ${on? 'text-gray-900' : 'text-gray-400'}`}>
-                              {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
+                              {String(b.header).replace(new RegExp('\\s*—\\s*\\d+\\s*lb.*$','i'),'').trim()}
                               {!on? ' — excluded' : ''}
                               {on && (
                                 <label className="ml-3 text-xs text-gray-600 inline-flex items-center gap-1">
@@ -1780,7 +1780,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                       <div key={b.id} className="text-sm text-gray-900">
                         <div>
                           {/* Header shows only Lift @ XX% (strip loads); add expand */}
-                          {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
+                          {String(b.header).replace(new RegExp('\\s*—\\s*\\d+\\s*lb.*$','i'),'').trim()}
                         </div>
                         {(() => {
                           const name = b.name;
