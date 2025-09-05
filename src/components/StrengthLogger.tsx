@@ -382,6 +382,44 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch { return []; }
   };
 
+  // Build from computed.steps (single source of truth)
+  const parseFromComputed = (computed: any): LoggedExercise[] => {
+    try {
+      const steps: any[] = Array.isArray(computed?.steps) ? computed.steps : [];
+      if (!steps.length) return [];
+      const byName: Record<string, LoggedExercise> = {};
+      const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+      const pctOf = (name: string, pct?: number): number => {
+        if (!pct || !performanceNumbers) return 0;
+        const t = name.toLowerCase();
+        const one = t.includes('deadlift') ? performanceNumbers?.deadlift
+                  : t.includes('bench') ? performanceNumbers?.bench
+                  : t.includes('overhead') || t.includes('ohp') ? (performanceNumbers?.overhead || performanceNumbers?.overheadPress1RM)
+                  : t.includes('squat') ? performanceNumbers?.squat
+                  : undefined;
+        if (typeof one !== 'number') return 0;
+        return round5(one * (pct/100));
+      };
+      for (const st of steps) {
+        const isStrength = String(st?.type||'').toLowerCase()==='strength_work' || !!st?.exercise;
+        if (!isStrength) continue;
+        const name = (st.exercise || st.exercise_name || st.name || '').toString().trim();
+        if (!name) continue;
+        const reps = Number(st.reps) || 0;
+        let pct: number | undefined;
+        const inten = String(st.intensity||st.target||'');
+        const m = inten.match(/(\d{1,3})\s*%/);
+        if (m) pct = parseInt(m[1],10);
+        const weight = pct ? pctOf(name, pct) : (Number(st.weight)||0);
+        if (!byName[name]) {
+          byName[name] = { id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name, expanded: true, sets: [] } as LoggedExercise;
+        }
+        byName[name].sets.push({ reps, weight: weight||0, barType: 'standard', rir: undefined, completed: false });
+      }
+      return Object.values(byName);
+    } catch { return []; }
+  };
+
   // Proper initialization with cleanup
   useEffect(() => {
     // Load user 1RMs for weight computation
@@ -437,6 +475,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }
     }
 
+    if ((workoutToLoad as any)?.computed && Array.isArray((workoutToLoad as any).computed?.steps)) {
+      const exs = parseFromComputed((workoutToLoad as any).computed);
+      if (exs.length) {
+        setExercises(exs);
+        setIsInitialized(true);
+        return;
+      }
+    }
     if (workoutToLoad && workoutToLoad.strength_exercises && workoutToLoad.strength_exercises.length > 0) {
       console.log('📝 Pre-populating with planned workout exercises');
       // Pre-populate with scheduled workout data
@@ -485,7 +531,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!user) return;
         const { data } = await supabase
           .from('planned_workouts')
-          .select('steps_preset, rendered_description, description, strength_exercises')
+          .select('computed, steps_preset, rendered_description, description, strength_exercises')
           .eq('user_id', user.id)
           .eq('date', date)
           .eq('type', 'strength')
@@ -493,6 +539,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           .limit(1)
           .maybeSingle();
         if (!data) return;
+        if ((data as any)?.computed && Array.isArray((data as any).computed?.steps)) {
+          const exs = parseFromComputed((data as any).computed);
+          if (exs.length) { setExercises(prev=> prev.length? prev: exs); return; }
+        }
         if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
           const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => ({
             id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
