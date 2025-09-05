@@ -1467,7 +1467,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           </span>
                                         )}
                                       </div>
-                                      <div className="text-sm text-gray-600 mt-1">{workout.description}</div>
+                                      <div className="text-sm text-gray-600 mt-1">{(workout as any).rendered_description || workout.description}</div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>

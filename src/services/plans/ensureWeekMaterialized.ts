@@ -169,17 +169,29 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const t = String(row?.type||'').toLowerCase();
           let desc = String((row as any)?.rendered_description || (row as any)?.description || '').trim();
           if (t==='strength' && desc) {
+            const round5 = (n:number) => Math.round(n/5)*5;
             const injectLoads = (txt: string): string => {
-              return txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
+              // 1) Main lifts with percent
+              let out = txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
                 if (/\b\d+\s*lb\b/i.test(String(tail))) return m; // already includes load
                 const pct = parseInt(String(pctStr), 10);
                 const lift = String(name||'').toLowerCase();
                 const orm = lift.includes('dead') ? (perfNumbersUpgrade?.deadlift) : lift.includes('bench') ? (perfNumbersUpgrade?.bench) : (lift.includes('ohp')||lift.includes('overhead')||lift.includes('press')) ? (perfNumbersUpgrade?.overheadPress1RM || perfNumbersUpgrade?.overhead) : perfNumbersUpgrade?.squat;
                 if (!orm || !pct || !isFinite(orm)) return m;
-                const rawW = Math.round(Number(orm) * (pct/100));
-                const rounded = Math.round(rawW/5)*5;
+                const rounded = round5(Number(orm) * (pct/100));
                 return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
               });
+              // 2) Accessory Barbell/DB Row without explicit percent — estimate from Bench 1RM (95%), fallback DL 55%
+              out = out.replace(/\b(Barbell Row|BB Row|Row|DB Row|Dumbbell Row)\b([^;]*)/gi, (m, label, tail) => {
+                if (/\b\d+\s*lb\b/i.test(m)) return m; // already shows load
+                const bench: number | undefined = typeof perfNumbersUpgrade?.bench === 'number' ? perfNumbersUpgrade.bench : undefined;
+                const dead: number | undefined = typeof perfNumbersUpgrade?.deadlift === 'number' ? perfNumbersUpgrade.deadlift : undefined;
+                const est = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
+                if (typeof est !== 'number' || !isFinite(est)) return m;
+                const rounded = round5(est);
+                return `${label} — ${rounded} lb${tail || ''}`;
+              });
+              return out;
             };
             const next = injectLoads(desc);
             if (next !== desc) {
