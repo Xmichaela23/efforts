@@ -176,7 +176,13 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 if (/\b\d+\s*lb\b/i.test(String(tail))) return m; // already includes load
                 const pct = parseInt(String(pctStr), 10);
                 const lift = String(name||'').toLowerCase();
-                const orm = lift.includes('dead') ? (perfNumbersUpgrade?.deadlift) : lift.includes('bench') ? (perfNumbersUpgrade?.bench) : (lift.includes('ohp')||lift.includes('overhead')||lift.includes('press')) ? (perfNumbersUpgrade?.overheadPress1RM || perfNumbersUpgrade?.overhead) : perfNumbersUpgrade?.squat;
+                const orm = lift.includes('dead')
+                  ? (perfNumbersUpgrade?.deadlift)
+                  : (lift.includes('bench') || lift.includes('row'))
+                  ? (perfNumbersUpgrade?.bench)
+                  : (lift.includes('ohp')||lift.includes('overhead')||lift.includes('press'))
+                  ? (perfNumbersUpgrade?.overheadPress1RM || perfNumbersUpgrade?.overhead)
+                  : perfNumbersUpgrade?.squat;
                 if (!orm || !pct || !isFinite(orm)) return m;
                 const rounded = round5(Number(orm) * (pct/100));
                 return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
@@ -354,7 +360,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const liftKey = (text: string): keyof typeof oneRM => {
             const t = text.toLowerCase();
             if (t.includes('dead')) return 'deadlift';
-            if (t.includes('bench')) return 'bench';
+            if (t.includes('bench') || t.includes('row')) return 'bench';
             if (t.includes('ohp') || t.includes('overhead') || t.includes('press')) return 'overhead';
             return 'squat';
           };
