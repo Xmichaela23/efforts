@@ -1692,14 +1692,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                   const rowHeaderRe = new RegExp('([A-Za-z\\- \\/]+)\\s+(\\d+)\\s*[x×]\\s*(\\d+)(?:\\s*@\\s*(\\d{1,3})%)?.*?(?:rest\\s+(\\d+(?:[–-]\\d+)?)\\s*(min|s))?','i');
                                   const m = h.match(rowHeaderRe);
                                   if (m) {
-                                    const ex = m[1].replace(/\s*\(.*?\)\s*$/,'').trim();
+                                    const ex = m[1].replace(new RegExp('\\s*\\(.*?\\)\\s*$'),'').trim();
                                     const sets = parseInt(m[2],10);
                                     const reps = parseInt(m[3],10);
                                     const pct = m[4]?parseInt(m[4],10):undefined;
                                     const restNote = m[5] ? `${m[5]} ${m[6]}`.replace('--','–') : undefined;
                                     const perf:any = (perfNumbers||{});
                                     const oneRM:any = { squat: perf?.squat, bench: perf?.bench, deadlift: perf?.deadlift, overhead: perf?.overheadPress1RM || perf?.overhead || perf?.ohp };
-                                    const liftKey = (()=>{ const t=ex.toLowerCase(); if(/deadlift/.test(t)) return 'deadlift'; if(/bench/.test(t)) return 'bench'; if(/overhead|ohp/.test(t)) return 'overhead'; if(/row/.test(t)) return (oneRM?.bench? 'bench':'deadlift'); return 'squat'; })();
+                                    const liftKey = (()=>{ const t=ex.toLowerCase(); if(new RegExp('deadlift').test(t)) return 'deadlift'; if(new RegExp('bench').test(t)) return 'bench'; if(new RegExp('overhead|ohp').test(t)) return 'overhead'; if(new RegExp('row').test(t)) return (oneRM?.bench? 'bench':'deadlift'); return 'squat'; })();
                                     const calcW = (p?: number) => { if(!p||!oneRM[liftKey]||typeof oneRM[liftKey]!=='number') return undefined; const rw=Math.round((oneRM[liftKey] as number)*(p/100)); return `${Math.max(5, Math.round(rw/5)*5)} lb`; };
                                     const wt = calcW(pct);
                                     const arr: string[] = [];
@@ -1715,7 +1715,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                   const tok = steps.find(t => new RegExp('st_acc_barbell_row_','i').test(String(t)));
                                   if (tok) {
                                     const rowTokRe = new RegExp('st_acc_barbell_row_(\\d+)x(\\d+)(?:_@pct(\\d{1,3}))?_rest(\\d+)','i');
-                                    const mt = String(tok).toLowerCase().match(rowTokRe);
+                                    const mt = new RegExp('st_acc_barbell_row_(\\d+)x(\\d+)(?:_@pct(\\d{1,3}))?_rest(\\d+)','i').exec(String(tok).toLowerCase());
                                     if (mt) {
                                       const sets = parseInt(mt[1], 10);
                                       const reps = parseInt(mt[2], 10);
@@ -1738,7 +1738,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                               if (!group.length) return null;
                               return (
                                 <ul className="mt-1 ml-6 list-none space-y-1">
-                                  {group.map((ln, i) => (<li key={i} className="text-sm text-gray-800">{ln}</li>))}
+                                  {group.map((ln, i) => (<li key={String(i)} className="text-sm text-gray-800">{ln}</li>))}
                                 </ul>
                               );
                             })()
@@ -1779,7 +1779,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                               if (!group.length) return null;
                               return (
                                 <ul className="mt-1 ml-6 list-none space-y-1">
-                                  {group.map((ln, i) => (<li key={i} className="text-sm text-gray-800">{ln}</li>))}
+                                  {group.map((ln, i) => (<li key={String(i)} className="text-sm text-gray-800">{ln}</li>))}
                                 </ul>
                               );
                             })()}
