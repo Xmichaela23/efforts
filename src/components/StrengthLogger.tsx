@@ -1034,15 +1034,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </button>
 
                       {editingTimerKey === `${exercise.id}-${setIndex}` && (
-                        <div className="absolute top-8 left-0 bg-black/90 text-white border border-black shadow-xl rounded-md p-2 z-50 w-44">
+                        <div className="absolute top-10 left-0 bg-black/90 text-white border border-black shadow-2xl rounded-lg p-3 z-50 w-64">
                           <input
                             type="tel"
                             value={editingTimerValue}
                             onChange={(e)=>setEditingTimerValue(e.target.value)}
                             placeholder="mm:ss or 90"
-                            className="w-full h-8 px-2 bg-transparent border border-white/25 text-white placeholder-white/60 text-sm rounded"
+                            className="w-full h-10 px-3 bg-transparent border border-white/25 text-white placeholder-white/60 text-base rounded-md"
                           />
-                          <div className="flex items-center justify-between mt-2 gap-2">
+                          <div className="flex items-center justify-between mt-3 gap-3">
                             <button
                               onClick={() => {
                                 const parsed = parseTimerInput(editingTimerValue);
@@ -1051,7 +1051,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   setEditingTimerKey(null);
                                 }
                               }}
-                              className="text-xs px-2 py-1 rounded border border-white/25 hover:bg-white/10"
+                              className="text-sm px-3 py-1.5 rounded-md border border-white/25 hover:bg-white/10"
                             >
                               Save
                             </button>
@@ -1061,13 +1061,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 setTimers(prev => ({ ...prev, [editingTimerKey]: { seconds: 0, running: false } }));
                                 setEditingTimerKey(null);
                               }}
-                              className="text-xs px-2 py-1 rounded border border-white/25 hover:bg-white/10"
+                              className="text-sm px-3 py-1.5 rounded-md border border-white/25 hover:bg-white/10"
                             >
                               Clear
                             </button>
                             <button
                               onClick={() => setEditingTimerKey(null)}
-                              className="text-xs px-2 py-1 rounded border border-white/25 hover:bg-white/10"
+                              className="text-sm px-3 py-1.5 rounded-md border border-white/25 hover:bg-white/10"
                             >
                               Close
                             </button>
