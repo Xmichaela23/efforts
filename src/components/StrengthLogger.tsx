@@ -444,6 +444,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } catch { return []; }
   };
 
+  // Utility to ensure warm-up → main → cooldown ordering anytime we mutate exercises
+  const orderExercises = (arr: LoggedExercise[]): LoggedExercise[] => {
+    const isWarm = (n:string)=>/warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(n);
+    const isCool = (n:string)=>/cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(n);
+    const warm: LoggedExercise[] = [];
+    const main: LoggedExercise[] = [];
+    const cool: LoggedExercise[] = [];
+    for (const ex of arr){ if (isWarm(ex.name)) warm.push(ex); else if (isCool(ex.name)) cool.push(ex); else main.push(ex); }
+    return [...warm, ...main, ...cool];
+  };
+
   // Proper initialization with cleanup
   useEffect(() => {
     // Load user 1RMs for weight computation
@@ -904,7 +915,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         expanded: true,
                         sets: Array.from({ length: Math.max(1, opt.sets) }, () => ({ reps: Math.max(1,opt.reps), weight: 0, barType: 'standard', rir: undefined, completed: false }))
                       } as LoggedExercise];
-                      return next;
+                      return orderExercises(next);
                     });
                     setPendingOrOptions(null);
                   }}
