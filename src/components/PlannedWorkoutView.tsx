@@ -53,6 +53,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   }> | null>(null);
   const [orSelections, setOrSelections] = React.useState<Record<string, string>>({});
   const [includeOptional, setIncludeOptional] = React.useState<Record<string, boolean>>({});
+  const [completeOptional, setCompleteOptional] = React.useState<Record<string, boolean>>({});
+  const [expandedBlocks, setExpandedBlocks] = React.useState<Record<string, boolean>>({});
   const [fallbackPace, setFallbackPace] = React.useState<string | undefined>(undefined);
   const [perfNumbers, setPerfNumbers] = React.useState<any | undefined>(undefined);
   const [totalYards, setTotalYards] = React.useState<number | undefined>(undefined);
@@ -672,6 +674,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const incKey = (name:string) => `inc:${(workout as any).id}:${name.toLowerCase()}`;
       const ss: Record<string,string> = { ...orSelections };
       const inc: Record<string,boolean> = { ...includeOptional };
+      const comp: Record<string,boolean> = { ...completeOptional };
 
       const blocks: Array<{ id:string; name:string; header:string; isOptional?:boolean; orGroup?:number; optionKey?:string }>=[];
       const segs = txt.split(/;+/).map(s=>s.trim()).filter(Boolean);
@@ -684,6 +687,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           if (sessionStorage.getItem(incKey(name)) === null) sessionStorage.setItem(incKey(name), 'false');
           const on = sessionStorage.getItem(incKey(name)) === 'true';
           inc[name] = on;
+          const compKey = `${incKey(name)}:complete`;
+          if (sessionStorage.getItem(compKey) === null) sessionStorage.setItem(compKey, 'false');
+          comp[name] = sessionStorage.getItem(compKey) === 'true';
           blocks.push({ id, name, header: raw.replace(/^optional[:\-]\s*/i,'Optional: '), isOptional: true, optionKey: incKey(name) });
           continue;
         }
@@ -710,10 +716,39 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       }
       setOrSelections(ss);
       setIncludeOptional(inc);
+      setCompleteOptional(comp);
       setStrengthBlocks(blocks);
     } catch { setStrengthBlocks(null); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [friendlyDesc, (workout as any)?.rendered_description, workout.id]);
+
+  // Group per-set strength lines by exercise name to render on expand
+  const groupedStrengthLines = React.useMemo(() => {
+    const groups: Record<string, string[]> = {};
+    try {
+      const lines = Array.isArray(strengthLines) ? strengthLines : [];
+      let current: string | null = null;
+      for (const ln of lines) {
+        const m = String(ln).match(/^([A-Za-z][A-Za-z\- ]+)\s+1\s×\s/);
+        if (m) {
+          current = m[1].trim();
+          const stripped = String(ln).replace(/^([A-Za-z][A-Za-z\- ]+)\s+/, '');
+          if (!groups[current]) groups[current] = [];
+          groups[current].push(stripped);
+        } else if (/^Rest\b/i.test(String(ln))) {
+          if (current) {
+            if (!groups[current]) groups[current] = [];
+            groups[current].push(String(ln));
+          }
+        }
+      }
+    } catch {}
+    return groups;
+  }, [strengthLines]);
+
+  const toggleExpand = (id: string) => {
+    setExpandedBlocks(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const handleSelectOr = (groupKey: string, value: string) => {
     try { sessionStorage.setItem(groupKey, value); } catch {}
@@ -722,6 +757,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const handleIncludeOptional = (optKey: string, name: string, next: boolean) => {
     try { sessionStorage.setItem(optKey, String(next)); } catch {}
     setIncludeOptional(prev => ({ ...prev, [name]: next }));
+  };
+  const handleCompleteOptional = (optKey: string, name: string, next: boolean) => {
+    const compKey = `${optKey}:complete`;
+    try { sessionStorage.setItem(compKey, String(next)); } catch {}
+    setCompleteOptional(prev => ({ ...prev, [name]: next }));
   };
 
   // Derive swim yard total from rendered step lines as a fallback
@@ -1503,12 +1543,35 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             onChange={() => handleSelectOr(b.optionKey as string, b.id)}
                             className="mt-1"
                           />
-                          <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>{b.header}</div>
+                          <div className="flex-1">
+                            <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>
+                              {/* Header shows only Lift @ XX% (strip loads) */}
+                              {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
+                              {chosen && (
+                                <button
+                                  onClick={() => toggleExpand(b.id)}
+                                  className="ml-2 text-xs text-gray-500 underline"
+                                >{expandedBlocks[b.id] ? 'Hide sets' : 'Show sets'}</button>
+                              )}
+                            </div>
+                            {chosen && expandedBlocks[b.id] && (() => {
+                              // Show grouped per-set lines for this exercise
+                              const name = b.name;
+                              const group = groupedStrengthLines[name] || [];
+                              if (!group.length) return null;
+                              return (
+                                <ul className="mt-1 ml-6 list-none space-y-1">
+                                  {group.map((ln, i) => (<li key={i} className="text-sm text-gray-800">{ln}</li>))}
+                                </ul>
+                              );
+                            })()}
+                          </div>
                         </div>
                       );
                     }
                     if (isOpt) {
                       const on = includeOptional[b.name] ?? false;
+                      const done = completeOptional[b.name] ?? false;
                       return (
                         <div key={b.id} className="flex items-start gap-2">
                           <input
@@ -1517,11 +1580,63 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             onChange={(e) => handleIncludeOptional(b.optionKey as string, b.name, e.target.checked)}
                             className="mt-1"
                           />
-                          <div className={`text-sm ${on? 'text-gray-900' : 'text-gray-400'}`}>{b.header}{!on? ' — excluded' : ''}</div>
+                          <div className="flex-1">
+                            <div className={`text-sm ${on? 'text-gray-900' : 'text-gray-400'}`}>
+                              {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
+                              {!on? ' — excluded' : ''}
+                              {on && (
+                                <>
+                                  <button
+                                    onClick={() => toggleExpand(b.id)}
+                                    className="ml-2 text-xs text-gray-500 underline"
+                                  >{expandedBlocks[b.id] ? 'Hide sets' : 'Show sets'}</button>
+                                  <label className="ml-3 text-xs text-gray-600 inline-flex items-center gap-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={done}
+                                      onChange={(e)=>handleCompleteOptional(b.optionKey as string, b.name, e.target.checked)}
+                                    />
+                                    Complete
+                                  </label>
+                                </>
+                              )}
+                            </div>
+                            {on && expandedBlocks[b.id] && (() => {
+                              const name = b.name;
+                              const group = groupedStrengthLines[name] || [];
+                              if (!group.length) return null;
+                              return (
+                                <ul className="mt-1 ml-6 list-none space-y-1">
+                                  {group.map((ln, i) => (<li key={i} className="text-sm text-gray-800">{ln}</li>))}
+                                </ul>
+                              );
+                            })()}
+                          </div>
                         </div>
                       );
                     }
-                    return (<div key={b.id} className="text-sm text-gray-900">{b.header}</div>);
+                    return (
+                      <div key={b.id} className="text-sm text-gray-900">
+                        <div>
+                          {/* Header shows only Lift @ XX% (strip loads); add expand */}
+                          {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
+                          <button
+                            onClick={() => toggleExpand(b.id)}
+                            className="ml-2 text-xs text-gray-500 underline"
+                          >{expandedBlocks[b.id] ? 'Hide sets' : 'Show sets'}</button>
+                        </div>
+                        {expandedBlocks[b.id] && (() => {
+                          const name = b.name;
+                          const group = groupedStrengthLines[name] || [];
+                          if (!group.length) return null;
+                          return (
+                            <ul className="mt-1 ml-6 list-none space-y-1">
+                              {group.map((ln, i) => (<li key={i} className="text-sm text-gray-800">{ln}</li>))}
+                            </ul>
+                          );
+                        })()}
+                      </div>
+                    );
                   })}
                 </div>
               );
