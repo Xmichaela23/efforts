@@ -389,6 +389,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (!steps.length) return [];
       const byName: Record<string, LoggedExercise> = {};
       const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+      const isWarm = (n:string)=>/warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(n);
+      const isCool = (n:string)=>/cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(n);
+      const isBodyweight = (n:string)=>/(pull\-?ups|chin\-?ups|push\-?ups|dips|plank|sit\-?ups|burpees|hollow|superman)/i.test(n);
       const pctOf = (name: string, pct?: number): number => {
         if (!pct || !performanceNumbers) return 0;
         const t = name.toLowerCase();
@@ -410,13 +413,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         const inten = String(st.intensity||st.target||'');
         const m = inten.match(/(\d{1,3})\s*%/);
         if (m) pct = parseInt(m[1],10);
-        const weight = pct ? pctOf(name, pct) : (Number(st.weight)||0);
+        const weight = isBodyweight(name) ? 0 : (pct ? pctOf(name, pct) : (Number(st.weight)||0));
         if (!byName[name]) {
           byName[name] = { id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`, name, expanded: true, sets: [] } as LoggedExercise;
         }
         byName[name].sets.push({ reps, weight: weight||0, barType: 'standard', rir: undefined, completed: false });
       }
-      return Object.values(byName);
+      const arr = Object.values(byName);
+      // Order: warm-up first, then main, cooldown last
+      arr.sort((a,b)=>{
+        const aw = isWarm(a.name)?0:isCool(a.name)?2:1;
+        const bw = isWarm(b.name)?0:isCool(b.name)?2:1;
+        if (aw!==bw) return aw-bw; return 0;
+      });
+      return arr;
     } catch { return []; }
   };
 
