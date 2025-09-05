@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 
@@ -634,7 +634,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     size="sm"
                     className="text-gray-600 hover:text-gray-800 h-8 w-8 p-0 flex-shrink-0"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <X className="h-4 w-4" />
                   </Button>
                 )}
               </div>
@@ -643,117 +643,96 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {(expandedExercises[exercise.id] !== false) && (
               <div className="px-3 py-2">
                 {exercise.sets.map((set, setIndex) => (
-                  <div key={setIndex} className="mb-3 pb-3 border-b border-gray-100 last:border-b-0 last:mb-0 last:pb-0">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-gray-700">Set {setIndex + 1}</span>
-                        <div className="flex items-center gap-2">
-                          {exercise.sets.length > 1 && (
-                            <button
-                              onClick={() => deleteSet(exercise.id, setIndex)}
-                              className="text-gray-400 hover:text-red-600 p-1"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                          <button
-                            onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
-                            className={`text-xs px-3 py-2 rounded min-h-[32px] ${
-                              set.completed 
-                                ? 'bg-green-100 text-green-700' 
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {set.completed ? '✓ Done' : 'Done'}
-                          </button>
-                        </div>
-                      </div>
-                      
-                      <div className="grid grid-cols-3 gap-3 mb-2">
-                        <div className="flex flex-col">
-                          <label className="text-xs text-gray-500 mb-1">Reps</label>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={set.reps === 0 ? '' : set.reps.toString()}
-                            onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-base border-gray-300"
-                            style={{ fontSize: '16px' }}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <label className="text-xs text-gray-500 mb-1">Weight (lbs)</label>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={set.weight === 0 ? '' : set.weight.toString()}
-                            onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
-                            className="h-9 text-center text-base border-gray-300"
-                            style={{ fontSize: '16px' }}
-                            placeholder="0"
-                          />
-                        </div>
-                        <div className="flex flex-col">
-                          <label className="text-xs text-gray-500 mb-1">RIR</label>
-                          <Input
-                            type="number"
-                            inputMode="numeric"
-                            pattern="[0-9]*"
-                            value={set.rir || ''}
-                            onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
-                            className="h-9 text-center text-base border-gray-300"
-                            min="0"
-                            max="5"
-                            style={{ fontSize: '16px' }}
-                            placeholder="RIR"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col">
-                        <div className="flex items-center justify-between">
-                          <button
-                            onClick={() => togglePlateCalc(exercise.id, setIndex)}
-                            className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
-                          >
-                            Plates
-                            {expandedPlates[`${exercise.id}-${setIndex}`] ? 
-                              <ChevronUp className="h-3 w-3" /> : 
-                              <ChevronDown className="h-3 w-3" />
-                            }
-                          </button>
-                          
-                          <Select
-                            value={set.barType || 'standard'}
-                            onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
-                          >
-                            <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
-                              <SelectItem value="standard">Barbell (45lb)</SelectItem>
-                              <SelectItem value="womens">Women's (33lb)</SelectItem>
-                              <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
-                              <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
-                              <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
-                              <SelectItem value="cambered">Cambered (55lb)</SelectItem>
-                              <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
-                              <SelectItem value="technique">Technique (15lb)</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        
-                        {expandedPlates[`${exercise.id}-${setIndex}`] && (
-                          <PlateMath
-                            weight={set.weight}
-                            barType={set.barType || 'standard'}
-                            useImperial={true}
-                          />
-                        )}
-                      </div>
+                  <div key={setIndex} className="mb-2 last:mb-0">
+                    <div className="flex items-center gap-2">
+                      <div className="w-6 text-xs text-gray-500 text-right">{setIndex + 1}</div>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={set.reps === 0 ? '' : set.reps.toString()}
+                        onChange={(e) => updateSet(exercise.id, setIndex, { reps: parseInt(e.target.value) || 0 })}
+                        className="h-9 text-center text-sm border-gray-300 flex-1"
+                        style={{ fontSize: '16px' }}
+                        placeholder="Reps"
+                      />
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={set.weight === 0 ? '' : set.weight.toString()}
+                        onChange={(e) => updateSet(exercise.id, setIndex, { weight: parseInt(e.target.value) || 0 })}
+                        className="h-9 text-center text-sm border-gray-300 flex-1"
+                        style={{ fontSize: '16px' }}
+                        placeholder="Weight"
+                      />
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        value={set.rir || ''}
+                        onChange={(e) => updateSet(exercise.id, setIndex, { rir: parseInt(e.target.value) || undefined })}
+                        className="h-9 text-center text-sm border-gray-300 w-16"
+                        min="0"
+                        max="5"
+                        style={{ fontSize: '16px' }}
+                        placeholder="RIR"
+                      />
+                      <button
+                        onClick={() => updateSet(exercise.id, setIndex, { completed: !set.completed })}
+                        className={`text-xs px-2 py-1 rounded min-h-[28px] ${set.completed ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {set.completed ? '✓ Done' : 'Done'}
+                      </button>
+                      {exercise.sets.length > 1 && (
+                        <button
+                          onClick={() => deleteSet(exercise.id, setIndex)}
+                          className="text-gray-400 hover:text-red-600 h-8 w-8 flex items-center justify-center"
+                          aria-label="Delete set"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
+                    <div className="flex items-center justify-between mt-1">
+                      <button
+                        onClick={() => togglePlateCalc(exercise.id, setIndex)}
+                        className="text-xs text-gray-500 flex items-center gap-1 hover:text-gray-700"
+                      >
+                        Plates
+                        {expandedPlates[`${exercise.id}-${setIndex}`] ? (
+                          <ChevronUp className="h-3 w-3" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3" />
+                        )}
+                      </button>
+                      <Select
+                        value={set.barType || 'standard'}
+                        onValueChange={(value) => updateSet(exercise.id, setIndex, { barType: value })}
+                      >
+                        <SelectTrigger className="h-6 text-xs bg-transparent p-0 m-0 text-gray-500 hover:text-gray-700 gap-1 w-auto border-none">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-white border border-gray-200 shadow-xl z-50">
+                          <SelectItem value="standard">Barbell (45lb)</SelectItem>
+                          <SelectItem value="womens">Women's (33lb)</SelectItem>
+                          <SelectItem value="safety">Safety Squat (45lb)</SelectItem>
+                          <SelectItem value="ez">EZ Curl (25lb)</SelectItem>
+                          <SelectItem value="trap">Trap/Hex (60lb)</SelectItem>
+                          <SelectItem value="cambered">Cambered (55lb)</SelectItem>
+                          <SelectItem value="swiss">Swiss/Football (35lb)</SelectItem>
+                          <SelectItem value="technique">Technique (15lb)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {expandedPlates[`${exercise.id}-${setIndex}`] && (
+                      <PlateMath
+                        weight={set.weight}
+                        barType={set.barType || 'standard'}
+                        useImperial={true}
+                      />
+                    )}
+                  </div>
                 ))}
                 
                 <Button 
