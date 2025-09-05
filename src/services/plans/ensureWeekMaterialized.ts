@@ -350,6 +350,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             deadlift: typeof perf.deadlift === 'number' ? perf.deadlift : undefined,
             overhead: typeof perf.overheadPress1RM === 'number' ? perf.overheadPress1RM : (typeof perf.overhead === 'number' ? perf.overhead : undefined),
           } as Record<string, number | undefined>;
+          const round5 = (n:number) => Math.round(n/5)*5;
           const liftKey = (text: string): keyof typeof oneRM => {
             const t = text.toLowerCase();
             if (t.includes('dead')) return 'deadlift';
@@ -358,17 +359,27 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             return 'squat';
           };
           const addLoads = (txt: string): string => {
-            return txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
-              // If a weight is already present (e.g., "— 110 lb"), keep as-is
+            // Main lifts with %
+            let out = txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
               if (/\b\d+\s*lb\b/i.test(String(tail))) return m;
               const pct = parseInt(String(pctStr), 10);
               const key = liftKey(String(name));
               const orm = oneRM[key];
               if (!orm || !pct || !isFinite(orm)) return m;
-              const w = Math.round(orm * (pct/100));
-              const rounded = Math.round(w/5)*5;
+              const rounded = round5(orm * (pct/100));
               return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
             });
+            // Accessory: Rows without % — estimate from Bench (95%), fallback Deadlift (55%)
+            out = out.replace(/\b(Barbell Row|BB Row|Row|DB Row|Dumbbell Row)\b([^;]*)/gi, (m, label, tail) => {
+              if (/\b\d+\s*lb\b/i.test(m)) return m;
+              const bench: number | undefined = typeof oneRM.bench === 'number' ? oneRM.bench : undefined;
+              const dead: number | undefined = typeof oneRM.deadlift === 'number' ? oneRM.deadlift : undefined;
+              const est = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
+              if (typeof est !== 'number' || !isFinite(est)) return m;
+              const rounded = round5(est);
+              return `${label} — ${rounded} lb${tail || ''}`;
+            });
+            return out;
           };
           rendered = addLoads(rendered);
         } catch {}
