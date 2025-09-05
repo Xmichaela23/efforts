@@ -43,6 +43,16 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const [resolvedDuration, setResolvedDuration] = React.useState<number | undefined>(undefined);
   const [stepLines, setStepLines] = React.useState<string[] | null>(null);
   const [strengthLines, setStrengthLines] = React.useState<string[] | null>(null);
+  const [strengthBlocks, setStrengthBlocks] = React.useState<Array<{
+    id: string;
+    name: string;
+    header: string;
+    isOptional?: boolean;
+    orGroup?: number;
+    optionKey?: string;
+  }> | null>(null);
+  const [orSelections, setOrSelections] = React.useState<Record<string, string>>({});
+  const [includeOptional, setIncludeOptional] = React.useState<Record<string, boolean>>({});
   const [fallbackPace, setFallbackPace] = React.useState<string | undefined>(undefined);
   const [perfNumbers, setPerfNumbers] = React.useState<any | undefined>(undefined);
   const [totalYards, setTotalYards] = React.useState<number | undefined>(undefined);
@@ -650,6 +660,69 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workout.id]);
+
+  // Parse friendly strength summary into structured headers with OR and Optional detection
+  React.useEffect(() => {
+    try {
+      if (String((workout as any).type||'').toLowerCase() !== 'strength') { setStrengthBlocks(null); return; }
+      const txt = String((workout as any).rendered_description || friendlyDesc || workout.description || '').trim();
+      if (!txt) { setStrengthBlocks(null); return; }
+      // Persisted UI prefs per workout
+      const orKey = (gid:number) => `or:${(workout as any).id}:${gid}`;
+      const incKey = (name:string) => `inc:${(workout as any).id}:${name.toLowerCase()}`;
+      const ss: Record<string,string> = { ...orSelections };
+      const inc: Record<string,boolean> = { ...includeOptional };
+
+      const blocks: Array<{ id:string; name:string; header:string; isOptional?:boolean; orGroup?:number; optionKey?:string }>=[];
+      const segs = txt.split(/;+/).map(s=>s.trim()).filter(Boolean);
+      let groupCounter = 0;
+      for (const raw of segs) {
+        // Optional section (e.g., "Optional: - 5–10 min core, athlete’s choice")
+        if (/^optional[:\-]/i.test(raw)) {
+          const name = 'Optional Work';
+          const id = `opt-${blocks.length}`;
+          if (sessionStorage.getItem(incKey(name)) === null) sessionStorage.setItem(incKey(name), 'false');
+          const on = sessionStorage.getItem(incKey(name)) === 'true';
+          inc[name] = on;
+          blocks.push({ id, name, header: raw.replace(/^optional[:\-]\s*/i,'Optional: '), isOptional: true, optionKey: incKey(name) });
+          continue;
+        }
+        // OR alternatives — split but mark same group
+        const parts = raw.split(/\s+OR\s+/i).map(p=>p.trim()).filter(Boolean);
+        if (parts.length > 1) {
+          groupCounter += 1;
+          const gid = groupCounter;
+          if (sessionStorage.getItem(orKey(gid)) === null) sessionStorage.setItem(orKey(gid), '');
+          const selected = sessionStorage.getItem(orKey(gid)) || '';
+          parts.forEach((p, idx) => {
+            const name = p.split(/\s+\d+[x×]/)[0]?.trim() || `Choice ${idx+1}`;
+            const id = `or-${gid}-${idx}`;
+            const header = p;
+            blocks.push({ id, name, header, orGroup: gid, optionKey: orKey(gid) });
+            if (!ss[orKey(gid)]) ss[orKey(gid)] = selected;
+          });
+          continue;
+        }
+        // Regular exercise
+        const name = raw.split(/\s+\d+[x×]/)[0]?.trim() || `Exercise ${blocks.length+1}`;
+        const id = `ex-${blocks.length}`;
+        blocks.push({ id, name, header: raw });
+      }
+      setOrSelections(ss);
+      setIncludeOptional(inc);
+      setStrengthBlocks(blocks);
+    } catch { setStrengthBlocks(null); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [friendlyDesc, (workout as any)?.rendered_description, workout.id]);
+
+  const handleSelectOr = (groupKey: string, value: string) => {
+    try { sessionStorage.setItem(groupKey, value); } catch {}
+    setOrSelections(prev => ({ ...prev, [groupKey]: value }));
+  };
+  const handleIncludeOptional = (optKey: string, name: string, next: boolean) => {
+    try { sessionStorage.setItem(optKey, String(next)); } catch {}
+    setIncludeOptional(prev => ({ ...prev, [name]: next }));
+  };
 
   // Derive swim yard total from rendered step lines as a fallback
   React.useEffect(() => {
@@ -1411,6 +1484,49 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           {(() => {
             const strength = Array.isArray(strengthLines) ? strengthLines : [];
             const lines = Array.isArray(stepLines) ? stepLines : [];
+            // Structured strength headers (preferred)
+            if (Array.isArray(strengthBlocks) && strengthBlocks.length > 0) {
+              return (
+                <div className="space-y-2">
+                  {strengthBlocks.map((b) => {
+                    const isOr = typeof b.orGroup === 'number' && b.optionKey;
+                    const isOpt = Boolean(b.isOptional && b.optionKey);
+                    if (isOr) {
+                      const groupSel = orSelections[b.optionKey as string] || '';
+                      const chosen = groupSel === b.id;
+                      return (
+                        <div key={b.id} className="flex items-start gap-2">
+                          <input
+                            type="radio"
+                            name={b.optionKey}
+                            checked={chosen}
+                            onChange={() => handleSelectOr(b.optionKey as string, b.id)}
+                            className="mt-1"
+                          />
+                          <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>{b.header}</div>
+                        </div>
+                      );
+                    }
+                    if (isOpt) {
+                      const on = includeOptional[b.name] ?? false;
+                      return (
+                        <div key={b.id} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={on}
+                            onChange={(e) => handleIncludeOptional(b.optionKey as string, b.name, e.target.checked)}
+                            className="mt-1"
+                          />
+                          <div className={`text-sm ${on? 'text-gray-900' : 'text-gray-400'}`}>{b.header}{!on? ' — excluded' : ''}</div>
+                        </div>
+                      );
+                    }
+                    return (<div key={b.id} className="text-sm text-gray-900">{b.header}</div>);
+                  })}
+                </div>
+              );
+            }
+            // Per-set lines fallback
             if (strength.length > 0) {
               return (
                 <ul className="list-none space-y-1">

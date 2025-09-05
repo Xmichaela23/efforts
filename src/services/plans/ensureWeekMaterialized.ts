@@ -239,11 +239,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 const scale = (typeof pct === 'number') ? (pct/100) : 1;
                 const est = (typeof base === 'number') ? base * scale : undefined;
                 if (typeof est !== 'number' || !isFinite(est)) return m;
-                const hasLb = /\b\d+\s*lb\b/i.test(m);
-                if (hasLb && scale === 1) return m; // already has a load and no pct to override
-                const rounded = round5(est);
                 const pctTxt = (typeof pct === 'number') ? ` @ ${pct}%` : '';
-                return `${label}${pctTxt} — ${rounded} lb${tail || ''}`;
+                const rounded = round5(est);
+                const cleanTail = String(tail || '').replace(/\s*—\s*\d+\s*lb\b/i, '');
+                return `${label}${pctTxt} — ${rounded} lb${cleanTail}`;
               });
               return out;
             };
@@ -437,7 +436,6 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             });
             // Accessory: Rows without % — estimate from Bench (95%), fallback Deadlift (55%)
             out = out.replace(/\b(Barbell Row|BB Row|Row|DB Row|Dumbbell Row)\b([^;]*)/gi, (m, label, tail) => {
-              if (/\b\d+\s*lb\b/i.test(m)) return m;
               const bench: number | undefined = typeof oneRM.bench === 'number' ? oneRM.bench : undefined;
               const dead: number | undefined = typeof oneRM.deadlift === 'number' ? oneRM.deadlift : undefined;
               const base = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
@@ -445,7 +443,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               const est = (typeof base === 'number') ? base * scale : undefined;
               if (typeof est !== 'number' || !isFinite(est)) return m;
               const rounded = round5(est);
-              return `${label} — ${rounded} lb${tail || ''}`;
+              const pctTxt = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens)) ? ` @ ${pctFromTokens}%` : '';
+              const cleanTail = String(tail || '').replace(/\s*—\s*\d+\s*lb\b/i, '');
+              return `${label}${pctTxt} — ${rounded} lb${cleanTail}`;
             });
             return out;
           };
