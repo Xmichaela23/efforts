@@ -677,7 +677,20 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const comp: Record<string,boolean> = { ...completeOptional };
 
       const blocks: Array<{ id:string; name:string; header:string; isOptional?:boolean; orGroup?:number; optionKey?:string }>=[];
-      const segs = txt.split(/;+/).map(s=>s.trim()).filter(Boolean);
+      const segsRaw = txt.split(/;+/).map(s=>s.trim()).filter(Boolean);
+      // Ensure "Optional:" becomes its own segment even if authored after a period
+      const segs: string[] = [];
+      for (const s of segsRaw) {
+        const idx = s.search(/\bOptional\s*[:\-]/i);
+        if (idx > 0) {
+          const a = s.slice(0, idx).trim().replace(/[\.,;]+$/,'');
+          const b = s.slice(idx).trim();
+          if (a) segs.push(a);
+          if (b) segs.push(b);
+        } else {
+          segs.push(s);
+        }
+      }
       let groupCounter = 0;
       for (const raw of segs) {
         // Optional section (e.g., "Optional: - 5–10 min core, athlete’s choice")
@@ -1547,15 +1560,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>
                               {/* Header shows only Lift @ XX% (strip loads) */}
                               {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
-                              {chosen && (
-                                <button
-                                  onClick={() => toggleExpand(b.id)}
-                                  className="ml-2 text-xs text-gray-500 underline"
-                                >{expandedBlocks[b.id] ? 'Hide sets' : 'Show sets'}</button>
-                              )}
                             </div>
-                            {chosen && expandedBlocks[b.id] && (() => {
-                              // Show grouped per-set lines for this exercise
+                            {chosen && (() => {
+                              // Show grouped per-set lines for this exercise automatically when selected
                               const name = b.name;
                               const group = groupedStrengthLines[name] || [];
                               if (!group.length) return null;
