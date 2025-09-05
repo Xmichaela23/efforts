@@ -140,6 +140,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
+  const [pendingOrOptions, setPendingOrOptions] = useState<string[] | null>(null);
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
@@ -287,6 +288,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return results;
   };
 
+  const extractOrOptions = (desc: string): string[] | null => {
+    try {
+      const body = String(desc || '');
+      const tokens = body
+        .split(/\n|;|\u2022/) // newlines, semicolons, bullets
+        .map(s=>s.trim())
+        .filter(Boolean);
+      for (const t of tokens) {
+        if (/\bOR\b/i.test(t)) {
+          const parts = t.split(/\bOR\b/i).map(s=>s.trim()).filter(Boolean);
+          if (parts.length >= 2) return parts.slice(0, 3); // support 2-3 options
+        }
+      }
+    } catch {}
+    return null;
+  };
+
   // Proper initialization with cleanup
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
@@ -349,12 +367,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     } else if (workoutToLoad && typeof workoutToLoad.description === 'string') {
       // Fallback: parse description if structured array missing
       const parsed = parseStrengthDescription(workoutToLoad.description);
+      const orOpts = extractOrOptions(workoutToLoad.description);
       if (parsed.length > 0) {
         console.log('📝 Parsed exercises from description');
         setExercises(parsed);
+        if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
       } else {
         console.log('🆕 Starting with empty exercise for manual logging');
         setExercises([createEmptyExercise()]);
+        if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
       }
     } else {
       console.log('🆕 Starting with empty exercise for manual logging');
@@ -658,6 +679,28 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       {/* Main content container with proper mobile scrolling */}
       <div className="space-y-3 w-full pb-4">
+        {pendingOrOptions && pendingOrOptions.length > 1 && (
+          <div className="px-3">
+            <div className="flex items-center flex-wrap gap-2 text-sm">
+              <span className="text-gray-600">Choose one:</span>
+              {pendingOrOptions.map((opt, idx) => (
+                <button
+                  key={idx}
+                  className="px-2 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                  onClick={() => {
+                    const exs = parseStrengthDescription(opt);
+                    if (exs.length > 0) {
+                      setExercises(prev => [...prev, ...exs]);
+                      setPendingOrOptions(null);
+                    }
+                  }}
+                >
+                  {opt.replace(/\s*\(.*?\)\s*$/, '')}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {exercises.map((exercise, exerciseIndex) => (
           <div key={exercise.id} className="bg-white">
             <div className="p-3">
