@@ -692,6 +692,15 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         }
       }
       let groupCounter = 0;
+      const baseNameFromHeader = (h: string): string => {
+        try {
+          let s = String(h||'');
+          s = s.replace(/\s*—\s*\d+\s*lb.*$/i,'').trim(); // strip loads if present
+          s = s.split(/\s+@/)[0]; // drop inline percent
+          s = s.split(/\s+\d+[x×]/)[0]; // drop sets marker if present
+          return s.trim();
+        } catch { return String(h||'').trim(); }
+      };
       for (const raw of segs) {
         // Optional section (e.g., "Optional: - 5–10 min core, athlete’s choice")
         if (/^optional[:\-]/i.test(raw)) {
@@ -714,7 +723,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           if (sessionStorage.getItem(orKey(gid)) === null) sessionStorage.setItem(orKey(gid), '');
           const selected = sessionStorage.getItem(orKey(gid)) || '';
           parts.forEach((p, idx) => {
-            const name = p.split(/\s+\d+[x×]/)[0]?.trim() || `Choice ${idx+1}`;
+            const name = baseNameFromHeader(p) || `Choice ${idx+1}`;
             const id = `or-${gid}-${idx}`;
             const header = p;
             blocks.push({ id, name, header, orGroup: gid, optionKey: orKey(gid) });
@@ -723,7 +732,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           continue;
         }
         // Regular exercise
-        const name = raw.split(/\s+\d+[x×]/)[0]?.trim() || `Exercise ${blocks.length+1}`;
+        const name = baseNameFromHeader(raw) || `Exercise ${blocks.length+1}`;
         const id = `ex-${blocks.length}`;
         blocks.push({ id, name, header: raw });
       }
@@ -1517,17 +1526,21 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       )}
 
       <div className="space-y-3">
-        {/* Planned pill and title */}
+        {/* Title and meta */}
         <div className="flex items-center justify-between">
-          <span className="text-[10px] uppercase tracking-wide text-gray-500">Planned</span>
+          <div className="text-base font-semibold">
+            {(() => {
+              const focus = deriveFocus();
+              return focus && focus !== 'Planned'
+                ? `${getWorkoutTypeLabel(workout.type)} — ${focus}`
+                : `${getWorkoutTypeLabel(workout.type)}`;
+            })()}
+          </div>
           <div className="text-sm text-gray-500">
             {resolvedDuration ? `${resolvedDuration} min` : (typeof workout.duration==='number'?`${workout.duration} min`: '')}
             {String((workout as any).type||'').toLowerCase()==='swim' && typeof (totalYardsMemo||totalYards)==='number' && (totalYardsMemo||totalYards)!>0 ? ` • ${(totalYardsMemo||totalYards)} yd` : ''}
           </div>
         </div>
-        <h3 className="text-base font-semibold">
-          {getWorkoutTypeLabel(workout.type)} — {deriveFocus()}
-        </h3>
         {String((workout as any).type||'').toLowerCase()==='swim' && typeof (totalYardsMemo||totalYards)==='number' && (totalYardsMemo||totalYards)!>0 && (
           <div className="text-sm text-gray-500">Total {(totalYardsMemo||totalYards)} yd</div>
         )}
