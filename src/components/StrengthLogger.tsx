@@ -477,7 +477,42 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }
     
     setIsInitialized(true);
-  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate]);
+    // Direct fetch as a safety net (does not overwrite if already filled)
+    (async () => {
+      try {
+        const date = getTodayDateString();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase
+          .from('planned_workouts')
+          .select('steps_preset, rendered_description, description, strength_exercises')
+          .eq('user_id', user.id)
+          .eq('date', date)
+          .eq('type', 'strength')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (!data) return;
+        if (Array.isArray((data as any).strength_exercises) && (data as any).strength_exercises.length>0) {
+          const pre: LoggedExercise[] = (data as any).strength_exercises.map((exercise: any, index: number) => ({
+            id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+            name: exercise.name || '',
+            expanded: true,
+            sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
+          }));
+          if (pre.length>0) setExercises(prev => prev.length? prev : pre);
+          return;
+        }
+        const steps: string[] = Array.isArray((data as any).steps_preset) ? (data as any).steps_preset : [];
+        const viaTok = parseStepsPreset(steps);
+        const src2 = (data as any).rendered_description || (data as any).description || '';
+        const parsed2 = viaTok.length>0 ? viaTok : parseStrengthDescription(src2);
+        if (parsed2.length>0) setExercises(prev => prev.length? prev : parsed2);
+        const or2 = extractOrOptions(src2);
+        if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
+      } catch {}
+    })();
+  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate, performanceNumbers]);
 
   // Ensure timers exist for current sets (default 90s)
   useEffect(() => {
