@@ -433,14 +433,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         }
         byName[name].sets.push({ reps, weight: weight||0, barType: 'standard', rir: undefined, completed: false });
       }
-      const arr = Object.values(byName);
-      // Order: warm-up first, then main, cooldown last
-      arr.sort((a,b)=>{
-        const aw = isWarm(a.name)?0:isCool(a.name)?2:1;
-        const bw = isWarm(b.name)?0:isCool(b.name)?2:1;
-        if (aw!==bw) return aw-bw; return 0;
-      });
-      return arr;
+      const all = Object.values(byName);
+      const warm: LoggedExercise[] = [];
+      const main: LoggedExercise[] = [];
+      const cool: LoggedExercise[] = [];
+      for (const ex of all){
+        if (isWarm(ex.name)) warm.push(ex); else if (isCool(ex.name)) cool.push(ex); else main.push(ex);
+      }
+      return [...warm, ...main, ...cool];
     } catch { return []; }
   };
 
