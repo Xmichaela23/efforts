@@ -1681,7 +1681,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                               if (!group.length) {
                                 try {
                                   const h = String(b.header);
-                                  const m = h.match(/([A-Za-z\- \/]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*@\s*(\d{1,3})%)?.*?(?:rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s))?/i);
+                                  const rowHeaderRe = new RegExp('([A-Za-z\\- \\/]+)\\s+(\\d+)\\s*[x×]\\s*(\\d+)(?:\\s*@\\s*(\\d{1,3})%)?.*?(?:rest\\s+(\\d+(?:[–-]\\d+)?)\\s*(min|s))?','i');
+                                  const m = h.match(rowHeaderRe);
                                   if (m) {
                                     const ex = m[1].replace(/\s*\(.*?\)\s*$/,'').trim();
                                     const sets = parseInt(m[2],10);
@@ -1703,9 +1704,10 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                               if (!group.length) {
                                 try {
                                   const steps: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
-                                  const tok = steps.find(t => /st_acc_barbell_row_/i.test(String(t)));
+                                  const tok = steps.find(t => new RegExp('st_acc_barbell_row_','i').test(String(t)));
                                   if (tok) {
-                                    const mt = String(tok).toLowerCase().match(/st_acc_barbell_row_(\d+)x(\d+)(?:_@pct(\d{1,3}))?_rest(\d+)/i);
+                                    const rowTokRe = new RegExp('st_acc_barbell_row_(\\d+)x(\\d+)(?:_@pct(\\d{1,3}))?_rest(\\d+)','i');
+                                    const mt = String(tok).toLowerCase().match(rowTokRe);
                                     if (mt) {
                                       const sets = parseInt(mt[1], 10);
                                       const reps = parseInt(mt[2], 10);
@@ -1790,7 +1792,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                           if (!group.length) {
                             try {
                               const h = String(b.header);
-                              const m = h.match(/([A-Za-z\- \/]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*@\s*(\d{1,3})%)?.*?(?:rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s))?/i);
+                              const rowHeaderRe = new RegExp('([A-Za-z\\- \\/]+)\\s+(\\d+)\\s*[x×]\\s*(\\d+)(?:\\s*@\\s*(\\d{1,3})%)?.*?(?:rest\\s+(\\d+(?:[–-]\\d+)?)\\s*(min|s))?','i');
+                              const m = h.match(rowHeaderRe);
                               if (m) {
                                 const ex = m[1].replace(/\s*\(.*?\)\s*$/,'').trim();
                                 const sets = parseInt(m[2],10);
