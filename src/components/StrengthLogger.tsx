@@ -560,7 +560,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   }
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-28">
       {/* Header */}
       <div className="bg-white pb-4 mb-4">
         <div className="flex items-center w-full">
@@ -571,7 +571,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       </div>
 
       {/* Main content container with proper mobile scrolling */}
-      <div className="space-y-4 w-full pb-4">
+      <div className="space-y-3 w-full pb-4">
         {exercises.map((exercise, exerciseIndex) => (
           <div key={exercise.id} className="bg-white">
             <div className="p-3">
@@ -742,7 +742,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     addSet(exercise.id);
                   }}
                   variant="ghost"
-                  className="w-full h-9 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50"
+                  className="w-full h-9 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 mt-1"
                   type="button"
                 >
                   <Plus className="h-4 w-4 mr-2" />
@@ -754,7 +754,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative bg-white p-3">
+        <div className="relative bg-white px-3 pt-2 pb-2">
           <div className="flex items-center border border-gray-200 bg-white">
             <div className="pl-3 text-gray-400">
               <Search className="h-4 w-4" />
@@ -778,7 +778,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-16 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
+            <div className="absolute top-14 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
@@ -794,8 +794,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
       </div>
 
-      {/* Fixed bottom save button */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white">
+      {/* Fixed bottom save button (stable, safe-area aware) */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
           className="w-full h-12 text-black hover:text-blue-600 text-base font-medium"
