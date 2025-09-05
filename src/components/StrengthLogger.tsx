@@ -364,10 +364,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }));
       
       setExercises(prePopulatedExercises);
-    } else if (workoutToLoad && typeof workoutToLoad.description === 'string') {
-      // Fallback: parse description if structured array missing
-      const parsed = parseStrengthDescription(workoutToLoad.description);
-      const orOpts = extractOrOptions(workoutToLoad.description);
+    } else if (workoutToLoad && (typeof (workoutToLoad as any).rendered_description === 'string' || typeof workoutToLoad.description === 'string')) {
+      // Fallback: parse rendered_description first, then description
+      const src = (workoutToLoad as any).rendered_description || workoutToLoad.description || '';
+      const parsed = parseStrengthDescription(src);
+      const orOpts = extractOrOptions(src);
       if (parsed.length > 0) {
         console.log('📝 Parsed exercises from description');
         setExercises(parsed);
