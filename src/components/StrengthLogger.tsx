@@ -270,11 +270,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (t.includes('deadlift')) return typeof performanceNumbers?.deadlift==='number'? performanceNumbers.deadlift: undefined;
       if (t.includes('bench')) return typeof performanceNumbers?.bench==='number'? performanceNumbers.bench: undefined;
       if (t.includes('overhead') || t.includes('ohp')) return typeof performanceNumbers?.overhead==='number'? performanceNumbers.overhead: (typeof performanceNumbers?.overheadPress1RM==='number'? performanceNumbers.overheadPress1RM: undefined);
-      if (t.includes('row')) {
-        if (typeof performanceNumbers?.bench==='number') return Math.round(performanceNumbers.bench*0.95);
-        if (typeof performanceNumbers?.deadlift==='number') return Math.round(performanceNumbers.deadlift*0.55);
-      }
-      if (typeof performanceNumbers?.squat==='number') return performanceNumbers.squat;
+      if (t.includes('squat')) return typeof performanceNumbers?.squat==='number'? performanceNumbers.squat: undefined;
       return undefined;
     };
     for (const p of parts) {
@@ -380,17 +376,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           push(nameKey.replace(/\b1rm\b/i,''), sets, reps, w);
           continue;
         }
-        // st_acc_barbell_row_4x6_@pct70_rest90
-        const r = tok.match(/^st_acc_barbell_row_(\d+)x(\d+)(?:_@pct(\d{1,3}))?_rest(\d+)/i);
-        if (r) {
-          const sets = parseInt(r[1],10);
-          const reps = parseInt(r[2],10);
-          const pct = r[3]?parseInt(r[3],10):undefined;
-          const base = typeof performanceNumbers?.bench==='number'? Math.round(performanceNumbers.bench*0.95) : (typeof performanceNumbers?.deadlift==='number'? Math.round(performanceNumbers.deadlift*0.55): undefined);
-          const w = base? round5(base*((pct||100)/100)) : 0;
-          push('Barbell Row', sets, reps, w);
-          continue;
-        }
+        // Generic strength token: strength_<name>_SxR_<pct>
       }
       return out;
     } catch { return []; }
