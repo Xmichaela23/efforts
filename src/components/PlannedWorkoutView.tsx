@@ -1672,7 +1672,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                               className="mt-0.5"
                             />
                           </div>
-                          {chosen && (() => {
+                          {chosen && (
+                            (() => {
                               // Show grouped per-set lines for this exercise automatically when selected
                               const norm = (s:string)=>{
                                 let t = s.toLowerCase();
@@ -1740,7 +1741,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                   {group.map((ln, i) => (<li key={i} className="text-sm text-gray-800">{ln}</li>))}
                                 </ul>
                               );
-                            })()}
+                            })()
+                          )}
                           </div>
                         </div>
                       );
