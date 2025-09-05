@@ -749,6 +749,15 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     const groups: Record<string, string[]> = {};
     try {
       const lines = Array.isArray(strengthLines) ? strengthLines : [];
+      const normalize = (s: string) => {
+        try {
+          let x = String(s || '').toLowerCase();
+          x = x.replace(/bb\s*row|barbell\s*row/g, 'row');
+          x = x.replace(/db\s*row|dumbbell\s*row/g, 'row');
+          x = x.replace(/\s+/g, ' ').trim();
+          return x;
+        } catch { return String(s||'').toLowerCase().trim(); }
+      };
       let current: string | null = null;
       for (const ln of lines) {
         const m = String(ln).match(/^([A-Za-z][A-Za-z\- ]+)\s+1\s×\s/);
@@ -757,10 +766,14 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           const stripped = String(ln).replace(/^([A-Za-z][A-Za-z\- ]+)\s+/, '');
           if (!groups[current]) groups[current] = [];
           groups[current].push(stripped);
+          const key2 = normalize(current);
+          if (!groups[key2]) groups[key2] = groups[current];
         } else if (/^Rest\b/i.test(String(ln))) {
           if (current) {
             if (!groups[current]) groups[current] = [];
             groups[current].push(String(ln));
+            const key2 = normalize(current);
+            if (!groups[key2]) groups[key2] = groups[current];
           }
         }
       }
@@ -1576,8 +1589,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             </div>
                             {chosen && (() => {
                               // Show grouped per-set lines for this exercise automatically when selected
+                              const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bb\s*row|barbell\s*row/g,'row').replace(/db\s*row|dumbbell\s*row/g,'row').trim();
                               const name = b.name;
-                              const group = groupedStrengthLines[name] || [];
+                              const group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || [];
                               if (!group.length) return null;
                               return (
                                 <ul className="mt-1 ml-6 list-none space-y-1">
