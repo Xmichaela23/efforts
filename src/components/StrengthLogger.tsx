@@ -515,9 +515,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const orOpts = extractOrOptions(srcHdr);
       let exs = parseFromComputed((workoutToLoad as any).computed);
       if (orOpts && orOpts.length>1) {
-        // Suppress auto-prefill of any exercise that matches OR options; user must choose
-        const names = orOpts.map(o=>o.name.toLowerCase());
-        exs = exs.filter(e=>!names.includes(e.name.toLowerCase()));
+        // Suppress auto-prefill of any exercise that matches OR options (normalize names)
+        const norm = (s:string)=>String(s||'').toLowerCase()
+          .replace(/\s*\(.*?\)\s*/g,'')
+          .replace(/\s*@.*$/,'')
+          .replace(/\s*[—-].*$/,'')
+          .replace(/\s+/g,' ')
+          .trim();
+        const optionBases = orOpts.map(o=>norm(o.name));
+        exs = exs.filter(e=>!optionBases.includes(norm(e.name)));
         setPendingOrOptions(orOpts);
       }
       if (exs.length) {
