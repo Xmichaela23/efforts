@@ -480,6 +480,20 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                     repeatWithRest(name, sets, `${reps}`, weightTxt, restNote);
                     continue;
                   }
+                  // Variant order: "Name @ 70% — 105 lb ... 4×6"
+                  const mp2 = seg.match(/([A-Za-z\- ]+)\s*@\s*(\d{1,3})%[^;]*?\b(\d+)\s*[x×]\s*(\d+)/i);
+                  if (mp2){
+                    const name = mp2[1].trim().replace(/\s+/g,' ');
+                    if (hasName(name)) { continue; }
+                    const pct = parseInt(mp2[2],10);
+                    const sets = parseInt(mp2[3],10);
+                    const reps = parseInt(mp2[4],10);
+                    const wm = seg.match(/—\s*(\d+)\s*lb/i);
+                    const weightTxt = wm ? `${wm[1]} lb` : (():string|undefined=>{ const key = liftOf(name); const w = calcWeight(pct, key); return w?`${w} lb`:undefined; })();
+                    const restNote = parseRestNote(seg);
+                    repeatWithRest(name, sets, `${reps}`, weightTxt, restNote);
+                    continue;
+                  }
                   // Without percent e.g., Row 4×6–8
                   const mr = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
                   if (mr){
@@ -1682,6 +1696,32 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                     const arr: string[] = [];
                                     for (let i=0;i<sets;i+=1){ arr.push(`${ex} 1 × ${reps}${wt?` @ ${wt}`:''}`.trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
                                     group = arr;
+                                  }
+                                } catch {}
+                              }
+                              // Fallback from tokens (preferred for OR headers that omit 4x6)
+                              if (!group.length) {
+                                try {
+                                  const steps: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
+                                  const tok = steps.find(t => /st_acc_barbell_row_/i.test(String(t)));
+                                  if (tok) {
+                                    const mt = String(tok).toLowerCase().match(/st_acc_barbell_row_(\d+)x(\d+)(?:_@pct(\d{1,3}))?_rest(\d+)/i);
+                                    if (mt) {
+                                      const sets = parseInt(mt[1], 10);
+                                      const reps = parseInt(mt[2], 10);
+                                      const pct = mt[3] ? parseInt(mt[3], 10) : undefined;
+                                      const restS = mt[4] ? parseInt(mt[4], 10) : undefined;
+                                      const perf: any = (perfNumbers || {});
+                                      const bench = typeof perf?.bench === 'number' ? perf.bench as number : undefined;
+                                      const dead = typeof perf?.deadlift === 'number' ? perf.deadlift as number : undefined;
+                                      const base = typeof bench === 'number' ? bench * 0.95 : (typeof dead === 'number' ? dead * 0.55 : undefined);
+                                      const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+                                      const weightTxt = typeof base === 'number' ? `${round5(typeof pct==='number' ? base*(pct/100) : base)} lb` : undefined;
+                                      const restNote = typeof restS === 'number' && isFinite(restS) ? `${restS} s` : undefined;
+                                      const arr: string[] = [];
+                                      for (let i=0;i<Math.max(1, sets);i+=1){ arr.push(`Barbell Row 1 × ${reps}${weightTxt?` @ ${weightTxt}`:''}`.trim()); if (restNote && i<sets-1) arr.push(`Rest ${restNote}`); }
+                                      group = arr;
+                                    }
                                   }
                                 } catch {}
                               }
