@@ -141,7 +141,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [expandedExercises, setExpandedExercises] = useState<{[key: string]: boolean}>({});
   const [workoutStartTime] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
-  const [pendingOrOptions, setPendingOrOptions] = useState<string[] | null>(null);
+  const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
   const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
@@ -318,7 +318,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return results;
   };
 
-  const extractOrOptions = (desc: string): string[] | null => {
+  const extractOrOptions = (desc: string): Array<{ label: string; name: string; sets: number; reps: number }> | null => {
     try {
       const body = String(desc || '');
       const tokens = body
@@ -329,17 +329,31 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         // explicit OR keyword
         if (/\bOR\b/i.test(t)) {
           const parts = t.split(/\bOR\b/i).map(s=>s.trim()).filter(Boolean);
-          if (parts.length >= 2) return parts.slice(0, 3); // support 2-3 options
+          if (parts.length >= 2) {
+            const opts: Array<{ label: string; name: string; sets: number; reps: number }> = [];
+            for (const p of parts.slice(0,3)){
+              const m = p.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
+              if (m){
+                const rawName = m[1].replace(/\s*\(.*?\)\s*/g,'').replace(/\s*optional:?\s*$/i,'').trim();
+                const name = rawName.includes('/') ? rawName : rawName.replace(/\s+\bor\b\s+/i,'/');
+                const sets = parseInt(m[2],10);
+                const reps = parseInt(m[3],10); // lower bound
+                const label = name;
+                opts.push({ label, name, sets, reps });
+              }
+            }
+            if (opts.length>=2) return opts;
+          }
         }
         // slash-based alt in the exercise name: e.g., "Pull-Ups/Chin-Ups 4x6"
         const m = t.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)/i);
         if (m && /\//.test(m[1])) {
-          const name = m[1];
-          const sets = m[2];
-          const reps = m[3];
-          const names = name.split('/').map(s=>s.trim()).filter(Boolean).slice(0,3);
+          const rawName = m[1].replace(/\s*\(.*?\)\s*/g,'').trim();
+          const sets = parseInt(m[2],10);
+          const reps = parseInt(m[3],10);
+          const names = rawName.split('/').map(s=>s.trim()).filter(Boolean).slice(0,3);
           if (names.length >= 2) {
-            return names.map(n => `${n} ${sets}x${reps}`);
+            return names.map(n => ({ label: names.join('/'), name: n, sets, reps }));
           }
         }
       }
@@ -882,14 +896,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   key={idx}
                   className="px-2 py-1 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   onClick={() => {
-                    const exs = parseStrengthDescription(opt);
-                    if (exs.length > 0) {
-                      setExercises(prev => [...prev, ...exs]);
-                      setPendingOrOptions(null);
-                    }
+                    // Replace/add the chosen OR as simple prefilled sets (lower rep bound)
+                    setExercises(prev => {
+                      const next = [...prev, {
+                        id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+                        name: opt.name,
+                        expanded: true,
+                        sets: Array.from({ length: Math.max(1, opt.sets) }, () => ({ reps: Math.max(1,opt.reps), weight: 0, barType: 'standard', rir: undefined, completed: false }))
+                      } as LoggedExercise];
+                      return next;
+                    });
+                    setPendingOrOptions(null);
                   }}
                 >
-                  {opt.replace(/\s*\(.*?\)\s*$/, '')}
+                  {opt.label}
                 </button>
               ))}
             </div>
