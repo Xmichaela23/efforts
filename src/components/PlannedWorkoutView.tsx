@@ -866,6 +866,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const handleSelectOr = (groupKey: string, value: string) => {
     try { sessionStorage.setItem(groupKey, value); } catch {}
     setOrSelections(prev => ({ ...prev, [groupKey]: value }));
+    // Auto-expand the newly selected OR choice
+    setExpandedBlocks(prev => ({ ...prev, [value]: true }));
   };
   const handleIncludeOptional = (optKey: string, name: string, next: boolean) => {
     try { sessionStorage.setItem(optKey, String(next)); } catch {}
@@ -1652,27 +1654,25 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                       const groupSel = orSelections[b.optionKey as string] || '';
                       const chosen = groupSel === b.id;
                       return (
-                        <div
-                          key={b.id}
-                          className="flex items-start gap-2 cursor-pointer"
-                          onClick={() => handleSelectOr(b.optionKey as string, b.id)}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); handleSelectOr(b.optionKey as string, b.id); } }}
-                        >
-                          <input
-                            type="radio"
-                            name={b.optionKey}
-                            checked={chosen}
-                            onChange={() => handleSelectOr(b.optionKey as string, b.id)}
-                            className="mt-1"
-                          />
-                          <div className="flex-1">
+                        <div key={b.id} className="flex items-start gap-2">
+                          <div className="flex-1 cursor-pointer"
+                               onClick={() => handleSelectOr(b.optionKey as string, b.id)}
+                               role="button" tabIndex={0}
+                               onKeyDown={(e)=>{ if(e.key==='Enter' || e.key===' ') { e.preventDefault(); handleSelectOr(b.optionKey as string, b.id); } }}>
                             <div className={`text-sm ${chosen? 'text-gray-900' : 'text-gray-600'}`}>
-                              {/* Header shows only Lift @ XX% (strip loads) */}
                               {String(b.header).replace(/\s*—\s*\d+\s*lb.*$/i,'').trim()}
                             </div>
-                            {chosen && (() => {
+                          </div>
+                          <div className="pt-0.5">
+                            <input
+                              type="radio"
+                              name={b.optionKey}
+                              checked={chosen}
+                              onChange={() => handleSelectOr(b.optionKey as string, b.id)}
+                              className="mt-0.5"
+                            />
+                          </div>
+                          {chosen && (() => {
                               // Show grouped per-set lines for this exercise automatically when selected
                               const norm = (s:string)=> s.toLowerCase().replace(/\s+/g,' ').replace(/bb\s*row|barbell\s*row/g,'row').replace(/db\s*row|dumbbell\s*row/g,'row').replace(/\s*\(.*?\)\s*$/,'').trim();
                               const name = b.name;
