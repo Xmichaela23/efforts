@@ -1741,7 +1741,6 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                 </ul>
                               );
                           })()}
-                          </div>
                         </div>
                       );
                     }
