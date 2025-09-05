@@ -365,7 +365,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             try {
               const rawDesc = String((workout as any).rendered_description || workout.description || '').trim();
               if (/\brow\b|pull\-?ups|chin\-?ups/i.test(rawDesc)) {
-                const segs = rawDesc.split(/;+/).map(s=>s.trim()).filter(Boolean);
+                const segs = rawDesc.split(new RegExp(';+')).map(s=>s.trim()).filter(Boolean);
                 const seenName = (nm:string) => lines.some(l => l.startsWith(`${nm} 1 ×`));
                 const parseRestNote = (text: string): string | undefined => { const m = text.match(/rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s)/i); if (!m) return undefined; return `${m[1]} ${m[2]}`.replace('--','–'); };
                 const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; if (t.includes('row')) return 'bench'; return 'squat'; };
@@ -414,7 +414,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             // Also parse description like "Deadlift 5×3 @75%" to append accessories/main not present in strength_exercises
             {
               const raw = String((workout as any).rendered_description || workout.description || '').trim();
-              const segments = raw.split(/;+/).map(s=>s.trim()).filter(Boolean);
+              const segments = raw.split(new RegExp(';+')).map(s=>s.trim()).filter(Boolean);
               const pn = perfNumbers || {};
               const oneRM = { squat: pn?.squat, bench: pn?.bench, deadlift: pn?.deadlift, overhead: pn?.overheadPress1RM || pn?.overhead || pn?.ohp } as any;
               const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; return 'squat'; };
@@ -461,7 +461,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 } catch {}
                 return undefined;
               };
-              const expandOrParts = (text: string): string[] => { const parts = text.split(/\s+or\s+/i).map(s=>s.trim()).filter(Boolean); return parts.length>1 ? parts.map((p,i)=> i===0?p:`(or) ${p}`) : parts; };
+              const expandOrParts = (text: string): string[] => { const parts = text.split(new RegExp('\\s+or\\s+','i')).map(s=>s.trim()).filter(Boolean); return parts.length>1 ? parts.map((p,i)=> i===0?p:`(or) ${p}`) : parts; };
               const parseRestNote = (text: string): string | undefined => { const m = text.match(/rest\s+([0-9]+(?:[–-][0-9]+)?)\s*(min|s)/i); if (!m) return undefined; return `${m[1]} ${m[2]}`.replace('--','–'); };
               const repeatWithRest = (name:string, sets:number, repsText:string, weightText?:string, restNote?:string) => { for (let i=0;i<Math.max(1, sets);i+=1) { lines.push(`${name} 1 × ${repsText}${weightText?` @ ${weightText}`:''}`.trim()); if (restNote && i<sets-1) lines.push(`Rest ${restNote}`); } };
               for (const seg0 of segments){
@@ -744,7 +744,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const comp: Record<string,boolean> = { ...completeOptional };
 
       const blocks: Array<{ id:string; name:string; header:string; isOptional?:boolean; orGroup?:number; optionKey?:string }>=[];
-      const segsRaw = txt.split(/;+/).map(s=>s.trim()).filter(Boolean);
+      const segsRaw = txt.split(new RegExp(';+')).map(s=>s.trim()).filter(Boolean);
       // Ensure "Optional:" becomes its own segment even if authored after a period
       const segs: string[] = [];
       for (const s of segsRaw) {
@@ -762,9 +762,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       const baseNameFromHeader = (h: string): string => {
         try {
           let s = String(h||'');
-          s = s.replace(/\s*—\s*\d+\s*lb.*$/i,'').trim(); // strip loads if present
-          s = s.split(/\s+@/)[0]; // drop inline percent
-          s = s.split(/\s+\d+[x×]/)[0]; // drop sets marker if present
+          s = s.replace(new RegExp('\\s*—\\s*\\d+\\s*lb.*$','i'),'').trim();
+          s = s.split(new RegExp('\\s+@'))[0];
+          s = s.split(new RegExp('\\s+\\d+[x×]'))[0];
           return s.trim();
         } catch { return String(h||'').trim(); }
       };
@@ -783,7 +783,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           continue;
         }
         // OR alternatives — split but mark same group
-        const parts = raw.split(/\s+OR\s+/i).map(p=>p.trim()).filter(Boolean);
+        const parts = raw.split(new RegExp('\\s+OR\\s+','i')).map(p=>p.trim()).filter(Boolean);
         if (parts.length > 1) {
           groupCounter += 1;
           const gid = groupCounter;
@@ -1684,7 +1684,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                                 return t.trim();
                               };
                               const name = b.name;
-                              let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
+                              let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(new RegExp('\\s+@'))[0]] || [];
                               // Fallback synth from header when no grouped sets exist
                               if (!group.length) {
                                 try {
@@ -1803,7 +1803,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                             t = t.replace(new RegExp('overhead\\s*press|\\bohp\\b','g'),'ohp');
                             return t.trim();
                           };
-                          let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(/\s+@/)[0]] || [];
+                          let group = groupedStrengthLines[name] || groupedStrengthLines[norm(name)] || groupedStrengthLines[name.split(new RegExp('\\s+@'))[0]] || [];
                           // Fallback: synthesize per-set lines from header when grouping not available (e.g., week one edge cases)
                           if (!group.length) {
                             try {
