@@ -411,14 +411,15 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 }
               }
             } catch {}
-            // Fallback A: parse description like "Deadlift 5×3 @75%" into lines with weights (uses rendered_description if present)
-            if (lines.length === 0) {
+            // Also parse description like "Deadlift 5×3 @75%" to append accessories/main not present in strength_exercises
+            {
               const raw = String((workout as any).rendered_description || workout.description || '').trim();
               const segments = raw.split(/;+/).map(s=>s.trim()).filter(Boolean);
               const pn = perfNumbers || {};
               const oneRM = { squat: pn?.squat, bench: pn?.bench, deadlift: pn?.deadlift, overhead: pn?.overheadPress1RM || pn?.overhead || pn?.ohp } as any;
               const liftOf = (txt:string): keyof typeof oneRM => { const t = txt.toLowerCase(); if (t.includes('deadlift')) return 'deadlift'; if (t.includes('bench')) return 'bench'; if (t.includes('ohp') || t.includes('overhead')) return 'overhead'; if (t.includes('squat')) return 'squat'; return 'squat'; };
               const calcWeight = (pct: number|undefined, lift: keyof typeof oneRM): number | null => { if (!pct || !oneRM[lift] || typeof oneRM[lift] !== 'number') return null; const rawW = Math.round((oneRM[lift] as number) * (pct/100)); return Math.round(rawW/5)*5; };
+              const hasName = (nm: string) => lines.some((l)=> new RegExp(`^${nm}\\s+1\\s×`, 'i').test(l));
               // Accessory estimation (initial: horizontal pull/rows; extendable for others)
               const estimateAccessoryLoad = (exerciseName: string): string | undefined => {
                 try {
@@ -469,6 +470,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                   const mp = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
                   if (mp){
                     const name = mp[1].trim().replace(/\s+/g,' ');
+                    if (hasName(name)) { continue; }
                     const sets = parseInt(mp[2],10);
                     const reps = parseInt(mp[3],10);
                     const pct = parseInt(mp[4],10);
@@ -482,6 +484,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                   const mr = seg.match(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)(?:\s*[–-]\s*(\d+))?/i);
                   if (mr){
                     const name = mr[1].trim().replace(/\s+/g,' ');
+                    if (hasName(name)) { continue; }
                     const sets = parseInt(mr[2],10);
                     const r1 = parseInt(mr[3],10);
                     const r2 = mr[4]?parseInt(mr[4],10):undefined;
