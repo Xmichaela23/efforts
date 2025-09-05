@@ -379,6 +379,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             return 'squat';
           };
           const addLoads = (txt: string): string => {
+            // Derive accessory percents from tokens if present for this session (e.g., st_acc_barbell_row_*_@pct70)
+            const pctFromTokens = (() => {
+              try {
+                const steps: string[] = Array.isArray((s as any)?.steps_preset) ? (s as any).steps_preset : [];
+                for (const t of steps) {
+                  const m = String(t).toLowerCase().match(/st_acc_barbell_row_[^@]*_@pct(\d{1,3})/i);
+                  if (m) return Math.min(100, Math.max(1, parseInt(m[1], 10)));
+                }
+              } catch {}
+              return undefined;
+            })();
             // Main lifts with %
             let out = txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
               if (/\b\d+\s*lb\b/i.test(String(tail))) return m;
@@ -386,7 +397,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               const key = liftKey(String(name));
               const orm = oneRM[key];
               if (!orm || !pct || !isFinite(orm)) return m;
-              const rounded = round5(orm * (pct/100));
+              const proxy = key==='bench' && /row/i.test(String(name)) ? orm * 0.95 : orm;
+              const rounded = round5(proxy * (pct/100));
               return `${name} ${sets}×${reps} @ ${pct}% — ${rounded} lb${tail}`;
             });
             // Accessory: Rows without % — estimate from Bench (95%), fallback Deadlift (55%)
@@ -394,7 +406,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               if (/\b\d+\s*lb\b/i.test(m)) return m;
               const bench: number | undefined = typeof oneRM.bench === 'number' ? oneRM.bench : undefined;
               const dead: number | undefined = typeof oneRM.deadlift === 'number' ? oneRM.deadlift : undefined;
-              const est = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
+              const base = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
+              const scale = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens)) ? (pctFromTokens/100) : 1;
+              const est = (typeof base === 'number') ? base * scale : undefined;
               if (typeof est !== 'number' || !isFinite(est)) return m;
               const rounded = round5(est);
               return `${label} — ${rounded} lb${tail || ''}`;
