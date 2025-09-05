@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -141,6 +142,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [workoutStartTime] = useState<Date>(new Date());
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingOrOptions, setPendingOrOptions] = useState<string[] | null>(null);
+  const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
@@ -262,6 +264,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       .filter(Boolean);
 
     const results: LoggedExercise[] = [];
+    const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+    const oneRmOf = (name: string): number | undefined => {
+      const t = name.toLowerCase();
+      if (t.includes('deadlift')) return typeof performanceNumbers?.deadlift==='number'? performanceNumbers.deadlift: undefined;
+      if (t.includes('bench')) return typeof performanceNumbers?.bench==='number'? performanceNumbers.bench: undefined;
+      if (t.includes('overhead') || t.includes('ohp')) return typeof performanceNumbers?.overhead==='number'? performanceNumbers.overhead: (typeof performanceNumbers?.overheadPress1RM==='number'? performanceNumbers.overheadPress1RM: undefined);
+      if (t.includes('row')) {
+        if (typeof performanceNumbers?.bench==='number') return Math.round(performanceNumbers.bench*0.95);
+        if (typeof performanceNumbers?.deadlift==='number') return Math.round(performanceNumbers.deadlift*0.55);
+      }
+      if (typeof performanceNumbers?.squat==='number') return performanceNumbers.squat;
+      return undefined;
+    };
     for (const p of parts) {
       // Examples: "Back Squat 3x5 — 225 lb", "Bench Press 4×6", "Deadlift 5x3 - 315 lb"
       const m = p.match(/^\s*(.*?)\s+(\d+)\s*[x×]\s*(\d+)(?:.*?[—–-]\s*(\d+)\s*(?:lb|lbs|kg)?\b)?/i);
@@ -283,6 +298,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           expanded: true
         };
         results.push(ex);
+        continue;
+      }
+      // Percent pattern e.g., Bench 5x5 @ 70%
+      const mp = p.match(/^\s*(.*?)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%/i);
+      if (mp) {
+        const name = mp[1].trim();
+        const sets = parseInt(mp[2],10);
+        const reps = parseInt(mp[3],10);
+        const pct = parseInt(mp[4],10);
+        const one = oneRmOf(name);
+        const w = one ? round5(one*(pct/100)) : 0;
+        const ex: LoggedExercise = {
+          id: `${Date.now()}-${name}-${Math.random().toString(36).slice(2,8)}`,
+          name,
+          sets: Array.from({ length: sets }, () => ({ reps, weight: w, barType: 'standard', rir: undefined, completed: false })),
+          expanded: true
+        };
+        results.push(ex);
+        continue;
       }
     }
     return results;
@@ -296,16 +330,86 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         .map(s=>s.trim())
         .filter(Boolean);
       for (const t of tokens) {
+        // explicit OR keyword
         if (/\bOR\b/i.test(t)) {
           const parts = t.split(/\bOR\b/i).map(s=>s.trim()).filter(Boolean);
           if (parts.length >= 2) return parts.slice(0, 3); // support 2-3 options
+        }
+        // slash-based alt in the exercise name: e.g., "Pull-Ups/Chin-Ups 4x6"
+        const m = t.match(/^(.*?)\s+(\d+)\s*[x×]\s*(\d+)/i);
+        if (m && /\//.test(m[1])) {
+          const name = m[1];
+          const sets = m[2];
+          const reps = m[3];
+          const names = name.split('/').map(s=>s.trim()).filter(Boolean).slice(0,3);
+          if (names.length >= 2) {
+            return names.map(n => `${n} ${sets}x${reps}`);
+          }
         }
       }
     } catch {}
     return null;
   };
 
+  // Parse strength tokens from steps_preset if available
+  const parseStepsPreset = (stepsPreset?: string[]): LoggedExercise[] => {
+    try {
+      const arr = Array.isArray(stepsPreset) ? stepsPreset : [];
+      const out: LoggedExercise[] = [];
+      const round5 = (n:number) => Math.max(5, Math.round(n/5)*5);
+      const push = (name:string, sets:number, reps:number, w:number) => {
+        out.push({
+          id: `${Date.now()}-${name}-${Math.random().toString(36).slice(2,8)}`,
+          name,
+          expanded: true,
+          sets: Array.from({ length: sets }, () => ({ reps, weight: w||0, barType: 'standard', rir: undefined, completed: false }))
+        });
+      };
+      for (const tok0 of arr) {
+        const tok = String(tok0).toLowerCase();
+        // strength_deadlift_5x3_75pct | 70percent | 70%
+        const m = tok.match(/^strength_([a-z_]+)_(\d+)x(\d+).*?(\d{1,3})\s*(?:pct|percent|%)?/i);
+        if (m) {
+          const nameKey = m[1].replace(/_/g,' ');
+          const sets = parseInt(m[2],10);
+          const reps = parseInt(m[3],10);
+          const pct = parseInt(m[4],10);
+          const lift = nameKey.includes('dead')?'deadlift':nameKey.includes('bench')?'bench':nameKey.includes('overhead')||nameKey.includes('ohp')?'overhead':'squat';
+          const one = typeof performanceNumbers?.[lift]==='number'? performanceNumbers[lift]: undefined;
+          const w = one? round5(one*(pct/100)) : 0;
+          push(nameKey.replace(/\b1rm\b/i,''), sets, reps, w);
+          continue;
+        }
+        // st_acc_barbell_row_4x6_@pct70_rest90
+        const r = tok.match(/^st_acc_barbell_row_(\d+)x(\d+)(?:_@pct(\d{1,3}))?_rest(\d+)/i);
+        if (r) {
+          const sets = parseInt(r[1],10);
+          const reps = parseInt(r[2],10);
+          const pct = r[3]?parseInt(r[3],10):undefined;
+          const base = typeof performanceNumbers?.bench==='number'? Math.round(performanceNumbers.bench*0.95) : (typeof performanceNumbers?.deadlift==='number'? Math.round(performanceNumbers.deadlift*0.55): undefined);
+          const w = base? round5(base*((pct||100)/100)) : 0;
+          push('Barbell Row', sets, reps, w);
+          continue;
+        }
+      }
+      return out;
+    } catch { return []; }
+  };
+
   // Proper initialization with cleanup
+  useEffect(() => {
+    // Load user 1RMs for weight computation
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const pnResp = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).single();
+        const pn = (pnResp as any)?.data?.performance_numbers || null;
+        if (pn) setPerformanceNumbers(pn);
+      } catch {}
+    })();
+  }, []);
+
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
     
@@ -364,10 +468,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }));
       
       setExercises(prePopulatedExercises);
-    } else if (workoutToLoad && (typeof (workoutToLoad as any).rendered_description === 'string' || typeof workoutToLoad.description === 'string')) {
+    } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof workoutToLoad.description === 'string')) {
       // Fallback: parse rendered_description first, then description
+      const stepsArr: string[] = Array.isArray((workoutToLoad as any).steps_preset) ? (workoutToLoad as any).steps_preset : [];
+      const viaTokens = parseStepsPreset(stepsArr);
       const src = (workoutToLoad as any).rendered_description || workoutToLoad.description || '';
-      const parsed = parseStrengthDescription(src);
+      const parsed = viaTokens.length>0 ? viaTokens : parseStrengthDescription(src);
       const orOpts = extractOrOptions(src);
       if (parsed.length > 0) {
         console.log('📝 Parsed exercises from description');
