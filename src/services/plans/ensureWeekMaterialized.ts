@@ -171,6 +171,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           if (t==='strength' && desc) {
             const round5 = (n:number) => Math.round(n/5)*5;
             const injectLoads = (txt: string): string => {
+              // Derive accessory percents from tokens if present (e.g., st_acc_barbell_row_*_@pct70)
+              const pctFromTokens = (() => {
+                try {
+                  const steps: string[] = Array.isArray((row as any)?.steps_preset) ? (row as any).steps_preset : [];
+                  for (const t of steps) {
+                    const m = String(t).toLowerCase().match(/st_acc_barbell_row_[^@]*_@pct(\d{1,3})/i);
+                    if (m) return Math.min(100, Math.max(1, parseInt(m[1], 10)));
+                  }
+                } catch {}
+                return undefined;
+              })();
               // 1) Main lifts with percent
               let out = txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
                 if (/\b\d+\s*lb\b/i.test(String(tail))) return m; // already includes load
@@ -193,7 +204,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 if (/\b\d+\s*lb\b/i.test(m)) return m; // already shows load
                 const bench: number | undefined = typeof perfNumbersUpgrade?.bench === 'number' ? perfNumbersUpgrade.bench : undefined;
                 const dead: number | undefined = typeof perfNumbersUpgrade?.deadlift === 'number' ? perfNumbersUpgrade.deadlift : undefined;
-                const est = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
+                const base = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
+                const scale = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens)) ? (pctFromTokens/100) : 1;
+                const est = (typeof base === 'number') ? base * scale : undefined;
                 if (typeof est !== 'number' || !isFinite(est)) return m;
                 const rounded = round5(est);
                 return `${label} — ${rounded} lb${tail || ''}`;
