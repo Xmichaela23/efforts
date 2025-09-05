@@ -57,7 +57,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   // 1) If rows already exist for this week, upgrade any that are missing intervals
   const { data: existing, error: existErr } = await supabase
     .from('planned_workouts')
-    .select('id, user_id, type, steps_preset, export_hints, intervals, computed, tags, rendered_description, description')
+    .select('id, user_id, type, steps_preset, export_hints, intervals, computed, tags, rendered_description, description, day_number')
     .eq('training_plan_id', planId)
     .eq('week_number', weekNumber);
   if (!existErr && Array.isArray(existing) && existing.length > 0) {
@@ -142,6 +142,34 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         }
       } catch {}
 
+      // Load library plan for this week to allow picking updated tokens (e.g., new @pct on accessories)
+      let libraryWeekSessions: any[] | null = null;
+      try {
+        const { data: libPlan } = await supabase
+          .from('plans')
+          .select('sessions_by_week')
+          .eq('id', planId)
+          .single();
+        libraryWeekSessions = libPlan?.sessions_by_week?.[String(weekNumber)] || null;
+      } catch {}
+
+      const dayNameFromNum = (n: number): string => DAYS[Math.max(1, Math.min(7, n)) - 1];
+      const pctFromLibraryForRow = (row: any): number | undefined => {
+        try {
+          if (!Array.isArray(libraryWeekSessions)) return undefined;
+          const dayName = dayNameFromNum(Number(row?.day_number || 1));
+          const sessions = libraryWeekSessions.filter((s: any) => String(s?.day) === dayName && String(s?.discipline||s?.type||'').toLowerCase()==='strength');
+          for (const s of sessions) {
+            const steps: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset : [];
+            for (const t of steps) {
+              const m = String(t).toLowerCase().match(/st_acc_barbell_row_[^@]*_@pct(\d{1,3})/i);
+              if (m) return Math.min(100, Math.max(1, parseInt(m[1], 10)));
+            }
+          }
+        } catch {}
+        return undefined;
+      };
+
       for (const row of existing as any[]) {
         const hasSteps = row?.computed && Array.isArray(row.computed.steps) && row.computed.steps.length>0;
         if (!hasSteps) {
@@ -182,6 +210,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 } catch {}
                 return undefined;
               })();
+              const pctFromLibrary = pctFromTokens == null ? pctFromLibraryForRow(row) : undefined;
               // 1) Main lifts with percent
               let out = txt.replace(/([A-Za-z\- ]+)\s+(\d+)\s*[x×]\s*(\d+)\s*@\s*(\d{1,3})%([^;]*)/g, (m, name, sets, reps, pctStr, tail) => {
                 if (/\b\d+\s*lb\b/i.test(String(tail))) return m; // already includes load
@@ -205,7 +234,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 const bench: number | undefined = typeof perfNumbersUpgrade?.bench === 'number' ? perfNumbersUpgrade.bench : undefined;
                 const dead: number | undefined = typeof perfNumbersUpgrade?.deadlift === 'number' ? perfNumbersUpgrade.deadlift : undefined;
                 const base = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
-                const scale = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens)) ? (pctFromTokens/100) : 1;
+                const scale = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens))
+                  ? (pctFromTokens/100)
+                  : (typeof pctFromLibrary === 'number' && isFinite(pctFromLibrary) ? (pctFromLibrary/100) : 1);
                 const est = (typeof base === 'number') ? base * scale : undefined;
                 if (typeof est !== 'number' || !isFinite(est)) return m;
                 const rounded = round5(est);
