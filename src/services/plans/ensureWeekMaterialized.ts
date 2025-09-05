@@ -230,17 +230,20 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               });
               // 2) Accessory Barbell/DB Row without explicit percent — estimate from Bench 1RM (95%), fallback DL 55%
               out = out.replace(/\b(Barbell Row|BB Row|Row|DB Row|Dumbbell Row)\b([^;]*)/gi, (m, label, tail) => {
-                if (/\b\d+\s*lb\b/i.test(m)) return m; // already shows load
                 const bench: number | undefined = typeof perfNumbersUpgrade?.bench === 'number' ? perfNumbersUpgrade.bench : undefined;
                 const dead: number | undefined = typeof perfNumbersUpgrade?.deadlift === 'number' ? perfNumbersUpgrade.deadlift : undefined;
                 const base = (typeof bench === 'number' && isFinite(bench)) ? bench * 0.95 : (typeof dead === 'number' && isFinite(dead) ? dead * 0.55 : undefined);
-                const scale = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens))
-                  ? (pctFromTokens/100)
-                  : (typeof pctFromLibrary === 'number' && isFinite(pctFromLibrary) ? (pctFromLibrary/100) : 1);
+                const pct = (typeof pctFromTokens === 'number' && isFinite(pctFromTokens))
+                  ? pctFromTokens
+                  : (typeof pctFromLibrary === 'number' && isFinite(pctFromLibrary) ? pctFromLibrary : undefined);
+                const scale = (typeof pct === 'number') ? (pct/100) : 1;
                 const est = (typeof base === 'number') ? base * scale : undefined;
                 if (typeof est !== 'number' || !isFinite(est)) return m;
+                const hasLb = /\b\d+\s*lb\b/i.test(m);
+                if (hasLb && scale === 1) return m; // already has a load and no pct to override
                 const rounded = round5(est);
-                return `${label} — ${rounded} lb${tail || ''}`;
+                const pctTxt = (typeof pct === 'number') ? ` @ ${pct}%` : '';
+                return `${label}${pctTxt} — ${rounded} lb${tail || ''}`;
               });
               return out;
             };
