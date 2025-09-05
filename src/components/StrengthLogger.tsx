@@ -479,6 +479,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const exs = parseFromComputed((workoutToLoad as any).computed);
       if (exs.length) {
         setExercises(exs);
+        // Also surface OR chooser from header text if present
+        try {
+          const srcHdr = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
+          const orOpts = extractOrOptions(srcHdr);
+          if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
+        } catch {}
         setIsInitialized(true);
         return;
       }
