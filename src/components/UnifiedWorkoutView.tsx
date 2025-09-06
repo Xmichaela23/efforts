@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
 import CompletedTab from './CompletedTab';
+import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
@@ -37,6 +38,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const { deletePlannedWorkout } = usePlannedWorkouts();
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
+  const [assocOpen, setAssocOpen] = useState(false);
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
@@ -253,6 +255,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 ) : workout.type === 'strength' ? (
                   <div className="p-4">
                     <h3 className="font-semibold mb-4">Strength Workout Completed</h3>
+                    <div className="mb-3">
+                      <Button variant="outline" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
+                    </div>
                     {/* Use StrengthCompletedView for strength workouts with sanitized sets */}
                     <StrengthCompletedView workoutData={{
                       ...workout,
@@ -270,6 +275,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                           }))
                         : []
                     }} />
+                    {assocOpen && (
+                      <AssociatePlannedDialog
+                        workout={workout}
+                        open={assocOpen}
+                        onClose={()=>setAssocOpen(false)}
+                        onAssociated={()=>{ try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {} }}
+                      />
+                    )}
                   </div>
                 ) : (
                   <div className="p-4">
