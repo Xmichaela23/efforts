@@ -133,6 +133,8 @@ export interface Workout {
   avg_pace?: number;
   max_pace?: number;
   steps?: number;
+  // Swim-specific structured data
+  swim_data?: any;
           // Garmin-specific fields
         isGarminImported?: boolean;
         garmin_activity_id?: string;
@@ -678,6 +680,11 @@ export const useWorkouts = () => {
           } catch {
             return (w as any).sensor_data;
           }
+        })(),
+        swim_data: (() => {
+          try {
+            return typeof (w as any).swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any).swim_data;
+          } catch { return (w as any).swim_data; }
         })()
       }));
 
@@ -1288,6 +1295,7 @@ export const useWorkouts = () => {
         // GPS and sensor data for charts
         gps_track: workoutData.gps_track ? JSON.stringify(workoutData.gps_track) : null,
         sensor_data: workoutData.sensor_data ? JSON.stringify(workoutData.sensor_data) : null,
+        swim_data: (workoutData as any).swim_data ? JSON.stringify((workoutData as any).swim_data) : null,
       };
 
       console.log("Saving workout with ALL FIT data:", toSave);
@@ -1433,6 +1441,9 @@ export const useWorkouts = () => {
       if (data.sensor_data) {
         newWorkout.sensor_data = JSON.parse(data.sensor_data);
       }
+      if ((data as any).swim_data) {
+        try { (newWorkout as any).swim_data = JSON.parse((data as any).swim_data); } catch { (newWorkout as any).swim_data = (data as any).swim_data; }
+      }
 
       setWorkouts((prev) => [newWorkout, ...prev]);
 
@@ -1473,6 +1484,7 @@ export const useWorkouts = () => {
       if (updates.workout_status !== undefined) updateObject.workout_status = updates.workout_status;
       if (updates.intervals !== undefined) updateObject.intervals = JSON.stringify(updates.intervals);
       if (updates.strength_exercises !== undefined) updateObject.strength_exercises = JSON.stringify(updates.strength_exercises);
+      if ((updates as any).swim_data !== undefined) updateObject.swim_data = JSON.stringify((updates as any).swim_data);
       if (updates.avg_heart_rate !== undefined) updateObject.avg_heart_rate = updates.avg_heart_rate;
       if (updates.max_heart_rate !== undefined) updateObject.max_heart_rate = updates.max_heart_rate;
       if (updates.avg_power !== undefined) updateObject.avg_power = updates.avg_power;
