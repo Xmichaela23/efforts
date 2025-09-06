@@ -133,22 +133,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   const getWorkoutType = () => {
     // Handle Garmin activity types FIRST (more reliable than stored type)
-    if (workout.activity_type) {
-      const activityType = workout.activity_type.toLowerCase();
+    if (workout.activity_type || (workout as any)?.provider_sport) {
+      const raw = (workout.activity_type || (workout as any).provider_sport || '').toLowerCase();
       
-      if (activityType.includes('walking') || activityType.includes('walk')) {
+      if (raw.includes('walking') || raw.includes('walk')) {
         return 'walk';
       }
-      if (activityType.includes('running') || activityType.includes('run')) {
+      if (raw.includes('running') || raw.includes('run')) {
         return 'run';
       }
-      if (activityType.includes('cycling') || activityType.includes('bike') || activityType.includes('ride')) {
+      if (raw.includes('cycling') || raw.includes('bike') || raw.includes('ride')) {
         return 'ride';
       }
-      if (activityType.includes('swimming') || activityType.includes('swim')) {
+      if (raw.includes('swimming') || raw.includes('swim')) {
         return 'swim';
       }
-      if (activityType.includes('strength') || activityType.includes('weight')) {
+      if (raw.includes('strength') || raw.includes('weight')) {
         return 'strength';
       }
     }
@@ -200,6 +200,28 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     }
 
     const activityType = getWorkoutType();
+    const rawProvider = String((workout as any)?.provider_sport || (workout as any)?.activity_type || '').toLowerCase();
+    const humanize = (s: string) => s.replace(/_/g,' ').replace(/\s+/g,' ').trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+    const friendlySport = () => {
+      if (activityType === 'swim') {
+        if (/open\s*water|ocean|ow\b/.test(rawProvider)) return 'Open Water Swim';
+        if (/lap|pool/.test(rawProvider)) return 'Pool Swim';
+        return 'Swim';
+      }
+      if (activityType === 'run') {
+        if (/trail/.test(rawProvider)) return 'Trail Run';
+        return 'Run';
+      }
+      if (activityType === 'ride') {
+        if (/gravel/.test(rawProvider)) return 'Gravel Ride';
+        if (/mountain|mtb/.test(rawProvider)) return 'Mountain Bike';
+        if (/road/.test(rawProvider)) return 'Road Ride';
+        return 'Ride';
+      }
+      if (activityType === 'walk') return 'Walk';
+      if (activityType === 'strength') return 'Strength Training';
+      return humanize(rawProvider || activityType);
+    };
     
     // Get location from coordinates if available
     const lat = workout.starting_latitude || workout.start_position_lat;
@@ -222,13 +244,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                          activityType === 'strength' ? 'Strength Training' :
                          activityType.charAt(0).toUpperCase() + activityType.slice(1);
     
-    // Create title: "Location + Activity Type" or fallback
+    // Create title: "Location + Friendly Sport" or sanitized name fallback
     if (location && location !== 'Unknown Location') {
-      return `${location} ${formattedType}`;
+      return `${location} ${friendlySport()}`;
     } else if (workout.name && !workout.name.includes('Garmin Activity')) {
-      return workout.name;
+      const cleaned = humanize(String(workout.name));
+      // If name looks like a provider code (had underscores or all-caps), prefer friendly sport
+      if (/_/.test(String(workout.name)) || String(workout.name) === String(workout.name).toUpperCase()) {
+        return friendlySport();
+      }
+      return cleaned;
     } else {
-      return formattedType;
+      return friendlySport();
     }
   };
 

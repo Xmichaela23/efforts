@@ -273,7 +273,7 @@ export const useWorkouts = () => {
                 return 'run';
               };
 
-              const workoutType = getWorkoutType(activity.activity_type);
+              const workoutType = getWorkoutType(activity.activity_type || (activity as any).provider_sport || '');
               const activityDate = (() => {
                 const d = activity.start_time ? new Date(activity.start_time) : new Date();
                 return d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -289,6 +289,8 @@ export const useWorkouts = () => {
                 id: `garmin_${activity.garmin_activity_id || activity.id}`,
                 name: activity.activity_name || activity.activity_type || locationTitle || `Garmin ${workoutType}`,
                 type: workoutType,
+                activity_type: activity.activity_type,
+                provider_sport: activity.activity_type,
                 duration: Math.round(activity.duration_seconds / 60) || 0,
                 date: activityDate,
                 description: `Imported from Garmin - ${activity.activity_type || 'Activity'}`,
