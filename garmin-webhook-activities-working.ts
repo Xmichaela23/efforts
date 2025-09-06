@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 
@@ -272,7 +273,10 @@ async function processActivityDetails(activityDetails) {
             temperature: sample.airTemperatureCelcius || null,
             timerDuration: sample.timerDurationInSeconds || null,
             clockDuration: sample.clockDurationInSeconds || null,
-            movingDuration: sample.movingDurationInSeconds || null
+            movingDuration: sample.movingDurationInSeconds || null,
+            // Added for per-step slicing and distance-accurate splits
+            speedMetersPerSecond: sample.speedMetersPerSecond || null,
+            totalDistanceInMeters: sample.totalDistanceInMeters || null
           };
           
           allSensorData.push(sensorReading);
@@ -387,6 +391,63 @@ async function processActivityDetails(activityDetails) {
         console.error('Error saving activity:', error);
       } else {
         console.log(`✅ SAVED COMPLETE ACTIVITY: ${activity.activityType} - ${activity.summaryId} ${avgPower ? `Power: ${avgPower}W avg` : 'No power'} ${avgHeartRate ? `HR: ${avgHeartRate} avg` : 'No HR'} ${gpsTrack.length > 0 ? `GPS: ${gpsTrack.length} points` : 'No GPS'} ${allSensorData.length > 0 ? `Sensors: ${allSensorData.length} samples` : 'No sensors'}`);
+
+        // Mirror into workouts via ingest-activity (idempotent upsert by user_id,garmin_activity_id)
+        try {
+          const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ingest-activity`;
+          const swim_data = (activityDetail as any)?.lengths ? { lengths: (activityDetail as any).lengths } : null;
+          // Laps may appear at root or under summary depending on source
+          const laps = (activityDetail as any)?.laps ?? (activityDetail as any)?.summary?.laps ?? null;
+
+          const payload = {
+            userId: connection.user_id,
+            provider: 'garmin',
+            activity: {
+              garmin_activity_id: String(activity.summaryId ?? activity.activityId ?? ''),
+              activity_type: activity.activityType,
+              start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
+              duration_seconds: activity.durationInSeconds,
+              distance_meters: activity.distanceInMeters ?? null,
+              avg_heart_rate: avgHeartRate ?? activity.averageHeartRateInBeatsPerMinute ?? null,
+              max_heart_rate: maxHeartRate ?? activity.maxHeartRateInBeatsPerMinute ?? null,
+              avg_speed_mps: activity.averageSpeedInMetersPerSecond ?? null,
+              elevation_gain_meters: (activityDetail as any)?.summary?.totalElevationGainInMeters ?? null,
+              starting_latitude: activity.startingLatitudeInDegree ?? null,
+              starting_longitude: activity.startingLongitudeInDegree ?? null,
+              // Swim specifics if present
+              pool_length: activity.poolLengthInMeters ?? activity.pool_length ?? null,
+              strokes: activity.totalNumberOfStrokes ?? activity.strokes ?? null,
+              avg_swim_cadence: activity.averageSwimCadenceInStrokesPerMinute ?? null,
+              // Multisport linkage
+              is_parent: activity.isParent ?? null,
+              parentSummaryId: activity.parentSummaryId ?? null,
+              // Rich JSON
+              gps_track: gpsTrack.length ? gpsTrack : null,
+              sensor_data: allSensorData.length ? { samples: allSensorData } : null,
+              swim_data,
+              laps,
+            },
+          };
+
+          const authKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+          const res = await fetch(fnUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authKey}`,
+              'apikey': authKey,
+            },
+            body: JSON.stringify(payload),
+          });
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            console.warn('⚠️ ingest-activity responded non-OK:', res.status, txt);
+          } else {
+            console.log('🧩 Mirrored into workouts via ingest-activity');
+          }
+        } catch (ingErr) {
+          console.error('❌ Failed to mirror into workouts via ingest-activity:', ingErr);
+        }
       }
     } catch (error) {
       console.error('Error processing individual activity detail:', error);

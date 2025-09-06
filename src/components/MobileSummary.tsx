@@ -85,10 +85,10 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
     const gt = Array.isArray(completed?.gps_track) ? completed.gps_track : [];
     // Merge lat/lng when lengths align or best effort by timestamp/sequence
     for (let i=0;i<gt.length;i+=1) {
-      const g = gt[i];
-      const lat = g.lat ?? g.latitude;
-      const lng = g.lng ?? g.longitude;
-      const t = Number((g.elapsed_s ?? g.t ?? g.seconds) || i);
+      const g: any = gt[i];
+      const lat = (g?.lat ?? g?.latitude ?? g?.latitudeInDegree ?? (Array.isArray(g) ? g[1] : undefined)) as number | undefined;
+      const lng = (g?.lng ?? g?.longitude ?? g?.longitudeInDegree ?? (Array.isArray(g) ? g[0] : undefined)) as number | undefined;
+      const t = Number((g?.startTimeInSeconds ?? g?.elapsed_s ?? g?.t ?? g?.seconds) || i);
       if (out[i]) { out[i].lat = lat; out[i].lng = lng; out[i].t = Number.isFinite(t) ? t : out[i].t; }
       else { out.push({ t: Number.isFinite(t)?t:i, lat, lng }); }
     }
