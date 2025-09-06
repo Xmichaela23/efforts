@@ -1567,7 +1567,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       {/* Notes Modal */}
       {showNotesModal && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={()=>setShowNotesModal(false)} />
           <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
             <h3 className="text-lg font-semibold mb-3">How did it feel?</h3>
