@@ -43,6 +43,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     addPlan,
     deletePlan,
     loadProviderData,
+    repairPlan,
   } = useAppContext();
   
   const { plannedWorkouts } = usePlannedWorkouts();
@@ -553,6 +554,23 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-56">
+                  {currentPlans && currentPlans.length > 0 && (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        try {
+                          const active = currentPlans[0];
+                          if (!active?.id || !repairPlan) return;
+                          const res = await repairPlan(String(active.id));
+                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                          alert(`Plan repaired: ${res.repaired} item(s) updated`);
+                        } catch (e: any) {
+                          alert(`Repair failed: ${e?.message || 'unknown error'}`);
+                        }
+                      }}
+                    >
+                      Repair Active Plan
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={handleTrainingBaselinesClick}>
                     <Activity className="mr-2 h-4 w-4" />
                     Training Baselines
