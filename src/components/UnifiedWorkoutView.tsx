@@ -248,10 +248,23 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             {isCompleted ? (
               <div className="h-full">
                 {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
-                  <CompletedTab 
-                    workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
-                    workoutData={workout}
-                  />
+                  <div className="p-4">
+                    <div className="mb-3">
+                      <Button variant="outline" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
+                    </div>
+                    <CompletedTab 
+                      workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
+                      workoutData={workout}
+                    />
+                    {assocOpen && (
+                      <AssociatePlannedDialog
+                        workout={workout}
+                        open={assocOpen}
+                        onClose={()=>setAssocOpen(false)}
+                        onAssociated={()=>{ try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {} }}
+                      />
+                    )}
+                  </div>
                 ) : workout.type === 'strength' ? (
                   <div className="p-4">
                     <h3 className="font-semibold mb-4">Strength Workout Completed</h3>

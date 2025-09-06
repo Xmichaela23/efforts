@@ -250,7 +250,11 @@ export default function WorkoutCalendar({
       let tags: any[] = [];
       if (Array.isArray(raw)) tags = raw;
       else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
-      return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+      // Hide optional planned rows entirely
+      if (tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional')) return false;
+      // If a planned row is completed and explicitly associated to a workout, hide it (redundant)
+      if (String((w as any).workout_status||'').toLowerCase()==='completed' && (w as any).completed_workout_id) return false;
+      return true;
     });
 
     // Build raw events with consistent labels

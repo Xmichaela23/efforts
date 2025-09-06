@@ -71,6 +71,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         .eq('id', workout.id);
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       onAssociated?.(planned.id);
+      // Also update the resolved view users by emitting invalidate
       onClose();
     } catch (e: any) {
       setError(e?.message || 'Failed to associate');

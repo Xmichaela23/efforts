@@ -51,12 +51,118 @@ const getAvgHR = (completed: any): number | null => {
 
 type CompletedDisplay = { text: string; hr: number | null };
 
+// Build second-by-second samples from gps_track / sensor_data
+function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number }> {
+  const out: Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number }> = [];
+  try {
+    const sd = Array.isArray(completed?.sensor_data) ? completed.sensor_data : [];
+    // Try to detect fields
+    for (const s of sd) {
+      const t = Number((s.elapsed_s ?? s.t ?? s.time ?? s.seconds) || out.length);
+      const hr = (s.heart_rate ?? s.hr ?? s.bpm);
+      const speedMps = (s.speed_mps ?? s.speed ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined));
+      out.push({ t: Number.isFinite(t) ? t : out.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined });
+    }
+  } catch {}
+  try {
+    const gt = Array.isArray(completed?.gps_track) ? completed.gps_track : [];
+    // Merge lat/lng when lengths align or best effort by timestamp/sequence
+    for (let i=0;i<gt.length;i+=1) {
+      const g = gt[i];
+      const lat = g.lat ?? g.latitude;
+      const lng = g.lng ?? g.longitude;
+      const t = Number((g.elapsed_s ?? g.t ?? g.seconds) || i);
+      if (out[i]) { out[i].lat = lat; out[i].lng = lng; out[i].t = Number.isFinite(t) ? t : out[i].t; }
+      else { out.push({ t: Number.isFinite(t)?t:i, lat, lng }); }
+    }
+  } catch {}
+  // Ensure sorted by time
+  out.sort((a,b)=> (a.t||0)-(b.t||0));
+  return out;
+}
+
+function haversineMeters(a: {lat:number,lng:number}, b:{lat:number,lng:number}): number {
+  const toRad = (d:number)=> (d*Math.PI)/180; const R=6371000;
+  const dLat = toRad(b.lat - a.lat); const dLon = toRad(b.lng - a.lng);
+  const s = Math.sin(dLat/2)**2 + Math.cos(toRad(a.lat))*Math.cos(toRad(b.lat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+}
+
+function accumulate(completed: any) {
+  const samples = buildSamples(completed);
+  let cum = 0;
+  const rows = samples.map((s, i) => {
+    if (i>0) {
+      const prev = samples[i-1];
+      // Prefer gps distance
+      if (typeof s.lat === 'number' && typeof s.lng === 'number' && typeof prev.lat === 'number' && typeof prev.lng === 'number') {
+        cum += haversineMeters({lat:prev.lat,lng:prev.lng},{lat:s.lat,lng:s.lng});
+      } else if (typeof prev.speedMps === 'number') {
+        const dt = Math.max(0, (s.t - prev.t));
+        cum += prev.speedMps * dt;
+      }
+    }
+    return { ...s, cumMeters: cum };
+  });
+  return rows;
+}
+
+function avg(array: number[]): number | null { if (!array.length) return null; return array.reduce((a,b)=>a+b,0)/array.length; }
+
 const completedValueForStep = (completed: any, plannedStep: any): CompletedDisplay => {
   if (!completed) return '—';
-  // Minimal viable: use overall averages; later we can slice sensor_data per step
+  // Attempt per-step slice from samples; fallback to overall
   const isRunOrWalk = /run|walk/i.test(completed.type || '') || /running|walking/i.test(completed.activity_type || '');
   const isRide = /ride|bike|cycling/i.test(completed.type || '') || /cycling|bike/i.test(completed.activity_type || '');
   const isSwim = /swim/i.test(completed.type || '') || /swim/i.test(completed.activity_type || '');
+
+  try {
+    const rows = accumulate(completed);
+    if (rows.length >= 2) {
+      let windowStart = 0; let windowEnd = 0;
+      if (typeof plannedStep.distanceMeters === 'number' && plannedStep.distanceMeters > 0) {
+        // distance-based: advance cumMeters window
+        const dist = plannedStep.distanceMeters;
+        const startCum = rows.length ? rows[windowStart].cumMeters : 0;
+        let target = startCum + dist;
+        let i = windowStart;
+        while (i < rows.length && rows[i].cumMeters < target) i += 1;
+        windowEnd = Math.min(i, rows.length - 1);
+      } else if (typeof plannedStep.duration === 'number' && plannedStep.duration > 0) {
+        // time-based
+        const startT = rows[windowStart].t;
+        const targetT = startT + plannedStep.duration;
+        let i = windowStart;
+        while (i < rows.length && rows[i].t < targetT) i += 1;
+        windowEnd = Math.min(i, rows.length - 1);
+      }
+      // Extract stats
+      const seg = rows.slice(windowStart, Math.max(windowStart+1, windowEnd));
+      const timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
+      const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
+      const hrAvg = avg(seg.map(s=> (typeof s.hr==='number'?s.hr:NaN)).filter(n=>Number.isFinite(n) ));
+      const km = dMeters/1000;
+      const miles = km * 0.621371;
+      const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
+      if ((isRunOrWalk || isRide || isSwim) && (paceMinPerMile!=null || km>0)) {
+        if (isRunOrWalk) {
+          const m = Math.floor((paceMinPerMile||0));
+          const s = Math.round(((paceMinPerMile||0) - m)*60);
+          return { text: `${miles.toFixed(miles<1?2:2)} mi @ ${isFinite(m)?m:0}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
+        }
+        if (isRide) {
+          const mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
+          return { text: `${miles.toFixed(1)} mi @ ${mph.toFixed(1)} mph`, hr: hrAvg!=null?Math.round(hrAvg):null };
+        }
+        if (isSwim) {
+          const per100m = km>0 ? (timeSec/(km*10)) : null;
+          const mm = per100m!=null ? Math.floor(per100m/60) : 0;
+          const ss = per100m!=null ? Math.round(per100m%60) : 0;
+          return { text: `${(km*0.621371).toFixed(2)} mi @ ${mm}:${String(ss).padStart(2,'0')} /100m`, hr: hrAvg!=null?Math.round(hrAvg):null };
+        }
+      }
+    }
+  } catch {}
 
   if (typeof plannedStep.distanceMeters === 'number' && plannedStep.distanceMeters > 0) {
     const mi = plannedStep.distanceMeters / 1609.34;

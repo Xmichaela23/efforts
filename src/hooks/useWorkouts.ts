@@ -778,9 +778,18 @@ export const useWorkouts = () => {
       }
       if (!target) return;
 
-      // Mark the authored planned row as completed, but DO NOT move its date
-      const updates: any = { workout_status: 'completed' };
-      await supabase.from('planned_workouts').update(updates).eq('id', target.id);
+      // Mark the authored planned row as completed (no date move) and link both ways
+      await supabase
+        .from('planned_workouts')
+        .update({ workout_status: 'completed', completed_workout_id: (completed as any).id })
+        .eq('id', target.id);
+      try {
+        await supabase
+          .from('workouts')
+          .update({ planned_id: target.id })
+          .eq('id', (completed as any).id)
+          .eq('user_id', user.id);
+      } catch {}
       // Optionally tag completed workout with friendly name
       if (completed.name && completed.name !== target.name) {
         await supabase.from('workouts').update({ description: completed.description || '', name: target.name }).eq('id', completed.id).eq('user_id', user.id);
