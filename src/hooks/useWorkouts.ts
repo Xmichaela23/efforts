@@ -683,6 +683,90 @@ export const useWorkouts = () => {
     }
   };
 
+  // Auto‑attach helper: link a completed workout to a planned_workouts row
+  const autoAttachPlannedSession = async (completed: Workout) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch candidate planned rows by discipline within ±2 days
+      const date = completed.date;
+      const around = (iso: string, delta: number) => {
+        const d = new Date(iso + 'T00:00:00');
+        d.setDate(d.getDate()+delta);
+        return d.toISOString().slice(0,10);
+      };
+      const from = around(date, -2);
+      const to = around(date, 2);
+
+      const { data: planned } = await supabase
+        .from('planned_workouts')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('type', completed.type)
+        .in('workout_status', ['planned','in_progress'])
+        .gte('date', from)
+        .lte('date', to);
+
+      const candidates = Array.isArray(planned) ? planned : [];
+      if (!candidates.length) return;
+
+      // Same‑day candidates
+      const sameDay = candidates.filter((c:any)=> c.date === date);
+      const pickByHeuristics = (arr:any[]): any | null => {
+        if (arr.length === 1) return arr[0];
+        // Duration/Distance heuristics
+        const dur = (completed.total_timer_time ?? completed.moving_time ?? (completed.duration ? completed.duration*60 : null));
+        const distKm = typeof completed.distance === 'number' ? completed.distance : null;
+        let best: any = null; let bestScore = Number.NEGATIVE_INFINITY;
+        for (const r of arr) {
+          let score = 0;
+          const compSec = Number((r as any)?.computed?.total_duration_seconds) || null;
+          if (dur && compSec) {
+            const diff = Math.abs(dur - compSec) / compSec;
+            if (diff <= 0.15) score += 2; else score -= diff;
+          }
+          const tok = String((r as any)?.rendered_description || (r as any)?.description || '').toLowerCase();
+          const name = String((r as any)?.name || '').toLowerCase();
+          const lbl = name + ' ' + tok;
+          // Simple focus tokens
+          const focus = ['vo2','tempo','interval','endurance','threshold','sweet spot','technique'];
+          for (const f of focus) if ((completed.name||'').toLowerCase().includes(f) && lbl.includes(f)) score += 1;
+          if (distKm && typeof (r as any)?.targets_summary?.distance_km === 'number') {
+            const pd = (r as any).targets_summary.distance_km;
+            const diffD = Math.abs(distKm - pd) / Math.max(0.1, pd);
+            if (diffD <= 0.10) score += 1.5; else score -= diffD;
+          }
+          if (score > bestScore) { bestScore = score; best = r; }
+        }
+        // Only accept if score is positive
+        return bestScore > 0 ? best : null;
+      };
+
+      let target = pickByHeuristics(sameDay);
+      if (!target) {
+        // No same-day clear match → single candidate in ±2 days
+        const single = candidates.length === 1 ? candidates[0] : null;
+        if (single) target = single; else target = pickByHeuristics(candidates);
+      }
+      if (!target) return;
+
+      // Move target to completed date if needed and mark completed
+      const updates: any = { workout_status: 'completed' };
+      if (target.date !== date) updates.date = date;
+      await supabase.from('planned_workouts').update(updates).eq('id', target.id);
+      // Optionally tag completed workout with friendly name
+      if (completed.name && completed.name !== target.name) {
+        await supabase.from('workouts').update({ description: completed.description || '', name: target.name }).eq('id', completed.id).eq('user_id', user.id);
+      }
+      // Refresh front-end state
+      fetchWorkouts();
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    } catch (e) {
+      console.log('Auto attach error:', e);
+    }
+  };
+
   // 🔄 Initialize auth state and listen for changes
   useEffect(() => {
     let mounted = true;
@@ -1263,6 +1347,16 @@ export const useWorkouts = () => {
       }
 
       setWorkouts((prev) => [newWorkout, ...prev]);
+
+      // Auto‑attach to planned session per rules
+      try {
+        // Only for completed sessions
+        if ((newWorkout.workout_status === 'completed') && newWorkout.date && newWorkout.type) {
+          await autoAttachPlannedSession(newWorkout);
+        }
+      } catch (e) {
+        console.log('ℹ️ Auto-attach skipped:', e);
+      }
       return newWorkout;
     } catch (err) {
       console.error("Error in addWorkout:", err);
@@ -1558,6 +1652,9 @@ export const useWorkouts = () => {
     addWorkout,
     updateWorkout,
     deleteWorkout,
+    // expose for future explicit attach UI
+    // @ts-ignore
+    autoAttachPlannedSession,
     getWorkoutsForDate,
     getWorkoutsByType,
     refetch: fetchWorkouts,
