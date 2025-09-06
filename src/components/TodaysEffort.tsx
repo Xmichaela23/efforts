@@ -175,7 +175,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           });
           
           return exerciseSummaries.map((summary, index) => {
-            console.log('🔍 Creating metric for strength exercise:', { summary, icon: Dumbbell, iconName: 'Dumbbell' });
             return {
               icon: Dumbbell,
               value: summary

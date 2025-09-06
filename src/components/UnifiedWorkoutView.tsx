@@ -35,7 +35,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   }
 
   const { deletePlannedWorkout } = usePlannedWorkouts();
-  const isCompleted = workout.workout_status === 'completed';
+  const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab

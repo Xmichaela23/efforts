@@ -214,6 +214,7 @@ export const useWorkouts = () => {
 
       // Step 2: Fetch Garmin activities (if user has Garmin connection) — optionally deferred
       let garminWorkouts: any[] = [];
+      // Guard provider fetches behind explicit flag and only for endurance types
       if (includeProviders) try {
         // Try device_connections first; fall back to legacy user_connections
         let garminUserId: string | null = null;

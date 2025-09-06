@@ -105,15 +105,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
 
   // Load provider data once per session when Completed tab is first opened
   useEffect(() => {
+    // Only pull provider data for endurance types; skip for strength to avoid unnecessary queries
+    const isEndurance = (w: any) => {
+      const t = String(w?.type || '').toLowerCase();
+      return t === 'run' || t === 'ride' || t === 'swim' || t === 'walk';
+    };
     if (
       activeTab === 'completed' &&
       typeof loadProviderData === 'function' &&
-      !providerFetchedRef.current
+      !providerFetchedRef.current &&
+      isEndurance(selectedWorkout)
     ) {
       providerFetchedRef.current = true;
-      loadProviderData();
+      try { loadProviderData(); } catch {}
     }
-  }, [activeTab, loadProviderData]);
+  }, [activeTab, loadProviderData, selectedWorkout]);
 
   // Open weekly planner when routed with state { openPlans, focusPlanId, focusWeek }
   useLayoutEffect(() => {
