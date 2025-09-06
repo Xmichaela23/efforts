@@ -160,10 +160,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean };
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
   const addonCatalog: Record<string, { name: string; duration_min: number; variants: string[] }> = {
-    'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1'] },
-    'addon_core_5': { name: 'Core (5m)', duration_min: 5, variants: ['v1'] },
-    'addon_core_10': { name: 'Core (10m)', duration_min: 10, variants: ['v1'] },
-    'addon_mobility_5': { name: 'Mobility (5m)', duration_min: 5, variants: ['v1'] },
+    'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1','v2'] },
+    'addon_strength_wu_10': { name: 'Warm‑Up (10m)', duration_min: 10, variants: ['v1','v2'] },
+    'addon_core_5': { name: 'Core (5m)', duration_min: 5, variants: ['v1','v2'] },
+    'addon_core_10': { name: 'Core (10m)', duration_min: 10, variants: ['v1','v2'] },
+    'addon_mobility_5': { name: 'Mobility (5m)', duration_min: 5, variants: ['v1','v2'] },
+    'addon_mobility_10': { name: 'Mobility (10m)', duration_min: 10, variants: ['v1','v2'] },
   };
 
   const formatSeconds = (s: number) => {
@@ -698,19 +700,41 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     setShowWorkoutsMenu(false);
   };
 
-  const startOfWeek = (iso: string) => {
-    const [y,m,d] = iso.split('-').map((x)=>parseInt(x,10));
-    const dt = new Date(y, (m||1)-1, d||1);
-    const day = dt.getDay(); // 0 Sun..6 Sat
-    const diff = (day===0? -6 : 1 - day); // Monday as start
-    dt.setDate(dt.getDate()+diff);
-    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  // Timezone-safe weekday/weekly helpers based on Y-M-D arithmetic (no TZ drift)
+  const ymdParts = (iso: string) => {
+    const a = (iso||'').split('-').map(x=>parseInt(x,10));
+    return { y: a[0]||1970, m: a[1]||1, d: a[2]||1 };
+  };
+  const dayOfWeekYmd = (iso: string): number => { // 0=Sun..6=Sat
+    let { y, m, d } = ymdParts(iso);
+    // Tomohiko Sakamoto algorithm
+    const t = [0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4];
+    if (m < 3) y -= 1;
+    const v = (y + Math.floor(y/4) - Math.floor(y/100) + Math.floor(y/400) + t[m-1] + d) % 7;
+    return v;
+  };
+  const weekdayShortFromYmd = (iso: string): string => {
+    const map = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    return map[dayOfWeekYmd(iso)];
+  };
+  const addDaysYmd = (iso: string, days: number): string => {
+    const { y, m, d } = ymdParts(iso);
+    const dt = new Date(Date.UTC(y, m-1, d, 12, 0, 0));
+    dt.setUTCDate(dt.getUTCDate()+days);
+    const yy = dt.getUTCFullYear();
+    const mm = String(dt.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(dt.getUTCDate()).padStart(2,'0');
+    return `${yy}-${mm}-${dd}`;
+  };
+  const startOfWeek = (iso: string) => { // Monday start, TZ-agnostic
+    const dow = dayOfWeekYmd(iso); // 0 Sun..6 Sat
+    const back = dow === 0 ? 6 : (dow - 1); // how many days to go back to Monday
+    return addDaysYmd(iso, -back);
   };
   const withinWeek = (iso: string, weekStart: string) => {
-    const s = new Date(weekStart);
-    const e = new Date(s); e.setDate(e.getDate()+6);
-    const x = new Date(iso);
-    return x>=s && x<=e;
+    const ws = weekStart;
+    const we = addDaysYmd(weekStart, 6);
+    return iso >= ws && iso <= we;
   };
 
   const prefillFromPlanned = (row: any) => {
@@ -1006,18 +1030,35 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     .filter(w=> withinWeek(w.date, startOfWeek(getTodayDateString())))
                     .sort((a:any,b:any)=> a.date.localeCompare(b.date))
                     .map((w:any)=> (
-                      <button key={w.id} onClick={()=>{ prefillFromPlanned(w); setSourcePlannedName(`${new Date(w.date).toLocaleDateString('en-US',{weekday:'short'})} — ${w.name||'Strength'}`); setSourcePlannedId(w.id); setSourcePlannedDate(w.date); setShowWorkoutsMenu(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between">
-                        <span>{new Date(w.date).toLocaleDateString('en-US',{weekday:'short'})} — {w.name||'Strength'}</span>
+                      <button key={w.id} onClick={()=>{ prefillFromPlanned(w); setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); setSourcePlannedId(w.id); setSourcePlannedDate(w.date); setShowWorkoutsMenu(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between">
+                        <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
                         <span className={`text-2xs px-1.5 py-0.5 rounded border ${String(w.workout_status).toLowerCase()==='completed'?'border-green-200 text-green-700':'border-gray-200 text-gray-600'}`}>{String(w.workout_status||'planned')}</span>
                       </button>
                     ))}
                 </div>
                 <div className="mt-2 text-xs font-semibold text-gray-500 px-1 pb-1">Add‑ons</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Warm‑Up 5m</button>
-                  <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Core 5m</button>
-                  <button onClick={()=>attachAddon('addon_core_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Core 10m</button>
-                  <button onClick={()=>attachAddon('addon_mobility_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Mobility 5m</button>
+                <div className="space-y-1">
+                  <div>
+                    <div className="text-xs text-gray-600 px-1 mb-1">Warm‑Up</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
+                      <button onClick={()=>attachAddon('addon_strength_wu_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">10 min</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-600 px-1 mb-1">Core</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
+                      <button onClick={()=>attachAddon('addon_core_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">10 min</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-gray-600 px-1 mb-1">Mobility</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button onClick={()=>attachAddon('addon_mobility_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
+                      <button onClick={()=>attachAddon('addon_mobility_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">10 min</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
