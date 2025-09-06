@@ -218,8 +218,9 @@ export const useWorkouts = () => {
 
       // Step 2: Fetch Garmin activities (if user has Garmin connection) — optionally deferred
       let garminWorkouts: any[] = [];
-      // Guard provider fetches behind explicit flag and only for endurance types
-      if (includeProviders) try {
+      // Guard provider fetches behind explicit env flag so UI can be workouts-only by default
+      const ENABLE_PROVIDER_FALLBACK = (import.meta as any)?.env?.VITE_ENABLE_PROVIDER_FALLBACK === 'true';
+      if (includeProviders && ENABLE_PROVIDER_FALLBACK) try {
         // Try device_connections first; fall back to legacy user_connections
         let garminUserId: string | null = null;
         {
@@ -416,7 +417,7 @@ export const useWorkouts = () => {
 
       // Step 2b: Fetch Strava activities saved by webhook/importer (if connected)
       let stravaWorkouts: any[] = [];
-      if (includeProviders) try {
+      if (includeProviders && ENABLE_PROVIDER_FALLBACK) try {
         const { data: stravaRows, error: stravaErr } = await supabase
           .from('strava_activities')
           .select('*')
@@ -475,7 +476,7 @@ export const useWorkouts = () => {
       // Step 3: Merge all sources and remove duplicates (keep simple for now)
       // Do not merge raw Strava provider rows to avoid duplicates.
       // Strava activities are now normalized into the workouts table.
-      const allWorkouts = includeProviders
+      const allWorkouts = (includeProviders && ENABLE_PROVIDER_FALLBACK)
         ? [ ...(manualWorkouts || []), ...garminWorkouts ]
         : [ ...(manualWorkouts || []) ];
       
@@ -792,6 +793,17 @@ export const useWorkouts = () => {
       if (!target) return;
 
       // Mark the authored planned row as completed (no date move) and link both ways
+      // Guard: if planned row already linked to a different completed workout, do nothing
+      try {
+        const { data: already } = await supabase
+          .from('planned_workouts')
+          .select('id, completed_workout_id')
+          .eq('id', target.id)
+          .maybeSingle();
+        if (already && already.completed_workout_id && already.completed_workout_id !== (completed as any).id) {
+          return; // avoid creating multiple links
+        }
+      } catch {}
       await supabase
         .from('planned_workouts')
         .update({ workout_status: 'completed', completed_workout_id: (completed as any).id })
@@ -858,9 +870,9 @@ export const useWorkouts = () => {
   // 🔄 Fetch workouts when auth is ready
   useEffect(() => {
     if (!authReady) return;
-    fetchWorkouts(false); // fast first paint
-    const id = window.setTimeout(() => fetchWorkouts(true), 1200); // defer providers
-    return () => window.clearTimeout(id);
+    // Workouts-only by default; enable provider fallback via env flag if needed
+    fetchWorkouts(false);
+    return () => undefined;
   }, [authReady]);
 
   // Run a one-time 14-day backfill to auto-attach recent workouts
@@ -938,7 +950,7 @@ export const useWorkouts = () => {
     let t: number | null = null;
     const onFocus = () => {
       if (t) window.clearTimeout(t);
-      t = window.setTimeout(() => fetchWorkouts(true), 800);
+      t = window.setTimeout(() => fetchWorkouts(false), 800);
     };
     window.addEventListener('focus', onFocus);
     return () => { if (t) window.clearTimeout(t); window.removeEventListener('focus', onFocus); };
