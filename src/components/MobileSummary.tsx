@@ -52,16 +52,19 @@ const getAvgHR = (completed: any): number | null => {
 type CompletedDisplay = { text: string; hr: number | null };
 
 // Build second-by-second samples from gps_track / sensor_data
-function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number }> {
-  const out: Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number }> = [];
+function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> {
+  const out: Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> = [];
   try {
-    const sd = Array.isArray(completed?.sensor_data) ? completed.sensor_data : [];
+    const sd = Array.isArray(completed?.sensor_data?.samples)
+      ? completed.sensor_data.samples
+      : (Array.isArray(completed?.sensor_data) ? completed.sensor_data : []);
     // Try to detect fields
     for (const s of sd) {
-      const t = Number((s.elapsed_s ?? s.t ?? s.time ?? s.seconds) || out.length);
-      const hr = (s.heart_rate ?? s.hr ?? s.bpm);
-      const speedMps = (s.speed_mps ?? s.speed ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined));
-      out.push({ t: Number.isFinite(t) ? t : out.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined });
+      const t = Number((s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds) || out.length);
+      const hr = (s.heartRate ?? s.heart_rate ?? s.hr ?? s.bpm);
+      const speedMps = (s.speedMetersPerSecond ?? s.speed_mps ?? s.speed ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined));
+      const cumMeters = (typeof s.totalDistanceInMeters === 'number') ? s.totalDistanceInMeters : undefined;
+      out.push({ t: Number.isFinite(t) ? t : out.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined, cumMeters });
     }
   } catch {}
   // Swim fallback using swim_data.lengths
@@ -106,6 +109,11 @@ function accumulate(completed: any) {
   const samples = buildSamples(completed);
   let cum = 0;
   const rows = samples.map((s, i) => {
+    // Prefer provider cumulative distance if present
+    if (typeof (s as any).cumMeters === 'number' && Number.isFinite((s as any).cumMeters)) {
+      cum = (s as any).cumMeters as number;
+      return { ...s, cumMeters: cum };
+    }
     if (i>0) {
       const prev = samples[i-1];
       // Prefer gps distance
