@@ -143,6 +143,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [isInitialized, setIsInitialized] = useState(false);
   const [pendingOrOptions, setPendingOrOptions] = useState<Array<{ label: string; name: string; sets: number; reps: number }> | null>(null);
   const [performanceNumbers, setPerformanceNumbers] = useState<any | null>(null);
+  // Session notes modal
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [notesText, setNotesText] = useState('');
+  const [notesRpe, setNotesRpe] = useState<number | ''>('');
+  const [notesMood, setNotesMood] = useState<'positive'|'neutral'|'negative'|''>('');
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
@@ -802,7 +807,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }));
   };
 
-  const saveWorkout = () => {
+  const finalizeSave = (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
@@ -837,7 +842,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       duration: durationMinutes,
       strength_exercises: validExercises,
       workout_status: 'completed' as const,
-      completedManually: true
+      completedManually: true,
+      notes: extra?.notes,
+      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
+      mood: extra?.mood
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);
@@ -853,6 +861,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
       onClose();
     }
+  };
+
+  const saveWorkout = () => {
+    // Open notes modal first; user can save with or without notes
+    setShowNotesModal(true);
   };
 
   const handleInputChange = (value: string) => {
@@ -1236,6 +1249,47 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           Save
         </button>
       </div>
+
+      {/* Notes Modal */}
+      {showNotesModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={()=>setShowNotesModal(false)} />
+          <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10">
+            <h3 className="text-lg font-semibold mb-3">How did it feel?</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-600">Notes</label>
+                <textarea value={notesText} onChange={(e)=>setNotesText(e.target.value)} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Anything noteworthy…" />
+              </div>
+              <div className="grid grid-cols-3 gap-3 items-end">
+                <div>
+                  <label className="text-sm text-gray-600">RPE (1–10)</label>
+                  <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>setNotesRpe(e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '')} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
+                </div>
+                <div className="col-span-2">
+                  <label className="text-sm text-gray-600">Mood</label>
+                  <div className="mt-1 flex items-center gap-2">
+                    {([
+                      {k:'positive', l:':)'},
+                      {k:'neutral', l:':|'},
+                      {k:'negative', l:':('}
+                    ] as any[]).map(m=> (
+                      <button key={m.k} onClick={()=>setNotesMood(m.k)} className={`px-3 py-1.5 rounded border ${notesMood===m.k? 'bg-gray-900 text-white border-gray-900':'border-gray-300 text-gray-800'}`}>{m.l}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-center justify-between">
+              <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="text-sm text-gray-600">Skip</button>
+              <div className="flex items-center gap-2">
+                <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
+                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined, mood: notesMood||undefined as any }); }} className="px-3 py-2 text-sm bg-black text-white rounded">Save workout</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

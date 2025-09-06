@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import StrengthCompareTable from './StrengthCompareTable';
 import { useAppContext } from '@/contexts/AppContext';
 import { Dumbbell } from 'lucide-react';
 
@@ -158,60 +159,10 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
       {/* Exercises */}
       {showComparison && plannedWorkout ? (
-        // Side-by-side comparison view
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Planned Column */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-blue-600 border-b border-blue-200 pb-2">PLANNED</h3>
-            {plannedWorkout.strength_exercises?.map((exercise: any, index: number) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-medium text-gray-900">{exercise.name}</h4>
-                  <span className="text-sm text-gray-600">
-                    {((exercise.sets || 0) * (exercise.reps || 0) * (exercise.weight || 0)).toLocaleString()} lbs
-                  </span>
-                </div>
-                <div className="text-sm text-gray-600">
-                  {exercise.sets || 0} sets × {exercise.reps || 0} reps @ {exercise.weight || 0} lbs
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Completed Column */}
-          <div className="space-y-4">
-            <h3 className="font-semibold text-green-600 border-b border-green-200 pb-2">COMPLETED</h3>
-            {completedExercises.map((exercise: CompletedExercise, index: number) => {
-              if (!exercise.sets || !exercise.name) return null;
-              const exerciseVolume = calculateExerciseVolume(exercise.sets);
-              const comparison = getExerciseComparison(exercise.name, exercise.sets);
-              
-              return (
-                <div key={exercise.id || index} className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-medium text-gray-900">{exercise.name}</h4>
-                    <div className="text-right">
-                      <span className="text-sm text-gray-900">{exerciseVolume.toLocaleString()} lbs</span>
-                      {comparison && comparison.diff.volume !== 0 && (
-                        <div className={`text-xs ${comparison.diff.volume > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {comparison.diff.volume > 0 ? '+' : ''}{comparison.diff.volume.toLocaleString()} lbs
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    {exercise.sets.map((set, setIndex) => (
-                      <div key={setIndex} className="text-sm text-gray-600 flex justify-between">
-                        <span>Set {setIndex + 1}: {set.reps} reps @ {set.weight} lbs</span>
-                        {set.rir && <span>RIR: {set.rir}</span>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <StrengthCompareTable
+          planned={(plannedWorkout.strength_exercises || []).map((ex: any)=>({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight }))}
+          completed={completedExercises.map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))}
+        />
       ) : (
                 // Clean completed view (default)
         <div className="space-y-6">

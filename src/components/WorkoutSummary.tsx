@@ -3,6 +3,7 @@ import { Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppContext } from '@/contexts/AppContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import WorkoutDetail from './WorkoutDetail';
+import StrengthCompareTable from './StrengthCompareTable';
 import CompletedTab from './CompletedTab';
 
 interface WorkoutSummaryProps {
@@ -15,10 +16,14 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
   console.log('🚨 NEW CLEAN WORKOUT SUMMARY LOADED');
   console.log('🔍 Workout intervals:', workout.intervals);
   console.log('🔍 Full workout object:', JSON.stringify(workout, null, 2));
-  const { useImperial } = useAppContext();
+  const { useImperial, workouts } = useAppContext();
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [workoutStatus, setWorkoutStatus] = useState(workout?.status || workout?.workout_status || 'planned');
   const [activeTab, setActiveTab] = useState('summary');
+  const completedStrengthForDay = React.useMemo(()=>{
+    if (!workout?.date || workout?.type !== 'strength') return null;
+    return workouts.find(w => (w as any).date === workout.date && (w as any).type === 'strength' && ((w as any).workout_status === 'completed' || (w as any).status === 'completed')) || null;
+  }, [workouts, workout]);
 
   if (!workout) {
     return (
@@ -109,6 +114,20 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
 
         {/* Summary Tab - Original WorkoutSummary Content */}
         <TabsContent value="summary" className="space-y-4 mt-4">
+          {/* Strength side-by-side comparison */}
+          {workout.type === 'strength' && (
+            <div className="space-y-4">
+              {workout.strength_exercises && (
+                <StrengthCompareTable
+                  planned={(workout.strength_exercises || []).map((ex: any)=>({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight }))}
+                  completed={completedStrengthForDay ? ((completedStrengthForDay as any).strength_exercises || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] })) : []}
+                />
+              )}
+              {!completedStrengthForDay && (
+                <div className="text-sm text-gray-500">No completed strength data yet for this day.</div>
+              )}
+            </div>
+          )}
           {/* Description */}
           {workout.description && (
             <div className="space-y-2">
@@ -160,8 +179,8 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
             </div>
           )}
 
-          {/* Strength Exercises */}
-          {workout.strength_exercises && workout.strength_exercises.length > 0 && (
+          {/* Strength Exercises (planned-only listing when not using comparison) */}
+          {workout.type !== 'strength' && workout.strength_exercises && workout.strength_exercises.length > 0 && (
             <div className="space-y-3">
               <h3 className="font-semibold text-lg">EXERCISES</h3>
               {workout.strength_exercises.map((exercise: any, index: number) => (
