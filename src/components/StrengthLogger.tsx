@@ -1198,7 +1198,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {attachedAddons.map((a,idx)=> (
               <div key={idx} className="rounded border border-gray-200">
                 <div className="flex items-center justify-between p-2">
-                  <button className="text-sm text-gray-800 text-left" onClick={()=>setAttachedAddons(prev=>prev.map((x,i)=> i===idx?{...x, expanded: !x.expanded }:x))}>{a.name}</button>
+                  <div className="text-sm text-gray-800">{a.name}</div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">{formatSeconds(a.seconds)}</span>
                     {!a.completed ? (
@@ -1210,7 +1210,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     )}
                   </div>
                 </div>
-                {a.expanded && a.sequence && a.sequence.length>0 && (
+                {a.sequence && a.sequence.length>0 && (
                   <div className="px-2 pb-2">
                     <div className="text-xs text-gray-500 mb-1">Sequence</div>
                     <div className="divide-y divide-gray-100 border border-gray-100 rounded">
