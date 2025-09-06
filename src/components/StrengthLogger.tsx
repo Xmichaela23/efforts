@@ -207,7 +207,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Lat Pulldown', 'Cable Row', 'Leg Press', 'Leg Curls', 'Leg Extensions',
     'Cable Crossover', 'Tricep Pushdown', 'Face Pulls', 'Cable Curls',
     'Kettlebell Swings', 'Turkish Get-ups', 'Kettlebell Snatches',
-    'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows'
+    'Goblet Squats', 'Kettlebell Press', 'Kettlebell Rows',
+    // Core suggestions
+    'Sit-Up', 'Crunch', 'Reverse Crunch', 'Cross-Body Crunch', 'Bicycle Crunch', 'V-Up',
+    'Flutter Kicks', 'Scissor Kicks', 'Toe Touches',
+    'Plank', 'Side Plank', 'Side Plank with Hip Dip', 'Plank with Shoulder Taps', 'Copenhagen Plank',
+    'Hanging Knee Raise', 'Hanging Leg Raise', 'Toes-to-Bar', 'Hanging Windshield Wipers',
+    'Stability Ball Rollout', 'Stir the Pot', 'TRX Fallout', 'Ab Wheel Rollout',
+    'Russian Twist', 'Cable Woodchopper', 'Landmine Twist', 'Pallof Press',
+    'Farmer’s Carry', 'Suitcase Carry', 'Overhead Carry',
+    'Superman Hold', 'Back Extension', 'Hip Extension', 'Glute Bridge March', 'Reverse Hyperextension',
+    'Cable Crunch', 'Ab Machine Crunch', "Captain’s Chair Knee Raise", 'Roman Chair Sit-Up', 'GHD Sit-Up'
   ];
 
   // Get today's date string - FIXED: Use PST timezone to avoid date shifting
@@ -411,6 +421,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       const isWarm = (n:string)=>/warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(n);
       const isCool = (n:string)=>/cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(n);
       const isBodyweight = (n:string)=>/(pull\-?ups|chin\-?ups|push\-?ups|dips|plank|sit\-?ups|burpees|hollow|superman)/i.test(n);
+      const isAccessoryCore = (n:string)=>/(rollout|plank|carry|crunch|twist|woodchopper|stir\s*the\s*pot|pallof|hanging|toe\s*\-?s*to|flutter\s*kicks|scissor\s*kicks|superman|back\s*extension|hip\s*extension|glute\s*bridge|reverse\s*hyper|ab\s*wheel|side\s*plank|copenhagen)/i.test(n);
       const pctOf = (name: string, pct?: number): number => {
         if (!pct || !performanceNumbers) return 0;
         const t = name.toLowerCase();
@@ -429,6 +440,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!name) continue;
         // Skip warm-up / cool-down entries in strength logger
         if (isWarm(name) || isCool(name)) continue;
+        if (isAccessoryCore(name)) continue; // do not auto-prefill accessory/core work
         const reps = Number(st.reps) || 0;
         let pct: number | undefined;
         const inten = String(st.intensity||st.target||'');
