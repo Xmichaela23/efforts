@@ -29,8 +29,23 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const activeDate = selectedDate || today;
 
   const dateWorkoutsMemo = useMemo(() => {
-    const allWorkouts = [...(workouts || []), ...(plannedWorkouts || [])];
-    return allWorkouts.filter((w: any) => w.date === activeDate);
+    // Show only planned rows from planned_workouts; completed planned rows are hidden
+    const plannedOnly = (plannedWorkouts || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
+    const allWorkouts = [...(workouts || []), ...plannedOnly];
+    // Filter by date
+    const sameDate = allWorkouts.filter((w: any) => w.date === activeDate);
+    // De‑dupe by type/date: prefer completed workout over planned
+    const byKey = new Map<string, any>();
+    for (const w of sameDate) {
+      const key = `${String(w.type||'').toLowerCase()}|${w.date}`;
+      const isCompleted = String(w.workout_status||w.status||'').toLowerCase()==='completed';
+      const existing = byKey.get(key);
+      if (!existing) { byKey.set(key, w); continue; }
+      const existingCompleted = String(existing.workout_status||existing.status||'').toLowerCase()==='completed';
+      // Prefer completed over planned
+      if (isCompleted && !existingCompleted) byKey.set(key, w);
+    }
+    return Array.from(byKey.values());
   }, [workouts, plannedWorkouts, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
