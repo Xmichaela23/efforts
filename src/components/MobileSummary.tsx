@@ -117,51 +117,7 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
   const isSwim = /swim/i.test(completed.type || '') || /swim/i.test(completed.activity_type || '');
 
   try {
-    const rows = accumulate(completed);
-    if (rows.length >= 2) {
-      let windowStart = 0; let windowEnd = 0;
-      if (typeof plannedStep.distanceMeters === 'number' && plannedStep.distanceMeters > 0) {
-        // distance-based: advance cumMeters window
-        const dist = plannedStep.distanceMeters;
-        const startCum = rows.length ? rows[windowStart].cumMeters : 0;
-        let target = startCum + dist;
-        let i = windowStart;
-        while (i < rows.length && rows[i].cumMeters < target) i += 1;
-        windowEnd = Math.min(i, rows.length - 1);
-      } else if (typeof plannedStep.duration === 'number' && plannedStep.duration > 0) {
-        // time-based
-        const startT = rows[windowStart].t;
-        const targetT = startT + plannedStep.duration;
-        let i = windowStart;
-        while (i < rows.length && rows[i].t < targetT) i += 1;
-        windowEnd = Math.min(i, rows.length - 1);
-      }
-      // Extract stats
-      const seg = rows.slice(windowStart, Math.max(windowStart+1, windowEnd));
-      const timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
-      const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
-      const hrAvg = avg(seg.map(s=> (typeof s.hr==='number'?s.hr:NaN)).filter(n=>Number.isFinite(n) ));
-      const km = dMeters/1000;
-      const miles = km * 0.621371;
-      const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
-      if ((isRunOrWalk || isRide || isSwim) && (paceMinPerMile!=null || km>0)) {
-        if (isRunOrWalk) {
-          const m = Math.floor((paceMinPerMile||0));
-          const s = Math.round(((paceMinPerMile||0) - m)*60);
-          return { text: `${miles.toFixed(miles<1?2:2)} mi @ ${isFinite(m)?m:0}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
-        }
-        if (isRide) {
-          const mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
-          return { text: `${miles.toFixed(1)} mi @ ${mph.toFixed(1)} mph`, hr: hrAvg!=null?Math.round(hrAvg):null };
-        }
-        if (isSwim) {
-          const per100m = km>0 ? (timeSec/(km*10)) : null;
-          const mm = per100m!=null ? Math.floor(per100m/60) : 0;
-          const ss = per100m!=null ? Math.round(per100m%60) : 0;
-          return { text: `${(km*0.621371).toFixed(2)} mi @ ${mm}:${String(ss).padStart(2,'0')} /100m`, hr: hrAvg!=null?Math.round(hrAvg):null };
-        }
-      }
-    }
+    // This default path is now handled by a cursor-driven implementation below in render.
   } catch {}
 
   if (typeof plannedStep.distanceMeters === 'number' && plannedStep.distanceMeters > 0) {
@@ -254,6 +210,64 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Endurance (run/ride/swim)
   const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
 
+  // Build accumulated rows once for completed and advance a cursor across steps
+  const rows = completed ? accumulate(completed) : [];
+  let cursorIdx = 0;
+  let cursorCum = rows.length ? rows[0].cumMeters || 0 : 0;
+
+  const renderCompletedFor = (st: any): CompletedDisplay => {
+    if (!completed || rows.length < 2) return '—' as any;
+    const isRunOrWalk = /run|walk/i.test(completed.type || '') || /running|walking/i.test(completed.activity_type || '');
+    const isRide = /ride|bike|cycling/i.test(completed.type || '') || /cycling|bike/i.test(completed.activity_type || '');
+    const isSwim = /swim/i.test(completed.type || '') || /swim/i.test(completed.activity_type || '');
+
+    const startIdx = cursorIdx;
+    const startCum = cursorCum;
+    let endIdx = startIdx + 1;
+
+    if (typeof st.distanceMeters === 'number' && st.distanceMeters > 0) {
+      const targetCum = startCum + st.distanceMeters;
+      while (endIdx < rows.length && (rows[endIdx].cumMeters || 0) < targetCum) endIdx += 1;
+    } else if (typeof st.duration === 'number' && st.duration > 0) {
+      const startT = rows[startIdx].t;
+      const targetT = startT + st.duration;
+      while (endIdx < rows.length && rows[endIdx].t < targetT) endIdx += 1;
+    }
+    if (endIdx >= rows.length) endIdx = rows.length - 1;
+
+    // Advance cursor for next step
+    cursorIdx = endIdx;
+    cursorCum = rows[endIdx].cumMeters || cursorCum;
+
+    const seg = rows.slice(startIdx, Math.max(startIdx + 1, endIdx));
+    const timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
+    const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
+    const hrAvg = avg(seg.map(s=> (typeof s.hr==='number'?s.hr:NaN)).filter(n=>Number.isFinite(n) ));
+    const km = dMeters/1000;
+    const miles = km * 0.621371;
+    const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
+
+    if (isRunOrWalk) {
+      if (miles>0 && paceMinPerMile!=null) {
+        const m = Math.floor(paceMinPerMile);
+        const s = Math.round((paceMinPerMile - m)*60);
+        return { text: `${miles.toFixed(miles<1?2:2)} mi @ ${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
+      }
+    }
+    if (isRide) {
+      const mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
+      return { text: `${miles.toFixed(1)} mi @ ${mph.toFixed(1)} mph`, hr: hrAvg!=null?Math.round(hrAvg):null };
+    }
+    if (isSwim) {
+      const per100m = km>0 ? (timeSec/(km*10)) : null;
+      const mm = per100m!=null ? Math.floor(per100m/60) : 0;
+      const ss = per100m!=null ? Math.round(per100m%60) : 0;
+      return { text: `${(km*0.621371).toFixed(2)} mi @ ${mm}:${String(ss).padStart(2,'0')} /100m`, hr: hrAvg!=null?Math.round(hrAvg):null };
+    }
+    // Fallback overall
+    return completedValueForStep(completed, st);
+  };
+
   return (
     <div className="w-full">
       <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
@@ -265,7 +279,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           <div key={idx} className="grid grid-cols-2 gap-4 py-2 text-sm">
             <div className="text-gray-800">{joinPlannedLabel(st)}</div>
             <div className="text-gray-900">
-              {(() => { const val = completedValueForStep(completed, st); return (
+              {(() => { const val = renderCompletedFor(st); return (
                 <>
                   <div>{typeof val === 'string' ? val : val.text}</div>
                   {typeof val !== 'string' && val.hr ? (
