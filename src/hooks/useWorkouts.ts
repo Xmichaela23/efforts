@@ -481,9 +481,7 @@ export const useWorkouts = () => {
       // Step 3: Merge all sources and remove duplicates (keep simple for now)
       // Do not merge raw Strava provider rows to avoid duplicates.
       // Strava activities are now normalized into the workouts table.
-      const allWorkouts = (includeProviders && ENABLE_PROVIDER_FALLBACK)
-        ? [ ...(manualWorkouts || []), ...garminWorkouts ]
-        : [ ...(manualWorkouts || []) ];
+      const allWorkouts = [ ...(manualWorkouts || []) ];
       
       // Show all workouts including Garmin (removed duplicate filter)
       const uniqueWorkouts = allWorkouts;
@@ -875,10 +873,9 @@ export const useWorkouts = () => {
   // 🔄 Fetch workouts when auth is ready
   useEffect(() => {
     if (!authReady) return;
-    // First paint from workouts, then provider fallback to surface Garmin rows if not in workouts
+    // Load only first‑party workouts. Provider fallback disabled to avoid duplicates.
     fetchWorkouts(false);
-    const id = window.setTimeout(() => fetchWorkouts(true), 1200);
-    return () => window.clearTimeout(id);
+    return () => {};
   }, [authReady]);
 
   // Run a one-time 14-day backfill to auto-attach recent workouts
