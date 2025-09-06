@@ -152,6 +152,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
   const [editingTimerValue, setEditingTimerValue] = useState<string>("");
+  // Workouts • Add-ons dropdown
+  const [showWorkoutsMenu, setShowWorkoutsMenu] = useState(false);
+  const [sourcePlannedName, setSourcePlannedName] = useState<string>('');
+  const [sourcePlannedId, setSourcePlannedId] = useState<string | null>(null);
+  const [sourcePlannedDate, setSourcePlannedDate] = useState<string | null>(null);
+  type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean };
+  const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
+  const addonCatalog: Record<string, { name: string; duration_min: number; variants: string[] }> = {
+    'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1'] },
+    'addon_core_5': { name: 'Core (5m)', duration_min: 5, variants: ['v1'] },
+    'addon_core_10': { name: 'Core (10m)', duration_min: 10, variants: ['v1'] },
+    'addon_mobility_5': { name: 'Mobility (5m)', duration_min: 5, variants: ['v1'] },
+  };
 
   const formatSeconds = (s: number) => {
     const ss = Math.max(0, Math.floor(s));
@@ -660,6 +673,65 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return () => window.clearInterval(id);
   }, [timers]);
 
+  // Tick addon timers
+  useEffect(() => {
+    const anyRunning = attachedAddons.some(a => a.running && a.seconds > 0);
+    if (!anyRunning) return;
+    const id = window.setInterval(() => {
+      setAttachedAddons(prev => prev.map(a => {
+        if (a.running && a.seconds > 0) {
+          const ns = a.seconds - 1;
+          return { ...a, seconds: ns, running: ns > 0, completed: ns === 0 ? true : a.completed };
+        }
+        return a;
+      }));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [attachedAddons]);
+
+  const attachAddon = (tokenBase: string) => {
+    if (attachedAddons.length >= 2) return;
+    const meta = addonCatalog[tokenBase]; if (!meta) return;
+    const versionList = meta.variants; const version = versionList[0];
+    const seconds = meta.duration_min * 60;
+    setAttachedAddons(prev => [...prev, { token: `${tokenBase}.${version}`, name: meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false }]);
+    setShowWorkoutsMenu(false);
+  };
+
+  const startOfWeek = (iso: string) => {
+    const [y,m,d] = iso.split('-').map((x)=>parseInt(x,10));
+    const dt = new Date(y, (m||1)-1, d||1);
+    const day = dt.getDay(); // 0 Sun..6 Sat
+    const diff = (day===0? -6 : 1 - day); // Monday as start
+    dt.setDate(dt.getDate()+diff);
+    return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
+  };
+  const withinWeek = (iso: string, weekStart: string) => {
+    const s = new Date(weekStart);
+    const e = new Date(s); e.setDate(e.getDate()+6);
+    const x = new Date(iso);
+    return x>=s && x<=e;
+  };
+
+  const prefillFromPlanned = (row: any) => {
+    try {
+      if (row?.computed?.steps && Array.isArray(row.computed.steps)){
+        const exs = parseFromComputed(row.computed);
+        if (exs.length) { setExercises(exs); return; }
+      }
+      const se = Array.isArray(row?.strength_exercises)? row.strength_exercises : [];
+      if (se.length){
+        const mapped: LoggedExercise[] = se.map((exercise: any, index: number) => ({
+          id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
+          name: exercise.name || '',
+          expanded: true,
+          sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
+        }));
+        setExercises(mapped);
+      }
+    } catch {}
+  };
+
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
@@ -844,10 +916,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       workout_status: 'completed' as const,
       completedManually: true,
       notes: extra?.notes,
-      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined
+      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
+      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed }))
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);
+
+    // If sourced from a planned row and date differs, move then complete
+    (async ()=>{
+      try{
+        if (sourcePlannedId && sourcePlannedDate && sourcePlannedDate !== workoutDate){
+          await supabase.from('planned_workouts').update({ date: workoutDate, workout_status: 'completed' }).eq('id', sourcePlannedId);
+        }
+      } catch {}
+    })();
 
     // Use the app context to save - this will integrate with the main workout system
     addWorkout(completedWorkout);
@@ -909,15 +991,64 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     <div className="min-h-screen pb-28">
       {/* Header */}
       <div className="bg-white pb-4 mb-4">
-        <div className="flex items-center w-full">
+        <div className="flex items-center justify-between w-full">
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
+          <div className="relative">
+            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
+            {showWorkoutsMenu && (
+              <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
+                <div className="text-xs font-semibold text-gray-500 px-1 pb-1">Strength (This week)</div>
+                <div className="max-h-56 overflow-y-auto">
+                  {(Array.isArray(plannedWorkouts)? plannedWorkouts: [])
+                    .filter(w=>String((w as any).type).toLowerCase()==='strength')
+                    .filter(w=> withinWeek(w.date, startOfWeek(getTodayDateString())))
+                    .sort((a:any,b:any)=> a.date.localeCompare(b.date))
+                    .map((w:any)=> (
+                      <button key={w.id} onClick={()=>{ prefillFromPlanned(w); setSourcePlannedName(`${new Date(w.date).toLocaleDateString('en-US',{weekday:'short'})} — ${w.name||'Strength'}`); setSourcePlannedId(w.id); setSourcePlannedDate(w.date); setShowWorkoutsMenu(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between">
+                        <span>{new Date(w.date).toLocaleDateString('en-US',{weekday:'short'})} — {w.name||'Strength'}</span>
+                        <span className={`text-2xs px-1.5 py-0.5 rounded border ${String(w.workout_status).toLowerCase()==='completed'?'border-green-200 text-green-700':'border-gray-200 text-gray-600'}`}>{String(w.workout_status||'planned')}</span>
+                      </button>
+                    ))}
+                </div>
+                <div className="mt-2 text-xs font-semibold text-gray-500 px-1 pb-1">Add‑ons</div>
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Warm‑Up 5m</button>
+                  <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Core 5m</button>
+                  <button onClick={()=>attachAddon('addon_core_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Core 10m</button>
+                  <button onClick={()=>attachAddon('addon_mobility_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">Mobility 5m</button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
+        {sourcePlannedName && (
+          <div className="mt-2 text-sm text-gray-600">Source: {sourcePlannedName}</div>
+        )}
       </div>
 
       {/* Main content container with proper mobile scrolling */}
       <div className="space-y-3 w-full pb-4">
+        {attachedAddons.length>0 && (
+          <div className="px-3 space-y-2">
+            {attachedAddons.map((a,idx)=> (
+              <div key={idx} className="flex items-center justify-between rounded border border-gray-200 p-2">
+                <div className="text-sm text-gray-800">{a.name}</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500">{formatSeconds(a.seconds)}</span>
+                  {!a.completed ? (
+                    <button onClick={()=>setAttachedAddons(prev=>prev.map((x,i)=> i===idx?{...x, running: !x.running }:x))} className="px-2 py-1 text-xs border rounded">
+                      {a.running? 'Pause' : 'Start'}
+                    </button>
+                  ) : (
+                    <span className="text-green-600 text-xs">✓ Done</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
         {pendingOrOptions && pendingOrOptions.length > 1 && (
           <div className="px-3">
             <div className="flex items-center flex-wrap gap-2 text-sm">
