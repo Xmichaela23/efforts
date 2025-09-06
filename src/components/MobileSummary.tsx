@@ -118,7 +118,14 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   // Strength uses compare table
   if (type === 'strength') {
-    const plannedStrength = (planned.strength_exercises || []).map((ex: any)=>({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight }));
+    const plannedStrength = (planned.strength_exercises || []).map((ex: any)=>{
+      // Normalize planned fields even if a completed workout object is passed in
+      const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+      const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
+      const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
+      const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+      return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
+    });
     const completedStrength = (completed?.strength_exercises || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }));
     return (
       <div className="space-y-4">

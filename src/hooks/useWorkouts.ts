@@ -544,15 +544,17 @@ export const useWorkouts = () => {
                   return parsed.map((exercise: any, index) => ({
                     id: exercise.id || `temp-${index}`,
                     name: exercise.name || '',
-                    sets: exercise.sets ? exercise.sets.map((set: any) => ({
-                      reps: set.reps || 0,
-                      weight: set.weight || 0,
-                      rir: set.rir,
-                      // Consider a set completed if it has valid data, regardless of the completed flag
-                      completed: (set.reps > 0 && set.weight > 0) || set.completed || false
-                    })) : [],
-                    reps: exercise.reps || 0,
-                    weight: exercise.weight || 0,
+                    // Normalize to sets array for completed view compatibility
+                    sets: Array.isArray(exercise.sets)
+                      ? exercise.sets.map((set: any) => ({
+                          reps: Number((set?.reps as any) ?? 0) || 0,
+                          weight: Number((set?.weight as any) ?? 0) || 0,
+                          rir: typeof set?.rir === 'number' ? set.rir : undefined,
+                          completed: Boolean(set?.completed)
+                        }))
+                      : Array.from({ length: Math.max(1, Number(exercise.sets||0)) }, () => ({ reps: Number(exercise.reps||0)||0, weight: Number(exercise.weight||0)||0, completed: false })),
+                    reps: Number(exercise.reps || 0) || 0,
+                    weight: Number(exercise.weight || 0) || 0,
                     notes: exercise.notes || '',
                     weightMode: exercise.weightMode || 'same' as const
                   }));

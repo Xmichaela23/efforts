@@ -42,8 +42,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const existing = byKey.get(key);
       if (!existing) { byKey.set(key, w); continue; }
       const existingCompleted = String(existing.workout_status||existing.status||'').toLowerCase()==='completed';
-      // Prefer completed over planned
-      if (isCompleted && !existingCompleted) byKey.set(key, w);
+      // Prefer completed over planned; if both completed (provider + DB), keep the DB one
+      if (isCompleted && !existingCompleted) { byKey.set(key, w); continue; }
+      if (isCompleted && existingCompleted) {
+        const preferExistingDb = !(String((w?.id||'')).startsWith('garmin_') || String((w?.id||'')).startsWith('strava_'));
+        if (preferExistingDb) byKey.set(key, w);
+      }
     }
     return Array.from(byKey.values());
   }, [workouts, plannedWorkouts, activeDate]);
