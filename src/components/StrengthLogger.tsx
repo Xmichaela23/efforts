@@ -1032,7 +1032,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     }));
   };
 
-  const finalizeSave = (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
+  const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
@@ -1044,8 +1044,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       return;
     }
 
-    // FIXED: Use consistent PST timezone for date to avoid shifting to tomorrow
-    const workoutDate = scheduledWorkout?.date || getTodayDateString();
+    // FIXED: Use consistent PST timezone and move cross-day selections to TODAY
+    // If this log was sourced from a planned workout (via Workouts menu), always save to today
+    const workoutDate = sourcePlannedId ? getTodayDateString() : (scheduledWorkout?.date || getTodayDateString());
     
     // 🔍 DEBUG: Log the exact date being used
     console.log('🔍 DEBUG - Date details:');
@@ -1084,12 +1085,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       } catch {}
     })();
 
-    // Use the app context to save - this will integrate with the main workout system
-    addWorkout(completedWorkout);
+    // Use the app context to save and navigate with the DB-saved workout (has id)
+    let saved: any = null;
+    try {
+      saved = await addWorkout(completedWorkout);
+    } catch (e) {
+      console.error('❌ Save failed:', e);
+    }
 
-    // Navigate to completed view instead of showing alert
+    // Navigate to completed view (prefer saved row if available)
     if (onWorkoutSaved) {
-      onWorkoutSaved(completedWorkout);
+      onWorkoutSaved(saved || completedWorkout);
     } else {
       // Fallback to old behavior if no navigation callback provided
       alert(`Workout saved! Total volume: ${currentTotalVolume.toLocaleString()}lbs`);
@@ -1362,13 +1368,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       </button>
 
                       {editingTimerKey === `${exercise.id}-${setIndex}` && (
-                        <div className="absolute top-10 left-0 bg-black/90 text-white border border-black shadow-2xl rounded-lg p-3 z-50 w-64">
+                        <div className="absolute top-10 left-0 bg-white text-gray-900 border border-gray-200 shadow-2xl rounded-lg p-3 z-50 w-64">
                           <input
                             type="tel"
                             value={editingTimerValue}
                             onChange={(e)=>setEditingTimerValue(e.target.value)}
                             placeholder="mm:ss or 90"
-                            className="w-full h-10 px-3 bg-transparent border border-white/25 text-white placeholder-white/60 text-base rounded-md"
+                            className="w-full h-10 px-3 bg-white border border-gray-300 text-gray-900 placeholder-gray-400 text-base rounded-md"
                           />
                           <div className="flex items-center justify-between mt-3 gap-3">
                             <button
@@ -1379,7 +1385,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                   setEditingTimerKey(null);
                                 }
                               }}
-                              className="text-sm px-3 py-1.5 rounded-md border border-white/25 hover:bg-white/10"
+                              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                             >
                               Save
                             </button>
@@ -1389,13 +1395,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                                 setTimers(prev => ({ ...prev, [editingTimerKey]: { seconds: 0, running: false } }));
                                 setEditingTimerKey(null);
                               }}
-                              className="text-sm px-3 py-1.5 rounded-md border border-white/25 hover:bg-white/10"
+                              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                             >
                               Clear
                             </button>
                             <button
                               onClick={() => setEditingTimerKey(null)}
-                              className="text-sm px-3 py-1.5 rounded-md border border-white/25 hover:bg-white/10"
+                              className="text-sm px-3 py-1.5 rounded-md border border-gray-300 text-gray-700 hover:bg-gray-50"
                             >
                               Close
                             </button>
@@ -1555,11 +1561,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         </div>
       </div>
 
-      {/* Fixed bottom save button (stable, safe-area aware) */}
-      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
+      {/* Fixed bottom save action (text-only per design) */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 py-3 bg-white/95 backdrop-blur border-t border-gray-200 z-[100]" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
         <button 
           onClick={saveWorkout}
-          className="w-full h-12 text-black hover:text-blue-600 text-base font-medium"
+          className="w-full h-12 text-base font-medium text-black hover:text-blue-600"
         >
           Save
         </button>
@@ -1582,10 +1588,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               </div>
             </div>
             <div className="mt-4 sticky bottom-0 bg-white pt-3">
-              <div className="flex items-center gap-2">
-                <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
-                <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="px-3 py-2 text-sm border border-gray-300 rounded">Skip</button>
-                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="px-3 py-2 text-sm bg-black text-white rounded w-full sm:w-auto">Save</button>
+              <div className="flex items-center gap-4">
+                <button onClick={()=>setShowNotesModal(false)} className="text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+                <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="text-sm text-gray-700 hover:text-gray-900">Skip</button>
+                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="text-sm text-black hover:text-blue-600">Save</button>
               </div>
             </div>
           </div>

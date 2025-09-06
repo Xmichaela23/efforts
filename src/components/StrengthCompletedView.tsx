@@ -39,16 +39,21 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return date.toISOString().split('T')[0];
   };
 
-  // Find the original planned workout for comparison
+  // Prefer the provided object as planned when it is a planned row
   const plannedWorkout = useMemo(() => {
-    const planned = workouts.find(w => 
-      normalizeDate(w.date) === normalizeDate(workoutData.date) && 
-      w.type === 'strength' && 
-      w.workout_status === 'planned' &&
-      w.id !== workoutData.id
+    if (String(workoutData?.workout_status).toLowerCase() === 'planned') return workoutData;
+    return null;
+  }, [workoutData]);
+
+  // Find completed strength workout for the same date (logger save)
+  const completedForDay = useMemo(() => {
+    const sameDay = workouts.find(w => 
+      normalizeDate(w.date) === normalizeDate(workoutData.date) &&
+      w.type === 'strength' &&
+      (w.workout_status === 'completed' || (w as any).status === 'completed')
     );
-    return planned;
-  }, [workouts, workoutData.date, workoutData.id]);
+    return sameDay || null;
+  }, [workouts, workoutData.date]);
 
   // FIXED: Calculate volume for an exercise - count sets with actual data
   const calculateExerciseVolume = (sets: Array<{ reps: number; weight: number; completed?: boolean }>) => {
@@ -89,15 +94,17 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
   // Determine which exercises array to use
   const getCompletedExercises = () => {
+    // If we have a saved completed workout for the day, prefer it
+    if (completedForDay?.strength_exercises && completedForDay.strength_exercises.length > 0) {
+      return completedForDay.strength_exercises as any[];
+    }
     if (workoutData.strength_exercises && workoutData.strength_exercises.length > 0) {
-      return workoutData.strength_exercises;
+      return workoutData.strength_exercises as any[];
     }
-    
     if (workoutData.completed_exercises && workoutData.completed_exercises.length > 0) {
-      return workoutData.completed_exercises;
+      return workoutData.completed_exercises as any[];
     }
-    
-    return [];
+    return [] as any[];
   };
 
   const completedExercises = getCompletedExercises();

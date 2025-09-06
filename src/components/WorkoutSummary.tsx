@@ -22,7 +22,9 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
   const [activeTab, setActiveTab] = useState('summary');
   const completedStrengthForDay = React.useMemo(()=>{
     if (!workout?.date || workout?.type !== 'strength') return null;
-    return workouts.find(w => (w as any).date === workout.date && (w as any).type === 'strength' && ((w as any).workout_status === 'completed' || (w as any).status === 'completed')) || null;
+    // Match on same date, prefer completed saved workout with strength_exercises
+    const match = workouts.find(w => (w as any).date === workout.date && (w as any).type === 'strength' && ((w as any).workout_status === 'completed' || (w as any).status === 'completed')) || null;
+    return match;
   }, [workouts, workout]);
 
   if (!workout) {
