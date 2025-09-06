@@ -1569,7 +1569,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       {showNotesModal && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={()=>setShowNotesModal(false)} />
-          <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10">
+          <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
             <h3 className="text-lg font-semibold mb-3">How did it feel?</h3>
             <div className="space-y-3">
               <div>
@@ -1581,10 +1581,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>setNotesRpe(e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '')} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
               </div>
             </div>
-            <div className="mt-4 grid grid-cols-3 gap-2">
-              <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
-              <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="px-3 py-2 text-sm border border-gray-300 rounded">Skip</button>
-              <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="px-3 py-2 text-sm bg-black text-white rounded">Save</button>
+            <div className="mt-4 sticky bottom-0 bg-white pt-3">
+              <div className="flex items-center gap-2">
+                <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
+                <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="px-3 py-2 text-sm border border-gray-300 rounded">Skip</button>
+                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="px-3 py-2 text-sm bg-black text-white rounded w-full sm:w-auto">Save</button>
+              </div>
             </div>
           </div>
         </div>
