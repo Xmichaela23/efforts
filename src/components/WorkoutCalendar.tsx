@@ -233,7 +233,17 @@ export default function WorkoutCalendar({
         return !completedPlannedKeys.has(key);
       } catch { return true; }
     });
-    const all = [ ...wkCombinedFiltered, ...planned ];
+    // Normalize planned statuses: if a planned row is marked completed in DB but we have
+    // no matching completed workout for that date/type, treat it as planned for UI
+    const mappedPlanned = (planned as any[]).map((p:any)=>{
+      const key = `${String(p.date)}|${String(p.type||'').toLowerCase()}`;
+      if (String(p?.workout_status||'').toLowerCase()==='completed' && !completedWorkoutKeys.has(key)) {
+        return { ...p, workout_status: 'planned' };
+      }
+      return p;
+    });
+
+    const all = [ ...wkCombinedFiltered, ...mappedPlanned ];
     // Filter out planned optionals defensively (tags may be JSON string or array)
     const allFiltered = all.filter((w: any) => {
       const raw = (w as any).tags;

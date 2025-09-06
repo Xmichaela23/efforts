@@ -39,6 +39,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     for (const w of sameDate) {
       const key = `${String(w.type||'').toLowerCase()}|${w.date}`;
       const isCompleted = String(w.workout_status||w.status||'').toLowerCase()==='completed';
+      // If this is a planned row that is incorrectly marked completed (no matching completed workout in state), coerce to planned
+      if (!isCompleted && Array.isArray((w as any).steps_preset)) {
+        (w as any).workout_status = 'planned';
+      }
       const existing = byKey.get(key);
       if (!existing) { byKey.set(key, w); continue; }
       const existingCompleted = String(existing.workout_status||existing.status||'').toLowerCase()==='completed';
