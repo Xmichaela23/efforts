@@ -157,7 +157,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [sourcePlannedName, setSourcePlannedName] = useState<string>('');
   const [sourcePlannedId, setSourcePlannedId] = useState<string | null>(null);
   const [sourcePlannedDate, setSourcePlannedDate] = useState<string | null>(null);
-  type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean };
+  type AddonStep = { move: string; time_sec: number };
+  type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
   const addonCatalog: Record<string, { name: string; duration_min: number; variants: string[] }> = {
     'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1','v2'] },
@@ -167,6 +168,126 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'addon_mobility_5': { name: 'Mobility (5m)', duration_min: 5, variants: ['v1','v2'] },
     'addon_mobility_10': { name: 'Mobility (10m)', duration_min: 10, variants: ['v1','v2'] },
   };
+
+  // Full addon definitions including sequences
+  const addonDefinitions: Record<string, { name: string; duration_min: number; sequence: AddonStep[] }> = {
+    'addon_strength_wu_5.v1': { name: 'Strength Warm-Up — 5 min (v1)', duration_min: 5, sequence: [
+      { move: 'Jumping Jacks', time_sec: 60 },
+      { move: 'Bodyweight Squats', time_sec: 60 },
+      { move: 'Arm Circles', time_sec: 60 },
+      { move: 'Hip Circles', time_sec: 60 },
+      { move: 'Glute Bridge Hold', time_sec: 60 },
+    ]},
+    'addon_strength_wu_5.v2': { name: 'Strength Warm-Up — 5 min (v2)', duration_min: 5, sequence: [
+      { move: 'High Knees (in place)', time_sec: 60 },
+      { move: 'Reverse Lunges (alternating)', time_sec: 60 },
+      { move: 'Shoulder Taps (high plank)', time_sec: 60 },
+      { move: 'Inchworm Walkouts', time_sec: 60 },
+      { move: 'Torso Twists (standing)', time_sec: 60 },
+    ]},
+    'addon_strength_wu_10.v1': { name: 'Strength Warm-Up — 10 min (v1)', duration_min: 10, sequence: [
+      { move: 'Jumping Jacks', time_sec: 60 },
+      { move: 'Bodyweight Squats', time_sec: 60 },
+      { move: 'Arm Circles', time_sec: 60 },
+      { move: 'Hip Circles', time_sec: 60 },
+      { move: 'Glute Bridge Hold', time_sec: 60 },
+      { move: 'High Knees (in place)', time_sec: 60 },
+      { move: 'Reverse Lunges (alternating)', time_sec: 60 },
+      { move: 'Shoulder Taps (high plank)', time_sec: 60 },
+      { move: 'Inchworm Walkouts', time_sec: 60 },
+      { move: 'Torso Twists (standing)', time_sec: 60 },
+    ]},
+    'addon_strength_wu_10.v2': { name: 'Strength Warm-Up — 10 min (v2)', duration_min: 10, sequence: [
+      { move: 'Butt Kicks (in place)', time_sec: 60 },
+      { move: 'Lateral Lunges (alternating)', time_sec: 60 },
+      { move: 'Leg Swings (front/back, each side 30s)', time_sec: 60 },
+      { move: 'Arm Crosses + Overheads', time_sec: 60 },
+      { move: 'World’s Greatest Stretch (alternating)', time_sec: 60 },
+      { move: 'Knee Hugs (walk-in-place)', time_sec: 60 },
+      { move: 'Calf Raises (tempo)', time_sec: 60 },
+      { move: 'Hip Airplanes (hands on hips)', time_sec: 60 },
+      { move: 'Plank to Down Dog', time_sec: 60 },
+      { move: 'Glute Bridge March', time_sec: 60 },
+    ]},
+    'addon_core_5.v1': { name: 'Core — 5 min (v1)', duration_min: 5, sequence: [
+      { move: 'Crunch', time_sec: 60 },
+      { move: 'Reverse Crunch', time_sec: 60 },
+      { move: 'Bicycle Crunch', time_sec: 60 },
+      { move: 'Flutter Kicks', time_sec: 60 },
+      { move: 'Front Plank', time_sec: 60 },
+    ]},
+    'addon_core_5.v2': { name: 'Core — 5 min (v2)', duration_min: 5, sequence: [
+      { move: 'Sit-Up', time_sec: 60 },
+      { move: 'Leg Raises (lying)', time_sec: 60 },
+      { move: 'Scissor Kicks', time_sec: 60 },
+      { move: 'Side Plank (Left)', time_sec: 60 },
+      { move: 'Side Plank (Right)', time_sec: 60 },
+    ]},
+    'addon_core_10.v1': { name: 'Core — 10 min (v1)', duration_min: 10, sequence: [
+      { move: 'Crunch', time_sec: 60 },
+      { move: 'Reverse Crunch', time_sec: 60 },
+      { move: 'Bicycle Crunch', time_sec: 60 },
+      { move: 'Flutter Kicks', time_sec: 60 },
+      { move: 'Front Plank', time_sec: 60 },
+      { move: 'Sit-Up', time_sec: 60 },
+      { move: 'Leg Raises (lying)', time_sec: 60 },
+      { move: 'Scissor Kicks', time_sec: 60 },
+      { move: 'Side Plank (Left)', time_sec: 60 },
+      { move: 'Side Plank (Right)', time_sec: 60 },
+    ]},
+    'addon_core_10.v2': { name: 'Core — 10 min (v2)', duration_min: 10, sequence: [
+      { move: 'Dead Bug', time_sec: 60 },
+      { move: 'Bird Dog', time_sec: 60 },
+      { move: 'Hollow Hold', time_sec: 60 },
+      { move: 'Toe Touches', time_sec: 60 },
+      { move: 'Front Plank (reach alternations)', time_sec: 60 },
+      { move: 'Side Plank (Left, hip dips)', time_sec: 60 },
+      { move: 'Side Plank (Right, hip dips)', time_sec: 60 },
+      { move: 'Reverse Crunch', time_sec: 60 },
+      { move: 'Bicycle Crunch', time_sec: 60 },
+      { move: 'Flutter Kicks', time_sec: 60 },
+    ]},
+    'addon_mobility_5.v1': { name: 'Mobility — 5 min (v1)', duration_min: 5, sequence: [
+      { move: 'Cat–Cow', time_sec: 60 },
+      { move: 'Child’s Pose', time_sec: 60 },
+      { move: 'Thread the Needle (Left)', time_sec: 60 },
+      { move: 'Thread the Needle (Right)', time_sec: 60 },
+      { move: 'Seated Forward Fold', time_sec: 60 },
+    ]},
+    'addon_mobility_5.v2': { name: 'Mobility — 5 min (v2)', duration_min: 5, sequence: [
+      { move: 'Downward Dog', time_sec: 60 },
+      { move: 'Figure-4 Glute Stretch (each side 30s)', time_sec: 60 },
+      { move: 'Butterfly Stretch', time_sec: 60 },
+      { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
+      { move: 'Arm Circles (slow)', time_sec: 60 },
+    ]},
+    'addon_mobility_10.v1': { name: 'Mobility — 10 min (v1)', duration_min: 10, sequence: [
+      { move: 'Cat–Cow', time_sec: 60 },
+      { move: 'Child’s Pose', time_sec: 60 },
+      { move: 'Thread the Needle (Left)', time_sec: 60 },
+      { move: 'Thread the Needle (Right)', time_sec: 60 },
+      { move: 'Seated Forward Fold', time_sec: 60 },
+      { move: 'Downward Dog', time_sec: 60 },
+      { move: 'Figure-4 Glute Stretch (each side 30s)', time_sec: 60 },
+      { move: 'Butterfly Stretch', time_sec: 60 },
+      { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
+      { move: 'Arm Circles (slow)', time_sec: 60 },
+    ]},
+    'addon_mobility_10.v2': { name: 'Mobility — 10 min (v2)', duration_min: 10, sequence: [
+      { move: 'Plank to Down Dog', time_sec: 60 },
+      { move: 'World’s Greatest Stretch (alternating)', time_sec: 60 },
+      { move: 'Half-Kneeling Hip Flexor Stretch (each side 30s)', time_sec: 60 },
+      { move: 'Hamstring Stretch (supine)', time_sec: 60 },
+      { move: '90/90 Hip Switches (controlled)', time_sec: 60 },
+      { move: 'Cat–Cow', time_sec: 60 },
+      { move: 'Child’s Pose', time_sec: 60 },
+      { move: 'Seated Forward Fold', time_sec: 60 },
+      { move: 'Figure-4 Glute Stretch (each side 30s)', time_sec: 60 },
+      { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
+    ]},
+  };
+
+  const getAddonDef = (base: string, version: string) => addonDefinitions[`${base}.${version}`];
 
   const formatSeconds = (s: number) => {
     const ss = Math.max(0, Math.floor(s));
@@ -696,7 +817,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const meta = addonCatalog[tokenBase]; if (!meta) return;
     const versionList = meta.variants; const version = versionList[0];
     const seconds = meta.duration_min * 60;
-    setAttachedAddons(prev => [...prev, { token: `${tokenBase}.${version}`, name: meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false }]);
+    const def = getAddonDef(tokenBase, version);
+    setAttachedAddons(prev => [...prev, { token: `${tokenBase}.${version}`, name: meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false, sequence: def?.sequence || [], expanded: true }]);
     setShowWorkoutsMenu(false);
   };
 
@@ -941,7 +1063,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       completedManually: true,
       notes: extra?.notes,
       rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
-      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed }))
+      addons: attachedAddons.map(a => ({ token: a.token, version: a.version, duration_min: a.duration_min, completed: a.completed, sequence: a.sequence }))
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);
@@ -1074,18 +1196,33 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         {attachedAddons.length>0 && (
           <div className="px-3 space-y-2">
             {attachedAddons.map((a,idx)=> (
-              <div key={idx} className="flex items-center justify-between rounded border border-gray-200 p-2">
-                <div className="text-sm text-gray-800">{a.name}</div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">{formatSeconds(a.seconds)}</span>
-                  {!a.completed ? (
-                    <button onClick={()=>setAttachedAddons(prev=>prev.map((x,i)=> i===idx?{...x, running: !x.running }:x))} className="px-2 py-1 text-xs border rounded">
-                      {a.running? 'Pause' : 'Start'}
-                    </button>
-                  ) : (
-                    <span className="text-green-600 text-xs">✓ Done</span>
-                  )}
+              <div key={idx} className="rounded border border-gray-200">
+                <div className="flex items-center justify-between p-2">
+                  <button className="text-sm text-gray-800 text-left" onClick={()=>setAttachedAddons(prev=>prev.map((x,i)=> i===idx?{...x, expanded: !x.expanded }:x))}>{a.name}</button>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{formatSeconds(a.seconds)}</span>
+                    {!a.completed ? (
+                      <button onClick={()=>setAttachedAddons(prev=>prev.map((x,i)=> i===idx?{...x, running: !x.running }:x))} className="px-2 py-1 text-xs border rounded">
+                        {a.running? 'Pause' : 'Start'}
+                      </button>
+                    ) : (
+                      <span className="text-green-600 text-xs">✓ Done</span>
+                    )}
+                  </div>
                 </div>
+                {a.expanded && a.sequence && a.sequence.length>0 && (
+                  <div className="px-2 pb-2">
+                    <div className="text-xs text-gray-500 mb-1">Sequence</div>
+                    <div className="divide-y divide-gray-100 border border-gray-100 rounded">
+                      {a.sequence.map((step, sIdx)=> (
+                        <div key={sIdx} className="flex items-center justify-between px-2 py-1.5 bg-white">
+                          <div className="text-sm text-gray-700">{step.move}</div>
+                          <div className="text-xs text-gray-500">{Math.round(step.time_sec/60)}m{String(step.time_sec%60).padStart(2,'0')}s</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
