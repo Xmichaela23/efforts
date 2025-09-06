@@ -778,9 +778,8 @@ export const useWorkouts = () => {
       }
       if (!target) return;
 
-      // Move target to completed date if needed and mark completed
+      // Mark the authored planned row as completed, but DO NOT move its date
       const updates: any = { workout_status: 'completed' };
-      if (target.date !== date) updates.date = date;
       await supabase.from('planned_workouts').update(updates).eq('id', target.id);
       // Optionally tag completed workout with friendly name
       if (completed.name && completed.name !== target.name) {
