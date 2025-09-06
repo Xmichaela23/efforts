@@ -74,6 +74,8 @@ export interface Workout {
   intervals?: RunInterval[] | RideInterval[] | SwimInterval[];
   strength_exercises?: StrengthExercise[];
   workout_status?: "planned" | "completed" | "skipped" | "in_progress";
+  // Linkage to authored planned workout (if associated)
+  planned_id?: string | null;
   created_at?: string;
   updated_at?: string;
   avg_heart_rate?: number;
@@ -516,6 +518,7 @@ export const useWorkouts = () => {
         userComments: w.userComments ?? w.usercomments ?? "",
         completedManually: w.completedManually ?? w.completedmanually ?? false,
         workout_status: w.workout_status ?? (w.strava_activity_id || w.isGarminImported ? 'completed' : 'planned'),
+        planned_id: (w as any)?.planned_id ?? null,
         created_at: w.created_at,
         updated_at: w.updated_at,
         intervals: w.intervals ? (typeof w.intervals === 'string' ? JSON.parse(w.intervals) : w.intervals) : [],
@@ -1316,6 +1319,7 @@ export const useWorkouts = () => {
         userComments: data.usercomments ?? "",
         completedManually: data.completedmanually ?? false,
         workout_status: data.workout_status ?? "planned",
+        planned_id: (data as any)?.planned_id ?? null,
         created_at: data.created_at,
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],
@@ -1534,6 +1538,7 @@ export const useWorkouts = () => {
         userComments: data.usercomments ?? "",
         completedManually: data.completedmanually ?? false,
         workout_status: data.workout_status ?? "planned",
+        planned_id: (data as any)?.planned_id ?? null,
         created_at: data.created_at,
         updated_at: data.updated_at,
         intervals: data.intervals ? JSON.parse(data.intervals) : [],

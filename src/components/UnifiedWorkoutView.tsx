@@ -9,6 +9,7 @@ import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import PlannedWorkoutView from './PlannedWorkoutView';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { supabase } from '@/lib/supabase';
 
 interface UnifiedWorkoutViewProps {
   workout: any;
@@ -39,6 +40,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
   const [assocOpen, setAssocOpen] = useState(false);
+  const [undoing, setUndoing] = useState(false);
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
@@ -174,6 +176,35 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 return 'Planned';
               })()}
             </p>
+            {isCompleted && workout?.planned_id && (
+              <div className="mt-1 inline-flex items-center gap-2 text-xs">
+                <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-200">
+                  Auto-linked to plan
+                </span>
+                <button
+                  disabled={undoing}
+                  onClick={async () => {
+                    try {
+                      setUndoing(true);
+                      // Detach both sides
+                      const pid = String(workout.planned_id);
+                      await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
+                      await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
+                      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                      // Force local UI to reflect detach by clearing field on object reference if present
+                      (workout as any).planned_id = null;
+                    } catch (e) {
+                      // noop
+                    } finally {
+                      setUndoing(false);
+                    }
+                  }}
+                  className="underline text-gray-600 hover:text-gray-900 disabled:opacity-50"
+                >
+                  Undo
+                </button>
+              </div>
+            )}
           </div>
         </div>
         <Button
