@@ -44,7 +44,14 @@ const joinPlannedLabel = (step: any): string => {
   return String(label || '').toString();
 };
 
-const completedValueForStep = (completed: any, plannedStep: any): string => {
+const getAvgHR = (completed: any): number | null => {
+  const v = completed?.avg_heart_rate ?? completed?.metrics?.avg_heart_rate;
+  return typeof v === 'number' && v > 0 ? Math.round(v) : null;
+};
+
+type CompletedDisplay = { text: string; hr: number | null };
+
+const completedValueForStep = (completed: any, plannedStep: any): CompletedDisplay => {
   if (!completed) return '—';
   // Minimal viable: use overall averages; later we can slice sensor_data per step
   const isRunOrWalk = /run|walk/i.test(completed.type || '') || /running|walking/i.test(completed.activity_type || '');
@@ -56,17 +63,17 @@ const completedValueForStep = (completed: any, plannedStep: any): string => {
     if (isRunOrWalk) {
       const secPerKm = completed.avg_pace || completed.metrics?.avg_pace; // seconds per km
       const secPerMi = typeof secPerKm === 'number' ? secPerKm * 1.60934 : undefined;
-      return `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${fmtPace(secPerMi)}`;
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${fmtPace(secPerMi)}` , hr: getAvgHR(completed) };
     }
     if (isRide) {
       const kph = completed.avg_speed || completed.metrics?.avg_speed; // km/h
       const mph = typeof kph === 'number' ? kph * 0.621371 : undefined;
-      return `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`;
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
       const secPerKm = completed.avg_pace || completed.metrics?.avg_pace;
       const secPer100 = typeof secPerKm === 'number' ? (secPerKm / 10) : undefined;
-      return `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${secPer100 ? `${fmtTime(secPer100)} /100m` : '—'}`;
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${secPer100 ? `${fmtTime(secPer100)} /100m` : '—'}`, hr: getAvgHR(completed) };
     }
   }
 
@@ -74,17 +81,17 @@ const completedValueForStep = (completed: any, plannedStep: any): string => {
     if (isRunOrWalk) {
       const secPerKm = completed.avg_pace || completed.metrics?.avg_pace;
       const secPerMi = typeof secPerKm === 'number' ? secPerKm * 1.60934 : undefined;
-      return `${fmtTime(plannedStep.duration)} @ ${fmtPace(secPerMi)}`;
+      return { text: `${fmtTime(plannedStep.duration)} @ ${fmtPace(secPerMi)}`, hr: getAvgHR(completed) };
     }
     if (isRide) {
       const kph = completed.avg_speed || completed.metrics?.avg_speed;
       const mph = typeof kph === 'number' ? kph * 0.621371 : undefined;
-      return `${fmtTime(plannedStep.duration)} @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`;
+      return { text: `${fmtTime(plannedStep.duration)} @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
       const secPerKm = completed.avg_pace || completed.metrics?.avg_pace;
       const secPer100 = typeof secPerKm === 'number' ? (secPerKm / 10) : undefined;
-      return `${fmtTime(plannedStep.duration)} @ ${secPer100 ? `${fmtTime(secPer100)} /100m` : '—'}`;
+      return { text: `${fmtTime(plannedStep.duration)} @ ${secPer100 ? `${fmtTime(secPer100)} /100m` : '—'}`, hr: getAvgHR(completed) };
     }
   }
 
@@ -94,10 +101,10 @@ const completedValueForStep = (completed: any, plannedStep: any): string => {
   const paceSecPerKm = completed.avg_pace || completed.metrics?.avg_pace;
   const pacePerMi = typeof paceSecPerKm === 'number' ? paceSecPerKm * 1.60934 : undefined;
   if (dist && durSec) {
-    return `${dist} @ ${fmtPace(pacePerMi)}`;
+    return { text: `${dist} @ ${fmtPace(pacePerMi)}`, hr: getAvgHR(completed) };
   }
-  if (durSec) return fmtTime(durSec);
-  return '—';
+  if (durSec) return { text: fmtTime(durSec), hr: getAvgHR(completed) };
+  return { text: '—', hr: getAvgHR(completed) };
 };
 
 export default function MobileSummary({ planned, completed }: MobileSummaryProps) {
@@ -144,7 +151,16 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         {steps.map((st, idx) => (
           <div key={idx} className="grid grid-cols-2 gap-4 py-2 text-sm">
             <div className="text-gray-800">{joinPlannedLabel(st)}</div>
-            <div className="text-gray-900">{completedValueForStep(completed, st)}</div>
+            <div className="text-gray-900">
+              {(() => { const val = completedValueForStep(completed, st); return (
+                <>
+                  <div>{typeof val === 'string' ? val : val.text}</div>
+                  {typeof val !== 'string' && val.hr ? (
+                    <div className="text-xs text-gray-500">{val.hr} bpm</div>
+                  ) : null}
+                </>
+              ); })()}
+            </div>
           </div>
         ))}
         {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (

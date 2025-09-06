@@ -815,6 +815,22 @@ export const useWorkouts = () => {
     return () => window.clearTimeout(id);
   }, [authReady]);
 
+  // Run a one-time 14-day backfill to auto-attach recent workouts
+  useEffect(() => {
+    if (!authReady) return;
+    const KEY = 'autoattach_backfill_14d_done';
+    const already = typeof window !== 'undefined' ? window.localStorage.getItem(KEY) : '1';
+    if (already) return;
+    (async () => {
+      try {
+        await backfillRecentAttachments(14);
+        try { window.localStorage.setItem(KEY, String(Date.now())); } catch {}
+      } catch (e) {
+        console.log('Backfill skipped:', e);
+      }
+    })();
+  }, [authReady]);
+
   // 🧲 Background Strava backfill (recent days) is disabled by default to avoid function errors on app load.
   // Enable by setting VITE_ENABLE_STRAVA_AUTO_BACKFILL=true at build time.
   useEffect(() => {
@@ -1112,6 +1128,33 @@ export const useWorkouts = () => {
       console.error("❌ Error in importGarminActivities:", err);
       throw err;
     }
+  };
+
+  // Backfill: attach completed workouts in last N days
+  const backfillRecentAttachments = async (days: number = 14) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { processed: 0 };
+    const sinceIso = new Date(Date.now() - days*24*60*60*1000).toISOString().slice(0,10);
+    const { data: recents, error } = await supabase
+      .from('workouts')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('workout_status', 'completed')
+      .gte('date', sinceIso)
+      .order('date', { ascending: false })
+      .limit(300);
+    if (error) throw error;
+    const list = Array.isArray(recents) ? recents : [];
+    let processed = 0;
+    for (const r of list) {
+      try {
+        await autoAttachPlannedSession({ ...(r as any) } as Workout);
+        processed += 1;
+      } catch {}
+    }
+    await fetchWorkouts();
+    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    return { processed };
   };
 
   const addWorkout = async (workoutData: Omit<Workout, "id">) => {
