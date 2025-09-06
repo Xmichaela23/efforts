@@ -62,13 +62,66 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
     try {
       setLoading(true);
       setError(null);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Not signed in');
+
+      // Ensure we have a persisted workouts row. If this is a provider-only item (e.g., garmin_*, strava_*),
+      // create a workouts row first so we can link both sides.
+      let completedId: string = String(workout?.id || '');
+      const isProviderOnly = /^garmin_/i.test(completedId) || /^strava_/i.test(completedId);
+      if (isProviderOnly) {
+        const toSave: any = {
+          name: workout?.name || 'Imported Activity',
+          type: String(workout?.type || 'run'),
+          date: String(workout?.date || new Date().toISOString().slice(0,10)),
+          duration: Math.round(Number(workout?.duration || (workout?.moving_time || workout?.total_timer_time || 0)/60) || 0),
+          description: workout?.description || '',
+          usercomments: '',
+          completedmanually: false,
+          workout_status: 'completed',
+          intervals: JSON.stringify([]),
+          strength_exercises: JSON.stringify([]),
+          user_id: user.id,
+          avg_heart_rate: workout?.avg_heart_rate ?? null,
+          max_heart_rate: workout?.max_heart_rate ?? null,
+          avg_power: workout?.avg_power ?? null,
+          max_power: workout?.max_power ?? null,
+          normalized_power: workout?.normalized_power ?? null,
+          avg_speed: workout?.avg_speed ?? null,
+          max_speed: workout?.max_speed ?? null,
+          avg_cadence: workout?.avg_cadence ?? null,
+          max_cadence: workout?.max_cadence ?? null,
+          elevation_gain: workout?.elevation_gain ?? null,
+          elevation_loss: workout?.elevation_loss ?? null,
+          calories: workout?.calories ?? null,
+          distance: workout?.distance ?? null,
+          timestamp: workout?.timestamp ?? null,
+          start_position_lat: workout?.start_position_lat ?? null,
+          start_position_long: workout?.start_position_long ?? null,
+          friendly_name: workout?.friendly_name || null,
+          moving_time: typeof workout?.moving_time === 'number' ? Math.round(workout.moving_time) : null,
+          elapsed_time: typeof workout?.elapsed_time === 'number' ? Math.round(workout.elapsed_time) : null,
+          total_timer_time: typeof workout?.total_timer_time === 'number' ? Math.round(workout.total_timer_time) : null,
+          total_elapsed_time: typeof workout?.total_elapsed_time === 'number' ? Math.round(workout.total_elapsed_time) : null,
+          gps_track: workout?.gps_track ? JSON.stringify(workout.gps_track) : null,
+          sensor_data: workout?.sensor_data ? JSON.stringify(workout.sensor_data) : null,
+        };
+        const { data: inserted, error: insErr } = await supabase
+          .from('workouts')
+          .insert([toSave])
+          .select()
+          .single();
+        if (insErr) throw insErr;
+        completedId = inserted.id as string;
+      }
+
       // Flip planned to completed and link ids
       await supabase.from('planned_workouts')
-        .update({ workout_status: 'completed', completed_workout_id: workout.id })
+        .update({ workout_status: 'completed', completed_workout_id: completedId })
         .eq('id', planned.id);
       await supabase.from('workouts')
         .update({ planned_id: planned.id })
-        .eq('id', workout.id);
+        .eq('id', completedId);
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       onAssociated?.(planned.id);
       // Also update the resolved view users by emitting invalidate
