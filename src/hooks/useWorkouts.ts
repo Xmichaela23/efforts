@@ -933,8 +933,13 @@ export const useWorkouts = () => {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'strava_activities', filter: `user_id=eq.${user.id}` }, () => {
           fetchWorkouts();
         })
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'garmin_activities', filter: `garmin_user_id=is.not.null` }, () => {
-          fetchWorkouts();
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'garmin_activities', filter: `garmin_user_id=is.not.null` }, async () => {
+          try {
+            await importGarminActivities();
+          } catch {
+            // fallback to simple refresh
+            fetchWorkouts();
+          }
         })
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => {
           fetchWorkouts();
