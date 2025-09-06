@@ -219,7 +219,7 @@ export const useWorkouts = () => {
       // Step 2: Fetch Garmin activities (if user has Garmin connection) — optionally deferred
       let garminWorkouts: any[] = [];
       // Guard provider fetches behind explicit env flag so UI can be workouts-only by default
-      const ENABLE_PROVIDER_FALLBACK = (import.meta as any)?.env?.VITE_ENABLE_PROVIDER_FALLBACK === 'true';
+      const ENABLE_PROVIDER_FALLBACK = (import.meta as any)?.env?.VITE_ENABLE_PROVIDER_FALLBACK !== 'false';
       if (includeProviders && ENABLE_PROVIDER_FALLBACK) try {
         // Try device_connections first; fall back to legacy user_connections
         let garminUserId: string | null = null;
@@ -870,9 +870,10 @@ export const useWorkouts = () => {
   // 🔄 Fetch workouts when auth is ready
   useEffect(() => {
     if (!authReady) return;
-    // Workouts-only by default; enable provider fallback via env flag if needed
+    // First paint from workouts, then provider fallback to surface Garmin rows if not in workouts
     fetchWorkouts(false);
-    return () => undefined;
+    const id = window.setTimeout(() => fetchWorkouts(true), 1200);
+    return () => window.clearTimeout(id);
   }, [authReady]);
 
   // Run a one-time 14-day backfill to auto-attach recent workouts
@@ -955,7 +956,7 @@ export const useWorkouts = () => {
     let t: number | null = null;
     const onFocus = () => {
       if (t) window.clearTimeout(t);
-      t = window.setTimeout(() => fetchWorkouts(false), 800);
+      t = window.setTimeout(() => fetchWorkouts(true), 800);
     };
     window.addEventListener('focus', onFocus);
     return () => { if (t) window.clearTimeout(t); window.removeEventListener('focus', onFocus); };
