@@ -701,7 +701,7 @@ export const useWorkouts = () => {
 
       const { data: planned } = await supabase
         .from('planned_workouts')
-        .select('*')
+        .select('id,user_id,type,date,name,duration,rendered_description,description,computed,intervals,workout_status,targets_summary')
         .eq('user_id', user.id)
         .eq('type', completed.type)
         .in('workout_status', ['planned','in_progress'])
@@ -713,6 +713,30 @@ export const useWorkouts = () => {
 
       // Same‑day candidates
       const sameDay = candidates.filter((c:any)=> c.date === date);
+      const derivePlannedStats = (r:any) => {
+        // Derive seconds and km from computed.steps or intervals or duration
+        let secs = 0; let km = 0;
+        try {
+          const comp = (r as any)?.computed;
+          if (comp && Array.isArray(comp.steps)) {
+            for (const st of comp.steps) {
+              if (typeof st.duration === 'number') secs += st.duration;
+              if (typeof st.distanceMeters === 'number') km += st.distanceMeters / 1000;
+            }
+            if (!secs && typeof comp.total_duration_seconds === 'number') secs = comp.total_duration_seconds;
+          }
+        } catch {}
+        try {
+          const ints = Array.isArray((r as any)?.intervals) ? (r as any).intervals : [];
+          for (const it of ints) {
+            if (typeof it.duration === 'number') secs += it.duration;
+            if (typeof it.distanceMeters === 'number') km += it.distanceMeters / 1000;
+          }
+        } catch {}
+        if (!secs && typeof r.duration === 'number') secs = r.duration * 60;
+        return { secs, km };
+      };
+
       const pickByHeuristics = (arr:any[]): any | null => {
         if (arr.length === 1) return arr[0];
         // Duration/Distance heuristics
@@ -721,9 +745,9 @@ export const useWorkouts = () => {
         let best: any = null; let bestScore = Number.NEGATIVE_INFINITY;
         for (const r of arr) {
           let score = 0;
-          const compSec = Number((r as any)?.computed?.total_duration_seconds) || null;
-          if (dur && compSec) {
-            const diff = Math.abs(dur - compSec) / compSec;
+          const stats = derivePlannedStats(r);
+          if (dur && stats.secs) {
+            const diff = Math.abs(dur - stats.secs) / Math.max(60, stats.secs);
             if (diff <= 0.15) score += 2; else score -= diff;
           }
           const tok = String((r as any)?.rendered_description || (r as any)?.description || '').toLowerCase();
@@ -732,9 +756,9 @@ export const useWorkouts = () => {
           // Simple focus tokens
           const focus = ['vo2','tempo','interval','endurance','threshold','sweet spot','technique'];
           for (const f of focus) if ((completed.name||'').toLowerCase().includes(f) && lbl.includes(f)) score += 1;
-          if (distKm && typeof (r as any)?.targets_summary?.distance_km === 'number') {
-            const pd = (r as any).targets_summary.distance_km;
-            const diffD = Math.abs(distKm - pd) / Math.max(0.1, pd);
+          const plannedKm = (typeof (r as any)?.targets_summary?.distance_km === 'number') ? (r as any).targets_summary.distance_km : (stats.km || null);
+          if (distKm && plannedKm) {
+            const diffD = Math.abs(distKm - plannedKm) / Math.max(0.5, plannedKm);
             if (diffD <= 0.10) score += 1.5; else score -= diffD;
           }
           if (score > bestScore) { bestScore = score; best = r; }
