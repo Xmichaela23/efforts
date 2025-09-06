@@ -147,7 +147,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [notesText, setNotesText] = useState('');
   const [notesRpe, setNotesRpe] = useState<number | ''>('');
-  const [notesMood, setNotesMood] = useState<'positive'|'neutral'|'negative'|''>('');
+  // Mood removed per request; keep RPE only
   // Per-set rest timers: key = `${exerciseId}-${setIndex}`
   const [timers, setTimers] = useState<{ [key: string]: { seconds: number; running: boolean } }>({});
   const [editingTimerKey, setEditingTimerKey] = useState<string | null>(null);
@@ -427,6 +427,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (!isStrength) continue;
         const name = (st.exercise || st.exercise_name || st.name || '').toString().trim();
         if (!name) continue;
+        // Skip warm-up / cool-down entries in strength logger
+        if (isWarm(name) || isCool(name)) continue;
         const reps = Number(st.reps) || 0;
         let pct: number | undefined;
         const inten = String(st.intensity||st.target||'');
@@ -439,26 +441,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         byName[name].sets.push({ reps, weight: weight||0, barType: 'standard', rir: undefined, completed: false });
       }
       const all = Object.values(byName);
-      const warm: LoggedExercise[] = [];
-      const main: LoggedExercise[] = [];
-      const cool: LoggedExercise[] = [];
-      for (const ex of all){
-        if (isWarm(ex.name)) warm.push(ex); else if (isCool(ex.name)) cool.push(ex); else main.push(ex);
-      }
-      return [...warm, ...main, ...cool];
+      return all; // warm/cool removed from logger
     } catch { return []; }
   };
 
   // Utility to ensure warm-up → main → cooldown ordering anytime we mutate exercises
-  const orderExercises = (arr: LoggedExercise[]): LoggedExercise[] => {
-    const isWarm = (n:string)=>/warm[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*up/i.test(n);
-    const isCool = (n:string)=>/cool[\s\u00A0]*(?:-|[\u2010-\u2015])?\s*down/i.test(n);
-    const warm: LoggedExercise[] = [];
-    const main: LoggedExercise[] = [];
-    const cool: LoggedExercise[] = [];
-    for (const ex of arr){ if (isWarm(ex.name)) warm.push(ex); else if (isCool(ex.name)) cool.push(ex); else main.push(ex); }
-    return [...warm, ...main, ...cool];
-  };
+  const orderExercises = (arr: LoggedExercise[]): LoggedExercise[] => arr; // no warm/cool entries to sort
 
   // Proper initialization with cleanup
   useEffect(() => {
@@ -844,8 +832,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       workout_status: 'completed' as const,
       completedManually: true,
       notes: extra?.notes,
-      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined,
-      mood: extra?.mood
+      rpe: typeof extra?.rpe === 'number' ? extra?.rpe : undefined
     };
 
     console.log('🔍 Saving completed workout:', completedWorkout);
@@ -1261,30 +1248,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <label className="text-sm text-gray-600">Notes</label>
                 <textarea value={notesText} onChange={(e)=>setNotesText(e.target.value)} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Anything noteworthy…" />
               </div>
-              <div className="grid grid-cols-3 gap-3 items-end">
-                <div>
-                  <label className="text-sm text-gray-600">RPE (1–10)</label>
-                  <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>setNotesRpe(e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '')} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-sm text-gray-600">Mood</label>
-                  <div className="mt-1 flex items-center gap-2">
-                    {([
-                      {k:'positive', l:':)'},
-                      {k:'neutral', l:':|'},
-                      {k:'negative', l:':('}
-                    ] as any[]).map(m=> (
-                      <button key={m.k} onClick={()=>setNotesMood(m.k)} className={`px-3 py-1.5 rounded border ${notesMood===m.k? 'bg-gray-900 text-white border-gray-900':'border-gray-300 text-gray-800'}`}>{m.l}</button>
-                    ))}
-                  </div>
-                </div>
+              <div>
+                <label className="text-sm text-gray-600">RPE (1–10)</label>
+                <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>setNotesRpe(e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '')} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
               </div>
             </div>
             <div className="mt-4 flex items-center justify-between">
               <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="text-sm text-gray-600">Skip</button>
               <div className="flex items-center gap-2">
                 <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
-                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined, mood: notesMood||undefined as any }); }} className="px-3 py-2 text-sm bg-black text-white rounded">Save workout</button>
+                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="px-3 py-2 text-sm bg-black text-white rounded">Save workout</button>
               </div>
             </div>
           </div>
