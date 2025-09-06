@@ -131,6 +131,44 @@ function accumulate(completed: any) {
 
 function avg(array: number[]): number | null { if (!array.length) return null; return array.reduce((a,b)=>a+b,0)/array.length; }
 
+// --- Swim pool helpers (match Completed view logic) ---
+function inferPoolLengthMetersFromCompleted(completed: any): number | null {
+  try {
+    const explicit = Number((completed?.pool_length ?? completed?.metrics?.pool_length));
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    const distKm = typeof completed?.distance === 'number' ? completed.distance : undefined;
+    const distM = typeof distKm === 'number' && distKm > 0 ? distKm * 1000 : undefined;
+    const nLengths = Number((completed as any)?.number_of_active_lengths) || (Array.isArray((completed as any)?.swim_data?.lengths) ? (completed as any).swim_data.lengths.length : 0);
+    if (distM && nLengths > 0) return distM / nLengths;
+  } catch {}
+  return null;
+}
+
+function isYardPoolCompleted(completed: any): boolean | null {
+  const L = inferPoolLengthMetersFromCompleted(completed);
+  if (!L) return null;
+  if (Math.abs(L - 22.86) <= 0.6) return true; // 25y
+  if (Math.abs(L - 25) <= 0.8 || Math.abs(L - 50) <= 1.2 || Math.abs(L - 33.33) <= 1.0) return false;
+  return null;
+}
+
+function computeOverallSwimPer100Sec(completed: any): number | null {
+  try {
+    const durationSec = Number(
+      completed?.total_timer_time ?? completed?.moving_time ?? completed?.elapsed_time
+    );
+    const distKm = Number(completed?.distance);
+    const dMeters = Number.isFinite(distKm) && distKm > 0 ? distKm * 1000 : undefined;
+    if (!durationSec || !dMeters || dMeters <= 0) return null;
+    const yardPool = isYardPoolCompleted(completed);
+    if (yardPool === true) {
+      const distYd = dMeters / 0.9144;
+      return durationSec / (distYd / 100);
+    }
+    return durationSec / (dMeters / 100);
+  } catch { return null; }
+}
+
 const completedValueForStep = (completed: any, plannedStep: any): CompletedDisplay => {
   if (!completed) return '—';
   // Attempt per-step slice from samples; fallback to overall
@@ -155,9 +193,9 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
       return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
-      const secPerKm = completed.avg_pace || completed.metrics?.avg_pace;
-      const secPer100 = typeof secPerKm === 'number' ? (secPerKm / 10) : undefined;
-      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${secPer100 ? `${fmtTime(secPer100)} /100m` : '—'}`, hr: getAvgHR(completed) };
+      const per100 = computeOverallSwimPer100Sec(completed);
+      const yardPool = isYardPoolCompleted(completed) === true;
+      return { text: `${mi.toFixed(mi < 1 ? 2 : 1)} mi @ ${per100 ? `${fmtTime(per100)} ${yardPool ? '/100yd' : '/100m'}` : '—'}`, hr: getAvgHR(completed) };
     }
   }
 
@@ -173,9 +211,9 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
       return { text: `${fmtTime(plannedStep.duration)} @ ${mph ? `${mph.toFixed(1)} mph` : '—'}`, hr: getAvgHR(completed) };
     }
     if (isSwim) {
-      const secPerKm = completed.avg_pace || completed.metrics?.avg_pace;
-      const secPer100 = typeof secPerKm === 'number' ? (secPerKm / 10) : undefined;
-      return { text: `${fmtTime(plannedStep.duration)} @ ${secPer100 ? `${fmtTime(secPer100)} /100m` : '—'}`, hr: getAvgHR(completed) };
+      const per100 = computeOverallSwimPer100Sec(completed);
+      const yardPool = isYardPoolCompleted(completed) === true;
+      return { text: `${fmtTime(plannedStep.duration)} @ ${per100 ? `${fmtTime(per100)} ${yardPool ? '/100yd' : '/100m'}` : '—'}`, hr: getAvgHR(completed) };
     }
   }
 

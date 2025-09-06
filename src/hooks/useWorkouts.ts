@@ -342,6 +342,8 @@ export const useWorkouts = () => {
                 
                 // Swim-specific structured data (lengths, laps, swolf, strokes)
                 swim_data: activity.swim_data,
+                // Swim counts
+                number_of_active_lengths: activity.number_of_active_lengths,
                 
                 // 🔧 FIX: Create metrics object that CompletedTab expects
                 metrics: {
@@ -405,7 +407,8 @@ export const useWorkouts = () => {
                   
                   // Swim-specific metrics
                   strokes: activity.strokes,
-                  pool_length: activity.pool_length
+                  pool_length: activity.pool_length,
+                  number_of_active_lengths: activity.number_of_active_lengths
                 }
               };
             });
@@ -1105,6 +1108,7 @@ export const useWorkouts = () => {
             // Swim-specific data
             strokes: activity.strokes || undefined,
             pool_length: activity.pool_length || undefined,
+            number_of_active_lengths: activity.number_of_active_lengths || undefined,
             
             // Training load metrics - Use correct Garmin field names
             tss: activity.training_stress_score,
@@ -1153,6 +1157,7 @@ export const useWorkouts = () => {
               // Swim-specific metrics
               strokes: activity.strokes,
               pool_length: activity.pool_length,
+              number_of_active_lengths: activity.number_of_active_lengths,
               // Training load metrics - Use correct Garmin field names
               training_stress_score: activity.training_stress_score,
               intensity_factor: activity.intensity_factor,

@@ -2,6 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 
 import { useAppContext } from '@/contexts/AppContext';
+import { useWorkouts } from '@/hooks/useWorkouts';
 import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 
@@ -36,9 +37,13 @@ interface CompletedTabProps {
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
   const { useImperial } = useAppContext();
+  const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
   const [isLoading, setIsLoading] = useState(true);
+  const [editingPool, setEditingPool] = useState(false);
+  const [poolLengthMeters, setPoolLengthMeters] = useState<number | null>(null);
+  const [rememberDefault, setRememberDefault] = useState(false);
   
   // No need to initialize localSelectedMetric here - it's handled in the sub-component
 
@@ -73,6 +78,20 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
       setIsLoading(true);
     }
   }, [workoutData]);
+  // Initialize pool length state from explicit, inferred, or default
+  useEffect(() => {
+    if (workoutType !== 'swim') return;
+    try {
+      const explicit = Number((workoutData as any)?.pool_length);
+      if (Number.isFinite(explicit) && explicit > 0) { setPoolLengthMeters(explicit); return; }
+      const defStr = typeof window !== 'undefined' ? window.localStorage.getItem('pool_length_default_m') : null;
+      const def = defStr ? Number(defStr) : NaN;
+      if (Number.isFinite(def) && def > 0) { setPoolLengthMeters(def); return; }
+      // Fallback to inference later via helpers (keep null so helpers compute)
+      setPoolLengthMeters(null);
+    } catch { setPoolLengthMeters(null); }
+  }, [workoutType, workoutData?.id]);
+
 
   // No debouncing needed - direct state management
 
@@ -179,8 +198,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     );
   }
 
-  // 🔒 EXISTING GARMIN LOGIC - UNTOUCHED
-  if (!workoutData.gps_track || workoutData.gps_track.length === 0) {
+  // 🔒 EXISTING GARMIN LOGIC - allow swims without GPS
+  if (workoutType !== 'swim' && (!workoutData.gps_track || workoutData.gps_track.length === 0)) {
    return (
      <div className="flex items-center justify-center h-64">
        <div className="text-center">
@@ -648,19 +667,95 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
         {
           label: 'Pace',
-          value: formatSwimPace(workoutData.avg_pace),
-          unit: '/100m'
+          value: (() => {
+            const s = computeSwimAvgPaceSecPer100();
+            return s ? formatSwimPace(s) : 'N/A';
+          })(),
+          unit: (() => (isYardPool() === true ? '/100yd' : '/100m'))()
         },
         {
           label: 'Cadence',
           value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
           unit: 'spm'
         },
+        {
+          label: 'Lengths',
+          value: (() => {
+            const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null);
+            return n != null ? safeNumber(n) : 'N/A';
+          })()
+        },
+        {
+          label: 'Pool',
+          value: formatPoolLengthLabel()
+        },
         ...baseMetrics.slice(3) // Elevation, Calories
       ];
     }
 
     return baseMetrics;
+  };
+
+  // ----- Swim helpers -----
+  const getDurationSeconds = (): number | null => {
+    const t = Number(
+      workoutData.total_timer_time ??
+      workoutData.moving_time ??
+      workoutData.elapsed_time ??
+      (typeof workoutData.duration === 'number' ? workoutData.duration * 60 : null)
+    );
+    return Number.isFinite(t) && t > 0 ? t : null;
+  };
+
+  const getDistanceMeters = (): number | null => {
+    const km = computeDistanceKm(workoutData);
+    if (km != null && Number.isFinite(km) && km > 0) return km * 1000;
+    return null;
+  };
+
+  const inferPoolLengthMeters = (): number | null => {
+    const explicit = Number(poolLengthMeters ?? (workoutData as any).pool_length);
+    if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    const distM = getDistanceMeters();
+    const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
+    if (distM && nLengths > 0) return distM / nLengths;
+    return null;
+  };
+
+  const isYardPool = (): boolean | null => {
+    const L = inferPoolLengthMeters();
+    if (!L) return null;
+    if (Math.abs(L - 22.86) <= 0.6) return true; // 25y
+    if (Math.abs(L - 25) <= 0.8 || Math.abs(L - 50) <= 1.2 || Math.abs(L - 33.33) <= 1.0) return false;
+    return null;
+  };
+
+  const computeSwimAvgPaceSecPer100 = (): number | null => {
+    const sec = getDurationSeconds();
+    const distM = getDistanceMeters();
+    if (!sec || !distM || distM <= 0) return null;
+    const yardPool = isYardPool();
+    if (yardPool === true) {
+      const distYd = distM / 0.9144;
+      if (distYd <= 0) return null;
+      return sec / (distYd / 100);
+    }
+    return sec / (distM / 100);
+  };
+
+  const formatPoolLengthLabel = (): string => {
+    const L = inferPoolLengthMeters();
+    if (!L) return 'N/A';
+    const yardPool = isYardPool();
+    if (yardPool === true) return '25 yd';
+    const candidates = [25, 50, 33.33];
+    let best = L; let label = `${Math.round(L)} m`;
+    for (const c of candidates) {
+      if (Math.abs(L - c) < Math.abs(best - (typeof best === 'number' ? best : c))) {
+        best = c; label = `${c} m`;
+      }
+    }
+    return label;
   };
 
   const primaryMetrics = getPrimaryMetrics();
@@ -1027,10 +1122,51 @@ const formatPace = (paceValue: any): string => {
        )}
      </div>
      
-     {/* 🏠 SHOW MAP ROW - Distance removed since it's in metrics grid */}
-     <div className="flex items-center justify-end mb-3">
-       {/* Map toggle could go here if needed */}
-     </div>
+     {/* 🏠 SWIM SETTINGS (Pool length editor) */}
+     {workoutType === 'swim' && (
+       <div className="flex items-center justify-between mb-2">
+         <div className="text-sm text-gray-600">Pool length</div>
+         {!editingPool ? (
+           <div className="flex items-center gap-2">
+             <div className="text-sm font-medium">{formatPoolLengthLabel()}</div>
+             <button className="text-xs underline text-gray-600 hover:text-black" onClick={()=>setEditingPool(true)}>Edit</button>
+           </div>
+         ) : (
+           <div className="flex items-center gap-2">
+             <select
+               className="border rounded px-2 py-1 text-sm"
+               value={(poolLengthMeters ?? inferPoolLengthMeters() ?? 25).toString()}
+               onChange={(e)=> setPoolLengthMeters(Number(e.target.value))}
+             >
+               <option value="22.86">25 yd</option>
+               <option value="25">25 m</option>
+               <option value="33.33">33.33 m</option>
+               <option value="50">50 m</option>
+             </select>
+             <label className="flex items-center gap-1 text-xs text-gray-600">
+               <input type="checkbox" checked={rememberDefault} onChange={(e)=> setRememberDefault(e.target.checked)} />
+               Remember as default
+             </label>
+             <button
+               className="text-xs px-2 py-1 rounded bg-black text-white"
+               onClick={async()=>{
+                 try {
+                   const m = Number(poolLengthMeters ?? inferPoolLengthMeters() ?? 25);
+                   if (Number.isFinite(m) && m > 0) {
+                     await updateWorkout?.(workoutData.id, { pool_length: m });
+                     if (rememberDefault && typeof window !== 'undefined') {
+                       try { window.localStorage.setItem('pool_length_default_m', String(m)); } catch {}
+                     }
+                   }
+                 } catch {}
+                 setEditingPool(false);
+               }}
+             >Save</button>
+             <button className="text-xs underline text-gray-600 hover:text-black" onClick={()=> setEditingPool(false)}>Cancel</button>
+           </div>
+         )}
+       </div>
+     )}
      
      {/* 🏠 ALL METRICS - 3-column grid with proper row alignment */}
      <div className="grid grid-cols-3 gap-3">

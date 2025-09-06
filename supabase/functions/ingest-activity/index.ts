@@ -119,16 +119,13 @@ function mapGarminToWorkout(activity: any, userId: string) {
     max_power: Number.isFinite(activity.max_watts) ? Math.round(activity.max_watts) : (Number.isFinite(activity.max_power) ? Math.round(activity.max_power) : null),
     avg_cadence: activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_bike_cadence ?? null,
     max_cadence: activity.max_running_cadence ?? activity.max_bike_cadence ?? null,
-    steps: Number.isFinite(activity.steps) ? activity.steps : null,
     strokes: Number.isFinite(activity.strokes) ? activity.strokes : null,
     pool_length: Number.isFinite(activity.pool_length) ? activity.pool_length : null,
     tss: activity.training_stress_score ?? null,
     intensity_factor: activity.intensity_factor ?? null,
     normalized_power: Number.isFinite(activity.normalized_power) ? Math.round(activity.normalized_power) : null,
     hrv: Number.isFinite(activity.hrv) ? Math.round(activity.hrv) : (Number.isFinite(activity.heart_rate_variability) ? Math.round(activity.heart_rate_variability) : null),
-    // Multisport linkage
-    garmin_is_parent: typeof activity.is_parent === 'boolean' ? activity.is_parent : (typeof activity.isParent === 'boolean' ? activity.isParent : null),
-    garmin_parent_summary_id: activity.parent_summary_id ?? activity.parentSummaryId ?? null,
+    // Multisport linkage (omit columns not present in workouts schema)
     // Location (prefer explicit, fallback to first gps_track point)
     start_position_lat: (activity.starting_latitude ?? (Array.isArray(activity.gps_track) ? (activity.gps_track[0]?.lat ?? activity.gps_track[0]?.latitude ?? activity.gps_track[0]?.latitudeInDegree ?? null) : null)) ?? null,
     start_position_long: (activity.starting_longitude ?? (Array.isArray(activity.gps_track) ? (activity.gps_track[0]?.lng ?? activity.gps_track[0]?.longitude ?? activity.gps_track[0]?.longitudeInDegree ?? null) : null)) ?? null,

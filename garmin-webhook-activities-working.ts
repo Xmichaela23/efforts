@@ -63,13 +63,13 @@ async function fetchActivityDetails(summaryId, userId) {
     
     const accessToken = connection.connection_data.access_token;
     
-    // Calculate time range (last 24 hours)
+    // Calculate time range (last 7 days) to capture older resends
     const now = Math.floor(Date.now() / 1000);
-    const oneDayAgo = now - 24 * 60 * 60;
+    const oneDayAgo = now - 7 * 24 * 60 * 60;
     
     // Call Garmin Activity Details API
     const response = await fetch(
-      `https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=${oneDayAgo}&uploadEndTimeInSeconds=${now}`,
+      `https://apis.garmin.com/wellness-api/rest/activityDetails?uploadStartTimeInSeconds=${oneDayAgo}&uploadEndTimeInSeconds=${now}&includeAll=true&maxPageSize=200`,
       {
         headers: {
           'Authorization': `Bearer ${accessToken}`,
