@@ -76,8 +76,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     if (selectedWorkout) {
       // Smart tab routing based on workout status and type
       if (selectedWorkout.type === 'strength') {
-        // Strength should default to the Planned tab so users see sets/reps/weights
-        setActiveTab('planned');
+        // Strength: if completed, open Completed; otherwise Planned
+        if (String(selectedWorkout.workout_status || '').toLowerCase() === 'completed') {
+          setActiveTab('completed');
+        } else {
+          setActiveTab('planned');
+        }
       } else if (selectedWorkout.workout_status === 'completed') {
         // Check if this was a planned workout that got completed
         // Be more specific about what constitutes "planned data" to avoid false positives for Garmin imports

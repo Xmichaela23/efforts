@@ -199,6 +199,13 @@ export default function WorkoutCalendar({
   const events = useMemo(() => {
     const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : (Array.isArray(plannedWorkouts) ? plannedWorkouts : []);
 
+    // Build a quick lookup of days/types that already have a completed planned row
+    const completedPlannedKeys = new Set(
+      (planned as any[])
+        .filter((p: any) => String(p?.workout_status || '').toLowerCase() === 'completed')
+        .map((p: any) => `${String(p.date)}|${String(p.type || '').toLowerCase()}`)
+    );
+
     // Always merge DB range rows with provider rows from app state for this week
     const wkDb = Array.isArray(workoutsWeekRows) ? workoutsWeekRows : [];
     const wkStateProvider = (Array.isArray(workouts) ? workouts : [])
@@ -212,7 +219,14 @@ export default function WorkoutCalendar({
       })
       .map((w: any) => ({ ...w, provider: deriveProvider(w) }));
 
-    const wkCombined = [...wkDb, ...wkStateProvider];
+    // If a planned row has been marked completed for the same date+type,
+    // suppress the generic workout DB row to avoid duplicate "ST ✓" labels.
+    const wkCombined = [...wkDb, ...wkStateProvider].filter((w: any) => {
+      try {
+        const key = `${String(w.date)}|${String(w.type || w.workout_type || '').toLowerCase()}`;
+        return !completedPlannedKeys.has(key);
+      } catch { return true; }
+    });
     const all = [ ...wkCombined, ...planned ];
     // Filter out planned optionals defensively (tags may be JSON string or array)
     const allFiltered = all.filter((w: any) => {
