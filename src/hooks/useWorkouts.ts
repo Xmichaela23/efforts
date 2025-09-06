@@ -337,6 +337,9 @@ export const useWorkouts = () => {
                 // Sensor data for charts
                 sensor_data: activity.sensor_data,
                 
+                // Swim-specific structured data (lengths, laps, swolf, strokes)
+                swim_data: activity.swim_data,
+                
                 // 🔧 FIX: Create metrics object that CompletedTab expects
                 metrics: {
                   // Heart rate data
@@ -1141,6 +1144,9 @@ export const useWorkouts = () => {
           
           // Sensor data for charts
           sensor_data: activity.sensor_data,
+
+          // Swim-specific structured data
+          swim_data: activity.swim_data,
         };
 
           // Use existing addWorkout function to save the data

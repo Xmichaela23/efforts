@@ -64,6 +64,20 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
       out.push({ t: Number.isFinite(t) ? t : out.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined });
     }
   } catch {}
+  // Swim fallback using swim_data.lengths
+  try {
+    if ((!out.length || out.length < 3) && completed?.swim_data && Array.isArray(completed.swim_data.lengths)) {
+      let t = 0;
+      for (const len of completed.swim_data.lengths) {
+        const dur = Number(len?.duration_s || len?.duration || 0);
+        const dist = Number(len?.distance_m || len?.distance || 0);
+        const speed = dur>0 ? dist/dur : undefined;
+        const hr = typeof len?.avg_heart_rate === 'number' ? len.avg_heart_rate : undefined;
+        out.push({ t, hr, speedMps: speed });
+        t += dur > 0 ? dur : 1;
+      }
+    }
+  } catch {}
   try {
     const gt = Array.isArray(completed?.gps_track) ? completed.gps_track : [];
     // Merge lat/lng when lengths align or best effort by timestamp/sequence
