@@ -131,6 +131,7 @@ interface AppContextType {
   hasUserBaselines: () => Promise<boolean>;
   plansBundleReady?: boolean;
   plansBundleError?: string | null;
+  repairPlan?: (planId: string) => Promise<{ repaired: number }>;
 }
 
 const defaultAppContext: AppContextType = {
@@ -773,6 +774,78 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await loadPlans();
   };
 
+  // Repair a plan's planned_workouts: revert orphaned completions and restore authored dates
+  const repairPlan = async (planId: string): Promise<{ repaired: number }> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error('Not signed in');
+    let repaired = 0;
+    // Find Week 1 anchor to compute canonical dates
+    const { data: w1 } = await supabase
+      .from('planned_workouts')
+      .select('date, day_number')
+      .eq('training_plan_id', planId)
+      .eq('week_number', 1)
+      .order('day_number', { ascending: true })
+      .limit(1);
+    if (!Array.isArray(w1) || w1.length === 0) return { repaired };
+    const anchor = w1[0] as any;
+    const toJs = (iso: string) => { const p = String(iso).split('-').map((x)=>parseInt(x,10)); return new Date(p[0], (p[1]||1)-1, p[2]||1); };
+    const mondayW1 = (() => {
+      const js = toJs(String(anchor.date));
+      const anchorDn = Number(anchor.day_number) || 1;
+      js.setDate(js.getDate() - (anchorDn - 1));
+      return js;
+    })();
+
+    // Load all planned rows for this plan
+    const { data: rows } = await supabase
+      .from('planned_workouts')
+      .select('id,date,type,week_number,day_number,workout_status')
+      .eq('user_id', user.id)
+      .eq('training_plan_id', planId);
+    const list = Array.isArray(rows) ? rows : [];
+
+    // Build a quick set of actual completed workouts (date+type)
+    const minDate = list.reduce((m, r:any)=> m && m < r.date ? m : r.date, null as any);
+    const maxDate = list.reduce((m, r:any)=> m && m > r.date ? m : r.date, null as any);
+    const { data: completed } = await supabase
+      .from('workouts')
+      .select('date,type')
+      .eq('user_id', user.id)
+      .eq('workout_status','completed')
+      .gte('date', minDate || '1900-01-01')
+      .lte('date', maxDate || '2999-12-31');
+    const completedKeys = new Set((Array.isArray(completed)?completed:[]).map((w:any)=> `${w.date}|${String(w.type||'').toLowerCase()}`));
+
+    const updates: any[] = [];
+    for (const r of list) {
+      const dn = Number((r as any).day_number) || 1;
+      const wn = Number((r as any).week_number) || 1;
+      const js = new Date(mondayW1.getFullYear(), mondayW1.getMonth(), mondayW1.getDate());
+      js.setDate(js.getDate() + (wn-1)*7 + (dn-1));
+      const y = js.getFullYear();
+      const m = String(js.getMonth()+1).padStart(2,'0');
+      const d = String(js.getDate()).padStart(2,'0');
+      const canonical = `${y}-${m}-${d}`;
+      const key = `${String(r.date)}|${String((r as any).type||'').toLowerCase()}`;
+      const hasRealCompleted = completedKeys.has(key);
+      // 1) If row is marked completed but there is no real completed workout, revert to planned
+      if (String((r as any).workout_status||'').toLowerCase()==='completed' && !hasRealCompleted) {
+        updates.push({ id: r.id, workout_status: 'planned', date: canonical }); repaired += 1; continue;
+      }
+      // 2) If row is planned but date drifted, restore canonical date
+      if (String((r as any).workout_status||'').toLowerCase()!=='completed' && String(r.date) !== canonical) {
+        updates.push({ id: r.id, date: canonical }); repaired += 1; continue;
+      }
+    }
+    while (updates.length) {
+      const batch = updates.splice(0, 200);
+      await supabase.from('planned_workouts').upsert(batch, { onConflict: 'id' });
+    }
+    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    return { repaired };
+  };
+
   return (
     <AppContext.Provider
       value={{
@@ -799,6 +872,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         hasUserBaselines,
         plansBundleReady,
         plansBundleError,
+        repairPlan,
       }}
     >
       {children}
