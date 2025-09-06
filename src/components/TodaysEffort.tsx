@@ -574,8 +574,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       
                       {/* Metrics Row */}
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        {formatRichWorkoutDisplay(workout).metrics.map((metric, index) => (
-                          <span key={index}>{metric}</span>
+                        {formatRichWorkoutDisplay(workout).metrics.map((metric: any, index: number) => (
+                          <span key={index}>{typeof metric === 'string' ? metric : (metric && typeof metric.value === 'string' ? metric.value : '')}</span>
                         ))}
                       </div>
                     </div>
