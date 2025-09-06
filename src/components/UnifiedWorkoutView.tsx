@@ -41,6 +41,67 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
+  const [linkedPlanned, setLinkedPlanned] = useState<any | null>(null);
+
+  // Resolve linked planned row for completed workouts
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        if (!isCompleted) { setLinkedPlanned(null); return; }
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+
+        // 1) If workout already has planned_id, fetch by id
+        const pid = (workout as any)?.planned_id as string | undefined;
+        if (pid) {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('*')
+            .eq('id', pid)
+            .single();
+          if (!cancelled) setLinkedPlanned(data || null);
+          return;
+        }
+
+        // 2) Otherwise try to find by completed_workout_id
+        {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('completed_workout_id', (workout as any).id)
+            .limit(1);
+          if (Array.isArray(data) && data.length) {
+            if (!cancelled) setLinkedPlanned(data[0]);
+            return;
+          }
+        }
+
+        // 3) Fallback: look for a same-day planned of same type
+        if ((workout as any).date && (workout as any).type) {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('*')
+            .eq('user_id', user.id)
+            .eq('type', (workout as any).type)
+            .eq('date', String((workout as any).date).slice(0,10))
+            .limit(1);
+          if (Array.isArray(data) && data.length) {
+            if (!cancelled) setLinkedPlanned(data[0]);
+            return;
+          }
+        }
+        if (!cancelled) setLinkedPlanned(null);
+      } catch {
+        if (!cancelled) setLinkedPlanned(null);
+      }
+    };
+    load();
+    const handler = () => load();
+    window.addEventListener('planned:invalidate', handler);
+    return () => { cancelled = true; window.removeEventListener('planned:invalidate', handler); };
+  }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type]);
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
@@ -271,7 +332,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-4">
-            <MobileSummary planned={workout} completed={isCompleted ? workout : null} />
+            <MobileSummary 
+              planned={isCompleted ? (linkedPlanned || null) : workout} 
+              completed={isCompleted ? workout : null} 
+            />
           </TabsContent>
 
           {/* Completed Tab */}
@@ -292,7 +356,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         workout={workout}
                         open={assocOpen}
                         onClose={()=>setAssocOpen(false)}
-                        onAssociated={()=>{ try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {} }}
+                        onAssociated={async(pid)=>{ 
+                          try { (workout as any).planned_id = pid; } catch {}
+                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                          // Proactively load the linked planned row so Summary updates immediately
+                          try {
+                            const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
+                            setLinkedPlanned(data || null);
+                          } catch {}
+                        }}
                       />
                     )}
                   </div>
@@ -324,7 +396,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         workout={workout}
                         open={assocOpen}
                         onClose={()=>setAssocOpen(false)}
-                        onAssociated={()=>{ try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {} }}
+                        onAssociated={async(pid)=>{ 
+                          try { (workout as any).planned_id = pid; } catch {}
+                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                          try {
+                            const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
+                            setLinkedPlanned(data || null);
+                          } catch {}
+                        }}
                       />
                     )}
                   </div>
