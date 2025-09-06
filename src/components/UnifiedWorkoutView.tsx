@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
 import CompletedTab from './CompletedTab';
+import MobileSummary from './MobileSummary';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import PlannedWorkoutView from './PlannedWorkoutView';
@@ -237,37 +238,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-4">
-            <div className="space-y-4">
-              {isCompleted ? (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-green-900 mb-2">Planned vs Completed</h3>
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <span className="font-medium text-blue-600">Planned:</span>
-                        <div className="text-sm text-gray-600 mt-1">
-                          {workout.duration} minutes
-                        </div>
-                      </div>
-                      <div>
-                        <span className="font-medium text-green-600">Completed:</span>
-                        <div className="text-sm text-gray-600 mt-1">
-                          {workout.duration} minutes
-                        </div>
-                      </div>
-                    </div>
-                    {/* Add more planned vs completed comparisons here */}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-yellow-900 mb-2">Not Yet Completed</h3>
-                  <p className="text-sm text-yellow-800">
-                    This workout hasn't been completed yet. Complete it to see the planned vs actual comparison.
-                  </p>
-                </div>
-              )}
-            </div>
+            <MobileSummary planned={workout} completed={isCompleted ? workout : null} />
           </TabsContent>
 
           {/* Completed Tab */}

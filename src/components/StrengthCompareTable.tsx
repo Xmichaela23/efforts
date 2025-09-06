@@ -4,13 +4,16 @@ export interface StrengthSet { reps: number; weight: number; rir?: number; compl
 export interface StrengthExercise { name: string; sets?: number; reps?: number; weight?: number; setsArray?: StrengthSet[] }
 
 function normalizeName(raw: string): string {
-  return String(raw || '')
+  const base = String(raw || '')
     .toLowerCase()
     .replace(/\s*\(.*?\)\s*/g, '')
     .replace(/\s*@.*$/, '')
     .replace(/\s*[—-].*$/, '')
     .replace(/\s+/g, ' ')
     .trim();
+  // Alias groups: treat Pull-Ups and Chin-Ups as the same movement for comparison
+  if (/\b(pull|chin)[-\s]?ups?\b/.test(base)) return 'chin-ups';
+  return base;
 }
 
 function calcVolume(sets: StrengthSet[]): number {
