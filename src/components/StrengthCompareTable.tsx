@@ -38,7 +38,10 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const pReps = (p?.reps || 0);
     const pW = (p?.weight || 0);
     const pVol = pSets * pReps * pW;
-    const cSetsArr = (c as any)?.setsArray as StrengthSet[] | undefined;
+    const cSetsArrRaw = (c as any)?.setsArray as StrengthSet[] | undefined;
+    const cSetsArr = Array.isArray(cSetsArrRaw)
+      ? cSetsArrRaw.filter((s:any)=> s && typeof s === 'object' && ('reps' in s || 'weight' in s))
+      : [];
     const cSets = Array.isArray(cSetsArr) ? cSetsArr.length : 0;
     const cRepsAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.reps||0)) : 0;
     const cWAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.weight||0)) : 0;

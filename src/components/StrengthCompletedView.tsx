@@ -107,7 +107,18 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return [] as any[];
   };
 
-  const completedExercises = getCompletedExercises();
+  // Sanitize completed exercises to avoid rendering raw objects by mistake
+  const completedExercises = getCompletedExercises().map((ex: any) => {
+    const safeSets = Array.isArray(ex?.sets)
+      ? ex.sets.map((s: any) => ({
+          reps: Number((s?.reps as any) ?? 0) || 0,
+          weight: Number((s?.weight as any) ?? 0) || 0,
+          rir: typeof s?.rir === 'number' ? s.rir : undefined,
+          completed: Boolean(s?.completed)
+        }))
+      : [];
+    return { ...ex, sets: safeSets };
+  });
 
   // FIXED: Calculate total workout statistics - handle both array and single exercise formats
   const workoutStats = useMemo(() => {
