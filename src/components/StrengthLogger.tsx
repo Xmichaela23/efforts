@@ -157,6 +157,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [sourcePlannedName, setSourcePlannedName] = useState<string>('');
   const [sourcePlannedId, setSourcePlannedId] = useState<string | null>(null);
   const [sourcePlannedDate, setSourcePlannedDate] = useState<string | null>(null);
+  const [lockManualPrefill, setLockManualPrefill] = useState<boolean>(false);
   type AddonStep = { move: string; time_sec: number };
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
@@ -612,6 +613,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
+    if (lockManualPrefill) {
+      // Respect manual selection: do not reinitialize/clear
+      if (!isInitialized) setIsInitialized(true);
+      return;
+    }
     
     // Always start fresh - clear any existing state
     setExercises([]);
@@ -752,7 +758,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
     })();
-  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate, performanceNumbers]);
+  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate, performanceNumbers, lockManualPrefill, isInitialized]);
 
   // Ensure timers exist for current sets (default 90s)
   useEffect(() => {
@@ -861,6 +867,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   const prefillFromPlanned = (row: any) => {
     try {
+      setLockManualPrefill(true);
       if (row?.computed?.steps && Array.isArray(row.computed.steps)){
         const exs = parseFromComputed(row.computed);
         if (exs.length) { setExercises(exs); return; }
@@ -1146,13 +1153,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {showWorkoutsMenu && (
               <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
                 <div className="text-xs font-semibold text-gray-500 px-1 pb-1">Strength (This week)</div>
-                <div className="max-h-56 overflow-y-auto">
+                <div className="max-h-56 overflow-y-auto" onMouseDown={(e)=>e.preventDefault()}>
                   {(Array.isArray(plannedWorkouts)? plannedWorkouts: [])
                     .filter(w=>String((w as any).type).toLowerCase()==='strength')
                     .filter(w=> withinWeek(w.date, startOfWeek(getTodayDateString())))
                     .sort((a:any,b:any)=> a.date.localeCompare(b.date))
                     .map((w:any)=> (
-                      <button key={w.id} onClick={()=>{ prefillFromPlanned(w); setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); setSourcePlannedId(w.id); setSourcePlannedDate(w.date); setShowWorkoutsMenu(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between">
+                      <button key={w.id} onClick={()=>{ prefillFromPlanned(w); setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); setSourcePlannedId(w.id); setSourcePlannedDate(w.date); setShowWorkoutsMenu(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
                         <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
                         <span className={`text-2xs px-1.5 py-0.5 rounded border ${String(w.workout_status).toLowerCase()==='completed'?'border-green-200 text-green-700':'border-gray-200 text-gray-600'}`}>{String(w.workout_status||'planned')}</span>
                       </button>
