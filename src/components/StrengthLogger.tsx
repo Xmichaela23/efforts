@@ -1098,7 +1098,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const saveWorkout = () => {
-    // Open notes modal first; user can save with or without notes
+    // Open notes modal; user can save with or without notes
     setShowNotesModal(true);
   };
 
@@ -1581,12 +1581,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>setNotesRpe(e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '')} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
               </div>
             </div>
-            <div className="mt-4 flex items-center justify-between">
-              <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="text-sm text-gray-600">Skip</button>
-              <div className="flex items-center gap-2">
-                <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
-                <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="px-3 py-2 text-sm bg-black text-white rounded">Save workout</button>
-              </div>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <button onClick={()=>setShowNotesModal(false)} className="px-3 py-2 text-sm border border-gray-300 rounded">Cancel</button>
+              <button onClick={()=>{ setShowNotesModal(false); finalizeSave(); }} className="px-3 py-2 text-sm border border-gray-300 rounded">Skip</button>
+              <button onClick={()=>{ setShowNotesModal(false); finalizeSave({ notes: notesText.trim()||undefined, rpe: typeof notesRpe==='number'?notesRpe: undefined }); }} className="px-3 py-2 text-sm bg-black text-white rounded">Save</button>
             </div>
           </div>
         </div>
