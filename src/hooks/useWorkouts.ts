@@ -1642,6 +1642,8 @@ export const useWorkouts = () => {
       }
 
       console.log("Using user for delete:", user.id);
+      // Capture the workout we are about to delete so we can repair any attached planned row
+      const prior = workouts.find((w) => w.id === id);
 
       const { error } = await supabase
         .from("workouts")
@@ -1651,6 +1653,25 @@ export const useWorkouts = () => {
 
       if (error) throw error;
       setWorkouts((prev) => prev.filter((w) => w.id !== id));
+
+      // If this was a completed workout, revert the same-day planned row (if any) back to planned
+      try {
+        const wasCompleted = String((prior as any)?.workout_status || '').toLowerCase() === 'completed';
+        const date = (prior as any)?.date as string | undefined;
+        const type = (prior as any)?.type as string | undefined;
+        if (wasCompleted && date && type) {
+          await supabase
+            .from('planned_workouts')
+            .update({ workout_status: 'planned' })
+            .eq('user_id', user.id)
+            .eq('date', date)
+            .eq('type', type)
+            .in('workout_status', ['completed','in_progress']);
+          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+        }
+      } catch (repairErr) {
+        console.log('Planned row repair skipped:', repairErr);
+      }
     } catch (err) {
       console.error("Error in deleteWorkout:", err);
       throw err;
