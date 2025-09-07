@@ -52,6 +52,17 @@ function mapStravaToWorkout(activity: any, userId: string) {
     : (sport.includes('walk') || sport.includes('hike')) ? 'walk'
     : 'strength';
 
+  // Attempt to compute summary (GAP, cadence) if samples are present
+  let computedSummary: any | null = null;
+  try { computedSummary = computeComputedFromActivity(activity); } catch {}
+  const computedJson = computedSummary ? JSON.stringify(computedSummary) : null;
+  const derivedAvgCadence = (() => {
+    try { const v = computedSummary?.overall?.avg_cadence_spm; return Number.isFinite(v) ? Math.round(v) : null; } catch { return null; }
+  })();
+  const derivedMaxCadence = (() => {
+    try { const v = computedSummary?.overall?.max_cadence_spm; return Number.isFinite(v) ? Math.round(v) : null; } catch { return null; }
+  })();
+
   return {
     user_id: userId,
     name: activity.name || 'Strava Activity',
@@ -85,6 +96,11 @@ function mapStravaToWorkout(activity: any, userId: string) {
     laps: activity.laps ? JSON.stringify(activity.laps) : null,
     // Polyline if available
     gps_trackpoints: activity.map?.polyline || activity.map?.summary_polyline || null,
+    // Cadence rollups (prefer Strava fields, else derived)
+    avg_cadence: Number.isFinite(activity.average_cadence) ? Math.round(activity.average_cadence) : derivedAvgCadence,
+    max_cadence: Number.isFinite(activity.max_cadence) ? Math.round(activity.max_cadence) : derivedMaxCadence,
+    // Server-computed summary for UI (includes GAP/cadence when available)
+    computed: computedJson,
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   };
@@ -101,8 +117,8 @@ function computeComputedFromActivity(activity: any): any | null {
       return null;
     }
 
-    // Normalize samples → { ts: epoch sec, t: seconds (relative), hr, speedMps, cumMeters }
-    const normalized: Array<{ ts: number; t: number; hr?: number; v?: number; d?: number }> = [];
+    // Normalize samples → { ts: epoch sec, t: seconds (relative), hr, v (m/s), d (m), elev (m), cad }
+    const normalized: Array<{ ts: number; t: number; hr?: number; v?: number; d?: number; elev?: number; cad?: number }> = [];
     for (let i = 0; i < samples.length; i += 1) {
       const s: any = samples[i];
       const ts = Number(
@@ -129,7 +145,19 @@ function computeComputedFromActivity(activity: any): any | null {
         : (typeof s.cumulativeDistanceInMeters === 'number' ? s.cumulativeDistanceInMeters
         : (typeof s.totalDistance === 'number' ? s.totalDistance
         : (typeof s.distance === 'number' ? s.distance : undefined)))));
-      normalized.push({ ts, t: Number.isFinite(t) ? t : i, hr, v, d });
+      const elev = (typeof s.elevationInMeters === 'number')
+        ? s.elevationInMeters
+        : (typeof s.elevation === 'number'
+          ? s.elevation
+          : (typeof s.altitude === 'number' ? s.altitude : (typeof s.enhancedElevation === 'number' ? s.enhancedElevation : undefined)));
+      const cad = (typeof s.stepsPerMinute === 'number')
+        ? s.stepsPerMinute
+        : (typeof s.runCadence === 'number'
+          ? s.runCadence
+          : (typeof s.bikeCadenceInRPM === 'number'
+            ? s.bikeCadenceInRPM
+            : (typeof s.swimCadenceInStrokesPerMinute === 'number' ? s.swimCadenceInStrokesPerMinute : (typeof s.cadence === 'number' ? s.cadence : undefined))));
+      normalized.push({ ts, t: Number.isFinite(t) ? t : i, hr, v, d, elev, cad });
     }
 
     // Ensure ordered by ts
@@ -177,6 +205,43 @@ function computeComputedFromActivity(activity: any): any | null {
       return Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length);
     })();
 
+    // Overall cadence (avg/max)
+    const cadStats = (() => {
+      const cads = normalized.map(s => (typeof s.cad === 'number' ? s.cad : NaN)).filter(Number.isFinite) as number[];
+      if (!cads.length) return { avg: null as number | null, max: null as number | null };
+      const avg = Math.round(cads.reduce((a, b) => a + b, 0) / cads.length);
+      const max = Math.max(...cads);
+      return { avg, max };
+    })();
+
+    // GAP overall (grade-adjusted pace)
+    const gapPaceSecPerMi = (() => {
+      const paceSecPerMiFromMetersSeconds = (meters: number, sec: number): number | null => {
+        if (!(meters > 0) || !(sec > 0)) return null;
+        const miles = (meters / 1000) * 0.621371;
+        return miles > 0 ? sec / miles : null;
+      };
+      let adjMeters = 0; let timeSec = 0;
+      for (let i = 1; i < normalized.length; i += 1) {
+        const a = normalized[i - 1];
+        const b = normalized[i];
+        const dt = Math.min(60, Math.max(0, (b.ts || b.t) - (a.ts || a.t)));
+        if (!dt) continue;
+        timeSec += dt;
+        const v = (typeof b.v === 'number' && b.v > 0.5) ? b.v : (typeof a.v === 'number' && a.v > 0.5 ? a.v : 0);
+        if (!v) continue;
+        const elevA = typeof a.elev === 'number' ? a.elev : null;
+        const elevB = typeof b.elev === 'number' ? b.elev : elevA;
+        const dElev = (elevA != null && elevB != null) ? (elevB - elevA) : 0;
+        const dMeters = v * dt;
+        const grade = dMeters > 0 ? Math.max(-0.10, Math.min(0.10, dElev / dMeters)) : 0;
+        const factor = 1 + 9 * grade;
+        const adj = dMeters / factor;
+        adjMeters += adj;
+      }
+      return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
+    })();
+
     // Segment by laps if provided
     const laps: any[] = Array.isArray(activity?.laps) ? activity.laps : [];
     const intervals: any[] = [];
@@ -221,7 +286,10 @@ function computeComputedFromActivity(activity: any): any | null {
         duration_s_moving: Math.round(movingSec),
         distance_m: Math.round(totalMeters),
         avg_pace_s_per_mi: overallPaceSecPerMi != null ? Math.round(overallPaceSecPerMi) : null,
+        gap_pace_s_per_mi: gapPaceSecPerMi != null ? Math.round(gapPaceSecPerMi) : null,
         avg_hr: avgHr,
+        avg_cadence_spm: cadStats.avg,
+        max_cadence_spm: cadStats.max,
       },
     };
     return computed;

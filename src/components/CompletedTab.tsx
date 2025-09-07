@@ -1290,149 +1290,159 @@ const formatPace = (paceValue: any): string => {
        )}
 
        {/* Row 2: GAP, Max Speed, Avg Cadence */}
-       {workoutType === 'run' && calculateGradeAdjustedPace() && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {calculateGradeAdjustedPace()}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">GAP</div>
-           </div>
-         </div>
-       )}
+      {workoutType === 'run' && (
+        <div className="px-2 py-1">
+          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {(() => {
+              const gapSec = (workoutData as any)?.computed?.overall?.gap_pace_s_per_mi
+                ?? (workoutData as any)?.metrics?.gap_pace_s_per_mi;
+              if (Number.isFinite(gapSec) && (gapSec as number) > 0) {
+                const sec = Number(gapSec);
+                return `${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,'0')}/mi`;
+              }
+              const txt = calculateGradeAdjustedPace();
+              return txt || 'N/A';
+            })()}
+          </div>
+          <div className="text-xs text-[#666666] font-normal">
+            <div className="font-medium">GAP</div>
+          </div>
+        </div>
+      )}
 
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {(workoutType === 'run' || workoutType === 'walk')
-             ? (() => {
-                 const raw = workoutData.metrics?.max_pace || workoutData.max_pace;
-                 const n = Number(raw);
-                 if (!Number.isFinite(n) || n <= 0) return 'N/A';
-                 const secPerKm = n < 30 ? n * 60 : n;
-                 const secPerMile = secPerKm * 1.60934;
-                 if (workoutType === 'walk' && secPerMile < 360) return 'N/A'; // guard for walk/hike
-                 return formatPace(raw);
-               })()
-             : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">{(workoutType === 'run' || workoutType === 'walk') ? 'Max Pace' : 'Max Speed'}</div>
-         </div>
-       </div>
-       
-       {workoutType === 'ride' ? (
-         <>
-           <div className="px-2 py-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A'}
-             </div>
-             <div className="text-xs text-[#666666] font-normal">
-               <div className="font-medium">Avg Power</div>
-             </div>
-           </div>
-           {/* Max Power */}
-           <div className="px-2 py-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {(() => {
-                 const field = workoutData.max_power ?? workoutData.metrics?.max_power;
-                 if (field != null) return safeNumber(field);
-                 const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
-                 const maxSensor = sensors
-                   .map((s: any) => Number(s.power))
-                   .filter((n: any) => Number.isFinite(n))
-                   .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
-                 return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
-               })()}
-             </div>
-             <div className="text-xs text-[#666666] font-normal">
-               <div className="font-medium">Max Power</div>
-             </div>
-           </div>
-           <div className="px-2 py-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {(() => {
-                 const v = (
-                   workoutData.avg_cadence ??
-                   workoutData.metrics?.avg_cadence ??
-                   workoutData.avg_bike_cadence
-                 );
-                 return v != null ? safeNumber(v) : 'N/A';
-               })()}
-             </div>
-             <div className="text-xs text-[#666666] font-normal">
-               <div className="font-medium">Avg Cadence</div>
-             </div>
-           </div>
-         </>
-       ) : (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {(() => {
-               const v = (
-                 workoutData.avg_cadence ??
-                 workoutData.metrics?.avg_cadence ??
-                 workoutData.avg_running_cadence
-               );
-               return v != null ? safeNumber(v) : 'N/A';
-             })()}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">Avg Cadence</div>
-           </div>
-         </div>
-       )}
-       
-       {/* Row 3: Elevation, Calories, Max HR */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Climbed</div>
-         </div>
-       </div>
-       
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Calories</div>
-         </div>
-       </div>
-       
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Max HR</div>
-         </div>
-       </div>
+      <div className="px-2 py-1">
+        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          {(workoutType === 'run' || workoutType === 'walk')
+            ? (() => {
+                const raw = workoutData.metrics?.max_pace || workoutData.max_pace;
+                const n = Number(raw);
+                if (!Number.isFinite(n) || n <= 0) return 'N/A';
+                const secPerKm = n < 30 ? n * 60 : n;
+                const secPerMile = secPerKm * 1.60934;
+                if (workoutType === 'walk' && secPerMile < 360) return 'N/A'; // guard for walk/hike
+                return formatPace(raw);
+              })()
+            : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
+        </div>
+        <div className="text-xs text-[#666666] font-normal">
+          <div className="font-medium">{(workoutType === 'run' || workoutType === 'walk') ? 'Max Pace' : 'Max Speed'}</div>
+        </div>
+      </div>
+      
+      {workoutType === 'ride' ? (
+        <>
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {workoutData.avg_power ? safeNumber(workoutData.avg_power) : 'N/A'}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Avg Power</div>
+            </div>
+          </div>
+          {/* Max Power */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {(() => {
+                const field = workoutData.max_power ?? workoutData.metrics?.max_power;
+                if (field != null) return safeNumber(field);
+                const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
+                const maxSensor = sensors
+                  .map((s: any) => Number(s.power))
+                  .filter((n: any) => Number.isFinite(n))
+                  .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
+                return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
+              })()}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Max Power</div>
+            </div>
+          </div>
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {(() => {
+                const v = (
+                  workoutData.avg_cadence ??
+                  workoutData.metrics?.avg_cadence ??
+                  workoutData.avg_bike_cadence
+                );
+                return v != null ? safeNumber(v) : 'N/A';
+              })()}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Avg Cadence</div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="px-2 py-1">
+          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {(() => {
+              const v = (
+                workoutData.avg_cadence ??
+                workoutData.metrics?.avg_cadence ??
+                workoutData.avg_running_cadence
+              );
+              return v != null ? safeNumber(v) : 'N/A';
+            })()}
+          </div>
+          <div className="text-xs text-[#666666] font-normal">
+            <div className="font-medium">Avg Cadence</div>
+          </div>
+        </div>
+      )}
+      
+      {/* Row 3: Elevation, Calories, Max HR */}
+      <div className="px-2 py-1">
+        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
+        </div>
+        <div className="text-xs text-[#666666] font-normal">
+          <div className="font-medium">Climbed</div>
+        </div>
+      </div>
+      
+      <div className="px-2 py-1">
+        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
+        </div>
+        <div className="text-xs text-[#666666] font-normal">
+          <div className="font-medium">Calories</div>
+        </div>
+      </div>
+      
+      <div className="px-2 py-1">
+        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
+        </div>
+        <div className="text-xs text-[#666666] font-normal">
+          <div className="font-medium">Max HR</div>
+        </div>
+      </div>
 
-       {/* Row 4: Max Cadence, TSS, VAM */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {(() => {
-             const field = (
-               workoutData.max_cadence ??
-               workoutData.metrics?.max_cadence ??
-               workoutData.max_bike_cadence ??
-               workoutData.max_running_cadence
-             );
-             if (field != null) return safeNumber(field);
-             const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
-             const maxSensor = sensors
-               .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
-               .filter((n: any) => Number.isFinite(n))
-               .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
-             return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
-           })()}
-         </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">Max Cadence</div>
-         </div>
-       </div>
+      {/* Row 4: Max Cadence, TSS, VAM */}
+      <div className="px-2 py-1">
+        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+          {(() => {
+            const field = (
+              workoutData.max_cadence ??
+              workoutData.metrics?.max_cadence ??
+              (workoutData as any)?.computed?.overall?.max_cadence_spm ??
+              workoutData.max_bike_cadence ??
+              workoutData.max_running_cadence
+            );
+            if (field != null) return safeNumber(field);
+            const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
+            const maxSensor = sensors
+              .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
+              .filter((n: any) => Number.isFinite(n))
+              .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
+            return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
+          })()}
+        </div>
+        <div className="text-xs text-[#666666] font-normal">
+          <div className="font-medium">Max Cadence</div>
+        </div>
+      </div>
        
        {workoutType === 'run' && (
          <div className="px-2 py-1">

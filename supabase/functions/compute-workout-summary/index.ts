@@ -280,19 +280,34 @@ Deno.serve(async (req) => {
     const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d||0) - (rows[0].d||0)) : 0;
     const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t||0) - (rows[0].t||0)) : 0;
     const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length-1));
+    // Overall cadence rollups
+    const overallCad = (() => {
+      const cads: number[] = [];
+      for (let i = 0; i < rows.length; i += 1) {
+        const c = rows[i].cad;
+        if (typeof c === 'number' && Number.isFinite(c)) cads.push(c);
+      }
+      if (!cads.length) return { avg: null as number | null, max: null as number | null };
+      const avg = Math.round(cads.reduce((a,b)=>a+b,0)/cads.length);
+      const max = Math.max(...cads);
+      return { avg, max };
+    })();
+
     const computed = {
       intervals: outIntervals,
       overall: {
         duration_s_moving: overallSec,
         distance_m: Math.round(overallMeters),
         avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
-        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
+        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null,
+        avg_cadence_spm: overallCad.avg,
+        max_cadence_spm: overallCad.max
       }
     };
 
     await supabase
       .from('workouts')
-      .update({ computed })
+      .update({ computed, avg_cadence: overallCad.avg ?? undefined, max_cadence: overallCad.max ?? undefined })
       .eq('id', workout_id);
 
     return new Response(JSON.stringify({ success: true, computed }), { headers: { 'Content-Type': 'application/json' } });
