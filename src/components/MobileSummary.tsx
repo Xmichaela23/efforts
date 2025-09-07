@@ -320,7 +320,23 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   let cursorIdx = 0;
   let cursorCum = rows.length ? rows[0].cumMeters || 0 : 0;
 
-  const renderCompletedFor = (st: any): CompletedDisplay => {
+  // Planned pace extractor (tight label)
+  const plannedPaceFor = (st: any): string => {
+    try {
+      const direct = st.paceTarget || st.target_pace || st.pace;
+      if (direct && String(direct).includes('/')) return String(direct);
+      if (typeof st.distanceMeters === 'number' && st.distanceMeters > 0 && typeof st.duration === 'number' && st.duration > 0) {
+        const miles = st.distanceMeters / 1609.34;
+        const paceMinPerMile = (st.duration / 60) / miles;
+        const m = Math.floor(paceMinPerMile);
+        const s = Math.round((paceMinPerMile - m) * 60);
+        return `${m}:${String(s).padStart(2,'0')}/mi`;
+      }
+    } catch {}
+    return '—';
+  };
+
+  const renderCompletedFor = (st: any): { paceText: string; hr: number | null } | string => {
     if (!comp || rows.length < 2) return '—' as any;
     const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
     const isRide = /ride|bike|cycling/i.test(comp.type || '') || /cycling|bike/i.test(comp.activity_type || '');
@@ -356,43 +372,45 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       if (miles>0 && paceMinPerMile!=null) {
         const m = Math.floor(paceMinPerMile);
         const s = Math.round((paceMinPerMile - m)*60);
-        return { text: `${miles.toFixed(miles<1?2:2)} mi @ ${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
+        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
       }
-      // Strict: if we cannot compute, return em dash
-      return { text: '—', hr: hrAvg!=null?Math.round(hrAvg):null };
+      return { paceText: '—', hr: hrAvg!=null?Math.round(hrAvg):null };
     }
     if (isRide) {
       const mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
-      return { text: `${miles.toFixed(1)} mi @ ${mph.toFixed(1)} mph`, hr: hrAvg!=null?Math.round(hrAvg):null };
+      return { paceText: mph>0 ? `${mph.toFixed(1)} mph` : '—', hr: hrAvg!=null?Math.round(hrAvg):null };
     }
     if (isSwim) {
       const per100m = km>0 ? (timeSec/(km*10)) : null;
       const mm = per100m!=null ? Math.floor(per100m/60) : 0;
       const ss = per100m!=null ? Math.round(per100m%60) : 0;
-      return { text: `${(km*0.621371).toFixed(2)} mi @ ${mm}:${String(ss).padStart(2,'0')} /100m`, hr: hrAvg!=null?Math.round(hrAvg):null };
+      return { paceText: per100m!=null ? `${mm}:${String(ss).padStart(2,'0')} /100m` : '—', hr: hrAvg!=null?Math.round(hrAvg):null };
     }
-    // Fallback overall
-    return completedValueForStep(comp, st);
+    const fallback = completedValueForStep(comp, st) as any;
+    return { paceText: typeof fallback === 'string' ? fallback : (fallback?.text || '—'), hr: typeof fallback === 'string' ? null : (fallback?.hr ?? null) };
   };
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-2 gap-4 text-xs text-gray-500">
-        <div className="font-medium text-black">Planned</div>
-        <div className="font-medium text-black">Completed</div>
+      <div className="grid grid-cols-3 gap-4 text-xs text-gray-500">
+        <div className="font-medium text-black">Planned Pace</div>
+        <div className="font-medium text-black">Executed Pace</div>
+        <div className="font-medium text-black">BPM</div>
       </div>
       <div className="mt-2 divide-y divide-gray-100">
         {steps.map((st, idx) => (
-          <div key={idx} className="grid grid-cols-2 gap-4 py-2 text-sm">
-            <div className="text-gray-800">{joinPlannedLabel(st)}</div>
+          <div key={idx} className="grid grid-cols-3 gap-4 py-2 text-sm">
+            <div className="text-gray-800">{plannedPaceFor(st)}</div>
             <div className="text-gray-900">
               {(() => { const val = renderCompletedFor(st); return (
                 <>
-                  <div>{typeof val === 'string' ? val : val.text}</div>
-                  {typeof val !== 'string' && val.hr ? (
-                    <div className="text-xs text-gray-500">{val.hr} bpm</div>
-                  ) : null}
+                  <div>{typeof val === 'string' ? val : val.paceText}</div>
                 </>
+              ); })()}
+            </div>
+            <div className="text-gray-900">
+              {(() => { const val = renderCompletedFor(st); return (
+                <div className="text-xs text-gray-700">{typeof val !== 'string' && val.hr ? `${val.hr} bpm` : '—'}</div>
               ); })()}
             </div>
           </div>

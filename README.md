@@ -152,3 +152,29 @@ supabase functions deploy send-workout-to-garmin --project-ref yyriamwvtvzlkumqr
 ---
 
 **This is the way forward** - smarter, faster, more reliable training plans that scale with your needs.
+
+## 🧪 Temporary Dev Hydration (Completed & Summary)
+
+While we finish full ingestion of rich Garmin details into the `workouts` table, the UI temporarily "hydrates" completed workouts at render-time.
+
+- What this does: If a completed workout lacks samples/laps in `workouts` but has a `garmin_activity_id`, the view fetches rich fields from `garmin_activities` and merges them in-memory so charts/metrics render.
+- Where it applies: `src/components/MobileSummary.tsx` and `src/components/CompletedTab.tsx`.
+- Fields used: `gps_track`, `sensor_data`, `swim_data`, plus key metrics like `pool_length`, `number_of_active_lengths`, cadence, power, speeds, temperature, steps.
+- Guardrails: Lists/calendar still read from `workouts` only to avoid duplicates; hydration happens only inside the detail views.
+
+Why this is temporary
+- We want a single source of truth: `workouts`. Reading `garmin_activities` directly from the client is a stopgap for development.
+- It adds extra reads and complexity and can hide ingestion gaps if left in place.
+
+Plan to remove it
+1) Ensure `ingest-activity` mirrors all required details (runs/rides/swims) into `workouts` (including samples where feasible or summarized series).
+2) Backfill or re-fetch recent activities to populate missing fields.
+3) Replace client-side hydration with a small Edge Function that returns a single merged payload if we still need dynamic merge logic.
+
+How to disable now (dev only)
+- Remove the hydration effects that query `garmin_activities` in:
+  - `src/components/MobileSummary.tsx`
+  - `src/components/CompletedTab.tsx`
+
+Action item
+- Keep this section until ingestion/backfill is complete, then remove hydration and this note.
