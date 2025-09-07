@@ -77,7 +77,8 @@ export function usePlannedRange(fromISO: string, toISO: string) {
           else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
           const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
           const isCompleted = String((w as any).workout_status || '').toLowerCase() === 'completed';
-          return !isOptional && !isCompleted;
+          const hasCompletedId = !!(w as any)?.completed_workout_id;
+          return !isOptional && !isCompleted && !hasCompletedId;
         });
         setRows(safe);
         const payload = { ts: Date.now(), rows: safe };
