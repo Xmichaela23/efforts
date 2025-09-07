@@ -129,6 +129,7 @@ export interface Workout {
   total_cycles?: number;
   deviceInfo?: any;
   metrics?: any;
+  computed?: any;
   // Run-specific fields
   avg_pace?: number;
   max_pace?: number;
@@ -661,6 +662,13 @@ export const useWorkouts = () => {
         total_cycles: w.total_cycles,
         deviceInfo: w.deviceInfo || w.device_info,
         metrics: w.metrics,
+        // Parsed computed summary if present
+        computed: (() => {
+          try {
+            const c = (w as any).computed;
+            return typeof c === 'string' ? JSON.parse(c) : c;
+          } catch { return (w as any).computed; }
+        })(),
         // Run-specific fields
         avg_pace: w.avg_pace,
         max_pace: w.max_pace,
@@ -1410,6 +1418,7 @@ export const useWorkouts = () => {
         threshold_power: data.threshold_power,
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
+        computed: (() => { try { return typeof (data as any).computed === 'string' ? JSON.parse((data as any).computed) : (data as any).computed; } catch { return (data as any).computed; } })(),
         metrics: {
           avg_heart_rate: data.avg_heart_rate,
           max_heart_rate: data.max_heart_rate,
@@ -1633,6 +1642,7 @@ export const useWorkouts = () => {
         threshold_power: data.threshold_power,
         total_cycles: data.total_cycles,
         deviceInfo: data.device_info,
+        computed: (() => { try { return typeof (data as any).computed === 'string' ? JSON.parse((data as any).computed) : (data as any).computed; } catch { return (data as any).computed; } })(),
         metrics: {
           avg_heart_rate: data.avg_heart_rate,
           max_heart_rate: data.max_heart_rate,

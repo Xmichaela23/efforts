@@ -84,6 +84,146 @@ function mapStravaToWorkout(activity: any, userId: string) {
   };
 }
 
+// Compute executed intervals and overall metrics suitable for UI consumption
+function computeComputedFromActivity(activity: any): any | null {
+  try {
+    const samples: any[] = Array.isArray(activity?.sensor_data?.samples)
+      ? activity.sensor_data.samples
+      : (Array.isArray(activity?.sensor_data) ? activity.sensor_data : []);
+
+    if (!Array.isArray(samples) || samples.length < 2) {
+      return null;
+    }
+
+    // Normalize samples → { ts: epoch sec, t: seconds (relative), hr, speedMps, cumMeters }
+    const normalized: Array<{ ts: number; t: number; hr?: number; v?: number; d?: number }> = [];
+    for (let i = 0; i < samples.length; i += 1) {
+      const s: any = samples[i];
+      const ts = Number(
+        s.timestamp
+        ?? s.startTimeInSeconds
+        ?? s.clockDurationInSeconds
+        ?? s.timerDurationInSeconds
+        ?? s.offsetInSeconds
+        ?? i
+      );
+      const t = Number(
+        s.timerDurationInSeconds
+        ?? s.clockDurationInSeconds
+        ?? s.movingDurationInSeconds
+        ?? s.elapsed_s
+        ?? s.offsetInSeconds
+        ?? s.startTimeInSeconds
+        ?? i
+      );
+      const hr = typeof s.heartRate === 'number' ? s.heartRate : undefined;
+      const v = (typeof s.speedMetersPerSecond === 'number' ? s.speedMetersPerSecond : undefined);
+      const d = (typeof s.totalDistanceInMeters === 'number' ? s.totalDistanceInMeters
+        : (typeof s.distanceInMeters === 'number' ? s.distanceInMeters
+        : (typeof s.cumulativeDistanceInMeters === 'number' ? s.cumulativeDistanceInMeters
+        : (typeof s.totalDistance === 'number' ? s.totalDistance
+        : (typeof s.distance === 'number' ? s.distance : undefined)))));
+      normalized.push({ ts, t: Number.isFinite(t) ? t : i, hr, v, d });
+    }
+
+    // Ensure ordered by ts
+    normalized.sort((a, b) => (a.ts || 0) - (b.ts || 0));
+
+    // Accumulate distance when provider cumulative is missing, exclude stationary (<0.3 m/s)
+    let last = normalized[0];
+    let cum = Number.isFinite(last.d as number) ? (last.d as number) : 0;
+    normalized[0].d = cum;
+    for (let i = 1; i < normalized.length; i += 1) {
+      const cur = normalized[i];
+      if (typeof cur.d === 'number' && Number.isFinite(cur.d)) {
+        // provider distance available → trust it
+        cum = cur.d;
+      } else {
+        const dt = Math.min(60, Math.max(0, (cur.ts || cur.t) - (last.ts || last.t)));
+        const v0 = (typeof last.v === 'number' && last.v >= 0.3) ? last.v : null;
+        const v1 = (typeof cur.v === 'number' && cur.v >= 0.3) ? cur.v : null;
+        if (dt && (v0 != null || v1 != null)) {
+          const vAvg = (v0 != null && v1 != null) ? (v0 + v1) / 2 : (v1 != null ? v1 : (v0 as number));
+          cum += vAvg * dt;
+        }
+        cur.d = cum;
+      }
+      last = cur;
+    }
+
+    // Overall metrics (moving-only pace)
+    let movingSec = 0;
+    for (let i = 1; i < normalized.length; i += 1) {
+      const a = normalized[i - 1];
+      const b = normalized[i];
+      const dt = Math.min(60, Math.max(0, (b.ts || b.t) - (a.ts || a.t)));
+      const v0 = (typeof a.v === 'number' && a.v >= 0.3) ? a.v : null;
+      const v1 = (typeof b.v === 'number' && b.v >= 0.3) ? b.v : null;
+      if (dt && (v0 != null || v1 != null)) movingSec += dt;
+    }
+    const totalMeters = Math.max(0, (normalized[normalized.length - 1].d || 0) - (normalized[0].d || 0));
+    const overallPaceSecPerMi = (movingSec > 0 && totalMeters > 0)
+      ? (movingSec) / ((totalMeters / 1000) * 0.621371)
+      : null;
+    const avgHr = (() => {
+      const hrs = normalized.map(s => (typeof s.hr === 'number' ? s.hr : NaN)).filter(Number.isFinite) as number[];
+      if (!hrs.length) return null;
+      return Math.round(hrs.reduce((a, b) => a + b, 0) / hrs.length);
+    })();
+
+    // Segment by laps if provided
+    const laps: any[] = Array.isArray(activity?.laps) ? activity.laps : [];
+    const intervals: any[] = [];
+    if (laps.length > 0) {
+      for (let i = 0; i < laps.length; i += 1) {
+        const startTs = Number(laps[i]?.startTimeInSeconds ?? laps[i]?.start_time ?? NaN);
+        const endTs = Number((i + 1 < laps.length ? laps[i + 1]?.startTimeInSeconds : NaN));
+        const within = normalized.filter(s => Number.isFinite(startTs) && (s.ts >= startTs) && (Number.isFinite(endTs) ? (s.ts < endTs) : true));
+        if (within.length < 2) continue;
+        const segMeters = Math.max(0, (within[within.length - 1].d || 0) - (within[0].d || 0));
+        let segMoving = 0;
+        const segHr: number[] = [];
+        for (let j = 1; j < within.length; j += 1) {
+          const a = within[j - 1];
+          const b = within[j];
+          const dt = Math.min(60, Math.max(0, (b.ts || b.t) - (a.ts || a.t)));
+          const v0 = (typeof a.v === 'number' && a.v >= 0.3) ? a.v : null;
+          const v1 = (typeof b.v === 'number' && b.v >= 0.3) ? b.v : null;
+          if (dt && (v0 != null || v1 != null)) segMoving += dt;
+          if (typeof b.hr === 'number') segHr.push(b.hr);
+        }
+        const segPaceSecPerMi = (segMoving > 0 && segMeters > 0)
+          ? (segMoving) / ((segMeters / 1000) * 0.621371)
+          : null;
+        const segAvgHr = segHr.length ? Math.round(segHr.reduce((a, b) => a + b, 0) / segHr.length) : null;
+        intervals.push({
+          planned_step_id: null,
+          kind: 'lap',
+          executed: {
+            duration_s: Math.round(segMoving),
+            distance_m: Math.round(segMeters),
+            avg_pace_s_per_mi: segPaceSecPerMi != null ? Math.round(segPaceSecPerMi) : null,
+            avg_hr: segAvgHr,
+          },
+        });
+      }
+    }
+
+    const computed = {
+      intervals,
+      overall: {
+        duration_s_moving: Math.round(movingSec),
+        distance_m: Math.round(totalMeters),
+        avg_pace_s_per_mi: overallPaceSecPerMi != null ? Math.round(overallPaceSecPerMi) : null,
+        avg_hr: avgHr,
+      },
+    };
+    return computed;
+  } catch {
+    return null;
+  }
+}
+
 function mapGarminToWorkout(activity: any, userId: string) {
   const startIso = activity.start_time || (activity.summary?.startTimeInSeconds ? new Date(activity.summary.startTimeInSeconds * 1000).toISOString() : null);
   const dateIso = startIso ? startIso.split('T')[0] : null;
@@ -138,6 +278,13 @@ function mapGarminToWorkout(activity: any, userId: string) {
     sensor_data: activity.sensor_data ? JSON.stringify(activity.sensor_data) : null,
     swim_data: activity.swim_data ? JSON.stringify(activity.swim_data) : null,
     laps: activity.laps ? JSON.stringify(activity.laps) : null,
+    // Server-computed summary for UI (intervals + overall)
+    computed: (() => {
+      try {
+        const c = computeComputedFromActivity(activity);
+        return c ? JSON.stringify(c) : null;
+      } catch { return null; }
+    })(),
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   };

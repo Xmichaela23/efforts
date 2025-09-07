@@ -356,6 +356,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   }
 
   // Endurance (run/ride/swim)
+  // Prefer server-computed executed intervals if present to render Executed Pace/BPM directly
+  const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
   const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
 
   // Build accumulated rows once for completed and advance a cursor across steps
@@ -525,16 +527,30 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           <div key={idx} className="grid grid-cols-3 gap-4 py-2 text-sm">
             <div className="text-gray-800">{plannedPaceFor(st)}</div>
             <div className="text-gray-900">
-              {(() => { const val = renderCompletedFor(st); return (
-                <>
-                  <div>{typeof val === 'string' ? val : val.paceText}</div>
-                </>
-              ); })()}
+              {(() => {
+                // If server-computed exists, use it; else compute client-side
+                if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
+                  const idx = idxIn => idxIn; // same order as planned for now (future: align by kind/id)
+                  const compIdx = idx(idx);
+                  const row = completedComputed.intervals[compIdx];
+                  const secPerMi = row?.executed?.avg_pace_s_per_mi;
+                  return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
+                }
+                const val = renderCompletedFor(st);
+                return <div>{typeof val === 'string' ? val : val.paceText}</div>;
+              })()}
             </div>
             <div className="text-gray-900">
-              {(() => { const val = renderCompletedFor(st); return (
-                <div className="text-xs text-gray-700">{typeof val !== 'string' && val.hr ? `${val.hr} bpm` : '—'}</div>
-              ); })()}
+              {(() => {
+                if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
+                  const compIdx = idx;
+                  const row = completedComputed.intervals[compIdx];
+                  const hr = row?.executed?.avg_hr;
+                  return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
+                }
+                const val = renderCompletedFor(st);
+                return <div className="text-xs text-gray-700">{typeof val !== 'string' && val.hr ? `${val.hr} bpm` : '—'}</div>;
+              })()}
             </div>
           </div>
         ))}
