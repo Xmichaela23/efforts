@@ -136,6 +136,7 @@ export interface Workout {
   steps?: number;
   // Swim-specific structured data
   swim_data?: any;
+  pool_length?: number;
           // Garmin-specific fields
         isGarminImported?: boolean;
         garmin_activity_id?: string;
@@ -697,7 +698,8 @@ export const useWorkouts = () => {
           try {
             return typeof (w as any).swim_data === 'string' ? JSON.parse((w as any).swim_data) : (w as any).swim_data;
           } catch { return (w as any).swim_data; }
-        })()
+        })(),
+        pool_length: w.pool_length
       }));
 
       // Quiet logs

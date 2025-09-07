@@ -1300,8 +1300,7 @@ const formatPace = (paceValue: any): string => {
                 const sec = Number(gapSec);
                 return `${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,'0')}/mi`;
               }
-              const txt = calculateGradeAdjustedPace();
-              return txt || 'N/A';
+              return 'N/A';
             })()}
           </div>
           <div className="text-xs text-[#666666] font-normal">

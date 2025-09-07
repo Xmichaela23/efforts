@@ -279,29 +279,69 @@ Deno.serve(async (req) => {
 
     const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d||0) - (rows[0].d||0)) : 0;
     const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t||0) - (rows[0].t||0)) : 0;
-    // Adjust GAP with asymmetric uphill/downhill factors to avoid unrealistic speed-ups
+    // GAP using Minetti 2002 energy cost curve (Strava-style approximation)
+    // Steps:
+    // 1) Smooth elevation (rolling median ~20s)
+    // 2) For each pair, compute dt (<=5s), v (m/s), dElev, grade g = dElev/dMeters (clamped), ignore |g|<0.005
+    // 3) Energy cost per meter C(g) = 155.4g^5 - 30.4g^4 - 43.3g^3 + 46.3g^2 + 19.5g + 3.6
+    // 4) Equivalent flat speed v_eq = v * C(g)/C(0), with C(0)=3.6
+    // 5) p_eq = 1 / v_eq (sec/m). GAP pace = time-weighted avg of p_eq → sec/mi
     const overallGap = (() => {
       if (!rows || rows.length < 2) return null as number | null;
-      let adjMeters = 0; let timeSec = 0;
+      // Build smoothed elevation array using rolling median over ~20s window
+      const smoothedElev: number[] = [];
+      const windowSec = 30;
+      for (let i = 0; i < rows.length; i += 1) {
+        const t0 = rows[i].t || rows[i].ts || i;
+        const lo = t0 - windowSec/2;
+        const hi = t0 + windowSec/2;
+        const bucket: number[] = [];
+        for (let j = 0; j < rows.length; j += 1) {
+          const tj = rows[j].t || rows[j].ts || j;
+          if (tj >= lo && tj <= hi) {
+            const ej = (rows[j] as any).elev;
+            if (typeof ej === 'number' && Number.isFinite(ej)) bucket.push(ej);
+          }
+        }
+        if (bucket.length) {
+          bucket.sort((a,b)=>a-b);
+          smoothedElev[i] = bucket[Math.floor(bucket.length/2)];
+        } else {
+          const ej = (rows[i] as any).elev;
+          smoothedElev[i] = (typeof ej === 'number' ? ej : 0);
+        }
+      }
+      const C0 = 3.6;
+      const cost = (g: number) => (((155.4*g - 30.4)*g - 43.3)*g + 46.3)*g*g + 19.5*g + 3.6; // Horner's method
+      let eqMeters = 0; let sumDt = 0;
       for (let i = 1; i < rows.length; i += 1) {
         const a = rows[i-1]; const b = rows[i];
-        const dt = Math.min(60, Math.max(0, (b.t || b.ts || 0) - (a.t || a.ts || 0)));
-        if (!dt) continue; timeSec += dt;
-        const v = (typeof b.v === 'number' && b.v > 0.5) ? b.v : (typeof a.v === 'number' && a.v > 0.5 ? a.v : 0);
-        if (!v) continue;
-        const elevA = typeof (a as any).elev === 'number' ? (a as any).elev : undefined;
-        const elevB = typeof (b as any).elev === 'number' ? (b as any).elev : elevA;
-        const dElev = (elevA!=null && elevB!=null) ? (Number(elevB) - Number(elevA)) : 0;
-        const dMeters = v * dt;
-        const gRaw = dMeters>0 ? (dElev / dMeters) : 0; // slope
-        const grade = Math.max(-0.10, Math.min(0.10, gRaw));
-        // Uphill penalty strong, downhill benefit modest
-        const k = grade >= 0 ? 9 : 3;
-        const factor = 1 + k * grade;
-        const adj = dMeters / Math.max(0.2, factor);
-        adjMeters += adj;
+        let dt = Math.max(0, (b.t || b.ts || 0) - (a.t || a.ts || 0));
+        if (!dt) continue; dt = Math.min(5, dt); // resample cap 5s
+        const dA = a.d || 0; const dB = b.d || dA;
+        let dMeters = Math.max(0, dB - dA);
+        // If distance missing, infer from speed
+        if (!(dMeters>0)) {
+          const vEst = (typeof b.v==='number' && b.v>0.3) ? b.v : (typeof a.v==='number' && a.v>0.3 ? a.v : 0);
+          if (vEst>0) dMeters = vEst * dt;
+        }
+        if (!(dMeters>0)) continue;
+        const v = dMeters / dt;
+        if (!(v>0.3)) continue;
+        const eA = smoothedElev[i-1]; const eB = smoothedElev[i] ?? eA;
+        const dElev = (Number.isFinite(eA) && Number.isFinite(eB)) ? (eB - eA) : 0;
+        let g = dMeters>0 ? (dElev / dMeters) : 0;
+        if (Math.abs(g) < 0.005) g = 0; // ignore tiny grades
+        if (g > 0.3) g = 0.3; if (g < -0.3) g = -0.3;
+        const Cg = cost(g);
+        const vEq = v * (Cg / C0);
+        if (!(vEq>0.1)) continue;
+        eqMeters += vEq * dt;
+        sumDt += dt;
       }
-      return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
+      if (!sumDt || !(eqMeters>0)) return null;
+      // GAP pace = total moving time / equivalent flat miles
+      return Math.round((sumDt) / (eqMeters / 1609.34));
     })();
 
     // Track max instantaneous speed for max pace metric
