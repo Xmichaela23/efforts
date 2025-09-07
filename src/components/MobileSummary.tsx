@@ -50,7 +50,7 @@ const getAvgHR = (completed: any): number | null => {
   return typeof v === 'number' && v > 0 ? Math.round(v) : null;
 };
 
-type CompletedDisplay = { text: string; hr: number | null };
+type CompletedDisplay = { text: string; hr: number | null; durationSec?: number };
 
 // Build second-by-second samples from gps_track / sensor_data
 function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: number; hr?: number; speedMps?: number; cumMeters?: number }> {
@@ -358,7 +358,16 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Endurance (run/ride/swim)
   // Prefer server-computed executed intervals if present to render Executed Pace/BPM directly
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
-  const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
+  const computedIntervals: any[] | null = (completedComputed && Array.isArray(completedComputed.intervals)) ? completedComputed.intervals : null;
+  const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
+  // Align planned to executed count when server-computed exists: drop leading extras (e.g., stray warmup/recovery)
+  const steps: any[] = (() => {
+    if (computedIntervals && plannedStepsBase.length > computedIntervals.length) {
+      const n = computedIntervals.length;
+      return plannedStepsBase.slice(plannedStepsBase.length - n);
+    }
+    return plannedStepsBase;
+  })();
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
@@ -426,7 +435,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return '—';
   };
 
-  const renderCompletedFor = (st: any): { paceText: string; hr: number | null } | string => {
+  const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
     if (!comp || rows.length < 2) return '—' as any;
     const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
     const isRide = /ride|bike|cycling/i.test(comp.type || '') || /cycling|bike/i.test(comp.activity_type || '');
@@ -490,41 +499,42 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       if (miles>0 && paceMinPerMile!=null) {
         const m = Math.floor(paceMinPerMile);
         const s = Math.round((paceMinPerMile - m)*60);
-        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
+        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
       }
       if (avgSpeedMps && avgSpeedMps > 0) {
         const secPerMile = 1609.34 / avgSpeedMps;
         const m = Math.floor(secPerMile/60);
         const s = Math.round(secPerMile%60);
-        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
+        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
       }
-      return { paceText: '—', hr: hrAvg!=null?Math.round(hrAvg):null };
+      return { paceText: '—', hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
     }
     if (isRide) {
       let mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
       if ((!mph || mph<=0) && avgSpeedMps && avgSpeedMps > 0) mph = avgSpeedMps * 2.236936;
-      return { paceText: mph>0 ? `${mph.toFixed(1)} mph` : '—', hr: hrAvg!=null?Math.round(hrAvg):null };
+      return { paceText: mph>0 ? `${mph.toFixed(1)} mph` : '—', hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
     }
     if (isSwim) {
       const per100m = km>0 ? (timeSec/(km*10)) : null;
       const mm = per100m!=null ? Math.floor(per100m/60) : 0;
       const ss = per100m!=null ? Math.round(per100m%60) : 0;
-      return { paceText: per100m!=null ? `${mm}:${String(ss).padStart(2,'0')} /100m` : '—', hr: hrAvg!=null?Math.round(hrAvg):null };
+      return { paceText: per100m!=null ? `${mm}:${String(ss).padStart(2,'0')} /100m` : '—', hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
     }
     const fallback = completedValueForStep(comp, st) as any;
-    return { paceText: typeof fallback === 'string' ? fallback : (fallback?.text || '—'), hr: typeof fallback === 'string' ? null : (fallback?.hr ?? null) };
+    return { paceText: typeof fallback === 'string' ? fallback : (fallback?.text || '—'), hr: typeof fallback === 'string' ? null : (fallback?.hr ?? null), durationSec: Math.round(timeSec) };
   };
 
   return (
     <div className="w-full">
-      <div className="grid grid-cols-3 gap-4 text-xs text-gray-500">
+      <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned Pace</div>
         <div className="font-medium text-black">Executed Pace</div>
+        <div className="font-medium text-black">Time</div>
         <div className="font-medium text-black">BPM</div>
       </div>
       <div className="mt-2 divide-y divide-gray-100">
         {steps.map((st, idx) => (
-          <div key={idx} className="grid grid-cols-3 gap-4 py-2 text-sm">
+          <div key={idx} className="grid grid-cols-4 gap-4 py-2 text-sm">
             <div className="text-gray-800">{plannedPaceFor(st)}</div>
             <div className="text-gray-900">
               {(() => {
@@ -537,6 +547,19 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                 }
                 const val = renderCompletedFor(st);
                 return <div>{typeof val === 'string' ? val : val.paceText}</div>;
+              })()}
+            </div>
+            <div className="text-gray-900">
+              {(() => {
+                if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
+                  const compIdx = idx;
+                  const row = completedComputed.intervals[compIdx] || null;
+                  const dur = row?.executed?.duration_s;
+                  return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
+                }
+                const val = renderCompletedFor(st) as any;
+                const dur = typeof val !== 'string' ? val.durationSec : null;
+                return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
               })()}
             </div>
             <div className="text-gray-900">
