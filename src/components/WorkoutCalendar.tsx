@@ -202,18 +202,26 @@ export default function WorkoutCalendar({
     // Build lookup of days/types that actually have a completed workout row this week
     // We only treat a planned row as completed if there is a matching completed workout
     const wkDb = Array.isArray(workoutsWeekRows) ? workoutsWeekRows : [];
-    // Avoid double-counting: rely solely on range query results for completed workouts this week.
-    const wkCombined = [...wkDb];
+    // Identify planned rows explicitly linked to a completed workout (authoritative association)
+    const plannedArr = Array.isArray(planned) ? (planned as any[]) : [];
+    const linkedCompletedIds = new Set(
+      plannedArr
+        .map((p: any) => p?.completed_workout_id)
+        .filter((id: any) => id != null)
+        .map((id: any) => String(id))
+    );
+    // Suppress raw workout rows that are explicitly linked to a planned row
+    const wkCombined = wkDb.filter((w: any) => !linkedCompletedIds.has(String(w?.id)));
+    // Build completed keys for date+type from all workouts in week (unfiltered)
     const completedWorkoutKeys = new Set(
-      wkCombined
+      wkDb
         .filter((w:any)=> String(w?.workout_status||'').toLowerCase()==='completed')
         .map((w:any)=> `${String(w.date)}|${String(w.type||w.workout_type||'').toLowerCase()}`)
     );
-    // Planned rows we treat as completed only if a matching completed workout exists
+    // Planned rows considered completed if linked OR marked completed
     const completedPlannedKeys = new Set(
-      (planned as any[])
-        .filter((p: any) => String(p?.workout_status || '').toLowerCase() === 'completed')
-        .filter((p: any) => completedWorkoutKeys.has(`${String(p.date)}|${String(p.type || '').toLowerCase()}`))
+      plannedArr
+        .filter((p: any) => p?.completed_workout_id || String(p?.workout_status || '').toLowerCase() === 'completed')
         .map((p: any) => `${String(p.date)}|${String(p.type || '').toLowerCase()}`)
     );
 
@@ -225,12 +233,11 @@ export default function WorkoutCalendar({
         return !completedPlannedKeys.has(key);
       } catch { return true; }
     });
-    // Normalize planned statuses: if a planned row is marked completed in DB but we have
-    // no matching completed workout for that date/type, treat it as planned for UI
+    // Normalize planned statuses:
+    // - If a planned row links to a completed workout, force completed ✓
     const mappedPlanned = (planned as any[]).map((p:any)=>{
-      const key = `${String(p.date)}|${String(p.type||'').toLowerCase()}`;
-      if (String(p?.workout_status||'').toLowerCase()==='completed' && !completedWorkoutKeys.has(key)) {
-        return { ...p, workout_status: 'planned' };
+      if (p?.completed_workout_id) {
+        return { ...p, workout_status: 'completed' };
       }
       return p;
     });
@@ -244,8 +251,6 @@ export default function WorkoutCalendar({
       else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
       // Hide optional planned rows entirely
       if (tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional')) return false;
-      // If a planned row is completed and explicitly associated to a workout, hide it (redundant)
-      if (String((w as any).workout_status||'').toLowerCase()==='completed' && (w as any).completed_workout_id) return false;
       return true;
     });
 
