@@ -66,6 +66,7 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
         ?? s.elapsedDurationInSeconds
         ?? s.sumDurationInSeconds
         ?? s.offsetInSeconds
+        ?? s.startTimeInSeconds
         ?? s.elapsed_s
         ?? s.t
         ?? s.time
@@ -384,8 +385,30 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         }
       }
       // Derive from distance+time if provided
-      const meters = typeof st.distanceMeters === 'number' ? st.distanceMeters : undefined;
-      const sec = typeof st.duration === 'number' ? st.duration : (typeof st.seconds === 'number' ? st.seconds : undefined);
+      const meters = (() => {
+        if (Number.isFinite(Number(st.distanceMeters))) return Number(st.distanceMeters);
+        if (Number.isFinite(Number(st.distance_m))) return Number(st.distance_m);
+        if (Number.isFinite(Number(st.meters))) return Number(st.meters);
+        if (Number.isFinite(Number(st.m))) return Number(st.m);
+        const ov = Number(st.original_val);
+        const ou = String(st.original_units || '').toLowerCase();
+        if (Number.isFinite(ov) && ov > 0) {
+          if (ou === 'mi') return ov * 1609.34;
+          if (ou === 'km') return ov * 1000;
+          if (ou === 'yd') return ov * 0.9144;
+          if (ou === 'm') return ov;
+        }
+        return undefined;
+      })();
+
+      const sec = (() => {
+        const cands = [st.duration, st.seconds, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
+        for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
+        // Parse 'mm:ss' strings
+        const ts = String(st.time || '').trim();
+        if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); return m*60 + s; }
+        return undefined;
+      })();
       if (meters && sec) {
         const miles = meters / 1609.34;
         if (miles > 0) {
@@ -411,12 +434,13 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
     // Resolve planned distance in meters from various shapes (computed steps, intervals)
     const stDistanceMeters = (() => {
-      const dm = Number(st.distanceMeters);
+      const dm = Number(st.distanceMeters ?? st.distance_m ?? st.meters ?? st.m);
       if (Number.isFinite(dm) && dm > 0) return dm;
       const ov = Number(st.original_val);
       const ou = String(st.original_units || '').toLowerCase();
       if (Number.isFinite(ov) && ov > 0) {
         if (ou === 'mi') return ov * 1609.34;
+        if (ou === 'km') return ov * 1000;
         if (ou === 'm') return ov;
         if (ou === 'yd' || ou === 'yard' || ou === 'yards') return ov * 0.9144;
       }
@@ -427,8 +451,14 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       const targetCum = startCum + stDistanceMeters;
       while (endIdx < rows.length && (rows[endIdx].cumMeters || 0) < targetCum) endIdx += 1;
     } else {
-      // Time-controlled step: prefer st.seconds, else st.duration
-      const dur = Number.isFinite(Number(st.seconds)) && Number(st.seconds) > 0 ? Number(st.seconds) : (Number.isFinite(Number(st.duration)) ? Number(st.duration) : 0);
+      // Time-controlled step: coerce duration from multiple fields
+      const durCandidates = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
+      let dur = 0;
+      for (const v of durCandidates) { const n = Number(v); if (Number.isFinite(n) && n > 0) { dur = n; break; } }
+      if (!dur) {
+        const ts = String(st.time || '').trim();
+        if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); dur = m*60 + s; }
+      }
       const startT = rows[startIdx].t;
       const targetT = startT + (dur > 0 ? dur : 0);
       while (endIdx < rows.length && rows[endIdx].t < targetT) endIdx += 1;
