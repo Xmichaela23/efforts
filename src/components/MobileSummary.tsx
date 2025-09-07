@@ -359,8 +359,18 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Prefer server-computed executed intervals if present to render Executed Pace/BPM directly
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
   const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
-  // Do NOT trim or reorder planned steps; render exactly as authored
-  const steps: any[] = plannedStepsBase;
+  // Order for display: Warm‑up first, Cool‑down last, others keep authored order
+  const steps: any[] = (() => {
+    const withIdx = plannedStepsBase.map((st, i) => ({ st, i }));
+    const weight = (st:any) => {
+      const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
+      if (/cool|cd/.test(k)) return 2;
+      if (/warm|wu/.test(k)) return 0;
+      return 1;
+    };
+    withIdx.sort((a,b)=> (weight(a.st) - weight(b.st)) || (a.i - b.i));
+    return withIdx.map(x=>x.st);
+  })();
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
