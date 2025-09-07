@@ -28,6 +28,7 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [invalidateTs, setInvalidateTs] = useState<number>(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +64,27 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
       }
     })();
     return () => { cancelled = true; };
+  }, [fromISO, toISO, invalidateTs]);
+
+  // Realtime invalidate on workouts changes (attach/complete)
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let active = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !active) return;
+        const k = key(user.id, fromISO, toISO);
+        const invalidate = () => {
+          try { mem.delete(k); localStorage.removeItem(`workoutsRange:${k}`); } catch {}
+          setInvalidateTs(Date.now());
+        };
+        channel = supabase.channel(`workouts-range-${user.id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => invalidate())
+          .subscribe();
+      } catch {}
+    })();
+    return () => { active = false; try { channel?.unsubscribe(); } catch {} };
   }, [fromISO, toISO]);
 
   return { rows, loading, error };
