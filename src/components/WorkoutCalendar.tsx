@@ -213,6 +213,17 @@ export default function WorkoutCalendar({
         .filter((id: any) => id != null)
         .map((id: any) => String(id))
     );
+    // Also consider workouts that point to a planned_id as linked completions
+    const workoutIdByPlannedId = new Map<string, string>();
+    for (const w of wkDb) {
+      try {
+        if (String(w?.workout_status||'').toLowerCase()==='completed' && (w as any)?.planned_id) {
+          const pid = String((w as any).planned_id);
+          workoutIdByPlannedId.set(pid, String((w as any).id));
+          linkedCompletedIds.add(String((w as any).id));
+        }
+      } catch {}
+    }
     // Suppress raw workout rows that are explicitly linked to a planned row
     const wkCombined = wkDb.filter((w: any) => !linkedCompletedIds.has(String(w?.id)));
     // Build completed keys for date+type from all workouts in week (unfiltered)
@@ -221,10 +232,10 @@ export default function WorkoutCalendar({
         .filter((w:any)=> String(w?.workout_status||'').toLowerCase()==='completed')
         .map((w:any)=> `${String(w.date)}|${String(w.type||w.workout_type||'').toLowerCase()}`)
     );
-    // Planned rows considered completed if linked OR marked completed
+    // Planned rows considered completed if linked via either side OR marked completed
     const completedPlannedKeys = new Set(
       plannedArr
-        .filter((p: any) => p?.completed_workout_id || String(p?.workout_status || '').toLowerCase() === 'completed')
+        .filter((p: any) => p?.completed_workout_id || workoutIdByPlannedId.has(String(p?.id)) || String(p?.workout_status || '').toLowerCase() === 'completed')
         .map((p: any) => `${String(p.date)}|${String(p.type || '').toLowerCase()}`)
     );
 
@@ -237,9 +248,9 @@ export default function WorkoutCalendar({
       } catch { return true; }
     });
     // Normalize planned statuses:
-    // - If a planned row links to a completed workout, force completed ✓
+    // - If a planned row links to a completed workout (either side), force completed ✓
     const mappedPlanned = (planned as any[]).map((p:any)=>{
-      if (p?.completed_workout_id) {
+      if (p?.completed_workout_id || workoutIdByPlannedId.has(String(p?.id))) {
         return { ...p, workout_status: 'completed' };
       }
       return p;
