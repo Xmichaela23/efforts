@@ -415,6 +415,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const km = dMeters/1000;
     const miles = km * 0.621371;
     const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
+    // Fallback: compute from avg speed when distance integration is unavailable
+    const speedVals = seg.map(s => (typeof (s as any).speedMps === 'number' ? (s as any).speedMps : NaN)).filter(n => Number.isFinite(n));
+    const avgSpeedMps = speedVals.length ? (speedVals.reduce((a,b)=>a+b,0)/speedVals.length) : null;
 
     if (isRunOrWalk) {
       if (miles>0 && paceMinPerMile!=null) {
@@ -422,10 +425,17 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         const s = Math.round((paceMinPerMile - m)*60);
         return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
       }
+      if (avgSpeedMps && avgSpeedMps > 0) {
+        const secPerMile = 1609.34 / avgSpeedMps;
+        const m = Math.floor(secPerMile/60);
+        const s = Math.round(secPerMile%60);
+        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
+      }
       return { paceText: '—', hr: hrAvg!=null?Math.round(hrAvg):null };
     }
     if (isRide) {
-      const mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
+      let mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
+      if ((!mph || mph<=0) && avgSpeedMps && avgSpeedMps > 0) mph = avgSpeedMps * 2.236936;
       return { paceText: mph>0 ? `${mph.toFixed(1)} mph` : '—', hr: hrAvg!=null?Math.round(hrAvg):null };
     }
     if (isSwim) {
