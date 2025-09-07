@@ -35,6 +35,12 @@ function toIso(dateLike: string | number | Date | null | undefined): string | nu
   } catch { return null; }
 }
 
+// Global helper: safely round numeric strings/floats to integers
+const roundInt = (v: any) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n) : null;
+};
+
 function mapStravaToWorkout(activity: any, userId: string) {
   const start = activity.start_date || activity.start_date_local;
   const durationMin = activity.moving_time != null ? Math.max(0, Math.round(activity.moving_time / 60)) : null;
@@ -257,8 +263,14 @@ function mapGarminToWorkout(activity: any, userId: string) {
     // Additional common metrics if provided
     avg_power: Number.isFinite(activity.average_watts) ? Math.round(activity.average_watts) : (Number.isFinite(activity.avg_power) ? Math.round(activity.avg_power) : null),
     max_power: Number.isFinite(activity.max_watts) ? Math.round(activity.max_watts) : (Number.isFinite(activity.max_power) ? Math.round(activity.max_power) : null),
-    avg_cadence: activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_bike_cadence ?? null,
-    max_cadence: activity.max_running_cadence ?? activity.max_bike_cadence ?? null,
+    avg_cadence: (() => {
+      const v = activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_run_cadence ?? activity.avg_bike_cadence;
+      return roundInt(v);
+    })(),
+    max_cadence: (() => {
+      const v = activity.max_running_cadence ?? activity.max_run_cadence ?? activity.max_bike_cadence;
+      return roundInt(v);
+    })(),
     strokes: Number.isFinite(activity.strokes) ? activity.strokes : null,
     pool_length: Number.isFinite(activity.pool_length) ? activity.pool_length : null,
     number_of_active_lengths: Number.isFinite(activity.number_of_active_lengths) ? activity.number_of_active_lengths : null,
@@ -267,7 +279,7 @@ function mapGarminToWorkout(activity: any, userId: string) {
     normalized_power: Number.isFinite(activity.normalized_power) ? Math.round(activity.normalized_power) : null,
     avg_temperature: Number.isFinite(activity.avg_temperature) ? activity.avg_temperature : null,
     max_temperature: Number.isFinite(activity.max_temperature) ? activity.max_temperature : null,
-    steps: Number.isFinite(activity.steps) ? activity.steps : null,
+    steps: roundInt(activity.steps),
     hrv: Number.isFinite(activity.hrv) ? Math.round(activity.hrv) : (Number.isFinite(activity.heart_rate_variability) ? Math.round(activity.heart_rate_variability) : null),
     // Multisport linkage (omit columns not present in workouts schema)
     // Location (prefer explicit, fallback to first gps_track point)

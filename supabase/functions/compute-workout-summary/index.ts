@@ -8,8 +8,8 @@ function seconds(val: any): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-function normalizeSamples(samples: any[]): Array<{ ts: number; t: number; v?: number; d?: number; hr?: number }>{
-  const out: Array<{ ts: number; t: number; v?: number; d?: number; hr?: number }> = [];
+function normalizeSamples(samples: any[]): Array<{ ts: number; t: number; v?: number; d?: number; hr?: number; elev?: number; cad?: number }>{
+  const out: Array<{ ts: number; t: number; v?: number; d?: number; hr?: number; elev?: number; cad?: number }> = [];
   for (let i = 0; i < samples.length; i += 1) {
     const s: any = samples[i] || {};
     const ts = Number(s.startTimeInSeconds ?? s.clockDurationInSeconds ?? s.timerDurationInSeconds ?? s.elapsed_s ?? s.offsetInSeconds ?? i);
@@ -21,10 +21,15 @@ function normalizeSamples(samples: any[]): Array<{ ts: number; t: number; v?: nu
       : (typeof s.totalDistance === 'number' ? s.totalDistance
       : (typeof s.distance === 'number' ? s.distance : undefined))));
     const hr = typeof s.heartRate === 'number' ? s.heartRate : undefined;
-    out.push({ ts: Number.isFinite(ts) ? ts : i, t: Number.isFinite(t) ? t : i, v, d, hr });
+    const elev = typeof s.elevationInMeters === 'number' ? s.elevationInMeters : undefined;
+    const cad = typeof s.stepsPerMinute === 'number' ? s.stepsPerMinute
+      : (typeof s.runCadence === 'number' ? s.runCadence
+      : (typeof s.bikeCadenceInRPM === 'number' ? s.bikeCadenceInRPM
+      : (typeof s.swimCadenceInStrokesPerMinute === 'number' ? s.swimCadenceInStrokesPerMinute : undefined)));
+    out.push({ ts: Number.isFinite(ts) ? ts : i, t: Number.isFinite(t) ? t : i, v, d, hr, elev, cad });
   }
   out.sort((a,b)=> (a.ts||0)-(b.ts||0));
-  // Fill cumulative distance if missing, exclude stationary under 0.3 m/s
+  // Fill cumulative distance if missing, exclude stationary under 0.5 m/s
   let last = out[0];
   let cum = typeof last?.d === 'number' ? last.d as number : 0;
   if (out.length) out[0].d = cum;
@@ -33,8 +38,8 @@ function normalizeSamples(samples: any[]): Array<{ ts: number; t: number; v?: nu
     if (typeof cur.d === 'number') { cum = cur.d; }
     else {
       const dt = Math.min(60, Math.max(0, (cur.ts||cur.t)-(last.ts||last.t)));
-      const v0 = (typeof last.v==='number' && last.v>=0.3) ? last.v : null;
-      const v1 = (typeof cur.v==='number' && cur.v>=0.3) ? cur.v : null;
+      const v0 = (typeof last.v==='number' && last.v>=0.5) ? last.v : null;
+      const v1 = (typeof cur.v==='number' && cur.v>=0.5) ? cur.v : null;
       if (dt && (v0!=null || v1!=null)) { const vAvg = v0!=null && v1!=null ? (v0+v1)/2 : (v1!=null?v1:(v0 as number)); cum += vAvg*dt; }
       cur.d = cum;
     }
@@ -47,6 +52,31 @@ function avg(nums: number[]): number | null { if (!nums.length) return null; ret
 
 function paceSecPerMiFromMetersSeconds(meters: number, sec: number): number | null {
   if (!(meters>0) || !(sec>0)) return null; const miles = (meters/1000)*0.621371; return miles>0 ? sec/miles : null;
+}
+
+// Approximate GAP: adjust speed by grade using a simple coefficient curve,
+// clamp grades to [-10%, 10%] to avoid spikes.
+function gapSecPerMi(samples: Array<{t:number; v?:number; elev?:number}>, sIdx: number, eIdx: number): number | null {
+  if (!samples || eIdx <= sIdx) return null;
+  let adjMeters = 0; let timeSec = 0;
+  for (let i = sIdx+1; i <= eIdx; i += 1) {
+    const a = samples[i-1]; const b = samples[i];
+    const dt = Math.min(60, Math.max(0, b.t - a.t));
+    if (!dt) continue; timeSec += dt;
+    const v = (typeof b.v === 'number' && b.v > 0.5) ? b.v : (typeof a.v === 'number' && a.v > 0.5 ? a.v : 0);
+    if (!v) continue;
+    const elevA = typeof a.elev==='number' ? a.elev : null;
+    const elevB = typeof b.elev==='number' ? b.elev : elevA;
+    const dElev = (elevA!=null && elevB!=null) ? (elevB - elevA) : 0;
+    const dMeters = v * dt;
+    const grade = dMeters>0 ? Math.max(-0.10, Math.min(0.10, dElev / dMeters)) : 0; // [-10%, 10%]
+    // Basic grade cost factor (positive grade slows you; negative speeds you)
+    // factor ≈ 1 + k*grade, with k ~ 9 for small grades (empirical)
+    const factor = 1 + 9 * grade;
+    const adj = dMeters / factor; // convert observed to equivalent flat meters
+    adjMeters += adj;
+  }
+  return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
 }
 
 function deriveMetersFromPlannedStep(st: any): number | null {
@@ -63,6 +93,21 @@ function deriveSecondsFromPlannedStep(st: any): number | null {
   for (const v of cands) { const n = seconds(v); if (n) return n; }
   const ts = String(st?.time||'').trim();
   if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); return m*60 + s; }
+  return null;
+}
+
+function derivePlannedPaceSecPerMi(st: any): number | null {
+  const p = Number(st?.pace_sec_per_mi);
+  if (Number.isFinite(p) && p > 0) return p;
+  const pr = Array.isArray(st?.pace_range) ? st.pace_range : null;
+  if (pr && pr.length === 2) {
+    const lo = Number(pr[0]); const hi = Number(pr[1]);
+    if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) return (lo+hi)/2;
+  }
+  // Parse text like "7:43/mi"
+  const txt = String(st?.pace || st?.target_pace || st?.paceTarget || '').trim();
+  const m = txt.match(/(\d{1,2}):(\d{2})\s*\/\s*mi/i);
+  if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec>0 ? sec : null; }
   return null;
 }
 
@@ -183,6 +228,22 @@ Deno.serve(async (req) => {
       let sIdx = info.startIdx;
       let eIdx = info.endIdx != null ? info.endIdx : Math.min(rows.length-1, info.startIdx+1);
       if (eIdx <= sIdx) eIdx = Math.min(rows.length-1, sIdx+1);
+      // For work steps, trim low-speed edges to avoid contamination from jog/pause
+      if (info.role === 'work') {
+        const plannedSecPerMi = derivePlannedPaceSecPerMi(st);
+        const plannedMps = plannedSecPerMi ? (1609.34 / plannedSecPerMi) : null;
+        const minMps = plannedMps ? plannedMps * 0.80 : null; // allow 20% slower than target
+        // compute median speed within current window
+        const speeds: number[] = [];
+        for (let j=sIdx;j<=eIdx;j+=1) { const v=rows[j].v; if (typeof v==='number' && v>0) speeds.push(v); }
+        speeds.sort((a,b)=>a-b);
+        const median = speeds.length ? speeds[Math.floor(speeds.length/2)] : null;
+        const dynMin = minMps ?? (median ? median * 0.80 : null);
+        if (dynMin != null) {
+          while (sIdx < eIdx && (!(rows[sIdx].v>0) || rows[sIdx].v < dynMin)) sIdx++;
+          while (eIdx > sIdx && (!(rows[eIdx].v>0) || rows[eIdx].v < dynMin)) eIdx--;
+        }
+      }
       const startD = rows[sIdx]?.d||0; const startT = rows[sIdx]?.t||0;
       const endD = rows[eIdx]?.d||startD; const endT = rows[eIdx]?.t||startT+1;
       const segMeters = Math.max(0, (endD) - (startD));
@@ -190,9 +251,13 @@ Deno.serve(async (req) => {
       const isExtra = info.role === 'pre_extra' || info.role === 'post_extra';
       const segSec = isExtra ? null : (segSecRaw >= 1 ? segSecRaw : null);
       const segPace = segSec != null ? paceSecPerMiFromMetersSeconds(segMeters, segSec) : null;
+      const segGap = segSec != null ? gapSecPerMi(rows, sIdx, eIdx) : null;
       const hrs: number[] = [];
+      const cads: number[] = [];
       if (!isExtra) { for (let j = sIdx; j <= eIdx; j += 1) { const h = rows[j].hr; if (typeof h === 'number') hrs.push(h); } }
+      if (!isExtra) { for (let j = sIdx; j <= eIdx; j += 1) { const c = rows[j].cad; if (typeof c === 'number') cads.push(c); } }
       const segHr = !isExtra ? avg(hrs) : null;
+      const segCad = !isExtra && cads.length ? Math.round(avg(cads)) : null;
       outIntervals.push({
         planned_step_id: st?.id ?? null,
         kind: st?.type || st?.kind || null,
@@ -205,19 +270,23 @@ Deno.serve(async (req) => {
           duration_s: segSec != null ? Math.round(segSec) : null,
           distance_m: segSec != null ? Math.round(segMeters) : null,
           avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
+          gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
           avg_hr: segHr != null ? Math.round(segHr) : null,
+          avg_cadence_spm: segCad,
         }
       });
     }
 
     const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d||0) - (rows[0].d||0)) : 0;
     const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t||0) - (rows[0].t||0)) : 0;
+    const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length-1));
     const computed = {
       intervals: outIntervals,
       overall: {
         duration_s_moving: overallSec,
         distance_m: Math.round(overallMeters),
-        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec)
+        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
+        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
       }
     };
 
