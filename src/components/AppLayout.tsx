@@ -732,6 +732,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       onDateSelect={handleDateSelect}
                       onSelectRoutine={handleSelectRoutine}
                       onOpenPlanBuilder={handleOpenPlanBuilder}
+                      currentPlans={currentPlans}
+                      completedPlans={completedPlans}
                       workouts={workouts}
                       plannedWorkouts={plannedWorkouts}
                     />
