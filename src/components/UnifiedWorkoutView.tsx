@@ -384,6 +384,44 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-4">
+            {isCompleted && (
+              <div className="mb-3 flex items-center gap-2">
+                {(!workout.planned_id && !linkedPlanned) ? (
+                  <Button variant="outline" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async()=>{
+                      try {
+                        const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
+                        if (!pid) return;
+                        await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
+                        await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
+                        try { (workout as any).planned_id = null; } catch {}
+                        setLinkedPlanned(null);
+                        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                      } catch {}
+                    }}
+                  >Unattach</Button>
+                )}
+                {assocOpen && (
+                  <AssociatePlannedDialog
+                    workout={workout}
+                    open={assocOpen}
+                    onClose={()=>setAssocOpen(false)}
+                    onAssociated={async(pid)=>{ 
+                      try { (workout as any).planned_id = pid; } catch {}
+                      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                      try {
+                        const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
+                        setLinkedPlanned(data || null);
+                      } catch {}
+                    }}
+                  />
+                )}
+              </div>
+            )}
             <MobileSummary 
               planned={isCompleted ? (linkedPlanned || null) : workout} 
               completed={isCompleted ? workout : null} 
@@ -396,36 +434,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               <div className="h-full">
                 {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                   <div className="p-4">
-                    <div className="mb-3">
-                      <Button variant="outline" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
-                    </div>
                     <CompletedTab 
                       workoutType={getWorkoutType() as 'ride' | 'run' | 'swim' | 'strength' | 'walk'}
                       workoutData={workout}
                     />
-                    {assocOpen && (
-                      <AssociatePlannedDialog
-                        workout={workout}
-                        open={assocOpen}
-                        onClose={()=>setAssocOpen(false)}
-                        onAssociated={async(pid)=>{ 
-                          try { (workout as any).planned_id = pid; } catch {}
-                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                          // Proactively load the linked planned row so Summary updates immediately
-                          try {
-                            const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
-                            setLinkedPlanned(data || null);
-                          } catch {}
-                        }}
-                      />
-                    )}
                   </div>
                 ) : workout.type === 'strength' ? (
                   <div className="p-4">
                     <h3 className="font-semibold mb-4">Strength Workout Completed</h3>
-                    <div className="mb-3">
-                      <Button variant="outline" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
-                    </div>
                     {/* Use StrengthCompletedView for strength workouts with sanitized sets */}
                     <StrengthCompletedView workoutData={{
                       ...workout,

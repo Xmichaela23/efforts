@@ -78,12 +78,12 @@ Deno.serve(async (req) => {
     const candidates = Array.isArray(plannedList) ? plannedList : [];
     if (!candidates.length) return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { 'Content-Type': 'application/json' } });
 
-    // Compute workout stats
+    // Compute workout stats (moving time and meters)
     const wSec = Number(w.moving_time ? (typeof w.moving_time==='number' ? w.moving_time : 0) : 0);
     const wMeters = Number(w.distance ? w.distance*1000 : 0);
 
     // Score candidates
-    let best: any = null; let bestScore = -1e9;
+    let best: any = null; let bestScore = -1e9; let bestDurPct: number | null = null; let bestDistPct: number | null = null;
     for (const p of candidates) {
       const totals = sumPlanned(p);
       let score = 0;
@@ -95,24 +95,28 @@ Deno.serve(async (req) => {
         if (dtMin <= 120) score += 2 - (dtMin/120);
         else score -= dtMin/120;
       }
-      // Duration ±25%
+      // Duration closeness (primary)
+      let durPct: number | null = null;
       if (totals.seconds && wSec>0) {
-        const diff = pctDiff(totals.seconds, wSec);
-        if (diff <= 0.25) score += 1.3 - (diff/0.25);
-        else score -= diff;
+        durPct = pctDiff(totals.seconds, wSec);
+        // Generous ramp: ≤50% still considered similar, ≤25% preferred
+        if (durPct <= 0.50) score += (durPct <= 0.25) ? (1.3 - (durPct/0.25)) : (0.5 - (durPct-0.25)/0.25);
+        else score -= durPct;
       }
-      // Distance tolerance (swim 10%, else 15%)
-      const tol = sport==='swim' ? 0.10 : 0.15;
+      // Distance closeness (secondary; swim stricter)
+      const tolTgt = sport==='swim' ? 0.10 : 0.50; // up to 50% for non-swim
+      let distPct: number | null = null;
       if (totals.meters && wMeters>0) {
-        const diff = pctDiff(totals.meters, wMeters);
-        if (diff <= tol) score += 1.5 - (diff/tol);
-        else score -= diff;
+        distPct = pctDiff(totals.meters, wMeters);
+        if (distPct <= tolTgt) score += (distPct <= 0.15 ? (1.5 - (distPct/0.15)) : (0.4 - Math.max(0, (distPct-0.15))/0.35));
+        else score -= distPct;
       }
-      if (score > bestScore) { bestScore = score; best = p; }
+      if (score > bestScore) { bestScore = score; best = p; bestDurPct = durPct; bestDistPct = distPct; }
     }
 
-    // Threshold to attach
-    if (!best || bestScore < 0.5) {
+    // Threshold to attach: accept if best is reasonably close on duration or distance
+    const softMatch = (bestDurPct != null && bestDurPct <= 0.50) || (bestDistPct != null && bestDistPct <= 0.50);
+    if (!best || (!softMatch && bestScore < 0.5)) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'score_too_low', bestScore }), { headers: { 'Content-Type': 'application/json' } });
     }
 
