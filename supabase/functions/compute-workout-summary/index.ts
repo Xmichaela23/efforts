@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
     // Build step boundaries; measured steps first, then fill bookends (WU/CD)
     let idx = 0; let cursorT = rows.length? rows[0].t : 0; let cursorD = rows.length? rows[0].d||0 : 0;
-    type StepInfo = { st: any; startIdx: number; endIdx: number | null; measured: boolean };
+    type StepInfo = { st: any; startIdx: number; endIdx: number | null; measured: boolean; role?: 'warmup'|'cooldown'|'pre_extra'|'post_extra'|'work' };
     const infos: StepInfo[] = [];
     for (let i=0;i<plannedSteps.length;i+=1) {
       const st = plannedSteps[i];
@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
         }
         if (idx >= rows.length) idx = rows.length - 1;
         cursorT = rows[idx].t; cursorD = rows[idx].d||cursorD;
-        infos.push({ st, startIdx, endIdx: idx, measured: true });
+        infos.push({ st, startIdx, endIdx: idx, measured: true, role: 'work' });
       } else {
         // Placeholder for bookend (no explicit duration/distance). Fill later.
         infos.push({ st, startIdx, endIdx: null, measured: false });
@@ -133,6 +133,7 @@ Deno.serve(async (req) => {
       // Leading bookends up to first measured start
       for (let i=0;i<firstMeasured;i+=1) {
         infos[i].endIdx = Math.max(infos[i].startIdx+1, infos[firstMeasured].startIdx);
+        infos[i].role = (i === 0) ? 'warmup' : 'pre_extra';
       }
     }
     if (infos.length && lastMeasured >=0 && lastMeasured < infos.length-1) {
@@ -140,6 +141,7 @@ Deno.serve(async (req) => {
       for (let i=lastMeasured+1;i<infos.length;i+=1) {
         infos[i].startIdx = infos[lastMeasured].endIdx ?? infos[i].startIdx;
         infos[i].endIdx = rows.length-1;
+        infos[i].role = (i === infos.length-1) ? 'cooldown' : 'post_extra';
       }
     }
 
@@ -153,11 +155,13 @@ Deno.serve(async (req) => {
       const startD = rows[sIdx]?.d||0; const startT = rows[sIdx]?.t||0;
       const endD = rows[eIdx]?.d||startD; const endT = rows[eIdx]?.t||startT+1;
       const segMeters = Math.max(0, (endD) - (startD));
-      const segSec = Math.max(1, (endT) - (startT));
-      const segPace = paceSecPerMiFromMetersSeconds(segMeters, segSec);
+      const segSecRaw = Math.max(0, (endT) - (startT));
+      const isExtra = info.role === 'pre_extra' || info.role === 'post_extra';
+      const segSec = isExtra ? null : (segSecRaw >= 1 ? segSecRaw : null);
+      const segPace = segSec != null ? paceSecPerMiFromMetersSeconds(segMeters, segSec) : null;
       const hrs: number[] = [];
-      for (let j = sIdx; j <= eIdx; j += 1) { const h = rows[j].hr; if (typeof h === 'number') hrs.push(h); }
-      const segHr = avg(hrs);
+      if (!isExtra) { for (let j = sIdx; j <= eIdx; j += 1) { const h = rows[j].hr; if (typeof h === 'number') hrs.push(h); } }
+      const segHr = !isExtra ? avg(hrs) : null;
       outIntervals.push({
         planned_step_id: st?.id ?? null,
         kind: st?.type || st?.kind || null,
@@ -166,8 +170,8 @@ Deno.serve(async (req) => {
           distance_m: deriveMetersFromPlannedStep(st)
         },
         executed: {
-          duration_s: Math.round(segSec),
-          distance_m: Math.round(segMeters),
+          duration_s: segSec != null ? Math.round(segSec) : null,
+          distance_m: segSec != null ? Math.round(segMeters) : null,
           avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
           avg_hr: segHr != null ? Math.round(segHr) : null,
         }
