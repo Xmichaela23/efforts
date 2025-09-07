@@ -279,7 +279,34 @@ Deno.serve(async (req) => {
 
     const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d||0) - (rows[0].d||0)) : 0;
     const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t||0) - (rows[0].t||0)) : 0;
-    const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length-1));
+    // Adjust GAP with asymmetric uphill/downhill factors to avoid unrealistic speed-ups
+    const overallGap = (() => {
+      if (!rows || rows.length < 2) return null as number | null;
+      let adjMeters = 0; let timeSec = 0;
+      for (let i = 1; i < rows.length; i += 1) {
+        const a = rows[i-1]; const b = rows[i];
+        const dt = Math.min(60, Math.max(0, (b.t || b.ts || 0) - (a.t || a.ts || 0)));
+        if (!dt) continue; timeSec += dt;
+        const v = (typeof b.v === 'number' && b.v > 0.5) ? b.v : (typeof a.v === 'number' && a.v > 0.5 ? a.v : 0);
+        if (!v) continue;
+        const elevA = typeof (a as any).elev === 'number' ? (a as any).elev : undefined;
+        const elevB = typeof (b as any).elev === 'number' ? (b as any).elev : elevA;
+        const dElev = (elevA!=null && elevB!=null) ? (Number(elevB) - Number(elevA)) : 0;
+        const dMeters = v * dt;
+        const gRaw = dMeters>0 ? (dElev / dMeters) : 0; // slope
+        const grade = Math.max(-0.10, Math.min(0.10, gRaw));
+        // Uphill penalty strong, downhill benefit modest
+        const k = grade >= 0 ? 9 : 3;
+        const factor = 1 + k * grade;
+        const adj = dMeters / Math.max(0.2, factor);
+        adjMeters += adj;
+      }
+      return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
+    })();
+
+    // Track max instantaneous speed for max pace metric
+    let maxV = 0;
+    for (let i=0;i<rows.length;i+=1){ const v = rows[i].v; if (typeof v==='number' && v>maxV) maxV = v; }
     // Overall cadence rollups
     const overallCad = (() => {
       const cads: number[] = [];
@@ -305,9 +332,16 @@ Deno.serve(async (req) => {
       }
     };
 
+    const updates: any = { computed };
+    if (overallCad.avg != null) updates.avg_cadence = overallCad.avg;
+    if (overallCad.max != null) updates.max_cadence = overallCad.max;
+    if (maxV && Number.isFinite(maxV) && maxV > 0) {
+      // store max_pace as seconds per km to match Strava path
+      updates.max_pace = Math.round(1000 / maxV);
+    }
     await supabase
       .from('workouts')
-      .update({ computed, avg_cadence: overallCad.avg ?? undefined, max_cadence: overallCad.max ?? undefined })
+      .update(updates)
       .eq('id', workout_id);
 
     return new Response(JSON.stringify({ success: true, computed }), { headers: { 'Content-Type': 'application/json' } });

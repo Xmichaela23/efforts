@@ -1314,13 +1314,32 @@ const formatPace = (paceValue: any): string => {
         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {(workoutType === 'run' || workoutType === 'walk')
             ? (() => {
-                const raw = workoutData.metrics?.max_pace || workoutData.max_pace;
-                const n = Number(raw);
-                if (!Number.isFinite(n) || n <= 0) return 'N/A';
-                const secPerKm = n < 30 ? n * 60 : n;
-                const secPerMile = secPerKm * 1.60934;
-                if (workoutType === 'walk' && secPerMile < 360) return 'N/A'; // guard for walk/hike
-                return formatPace(raw);
+                // Preferred: stored max_pace (sec/km). Fallback: derive from samples.
+                const stored = workoutData.metrics?.max_pace ?? workoutData.max_pace;
+                let secPerKm: number | null = null;
+                if (Number.isFinite(stored) && Number(stored) > 0) {
+                  const n = Number(stored);
+                  secPerKm = n < 30 ? n * 60 : n; // tolerate minutes value
+                } else {
+                  try {
+                    const samples = Array.isArray((workoutData as any)?.sensor_data?.samples)
+                      ? (workoutData as any).sensor_data.samples
+                      : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
+                    let maxMps = 0;
+                    for (let i = 0; i < samples.length; i += 1) {
+                      const s: any = samples[i] || {};
+                      const v = (typeof s.speedMetersPerSecond === 'number' ? s.speedMetersPerSecond
+                        : (typeof s.v === 'number' ? s.v
+                        : (typeof s.speed === 'number' ? s.speed : NaN)));
+                      if (Number.isFinite(v) && v > maxMps) maxMps = v;
+                    }
+                    if (maxMps > 0.5) secPerKm = 1000 / maxMps;
+                  } catch {}
+                }
+                if (!Number.isFinite(secPerKm) || (secPerKm as number) <= 0) return 'N/A';
+                const secPerMile = (secPerKm as number) * 1.60934;
+                if (workoutType === 'walk' && secPerMile < 360) return 'N/A';
+                return formatPace(secPerKm);
               })()
             : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
         </div>
