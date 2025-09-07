@@ -69,13 +69,15 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         if (error) throw error;
         if (cancelled) return;
         const safeAll = Array.isArray(data) ? data : [];
-        // Filter out optional-tagged planned rows (they appear only after activation when tag is removed)
+        // Filter out completed planned rows and optional-tagged rows
         const safe = safeAll.filter((w: any) => {
           const raw = (w as any).tags;
           let tags: any[] = [];
           if (Array.isArray(raw)) tags = raw;
           else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
-          return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+          const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+          const isCompleted = String((w as any).workout_status || '').toLowerCase() === 'completed';
+          return !isOptional && !isCompleted;
         });
         setRows(safe);
         const payload = { ts: Date.now(), rows: safe };
