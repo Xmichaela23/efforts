@@ -332,17 +332,37 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   // No animation: render values immediately on association
 
-  // Planned pace extractor (tight label)
+  // Planned pace extractor (tight label) - prefer computed pace_sec_per_mi or pace_range
   const plannedPaceFor = (st: any): string => {
     try {
       const direct = st.paceTarget || st.target_pace || st.pace;
       if (direct && String(direct).includes('/')) return String(direct);
-      if (typeof st.distanceMeters === 'number' && st.distanceMeters > 0 && typeof st.duration === 'number' && st.duration > 0) {
-        const miles = st.distanceMeters / 1609.34;
-        const paceMinPerMile = (st.duration / 60) / miles;
-        const m = Math.floor(paceMinPerMile);
-        const s = Math.round((paceMinPerMile - m) * 60);
+      const p = Number(st.pace_sec_per_mi);
+      if (Number.isFinite(p) && p > 0) {
+        const m = Math.floor(p / 60);
+        const s = Math.round(p % 60);
         return `${m}:${String(s).padStart(2,'0')}/mi`;
+      }
+      // If pace_range is [low, high] seconds per mile
+      if (Array.isArray(st.pace_range) && st.pace_range.length === 2) {
+        const lo = Number(st.pace_range[0]);
+        const hi = Number(st.pace_range[1]);
+        if (Number.isFinite(lo) && Number.isFinite(hi) && lo > 0 && hi > 0) {
+          const fm = (sec:number)=>`${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,'0')}`;
+          return `${fm(lo)}–${fm(hi)}/mi`;
+        }
+      }
+      // Derive from distance+time if provided
+      const meters = typeof st.distanceMeters === 'number' ? st.distanceMeters : undefined;
+      const sec = typeof st.duration === 'number' ? st.duration : (typeof st.seconds === 'number' ? st.seconds : undefined);
+      if (meters && sec) {
+        const miles = meters / 1609.34;
+        if (miles > 0) {
+          const paceMinPerMile = (sec / 60) / miles;
+          const m = Math.floor(paceMinPerMile);
+          const s = Math.round((paceMinPerMile - m) * 60);
+          return `${m}:${String(s).padStart(2,'0')}/mi`;
+        }
       }
     } catch {}
     return '—';
@@ -358,12 +378,28 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const startCum = cursorCum;
     let endIdx = startIdx + 1;
 
-    if (typeof st.distanceMeters === 'number' && st.distanceMeters > 0) {
-      const targetCum = startCum + st.distanceMeters;
+    // Resolve planned distance in meters from various shapes (computed steps, intervals)
+    const stDistanceMeters = (() => {
+      const dm = Number(st.distanceMeters);
+      if (Number.isFinite(dm) && dm > 0) return dm;
+      const ov = Number(st.original_val);
+      const ou = String(st.original_units || '').toLowerCase();
+      if (Number.isFinite(ov) && ov > 0) {
+        if (ou === 'mi') return ov * 1609.34;
+        if (ou === 'm') return ov;
+        if (ou === 'yd' || ou === 'yard' || ou === 'yards') return ov * 0.9144;
+      }
+      return NaN;
+    })();
+
+    if (Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) {
+      const targetCum = startCum + stDistanceMeters;
       while (endIdx < rows.length && (rows[endIdx].cumMeters || 0) < targetCum) endIdx += 1;
-    } else if (typeof st.duration === 'number' && st.duration > 0) {
+    } else {
+      // Time-controlled step: prefer st.seconds, else st.duration
+      const dur = Number.isFinite(Number(st.seconds)) && Number(st.seconds) > 0 ? Number(st.seconds) : (Number.isFinite(Number(st.duration)) ? Number(st.duration) : 0);
       const startT = rows[startIdx].t;
-      const targetT = startT + st.duration;
+      const targetT = startT + (dur > 0 ? dur : 0);
       while (endIdx < rows.length && rows[endIdx].t < targetT) endIdx += 1;
     }
     if (endIdx >= rows.length) endIdx = rows.length - 1;
