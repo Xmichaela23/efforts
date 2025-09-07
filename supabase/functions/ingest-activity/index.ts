@@ -106,6 +106,50 @@ function mapStravaToWorkout(activity: any, userId: string) {
   };
 }
 
+// ---- GAP helper (smoothed elev, moving-only, Minetti) ----
+function computeGAPSecPerMi(
+  normalized: Array<{ ts?: number; t: number; v?: number; d?: number; elev?: number }>
+): number | null {
+  if (!normalized?.length) return null;
+  // EMA smoothing for elevation (~10–15s at 1Hz)
+  let ema: number | null = null;
+  const alpha = 0.1;
+  const elevSm: number[] = new Array(normalized.length);
+  for (let i = 0; i < normalized.length; i++) {
+    const e = (typeof normalized[i].elev === 'number' && Number.isFinite(normalized[i].elev as number)) ? (normalized[i].elev as number) : ema;
+    ema = e == null ? ema : (ema == null ? e : (alpha * e + (1 - alpha) * ema));
+    elevSm[i] = ema ?? 0;
+  }
+  // Minetti energy cost (J/kg/m), clamp grade to ±30%
+  const minetti = (g: number) => {
+    const x = Math.max(-0.30, Math.min(0.30, g));
+    return (((155.4*x - 30.4)*x - 43.3)*x + 46.3)*x*x + 19.5*x + 3.6;
+  };
+  let eqMeters = 0, moveSec = 0;
+  for (let i = 1; i < normalized.length; i++) {
+    const a = normalized[i - 1], b = normalized[i];
+    const dt = Math.min(60, Math.max(0, Number((b.ts ?? b.t)) - Number((a.ts ?? a.t))));
+    if (!dt) continue;
+    // speed: prefer direct v; else fallback to distance delta
+    let v = Number.isFinite(b.v) ? (b.v as number) : NaN;
+    if (!Number.isFinite(v) && Number.isFinite(a.d) && Number.isFinite(b.d)) {
+      const dd = (b.d as number) - (a.d as number);
+      v = dd > 0 ? dd / dt : NaN;
+    }
+    if (!Number.isFinite(v) || v < 0.5) continue; // moving-only
+    moveSec += dt;
+    const de = (elevSm[i] - elevSm[i - 1]) || 0;
+    const dd = v * dt;
+    const g  = dd > 0 ? (de / dd) : 0;
+    // Equivalent flat speed using Minetti cost ratio
+    const v_eq = v * (minetti(g) / 3.6); // 3.6 = flat cost C(0)
+    eqMeters += v_eq * dt;
+  }
+  if (!(eqMeters > 0) || !(moveSec > 0)) return null;
+  const miles = eqMeters / 1609.344;
+  return miles > 0 ? Math.round(moveSec / miles) : null; // sec/mi
+}
+
 // Compute executed intervals and overall metrics suitable for UI consumption
 function computeComputedFromActivity(activity: any): any | null {
   try {
@@ -214,33 +258,8 @@ function computeComputedFromActivity(activity: any): any | null {
       return { avg, max };
     })();
 
-    // GAP overall (grade-adjusted pace)
-    const gapPaceSecPerMi = (() => {
-      const paceSecPerMiFromMetersSeconds = (meters: number, sec: number): number | null => {
-        if (!(meters > 0) || !(sec > 0)) return null;
-        const miles = (meters / 1000) * 0.621371;
-        return miles > 0 ? sec / miles : null;
-      };
-      let adjMeters = 0; let timeSec = 0;
-      for (let i = 1; i < normalized.length; i += 1) {
-        const a = normalized[i - 1];
-        const b = normalized[i];
-        const dt = Math.min(60, Math.max(0, (b.ts || b.t) - (a.ts || a.t)));
-        if (!dt) continue;
-        timeSec += dt;
-        const v = (typeof b.v === 'number' && b.v > 0.5) ? b.v : (typeof a.v === 'number' && a.v > 0.5 ? a.v : 0);
-        if (!v) continue;
-        const elevA = typeof a.elev === 'number' ? a.elev : null;
-        const elevB = typeof b.elev === 'number' ? b.elev : elevA;
-        const dElev = (elevA != null && elevB != null) ? (elevB - elevA) : 0;
-        const dMeters = v * dt;
-        const grade = dMeters > 0 ? Math.max(-0.10, Math.min(0.10, dElev / dMeters)) : 0;
-        const factor = 1 + 9 * grade;
-        const adj = dMeters / factor;
-        adjMeters += adj;
-      }
-      return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
-    })();
+    // GAP overall (grade-adjusted pace) — Minetti, moving-only, smoothed elevation
+    const gapPaceSecPerMi = computeGAPSecPerMi(normalized);
 
     // Segment by laps if provided
     const laps: any[] = Array.isArray(activity?.laps) ? activity.laps : [];
@@ -413,6 +432,11 @@ Deno.serve(async (req) => {
       const wid = justUpserted?.id;
       if (wid) {
         await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: wid }) });
+        // Ensure computed summary (GAP, cadence, intervals) is generated with latest server logic
+        try {
+          const sumUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
+          await fetch(sumUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: wid }) });
+        } catch {}
       }
     } catch {}
 

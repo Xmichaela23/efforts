@@ -107,5 +107,39 @@ export function usePlannedRange(fromISO: string, toISO: string) {
     return () => window.removeEventListener('planned:invalidate', handler);
   }, [fromISO, toISO]);
 
+  // Realtime: invalidate when planned_workouts change for this user
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let active = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user || !active) return;
+        const invalidate = async () => {
+          try {
+            const key = cacheKey(user.id, fromISO, toISO);
+            memoryCache.delete(key);
+            localStorage.removeItem(`plannedRange:${key}`);
+          } catch {}
+          setInvalidateTs(Date.now());
+        };
+        channel = supabase.channel(`planned-range-${user.id}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'planned_workouts', filter: `user_id=eq.${user.id}` }, async (payload) => {
+            // If the changed row is inside our date window, invalidate
+            try {
+              const d = String((payload.new as any)?.date || (payload.old as any)?.date || '').slice(0,10);
+              if (d && d >= fromISO && d <= toISO) await invalidate();
+              else await invalidate(); // conservative: invalidate anyway
+            } catch { await invalidate(); }
+          })
+          .subscribe();
+      } catch {}
+    })();
+    return () => {
+      active = false;
+      try { channel?.unsubscribe(); } catch {}
+    };
+  }, [fromISO, toISO]);
+
   return { rows, loading, error };
 }
