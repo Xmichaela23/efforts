@@ -202,16 +202,8 @@ export default function WorkoutCalendar({
     // Build lookup of days/types that actually have a completed workout row this week
     // We only treat a planned row as completed if there is a matching completed workout
     const wkDb = Array.isArray(workoutsWeekRows) ? workoutsWeekRows : [];
-    const wkStateProvider = (Array.isArray(workouts) ? workouts : [])
-      .filter((w: any) => {
-        if (!w || !w.date) return false;
-        const id = String(w.id || '');
-        const isProvider = id.startsWith('garmin_') || id.startsWith('strava_') || !!w.isGarminImported || !!w.strava_data || !!w.garmin_activity_id || !!w.strava_activity_id;
-        if (!isProvider) return false;
-        return w.date >= fromISO && w.date <= toISO;
-      })
-      .map((w: any) => ({ ...w, provider: deriveProvider(w) }));
-    const wkCombined = [...wkDb, ...wkStateProvider];
+    // Avoid double-counting: rely solely on range query results for completed workouts this week.
+    const wkCombined = [...wkDb];
     const completedWorkoutKeys = new Set(
       wkCombined
         .filter((w:any)=> String(w?.workout_status||'').toLowerCase()==='completed')
@@ -227,7 +219,7 @@ export default function WorkoutCalendar({
 
     // If a planned row has been marked completed for the same date+type (and confirmed by completedWorkoutKeys),
     // suppress the generic workout DB row to avoid duplicate "ST ✓" labels.
-    const wkCombinedFiltered = [...wkDb, ...wkStateProvider].filter((w: any) => {
+    const wkCombinedFiltered = [...wkCombined].filter((w: any) => {
       try {
         const key = `${String(w.date)}|${String(w.type || w.workout_type || '').toLowerCase()}`;
         return !completedPlannedKeys.has(key);
@@ -288,7 +280,7 @@ export default function WorkoutCalendar({
         } as any;
       });
 
-    // Dedupe: same day + type + ~same miles → keep best provider
+    // Dedupe: same day + type + ~same miles → keep a single entry
     const byDay = new Map<string, any[]>();
     for (const ev of raw) {
       const key = String(ev.date);
@@ -301,13 +293,16 @@ export default function WorkoutCalendar({
       const buckets = new Map<string, any>();
       for (const ev of list) {
         const isPlanned = String(ev.provider || '').toLowerCase() === 'workouts';
-        // Do not merge distinct planned rows; key them by id. Still dedupe provider-origin events.
-        const bKey = isPlanned ? `planned|${String(ev._src?.id || ev.href || '')}` : `${ev._sigType}|${ev._sigMiles}`;
+        // If both a planned and a completed of same type exist, collapse to one bucket keyed by type+miles
+        const bKey = `${ev._sigType}|${ev._sigMiles}`;
         const existing = buckets.get(bKey);
         if (!existing) {
           buckets.set(bKey, ev);
         } else {
-          const keep = providerPriority(ev._src) >= providerPriority(existing._src) ? ev : existing;
+          // Prefer completed over planned; otherwise keep the first
+          const evCompleted = /✓$/.test(ev.label);
+          const exCompleted = /✓$/.test(existing.label);
+          const keep = (evCompleted && !exCompleted) ? ev : existing;
           buckets.set(bKey, keep);
         }
       }

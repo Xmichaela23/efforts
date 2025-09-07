@@ -89,7 +89,7 @@ function mapGarminToWorkout(activity: any, userId: string) {
   const dateIso = startIso ? startIso.split('T')[0] : null;
   const typeKey = (activity.activity_type || activity.summary?.activityType?.typeKey || '').toLowerCase();
   const type = typeKey.includes('run') ? 'run'
-    : (typeKey.includes('bike') || typeKey.includes('cycl') || typeKey.includes('ride')) ? 'ride'
+    : (typeKey.includes('bike') || typeKey.includes('bik') || typeKey.includes('cycl') || typeKey.includes('ride')) ? 'ride'
     : typeKey.includes('swim') ? 'swim'
     : typeKey.includes('walk') ? 'walk'
     : 'strength';
