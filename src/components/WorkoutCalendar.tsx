@@ -353,7 +353,7 @@ export default function WorkoutCalendar({
     try {
       const activePlan = Array.isArray(currentPlans) && currentPlans.length > 0 ? currentPlans[0] : null;
       if (!activePlan || !activePlan.id) return;
-      // Find Week 1 anchor
+      // Try to find Week 1 anchor from existing rows
       const { data: w1 } = await supabase
         .from('planned_workouts')
         .select('date, day_number')
@@ -361,15 +361,43 @@ export default function WorkoutCalendar({
         .eq('week_number', 1)
         .order('day_number', { ascending: true })
         .limit(1);
-      if (!Array.isArray(w1) || w1.length === 0) return;
-      const anchor = w1[0] as any;
-      const w1Start = computeWeek1Start(String(anchor.date), Number(anchor.day_number));
-      const tgtStart = startOfWeek(d);
-      const diffDays = Math.round((resolveDate(toDateOnlyString(tgtStart)).getTime() - resolveDate(toDateOnlyString(w1Start)).getTime()) / (1000 * 60 * 60 * 24));
-      const weekNumber = Math.floor(diffDays / 7) + 1;
-      if (!Number.isFinite(weekNumber) || weekNumber < 1) return;
+
+      let weekNumber: number | null = null;
+      if (Array.isArray(w1) && w1.length > 0) {
+        const anchor = w1[0] as any;
+        const w1Start = computeWeek1Start(String(anchor.date), Number(anchor.day_number));
+        const tgtStart = startOfWeek(d);
+        const diffDays = Math.round((resolveDate(toDateOnlyString(tgtStart)).getTime() - resolveDate(toDateOnlyString(w1Start)).getTime()) / (1000 * 60 * 60 * 24));
+        weekNumber = Math.floor(diffDays / 7) + 1;
+      } else {
+        // Fallback: derive Week 1 Monday from plan.config.user_selected_start_date
+        try {
+          const { data: planRow } = await supabase
+            .from('plans')
+            .select('duration_weeks, config')
+            .eq('id', activePlan.id)
+            .maybeSingle();
+          const sel = String((planRow as any)?.config?.user_selected_start_date || '').slice(0, 10);
+          let startMonday: Date;
+          if (sel) {
+            const parts = sel.split('-').map((x) => parseInt(x, 10));
+            const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
+            startMonday = startOfWeek(base);
+          } else {
+            // As a last resort, anchor to the Monday of today
+            startMonday = startOfWeek(new Date());
+          }
+          const tgtStart = startOfWeek(d);
+          const diffDays = Math.round((resolveDate(toDateOnlyString(tgtStart)).getTime() - resolveDate(toDateOnlyString(startMonday)).getTime()) / (1000 * 60 * 60 * 24));
+          weekNumber = Math.floor(diffDays / 7) + 1;
+          const dur = Number((planRow as any)?.duration_weeks || 0);
+          if (Number.isFinite(dur) && dur > 0) weekNumber = Math.max(1, Math.min(weekNumber || 1, dur));
+        } catch {}
+      }
+
+      if (!Number.isFinite(weekNumber as number) || (weekNumber as number) < 1) return;
       const mod = await import('@/services/plans/ensureWeekMaterialized');
-      await mod.ensureWeekMaterialized(String(activePlan.id), weekNumber);
+      await mod.ensureWeekMaterialized(String(activePlan.id), Number(weekNumber));
     } catch {}
   };
 
