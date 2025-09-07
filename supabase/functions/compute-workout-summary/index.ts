@@ -99,35 +99,64 @@ Deno.serve(async (req) => {
     // Build planned steps
     const plannedSteps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
 
-    // Cursor across executed rows; greedily match distance else time; treat first and last unmatched as WU/CD
+    // Build step boundaries; measured steps first, then fill bookends (WU/CD)
     let idx = 0; let cursorT = rows.length? rows[0].t : 0; let cursorD = rows.length? rows[0].d||0 : 0;
-    const outIntervals: any[] = [];
+    type StepInfo = { st: any; startIdx: number; endIdx: number | null; measured: boolean };
+    const infos: StepInfo[] = [];
     for (let i=0;i<plannedSteps.length;i+=1) {
       const st = plannedSteps[i];
       const startIdx = idx; const startT = cursorT; const startD = cursorD;
-      // Prefer distance-based segmentation
       const targetMeters = deriveMetersFromPlannedStep(st);
-      if (targetMeters && targetMeters>0) {
-        const goalD = startD + targetMeters;
-        while (idx < rows.length && (rows[idx].d||0) < goalD) idx += 1;
-      } else {
-        const dur = deriveSecondsFromPlannedStep(st);
-        if (dur && dur>0) {
-          const goalT = startT + dur;
+      const targetSeconds = deriveSecondsFromPlannedStep(st);
+      if ((targetMeters && targetMeters>0) || (targetSeconds && targetSeconds>0)) {
+        if (targetMeters && targetMeters>0) {
+          const goalD = startD + targetMeters;
+          while (idx < rows.length && (rows[idx].d||0) < goalD) idx += 1;
+        } else if (targetSeconds && targetSeconds>0) {
+          const goalT = startT + targetSeconds;
           while (idx < rows.length && (rows[idx].t||0) < goalT) idx += 1;
-        } else {
-          // Bookend (WU/CD): for now, allocate minimal slice until next work block; fallback to 0
-          // Here we give a tiny slice if empty to keep alignment shape
-          idx = Math.min(rows.length-1, Math.max(startIdx+1, idx+1));
         }
+        if (idx >= rows.length) idx = rows.length - 1;
+        cursorT = rows[idx].t; cursorD = rows[idx].d||cursorD;
+        infos.push({ st, startIdx, endIdx: idx, measured: true });
+      } else {
+        // Placeholder for bookend (no explicit duration/distance). Fill later.
+        infos.push({ st, startIdx, endIdx: null, measured: false });
+        // Do NOT advance idx here; the next measured step will define the boundary
       }
-      if (idx >= rows.length) idx = rows.length - 1;
-      cursorT = rows[idx].t; cursorD = rows[idx].d||cursorD;
-      const segMeters = Math.max(0, (rows[idx].d||0) - startD);
-      const segSec = Math.max(1, (rows[idx].t||0) - startT);
+    }
+
+    // Fill first/last bookends using measured neighbors
+    const firstMeasured = infos.findIndex(x => x.measured);
+    const lastMeasured = (() => { for (let i=infos.length-1;i>=0;i-=1){ if (infos[i].measured) return i; } return -1; })();
+    if (infos.length && firstMeasured > 0) {
+      // Leading bookends up to first measured start
+      for (let i=0;i<firstMeasured;i+=1) {
+        infos[i].endIdx = Math.max(infos[i].startIdx+1, infos[firstMeasured].startIdx);
+      }
+    }
+    if (infos.length && lastMeasured >=0 && lastMeasured < infos.length-1) {
+      // Trailing bookends from last measured end to end of workout
+      for (let i=lastMeasured+1;i<infos.length;i+=1) {
+        infos[i].startIdx = infos[lastMeasured].endIdx ?? infos[i].startIdx;
+        infos[i].endIdx = rows.length-1;
+      }
+    }
+
+    // Materialize intervals
+    const outIntervals: any[] = [];
+    for (const info of infos) {
+      const st = info.st;
+      let sIdx = info.startIdx;
+      let eIdx = info.endIdx != null ? info.endIdx : Math.min(rows.length-1, info.startIdx+1);
+      if (eIdx <= sIdx) eIdx = Math.min(rows.length-1, sIdx+1);
+      const startD = rows[sIdx]?.d||0; const startT = rows[sIdx]?.t||0;
+      const endD = rows[eIdx]?.d||startD; const endT = rows[eIdx]?.t||startT+1;
+      const segMeters = Math.max(0, (endD) - (startD));
+      const segSec = Math.max(1, (endT) - (startT));
       const segPace = paceSecPerMiFromMetersSeconds(segMeters, segSec);
       const hrs: number[] = [];
-      for (let j = startIdx; j <= idx; j += 1) { const h = rows[j].hr; if (typeof h === 'number') hrs.push(h); }
+      for (let j = sIdx; j <= eIdx; j += 1) { const h = rows[j].hr; if (typeof h === 'number') hrs.push(h); }
       const segHr = avg(hrs);
       outIntervals.push({
         planned_step_id: st?.id ?? null,

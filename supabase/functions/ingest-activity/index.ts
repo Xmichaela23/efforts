@@ -320,6 +320,22 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
+    // Fire-and-forget: auto-attach to planned and compute summary for zero-touch UX
+    try {
+      const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/auto-attach-planned`;
+      const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+      const { data: justUpserted } = await supabase
+        .from('workouts')
+        .select('id')
+        .eq('user_id', row.user_id)
+        .eq(onConflict!.includes('garmin') ? 'garmin_activity_id' : 'strava_activity_id', onConflict!.includes('garmin') ? row.garmin_activity_id : row.strava_activity_id)
+        .maybeSingle();
+      const wid = justUpserted?.id;
+      if (wid) {
+        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: wid }) });
+      }
+    } catch {}
+
     return new Response(JSON.stringify({ success: true }), { headers: { ...cors, 'Content-Type': 'application/json' } });
   } catch (err) {
     return new Response(JSON.stringify({ success: false, error: `${err}` }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });

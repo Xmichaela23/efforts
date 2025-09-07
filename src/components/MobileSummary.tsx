@@ -380,6 +380,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Planned pace extractor (tight label) - prefer computed pace_sec_per_mi or pace_range
   const plannedPaceFor = (st: any): string => {
     try {
+      const kindStr = String(st.kind || st.type || st.name || '').toLowerCase();
+      const isWarm = /warm|wu/.test(kindStr);
+      const isCool = /cool|cd/.test(kindStr);
+      if (isWarm) return 'Warm‑up';
+      if (isCool) return 'Cool‑down';
       const direct = st.paceTarget || st.target_pace || st.pace;
       if (direct && String(direct).includes('/')) return String(direct);
       const p = Number(st.pace_sec_per_mi);
@@ -397,7 +402,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           return `${fm(lo)}–${fm(hi)}/mi`;
         }
       }
-      // Derive from distance+time if provided
+      // Derive from distance+time only for explicit work/interval steps (avoid fabricating WU/CD paces)
+      const isWorky = /(work|interval|rep|effort)/.test(kindStr);
+      if (!isWorky) return '—';
       const meters = (() => {
         if (Number.isFinite(Number(st.distanceMeters))) return Number(st.distanceMeters);
         if (Number.isFinite(Number(st.distance_m))) return Number(st.distance_m);
