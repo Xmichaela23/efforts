@@ -153,8 +153,10 @@ function accumulate(completed: any) {
         // Integrate speed when GPS and provider cumulative are missing
         const dt = Number(s.t) - Number(prev.t);
         const validDt = Number.isFinite(dt) && dt > 0 && dt < 60 ? dt : 0;
-        const v0 = typeof (prev as any).speedMps === 'number' && Number.isFinite((prev as any).speedMps) ? (prev as any).speedMps : null;
-        const v1 = typeof (s as any).speedMps === 'number' && Number.isFinite((s as any).speedMps) ? (s as any).speedMps : null;
+        const rawV0 = typeof (prev as any).speedMps === 'number' && Number.isFinite((prev as any).speedMps) ? (prev as any).speedMps : null;
+        const rawV1 = typeof (s as any).speedMps === 'number' && Number.isFinite((s as any).speedMps) ? (s as any).speedMps : null;
+        const v0 = rawV0 != null && rawV0 >= 0.3 ? rawV0 : null; // ignore stationary/near-stationary
+        const v1 = rawV1 != null && rawV1 >= 0.3 ? rawV1 : null;
         if (validDt && (v0 != null || v1 != null)) {
           const v = v0 != null && v1 != null ? (v0 + v1) / 2 : (v1 != null ? v1 : (v0 as number));
           cum += v * validDt;
@@ -477,7 +479,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const miles = km * 0.621371;
     const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
     // Fallback: compute from avg speed when distance integration is unavailable
-    const speedVals = seg.map(s => (typeof (s as any).speedMps === 'number' ? (s as any).speedMps : NaN)).filter(n => Number.isFinite(n));
+    const speedVals = seg
+      .map(s => (typeof (s as any).speedMps === 'number' ? (s as any).speedMps : NaN))
+      .filter(n => Number.isFinite(n) && n >= 0.3);
     const avgSpeedMps = speedVals.length ? (speedVals.reduce((a,b)=>a+b,0)/speedVals.length) : null;
 
     if (isRunOrWalk) {
