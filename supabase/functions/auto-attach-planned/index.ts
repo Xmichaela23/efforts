@@ -53,9 +53,16 @@ Deno.serve(async (req) => {
       .maybeSingle();
     if (!w) return new Response(JSON.stringify({ error: 'workout not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
 
-    // Already linked
+    // Already linked → recompute summary and return
     // @ts-ignore
-    if (w.planned_id) return new Response(JSON.stringify({ success: true, attached: false, reason: 'already_linked' }), { headers: { 'Content-Type': 'application/json' } });
+    if (w.planned_id) {
+      try {
+        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        await fetch(fnUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: w.id }) });
+      } catch {}
+      return new Response(JSON.stringify({ success: true, attached: false, recomputed: true, reason: 'already_linked' }), { headers: { 'Content-Type': 'application/json' } });
+    }
 
     const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
 

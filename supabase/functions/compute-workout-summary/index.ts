@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
 
     // Build step boundaries; measured steps first, then fill bookends (WU/CD)
     let idx = 0; let cursorT = rows.length? rows[0].t : 0; let cursorD = rows.length? rows[0].d||0 : 0;
-    type StepInfo = { st: any; startIdx: number; endIdx: number | null; measured: boolean; role?: 'warmup'|'cooldown'|'pre_extra'|'post_extra'|'work' };
+    type StepInfo = { st: any; startIdx: number; endIdx: number | null; measured: boolean; role?: 'warmup'|'cooldown'|'pre_extra'|'post_extra'|'work'|'recovery' };
     const infos: StepInfo[] = [];
     for (let i=0;i<plannedSteps.length;i+=1) {
       const st = plannedSteps[i];
@@ -145,6 +145,37 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Fill interior unmeasured groups as recoveries between measured neighbors
+    if (firstMeasured >= 0 && lastMeasured >= 0) {
+      let i = firstMeasured;
+      while (i <= lastMeasured) {
+        if (!infos[i].measured) {
+          // find group [i..j-1] of unmeasured
+          let j = i;
+          while (j <= lastMeasured && !infos[j].measured) j += 1;
+          const prev = infos[i-1];
+          const next = infos[j];
+          if (prev && next && prev.measured && next.measured) {
+            const totalStart = prev.endIdx ?? prev.startIdx;
+            const totalEnd = next.startIdx;
+            const width = Math.max(0, totalEnd - totalStart);
+            const slots = j - i;
+            const stepWidth = slots>0 ? Math.max(1, Math.floor(width / slots)) : width;
+            for (let k=0;k<slots;k+=1) {
+              const s = totalStart + stepWidth*k;
+              const e = (k === slots-1) ? totalEnd : Math.min(totalEnd, s + stepWidth);
+              infos[i+k].startIdx = Math.min(s, totalEnd);
+              infos[i+k].endIdx = Math.max(infos[i+k].startIdx+1, e);
+              infos[i+k].role = 'recovery';
+            }
+          }
+          i = j;
+        } else {
+          i += 1;
+        }
+      }
+    }
+
     // Materialize intervals
     const outIntervals: any[] = [];
     for (const info of infos) {
@@ -165,6 +196,7 @@ Deno.serve(async (req) => {
       outIntervals.push({
         planned_step_id: st?.id ?? null,
         kind: st?.type || st?.kind || null,
+        role: info.role || (info.measured ? 'work' : null),
         planned: {
           duration_s: deriveSecondsFromPlannedStep(st),
           distance_m: deriveMetersFromPlannedStep(st)
