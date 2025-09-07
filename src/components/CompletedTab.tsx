@@ -5,6 +5,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
+import { supabase } from '../lib/supabase';
 
 // Custom styles for range sliders
 const sliderStyles = `
@@ -44,6 +45,60 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [editingPool, setEditingPool] = useState(false);
   const [poolLengthMeters, setPoolLengthMeters] = useState<number | null>(null);
   const [rememberDefault, setRememberDefault] = useState(false);
+  const [hydrated, setHydrated] = useState<any>(workoutData);
+  
+  useEffect(() => {
+    setHydrated(workoutData);
+  }, [workoutData]);
+  
+  // Dev hydration: if workout lacks samples but has a garmin_activity_id,
+  // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const c = workoutData as any;
+        if (!c) return;
+        const hasSamples = !!(Array.isArray(c?.sensor_data?.samples) && c.sensor_data.samples.length > 3)
+          || !!(Array.isArray(c?.sensor_data) && c.sensor_data.length > 3)
+          || !!(Array.isArray(c?.gps_track) && c.gps_track.length > 3)
+          || !!(Array.isArray(c?.swim_data?.lengths) && c.swim_data.lengths.length > 0);
+        const garminId = String(c?.garmin_activity_id || '').trim();
+        if (hasSamples || !garminId) return;
+
+        const { data, error } = await supabase
+          .from('garmin_activities')
+          .select('gps_track,sensor_data,swim_data,avg_heart_rate,max_heart_rate,avg_speed_mps,max_speed_mps,avg_power,max_power,avg_run_cadence,max_run_cadence,avg_bike_cadence,max_bike_cadence,avg_temperature,max_temperature,pool_length,number_of_active_lengths,distance_meters,duration_seconds,active_kilocalories,steps')
+          .eq('garmin_activity_id', garminId)
+          .single();
+        if (error || !data) return;
+
+        const merged: any = { ...c };
+        if (!merged.sensor_data && data.sensor_data) merged.sensor_data = data.sensor_data;
+        if (!merged.gps_track && data.gps_track) merged.gps_track = data.gps_track;
+        if (!merged.swim_data && data.swim_data) merged.swim_data = data.swim_data;
+        // Fill common metrics if missing
+        merged.metrics = { ...(merged.metrics || {}) };
+        if (merged.avg_heart_rate == null && typeof data.avg_heart_rate === 'number') merged.avg_heart_rate = data.avg_heart_rate;
+        if (merged.max_heart_rate == null && typeof data.max_heart_rate === 'number') merged.max_heart_rate = data.max_heart_rate;
+        if (merged.avg_speed == null && typeof data.avg_speed_mps === 'number') merged.avg_speed = data.avg_speed_mps * 3.6; // kph
+        if (merged.metrics.avg_speed == null && typeof data.avg_speed_mps === 'number') merged.metrics.avg_speed = data.avg_speed_mps * 3.6;
+        if (merged.max_speed == null && typeof data.max_speed_mps === 'number') merged.max_speed = data.max_speed_mps * 3.6;
+        if (merged.avg_power == null && typeof data.avg_power === 'number') merged.avg_power = data.avg_power;
+        if (merged.max_power == null && typeof data.max_power === 'number') merged.max_power = data.max_power;
+        if (merged.steps == null && typeof data.steps === 'number') merged.steps = data.steps;
+        if (merged.distance == null && typeof data.distance_meters === 'number') merged.distance = data.distance_meters / 1000; // km
+        if (merged.moving_time == null && typeof data.duration_seconds === 'number') merged.moving_time = data.duration_seconds;
+        if (merged.total_timer_time == null && typeof data.duration_seconds === 'number') merged.total_timer_time = data.duration_seconds;
+        if (merged.calories == null && typeof data.active_kilocalories === 'number') merged.calories = data.active_kilocalories;
+        if (merged.number_of_active_lengths == null && typeof data.number_of_active_lengths === 'number') merged.number_of_active_lengths = data.number_of_active_lengths;
+        if (merged.pool_length == null && typeof data.pool_length === 'number') merged.pool_length = data.pool_length;
+        if (!cancelled) setHydrated(merged);
+      } catch { /* noop */ }
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, [workoutData]);
   
   // No need to initialize localSelectedMetric here - it's handled in the sub-component
 
@@ -1419,12 +1474,12 @@ const formatPace = (paceValue: any): string => {
          <div className="bg-white rounded-lg overflow-hidden">
            <div className="h-64 relative">
              <ActivityMap
-               gpsTrack={workoutData.gps_track}
-               activityName={workoutData.name || generateTitle()}
+               gpsTrack={Array.isArray((hydrated||workoutData).gps_track) ? (hydrated||workoutData).gps_track : []}
+               activityName={(hydrated||workoutData).name || generateTitle()}
                activityType={workoutType}
-               startLocation={workoutData.start_position_lat && workoutData.start_position_long ? {
-                 lat: workoutData.start_position_lat,
-                 lng: workoutData.start_position_long
+               startLocation={(hydrated||workoutData).start_position_lat && (hydrated||workoutData).start_position_long ? {
+                 lat: (hydrated||workoutData).start_position_lat,
+                 lng: (hydrated||workoutData).start_position_long
                } : null}
              />
            </div>
@@ -1436,8 +1491,8 @@ const formatPace = (paceValue: any): string => {
          {/* Chart container - clear separation from map */}
          <div className="h-[500px] w-full">
            <CleanElevationChart
-             gpsTrack={workoutData.gps_track}
-             sensorData={workoutData.sensor_data}
+             gpsTrack={Array.isArray((hydrated||workoutData).gps_track) ? (hydrated||workoutData).gps_track : []}
+             sensorData={Array.isArray((hydrated||workoutData)?.sensor_data?.samples) ? (hydrated||workoutData).sensor_data.samples : (Array.isArray((hydrated||workoutData)?.sensor_data) ? (hydrated||workoutData).sensor_data : [])}
              workoutType={workoutType}
              selectedMetric={selectedMetric}
              useImperial={useImperial}
