@@ -120,6 +120,16 @@ function accumulate(completed: any) {
       // Strict mode: only accumulate when we have GPS geometry
       if (typeof s.lat === 'number' && typeof s.lng === 'number' && typeof prev.lat === 'number' && typeof prev.lng === 'number') {
         cum += haversineMeters({lat:prev.lat,lng:prev.lng},{lat:s.lat,lng:s.lng});
+      } else {
+        // Integrate speed when GPS and provider cumulative are missing
+        const dt = Number(s.t) - Number(prev.t);
+        const validDt = Number.isFinite(dt) && dt > 0 && dt < 60 ? dt : 0;
+        const v0 = typeof (prev as any).speedMps === 'number' && Number.isFinite((prev as any).speedMps) ? (prev as any).speedMps : null;
+        const v1 = typeof (s as any).speedMps === 'number' && Number.isFinite((s as any).speedMps) ? (s as any).speedMps : null;
+        if (validDt && (v0 != null || v1 != null)) {
+          const v = v0 != null && v1 != null ? (v0 + v1) / 2 : (v1 != null ? v1 : (v0 as number));
+          cum += v * validDt;
+        }
       }
     }
     return { ...s, cumMeters: cum };
@@ -319,6 +329,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const rows = comp ? accumulate(comp) : [];
   let cursorIdx = 0;
   let cursorCum = rows.length ? rows[0].cumMeters || 0 : 0;
+
+  // No animation: render values immediately on association
 
   // Planned pace extractor (tight label)
   const plannedPaceFor = (st: any): string => {
