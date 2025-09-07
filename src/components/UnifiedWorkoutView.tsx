@@ -360,7 +360,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-4">
             <PlannedWorkoutView 
-              workout={workout}
+              workout={isCompleted ? (linkedPlanned || workout) : workout}
               showHeader={false}
               onEdit={() => {
                 // TODO: Implement edit functionality

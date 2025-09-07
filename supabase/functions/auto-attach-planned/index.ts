@@ -66,14 +66,20 @@ Deno.serve(async (req) => {
 
     const { sport, subtype } = sportSubtype(w.provider_sport || w.type);
 
-    // Fetch same-day planned candidates of same sport
+    // Fetch planned candidates of same sport within a 1-day window to avoid UTC skew
+    const day = String(w.date || '').slice(0,10);
+    const toISO = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    const base = day && /^\d{4}-\d{2}-\d{2}$/.test(day) ? new Date(`${day}T00:00:00`) : null;
+    const fromDay = base ? new Date(base.getFullYear(), base.getMonth(), base.getDate() - 1) : null;
+    const toDay = base ? new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1) : null;
     const { data: plannedList } = await supabase
       .from('planned_workouts')
-      .select('id,user_id,type,date,name,computed,intervals,workout_status')
+      .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id')
       .eq('user_id', w.user_id)
       .eq('type', sport)
-      .eq('date', w.date)
-      .in('workout_status', ['planned','in_progress']);
+      .gte('date', fromDay ? toISO(fromDay) : day)
+      .lte('date', toDay ? toISO(toDay) : day)
+      .in('workout_status', ['planned','in_progress','completed']);
 
     const candidates = Array.isArray(plannedList) ? plannedList : [];
     if (!candidates.length) return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_candidates' }), { headers: { 'Content-Type': 'application/json' } });
@@ -95,6 +101,20 @@ Deno.serve(async (req) => {
         if (dtMin <= 120) score += 2 - (dtMin/120);
         else score -= dtMin/120;
       }
+      // Prefer exact date match, then adjacent day
+      try {
+        const pdate = String((p as any).date || '').slice(0,10);
+        if (pdate && day) {
+          if (pdate === day) score += 1.0;
+          else {
+            const pd = new Date(`${pdate}T00:00:00`).getTime();
+            const wd = new Date(`${day}T00:00:00`).getTime();
+            const ddays = Math.abs(pd - wd) / 86400000;
+            if (ddays <= 1.0) score += 0.5;
+          }
+        }
+      } catch {}
+
       // Duration closeness (primary)
       let durPct: number | null = null;
       if (totals.seconds && wSec>0) {
@@ -120,7 +140,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'score_too_low', bestScore }), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // Link
+    // Link (allow re-attach if previously completed to a deleted/old workout)
+    const prevCompletedId = (best as any)?.completed_workout_id as string | null | undefined;
+    if (prevCompletedId && prevCompletedId !== w.id) {
+      try {
+        // Detach previous workout if it exists
+        await supabase.from('workouts').update({ planned_id: null }).eq('id', prevCompletedId);
+      } catch {}
+    }
     await supabase
       .from('planned_workouts')
       .update({ workout_status: 'completed', completed_workout_id: w.id })
