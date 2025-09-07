@@ -1437,7 +1437,7 @@ const formatPace = (paceValue: any): string => {
         </div>
       </div>
 
-      {/* Row 4: Max Cadence, TSS, VAM */}
+      {/* Row 4: Max Cadence, VAM */}
       <div className="px-2 py-1">
         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {(() => {
@@ -1461,17 +1461,6 @@ const formatPace = (paceValue: any): string => {
           <div className="font-medium">Max Cadence</div>
         </div>
       </div>
-       
-       {workoutType === 'run' && (
-         <div className="px-2 py-1">
-           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-             {workoutData.metrics?.training_stress_score ? safeNumber(Math.round(workoutData.metrics.training_stress_score * 10) / 10) : 'N/A'}
-           </div>
-           <div className="text-xs text-[#666666] font-normal">
-             <div className="font-medium">TSS</div>
-           </div>
-         </div>
-       )}
        
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>

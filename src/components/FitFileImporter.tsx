@@ -772,7 +772,7 @@ const FitFileImporter: React.FC<FitFileImporterProps> = ({ onWorkoutsImported })
                         <span>Elevation: {workout.metrics.elevation_gain}m</span>
                       )}
                       {workout.metrics.training_stress_score && (
-                        <span>TSS: {workout.metrics.training_stress_score}</span>
+                        <span>IF: {workout.metrics.intensity_factor}%</span>
                       )}
                       {workout.metrics.intensity_factor && (
                         <span>IF: {workout.metrics.intensity_factor}%</span>

@@ -301,33 +301,12 @@ const WorkoutMetrics: React.FC<WorkoutMetricsProps> = ({ workout }) => {
       )}
 
       {/* Training Load Metrics */}
-      {(workout.tss || workout.intensity_factor) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {workout.tss && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Training Stress Score</CardTitle>
-                <Zap className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{workout.tss}</div>
-                <p className="text-xs text-muted-foreground">TSS</p>
-              </CardContent>
-            </Card>
-          )}
-
-          {workout.intensity_factor && (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Intensity Factor</CardTitle>
-                <TrendingUp className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{workout.intensity_factor.toFixed(2)}</div>
-                <p className="text-xs text-muted-foreground">IF</p>
-              </CardContent>
-            </Card>
-          )}
+      {workout.intensity_factor && (
+        <div className="grid grid-cols-1 gap-6">
+          <div>
+            <div className="text-2xl font-bold">{workout.intensity_factor}</div>
+            <p className="text-xs text-muted-foreground">IF</p>
+          </div>
         </div>
       )}
     </div>

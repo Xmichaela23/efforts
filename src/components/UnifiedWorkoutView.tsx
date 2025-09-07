@@ -110,15 +110,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       try {
         const hasSteps = Array.isArray((linkedPlanned as any)?.computed?.steps) && (linkedPlanned as any).computed.steps.length>0;
         if (hasSteps) return;
-        // Find active plan and materialize this week
-        const planId = (linkedPlanned as any)?.training_plan_id;
-        const dateStr = String((linkedPlanned as any)?.date || '').slice(0,10);
-        if (!planId || !dateStr) return;
-        const d = new Date(dateStr + 'T00:00:00');
-        const oneJan = new Date(d.getFullYear(), 0, 1);
-        const weekNum = Math.ceil((((d as any) - (oneJan as any)) / 86400000 + oneJan.getDay() + 1) / 7);
-        // Call edge: reuse existing planned function via RPC substitute (emit event for calendar handler)
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+        // Materialize using plan/week from the planned row
+        const planId = (linkedPlanned as any)?.training_plan_id as string | undefined;
+        const weekNum = Number((linkedPlanned as any)?.week_number);
+        if (!planId || !Number.isFinite(weekNum) || weekNum < 1) return;
+        try {
+          const mod = await import('@/services/plans/ensureWeekMaterialized');
+          await mod.ensureWeekMaterialized(String(planId), Number(weekNum));
+          // Refetch this planned row to get computed.steps populated
+          const { data } = await supabase.from('planned_workouts').select('*').eq('id', (linkedPlanned as any).id).single();
+          setLinkedPlanned(data || null);
+          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+        } catch {}
       } catch {}
     };
     // When switching to Summary tab, try a materialize pass

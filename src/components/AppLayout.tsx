@@ -236,7 +236,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
           avg_cadence: workout.metrics?.avg_cadence,
           max_cadence: workout.metrics?.max_cadence,
           calories: workout.metrics?.calories,
-          tss: workout.metrics?.training_stress_score,
           intensity_factor: workout.metrics?.intensity_factor,
 
           // ELEVATION - check both locations for elevation_gain

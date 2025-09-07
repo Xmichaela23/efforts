@@ -259,18 +259,11 @@ const FilteredWorkoutList: React.FC<FilteredWorkoutListProps> = ({ onWorkoutSele
                 )}
                 
                 {/* Training load indicators */}
-                {(workout.tss || workout.intensity_factor) && (
-                  <div className="mt-2 flex gap-2">
-                    {workout.tss && (
-                      <Badge variant="secondary" className="text-xs">
-                        TSS: {workout.tss}
-                      </Badge>
-                    )}
-                    {workout.intensity_factor && (
-                      <Badge variant="secondary" className="text-xs">
-                        IF: {workout.intensity_factor.toFixed(2)}
-                      </Badge>
-                    )}
+                {workout.intensity_factor && (
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>
+                      IF: {workout.intensity_factor}
+                    </span>
                   </div>
                 )}
               </CardContent>
