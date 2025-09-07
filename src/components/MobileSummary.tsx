@@ -530,9 +530,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               {(() => {
                 // If server-computed exists, use it; else compute client-side
                 if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
-                  const idx = idxIn => idxIn; // same order as planned for now (future: align by kind/id)
-                  const compIdx = idx(idx);
-                  const row = completedComputed.intervals[compIdx];
+                  const compIdx = idx; // same order as planned for now (future: align by kind/id)
+                  const row = completedComputed.intervals[compIdx] || null;
                   const secPerMi = row?.executed?.avg_pace_s_per_mi;
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
                 }
@@ -544,7 +543,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               {(() => {
                 if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
                   const compIdx = idx;
-                  const row = completedComputed.intervals[compIdx];
+                  const row = completedComputed.intervals[compIdx] || null;
                   const hr = row?.executed?.avg_hr;
                   return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
                 }
