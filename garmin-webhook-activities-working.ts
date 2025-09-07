@@ -411,6 +411,8 @@ async function processActivityDetails(activityDetails) {
               avg_heart_rate: avgHeartRate ?? activity.averageHeartRateInBeatsPerMinute ?? null,
               max_heart_rate: maxHeartRate ?? activity.maxHeartRateInBeatsPerMinute ?? null,
               avg_speed_mps: activity.averageSpeedInMetersPerSecond ?? null,
+              max_speed_mps: activity.maxSpeedInMetersPerSecond ?? null,
+              calories: activity.activeKilocalories ?? null,
               elevation_gain_meters: (activityDetail as any)?.summary?.totalElevationGainInMeters ?? null,
               starting_latitude: activity.startingLatitudeInDegree ?? null,
               starting_longitude: activity.startingLongitudeInDegree ?? null,
@@ -418,6 +420,18 @@ async function processActivityDetails(activityDetails) {
               pool_length: activity.poolLengthInMeters ?? activity.pool_length ?? null,
               strokes: activity.totalNumberOfStrokes ?? activity.strokes ?? null,
               avg_swim_cadence: activity.averageSwimCadenceInStrokesPerMinute ?? null,
+              // Run/Bike cadence
+              avg_bike_cadence: activity.averageBikeCadenceInRoundsPerMinute ?? null,
+              max_bike_cadence: activity.maxBikeCadenceInRoundsPerMinute ?? null,
+              avg_run_cadence: activity.averageRunCadenceInStepsPerMinute ?? null,
+              max_run_cadence: activity.maxRunCadenceInStepsPerMinute ?? null,
+              // Power (if any sensors)
+              avg_power: avgPower ?? (activityDetail as any)?.summary?.averagePowerInWatts ?? null,
+              max_power: maxPower ?? (activityDetail as any)?.summary?.maxPowerInWatts ?? null,
+              // Temps & steps
+              avg_temperature: avgTemperature ?? (activityDetail as any)?.summary?.avgTemperatureCelcius ?? null,
+              max_temperature: maxTemperature ?? null,
+              steps: (activityDetail as any)?.summary?.steps ?? activity.steps ?? null,
               // Multisport linkage
               is_parent: activity.isParent ?? null,
               parentSummaryId: activity.parentSummaryId ?? null,

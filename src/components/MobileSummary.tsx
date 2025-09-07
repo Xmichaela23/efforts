@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import StrengthCompareTable from './StrengthCompareTable';
 
 type MobileSummaryProps = {
@@ -116,12 +117,9 @@ function accumulate(completed: any) {
     }
     if (i>0) {
       const prev = samples[i-1];
-      // Prefer gps distance
+      // Strict mode: only accumulate when we have GPS geometry
       if (typeof s.lat === 'number' && typeof s.lng === 'number' && typeof prev.lat === 'number' && typeof prev.lng === 'number') {
         cum += haversineMeters({lat:prev.lat,lng:prev.lng},{lat:s.lat,lng:s.lng});
-      } else if (typeof prev.speedMps === 'number') {
-        const dt = Math.max(0, (s.t - prev.t));
-        cum += prev.speedMps * dt;
       }
     }
     return { ...s, cumMeters: cum };
@@ -217,15 +215,7 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
     }
   }
 
-  // Fallback: overall time and distance
-  const dist = typeof completed.distance === 'number' ? fmtDistanceMi(completed.distance) : undefined;
-  const durSec = typeof completed.total_timer_time === 'number' ? completed.total_timer_time : (typeof completed.moving_time === 'number' ? completed.moving_time : undefined);
-  const paceSecPerKm = completed.avg_pace || completed.metrics?.avg_pace;
-  const pacePerMi = typeof paceSecPerKm === 'number' ? paceSecPerKm * 1.60934 : undefined;
-  if (dist && durSec) {
-    return { text: `${dist} @ ${fmtPace(pacePerMi)}`, hr: getAvgHR(completed) };
-  }
-  if (durSec) return { text: fmtTime(durSec), hr: getAvgHR(completed) };
+  // Strict mode: no aggregate fallback in development
   return { text: '—', hr: getAvgHR(completed) };
 };
 
@@ -237,6 +227,60 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   }
 
   const type = String(planned.type || '').toLowerCase();
+
+  // Dev hydration: if completed lacks samples but we have a garmin_activity_id,
+  // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
+  const [hydratedCompleted, setHydratedCompleted] = useState<any>(completed);
+
+  useEffect(() => {
+    setHydratedCompleted(completed);
+  }, [completed]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const hydrate = async () => {
+      try {
+        const c = completed as any;
+        if (!c) return;
+        const hasSamples = !!(Array.isArray(c?.sensor_data?.samples) && c.sensor_data.samples.length > 3)
+          || !!(Array.isArray(c?.sensor_data) && c.sensor_data.length > 3)
+          || !!(Array.isArray(c?.gps_track) && c.gps_track.length > 3)
+          || !!(Array.isArray(c?.swim_data?.lengths) && c.swim_data.lengths.length > 0);
+        const garminId = String(c?.garmin_activity_id || '').trim();
+        if (hasSamples || !garminId) return;
+
+        const { data, error } = await supabase
+          .from('garmin_activities')
+          .select('gps_track,sensor_data,swim_data,avg_heart_rate,max_heart_rate,avg_speed_mps,max_speed_mps,avg_power,max_power,avg_run_cadence,max_run_cadence,avg_bike_cadence,max_bike_cadence,pool_length,number_of_active_lengths,distance_meters,duration_seconds,active_kilocalories,steps')
+          .eq('garmin_activity_id', garminId)
+          .single();
+        if (error || !data) return;
+
+        const merged = { ...c };
+        if (!merged.sensor_data && data.sensor_data) merged.sensor_data = data.sensor_data;
+        if (!merged.gps_track && data.gps_track) merged.gps_track = data.gps_track;
+        if (!merged.swim_data && data.swim_data) merged.swim_data = data.swim_data;
+        // Fill common metrics if missing
+        merged.metrics = { ...(merged.metrics || {}) };
+        if (merged.avg_heart_rate == null && typeof data.avg_heart_rate === 'number') merged.avg_heart_rate = data.avg_heart_rate;
+        if (merged.max_heart_rate == null && typeof data.max_heart_rate === 'number') merged.max_heart_rate = data.max_heart_rate;
+        if (merged.avg_speed == null && typeof data.avg_speed_mps === 'number') merged.avg_speed = data.avg_speed_mps * 3.6; // kph
+        if (merged.metrics.avg_speed == null && typeof data.avg_speed_mps === 'number') merged.metrics.avg_speed = data.avg_speed_mps * 3.6;
+        if (merged.avg_power == null && typeof data.avg_power === 'number') merged.avg_power = data.avg_power;
+        if (merged.max_power == null && typeof data.max_power === 'number') merged.max_power = data.max_power;
+        if (merged.steps == null && typeof data.steps === 'number') merged.steps = data.steps;
+        if (merged.distance == null && typeof data.distance_meters === 'number') merged.distance = data.distance_meters / 1000; // km
+        if (merged.moving_time == null && typeof data.duration_seconds === 'number') merged.moving_time = data.duration_seconds;
+        if (merged.total_timer_time == null && typeof data.duration_seconds === 'number') merged.total_timer_time = data.duration_seconds;
+        if (merged.calories == null && typeof data.active_kilocalories === 'number') merged.calories = data.active_kilocalories;
+        if (merged.number_of_active_lengths == null && typeof data.number_of_active_lengths === 'number') merged.number_of_active_lengths = data.number_of_active_lengths;
+        if (merged.pool_length == null && typeof data.pool_length === 'number') merged.pool_length = data.pool_length;
+        if (!cancelled) setHydratedCompleted(merged);
+      } catch {}
+    };
+    hydrate();
+    return () => { cancelled = true; };
+  }, [completed]);
 
   // Strength uses compare table
   if (type === 'strength') {
@@ -271,15 +315,16 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const steps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
 
   // Build accumulated rows once for completed and advance a cursor across steps
-  const rows = completed ? accumulate(completed) : [];
+  const comp = hydratedCompleted || completed;
+  const rows = comp ? accumulate(comp) : [];
   let cursorIdx = 0;
   let cursorCum = rows.length ? rows[0].cumMeters || 0 : 0;
 
   const renderCompletedFor = (st: any): CompletedDisplay => {
-    if (!completed || rows.length < 2) return '—' as any;
-    const isRunOrWalk = /run|walk/i.test(completed.type || '') || /running|walking/i.test(completed.activity_type || '');
-    const isRide = /ride|bike|cycling/i.test(completed.type || '') || /cycling|bike/i.test(completed.activity_type || '');
-    const isSwim = /swim/i.test(completed.type || '') || /swim/i.test(completed.activity_type || '');
+    if (!comp || rows.length < 2) return '—' as any;
+    const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
+    const isRide = /ride|bike|cycling/i.test(comp.type || '') || /cycling|bike/i.test(comp.activity_type || '');
+    const isSwim = /swim/i.test(comp.type || '') || /swim/i.test(comp.activity_type || '');
 
     const startIdx = cursorIdx;
     const startCum = cursorCum;
@@ -313,6 +358,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         const s = Math.round((paceMinPerMile - m)*60);
         return { text: `${miles.toFixed(miles<1?2:2)} mi @ ${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null };
       }
+      // Strict: if we cannot compute, return em dash
+      return { text: '—', hr: hrAvg!=null?Math.round(hrAvg):null };
     }
     if (isRide) {
       const mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
@@ -325,7 +372,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       return { text: `${(km*0.621371).toFixed(2)} mi @ ${mm}:${String(ss).padStart(2,'0')} /100m`, hr: hrAvg!=null?Math.round(hrAvg):null };
     }
     // Fallback overall
-    return completedValueForStep(completed, st);
+    return completedValueForStep(comp, st);
   };
 
   return (
