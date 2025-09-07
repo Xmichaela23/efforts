@@ -59,6 +59,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
       try {
         const c = workoutData as any;
         if (!c) return;
+        // Dev-only guard: only hydrate from garmin_activities in development
+        const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env && (((import.meta as any).env.DEV) || ((import.meta as any).env.MODE === 'development'));
+        if (!isDev) return;
         const hasSamples = !!(Array.isArray(c?.sensor_data?.samples) && c.sensor_data.samples.length > 3)
           || !!(Array.isArray(c?.sensor_data) && c.sensor_data.length > 3)
           || !!(Array.isArray(c?.gps_track) && c.gps_track.length > 3)

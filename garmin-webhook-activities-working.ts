@@ -419,6 +419,7 @@ async function processActivityDetails(activityDetails) {
               // Swim specifics if present
               pool_length: activity.poolLengthInMeters ?? activity.pool_length ?? null,
               strokes: activity.totalNumberOfStrokes ?? activity.strokes ?? null,
+              number_of_active_lengths: activity.numberOfActiveLengths ?? null,
               avg_swim_cadence: activity.averageSwimCadenceInStrokesPerMinute ?? null,
               // Run/Bike cadence
               avg_bike_cadence: activity.averageBikeCadenceInRoundsPerMinute ?? null,

@@ -61,10 +61,38 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
       : (Array.isArray(completed?.sensor_data) ? completed.sensor_data : []);
     // Try to detect fields
     for (const s of sd) {
-      const t = Number((s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds) || out.length);
-      const hr = (s.heartRate ?? s.heart_rate ?? s.hr ?? s.bpm);
-      const speedMps = (s.speedMetersPerSecond ?? s.speed_mps ?? s.speed ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined));
-      const cumMeters = (typeof s.totalDistanceInMeters === 'number') ? s.totalDistanceInMeters : undefined;
+      const t = Number((s.timerDurationInSeconds
+        ?? s.clockDurationInSeconds
+        ?? s.elapsedDurationInSeconds
+        ?? s.sumDurationInSeconds
+        ?? s.offsetInSeconds
+        ?? s.elapsed_s
+        ?? s.t
+        ?? s.time
+        ?? s.seconds
+        ?? out.length));
+      const hr = (s.heartRate ?? s.heart_rate ?? s.hr ?? s.bpm ?? s.heartRateInBeatsPerMinute);
+      const speedMps = (
+        s.speedMetersPerSecond
+        ?? s.speedInMetersPerSecond
+        ?? s.enhancedSpeedInMetersPerSecond
+        ?? s.currentSpeedInMetersPerSecond
+        ?? s.instantaneousSpeedInMetersPerSecond
+        ?? s.speed_mps
+        ?? s.enhancedSpeed
+        ?? s.speed
+        ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined)
+        ?? (typeof s.paceInSecondsPerKilometer === 'number' ? (1000 / s.paceInSecondsPerKilometer) : undefined)
+      );
+      const cumMeters = (typeof s.totalDistanceInMeters === 'number')
+        ? s.totalDistanceInMeters
+        : (typeof s.distanceInMeters === 'number')
+          ? s.distanceInMeters
+          : (typeof s.cumulativeDistanceInMeters === 'number')
+            ? s.cumulativeDistanceInMeters
+            : (typeof s.totalDistance === 'number')
+              ? s.totalDistance
+              : (typeof s.distance === 'number' ? s.distance : undefined);
       out.push({ t: Number.isFinite(t) ? t : out.length, hr: typeof hr === 'number' ? hr : undefined, speedMps: typeof speedMps === 'number' ? speedMps : undefined, cumMeters });
     }
   } catch {}
@@ -252,6 +280,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       try {
         const c = completed as any;
         if (!c) return;
+        // Dev-only guard: only hydrate from garmin_activities in development
+        const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env && (((import.meta as any).env.DEV) || ((import.meta as any).env.MODE === 'development'));
+        if (!isDev) return;
         const hasSamples = !!(Array.isArray(c?.sensor_data?.samples) && c.sensor_data.samples.length > 3)
           || !!(Array.isArray(c?.sensor_data) && c.sensor_data.length > 3)
           || !!(Array.isArray(c?.gps_track) && c.gps_track.length > 3)
