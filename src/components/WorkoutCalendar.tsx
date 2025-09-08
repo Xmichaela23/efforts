@@ -249,6 +249,17 @@ export default function WorkoutCalendar({
         .filter((w:any)=> String(w?.workout_status||'').toLowerCase()==='completed')
         .map((w:any)=> `${String(w.date)}|${String(w.type||w.workout_type||'').toLowerCase()}`)
     );
+    // Count how many planned rows exist per date+type (for lightweight suppression heuristic)
+    const plannedCountByKey = (() => {
+      const m = new Map<string, number>();
+      for (const p of plannedArr) {
+        try {
+          const key = `${String(p.date)}|${String(p.type||'').toLowerCase()}`;
+          m.set(key, (m.get(key) || 0) + 1);
+        } catch {}
+      }
+      return m;
+    })();
     // Planned rows considered completed if linked via either side OR marked completed
     const completedPlannedKeys = new Set(
       plannedArr
@@ -287,6 +298,10 @@ export default function WorkoutCalendar({
       if (isPlannedRow) {
         if ((w as any)?.completed_workout_id) return false;
         if (workoutIdByPlannedId.has(String((w as any).id))) return false;
+        // Heuristic: if there is at least one completed workout for same date+type
+        // and only a single planned row for that date+type, hide the planned row.
+        const k = `${String((w as any).date)}|${String((w as any).type||'').toLowerCase()}`;
+        if (completedWorkoutKeys.has(k) && (plannedCountByKey.get(k) === 1)) return false;
       }
       return true;
     });
