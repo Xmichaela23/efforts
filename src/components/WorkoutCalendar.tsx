@@ -282,6 +282,12 @@ export default function WorkoutCalendar({
       else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
       // Hide optional planned rows entirely
       if (tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional')) return false;
+      // If this is a planned row that has a completed workout linked via either side, suppress it (completed wins)
+      const isPlannedRow = String((w as any).source || '').toLowerCase() === 'training_plan' || String((w as any).provider||'').toLowerCase()==='workouts';
+      if (isPlannedRow) {
+        if ((w as any)?.completed_workout_id) return false;
+        if (workoutIdByPlannedId.has(String((w as any).id))) return false;
+      }
       return true;
     });
 
