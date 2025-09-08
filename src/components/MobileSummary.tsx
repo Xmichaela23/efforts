@@ -586,7 +586,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       // Time-controlled step: coerce duration from multiple fields
       const dur = plannedDurSec || 0;
       const startT = rows[startIdx].t;
-      const targetT = startT + (dur > 0 ? dur : 0);
+      // If warm-up time is unusually long, cap at movement portion only (ignore idle)
+      const capDur = (isWarm && dur > 0) ? Math.min(dur, Math.max(0, rows[rows.length-1].t - startT)) : dur;
+      const targetT = startT + (capDur > 0 ? capDur : 0);
       while (endIdx < rows.length && rows[endIdx].t < targetT) endIdx += 1;
     }
     if (endIdx >= rows.length) endIdx = rows.length - 1;
@@ -599,7 +601,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     let timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
     const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
     // HR smoothing: average only over non-zero, clamp to plausible 60-210 bpm
-    const hrVals = seg
+    let hrVals = seg
       .map(s=> (typeof s.hr==='number' && s.hr>40 && s.hr<230 ? s.hr : NaN))
       .filter(n=>Number.isFinite(n));
     // If warm-up: allow first few seconds to settle; trim first 5s to reduce HR spikes
@@ -607,12 +609,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       const t0 = seg[0].t;
       const trimmed = seg.filter(s=> (s.t - t0) >= 5);
       const hrVals2 = trimmed.map(s=> (typeof s.hr==='number' && s.hr>40 && s.hr<230 ? s.hr : NaN)).filter(n=>Number.isFinite(n));
-      if (hrVals2.length) {
-        const avg2 = Math.round(hrVals2.reduce((a,b)=>a+b,0)/hrVals2.length);
-        const km2 = Math.max(1, (trimmed[trimmed.length-1].t - trimmed[0].t));
-        // replace hrVals with smoothed value
-        return { paceText: '—', hr: avg2, durationSec: Math.round(timeSec) } as any; // placeholder replaced below
-      }
+      if (hrVals2.length) hrVals = hrVals2;
     }
     const hrAvg = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
     const km = dMeters/1000;
