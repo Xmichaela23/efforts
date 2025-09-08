@@ -73,6 +73,7 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
         ?? s.seconds
         ?? out.length));
       const hr = (s.heartRate ?? s.heart_rate ?? s.hr ?? s.bpm ?? s.heartRateInBeatsPerMinute);
+      // Only accept explicit meters-per-second or convertible pace fields
       const speedMps = (
         s.speedMetersPerSecond
         ?? s.speedInMetersPerSecond
@@ -80,8 +81,6 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
         ?? s.currentSpeedInMetersPerSecond
         ?? s.instantaneousSpeedInMetersPerSecond
         ?? s.speed_mps
-        ?? s.enhancedSpeed
-        ?? s.speed
         ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined)
         ?? (typeof s.paceInSecondsPerKilometer === 'number' ? (1000 / s.paceInSecondsPerKilometer) : undefined)
       );
