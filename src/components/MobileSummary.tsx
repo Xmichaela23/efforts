@@ -597,7 +597,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const milesMeasured = (km * 0.621371);
     const milesPlanned = plannedMetersForPace > 0 ? (plannedMetersForPace/1609.34) : 0;
     // Prefer measured distance when it looks reasonable; else planned; else derive from avg speed
-    let miles = milesMeasured > 0.03 ? milesMeasured : (milesPlanned > 0 ? milesPlanned : 0);
+    let miles = (milesMeasured > 0.03 && milesMeasured < 1.0) ? milesMeasured : (milesPlanned > 0 ? milesPlanned : 0);
     if (miles <= 0 && avgSpeedMps && avgSpeedMps > 0.2) {
       miles = (avgSpeedMps * timeSec) / 1609.34;
     }
@@ -621,7 +621,24 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       }
       // If we still don't have reliable distance math, compute from average speed
       if (avgSpeedMps && (isRest ? avgSpeedMps >= 0.2 : avgSpeedMps > 0)) {
-        const secPerMile = 1609.34 / avgSpeedMps;
+        // Guard against unit mix-ups (mph mistaken for m/s) and outliers
+        let v = avgSpeedMps;
+        if (v > 8) v = NaN; // > ~18 mph for run is invalid
+        if (Number.isFinite(v)) {
+          const secPerMile = 1609.34 / v;
+          if (secPerMile >= 180 && secPerMile <= 1200) {
+            const m = Math.floor(secPerMile/60);
+            const s = Math.round(secPerMile%60);
+            return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
+          }
+        }
+        // If invalid, try planned distance/time if available
+        if (milesPlanned > 0) {
+          const paceMinPerMile2 = (timeSec/60) / milesPlanned;
+          const m2 = Math.floor(paceMinPerMile2);
+          const s2 = Math.round((paceMinPerMile2 - m2)*60);
+          return { paceText: `${m2}:${String(s2).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
+        }
         const m = Math.floor(secPerMile/60);
         const s = Math.round(secPerMile%60);
         return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
