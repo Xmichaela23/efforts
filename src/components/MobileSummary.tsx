@@ -281,12 +281,33 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     // rest: R2min, _r180, r2-3min
     const restMin = pickMin(/(?:^|_|\b)r\s*(\d{1,3})\s*min|r(\d{1,3})-?(\d{1,3})?\s*min/i);
     const restSec = pickSec(/(?:^|_|\b)r\s*(\d{1,4})\s*s\b/i);
-    const rest = restSec != null ? restSec : (restMin!=null ? restMin*60 : null);
+    // also support bare r120 => 120 seconds
+    const restBareSecMatch = tokensJoined.match(/(?:^|_|\b)r\s*(\d{1,4})(?![a-z])/i);
+    const restBareSec = restBareSecMatch ? parseInt(restBareSecMatch[1],10) : null;
+    const rest = restSec != null ? restSec : (restBareSec!=null && restBareSec>0 ? restBareSec : (restMin!=null ? restMin*60 : null));
     return {
       warmup_s: warmMin!=null ? warmMin*60 : null,
       cooldown_s: coolMin!=null ? coolMin*60 : null,
       rest_s: rest
     };
+  })();
+
+  // Fallback work interval distance parsed from tokens, e.g., interval_6x400m_* → 400m
+  const fallbackWorkMeters: number | null = (() => {
+    try {
+      let m = tokensJoined.match(/(\d+)x(\d+(?:\.\d+)?)(mi|mile|miles|km|kilometer|kilometre|m|meter|metre|yd|yard|yards)/i);
+      if (!m) m = tokensJoined.match(/(\d+)\s*x\s*(\d+(?:\.\d+)?)(mi|mile|miles|km|kilometer|kilometre|m|meter|metre|yd|yard|yards)/i);
+      if (!m) m = tokensJoined.match(/x\s*(\d+(?:\.\d+)?)(mi|mile|miles|km|kilometer|kilometre|m|meter|metre|yd|yard|yards)/i);
+      if (m) {
+        const val = parseFloat(m[2]);
+        const unit = m[3].toLowerCase();
+        if (unit.startsWith('mi')) return val * 1609.34;
+        if (unit.startsWith('km')) return val * 1000;
+        if (unit === 'm' || unit.startsWith('met')) return val;
+        if (unit.startsWith('yd')) return val * 0.9144;
+      }
+    } catch {}
+    return null;
   })();
 
   // Dev hydration: if completed lacks samples but we have a garmin_activity_id,
@@ -515,7 +536,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
     // Planned time (sec) if present – used to align rest/jog and as fallback to avoid 0:01 artifacts
     let plannedDurSec = (() => {
-      const cands = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
+      const cands = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds, (st as any)?.duration_s, (st as any)?.rest_s];
       for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
       // v3 rest field
       const rs = Number((st as any)?.rest_s);
@@ -549,7 +570,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       if (isCool && defaultDurations.cooldown_s) plannedDurSec = defaultDurations.cooldown_s;
     }
 
-    if (Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) {
+    if ((Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) || (fallbackWorkMeters && !isRest && !isWarm && !isCool)) {
+      const dist = (Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) ? (stDistanceMeters as number) : (fallbackWorkMeters as number);
       const targetCum = startCum + stDistanceMeters;
       while (endIdx < rows.length && (rows[endIdx].cumMeters || 0) < targetCum) endIdx += 1;
     } else {
