@@ -592,7 +592,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
     const hrAvg = avg(seg.map(s=> (typeof s.hr==='number'?s.hr:NaN)).filter(n=>Number.isFinite(n) ));
     const km = dMeters/1000;
-    const miles = km * 0.621371;
+    const plannedMetersForPace = (Number.isFinite(stDistanceMeters) && stDistanceMeters>0) ? (stDistanceMeters as number) : (fallbackWorkMeters || 0);
+    const milesMeasured = (km * 0.621371);
+    const milesPlanned = plannedMetersForPace > 0 ? (plannedMetersForPace/1609.34) : 0;
+    const miles = milesMeasured>0 ? milesMeasured : (milesPlanned>0 ? milesPlanned : 0);
     const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
     // Fallback: compute from avg speed when distance integration is unavailable
     const speedVals = seg
