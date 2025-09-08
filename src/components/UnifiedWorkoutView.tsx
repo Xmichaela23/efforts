@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
@@ -42,6 +42,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [linkedPlanned, setLinkedPlanned] = useState<any | null>(null);
+  // Suppress auto re-link fallback briefly after an explicit Unattach
+  const suppressRelinkUntil = useRef<number>(0);
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {
@@ -79,6 +81,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         }
 
         // 3) Fallback: look for a same-day planned of same type
+        //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
+        if (suppressRelinkUntil.current > Date.now()) {
+          if (!cancelled) setLinkedPlanned(null);
+          return;
+        }
         if ((workout as any).date && (workout as any).type) {
           const { data } = await supabase
             .from('planned_workouts')
@@ -404,7 +411,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
                         try { (workout as any).planned_id = null; } catch {}
                         setLinkedPlanned(null);
+                        // Prevent immediate fallback re-link detection for a short window
+                        suppressRelinkUntil.current = Date.now() + 15000; // 15s
                         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                       } catch {}
                     }}
                   >Unattach</Button>
