@@ -614,36 +614,37 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     }
 
     if (isRunOrWalk) {
-      if (miles>0 && paceMinPerMile!=null) {
-        const m = Math.floor(paceMinPerMile);
-        const s = Math.round((paceMinPerMile - m)*60);
-        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
+      // Strategy:
+      // 1) Use measured distance if plausible
+      // 2) For work steps, if measured is tiny, use planned distance
+      // 3) For jog/rest, if measured is tiny, compute from avg speed when sane; otherwise show —
+      const isWork = !isRest && !isWarm && !isCool;
+      const measuredMiles = milesMeasured;
+      const plannedMiles = milesPlanned;
+      let useMiles = 0;
+      if (measuredMiles > 0.03 && measuredMiles < 5) {
+        useMiles = measuredMiles;
+      } else if (isWork && plannedMiles > 0) {
+        useMiles = plannedMiles;
       }
-      // If we still don't have reliable distance math, compute from average speed
-      if (avgSpeedMps && (isRest ? avgSpeedMps >= 0.2 : avgSpeedMps > 0)) {
-        // Guard against unit mix-ups (mph mistaken for m/s) and outliers
-        let v = avgSpeedMps;
-        if (v > 8) v = NaN; // > ~18 mph for run is invalid
-        if (Number.isFinite(v)) {
-          const secPerMile = 1609.34 / v;
-          if (secPerMile >= 180 && secPerMile <= 1200) {
-            const m = Math.floor(secPerMile/60);
-            const s = Math.round(secPerMile%60);
-            return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
-          }
+      if (useMiles > 0) {
+        const paceMinPerMileCalc = (timeSec/60) / useMiles;
+        if (paceMinPerMileCalc > 2 && paceMinPerMileCalc < 20) {
+          const m = Math.floor(paceMinPerMileCalc);
+          const s = Math.round((paceMinPerMileCalc - m)*60);
+          return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg, durationSec: Math.round(timeSec) };
         }
-        // If invalid, try planned distance/time if available
-        if (milesPlanned > 0) {
-          const paceMinPerMile2 = (timeSec/60) / milesPlanned;
-          const m2 = Math.floor(paceMinPerMile2);
-          const s2 = Math.round((paceMinPerMile2 - m2)*60);
-          return { paceText: `${m2}:${String(s2).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
-        }
-        const m = Math.floor(secPerMile/60);
-        const s = Math.round(secPerMile%60);
-        return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
       }
-      return { paceText: '—', hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
+      // Last resort for jog/rest only: derive from avg speed if looks like m/s
+      if (isRest && avgSpeedMps && avgSpeedMps > 0.2 && avgSpeedMps < 8) {
+        const secPerMile = 1609.34 / avgSpeedMps;
+        if (secPerMile >= 240 && secPerMile <= 1200) {
+          const m = Math.floor(secPerMile/60);
+          const s = Math.round(secPerMile%60);
+          return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg, durationSec: Math.round(timeSec) };
+        }
+      }
+      return { paceText: '—', hr: hrAvg, durationSec: Math.round(timeSec) };
     }
     if (isRide) {
       let mph = timeSec>0 ? (miles/(timeSec/3600)) : 0;
