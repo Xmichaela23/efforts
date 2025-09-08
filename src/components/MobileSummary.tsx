@@ -386,8 +386,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       const kindStr = String(st.kind || st.type || st.name || '').toLowerCase();
       const isWarm = /warm|wu/.test(kindStr);
       const isCool = /cool|cd/.test(kindStr);
+      const isRest = /rest|recover|recovery|jog/.test(kindStr);
       if (isWarm) return 'Warm‑up';
       if (isCool) return 'Cool‑down';
+      if (isRest) return 'Jog';
       const direct = st.paceTarget || st.target_pace || st.pace;
       if (direct && String(direct).includes('/')) return String(direct);
       const p = Number(st.pace_sec_per_mi);
@@ -450,6 +452,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
     const isRide = /ride|bike|cycling/i.test(comp.type || '') || /cycling|bike/i.test(comp.activity_type || '');
     const isSwim = /swim/i.test(comp.type || '') || /swim/i.test(comp.activity_type || '');
+    const kindStr = String(st.kind || st.type || st.name || '').toLowerCase();
+    const isRest = /rest|recover|recovery|jog/.test(kindStr);
 
     const startIdx = cursorIdx;
     const startCum = cursorCum;
@@ -470,18 +474,21 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       return NaN;
     })();
 
+    // Planned time (sec) if present – used to align rest/jog and as fallback to avoid 0:01 artifacts
+    const plannedDurSec = (() => {
+      const cands = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
+      for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
+      const ts = String(st.time || '').trim();
+      if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); return m*60 + s; }
+      return 0;
+    })();
+
     if (Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) {
       const targetCum = startCum + stDistanceMeters;
       while (endIdx < rows.length && (rows[endIdx].cumMeters || 0) < targetCum) endIdx += 1;
     } else {
       // Time-controlled step: coerce duration from multiple fields
-      const durCandidates = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
-      let dur = 0;
-      for (const v of durCandidates) { const n = Number(v); if (Number.isFinite(n) && n > 0) { dur = n; break; } }
-      if (!dur) {
-        const ts = String(st.time || '').trim();
-        if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); dur = m*60 + s; }
-      }
+      const dur = plannedDurSec || 0;
       const startT = rows[startIdx].t;
       const targetT = startT + (dur > 0 ? dur : 0);
       while (endIdx < rows.length && rows[endIdx].t < targetT) endIdx += 1;
@@ -493,7 +500,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     cursorCum = rows[endIdx].cumMeters || cursorCum;
 
     const seg = rows.slice(startIdx, Math.max(startIdx + 1, endIdx));
-    const timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
+    let timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
     const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
     const hrAvg = avg(seg.map(s=> (typeof s.hr==='number'?s.hr:NaN)).filter(n=>Number.isFinite(n) ));
     const km = dMeters/1000;
@@ -505,13 +512,19 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       .filter(n => Number.isFinite(n) && n >= 0.3);
     const avgSpeedMps = speedVals.length ? (speedVals.reduce((a,b)=>a+b,0)/speedVals.length) : null;
 
+    // If segmentation produced a tiny duration but the plan had a real duration, honor planned time (prevents 0:01 artifacts)
+    if (timeSec < 5 && plannedDurSec > 0) {
+      timeSec = plannedDurSec;
+    }
+
     if (isRunOrWalk) {
       if (miles>0 && paceMinPerMile!=null) {
         const m = Math.floor(paceMinPerMile);
         const s = Math.round((paceMinPerMile - m)*60);
         return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
       }
-      if (avgSpeedMps && avgSpeedMps > 0) {
+      // For jog/rest, allow slower speeds; otherwise require decent movement
+      if (avgSpeedMps && (isRest ? avgSpeedMps >= 0.2 : avgSpeedMps > 0)) {
         const secPerMile = 1609.34 / avgSpeedMps;
         const m = Math.floor(secPerMile/60);
         const s = Math.round(secPerMile%60);
