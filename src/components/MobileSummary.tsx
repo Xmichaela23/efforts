@@ -467,6 +467,19 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       // v3 swim/other: distance_yd
       const dYd = Number((st as any).distance_yd ?? (st as any).distance_yds);
       if (Number.isFinite(dYd) && dYd > 0) return ydToM(dYd);
+      // Parse from label/name/description e.g., "400m", "1 mi", "2km"
+      try {
+        const txt = String(st.label || st.name || st.description || '').toLowerCase();
+        const m = txt.match(/(\d+(?:\.\d+)?)\s*(mi|mile|miles|km|kilometer|kilometre|m|meter|metre|yd|yard|yards)\b/);
+        if (m) {
+          const val = parseFloat(m[1]);
+          const unit = m[2];
+          if (unit.startsWith('mi')) return val * 1609.34;
+          if (unit.startsWith('km')) return val * 1000;
+          if (unit === 'm' || unit.startsWith('met')) return val;
+          if (unit.startsWith('yd')) return ydToM(val);
+        }
+      } catch {}
       const ov = Number(st.original_val);
       const ou = String(st.original_units || '').toLowerCase();
       if (Number.isFinite(ov) && ov > 0) {
@@ -487,6 +500,24 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       if (Number.isFinite(rs) && rs > 0) return rs;
       const ts = String(st.time || '').trim();
       if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); return m*60 + s; }
+      // Parse from label tokens, e.g., "R2min", "r180", "20s", "12min"
+      try {
+        const txt = String(st.label || st.name || st.description || '').toLowerCase();
+        let m: RegExpMatchArray | null = null;
+        m = txt.match(/r\s*(\d+)\s*min|r(\d+)\s*min|r(\d+)-?(\d+)?\s*min/i);
+        if (m) {
+          const a = parseInt(m[1] || m[2] || m[3] || '0', 10);
+          const b = m[4] ? parseInt(m[4],10) : a;
+          const avg = Math.round((a + b) / 2) * 60;
+          if (avg > 0) return avg;
+        }
+        m = txt.match(/(\d+)\s*min/);
+        if (m) {
+          const v = parseInt(m[1], 10) * 60; if (v > 0) return v;
+        }
+        m = txt.match(/(\d+)\s*s\b/);
+        if (m) { const v = parseInt(m[1],10); if (v>0) return v; }
+      } catch {}
       return 0;
     })();
 
