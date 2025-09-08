@@ -461,8 +461,12 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
     // Resolve planned distance in meters from various shapes (computed steps, intervals)
     const stDistanceMeters = (() => {
+      const ydToM = (yd:number)=> yd * 0.9144;
       const dm = Number(st.distanceMeters ?? st.distance_m ?? st.meters ?? st.m);
       if (Number.isFinite(dm) && dm > 0) return dm;
+      // v3 swim/other: distance_yd
+      const dYd = Number((st as any).distance_yd ?? (st as any).distance_yds);
+      if (Number.isFinite(dYd) && dYd > 0) return ydToM(dYd);
       const ov = Number(st.original_val);
       const ou = String(st.original_units || '').toLowerCase();
       if (Number.isFinite(ov) && ov > 0) {
@@ -478,6 +482,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const plannedDurSec = (() => {
       const cands = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
       for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
+      // v3 rest field
+      const rs = Number((st as any)?.rest_s);
+      if (Number.isFinite(rs) && rs > 0) return rs;
       const ts = String(st.time || '').trim();
       if (/^\d{1,2}:\d{2}$/.test(ts)) { const [m,s] = ts.split(':').map((x:string)=>parseInt(x,10)); return m*60 + s; }
       return 0;
