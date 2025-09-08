@@ -200,7 +200,24 @@ export default function WorkoutCalendar({
 
   // Convert workouts to calendar events
   const events = useMemo(() => {
-    const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : (Array.isArray(plannedWorkouts) ? plannedWorkouts : []);
+    // Prefer range-scoped planned rows; if missing, filter the global list to match range and hide completed/linked/optional
+    const plannedFallback = (() => {
+      const src = Array.isArray(plannedWorkouts) ? plannedWorkouts : [];
+      return src.filter((p: any) => {
+        try {
+          const d = String(p?.date || '').slice(0,10);
+          if (!(d && d >= fromISO && d <= toISO)) return false;
+          const status = String(p?.workout_status||'').toLowerCase();
+          const hasCompletedId = !!p?.completed_workout_id;
+          const raw = (p as any).tags;
+          let tags: any[] = [];
+          if (Array.isArray(raw)) tags = raw; else if (typeof raw === 'string') { try { const j = JSON.parse(raw); if (Array.isArray(j)) tags = j; } catch {} }
+          const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+          return !isOptional && status !== 'completed' && !hasCompletedId;
+        } catch { return false; }
+      });
+    })();
+    const planned = (plannedWeekRows && plannedWeekRows.length > 0) ? plannedWeekRows : plannedFallback;
 
     // Build lookup of days/types that actually have a completed workout row this week
     // We only treat a planned row as completed if there is a matching completed workout
