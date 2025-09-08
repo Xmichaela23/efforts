@@ -396,8 +396,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       try {
                         const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
                         if (!pid) return;
+                        // 1) Detach primary planned row
                         await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
-                        await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
+                        // 2) Safety: detach any planned rows pointing at this workout id
+                        await supabase.from('planned_workouts').update({ completed_workout_id: null }).eq('completed_workout_id', workout.id);
+                        // 3) Clear workout link and any stale computed summary so client re-slices or recomputes
+                        await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
                         try { (workout as any).planned_id = null; } catch {}
                         setLinkedPlanned(null);
                         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
