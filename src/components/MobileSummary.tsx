@@ -572,7 +572,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
     if ((Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) || (fallbackWorkMeters && !isRest && !isWarm && !isCool)) {
       const dist = (Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) ? (stDistanceMeters as number) : (fallbackWorkMeters as number);
-      const targetCum = startCum + stDistanceMeters;
+      const targetCum = startCum + dist;
       while (endIdx < rows.length && (rows[endIdx].cumMeters || 0) < targetCum) endIdx += 1;
     } else {
       // Time-controlled step: coerce duration from multiple fields
