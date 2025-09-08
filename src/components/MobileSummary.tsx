@@ -81,6 +81,7 @@ function buildSamples(completed: any): Array<{ t: number; lat?: number; lng?: nu
         ?? s.currentSpeedInMetersPerSecond
         ?? s.instantaneousSpeedInMetersPerSecond
         ?? s.speed_mps
+        ?? s.enhancedSpeed
         ?? (typeof s.pace_min_per_km === 'number' ? (1000 / (s.pace_min_per_km * 60)) : undefined)
         ?? (typeof s.paceInSecondsPerKilometer === 'number' ? (1000 / s.paceInSecondsPerKilometer) : undefined)
       );
@@ -415,8 +416,16 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
   const rows = comp ? accumulate(comp) : [];
+  // Warm-up normalization: skip tiny initial sample blips (< 5s or < 10m)
   let cursorIdx = 0;
   let cursorCum = rows.length ? rows[0].cumMeters || 0 : 0;
+  while (cursorIdx + 1 < rows.length) {
+    const dt = (rows[cursorIdx+1].t - rows[cursorIdx].t);
+    const dd = (rows[cursorIdx+1].cumMeters - rows[cursorIdx].cumMeters);
+    if (dt > 5 || dd > 10) break; // start once movement is real
+    cursorIdx += 1;
+    cursorCum = rows[cursorIdx].cumMeters || cursorCum;
+  }
 
   // No animation: render values immediately on association
 
@@ -590,7 +599,21 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     let timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
     const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
     // HR smoothing: average only over non-zero, clamp to plausible 60-210 bpm
-    const hrVals = seg.map(s=> (typeof s.hr==='number' && s.hr>40 && s.hr<230 ? s.hr : NaN)).filter(n=>Number.isFinite(n));
+    const hrVals = seg
+      .map(s=> (typeof s.hr==='number' && s.hr>40 && s.hr<230 ? s.hr : NaN))
+      .filter(n=>Number.isFinite(n));
+    // If warm-up: allow first few seconds to settle; trim first 5s to reduce HR spikes
+    if (isWarm && seg.length>3) {
+      const t0 = seg[0].t;
+      const trimmed = seg.filter(s=> (s.t - t0) >= 5);
+      const hrVals2 = trimmed.map(s=> (typeof s.hr==='number' && s.hr>40 && s.hr<230 ? s.hr : NaN)).filter(n=>Number.isFinite(n));
+      if (hrVals2.length) {
+        const avg2 = Math.round(hrVals2.reduce((a,b)=>a+b,0)/hrVals2.length);
+        const km2 = Math.max(1, (trimmed[trimmed.length-1].t - trimmed[0].t));
+        // replace hrVals with smoothed value
+        return { paceText: '—', hr: avg2, durationSec: Math.round(timeSec) } as any; // placeholder replaced below
+      }
+    }
     const hrAvg = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
     const km = dMeters/1000;
     const plannedMetersForPace = (Number.isFinite(stDistanceMeters) && stDistanceMeters>0) ? (stDistanceMeters as number) : (fallbackWorkMeters || 0);
