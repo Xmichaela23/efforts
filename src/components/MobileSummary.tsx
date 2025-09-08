@@ -268,6 +268,26 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   }
 
   const type = String(planned.type || '').toLowerCase();
+  const tokens: string[] = Array.isArray((planned as any)?.steps_preset) ? ((planned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
+  const tokensJoined = tokens.join(' ').toLowerCase();
+  const defaultDurations = (() => {
+    const pickMin = (re: RegExp): number | null => {
+      const m = tokensJoined.match(re); if (!m) return null; const a = parseInt(m[1]||m[2]||m[3]||'0',10); const b = m[4]?parseInt(m[4],10):a; const avg = Math.round((a+b)/2); return avg>0?avg: null;
+    };
+    const pickSec = (re: RegExp): number | null => { const m = tokensJoined.match(re); if (!m) return null; const v = parseInt(m[1],10); return v>0?v:null; };
+    // warmup/cooldown minutes present in tokens e.g. warmup_*_12min, cooldown_*_10min
+    const warmMin = pickMin(/warmup[^\d]*?(\d{1,3})\s*min/i);
+    const coolMin = pickMin(/cooldown[^\d]*?(\d{1,3})\s*min/i);
+    // rest: R2min, _r180, r2-3min
+    const restMin = pickMin(/(?:^|_|\b)r\s*(\d{1,3})\s*min|r(\d{1,3})-?(\d{1,3})?\s*min/i);
+    const restSec = pickSec(/(?:^|_|\b)r\s*(\d{1,4})\s*s\b/i);
+    const rest = restSec != null ? restSec : (restMin!=null ? restMin*60 : null);
+    return {
+      warmup_s: warmMin!=null ? warmMin*60 : null,
+      cooldown_s: coolMin!=null ? coolMin*60 : null,
+      rest_s: rest
+    };
+  })();
 
   // Dev hydration: if completed lacks samples but we have a garmin_activity_id,
   // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
@@ -454,6 +474,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const isSwim = /swim/i.test(comp.type || '') || /swim/i.test(comp.activity_type || '');
     const kindStr = String(st.kind || st.type || st.name || '').toLowerCase();
     const isRest = /rest|recover|recovery|jog/.test(kindStr);
+    const isWarm = /warm|wu/.test(kindStr);
+    const isCool = /cool|cd/.test(kindStr);
 
     const startIdx = cursorIdx;
     const startCum = cursorCum;
@@ -492,7 +514,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     })();
 
     // Planned time (sec) if present – used to align rest/jog and as fallback to avoid 0:01 artifacts
-    const plannedDurSec = (() => {
+    let plannedDurSec = (() => {
       const cands = [st.seconds, st.duration, st.duration_sec, st.durationSeconds, st.time_sec, st.timeSeconds];
       for (const v of cands) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
       // v3 rest field
@@ -520,6 +542,12 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       } catch {}
       return 0;
     })();
+    // Fallback to defaults parsed from tokens when missing
+    if (!plannedDurSec || plannedDurSec <= 0) {
+      if (isRest && defaultDurations.rest_s) plannedDurSec = defaultDurations.rest_s;
+      if (isWarm && defaultDurations.warmup_s) plannedDurSec = defaultDurations.warmup_s;
+      if (isCool && defaultDurations.cooldown_s) plannedDurSec = defaultDurations.cooldown_s;
+    }
 
     if (Number.isFinite(stDistanceMeters) && stDistanceMeters > 0) {
       const targetCum = startCum + stDistanceMeters;
