@@ -589,12 +589,18 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const seg = rows.slice(startIdx, Math.max(startIdx + 1, endIdx));
     let timeSec = Math.max(1, (seg[seg.length-1]?.t ?? rows[rows.length-1].t) - (seg[0]?.t ?? rows[0].t));
     const dMeters = Math.max(0, (seg[seg.length-1]?.cumMeters ?? 0) - (seg[0]?.cumMeters ?? 0));
-    const hrAvg = avg(seg.map(s=> (typeof s.hr==='number'?s.hr:NaN)).filter(n=>Number.isFinite(n) ));
+    // HR smoothing: average only over non-zero, clamp to plausible 60-210 bpm
+    const hrVals = seg.map(s=> (typeof s.hr==='number' && s.hr>40 && s.hr<230 ? s.hr : NaN)).filter(n=>Number.isFinite(n));
+    const hrAvg = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
     const km = dMeters/1000;
     const plannedMetersForPace = (Number.isFinite(stDistanceMeters) && stDistanceMeters>0) ? (stDistanceMeters as number) : (fallbackWorkMeters || 0);
     const milesMeasured = (km * 0.621371);
     const milesPlanned = plannedMetersForPace > 0 ? (plannedMetersForPace/1609.34) : 0;
-    const miles = milesMeasured>0 ? milesMeasured : (milesPlanned>0 ? milesPlanned : 0);
+    // Prefer measured distance when it looks reasonable; else planned; else derive from avg speed
+    let miles = milesMeasured > 0.03 ? milesMeasured : (milesPlanned > 0 ? milesPlanned : 0);
+    if (miles <= 0 && avgSpeedMps && avgSpeedMps > 0.2) {
+      miles = (avgSpeedMps * timeSec) / 1609.34;
+    }
     const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
     // Fallback: compute from avg speed when distance integration is unavailable
     const speedVals = seg
@@ -613,7 +619,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         const s = Math.round((paceMinPerMile - m)*60);
         return { paceText: `${m}:${String(s).padStart(2,'0')}/mi`, hr: hrAvg!=null?Math.round(hrAvg):null, durationSec: Math.round(timeSec) };
       }
-      // For jog/rest, allow slower speeds; otherwise require decent movement
+      // If we still don't have reliable distance math, compute from average speed
       if (avgSpeedMps && (isRest ? avgSpeedMps >= 0.2 : avgSpeedMps > 0)) {
         const secPerMile = 1609.34 / avgSpeedMps;
         const m = Math.floor(secPerMile/60);
