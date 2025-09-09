@@ -399,6 +399,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Endurance (run/ride/swim)
   // Prefer server-computed executed intervals if present to render Executed Pace/BPM directly
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
+  const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
+  const hasServerComputed = computedIntervals.length > 0;
   const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
   // Order for display: Warm‑up first, Cool‑down last, others keep authored order
   const steps: any[] = (() => {
@@ -682,7 +684,6 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   };
 
   // -------- Server-computed interval matching --------
-  const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const roleOf = (st: any): 'warmup'|'cooldown'|'recovery'|'work' => {
     const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
     if (/cool|cd\b/.test(k)) return 'cooldown';
@@ -716,16 +717,26 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return out;
   }, [computedIntervals, steps]);
 
+  // -------- Strict mode: if workout is attached to a plan, do NOT render client fallback. --------
+  const isAttachedToPlan = !!planned && !!(planned as any)?.id;
+  const [computeInvoked, setComputeInvoked] = useState(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (isAttachedToPlan && !hasServerComputed && completed && (completed as any)?.id && !computeInvoked) {
+          setComputeInvoked(true);
+          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: (completed as any).id } });
+        }
+      } catch {}
+    })();
+  }, [isAttachedToPlan, hasServerComputed, completed, computeInvoked]);
+
   return (
     <div className="w-full">
       {(() => {
-        const hasComputed = Array.isArray(completedComputed?.intervals) && completedComputed.intervals.length > 0;
         const ver = completedComputed?.version || completedComputed?.computed_version || null;
-        return (
-          <div className="text-[11px] text-gray-500 mb-2">
-            Source: {hasComputed ? `server-computed${ver ? ` (${ver})` : ''}` : 'client fallback'}
-          </div>
-        );
+        const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : (isAttachedToPlan ? 'waiting for server' : 'client fallback');
+        return <div className="text-[11px] text-gray-500 mb-2">Source: {label}</div>;
       })()}
       <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned Pace</div>
@@ -740,7 +751,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <div className="text-gray-900">
               {(() => {
                 const hasComputed = computedIntervals && computedIntervals.length > 0;
-                if (hasComputed) {
+                if (hasServerComputed) {
                   const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
                   const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
                   const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
@@ -754,7 +765,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <div className="text-gray-900">
               {(() => {
                 const hasComputed = computedIntervals && computedIntervals.length > 0;
-                if (hasComputed) {
+                if (hasServerComputed) {
                   const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
                   const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
                   const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
@@ -769,7 +780,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <div className="text-gray-900">
               {(() => {
                 const hasComputed = computedIntervals && computedIntervals.length > 0;
-                if (hasComputed) {
+                if (hasServerComputed) {
                   const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
                   const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
                   const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
