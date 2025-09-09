@@ -190,13 +190,13 @@ export default function WorkoutCalendar({
   const { rows: plannedWeekRows } = usePlannedRange(fromISO, toISO);
   const { rows: workoutsWeekRows } = useWorkoutsRange(fromISO, toISO);
 
-  // Ensure summaries are computed for the visible week (runs once per week in session)
+  // Ensure attach + compute sweep runs for the visible week (once per week in session)
   useEffect(() => {
     (async () => {
       try {
         if (!fromISO || backfilledWeeks.has(fromISO)) return;
         backfilledWeeks.add(fromISO);
-        await supabase.functions.invoke('backfill-week-summaries', { body: { week_start: fromISO } });
+        await supabase.functions.invoke('sweep-week', { body: { week_start: fromISO } });
       } catch {}
     })();
   }, [fromISO]);
