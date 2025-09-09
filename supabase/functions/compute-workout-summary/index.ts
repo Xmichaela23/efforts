@@ -388,7 +388,7 @@ Deno.serve(async (req) => {
       return {
         planned_step_id: (st?.id ?? null),
         kind: st?.type || st?.kind || null,
-        role: stepRole(st),
+        role: (sport === 'swim' && role === 'recovery') ? 'rest' : role,
         planned: { duration_s: deriveSecondsFromPlannedStep(st), distance_m: deriveMetersFromPlannedStep(st) },
         executed: {
           duration_s: Math.round(segSec),

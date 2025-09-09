@@ -440,7 +440,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       const isRest = /rest|recover|recovery|jog/.test(kindStr);
       if (isWarm) return 'Warm‑up';
       if (isCool) return 'Cool‑down';
-      if (isRest) return 'Jog';
+      if (isRest) {
+        if (type === 'swim') return 'Rest';
+        if (type === 'ride' || type === 'bike' || type === 'cycling') return 'Easy';
+        return 'Jog';
+      }
       const direct = st.paceTarget || st.target_pace || st.pace;
       if (direct && String(direct).includes('/')) return String(direct);
       const p = Number(st.pace_sec_per_mi);
