@@ -298,10 +298,7 @@ export default function WorkoutCalendar({
       if (isPlannedRow) {
         if ((w as any)?.completed_workout_id) return false;
         if (workoutIdByPlannedId.has(String((w as any).id))) return false;
-        // Heuristic: if there is at least one completed workout for same date+type
-        // and only a single planned row for that date+type, hide the planned row.
-        const k = `${String((w as any).date)}|${String((w as any).type||'').toLowerCase()}`;
-        if (completedWorkoutKeys.has(k) && (plannedCountByKey.get(k) === 1)) return false;
+        // Do not hide planned rows based on same-day/type heuristics; only hide when explicitly linked
       }
       return true;
     });
