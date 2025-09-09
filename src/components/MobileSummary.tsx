@@ -681,6 +681,41 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return { paceText: typeof fallback === 'string' ? fallback : (fallback?.text || '—'), hr: typeof fallback === 'string' ? null : (fallback?.hr ?? null), durationSec: Math.round(timeSec) };
   };
 
+  // -------- Server-computed interval matching --------
+  const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
+  const roleOf = (st: any): 'warmup'|'cooldown'|'recovery'|'work' => {
+    const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
+    if (/cool|cd\b/.test(k)) return 'cooldown';
+    if (/warm|wu\b/.test(k)) return 'warmup';
+    if (/rest|recover|recovery|jog|easy/.test(k)) return 'recovery';
+    return 'work';
+  };
+  const matchedIdxByStep = useMemo(()=>{
+    if (!computedIntervals.length || !steps.length) return [] as number[];
+    const used = new Set<number>();
+    const out: number[] = [];
+    for (const st of steps) {
+      let found = -1;
+      const pid = (st as any)?.id ?? null;
+      if (pid) {
+        for (let i=0;i<computedIntervals.length;i++) {
+          if (used.has(i)) continue;
+          if (computedIntervals[i]?.planned_step_id && computedIntervals[i].planned_step_id === pid) { found = i; break; }
+        }
+      }
+      if (found === -1) {
+        const r = roleOf(st);
+        for (let i=0;i<computedIntervals.length;i++) {
+          if (used.has(i)) continue;
+          if (String(computedIntervals[i]?.role||'') === r) { found = i; break; }
+        }
+      }
+      if (found !== -1) used.add(found);
+      out.push(found);
+    }
+    return out;
+  }, [computedIntervals, steps]);
+
   return (
     <div className="w-full">
       <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
@@ -695,10 +730,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <div className="text-gray-800">{plannedPaceFor(st)}</div>
             <div className="text-gray-900">
               {(() => {
-                // If server-computed exists, use it; else compute client-side
-                if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
-                  const compIdx = idx; // same order as planned for now (future: align by kind/id)
-                  const row = completedComputed.intervals[compIdx] || null;
+                const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                if (compIdx != null && compIdx >= 0 && computedIntervals[compIdx]) {
+                  const row = computedIntervals[compIdx];
                   const secPerMi = row?.executed?.avg_pace_s_per_mi;
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
                 }
@@ -708,9 +742,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             </div>
             <div className="text-gray-900">
               {(() => {
-                if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
-                  const compIdx = idx;
-                  const row = completedComputed.intervals[compIdx] || null;
+                const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                if (compIdx != null && compIdx >= 0 && computedIntervals[compIdx]) {
+                  const row = computedIntervals[compIdx];
                   const dur = row?.executed?.duration_s;
                   return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
                 }
@@ -721,9 +755,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             </div>
             <div className="text-gray-900">
               {(() => {
-                if (completedComputed && Array.isArray(completedComputed.intervals) && completedComputed.intervals.length) {
-                  const compIdx = idx;
-                  const row = completedComputed.intervals[compIdx] || null;
+                const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                if (compIdx != null && compIdx >= 0 && computedIntervals[compIdx]) {
+                  const row = computedIntervals[compIdx];
                   const hr = row?.executed?.avg_hr;
                   return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
                 }
