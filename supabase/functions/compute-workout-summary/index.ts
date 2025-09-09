@@ -238,12 +238,22 @@ function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
 
 // ---------- main handler ----------
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      },
+    });
+  }
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { 'Access-Control-Allow-Origin': '*' } });
 
   try {
     const { workout_id } = await req.json();
     if (!workout_id) {
-      return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type':'application/json' }});
+      return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
@@ -256,7 +266,7 @@ Deno.serve(async (req) => {
       .maybeSingle();
 
     if (!w) {
-      return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json'}});
+      return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*'}});
     }
 
     // sport from workouts.type (fallback 'run' for walk/undefined)
@@ -518,7 +528,7 @@ Deno.serve(async (req) => {
         .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
         .eq('id', workout_id);
 
-      return new Response(JSON.stringify({ success:true, computed, mode: laps.length ? 'laps-no-plan' : 'splits-no-plan' }), { headers: { 'Content-Type':'application/json' } });
+      return new Response(JSON.stringify({ success:true, computed, mode: laps.length ? 'laps-no-plan' : 'splits-no-plan' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
     const snapped = trySnapToLaps(plannedSteps, laps);
@@ -538,7 +548,7 @@ Deno.serve(async (req) => {
         .from('workouts')
         .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
         .eq('id', workout_id);
-      return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json' } });
+      return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
     // Build step windows
@@ -738,9 +748,9 @@ Deno.serve(async (req) => {
       .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
       .eq('id', workout_id);
 
-    return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json' } });
+    return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
 
   } catch (e:any) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json' } });
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
   }
 });

@@ -731,6 +731,32 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     })();
   }, [isAttachedToPlan, hasServerComputed, completed, computeInvoked]);
 
+  // Poll for server-computed after invoke (or when attached without data)
+  useEffect(() => {
+    let cancelled = false;
+    if (!isAttachedToPlan || hasServerComputed || !(completed as any)?.id) return;
+    let tries = 0;
+    const maxTries = 10;
+    const tick = async () => {
+      try {
+        const { data } = await supabase
+          .from('workouts')
+          .select('computed,computed_version,computed_at')
+          .eq('id', (completed as any).id)
+          .maybeSingle();
+        const compd = (data as any)?.computed;
+        if (!cancelled && compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+          setHydratedCompleted((prev:any) => ({ ...(prev || completed), computed: compd }));
+          return; // stop polling
+        }
+      } catch {}
+      tries += 1;
+      if (!cancelled && tries < maxTries) setTimeout(tick, 1500);
+    };
+    setTimeout(tick, 1200);
+    return () => { cancelled = true; };
+  }, [isAttachedToPlan, hasServerComputed, completed]);
+
   return (
     <div className="w-full">
       {(() => {
