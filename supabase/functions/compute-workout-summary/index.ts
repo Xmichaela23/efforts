@@ -1,6 +1,454 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
+// ---------- small helpers ----------
+const ydToM = (yd:number)=> yd * 0.9144;
+const kmToM = (km:number)=> km * 1000;
+const miToM = (mi:number)=> mi * 1609.34;
+
+function seconds(val: any) {
+  const n = Number(val);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function avg(nums: number[]) {
+  if (!nums.length) return null;
+  return nums.reduce((a, b)=>a + b, 0) / nums.length;
+}
+
+function paceSecPerMiFromMetersSeconds(meters: number, sec: number) {
+  if (!(meters > 0) || !(sec > 0)) return null;
+  const miles = meters / 1609.34;
+  return miles > 0 ? sec / miles : null;
+}
+
+// ---------- robust sample normalization ----------
+function normalizeSamples(samples: any[]) {
+  const out: Array<{ ts:number; t:number; v?:number; d?:number; hr?:number; elev?:number; cad?:number }> = [];
+  for (let i=0;i<samples.length;i+=1) {
+    const s = samples[i] || {};
+    const ts = Number(
+      s.startTimeInSeconds ??
+      s.clockDurationInSeconds ??
+      s.timerDurationInSeconds ??
+      s.elapsed_s ??
+      s.offsetInSeconds ??
+      i
+    );
+    const t = Number(
+      s.timerDurationInSeconds ??
+      s.clockDurationInSeconds ??
+      s.elapsed_s ??
+      s.offsetInSeconds ??
+      i
+    );
+    // Accept only m/s speed fields or convertable pace fields; avoid mph/kph
+    const v = (typeof s.speedMetersPerSecond === 'number' && s.speedMetersPerSecond) ||
+              (typeof s.speedInMetersPerSecond === 'number' && s.speedInMetersPerSecond) ||
+              (typeof s.enhancedSpeedInMetersPerSecond === 'number' && s.enhancedSpeedInMetersPerSecond) ||
+              (typeof s.currentSpeedInMetersPerSecond === 'number' && s.currentSpeedInMetersPerSecond) ||
+              (typeof s.instantaneousSpeedInMetersPerSecond === 'number' && s.instantaneousSpeedInMetersPerSecond) ||
+              (typeof s.speed_mps === 'number' && s.speed_mps) ||
+              (typeof s.enhancedSpeed === 'number' && s.enhancedSpeed) ||
+              (typeof s.pace_min_per_km === 'number' && (1000 / (s.pace_min_per_km * 60))) ||
+              (typeof s.paceInSecondsPerKilometer === 'number' && (1000 / s.paceInSecondsPerKilometer)) ||
+              undefined;
+
+    const d = (typeof s.totalDistanceInMeters === 'number' && s.totalDistanceInMeters) ||
+              (typeof s.distanceInMeters === 'number' && s.distanceInMeters) ||
+              (typeof s.cumulativeDistanceInMeters === 'number' && s.cumulativeDistanceInMeters) ||
+              (typeof s.totalDistance === 'number' && s.totalDistance) ||
+              (typeof s.distance === 'number' && s.distance) ||
+              undefined;
+
+    const hr = (typeof s.heartRate === 'number' && s.heartRate) ||
+               (typeof s.heart_rate === 'number' && s.heart_rate) ||
+               (typeof s.heartRateInBeatsPerMinute === 'number' && s.heartRateInBeatsPerMinute) ||
+               undefined;
+
+    const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) ||
+                 (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) ||
+                 (typeof s.altitude === 'number' && s.altitude) ||
+                 undefined;
+
+    const cad = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute) ||
+                (typeof s.runCadence === 'number' && s.runCadence) ||
+                (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM) ||
+                (typeof s.swimCadenceInStrokesPerMinute === 'number' && s.swimCadenceInStrokesPerMinute) ||
+                (typeof s.avg_run_cadence === 'number' && s.avg_run_cadence) ||
+                undefined;
+
+    out.push({ ts: Number.isFinite(ts) ? ts : i, t: Number.isFinite(t) ? t : i, v, d, hr, elev, cad });
+  }
+
+  out.sort((a,b)=>(a.ts||0)-(b.ts||0));
+
+  // Fill cumulative distance if missing; ignore near-stationary (<0.5 m/s)
+  if (!out.length) return out;
+  let last = out[0];
+  let cum = typeof last?.d === 'number' ? last.d : 0;
+  out[0].d = cum;
+
+  for (let i=1;i<out.length;i+=1) {
+    const cur = out[i];
+    if (typeof cur.d === 'number') {
+      cum = cur.d;
+    } else {
+      const dt = Math.min(60, Math.max(0, (cur.ts || cur.t) - (last.ts || last.t)));
+      const v0 = (typeof last.v === 'number' && last.v >= 0.5) ? last.v : null;
+      const v1 = (typeof cur.v === 'number' && cur.v >= 0.5) ? cur.v : null;
+      if (dt && (v0 != null || v1 != null)) {
+        const vAvg = v0 != null && v1 != null ? (v0 + v1)/2 : (v1 ?? v0 ?? 0);
+        cum += vAvg * dt;
+      }
+      cur.d = cum;
+    }
+    last = cur;
+  }
+  return out;
+}
+
+// ---------- planned field readers (v3 + token parsing) ----------
+function deriveMetersFromPlannedStep(st: any): number | null {
+  const dm = Number(st?.distanceMeters ?? st?.distance_m ?? st?.m ?? st?.meters);
+  if (Number.isFinite(dm) && dm > 0) return dm;
+
+  // v3 swim/other
+  const yd = Number(st?.distance_yd ?? st?.distance_yds);
+  if (Number.isFinite(yd) && yd > 0) return ydToM(yd);
+
+  // Parse from label/name/description: "400m", "0.25 mi", "1 km", "200yd"
+  const txt = String(st?.label || st?.name || st?.description || '').toLowerCase();
+  const m = txt.match(/(\d+(?:\.\d+)?)\s*(mi|mile|miles|km|kilometer|kilometre|m|meter|metre|yd|yard|yards)\b/);
+  if (m) {
+    const val = parseFloat(m[1]); const unit = m[2];
+    if (unit.startsWith('mi')) return miToM(val);
+    if (unit.startsWith('km')) return kmToM(val);
+    if (unit === 'm' || unit.startsWith('met')) return val;
+    if (unit.startsWith('yd')) return ydToM(val);
+  }
+  const ov = Number(st?.original_val);
+  const ou = String(st?.original_units || '').toLowerCase();
+  if (Number.isFinite(ov) && ov > 0) {
+    if (ou === 'mi') return miToM(ov);
+    if (ou === 'km') return kmToM(ov);
+    if (ou === 'yd' || ou === 'yard' || ou === 'yards') return ydToM(ov);
+    if (ou === 'm') return ov;
+  }
+  return null;
+}
+
+function deriveSecondsFromPlannedStep(st: any): number | null {
+  const cands = [
+    st?.duration_s,    // v3
+    st?.rest_s,        // v3 rest
+    st?.seconds,
+    st?.duration,
+    st?.duration_sec,
+    st?.durationSeconds,
+    st?.time_sec,
+    st?.timeSeconds
+  ];
+  for (const v of cands) {
+    const n = seconds(v);
+    if (n) return n;
+  }
+  // Parse mm:ss, R2min, r90, 20s
+  const txt = String(st?.label || st?.name || st?.description || '').toLowerCase();
+  const mmss = txt.match(/(\d{1,2}):(\d{2})/);
+  if (mmss) {
+    const sec = parseInt(mmss[1],10)*60 + parseInt(mmss[2],10);
+    if (sec > 0) return sec;
+  }
+  const rMin = txt.match(/\br\s*(\d{1,3})\s*min|\br(\d{1,3})-?(\d{1,3})?\s*min/);
+  if (rMin) {
+    const a = parseInt(rMin[1] || rMin[2] || rMin[3] || '0', 10);
+    const b = rMin[3] ? parseInt(rMin[3],10) : a;
+    const avg = Math.round((a+b)/2)*60;
+    if (avg>0) return avg;
+  }
+  const rSec = txt.match(/\br\s*(\d{1,4})\s*s\b/);
+  if (rSec) { const v = parseInt(rSec[1],10); if (v>0) return v; }
+  const bare = txt.match(/\br\s*(\d{1,4})\b/);
+  if (bare) { const v = parseInt(bare[1],10); if (v>0 && v<3600) return v; }
+  return null;
+}
+
+function derivePlannedPaceSecPerMi(st:any): number | null {
+  const p = Number(st?.pace_sec_per_mi);
+  if (Number.isFinite(p) && p > 0) return p;
+  const pr = Array.isArray(st?.pace_range) ? st.pace_range : null;
+  if (pr && pr.length === 2) {
+    const lo = Number(pr[0]), hi = Number(pr[1]);
+    if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) return (lo+hi)/2;
+  }
+  const txt = String(st?.pace || st?.target_pace || st?.paceTarget || '').trim();
+  const m = txt.match(/(\d{1,2}):(\d{2})\s*\/\s*mi/i);
+  if (m) { const sec = parseInt(m[1],10)*60 + parseInt(m[2],10); return sec > 0 ? sec : null; }
+  return null;
+}
+
+function stepRole(st:any): 'warmup'|'cooldown'|'recovery'|'work' {
+  const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
+  if (/cool|cd\b/.test(k)) return 'cooldown';
+  if (/warm|wu\b/.test(k)) return 'warmup';
+  if (/rest|recover|recovery|jog|easy/.test(k)) return 'recovery';
+  return 'work';
+}
+
+// ---------- GAP approximation for runs ----------
+function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
+  if (!rows || eIdx <= sIdx) return null;
+  let adjMeters = 0; let timeSec = 0;
+  for (let i=sIdx+1;i<=eIdx;i+=1) {
+    const a = rows[i-1], b = rows[i];
+    const dt = Math.min(60, Math.max(0, (b.t||0)-(a.t||0)));
+    if (!dt) continue; timeSec += dt;
+    const v = (b.v>0.5 ? b.v : (a.v>0.5 ? a.v : 0)); if (!v) continue;
+    const dMeters = v*dt;
+    const elevA = (typeof a.elev==='number'?a.elev:null);
+    const elevB = (typeof b.elev==='number'?b.elev:elevA);
+    const dElev = (elevA!=null && elevB!=null) ? (elevB - elevA) : 0;
+    const g = dMeters>0 ? Math.max(-0.10, Math.min(0.10, dElev/dMeters)) : 0;
+    const factor = 1 + 9*g;
+    const adj = dMeters / factor; adjMeters += adj;
+  }
+  return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
+}
+
+// ---------- main handler ----------
+Deno.serve(async (req) => {
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+
+  try {
+    const { workout_id } = await req.json();
+    if (!workout_id) {
+      return new Response(JSON.stringify({ error: 'workout_id required' }), { status: 400, headers: { 'Content-Type':'application/json' }});
+    }
+
+    const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+
+    // Load workout + planned link
+    const { data: w } = await supabase
+      .from('workouts')
+      .select('id,user_id,planned_id,computed,gps_track,sensor_data,swim_data,laps')
+      .eq('id', workout_id)
+      .maybeSingle();
+
+    if (!w) {
+      return new Response(JSON.stringify({ error:'workout not found' }), { status:404, headers:{'Content-Type':'application/json'}});
+    }
+
+    let planned: any = null;
+    if (w.planned_id) {
+      const { data: p } = await supabase
+        .from('planned_workouts')
+        .select('id,computed,intervals')
+        .eq('id', w.planned_id)
+        .maybeSingle();
+      planned = p || null;
+    }
+
+    // Parse sensor_data
+    const sensor = (() => { try { return typeof w.sensor_data === 'string' ? JSON.parse(w.sensor_data) : w.sensor_data; } catch { return w.sensor_data; } })();
+    const samples = Array.isArray(sensor?.samples) ? sensor.samples : Array.isArray(sensor) ? sensor : [];
+    let rows = normalizeSamples(samples);
+
+    // Movement gate: skip initial non-movement (WU contamination)
+    let startIdx = 0;
+    while (startIdx + 1 < rows.length) {
+      const a = rows[startIdx], b = rows[startIdx+1];
+      const dt = (b.t - a.t); const dd = (b.d - a.d);
+      if ((a.v && a.v >= 0.5) || (dd >= 10) || (dt >= 5)) break;
+      startIdx += 1;
+    }
+    if (startIdx > 0) rows = rows.slice(startIdx);
+
+    // Planned steps (prefer computed.steps)
+    const plannedSteps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps
+                        : (Array.isArray(planned?.intervals) ? planned.intervals : []);
+
+    // Build step windows
+    let idx = 0;
+    let cursorT = rows.length ? rows[0].t : 0;
+    let cursorD = rows.length ? (rows[0].d || 0) : 0;
+
+    type Info = { st:any; startIdx:number; endIdx:number|null; measured:boolean; role:'warmup'|'cooldown'|'recovery'|'work'|'pre_extra'|'post_extra' };
+    const infos: Info[] = [];
+
+    for (let i=0;i<plannedSteps.length;i+=1) {
+      const st = plannedSteps[i];
+      const role = stepRole(st);
+      const startIdxThis = idx;
+      const startT = cursorT;
+      const startD = cursorD;
+      const targetMeters = deriveMetersFromPlannedStep(st);
+      const targetSeconds = deriveSecondsFromPlannedStep(st);
+
+      if ((targetMeters && targetMeters > 0) || (targetSeconds && targetSeconds > 0)) {
+        if (targetMeters && targetMeters > 0) {
+          const goalD = startD + targetMeters;
+          while (idx < rows.length && (rows[idx].d || 0) < goalD) idx += 1;
+        } else if (targetSeconds && targetSeconds > 0) {
+          const goalT = startT + targetSeconds;
+          while (idx < rows.length && (rows[idx].t || 0) < goalT) idx += 1;
+        }
+        if (idx >= rows.length) idx = rows.length - 1;
+        cursorT = rows[idx].t;
+        cursorD = rows[idx].d || cursorD;
+        infos.push({ st, startIdx: startIdxThis, endIdx: idx, measured: true, role });
+      } else {
+        // placeholder (bookend/recovery without explicit duration/distance)
+        infos.push({ st, startIdx: startIdxThis, endIdx: null, measured: false, role });
+        // do not advance idx; next measured defines bound
+      }
+    }
+
+    // Fill leading/trailing bookends
+    const firstMeasured = infos.findIndex(x=>x.measured);
+    let lastMeasured = -1; for (let i=infos.length-1;i>=0;i--) { if (infos[i].measured) { lastMeasured = i; break; } }
+
+    if (infos.length && firstMeasured > 0) {
+      for (let i=0;i<firstMeasured;i+=1) {
+        infos[i].endIdx = Math.max(infos[i].startIdx+1, infos[firstMeasured].startIdx);
+        infos[i].role = (i===0)? 'warmup' : 'pre_extra';
+      }
+    }
+    if (infos.length && lastMeasured >= 0 && lastMeasured < infos.length-1) {
+      for (let i=lastMeasured+1;i<infos.length;i+=1) {
+        infos[i].startIdx = infos[lastMeasured].endIdx ?? infos[i].startIdx;
+        infos[i].endIdx = rows.length - 1;
+        infos[i].role = (i===infos.length-1)? 'cooldown' : 'post_extra';
+      }
+    }
+
+    // Fill interior unmeasured (recoveries) using planned durations; fallback equal split
+    if (firstMeasured >= 0 && lastMeasured >= 0) {
+      let i = firstMeasured;
+      while (i <= lastMeasured) {
+        if (!infos[i].measured) {
+          let j = i; while (j <= lastMeasured && !infos[j].measured) j += 1;
+          const prev = infos[i-1];
+          const next = infos[j];
+          if (prev && next && prev.measured && next.measured) {
+            let totalStart = prev.endIdx ?? prev.startIdx;
+            const totalEnd = next.startIdx;
+            const width = Math.max(0, totalEnd - totalStart);
+
+            const slots = j - i;
+            const plannedSecs: number[] = []; let sum = 0;
+            for (let k=0;k<slots;k+=1) { const s = deriveSecondsFromPlannedStep(infos[i+k].st) || 0; plannedSecs.push(s); sum += s; }
+
+            if (sum > 0 && width > 0) {
+              const totalT = rows[totalEnd].t - rows[totalStart].t; let tCursor = rows[totalStart].t;
+              for (let k=0;k<slots;k+=1) {
+                const share = plannedSecs[k]/sum; const thisT = tCursor + share * totalT;
+                let e = totalStart+1; while (e < rows.length && rows[e].t < thisT) e += 1;
+                infos[i+k].startIdx = totalStart; infos[i+k].endIdx = Math.max(totalStart+1, e); infos[i+k].role = 'recovery';
+                totalStart = infos[i+k].endIdx!; tCursor = thisT;
+              }
+            } else {
+              const stepWidth = slots>0 ? Math.max(1, Math.floor(width / slots)) : width;
+              for (let k=0;k<slots;k+=1) {
+                const s = totalStart + stepWidth*k; const e = (k===slots-1)? totalEnd : Math.min(totalEnd, s+stepWidth);
+                infos[i+k].startIdx = Math.min(s,totalEnd); infos[i+k].endIdx = Math.max(infos[i+k].startIdx+1, e); infos[i+k].role = 'recovery';
+                totalStart = infos[i+k].endIdx!;
+              }
+            }
+          }
+          i = j;
+        } else { i += 1; }
+      }
+    }
+
+    // Materialize intervals
+    const outIntervals: any[] = [];
+    for (const info of infos) {
+      const st = info.st;
+      let sIdx = info.startIdx; let eIdx = info.endIdx != null ? info.endIdx : Math.min(rows.length-1, info.startIdx+1);
+      if (eIdx <= sIdx) eIdx = Math.min(rows.length-1, sIdx+1);
+
+      // For work steps, trim edges with very low speed to avoid jog bleed
+      if (info.role === 'work') {
+        const plannedSecPerMi = derivePlannedPaceSecPerMi(st);
+        const plannedMps = plannedSecPerMi ? (1609.34 / plannedSecPerMi) : null;
+        const floorMps = plannedMps ? plannedMps * 0.80 : 2.0; // ~8:04/mi default floor
+        while (sIdx < eIdx && (!(rows[sIdx].v > 0) || rows[sIdx].v < floorMps)) sIdx++;
+        while (eIdx > sIdx && (!(rows[eIdx].v > 0) || rows[eIdx].v < floorMps)) eIdx--;
+      }
+
+      const startD = rows[sIdx]?.d || 0; const startT = rows[sIdx]?.t || 0;
+      const endD = rows[eIdx]?.d || startD; const endT = rows[eIdx]?.t || startT + 1;
+      const segMetersMeasured = Math.max(0, endD - startD);
+      const segSecRaw = Math.max(0, endT - startT);
+
+      const isExtra = (info.role === 'pre_extra' || info.role === 'post_extra');
+      const segSec = isExtra ? null : (segSecRaw >= 1 ? segSecRaw : null);
+
+      // If measured distance tiny (<30m), substitute planned distance for pace computation
+      let paceMeters = segMetersMeasured;
+      if (paceMeters < 30 && segSec != null) { const plannedM = deriveMetersFromPlannedStep(st); if (plannedM && plannedM > 0) paceMeters = plannedM; }
+
+      const segPace = segSec != null ? paceSecPerMiFromMetersSeconds(paceMeters, segSec) : null;
+      const segGap = segSec != null ? gapSecPerMi(rows, sIdx, eIdx) : null;
+
+      // HR smoothing 60–210 bpm; if warmup, drop first 5s of segment
+      let hrVals: number[] = []; const t0 = rows[sIdx]?.t || 0;
+      for (let j=sIdx;j<=eIdx;j+=1) {
+        const h = rows[j].hr; if (info.role==='warmup' && (rows[j].t - t0) < 5) continue;
+        if (typeof h === 'number' && h >= 60 && h <= 210) hrVals.push(h);
+      }
+      const segHr = hrVals.length ? Math.round(avg(hrVals)!) : null;
+
+      // cadence (optional)
+      let cads: number[] = []; for (let j=sIdx;j<=eIdx;j+=1) { const c = rows[j].cad; if (typeof c === 'number' && Number.isFinite(c)) cads.push(c); }
+      const segCad = cads.length ? Math.round(avg(cads)!) : null;
+
+      outIntervals.push({
+        planned_step_id: st?.id ?? null,
+        kind: st?.type || st?.kind || null,
+        role: info.role || (info.measured ? 'work' : null),
+        planned: { duration_s: deriveSecondsFromPlannedStep(st), distance_m: deriveMetersFromPlannedStep(st) },
+        executed: {
+          duration_s: segSec != null ? Math.round(segSec) : null,
+          distance_m: segSec != null ? Math.round(segMetersMeasured) : null,
+          avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
+          gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
+          avg_hr: segHr,
+          avg_cadence_spm: segCad
+        }
+      });
+    }
+
+    // Overall rollups (optional)
+    const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
+    const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+
+    const computed = {
+      intervals: outIntervals,
+      overall: {
+        duration_s_moving: overallSec,
+        distance_m: Math.round(overallMeters),
+        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec)
+      }
+    };
+
+    // Write to workouts
+    await supabase
+      .from('workouts')
+      .update({ computed, computed_version: 1, computed_at: new Date().toISOString() })
+      .eq('id', workout_id);
+
+    return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json' } });
+
+  } catch (e:any) {
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json' } });
+  }
+});
+
+// @ts-nocheck
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
 type Sample = { startTimeInSeconds?: number; timerDurationInSeconds?: number; clockDurationInSeconds?: number; elapsed_s?: number; offsetInSeconds?: number; speedMetersPerSecond?: number; totalDistanceInMeters?: number; distanceInMeters?: number; cumulativeDistanceInMeters?: number; totalDistance?: number; distance?: number; heartRate?: number };
 
 function seconds(val: any): number | null {

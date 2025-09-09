@@ -204,10 +204,10 @@ export const useWorkouts = () => {
 
       // Step 1: Fetch manual/planned workouts from workouts table (bounded window to avoid timeouts)
       const todayIso = new Date().toISOString().slice(0, 10);
-      const lookbackIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 30 days
+      const lookbackIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 90 days
       const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
-        .select("*")
+        .select("id,name,type,date,workout_status,planned_id,duration,description,usercomments,completedmanually,created_at,updated_at,avg_heart_rate,max_heart_rate,avg_power,max_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,tss,intensity_factor,distance,moving_time,elapsed_time,provider_sport,timestamp,start_position_lat,start_position_long,friendly_name")
         .eq("user_id", user.id)
         .gte("date", lookbackIso)
         .lte("date", todayIso)
@@ -891,7 +891,7 @@ export const useWorkouts = () => {
   // 🔄 Fetch workouts when auth is ready
   useEffect(() => {
     if (!authReady) return;
-    // Load only first‑party workouts. Provider fallback disabled to avoid duplicates.
+    // Load only first‑party workouts. Provider fallback disabled to avoid duplicates and latency.
     fetchWorkouts(false);
     return () => {};
   }, [authReady]);
@@ -976,7 +976,8 @@ export const useWorkouts = () => {
     let t: number | null = null;
     const onFocus = () => {
       if (t) window.clearTimeout(t);
-      t = window.setTimeout(() => fetchWorkouts(true), 800);
+      // Do not fetch providers on focus; keep it light
+      t = window.setTimeout(() => fetchWorkouts(false), 500);
     };
     window.addEventListener('focus', onFocus);
     return () => { if (t) window.clearTimeout(t); window.removeEventListener('focus', onFocus); };
