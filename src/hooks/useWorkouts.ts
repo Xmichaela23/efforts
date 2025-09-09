@@ -207,7 +207,7 @@ export const useWorkouts = () => {
       const lookbackIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10); // last 90 days
       const { data: manualWorkouts, error: manualError } = await supabase
         .from("workouts")
-        .select("id,name,type,date,workout_status,planned_id,duration,description,usercomments,completedmanually,created_at,updated_at,avg_heart_rate,max_heart_rate,avg_power,max_power,avg_speed,max_speed,avg_cadence,max_cadence,elevation_gain,elevation_loss,calories,tss,intensity_factor,distance,moving_time,elapsed_time,provider_sport,timestamp,start_position_lat,start_position_long,friendly_name")
+        .select("*")
         .eq("user_id", user.id)
         .gte("date", lookbackIso)
         .lte("date", todayIso)
