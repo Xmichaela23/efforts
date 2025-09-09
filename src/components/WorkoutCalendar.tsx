@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
@@ -77,6 +77,8 @@ function deriveProvider(w: any): string {
 
 // Cache the computed Week 1 Monday anchor per plan to avoid repeated reads
 const planStartMondayCache = new Map<string, string>(); // planId -> ISO (YYYY-MM-DD)
+// Backfill guard to avoid repeated server calls per week
+const backfilledWeeks = new Set<string>();
 
 // Derive calendar-cell abbreviation + duration (minutes) for planned workouts
 function derivePlannedCellLabel(w: any): string | null {
@@ -187,6 +189,17 @@ export default function WorkoutCalendar({
   const toISO = toDateOnlyString(weekEnd);
   const { rows: plannedWeekRows } = usePlannedRange(fromISO, toISO);
   const { rows: workoutsWeekRows } = useWorkoutsRange(fromISO, toISO);
+
+  // Ensure summaries are computed for the visible week (runs once per week in session)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!fromISO || backfilledWeeks.has(fromISO)) return;
+        backfilledWeeks.add(fromISO);
+        await supabase.functions.invoke('backfill-week-summaries', { body: { week_start: fromISO } });
+      } catch {}
+    })();
+  }, [fromISO]);
 
   // Prefetch previous and next weeks to warm caches
   const prevStart = addDays(weekStart, -7);

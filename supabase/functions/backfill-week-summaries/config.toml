@@ -1,0 +1,6 @@
+[functions]
+verify_jwt = false
+
+[schedule]
+cron = "0 * * * *"
+payload = '{"week_start":"AUTO"}'

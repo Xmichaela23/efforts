@@ -18,12 +18,20 @@ function mondayOf(dateISO: string) {
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    }});
+  }
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: { 'Access-Control-Allow-Origin': '*' } });
   try {
     const body = await req.json().catch(()=>({}));
     const weekStart: string | undefined = body?.week_start; // YYYY-MM-DD (any day in target week)
     if (!weekStart || !/^\d{4}-\d{2}-\d{2}$/.test(weekStart)) {
-      return new Response(JSON.stringify({ error: 'Provide week_start as YYYY-MM-DD' }), { status: 400, headers: { 'Content-Type':'application/json' }});
+      return new Response(JSON.stringify({ error: 'Provide week_start as YYYY-MM-DD' }), { status: 400, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
     const supabase = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
@@ -47,7 +55,7 @@ Deno.serve(async (req) => {
 
     const list = Array.isArray(rows) ? rows : [];
     if (!list.length) {
-      return new Response(JSON.stringify({ success:true, processed: 0, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json' }});
+      return new Response(JSON.stringify({ success:true, processed: 0, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
     // Invoke compute-workout-summary for each id (limit concurrency)
@@ -76,9 +84,9 @@ Deno.serve(async (req) => {
       }));
     }
 
-    return new Response(JSON.stringify({ success:true, processed, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json' }});
+    return new Response(JSON.stringify({ success:true, processed, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
   } catch (e) {
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json' }});
+    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
   }
 });
 
