@@ -761,7 +761,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     <div className="w-full">
       {(() => {
         const ver = completedComputed?.version || completedComputed?.computed_version || null;
-        const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : (isAttachedToPlan ? 'waiting for server' : 'client fallback');
+        const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : 'waiting for server';
         return <div className="text-[11px] text-gray-500 mb-2">Source: {label}</div>;
       })()}
       <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
@@ -784,8 +784,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const secPerMi = row?.executed?.avg_pace_s_per_mi;
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
                 }
-                const val = renderCompletedFor(st);
-                return <div>{typeof val === 'string' ? val : val.paceText}</div>;
+                return <div>—</div>;
               })()}
             </div>
             <div className="text-gray-900">
@@ -798,9 +797,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const dur = row?.executed?.duration_s;
                   return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
                 }
-                const val = renderCompletedFor(st) as any;
-                const dur = typeof val !== 'string' ? val.durationSec : null;
-                return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
+                return <div>—</div>;
               })()}
             </div>
             <div className="text-gray-900">
@@ -813,8 +810,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const hr = row?.executed?.avg_hr;
                   return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
                 }
-                const val = renderCompletedFor(st);
-                return <div className="text-xs text-gray-700">{typeof val !== 'string' && val.hr ? `${val.hr} bpm` : '—'}</div>;
+                return <div className="text-xs text-gray-700">—</div>;
               })()}
             </div>
           </div>
