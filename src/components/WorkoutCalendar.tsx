@@ -241,8 +241,8 @@ export default function WorkoutCalendar({
         }
       } catch {}
     }
-    // Suppress raw workout rows that are explicitly linked to a planned row
-    const wkCombined = wkDb.filter((w: any) => !linkedCompletedIds.has(String(w?.id)));
+    // Keep raw workout rows even when linked; we will suppress the planned row instead so the completed shows
+    const wkCombined = wkDb;
     // Build completed keys for date+type from all workouts in week (unfiltered)
     const completedWorkoutKeys = new Set(
       wkDb
@@ -267,14 +267,8 @@ export default function WorkoutCalendar({
         .map((p: any) => `${String(p.date)}|${String(p.type || '').toLowerCase()}`)
     );
 
-    // If a planned row has been marked completed for the same date+type (and confirmed by completedWorkoutKeys),
-    // suppress the generic workout DB row to avoid duplicate "ST ✓" labels.
-    const wkCombinedFiltered = [...wkCombined].filter((w: any) => {
-      try {
-        const key = `${String(w.date)}|${String(w.type || w.workout_type || '').toLowerCase()}`;
-        return !completedPlannedKeys.has(key);
-      } catch { return true; }
-    });
+    // Do not suppress workouts based on date/type; rely on explicit links and later de-dupe
+    const wkCombinedFiltered = [...wkCombined];
     // Normalize planned statuses:
     // - If a planned row links to a completed workout (either side), force completed ✓
     const mappedPlanned = (planned as any[]).map((p:any)=>{
@@ -344,24 +338,14 @@ export default function WorkoutCalendar({
 
     const deduped: CalendarEvent[] = [];
     for (const [day, list] of byDay.entries()) {
-      const buckets = new Map<string, any>();
+      // Only de-dupe exact duplicates (same href). We no longer collapse planned vs completed
+      // so that planned remains visible until there is an explicit link (handled earlier).
+      const seen = new Set<string>();
       for (const ev of list) {
-        const isPlanned = String(ev.provider || '').toLowerCase() === 'workouts';
-        // If both a planned and a completed of same type exist, collapse to one bucket keyed by type+miles
-        const bKey = `${ev._sigType}|${ev._sigMiles}`;
-        const existing = buckets.get(bKey);
-        if (!existing) {
-          buckets.set(bKey, ev);
-        } else {
-          // Prefer completed over planned; otherwise keep the first
-          const evCompleted = /✓$/.test(ev.label);
-          const exCompleted = /✓$/.test(existing.label);
-          const keep = (evCompleted && !exCompleted) ? ev : existing;
-          buckets.set(bKey, keep);
-        }
-      }
-      for (const kept of buckets.values()) {
-        deduped.push({ date: day, label: kept.label, href: kept.href, provider: kept.provider });
+        const key = String(ev.href || '') || `${ev._sigType}|${ev._sigMiles}|${ev.label}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        deduped.push({ date: day, label: ev.label, href: ev.href, provider: ev.provider });
       }
     }
 
