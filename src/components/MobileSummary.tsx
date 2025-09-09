@@ -731,6 +731,12 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           setComputeInvoked(true);
           await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: (completed as any).id } });
         }
+        // If we are viewing a planned row that is linked to a completed workout, but we didn't
+        // receive the completed object here, trigger compute for that completed id.
+        if (isAttachedToPlan && !hasServerComputed && !completed && (planned as any)?.completed_workout_id && !computeInvoked) {
+          setComputeInvoked(true);
+          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((planned as any).completed_workout_id) } });
+        }
       } catch {}
     })();
   }, [isAttachedToPlan, hasServerComputed, completed, computeInvoked]);
@@ -760,6 +766,33 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     setTimeout(tick, 1200);
     return () => { cancelled = true; };
   }, [isAttachedToPlan, hasServerComputed, completed]);
+
+  // Poll path when only planned has a completed_workout_id
+  useEffect(() => {
+    let cancelled = false;
+    const cid = (planned as any)?.completed_workout_id ? String((planned as any).completed_workout_id) : null;
+    if (!isAttachedToPlan || hasServerComputed || !cid) return;
+    let tries = 0;
+    const maxTries = 10;
+    const tick = async () => {
+      try {
+        const { data } = await supabase
+          .from('workouts')
+          .select('id,computed,computed_version,computed_at')
+          .eq('id', cid)
+          .maybeSingle();
+        const compd = (data as any)?.computed;
+        if (!cancelled && compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+          setHydratedCompleted((prev:any) => ({ ...(prev || {}), id: cid, computed: compd }));
+          return;
+        }
+      } catch {}
+      tries += 1;
+      if (!cancelled && tries < maxTries) setTimeout(tick, 1500);
+    };
+    setTimeout(tick, 1200);
+    return () => { cancelled = true; };
+  }, [isAttachedToPlan, hasServerComputed, planned]);
 
   return (
     <div className="w-full">
