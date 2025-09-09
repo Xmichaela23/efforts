@@ -718,6 +718,15 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   return (
     <div className="w-full">
+      {(() => {
+        const hasComputed = Array.isArray(completedComputed?.intervals) && completedComputed.intervals.length > 0;
+        const ver = completedComputed?.version || completedComputed?.computed_version || null;
+        return (
+          <div className="text-[11px] text-gray-500 mb-2">
+            Source: {hasComputed ? `server-computed${ver ? ` (${ver})` : ''}` : 'client fallback'}
+          </div>
+        );
+      })()}
       <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned Pace</div>
         <div className="font-medium text-black">Executed Pace</div>
@@ -730,9 +739,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <div className="text-gray-800">{plannedPaceFor(st)}</div>
             <div className="text-gray-900">
               {(() => {
-                const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                if (compIdx != null && compIdx >= 0 && computedIntervals[compIdx]) {
-                  const row = computedIntervals[compIdx];
+                const hasComputed = computedIntervals && computedIntervals.length > 0;
+                if (hasComputed) {
+                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
+                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
                   const secPerMi = row?.executed?.avg_pace_s_per_mi;
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
                 }
@@ -742,9 +753,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             </div>
             <div className="text-gray-900">
               {(() => {
-                const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                if (compIdx != null && compIdx >= 0 && computedIntervals[compIdx]) {
-                  const row = computedIntervals[compIdx];
+                const hasComputed = computedIntervals && computedIntervals.length > 0;
+                if (hasComputed) {
+                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
+                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
                   const dur = row?.executed?.duration_s;
                   return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
                 }
@@ -755,9 +768,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             </div>
             <div className="text-gray-900">
               {(() => {
-                const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                if (compIdx != null && compIdx >= 0 && computedIntervals[compIdx]) {
-                  const row = computedIntervals[compIdx];
+                const hasComputed = computedIntervals && computedIntervals.length > 0;
+                if (hasComputed) {
+                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
+                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
                   const hr = row?.executed?.avg_hr;
                   return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
                 }
