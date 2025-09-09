@@ -51,7 +51,20 @@ Deno.serve(async (req) => {
       .limit(1000);
     if (error) throw error;
     const ids: string[] = (Array.isArray(rows)?rows:[]).map((r: any)=>r.id);
-    if (!ids.length) {
+
+    // Also include any planned rows in window that already have completed_workout_id, regardless of workout_status
+    const { data: plannedRows } = await supabase
+      .from('planned_workouts')
+      .select('completed_workout_id,date')
+      .gte('date', fromISO)
+      .lte('date', toISOEnd)
+      .not('completed_workout_id', 'is', null)
+      .limit(1000);
+    const extraIds: string[] = (Array.isArray(plannedRows)?plannedRows:[])
+      .map((p:any)=>String(p.completed_workout_id||''))
+      .filter((x:string)=>x.length>0 && !ids.includes(x));
+    const allIds = [...ids, ...extraIds];
+    if (!allIds.length) {
       return new Response(JSON.stringify({ success:true, processed: 0, from: fromISO, to: toISOEnd }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' }});
     }
 
@@ -61,8 +74,8 @@ Deno.serve(async (req) => {
     const computeUrl = `${baseUrl}/functions/v1/compute-workout-summary`;
 
     const MAX = 4; let attached = 0; let computed = 0;
-    for (let i=0;i<ids.length;i+=MAX) {
-      const batch = ids.slice(i, i+MAX);
+    for (let i=0;i<allIds.length;i+=MAX) {
+      const batch = allIds.slice(i, i+MAX);
       // Attach first
       await Promise.all(batch.map(async(id)=>{
         try {

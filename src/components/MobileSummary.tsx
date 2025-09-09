@@ -730,12 +730,18 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         if (isAttachedToPlan && !hasServerComputed && completed && (completed as any)?.id && !computeInvoked) {
           setComputeInvoked(true);
           await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: (completed as any).id } });
+          try {
+            await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: (completed as any).id } });
+          } catch {}
         }
         // If we are viewing a planned row that is linked to a completed workout, but we didn't
         // receive the completed object here, trigger compute for that completed id.
         if (isAttachedToPlan && !hasServerComputed && !completed && (planned as any)?.completed_workout_id && !computeInvoked) {
           setComputeInvoked(true);
           await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((planned as any).completed_workout_id) } });
+          try {
+            await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String((planned as any).completed_workout_id) } });
+          } catch {}
         }
       } catch {}
     })();

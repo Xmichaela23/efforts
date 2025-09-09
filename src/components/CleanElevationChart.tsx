@@ -9,6 +9,7 @@ interface CleanElevationChartProps {
   workoutType: string;
   selectedMetric: string;
   useImperial: boolean;
+  analysisSeries?: any | null; // optional server-computed series
 }
 
 const CleanElevationChart: React.FC<CleanElevationChartProps> = ({ 
@@ -16,9 +17,57 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   sensorData,
   workoutType, 
   selectedMetric: externalSelectedMetric,
-  useImperial
+  useImperial,
+  analysisSeries
 }) => {
   const [selectedMetric, setSelectedMetric] = useState<'pace' | 'heartrate' | 'vam'>('pace');
+
+  // Read CSS variables (with fallbacks) for minimal/mobile visuals
+  const theme = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return {
+        pace: '#3b82f6',
+        gap: '#6366f1',
+        hr: '#ef4444',
+        cadence: '#10b981',
+        elevStroke: '#9ca3af',
+        grid: 'rgba(0,0,0,0.05)',
+        textSecondary: '#666666',
+        lw: { pace: 2, hr: 1.5, cadence: 1 },
+        op: { pace: 1, hr: 0.6, cadence: 0.5 }
+      } as const;
+    }
+    const css = getComputedStyle(document.documentElement);
+    const val = (name: string, fallback: string) => (css.getPropertyValue(name) || fallback).trim();
+    const num = (name: string, fallback: number) => {
+      const v = css.getPropertyValue(name).trim().replace('px','');
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : fallback;
+    };
+    const opNum = (name: string, fallback: number) => {
+      const v = Number(css.getPropertyValue(name).trim());
+      return Number.isFinite(v) ? v : fallback;
+    };
+    return {
+      pace: val('--series-pace', '#3b82f6'),
+      gap: val('--series-gap', '#6366f1'),
+      hr: val('--series-hr', '#ef4444'),
+      cadence: val('--series-cadence', '#10b981'),
+      elevStroke: val('--series-elev-stroke', '#9ca3af'),
+      grid: val('--grid-hairline', 'rgba(0,0,0,0.05)'),
+      textSecondary: val('--text-secondary', '#666666'),
+      lw: {
+        pace: num('--lw-pace', 2),
+        hr: num('--lw-hr', 1.5),
+        cadence: num('--lw-cadence', 1)
+      },
+      op: {
+        pace: opNum('--op-pace', 1),
+        hr: opNum('--op-hr', 0.6),
+        cadence: opNum('--op-cadence', 0.5)
+      }
+    } as const;
+  }, []);
   
   // Sync with external selectedMetric prop
   React.useEffect(() => {
@@ -80,8 +129,36 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     return n > 1e12 ? n / 1000 : n;
   };
 
-  // Process GPS data for chart
+  // Process data for chart (prefer server series)
   const chartData = useMemo(() => {
+    // Prefer server-computed series when present
+    if (analysisSeries && typeof analysisSeries === 'object') {
+      try {
+        const t = Array.isArray(analysisSeries.time) ? analysisSeries.time : (Array.isArray(analysisSeries.time_s) ? analysisSeries.time_s : []);
+        const distance_m = Array.isArray(analysisSeries.distance_m) ? analysisSeries.distance_m : [];
+        const elevation_m = Array.isArray(analysisSeries.elevation_m) ? analysisSeries.elevation_m : [];
+        const pace_s_per_km = Array.isArray(analysisSeries.pace_s_per_km) ? analysisSeries.pace_s_per_km : [];
+        const hr_bpm = Array.isArray(analysisSeries.hr_bpm) ? analysisSeries.hr_bpm : [];
+        const cadence_spm = Array.isArray(analysisSeries.cadence_spm) ? analysisSeries.cadence_spm : [];
+        const N = Math.max(distance_m.length, elevation_m.length, pace_s_per_km.length, hr_bpm.length, cadence_spm.length);
+        const out: Array<{ distance: number; absoluteElevation: number | null; metricValue: number | null }> = [];
+        for (let i = 0; i < N; i += 1) {
+          const distMi = Number.isFinite(distance_m[i]) ? (distance_m[i] / 1609.34) : (Number.isFinite(distance_m[i]) ? (distance_m[i] as number) : 0);
+          const elev = Number.isFinite(elevation_m[i]) ? (useImperial ? elevation_m[i] * 3.28084 : elevation_m[i]) : null;
+          let metric: number | null = null;
+          if (selectedMetric === 'pace') {
+            metric = Number.isFinite(pace_s_per_km[i]) ? (pace_s_per_km[i] as number) : null;
+          } else if (selectedMetric === 'heartrate') {
+            metric = Number.isFinite(hr_bpm[i]) ? (hr_bpm[i] as number) : null;
+          } else if (selectedMetric === 'vam') {
+            metric = null; // server series may add vam later; keep null for now
+          }
+          out.push({ distance: parseFloat((distMi || 0).toFixed(2)), absoluteElevation: elev, metricValue: metric });
+        }
+        return out;
+      } catch {}
+    }
+
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
     // Sample GPS track based on selected metric for optimal smoothness
@@ -288,7 +365,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
         originalIndex: index
       };
     });
-  }, [gpsTrack, sensorData, selectedMetric, useImperial]);
+  }, [gpsTrack, sensorData, selectedMetric, useImperial, analysisSeries]);
 
   // Debug logging
   console.log('🔍 CleanElevationChart debug:', {
@@ -320,17 +397,17 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     } : null
   });
 
-  // Get metric label and unit
+  // Get metric label, unit, and line styling
   const getMetricInfo = () => {
     switch (selectedMetric) {
       case 'pace':
-        return { label: 'Pace', unit: 'min/mi', color: '#3b82f6' };
+        return { label: 'Pace', unit: 'min/mi', color: theme.pace, width: theme.lw.pace, opacity: theme.op.pace, dash: undefined as string | undefined };
       case 'heartrate':
-        return { label: 'Heart Rate', unit: 'bpm', color: '#ef4444' };
+        return { label: 'Heart Rate', unit: 'bpm', color: theme.hr, width: theme.lw.hr, opacity: theme.op.hr, dash: undefined };
       case 'vam':
-        return { label: 'VAM', unit: 'm/h', color: '#10b981' };
+        return { label: 'VAM', unit: 'm/h', color: theme.cadence, width: theme.lw.cadence, opacity: theme.op.cadence, dash: undefined };
       default:
-        return { label: 'Metric', unit: '', color: '#6b7280' };
+        return { label: 'Metric', unit: '', color: theme.textSecondary, width: 1, opacity: 0.6, dash: undefined };
     }
   };
 
@@ -347,12 +424,12 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     <div className="h-full flex flex-col">
 
       
-      {/* Chart Container - Simple and clean */}
+      {/* Chart Container - full-bleed, minimal */}
       <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
         {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <CartesianGrid horizontal={true} vertical={false} stroke={theme.grid} />
             
             {/* X Axis - Distance */}
             <XAxis 
@@ -360,7 +437,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               type="number"
               domain={['dataMin', 'dataMax']}
               tickFormatter={(value) => `${value.toFixed(1)} mi`}
-              stroke="#6b7280"
+              stroke={theme.textSecondary}
               fontSize={10}
             />
             
@@ -370,20 +447,34 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               orientation="left"
               domain={['dataMin - 50', 'dataMax + 50']}
               tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
-              stroke="#6b7280"
+              stroke={theme.textSecondary}
               fontSize={10}
               width={40}
             />
+            {/* Right Y Axis - Selected metric (hidden ticks) */}
+            <YAxis yAxisId="right" orientation="right" hide domain={[ 'auto', 'auto' ]} />
             
             {/* Elevation Area */}
             <Area
               yAxisId="left"
               type="monotone"
               dataKey="absoluteElevation"
-              stroke="#6b7280"
-              strokeWidth={1.5}
-              fill="#e5e7eb"
-              fillOpacity={0.4}
+              stroke={theme.elevStroke}
+              strokeWidth={1}
+              fill="transparent"
+            />
+
+            {/* Selected metric line */}
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="metricValue"
+              stroke={metricInfo.color}
+              strokeWidth={metricInfo.width as number}
+              strokeOpacity={metricInfo.opacity as number}
+              dot={false}
+              isAnimationActive={false}
+              {...(metricInfo.dash ? { strokeDasharray: metricInfo.dash } : {})}
             />
             
             {/* Tooltip - Simple and clean */}
@@ -398,13 +489,12 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                   const metricValue = dataPoint?.metricValue;
                   
                   return (
-                    <div className="bg-white p-3 border border-gray-200 rounded-lg shadow-lg">
-                      <p className="font-medium">Distance: {label} mi</p>
-                      <p className="text-gray-600">Elevation: {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</p>
+                    <div style={{ background: 'transparent', padding: 0 }}>
+                      <div style={{ fontSize: 12, color: 'var(--text-primary)' }}>Dist {Number(label).toFixed(1)} mi</div>
+                      <div style={{ fontSize: 12, color: theme.textSecondary }}>Elev {Math.round(Number(elevation) || 0)} {useImperial ? 'ft' : 'm'}</div>
                       {metricValue !== null && metricValue !== undefined && (
-                        <p className="text-gray-600">{metricInfo.label}: {metricValue} {metricInfo.unit}</p>
+                        <div style={{ fontSize: 12, color: metricInfo.color }}>{metricInfo.label} {metricValue} {metricInfo.unit}</div>
                       )}
-                      <p className="text-xs text-gray-400">At this position</p>
                     </div>
                   );
                 }
@@ -423,43 +513,28 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
         )}
       </div>
 
-      {/* Metric Selection Buttons - Underneath Chart */}
-      <div className="flex gap-6 px-4 py-3 border-t border-gray-100">
+      {/* Metric toggles - text only, minimal */}
+      <div className="flex gap-6 px-4 py-3">
         <button
           onClick={() => setSelectedMetric('pace')}
-          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
-            selectedMetric === 'pace' 
-              ? 'text-black border-b-2 border-black pb-1 bg-blue-50' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          Pace
-        </button>
+          className={`text-sm font-medium px-0 py-0 ${selectedMetric === 'pace' ? 'underline' : ''}`}
+          style={{ color: selectedMetric === 'pace' ? 'var(--toggle-active-color)' : 'var(--toggle-inactive-color)' }}
+        >Pace</button>
         <button
           onClick={() => setSelectedMetric('heartrate')}
-          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
-            selectedMetric === 'heartrate' 
-              ? 'text-black border-b-2 border-black pb-1 bg-red-50' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          BPM
-        </button>
+          className={`text-sm font-medium px-0 py-0 ${selectedMetric === 'heartrate' ? 'underline' : ''}`}
+          style={{ color: selectedMetric === 'heartrate' ? 'var(--toggle-active-color)' : 'var(--toggle-inactive-color)' }}
+        >BPM</button>
         <button
           onClick={() => setSelectedMetric('vam')}
-          className={`text-sm font-medium transition-all px-3 py-1 rounded ${
-            selectedMetric === 'vam' 
-              ? 'text-black border-b-2 border-black pb-1 bg-green-50' 
-              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-          }`}
-        >
-          VAM
-        </button>
+          className={`text-sm font-medium px-0 py-0 ${selectedMetric === 'vam' ? 'underline' : ''}`}
+          style={{ color: selectedMetric === 'vam' ? 'var(--toggle-active-color)' : 'var(--toggle-inactive-color)' }}
+        >VAM</button>
       </div>
 
-      {/* Elevation Profile Title - Below Buttons */}
-      <div className="px-4 py-3 border-t border-gray-100">
-        <h3 className="text-lg font-semibold text-gray-900 text-center">Elevation Profile</h3>
+      {/* Minimal section label (optional) */}
+      <div className="px-4 py-2">
+        <h3 className="text-base font-medium text-foreground text-center">Elevation</h3>
       </div>
 
 

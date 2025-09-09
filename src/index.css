@@ -33,6 +33,40 @@
     --tabbar-h: 56px; /* matches h-14 */
     --todays-h: 12rem; /* universal (approved) */
     --cal-cell-h: 150px; /* pre-seed final target to avoid jump */
+    /* Analytics tokens (mobile, minimal) */
+    --series-pace: #3b82f6;
+    --series-gap: #6366f1;
+    --series-hr: #ef4444;
+    --series-cadence: #10b981;
+    --series-elev-stroke: #9ca3af;
+    --surface: #ffffff;
+    --text-primary: #111111;
+    --text-secondary: #666666;
+    --grid-hairline: rgba(0,0,0,0.05);
+
+    /* line widths */
+    --lw-pace: 2px;
+    --lw-gap: 2px;
+    --lw-hr: 1.5px;
+    --lw-cadence: 1px;
+
+    /* opacities */
+    --op-pace: 1;
+    --op-gap: 0.7;
+    --op-hr: 0.6;
+    --op-cadence: 0.5;
+    --op-muted: 0.3;
+
+    /* styles */
+    --dash-gap: 4 3;               /* GAP line dash */
+    --zone-bar-height: 10px;       /* compact stacked bars */
+    --marker-size: 6px;            /* tiny lap dots */
+    --route-width: 2.25px;         /* map route stroke */
+
+    /* toggles */
+    --toggle-active-color: var(--text-primary);
+    --toggle-inactive-color: #6b7280;
+    --toggle-active-underline: 1px;
   }
 }
 

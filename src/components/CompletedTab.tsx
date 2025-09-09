@@ -1490,19 +1490,17 @@ const formatPace = (paceValue: any): string => {
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
      <div className="w-full">
        {/* 🗺️ MAP SECTION - Fixed height container */}
-       <div className="w-full mb-16">
-         <div className="bg-white rounded-lg overflow-hidden">
-           <div className="h-64 relative">
-             <ActivityMap
-               gpsTrack={Array.isArray((hydrated||workoutData).gps_track) ? (hydrated||workoutData).gps_track : []}
-               activityName={(hydrated||workoutData).name || generateTitle()}
-               activityType={workoutType}
-               startLocation={(hydrated||workoutData).start_position_lat && (hydrated||workoutData).start_position_long ? {
-                 lat: (hydrated||workoutData).start_position_lat,
-                 lng: (hydrated||workoutData).start_position_long
-               } : null}
-             />
-           </div>
+       <div className="w-full mb-8">
+         <div className="h-64 relative">
+           <ActivityMap
+             gpsTrack={Array.isArray((hydrated||workoutData).gps_track) ? (hydrated||workoutData).gps_track : []}
+             activityName={(hydrated||workoutData).name || generateTitle()}
+             activityType={workoutType}
+             startLocation={(hydrated||workoutData).start_position_lat && (hydrated||workoutData).start_position_long ? {
+               lat: (hydrated||workoutData).start_position_lat,
+               lng: (hydrated||workoutData).start_position_long
+             } : null}
+           />
          </div>
        </div>
        
@@ -1516,10 +1514,103 @@ const formatPace = (paceValue: any): string => {
              workoutType={workoutType}
              selectedMetric={selectedMetric}
              useImperial={useImperial}
+             analysisSeries={(hydrated||workoutData)?.computed?.analysis?.series || null}
            />
          </div>
-       </div>
-     </div>
+         {((hydrated||workoutData)?.computed?.analysis?.ui?.footnote) && (
+           <div className="px-4 py-2 text-xs text-gray-500">
+             {(hydrated||workoutData).computed.analysis.ui.footnote}
+           </div>
+         )}
+         {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
+          <div className="px-4 py-2">
+            {Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
+              <div className="mb-2">
+                <div className="text-sm mb-1">Splits · km</div>
+                <div className="space-y-1">
+                  {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any) => (
+                    <div key={`km-${s.n}`} className="flex items-baseline justify-between text-sm">
+                      <div className="text-[#666666]">{s.n}</div>
+                      <div className="flex items-baseline gap-4">
+                        {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
+                        {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
+                        <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(s.avgPace_s_per_km/60)}:${String(Math.round(s.avgPace_s_per_km%60)).padStart(2,'0')}/km` : '—'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {Array.isArray((hydrated||workoutData).computed.analysis.events.splits.mi) && (hydrated||workoutData).computed.analysis.events.splits.mi.length > 0 && (
+              <div className="mb-2">
+                <div className="text-sm mb-1">Splits · mi</div>
+                <div className="space-y-1">
+                  {(hydrated||workoutData).computed.analysis.events.splits.mi.map((s:any) => (
+                    <div key={`mi-${s.n}`} className="flex items-baseline justify-between text-sm">
+                      <div className="text-[#666666]">{s.n}</div>
+                      <div className="flex items-baseline gap-4">
+                        {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
+                        {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
+                        <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor((s.avgPace_s_per_km)/60)}:${String(Math.round((s.avgPace_s_per_km)%60)).padStart(2,'0')}/km` : '—'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {/* Zones histograms (minimal stacked bars) */}
+        {((hydrated||workoutData)?.computed?.analysis?.zones) && (
+          <div className="px-4 py-4 space-y-3">
+            {Array.isArray((hydrated||workoutData).computed.analysis.zones?.hr?.bins) && (hydrated||workoutData).computed.analysis.zones.hr.bins.length > 0 && (()=>{
+              const hrBins = (hydrated||workoutData).computed.analysis.zones.hr.bins as any[];
+              const total = hrBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
+              return (
+                <div>
+                  <div className="text-sm mb-1">HR zones</div>
+                  <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
+                    {hrBins.map((b:any, i:number) => (
+                      <div key={`hrz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
+                    ))}
+                  </div>
+                  <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.hr.schema}</div>
+                </div>
+              );
+            })()}
+            {Array.isArray((hydrated||workoutData).computed.analysis.zones?.pace?.bins) && (hydrated||workoutData).computed.analysis.zones.pace.bins.length > 0 && (()=>{
+              const pBins = (hydrated||workoutData).computed.analysis.zones.pace.bins as any[];
+              const total = pBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
+              return (
+                <div>
+                  <div className="text-sm mb-1">Pace bands</div>
+                  <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
+                    {pBins.map((b:any, i:number) => (
+                      <div key={`pcz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
+                    ))}
+                  </div>
+                  <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.pace.schema}</div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+        {((hydrated||workoutData)?.computed?.analysis?.bests) && (
+          <div className="px-4 py-2 space-y-1">
+            <div className="text-sm mb-1">Bests</div>
+            {Array.isArray((hydrated||workoutData).computed.analysis.bests?.pace_s_per_km) && (hydrated||workoutData).computed.analysis.bests.pace_s_per_km.length > 0 && (
+              <div className="text-sm">
+                {(hydrated||workoutData).computed.analysis.bests.pace_s_per_km.map((b:any, i:number) => (
+                  <div key={`bp-${i}`} className="flex items-baseline justify-between">
+                    <div className="text-[#666666]">{b.duration_s/60} min</div>
+                    <div className="font-mono">{`${Math.floor(b.value/60)}:${String(Math.round(b.value%60)).padStart(2,'0')}/km`}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
      </div>
  );
 };
