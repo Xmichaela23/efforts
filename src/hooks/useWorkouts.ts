@@ -292,7 +292,6 @@ export const useWorkouts = () => {
                 name: activity.activity_name || activity.activity_type || locationTitle || `Garmin ${workoutType}`,
                 type: workoutType,
                 activity_type: activity.activity_type,
-                provider_sport: activity.activity_type,
                 duration: Math.round(activity.duration_seconds / 60) || 0,
                 date: activityDate,
                 description: `Imported from Garmin - ${activity.activity_type || 'Activity'}`,
