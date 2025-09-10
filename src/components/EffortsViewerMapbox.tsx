@@ -280,14 +280,18 @@ export default function EffortsViewerMapbox({
     if (!src) return;
     const route = (trackLngLat && trackLngLat.length > 1) ? trackLngLat : lastNonEmptyRouteRef.current;
     if (!route || route.length < 2) return;
+
+    const distNow = normalizedSamples[idx]?.d_m ?? (normalizedSamples[normalizedSamples.length - 1]?.d_m ?? 0);
+
     const cum = prepLine(route);
     const target = pointAtDistance(route as any, cum, (cum[cum.length - 1] || 1) * (distNow / (dTotal || 1)));
     src.setData({ type: "Feature", properties:{}, geometry: { type: "Point", coordinates: target } } as any);
-  }, [idx, distNow, dTotal, trackLngLat]);
+  }, [idx, dTotal, trackLngLat, normalizedSamples]);
 
   /** ----- Chart (responsive SVG with viewBox) ----- */
   const W = 700, H = 280, P = 28;
   const tTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].t_s : 0; // (currently not drawn, but handy)
+  const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 0;
 
   // y-domain (absolute elevation when tab === 'elev')
   const yDomain = useMemo<[number, number]>(() => {
