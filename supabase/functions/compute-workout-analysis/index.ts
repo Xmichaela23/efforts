@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -40,9 +40,9 @@ Deno.serve(async (req) => {
       if (val == null) return null;
       try { return typeof val === 'string' ? JSON.parse(val) : val; } catch { return val; }
     }
-    const gps = parseJson(w.gps_track) || [];
-    const sensorRaw = parseJson(w.sensor_data) || [];
-    const sensor = Array.isArray(sensorRaw?.samples) ? sensorRaw.samples : (Array.isArray(sensorRaw) ? sensorRaw : []);
+    let gps = parseJson(w.gps_track) || [];
+    let sensorRaw = parseJson(w.sensor_data) || [];
+    let sensor = Array.isArray(sensorRaw?.samples) ? sensorRaw.samples : (Array.isArray(sensorRaw) ? sensorRaw : []);
     const laps = parseJson(w.laps) || [];
 
     // Minimal provider provenance for envelope
@@ -54,6 +54,42 @@ Deno.serve(async (req) => {
       },
       units: { distance: 'm', elevation: 'm', speed: 'mps', pace: 's_per_km', hr: 'bpm', power: 'w' }
     };
+
+    // Load Garmin row for fallback/date correction when available
+    let ga: any = null;
+    try {
+      if ((w as any)?.garmin_activity_id && (w as any)?.user_id) {
+        const { data } = await supabase
+          .from('garmin_activities')
+          .select('sensor_data,samples_data,gps_track,start_time,start_time_offset_seconds')
+          .eq('user_id', (w as any).user_id)
+          .eq('garmin_activity_id', (w as any).garmin_activity_id)
+          .maybeSingle();
+        ga = data || null;
+      }
+    } catch {}
+
+    // Correct workouts.date to provider-local date for Garmin
+    try {
+      if (String((w as any)?.source || '').toLowerCase() === 'garmin' && (ga?.start_time || (w as any)?.timestamp)) {
+        const startIso: string | null = (ga?.start_time as string) || ((w as any)?.timestamp as string) || null;
+        const offSec = Number(ga?.start_time_offset_seconds);
+        if (startIso && Number.isFinite(Date.parse(startIso)) && Number.isFinite(offSec)) {
+          const expectedLocal = new Date(Date.parse(startIso) + offSec * 1000).toISOString().split('T')[0];
+          // @ts-ignore
+          if (expectedLocal && expectedLocal !== (w as any)?.date) {
+            await supabase.from('workouts').update({ date: expectedLocal }).eq('id', (w as any).id);
+          }
+        }
+      }
+    } catch {}
+
+    // If workouts JSON is empty, fall back to Garmin heavy JSON
+    if (((sensor?.length ?? 0) < 2) && ((gps?.length ?? 0) < 2) && ga) {
+      const sRaw = parseJson(ga.sensor_data) || parseJson(ga.samples_data) || [];
+      sensor = Array.isArray(sRaw?.samples) ? sRaw.samples : (Array.isArray(sRaw) ? sRaw : []);
+      gps = parseJson(ga.gps_track) || [];
+    }
 
     // Build minimal provider-agnostic run analysis (series + 1km/1mi splits)
     function normalizeSamples(samplesIn: any[]): Array<{ t:number; d:number; elev?:number; hr?:number; cad?:number }> {

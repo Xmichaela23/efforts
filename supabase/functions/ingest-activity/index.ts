@@ -41,6 +41,36 @@ const roundInt = (v: any) => {
   return Number.isFinite(n) ? Math.round(n) : null;
 };
 
+// --- Garmin local date + UTC timestamp resolver ---
+function garminLocalDateAndTimestamp(a: any): { date: string | null; timestamp: string } {
+  const sIn  = Number(a?.summary?.startTimeInSeconds ?? a?.start_time_in_seconds);
+  const sOff = Number(a?.summary?.startTimeOffsetInSeconds ?? a?.start_time_offset_seconds);
+  const sLoc = Number(a?.summary?.localStartTimeInSeconds ?? a?.local_start_time_in_seconds);
+
+  const localStr = a?.summary?.startTimeLocal ?? a?.start_time_local;
+  const utcStr   = a?.summary?.startTimeGmt ?? a?.summary?.startTimeGMT ?? a?.start_time;
+
+  const localMs = Number.isFinite(sLoc)
+    ? sLoc * 1000
+    : (Number.isFinite(sIn) && Number.isFinite(sOff))
+      ? (sIn + sOff) * 1000
+      : (typeof localStr === 'string' ? Date.parse(String(localStr).replace(' ', 'T')) : NaN);
+
+  const date = Number.isFinite(localMs)
+    ? new Date(localMs).toISOString().slice(0, 10)
+    : (typeof localStr === 'string' && localStr.includes('T'))
+      ? String(localStr).split('T')[0]
+      : (typeof utcStr === 'string' && utcStr.includes('T'))
+        ? String(utcStr).split('T')[0]
+        : null;
+
+  const timestamp = Number.isFinite(sIn)
+    ? new Date(sIn * 1000).toISOString()
+    : (typeof utcStr === 'string' ? new Date(utcStr).toISOString() : new Date().toISOString());
+
+  return { date, timestamp };
+}
+
 function mapStravaToWorkout(activity: any, userId: string) {
   const start = activity.start_date || activity.start_date_local;
   const durationMin = activity.moving_time != null ? Math.max(0, Math.round(activity.moving_time / 60)) : null;
@@ -318,18 +348,7 @@ function computeComputedFromActivity(activity: any): any | null {
 }
 
 function mapGarminToWorkout(activity: any, userId: string) {
-  // Prefer provider-local timestamp when available
-  const startIsoUtc = activity.start_time
-    || (activity.summary?.startTimeInSeconds ? new Date(activity.summary.startTimeInSeconds * 1000).toISOString() : null);
-  // Garmin often provides local offset seconds; derive local date to avoid UTC day shift
-  const offsetSec = Number(activity.start_time_offset_seconds ?? activity.summary?.startTimeOffsetInSeconds);
-  const startMillisUtc = startIsoUtc ? Date.parse(startIsoUtc) : NaN;
-  const startMillisLocal = Number.isFinite(startMillisUtc)
-    ? (startMillisUtc + (Number.isFinite(offsetSec) ? offsetSec * 1000 : 0))
-    : NaN;
-  const dateIso = Number.isFinite(startMillisLocal)
-    ? new Date(startMillisLocal).toISOString().split('T')[0]
-    : (startIsoUtc ? startIsoUtc.split('T')[0] : null);
+  const { date, timestamp } = garminLocalDateAndTimestamp(activity);
   const typeKey = (activity.activity_type || activity.summary?.activityType?.typeKey || '').toLowerCase();
   const type = typeKey.includes('run') ? 'run'
     : (typeKey.includes('bike') || typeKey.includes('bik') || typeKey.includes('cycl') || typeKey.includes('ride')) ? 'ride'
@@ -341,8 +360,8 @@ function mapGarminToWorkout(activity: any, userId: string) {
     user_id: userId,
     name: activity.activity_name || activity.activity_type || `Garmin ${type}`,
     type,
-    date: dateIso,
-    timestamp: startIsoUtc,
+    date: date,
+    timestamp: timestamp,
     duration: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
     moving_time: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
     elapsed_time: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
@@ -429,7 +448,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: false, error }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // Fire-and-forget: auto-attach to planned and compute summary for zero-touch UX
+    // Fire-and-forget: auto-attach to planned and compute summaries/analysis for zero-touch UX
     try {
       const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/auto-attach-planned`;
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
@@ -446,6 +465,11 @@ Deno.serve(async (req) => {
         try {
           const sumUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-summary`;
           await fetch(sumUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: wid }) });
+        } catch {}
+        // Ensure provider-agnostic analysis (series/splits) computes date correction too
+        try {
+          const anUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/compute-workout-analysis`;
+          await fetch(anUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ workout_id: wid }) });
         } catch {}
       }
     } catch {}

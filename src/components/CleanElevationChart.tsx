@@ -132,7 +132,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
 
   // Process data for chart (prefer server series)
   const chartData = useMemo(() => {
-    // Prefer server-computed series when present
+    // Prefer server-computed series when present, but only if elevation is usable
     if (analysisSeries && typeof analysisSeries === 'object') {
       try {
         const t = Array.isArray(analysisSeries.time) ? analysisSeries.time : (Array.isArray(analysisSeries.time_s) ? analysisSeries.time_s : []);
@@ -141,25 +141,29 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
         const pace_s_per_km = Array.isArray(analysisSeries.pace_s_per_km) ? analysisSeries.pace_s_per_km : [];
         const hr_bpm = Array.isArray(analysisSeries.hr_bpm) ? analysisSeries.hr_bpm : [];
         const cadence_spm = Array.isArray(analysisSeries.cadence_spm) ? analysisSeries.cadence_spm : [];
-        const N = Math.max(distance_m.length, elevation_m.length, pace_s_per_km.length, hr_bpm.length, cadence_spm.length, t.length);
-        const out: Array<{ distance: number; absoluteElevation: number | null; metricValue: number | null }> = [];
-        let baseElevation: number | null = null;
-        for (let i = 0; i < N; i += 1) {
-          const distMi = Number.isFinite(distance_m[i]) ? (distance_m[i] / 1609.34) : (Number.isFinite(distance_m[i]) ? (distance_m[i] as number) : 0);
-          const elevVal = Number.isFinite(elevation_m[i]) ? (useImperial ? elevation_m[i] * 3.28084 : elevation_m[i]) : null;
-          if (baseElevation == null && elevVal != null) baseElevation = elevVal;
-          const elev = elevVal;
-          let metric: number | null = null;
-          if (selectedMetric === 'pace') {
-            metric = Number.isFinite(pace_s_per_km[i]) ? (pace_s_per_km[i] as number) : null;
-          } else if (selectedMetric === 'heartrate') {
-            metric = Number.isFinite(hr_bpm[i]) ? (hr_bpm[i] as number) : null;
-          } else if (selectedMetric === 'vam') {
-            metric = null; // server series may add vam later; keep null for now
+        const validElevCount = elevation_m.filter((v: any) => Number.isFinite(v)).length;
+        const hasUsableElev = validElevCount >= 3 && distance_m.length >= 3;
+        if (hasUsableElev) {
+          const N = Math.max(distance_m.length, elevation_m.length, pace_s_per_km.length, hr_bpm.length, cadence_spm.length, t.length);
+          const out: Array<{ distance: number; absoluteElevation: number | null; metricValue: number | null }> = [];
+          let baseElevation: number | null = null;
+          for (let i = 0; i < N; i += 1) {
+            const distMi = Number.isFinite(distance_m[i]) ? (distance_m[i] / 1609.34) : (Number.isFinite(distance_m[i]) ? (distance_m[i] as number) : 0);
+            const elevVal = Number.isFinite(elevation_m[i]) ? (useImperial ? elevation_m[i] * 3.28084 : elevation_m[i]) : null;
+            if (baseElevation == null && elevVal != null) baseElevation = elevVal;
+            const elev = elevVal;
+            let metric: number | null = null;
+            if (selectedMetric === 'pace') {
+              metric = Number.isFinite(pace_s_per_km[i]) ? (pace_s_per_km[i] as number) : null;
+            } else if (selectedMetric === 'heartrate') {
+              metric = Number.isFinite(hr_bpm[i]) ? (hr_bpm[i] as number) : null;
+            } else if (selectedMetric === 'vam') {
+              metric = null; // server series may add vam later; keep null for now
+            }
+            out.push({ distance: parseFloat((distMi || 0).toFixed(2)), absoluteElevation: elev, metricValue: metric });
           }
-          out.push({ distance: parseFloat((distMi || 0).toFixed(2)), absoluteElevation: elev, metricValue: metric });
+          return out;
         }
-        return out;
       } catch {}
     }
 

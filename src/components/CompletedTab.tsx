@@ -1546,7 +1546,7 @@ const formatPace = (paceValue: any): string => {
          )}
          {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
           <div className="px-4 py-2">
-            {Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
+            {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
               <div className="mb-2">
                 <div className="text-sm mb-1">Splits · km</div>
                 <div className="space-y-1">
@@ -1563,7 +1563,7 @@ const formatPace = (paceValue: any): string => {
                 </div>
               </div>
             )}
-            {Array.isArray((hydrated||workoutData).computed.analysis.events.splits.mi) && (hydrated||workoutData).computed.analysis.events.splits.mi.length > 0 && (
+            {useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.mi) && (hydrated||workoutData).computed.analysis.events.splits.mi.length > 0 && (
               <div className="mb-2">
                 <div className="text-sm mb-1">Splits · mi</div>
                 <div className="space-y-1">
