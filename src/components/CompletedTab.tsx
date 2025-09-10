@@ -5,6 +5,7 @@ import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
 import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
+import EffortsViewerMapbox from './EffortsViewerMapbox';
 import { supabase } from '../lib/supabase';
 
 // Custom styles for range sliders
@@ -1544,6 +1545,49 @@ const formatPace = (paceValue: any): string => {
              {(hydrated||workoutData).computed.analysis.ui.footnote}
            </div>
          )}
+
+         {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
+         {(() => {
+           try {
+             const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
+             const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
+             const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
+             const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
+             const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
+             const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
+             const samples = (distance_m || []).map((d:number, i:number) => ({
+               t_s: Number(time_s?.[i] ?? i) || 0,
+               d_m: Number(d) || 0,
+               elev_m_sm: Number(elev?.[i]) || 0,
+               pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
+               hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
+               grade: null,
+               vam_m_per_h: null
+             }));
+             const gps = Array.isArray((hydrated||workoutData)?.gps_track) ? (hydrated||workoutData).gps_track : [];
+             const track = gps
+               .map((p:any)=>{
+                 const lng = p.lng ?? p.longitudeInDegree ?? p.longitude;
+                 const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+                 if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+                 return null;
+               })
+               .filter(Boolean) as [number,number][];
+             const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
+             if (!samples.length) return null;
+             return (
+               <div className="mt-4">
+                 <EffortsViewerMapbox
+                   mapboxToken={token}
+                   samples={samples}
+                   trackLngLat={track}
+                   useMiles={!!useImperial}
+                   useFeet={!!useImperial}
+                 />
+               </div>
+             );
+           } catch { return null; }
+         })()}
          {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
           <div className="px-4 py-2">
             {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
