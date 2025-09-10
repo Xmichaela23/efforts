@@ -476,7 +476,6 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             
             {/* Tooltip - Simple and clean */}
             <Tooltip
-              position={{ x: 0, y: -120 }}
               content={({ active, payload, label }) => {
                 if (active && payload && payload.length) {
                   const elevation = payload.find(p => p.dataKey === 'absoluteElevation')?.value;
