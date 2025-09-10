@@ -175,6 +175,7 @@ export default function EffortsViewerMapbox({
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const mapDivRef = useRef<HTMLDivElement>(null);
   const hasFitRef = useRef(false);
+  const prevRouteLenRef = useRef(0);
   const routeSrc = "route-src", routeId = "route-line";
   const cursorSrc = "cursor-src", cursorId = "cursor-pt";
 
@@ -220,12 +221,14 @@ export default function EffortsViewerMapbox({
     try {
       const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
       if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } } as any);
-      if (!hasFitRef.current && coords.length > 1) {
+      // Fit once when route transitions from empty→non-empty
+      if (!hasFitRef.current && coords.length > 1 && prevRouteLenRef.current === 0) {
         const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
         for (const c of coords) b.extend(c);
         map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
         hasFitRef.current = true;
       }
+      prevRouteLenRef.current = coords.length;
     } catch {}
   }, [trackLngLat]);
 
