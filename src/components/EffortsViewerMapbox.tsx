@@ -177,6 +177,7 @@ export default function EffortsViewerMapbox({
   const hasFitRef = useRef(false);
   const prevRouteLenRef = useRef(0);
   const lastNonEmptyRouteRef = useRef<[number,number][]>([]);
+  const lockedCameraRef = useRef<{ center: [number,number], zoom: number } | null>(null);
   const routeSrc = "route-src", routeId = "route-line";
   const cursorSrc = "cursor-src", cursorId = "cursor-pt";
 
@@ -243,8 +244,17 @@ export default function EffortsViewerMapbox({
         for (const c of coords) b.extend(c);
         map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
         hasFitRef.current = true;
+        try {
+          const c = map.getCenter();
+          lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
+        } catch {}
       }
       prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : 0;
+      // Re-apply locked camera to avoid style/resize reverting to globe
+      if (hasFitRef.current && lockedCameraRef.current) {
+        const { center, zoom } = lockedCameraRef.current;
+        try { map.jumpTo({ center, zoom }); } catch {}
+      }
     } catch {}
   }, [trackLngLat]);
 
