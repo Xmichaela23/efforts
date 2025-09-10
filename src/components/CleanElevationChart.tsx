@@ -472,18 +472,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               fill="transparent"
             />
 
-            {/* Selected metric line */}
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="metricValue"
-              stroke={metricInfo.color}
-              strokeWidth={metricInfo.width as number}
-              strokeOpacity={metricInfo.opacity as number}
-              dot={false}
-              isAnimationActive={false}
-              {...(metricInfo.dash ? { strokeDasharray: metricInfo.dash } : {})}
-            />
+            {/* Metric overlay intentionally removed; tooltip still uses metricValue */}
             
             {/* Tooltip - Simple and clean */}
             <Tooltip

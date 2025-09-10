@@ -1573,7 +1573,7 @@ const formatPace = (paceValue: any): string => {
                       <div className="flex items-baseline gap-4">
                         {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
                         {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
-                        <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor((s.avgPace_s_per_km)/60)}:${String(Math.round((s.avgPace_s_per_km)%60)).padStart(2,'0')}/km` : '—'}</div>
+                        <div className="font-mono">{s.avgPace_s_per_km != null ? (()=>{ const spm = s.avgPace_s_per_km * 1.60934; const mm = Math.floor(spm/60); const ss = Math.round(spm%60); return `${mm}:${String(ss).padStart(2,'0')}/mi`; })() : '—'}</div>
                       </div>
                     </div>
                   ))}
