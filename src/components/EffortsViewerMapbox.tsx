@@ -114,6 +114,7 @@ export default function EffortsViewerMapbox({
 
   useEffect(() => {
     if (!mapDivRef.current) return;
+    if (!mapboxToken) return; // don't initialize without token
     if (mapRef.current) return; // once
     mapboxgl.accessToken = mapboxToken;
     const map = new mapboxgl.Map({
@@ -146,6 +147,25 @@ export default function EffortsViewerMapbox({
 
     return () => { map.remove(); mapRef.current = null; };
   }, [mapboxToken, trackLngLat]);
+
+  // Update route source and fit when track changes after load
+  useEffect(() => {
+    const map = mapRef.current; if (!map) return;
+    const coords = trackLngLat || [];
+    try {
+      const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+      const data = { type:'Feature', geometry:{ type:'LineString', coordinates: coords } } as any;
+      if (src) {
+        src.setData(data);
+      }
+      if (!hasFitRef.current && coords.length > 1) {
+        const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+        for (const c of coords) b.extend(c);
+        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
+        hasFitRef.current = true;
+      }
+    } catch {}
+  }, [trackLngLat]);
 
   // move cursor marker when idx changes
   const dTotal = samples.length ? samples[samples.length-1].d_m : 1;

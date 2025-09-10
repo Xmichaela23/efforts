@@ -1559,7 +1559,7 @@ const formatPace = (paceValue: any): string => {
            const samples = new Array(len).fill(0).map((_,i:number)=>({
              t_s: Number(time_s?.[i] ?? i) || 0,
              d_m: Number(distance_m?.[i] ?? 0) || 0,
-             elev_m_sm: Number.isFinite(elev?.[i]) ? Number(elev[i]) : null,
+             elev_m_sm: (typeof elev?.[i] === 'number' ? Number(elev[i]) : null),
              pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
              hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
              grade: null as number | null,
