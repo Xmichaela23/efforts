@@ -176,6 +176,7 @@ export default function EffortsViewerMapbox({
   const mapDivRef = useRef<HTMLDivElement>(null);
   const hasFitRef = useRef(false);
   const prevRouteLenRef = useRef(0);
+  const lastNonEmptyRouteRef = useRef<[number,number][]>([]);
   const routeSrc = "route-src", routeId = "route-line";
   const cursorSrc = "cursor-src", cursorId = "cursor-pt";
 
@@ -217,18 +218,33 @@ export default function EffortsViewerMapbox({
   // Update map sources on data change
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
-    const coords = trackLngLat || [];
+    const incoming = trackLngLat || [];
+    const hasNonEmpty = (arr:[number,number][]) => Array.isArray(arr) && arr.length > 1 && Array.isArray(arr[0]) && typeof arr[0][0] === 'number';
+    // Keep last non-empty route to avoid blinking to empty when parent re-renders transiently
+    if (hasNonEmpty(incoming)) {
+      lastNonEmptyRouteRef.current = incoming as [number,number][];
+    }
+    const coords = hasNonEmpty(incoming) ? incoming : lastNonEmptyRouteRef.current;
     try {
-      const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-      if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } } as any);
+      let src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+      if (!src) {
+        map.addSource(routeSrc, { type: 'geojson', data: { type:'Feature', properties:{}, geometry:{ type:'LineString', coordinates: coords } } as any });
+        if (!map.getLayer(routeId)) {
+          map.addLayer({ id: routeId, type: 'line', source: routeSrc, layout: { 'line-join':'round', 'line-cap':'round' }, paint: { 'line-color':'#3b82f6', 'line-width': 3 } });
+        }
+        src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+      }
+      if (src && hasNonEmpty(coords)) {
+        src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
+      }
       // Fit once when route transitions from empty→non-empty
-      if (!hasFitRef.current && coords.length > 1 && prevRouteLenRef.current === 0) {
+      if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
         const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
         for (const c of coords) b.extend(c);
         map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
         hasFitRef.current = true;
       }
-      prevRouteLenRef.current = coords.length;
+      prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : 0;
     } catch {}
   }, [trackLngLat]);
 
