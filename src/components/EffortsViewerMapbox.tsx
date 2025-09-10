@@ -196,7 +196,7 @@ export default function EffortsViewerMapbox({
 
     map.on("load", () => {
       if (!map.getSource(routeSrc)) {
-        map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: trackLngLat || [] } } as any });
+        map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
       }
       if (!map.getLayer(routeId)) {
         map.addLayer({ id: routeId, type: "line", source: routeSrc, paint: { "line-color": "#3b82f6", "line-width": 3 } });
@@ -206,66 +206,65 @@ export default function EffortsViewerMapbox({
         map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
         map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       }
-      if (!hasFitRef.current && trackLngLat && trackLngLat.length > 1) {
-        const b = new mapboxgl.LngLatBounds(trackLngLat[0], trackLngLat[0]);
-        for (const c of trackLngLat) b.extend(c);
-        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-        hasFitRef.current = true;
-      }
     });
 
-    return () => { map.remove(); mapRef.current = null; };
+    // Keep camera on resize only (not each update)
+    const onResize = () => {
+      if (!mapRef.current) return;
+      mapRef.current.resize();
+      if (lockedCameraRef.current) {
+        const { center, zoom } = lockedCameraRef.current;
+        try { mapRef.current.jumpTo({ center, zoom }); } catch {}
+      }
+    };
+    map.on('resize', onResize);
+
+    return () => { map.off('resize', onResize); map.remove(); mapRef.current = null; };
   }, [mapboxToken, trackLngLat]);
 
-  // Update map sources on data change
+  // Update map sources when route changes (validate; fit once after idle; lock camera after fit)
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const incoming = trackLngLat || [];
-    const hasNonEmpty = (arr:[number,number][]) => Array.isArray(arr) && arr.length > 1 && Array.isArray(arr[0]) && typeof arr[0][0] === 'number';
-    // Keep last non-empty route to avoid blinking to empty when parent re-renders transiently
-    if (hasNonEmpty(incoming)) {
-      lastNonEmptyRouteRef.current = incoming as [number,number][];
+
+    const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
+    const filtered = Array.isArray(incoming) ? (incoming.filter(isValidCoord) as [number,number][]) : [];
+
+    const hasNonEmpty = (arr:[number,number][]) => Array.isArray(arr) && arr.length > 1 && isValidCoord(arr[0]);
+
+    if (hasNonEmpty(filtered)) {
+      lastNonEmptyRouteRef.current = filtered;
     }
-    const coords = hasNonEmpty(incoming) ? incoming : lastNonEmptyRouteRef.current;
-    // If route is already initialized with a non-empty geometry, keep camera and skip further source resets
-    if (routeInitializedRef.current && hasNonEmpty(lastNonEmptyRouteRef.current)) {
-      // Ensure camera stays stable
-      if (hasFitRef.current && lockedCameraRef.current) {
-        const { center, zoom } = lockedCameraRef.current;
-        try { map.jumpTo({ center, zoom }); } catch {}
-      }
-      return;
-    }
+    const coords = hasNonEmpty(filtered) ? filtered : lastNonEmptyRouteRef.current;
+
+    // If already initialized with a good route, do not reset the source to empty
+    if (routeInitializedRef.current && !hasNonEmpty(coords)) return;
+
     try {
-      let src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-      if (!src) {
-        map.addSource(routeSrc, { type: 'geojson', data: { type:'Feature', properties:{}, geometry:{ type:'LineString', coordinates: coords } } as any });
-        if (!map.getLayer(routeId)) {
-          map.addLayer({ id: routeId, type: 'line', source: routeSrc, layout: { 'line-join':'round', 'line-cap':'round' }, paint: { 'line-color':'#3b82f6', 'line-width': 3 } });
-        }
-        src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-      }
+      const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
       if (src && hasNonEmpty(coords)) {
         src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
       }
-      // Fit once when route transitions from empty→non-empty
+
+      // Fit once after style is ready and we have a valid route
       if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
-        const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
-        for (const c of coords) b.extend(c);
-        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-        hasFitRef.current = true;
-        try {
-          const c = map.getCenter();
-          lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
-        } catch {}
-        routeInitializedRef.current = true;
+        const doFit = () => {
+          const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+          for (const c of coords) b.extend(c);
+          map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
+          map.once('idle', () => {
+            try {
+              const c = map.getCenter();
+              lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
+            } catch {}
+            hasFitRef.current = true;
+            routeInitializedRef.current = true;
+          });
+        };
+        if (map.isStyleLoaded()) doFit(); else map.once('styledata', doFit);
       }
+
       prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : 0;
-      // Re-apply locked camera to avoid style/resize reverting to globe
-      if (hasFitRef.current && lockedCameraRef.current) {
-        const { center, zoom } = lockedCameraRef.current;
-        try { map.jumpTo({ center, zoom }); } catch {}
-      }
     } catch {}
   }, [trackLngLat]);
 
