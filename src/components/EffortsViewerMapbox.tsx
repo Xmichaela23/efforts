@@ -178,6 +178,7 @@ export default function EffortsViewerMapbox({
   const prevRouteLenRef = useRef(0);
   const lastNonEmptyRouteRef = useRef<[number,number][]>([]);
   const lockedCameraRef = useRef<{ center: [number,number], zoom: number } | null>(null);
+  const routeInitializedRef = useRef(false);
   const routeSrc = "route-src", routeId = "route-line";
   const cursorSrc = "cursor-src", cursorId = "cursor-pt";
 
@@ -226,6 +227,15 @@ export default function EffortsViewerMapbox({
       lastNonEmptyRouteRef.current = incoming as [number,number][];
     }
     const coords = hasNonEmpty(incoming) ? incoming : lastNonEmptyRouteRef.current;
+    // If route is already initialized with a non-empty geometry, keep camera and skip further source resets
+    if (routeInitializedRef.current && hasNonEmpty(lastNonEmptyRouteRef.current)) {
+      // Ensure camera stays stable
+      if (hasFitRef.current && lockedCameraRef.current) {
+        const { center, zoom } = lockedCameraRef.current;
+        try { map.jumpTo({ center, zoom }); } catch {}
+      }
+      return;
+    }
     try {
       let src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
       if (!src) {
@@ -248,6 +258,7 @@ export default function EffortsViewerMapbox({
           const c = map.getCenter();
           lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
         } catch {}
+        routeInitializedRef.current = true;
       }
       prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : 0;
       // Re-apply locked camera to avoid style/resize reverting to globe
