@@ -3,7 +3,6 @@ import { Button } from '@/components/ui/button';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
-import EffortsViewerMapbox from './EffortsViewerMapbox';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
@@ -1614,14 +1613,18 @@ const formatPace = (paceValue: any): string => {
         const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
         return (
           <div className="mt-4">
-            <EffortsViewerMapbox
-              mapboxToken={token}
-              samples={samples as any}
-              trackLngLat={track}
-              useMiles={!!useImperial}
-              useFeet={!!useImperial}
-              compact={compact}
-            />
+            <React.Suspense fallback={<div className="px-4 py-3 text-sm text-[#666666]">Loading map…</div>}>
+              <ViewerErrorBoundary>
+                <EffortsViewerMapbox
+                  mapboxToken={token}
+                  samples={samples as any}
+                  trackLngLat={track}
+                  useMiles={!!useImperial}
+                  useFeet={!!useImperial}
+                  compact={compact}
+                />
+              </ViewerErrorBoundary>
+            </React.Suspense>
           </div>
         );
       })()}
@@ -1719,3 +1722,10 @@ const formatPace = (paceValue: any): string => {
 };
 
 export default CompletedTab;
+
+class ViewerErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }>{
+  constructor(props: any){ super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError(){ return { hasError: true }; }
+  componentDidCatch(){ /* no-op */ }
+  render(){ if (this.state.hasError) return <div className="px-4 py-3 text-sm text-[#666666]">Map unavailable</div>; return this.props.children as any; }
+}
