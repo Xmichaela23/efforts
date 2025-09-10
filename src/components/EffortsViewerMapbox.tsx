@@ -116,12 +116,14 @@ export default function EffortsViewerMapbox({
   trackLngLat,
   useMiles = true,
   useFeet = true,
+  compact = false,
 }: {
   mapboxToken: string;
   samples: Sample[];
   trackLngLat: [number, number][];
   useMiles?: boolean;
   useFeet?: boolean;
+  compact?: boolean;
 }) {
   const [tab, setTab] = useState<MetricTab>("elev");
   const [idx, setIdx] = useState(0);
@@ -155,7 +157,7 @@ export default function EffortsViewerMapbox({
       }
       const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
       if (!map.getSource(cursorSrc)) {
-        map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "Point", coordinates: startCoord } } });
+        map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
         map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       }
       if (!hasFitRef.current && trackLngLat && trackLngLat.length > 1) {
@@ -349,30 +351,33 @@ export default function EffortsViewerMapbox({
 
       {/* Chart */}
       <div style={{ position: "relative" }}>
-        {/* Floating readout (non-blocking pointer) */}
-        <div
-          style={{
-            position: "absolute", right: 8, bottom: 12, zIndex: 2,
-            background: "rgba(255,255,255,.9)", backdropFilter: "blur(6px)",
-            border: "1px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,.06)",
-            borderRadius: 12, padding: "10px 12px", minWidth: 220, pointerEvents: "none"
-          }}
-        >
-          <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>
-            {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
+        {/* READOUT */}
+        {compact ? (
+          <div style={{margin:'6px 6px 10px 6px', padding:'10px 12px', border:'1px solid #e2e8f0', borderRadius:12, background:'#fff'}}>
+            <div style={{fontWeight:700}}>{fmtDist(s?.d_m??0,useMiles)} · {fmtTime(s?.t_s??0)}</div>
+            <div style={{color:'#0ea5e9', fontWeight:600}}>
+              {tab==='pace'?fmtPace(s?.pace_s_per_km??null,useMiles)
+               : tab==='bpm'?`${s?.hr_bpm??'—'} bpm`
+               : tab==='vam'?fmtVAM(s?.vam_m_per_h??null,useFeet)
+               : fmtAlt(s?.elev_m_sm??0,useFeet)}
+            </div>
+            <div style={{fontSize:13, color:'#475569'}}>
+              {tab==='elev' ? `Alt ${fmtAlt(s?.elev_m_sm??0,useFeet)} · Grade ${fmtPct(s?.grade??null)}`
+               : tab==='pace' ? `Pace ${fmtPace(s?.pace_s_per_km??null,useMiles)} · Grade ${fmtPct(s?.grade??null)}`
+               : tab==='bpm'  ? `HR ${s?.hr_bpm??'—'} bpm · Pace ${fmtPace(s?.pace_s_per_km??null,useMiles)}`
+               : `VAM ${fmtVAM(s?.vam_m_per_h??null,useFeet)} · Grade ${fmtPct(s?.grade??null)}`}
+            </div>
           </div>
-          <div style={{ color: "#0ea5e9", fontWeight: 600, marginBottom: 2 }}>
-            {tab === "pace"
-              ? fmtPace(s?.pace_s_per_km ?? null, useMiles)
-              : tab === "bpm"
-              ? `${s?.hr_bpm ?? "—"} bpm`
-              : tab === "vam"
-              ? fmtVAM(s?.vam_m_per_h ?? null, useFeet)
-              : fmtAlt(s?.elev_m_sm ?? 0, useFeet)}
+        ) : (
+          <div style={{ position: "absolute", right: 8, bottom: 12, zIndex: 2, background: "rgba(255,255,255,.9)", backdropFilter: "blur(6px)", border: "1px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,.06)", borderRadius: 12, padding: "10px 12px", minWidth: 220, pointerEvents: "none" }}>
+            <div style={{ fontWeight: 700, color: "#0f172a", marginBottom: 2 }}>{fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}</div>
+            <div style={{ color: "#0ea5e9", fontWeight: 600, marginBottom: 2 }}>
+              {tab === "pace" ? fmtPace(s?.pace_s_per_km ?? null, useMiles) : tab === "bpm" ? `${s?.hr_bpm ?? "—"} bpm` : tab === "vam" ? fmtVAM(s?.vam_m_per_h ?? null, useFeet) : fmtAlt(s?.elev_m_sm ?? 0, useFeet)}
+            </div>
+            <div style={{ fontSize: 13, color: "#475569" }}>{readoutSecond}</div>
+            <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8" }}>Computed</div>
           </div>
-          <div style={{ fontSize: 13, color: "#475569" }}>{readoutSecond}</div>
-          <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8" }}>Computed</div>
-        </div>
+        )}
 
         <svg
           ref={svgRef}

@@ -6,6 +6,7 @@ import { useWorkouts } from '@/hooks/useWorkouts';
 import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
+import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
 // Custom styles for range sliders
@@ -39,6 +40,7 @@ interface CompletedTabProps {
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
   const { useImperial } = useAppContext();
+  const compact = useCompact();
   const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
@@ -1592,6 +1594,7 @@ const formatPace = (paceValue: any): string => {
                  trackLngLat={track}
                  useMiles={!!useImperial}
                  useFeet={!!useImperial}
+                 compact={compact}
                />
              </div>
            );
