@@ -190,11 +190,16 @@ export default function EffortsViewerMapbox({
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      interactive: false
+      interactive: false,
+      minZoom: 3,
+      maxZoom: 18,
+      projection: { name: 'mercator' }
     });
     mapRef.current = map;
 
     map.on("load", () => {
+      try { map.setProjection({ name: 'mercator' } as any); } catch {}
+      try { (map as any).setFog?.(null); } catch {}
       if (!map.getSource(routeSrc)) {
         map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
       }
@@ -222,7 +227,7 @@ export default function EffortsViewerMapbox({
     return () => { map.off('resize', onResize); map.remove(); mapRef.current = null; };
   }, [mapboxToken, trackLngLat]);
 
-  // Update map sources when route changes (validate; fit once after idle; lock camera after fit)
+  // Update map sources when route changes (validate; fit once after style ready; lock camera after moveend)
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const incoming = trackLngLat || [];
@@ -252,7 +257,7 @@ export default function EffortsViewerMapbox({
           const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
           for (const c of coords) b.extend(c);
           map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-          map.once('idle', () => {
+          map.once('moveend', () => {
             try {
               const c = map.getCenter();
               lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
@@ -268,16 +273,17 @@ export default function EffortsViewerMapbox({
     } catch {}
   }, [trackLngLat]);
 
-  // Move cursor on scrub
-  const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
-  const distNow = normalizedSamples[idx]?.d_m ?? 0;
+  // Move cursor only when we have a non-empty route
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const src = map.getSource(cursorSrc) as mapboxgl.GeoJSONSource | undefined;
     if (!src) return;
-    const target = pointAtDistance(trackLngLat || [], lineCum, (lineCum[lineCum.length - 1] || 1) * (distNow / (dTotal || 1)));
-    src.setData({ type: "Feature", geometry: { type: "Point", coordinates: target } } as any);
-  }, [idx, distNow, dTotal, trackLngLat, lineCum]);
+    const route = (trackLngLat && trackLngLat.length > 1) ? trackLngLat : lastNonEmptyRouteRef.current;
+    if (!route || route.length < 2) return;
+    const cum = prepLine(route);
+    const target = pointAtDistance(route as any, cum, (cum[cum.length - 1] || 1) * (distNow / (dTotal || 1)));
+    src.setData({ type: "Feature", properties:{}, geometry: { type: "Point", coordinates: target } } as any);
+  }, [idx, distNow, dTotal, trackLngLat]);
 
   /** ----- Chart (responsive SVG with viewBox) ----- */
   const W = 700, H = 280, P = 28;
