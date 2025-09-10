@@ -224,8 +224,12 @@ export default function EffortsViewerMapbox({
     };
     map.on('resize', onResize);
 
-    return () => { map.off('resize', onResize); map.remove(); mapRef.current = null; };
-  }, [mapboxToken, trackLngLat]);
+    return () => {
+      try { map.off('resize', onResize); } catch {}
+      try { map.remove(); } catch {}
+      mapRef.current = null;
+    };
+  }, [mapboxToken]);
 
   // Update map sources when route changes (validate; fit once after style ready; lock camera after moveend)
   useEffect(() => {
