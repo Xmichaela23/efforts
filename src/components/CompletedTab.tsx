@@ -1610,7 +1610,7 @@ const formatPace = (paceValue: any): string => {
              }
            }
          } catch {}
-        const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
+        const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
         return (
           <div className="mt-4">
             <React.Suspense fallback={<div className="px-4 py-3 text-sm text-[#666666]">Loading map…</div>}>
