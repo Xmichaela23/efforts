@@ -1578,8 +1578,13 @@ const formatPace = (paceValue: any): string => {
          } catch {}
          // If series elevation is effectively missing, derive from gps_track altitude
          try {
-           const elevFinite = samples.filter((s:any)=>Number.isFinite(s.elev_m_sm)).length;
-           if (elevFinite < Math.max(3, Math.floor(samples.length*0.2))) {
+           const elevVals = samples.map((s:any)=>s.elev_m_sm).filter((v:any)=>Number.isFinite(v));
+           const elevFinite = elevVals.length;
+           const eMin = elevVals.length? Math.min(...elevVals) : 0;
+           const eMax = elevVals.length? Math.max(...elevVals) : 0;
+           const eRange = Math.abs(eMax - eMin);
+           const missingOrFlat = elevFinite < Math.max(3, Math.floor(samples.length*0.2)) || eRange < 0.5; // <0.5m variation → treat as missing
+           if (missingOrFlat) {
              const pts = gps.map((p:any)=>({
                lat: Number(p.lat ?? p.latitude ?? p.latitudeInDegree),
                lon: Number(p.lng ?? p.lon ?? p.longitude ?? p.longitudeInDegree),
