@@ -1555,15 +1555,29 @@ const formatPace = (paceValue: any): string => {
              const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
              const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
              const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
+             // Base samples from server series
              const samples = (distance_m || []).map((d:number, i:number) => ({
                t_s: Number(time_s?.[i] ?? i) || 0,
                d_m: Number(d) || 0,
-               elev_m_sm: Number(elev?.[i]) || 0,
+               elev_m_sm: (Number.isFinite(elev?.[i]) ? Number(elev[i]) : null) as number | null,
                pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
                hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
-               grade: null,
-               vam_m_per_h: null
+               grade: null as number | null,
+               vam_m_per_h: null as number | null
              }));
+             // Derive grade and VAM where possible
+             for (let i=1;i<samples.length;i++) {
+               const a = samples[i-1], b = samples[i];
+               const dd = Math.max(0, (b.d_m - a.d_m));
+               const dt = Math.max(1, (b.t_s - a.t_s));
+               const de = (Number.isFinite(b.elev_m_sm as any) && Number.isFinite(a.elev_m_sm as any)) ? ((b.elev_m_sm as number) - (a.elev_m_sm as number)) : null;
+               if (dd > 0 && de != null) {
+                 const g = de / dd;
+                 samples[i].grade = g;
+                 const v = dd / dt; // m/s
+                 samples[i].vam_m_per_h = v * g * 3600;
+               }
+             }
              const gps = Array.isArray((hydrated||workoutData)?.gps_track) ? (hydrated||workoutData).gps_track : [];
              const track = gps
                .map((p:any)=>{
@@ -1574,7 +1588,9 @@ const formatPace = (paceValue: any): string => {
                })
                .filter(Boolean) as [number,number][];
              const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
-             if (!samples.length) return null;
+             // Require at least some elevation points to show chart meaningfully
+             const validElevs = samples.filter(s => Number.isFinite(s.elev_m_sm as any)).length;
+             if (!samples.length || validElevs < 3) return null;
              return (
                <div className="mt-4">
                  <EffortsViewerMapbox

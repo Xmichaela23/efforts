@@ -103,6 +103,7 @@ export default function EffortsViewerMapbox({
   // ----- Mapbox setup -----
   const mapRef = useRef<mapboxgl.Map|null>(null);
   const mapDivRef = useRef<HTMLDivElement>(null);
+  const hasFitRef = useRef(false);
   const routeId = 'route-line';
   const routeSrc = 'route-src';
   const cursorId = 'cursor-pt';
@@ -134,11 +135,12 @@ export default function EffortsViewerMapbox({
       const startCoord = trackLngLat?.[0] ?? [-118.15,34.11];
       map.addSource(cursorSrc, { type:'geojson', data: { type:'Feature', geometry:{ type:'Point', coordinates:startCoord } } });
       map.addLayer({ id: cursorId, type:'circle', source: cursorSrc, paint: { 'circle-radius':6, 'circle-color':'#0ea5e9', 'circle-stroke-color':'#fff', 'circle-stroke-width':2 } });
-      // fit bounds
-      if (trackLngLat && trackLngLat.length>1) {
+      // fit bounds once without over-zoom
+      if (!hasFitRef.current && trackLngLat && trackLngLat.length>1) {
         const b = new mapboxgl.LngLatBounds(trackLngLat[0], trackLngLat[0]);
         for (const c of trackLngLat) b.extend(c);
-        map.fitBounds(b, { padding: 28, maxZoom: 15 });
+        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
+        hasFitRef.current = true;
       }
     });
 
@@ -154,6 +156,7 @@ export default function EffortsViewerMapbox({
     if (!src) return;
     const target = pointAtDistance(trackLngLat||[], lineCum, (lineCum[lineCum.length-1]||1) * (distNow/(dTotal||1)));
     src.setData({ type:'Feature', geometry:{ type:'Point', coordinates: target } } as any);
+    // keep the current camera; do NOT refit on cursor move
   }, [idx, distNow, dTotal, trackLngLat, lineCum]);
 
   /** ---------- Chart + UI ---------- */
