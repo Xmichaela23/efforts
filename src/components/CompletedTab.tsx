@@ -1555,6 +1555,19 @@ const formatPace = (paceValue: any): string => {
            }
            return out;
          })();
+         // Build GPS-derived track once (for route and optional elevation fallback)
+         const gpsRaw = (hydrated||workoutData)?.gps_track;
+         const gps = Array.isArray(gpsRaw)
+           ? gpsRaw
+           : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+         const track = gps
+           .map((p:any)=>{
+             const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+             const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+             if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+             return null;
+           })
+           .filter(Boolean) as [number,number][];
          // diagnostics
          try {
            const elevVals = samples.map((s:any)=>s.elev_m_sm).filter((v:any)=>Number.isFinite(v));
@@ -1563,34 +1576,53 @@ const formatPace = (paceValue: any): string => {
            // eslint-disable-next-line no-console
            console.log('[viewer] track pts:', track.length, 'samples:', samples.length, 'elev count:', elevVals.length, 'elev range:', eMin, eMax);
          } catch {}
-
-         const gpsRaw = (hydrated||workoutData)?.gps_track;
-         const gps = Array.isArray(gpsRaw)
-           ? gpsRaw
-           : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
-         const track = gps
-           .map((p:any)=>{
-             const lng = p.lng ?? p.longitudeInDegree ?? p.longitude;
-             const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-             if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-             return null;
-           })
-           .filter(Boolean) as [number,number][];
-         const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
-         return (
-           <div className="mt-4">
-             <EffortsViewerMapbox
-               mapboxToken={token}
-               samples={samples as any}
-               trackLngLat={track}
-               useMiles={!!useImperial}
-               useFeet={!!useImperial}
-               compact={compact}
-             />
-           </div>
-         );
-       })()}
-       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
+         // If series elevation is effectively missing, derive from gps_track altitude
+         try {
+           const elevFinite = samples.filter((s:any)=>Number.isFinite(s.elev_m_sm)).length;
+           if (elevFinite < Math.max(3, Math.floor(samples.length*0.2))) {
+             const pts = gps.map((p:any)=>({
+               lat: Number(p.lat ?? p.latitude ?? p.latitudeInDegree),
+               lon: Number(p.lng ?? p.lon ?? p.longitude ?? p.longitudeInDegree),
+               elev: (typeof p.elevation === 'number' ? Number(p.elevation) : (typeof p.altitude === 'number' ? Number(p.altitude) : NaN))
+             })).filter((p:any)=>[p.lat,p.lon].every(Number.isFinite));
+             if (pts.length > 1) {
+               const R = 6371000;
+               const hav = (a:any,b:any)=>{ const φ1=a.lat*Math.PI/180, φ2=b.lat*Math.PI/180; const dφ=(b.lat-a.lat)*Math.PI/180; const dλ=(b.lon-a.lon)*Math.PI/180; const s=Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2; return 2*R*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); };
+               const cum:number[] = [0];
+               for (let i=1;i<pts.length;i++) cum[i] = cum[i-1] + hav(pts[i-1], pts[i]);
+               const nearestIdx = (target:number)=>{ let lo=0, hi=cum.length-1; while(lo<hi){ const m=(lo+hi)>>1; (cum[m]<target)?(lo=m+1):(hi=m); } return lo; };
+               for (let i=0;i<samples.length;i++) {
+                 const idx = nearestIdx(samples[i].d_m);
+                 const ei = pts[idx]?.elev;
+                 if (Number.isFinite(ei)) samples[i].elev_m_sm = Number(ei);
+               }
+               // recompute grade/vam after setting elevation
+               for (let i=1;i<samples.length;i++) {
+                 const aS = samples[i-1], bS = samples[i];
+                 const dd = Math.max(1, bS.d_m - aS.d_m);
+                 const dh = (Number(bS.elev_m_sm) - Number(aS.elev_m_sm));
+                 const dt = Math.max(1, bS.t_s - aS.t_s);
+                 bS.grade = dh / dd;
+                 bS.vam_m_per_h = (dh/dt) * 3600;
+               }
+             }
+           }
+         } catch {}
+        const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
+        return (
+          <div className="mt-4">
+            <EffortsViewerMapbox
+              mapboxToken={token}
+              samples={samples as any}
+              trackLngLat={track}
+              useMiles={!!useImperial}
+              useFeet={!!useImperial}
+              compact={compact}
+            />
+          </div>
+        );
+      })()}
+      {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="px-4 py-2">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">
