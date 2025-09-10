@@ -1614,7 +1614,7 @@ const formatPace = (paceValue: any): string => {
         return (
           <div className="mt-4">
             <React.Suspense fallback={<div className="px-4 py-3 text-sm text-[#666666]">Loading map…</div>}>
-              <ViewerErrorBoundary>
+              <ViewerErrorBoundary fallback={null as any}>
                 <EffortsViewerMapbox
                   mapboxToken={token}
                   samples={samples as any}
@@ -1723,11 +1723,11 @@ const formatPace = (paceValue: any): string => {
 
 export default CompletedTab;
 
-class ViewerErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean }>{
+class ViewerErrorBoundary extends React.Component<{ children: React.ReactNode, fallback: React.ReactNode }, { hasError: boolean }>{
   constructor(props: any){ super(props); this.state = { hasError: false }; }
   static getDerivedStateFromError(){ return { hasError: true }; }
-  componentDidCatch(){ /* no-op */ }
-  render(){ if (this.state.hasError) return <div className="px-4 py-3 text-sm text-[#666666]">Map unavailable</div>; return this.props.children as any; }
+  componentDidCatch(err: any){ try { console.error('[viewer] error boundary caught', err); } catch {} }
+  render(){ if (this.state.hasError) return <div className="px-4 py-3 text-sm text-[#666666]">Map failed to load</div> as any; return this.props.children as any; }
 }
 
 const EffortsViewerMapbox = React.lazy(async () => {
