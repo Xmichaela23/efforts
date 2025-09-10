@@ -2,11 +2,10 @@
 // Drop-in, responsive, scrub-synced elevation/pace/BPM/VAM + Mapbox cursor
 // Copy-paste into Cursor.
 // Requires: npm i mapbox-gl
-// Also ensure: import "mapbox-gl/dist/mapbox-gl.css" once in your app.
+// Ensure mapbox-gl CSS is imported globally (e.g., in src/index.css)
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 // mapbox-gl is dynamically imported to avoid init races and SSR/circular issues
-import "mapbox-gl/dist/mapbox-gl.css";
 
 /** ---------- Types ---------- */
 type Sample = {
@@ -125,6 +124,9 @@ export default function EffortsViewerMapbox({
   useFeet?: boolean;
   compact?: boolean;
 }) {
+  if (!mapboxToken) {
+    return <div style={{ padding: '8px 12px', color: '#64748b', fontSize: 13 }}>Map unavailable (missing token)</div> as any;
+  }
   // Normalize samples to Sample[] regardless of upstream shape
   const normalizedSamples: Sample[] = useMemo(() => {
     const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
