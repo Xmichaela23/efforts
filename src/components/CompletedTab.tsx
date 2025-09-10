@@ -1729,3 +1729,8 @@ class ViewerErrorBoundary extends React.Component<{ children: React.ReactNode },
   componentDidCatch(){ /* no-op */ }
   render(){ if (this.state.hasError) return <div className="px-4 py-3 text-sm text-[#666666]">Map unavailable</div>; return this.props.children as any; }
 }
+
+const EffortsViewerMapbox = React.lazy(async () => {
+  const mod = await import('./EffortsViewerMapbox');
+  return { default: mod.default } as any;
+});
