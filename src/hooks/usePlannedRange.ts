@@ -61,7 +61,7 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         // Revalidate (SWR)
         const { data, error } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,workout_status,steps_preset,description,duration,computed,week_number,day_number,training_plan_id,tags,completed_workout_id')
+          .select('id,name,type,date,workout_status,description,duration,computed,week_number,day_number,training_plan_id,tags,completed_workout_id')
           .eq('user_id', user.id)
           .gte('date', fromISO)
           .lte('date', toISO)
