@@ -1612,6 +1612,7 @@ const formatPace = (paceValue: any): string => {
         )}
       </div>
      </div>
++   </div>
  );
 };
 
