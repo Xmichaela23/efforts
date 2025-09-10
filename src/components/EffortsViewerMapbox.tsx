@@ -153,11 +153,13 @@ export default function EffortsViewerMapbox({
         grade = dh / dd;
         vam = (dh/dt) * 3600;
       }
+      const rawPace = pace_s_per_km?.[i];
+      const secPerKm = Number.isFinite(rawPace as any) ? ((rawPace as number) < 30 ? (rawPace as number) * 60 : (rawPace as number)) : null;
       out.push({
         t_s: t,
         d_m: d,
         elev_m_sm: es,
-        pace_s_per_km: Number.isFinite(pace_s_per_km?.[i]) ? Number(pace_s_per_km[i]) : null,
+        pace_s_per_km: secPerKm,
         hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
         grade,
         vam_m_per_h: vam
