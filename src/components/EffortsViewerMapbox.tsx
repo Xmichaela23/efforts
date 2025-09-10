@@ -190,6 +190,9 @@ export default function EffortsViewerMapbox({
   useEffect(() => {
     if (!mapDivRef.current || !mapboxToken || mapRef.current) return;
     let cancelled = false;
+    let localMap: any = null;
+    let onResize: ((this: any, ev: any) => any) | null = null;
+
     (async () => {
       const mod: any = await import('mapbox-gl');
       const gl = mod?.default || mod;
@@ -205,6 +208,7 @@ export default function EffortsViewerMapbox({
         projection: { name: 'mercator' }
       });
       mapRef.current = map;
+      localMap = map;
 
       map.on("load", () => {
         try { map.setProjection({ name: 'mercator' } as any); } catch {}
@@ -213,7 +217,7 @@ export default function EffortsViewerMapbox({
           map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
         }
         if (!map.getLayer(routeId)) {
-          map.addLayer({ id: routeId, type: "line", source: routeSrc, paint: { "line-color": "#3b82f6", "line-width": 3 } });
+          map.addLayer({ id: routeId, type: "line", source: routeSrc, layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#3b82f6", "line-width": 3 } });
         }
         const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
         if (!map.getSource(cursorSrc)) {
@@ -222,8 +226,7 @@ export default function EffortsViewerMapbox({
         }
       });
 
-      // Keep camera on resize only (not each update)
-      const onResize = () => {
+      onResize = () => {
         if (!mapRef.current) return;
         mapRef.current.resize();
         if (lockedCameraRef.current) {
@@ -232,16 +235,15 @@ export default function EffortsViewerMapbox({
         }
       };
       map.on('resize', onResize);
-
-      // cleanup
-      return () => {
-        cancelled = true;
-        try { map.off('resize', onResize); } catch {}
-        try { map.remove(); } catch {}
-        mapRef.current = null;
-        glRef.current = null;
-      };
     })();
+
+    return () => {
+      cancelled = true;
+      try { if (localMap && onResize) localMap.off('resize', onResize); } catch {}
+      try { localMap?.remove(); } catch {}
+      mapRef.current = null;
+      glRef.current = null;
+    };
   }, [mapboxToken]);
 
   // Update map sources when route changes (validate; fit once after style ready; lock camera after moveend)

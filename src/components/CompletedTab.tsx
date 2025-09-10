@@ -3,8 +3,6 @@ import { Button } from '@/components/ui/button';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
-import ActivityMap from './ActivityMap';
-import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
