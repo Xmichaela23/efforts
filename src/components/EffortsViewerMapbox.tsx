@@ -124,9 +124,7 @@ export default function EffortsViewerMapbox({
   useFeet?: boolean;
   compact?: boolean;
 }) {
-  if (!mapboxToken) {
-    return <div style={{ padding: '8px 12px', color: '#64748b', fontSize: 13 }}>Map unavailable (missing token)</div> as any;
-  }
+  const tokenMissing = !mapboxToken;
   // Normalize samples to Sample[] regardless of upstream shape
   const normalizedSamples: Sample[] = useMemo(() => {
     const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
@@ -250,6 +248,7 @@ export default function EffortsViewerMapbox({
 
   // Update map sources when route changes (validate; fit once after style ready; lock camera after moveend)
   useEffect(() => {
+    if (!mapboxToken) return;
     const map = mapRef.current; if (!map) return;
     const GL = glRef.current; if (!GL) return;
     const incoming = trackLngLat || [];
@@ -297,6 +296,7 @@ export default function EffortsViewerMapbox({
 
   // Move cursor only when we have a non-empty route
   useEffect(() => {
+    if (!mapboxToken) return;
     const map = mapRef.current; if (!map) return;
     const src = map.getSource(cursorSrc) as any;
     if (!src) return;
@@ -308,7 +308,7 @@ export default function EffortsViewerMapbox({
     const cum = prepLine(route);
     const target = pointAtDistance(route as any, cum, (cum[cum.length - 1] || 1) * (distNow / (dTotal || 1)));
     src.setData({ type: "Feature", properties:{}, geometry: { type: "Point", coordinates: target } } as any);
-  }, [idx, dTotal, trackLngLat, normalizedSamples]);
+  }, [idx, dTotal, trackLngLat, normalizedSamples, mapboxToken]);
 
   /** ----- Chart (responsive SVG with viewBox) ----- */
   const W = 700, H = 280, P = 28;
@@ -440,8 +440,14 @@ export default function EffortsViewerMapbox({
       {/* Map */}
       <div
         ref={mapDivRef}
-        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none" }}
-      />
+        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none", position:'relative' }}
+      >
+        {tokenMissing && (
+          <div style={{position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b', fontSize:13, background:'#f8fafc'}}>
+            Map unavailable (missing token)
+          </div>
+        )}
+      </div>
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 16, margin: "6px 6px 10px 6px", fontWeight: 600 }}>
