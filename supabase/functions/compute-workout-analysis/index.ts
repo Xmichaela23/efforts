@@ -116,6 +116,20 @@ Deno.serve(async (req) => {
       }
       rows = out;
     }
+    // If distance never grows (provider didn't include distance in samples), rebuild from GPS
+    if (rows.length >= 2) {
+      const totalM = Math.max(0, (rows[rows.length-1].d||0) - (rows[0].d||0));
+      if (totalM < 50 && Array.isArray(gps) && gps.length > 1) {
+        const out: Array<{ t:number; d:number; elev?:number; hr?:number; cad?:number }> = [];
+        let cum = 0; const getTs = (p:any)=>Number(p?.timestamp ?? p?.startTimeInSeconds ?? p?.ts ?? 0); const tStart = getTs(gps[0]) || 0;
+        for (let i=0;i<gps.length;i+=1) {
+          if (i>0) cum += ( ()=>{ const a=gps[i-1], b=gps[i]; const lat1=Number(a.lat ?? a.latitudeInDegree ?? a.latitude); const lon1=Number(a.lng ?? a.longitudeInDegree ?? a.longitude); const lat2=Number(b.lat ?? b.latitudeInDegree ?? b.latitude); const lon2=Number(b.lng ?? b.longitudeInDegree ?? b.longitude); if (![lat1,lon1,lat2,lon2].every(Number.isFinite)) return 0; const R=6371000; const dLat=(lat2-lat1)*Math.PI/180; const dLon=(lon2-lon1)*Math.PI/180; const sa=Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2; const c=2*Math.atan2(Math.sqrt(sa), Math.sqrt(1-sa)); return R*c; })();
+          const elev = (typeof gps[i]?.elevation === 'number' ? gps[i].elevation : (typeof gps[i]?.altitude === 'number' ? gps[i].altitude : undefined));
+          out.push({ t: Math.max(0, getTs(gps[i]) - tStart), d: cum, elev });
+        }
+        rows = out;
+      }
+    }
     const hasRows = rows.length >= 2;
     const d0 = hasRows ? (rows[0].d || 0) : 0;
     const t0 = hasRows ? (rows[0].t || 0) : 0;
