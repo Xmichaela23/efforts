@@ -1558,25 +1558,41 @@ const formatPace = (paceValue: any): string => {
            const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
            if (!Array.isArray(distance_m) || distance_m.length < 2) return null;
            const len = Math.min(distance_m.length, time_s.length || distance_m.length);
-           const samples = new Array(len).fill(0).map((_,i:number)=>({
-             t_s: Number(time_s?.[i] ?? i) || 0,
-             d_m: Number(distance_m?.[i] ?? 0) || 0,
-             elev_m_sm: (typeof elev?.[i] === 'number' ? Number(elev[i]) : null),
-             pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
-             hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
-             grade: null as number | null,
-             vam_m_per_h: null as number | null,
-           }));
-           for (let i=1;i<samples.length;i++) {
-             const a = samples[i-1], b = samples[i];
-             const dd = Math.max(0, (b.d_m - a.d_m));
-             const dt = Math.max(1, (b.t_s - a.t_s));
-             const de = (Number.isFinite(b.elev_m_sm as any) && Number.isFinite(a.elev_m_sm as any)) ? ((b.elev_m_sm as number) - (a.elev_m_sm as number)) : null;
-             if (dd > 0 && de != null) {
-               const g = de / dd; samples[i].grade = g; samples[i].vam_m_per_h = (dd/dt) * g * 3600;
+           const samples = (()=>{
+             const out:any[] = [];
+             let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
+             const a = 0.2;
+             for (let i=0;i<len;i++){
+               const t = Number(time_s?.[i] ?? i) || 0;
+               const d = Number(distance_m?.[i] ?? 0) || 0;
+               const e = typeof elev?.[i] === 'number' ? Number(elev[i]) : null;
+               if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
+               const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
+               let grade: number | null = null, vam: number | null = null;
+               if (lastE != null && lastD != null && lastT != null){
+                 const dd = Math.max(1, d - lastD);
+                 const dh = es - lastE;
+                 const dt = Math.max(1, t - lastT);
+                 grade = dh / dd;
+                 vam = (dh/dt) * 3600;
+               }
+               out.push({
+                 t_s: t,
+                 d_m: d,
+                 elev_m_sm: es,
+                 pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
+                 hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
+                 grade,
+                 vam_m_per_h: vam
+               });
+               lastE = es; lastD = d; lastT = t;
              }
-           }
-           const gps = Array.isArray((hydrated||workoutData)?.gps_track) ? (hydrated||workoutData).gps_track : [];
+             return out;
+           })();
+           const gpsRaw = (hydrated||workoutData)?.gps_track;
+           const gps = Array.isArray(gpsRaw)
+             ? gpsRaw
+             : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
            const track = gps
              .map((p:any)=>{
                const lng = p.lng ?? p.longitudeInDegree ?? p.longitude;
