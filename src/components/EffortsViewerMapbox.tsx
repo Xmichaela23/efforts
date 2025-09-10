@@ -5,7 +5,7 @@
 // Also ensure: import "mapbox-gl/dist/mapbox-gl.css" once in your app.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
+// mapbox-gl is dynamically imported to avoid init races and SSR/circular issues
 import "mapbox-gl/dist/mapbox-gl.css";
 
 /** ---------- Types ---------- */
@@ -172,7 +172,8 @@ export default function EffortsViewerMapbox({
   const [locked, setLocked] = useState(false);
 
   /** ----- Mapbox ----- */
-  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const mapRef = useRef<any>(null);
+  const glRef = useRef<any>(null);
   const mapDivRef = useRef<HTMLDivElement>(null);
   const hasFitRef = useRef(false);
   const prevRouteLenRef = useRef(0);
@@ -186,54 +187,65 @@ export default function EffortsViewerMapbox({
 
   useEffect(() => {
     if (!mapDivRef.current || !mapboxToken || mapRef.current) return;
-    mapboxgl.accessToken = mapboxToken;
-    const map = new mapboxgl.Map({
-      container: mapDivRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      interactive: false,
-      minZoom: 3,
-      maxZoom: 18,
-      projection: { name: 'mercator' }
-    });
-    mapRef.current = map;
+    let cancelled = false;
+    (async () => {
+      const mod: any = await import('mapbox-gl');
+      const gl = mod?.default || mod;
+      if (cancelled) return;
+      glRef.current = gl;
+      gl.accessToken = mapboxToken;
+      const map = new gl.Map({
+        container: mapDivRef.current,
+        style: "mapbox://styles/mapbox/streets-v12",
+        interactive: false,
+        minZoom: 3,
+        maxZoom: 18,
+        projection: { name: 'mercator' }
+      });
+      mapRef.current = map;
 
-    map.on("load", () => {
-      try { map.setProjection({ name: 'mercator' } as any); } catch {}
-      try { (map as any).setFog?.(null); } catch {}
-      if (!map.getSource(routeSrc)) {
-        map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
-      }
-      if (!map.getLayer(routeId)) {
-        map.addLayer({ id: routeId, type: "line", source: routeSrc, paint: { "line-color": "#3b82f6", "line-width": 3 } });
-      }
-      const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
-      if (!map.getSource(cursorSrc)) {
-        map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
-        map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
-      }
-    });
+      map.on("load", () => {
+        try { map.setProjection({ name: 'mercator' } as any); } catch {}
+        try { (map as any).setFog?.(null); } catch {}
+        if (!map.getSource(routeSrc)) {
+          map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
+        }
+        if (!map.getLayer(routeId)) {
+          map.addLayer({ id: routeId, type: "line", source: routeSrc, paint: { "line-color": "#3b82f6", "line-width": 3 } });
+        }
+        const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
+        if (!map.getSource(cursorSrc)) {
+          map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
+          map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+        }
+      });
 
-    // Keep camera on resize only (not each update)
-    const onResize = () => {
-      if (!mapRef.current) return;
-      mapRef.current.resize();
-      if (lockedCameraRef.current) {
-        const { center, zoom } = lockedCameraRef.current;
-        try { mapRef.current.jumpTo({ center, zoom }); } catch {}
-      }
-    };
-    map.on('resize', onResize);
+      // Keep camera on resize only (not each update)
+      const onResize = () => {
+        if (!mapRef.current) return;
+        mapRef.current.resize();
+        if (lockedCameraRef.current) {
+          const { center, zoom } = lockedCameraRef.current;
+          try { mapRef.current.jumpTo({ center, zoom }); } catch {}
+        }
+      };
+      map.on('resize', onResize);
 
-    return () => {
-      try { map.off('resize', onResize); } catch {}
-      try { map.remove(); } catch {}
-      mapRef.current = null;
-    };
+      // cleanup
+      return () => {
+        cancelled = true;
+        try { map.off('resize', onResize); } catch {}
+        try { map.remove(); } catch {}
+        mapRef.current = null;
+        glRef.current = null;
+      };
+    })();
   }, [mapboxToken]);
 
   // Update map sources when route changes (validate; fit once after style ready; lock camera after moveend)
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
+    const GL = glRef.current; if (!GL) return;
     const incoming = trackLngLat || [];
 
     const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
@@ -250,7 +262,7 @@ export default function EffortsViewerMapbox({
     if (routeInitializedRef.current && !hasNonEmpty(coords)) return;
 
     try {
-      const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+      const src = map.getSource(routeSrc) as any;
       if (src && hasNonEmpty(coords)) {
         src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
       }
@@ -258,7 +270,7 @@ export default function EffortsViewerMapbox({
       // Fit once after style is ready and we have a valid route
       if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
         const doFit = () => {
-          const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+          const b = new GL.LngLatBounds(coords[0], coords[0]);
           for (const c of coords) b.extend(c);
           map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
           map.once('moveend', () => {
@@ -280,7 +292,7 @@ export default function EffortsViewerMapbox({
   // Move cursor only when we have a non-empty route
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
-    const src = map.getSource(cursorSrc) as mapboxgl.GeoJSONSource | undefined;
+    const src = map.getSource(cursorSrc) as any;
     if (!src) return;
     const route = (trackLngLat && trackLngLat.length > 1) ? trackLngLat : lastNonEmptyRouteRef.current;
     if (!route || route.length < 2) return;

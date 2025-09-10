@@ -221,7 +221,7 @@ export const useWorkouts = () => {
       // Step 2: Fetch Garmin activities (if user has Garmin connection) — optionally deferred
       let garminWorkouts: any[] = [];
       // Guard provider fetches behind explicit env flag so UI can be workouts-only by default
-      const ENABLE_PROVIDER_FALLBACK = (import.meta as any)?.env?.VITE_ENABLE_PROVIDER_FALLBACK !== 'false';
+      const ENABLE_PROVIDER_FALLBACK = false;
       if (includeProviders && ENABLE_PROVIDER_FALLBACK) try {
         // Try device_connections first; fall back to legacy user_connections
         let garminUserId: string | null = null;
