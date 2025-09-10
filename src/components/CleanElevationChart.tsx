@@ -132,20 +132,41 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
 
   // Process data for chart (prefer server series)
   const chartData = useMemo(() => {
+    // Lightweight helpers for visual quality
+    const smoothEma = (arr: Array<number | null>, alpha = 0.18): Array<number | null> => {
+      let ema: number | null = null;
+      const out: Array<number | null> = new Array(arr.length).fill(null);
+      for (let i = 0; i < arr.length; i += 1) {
+        const v = typeof arr[i] === 'number' && Number.isFinite(arr[i] as number) ? (arr[i] as number) : null;
+        if (v == null) { out[i] = ema; continue; }
+        ema = ema == null ? v : alpha * v + (1 - alpha) * ema;
+        out[i] = ema;
+      }
+      return out;
+    };
+    const downsampleTo = <T,>(rows: T[], target = 900): T[] => {
+      if (!Array.isArray(rows) || rows.length <= target) return rows;
+      const step = Math.ceil(rows.length / target);
+      const out: T[] = [];
+      for (let i = 0; i < rows.length; i += step) out.push(rows[i]);
+      if (rows[rows.length - 1] !== out[out.length - 1]) out.push(rows[rows.length - 1]);
+      return out;
+    };
     // Prefer server-computed series when present, but only if elevation is usable
     if (analysisSeries && typeof analysisSeries === 'object') {
       try {
         const t = Array.isArray(analysisSeries.time) ? analysisSeries.time : (Array.isArray(analysisSeries.time_s) ? analysisSeries.time_s : []);
         const distance_m = Array.isArray(analysisSeries.distance_m) ? analysisSeries.distance_m : [];
-        const elevation_m = Array.isArray(analysisSeries.elevation_m) ? analysisSeries.elevation_m : [];
+        const elevation_m_raw = Array.isArray(analysisSeries.elevation_m) ? analysisSeries.elevation_m : [];
         const pace_s_per_km = Array.isArray(analysisSeries.pace_s_per_km) ? analysisSeries.pace_s_per_km : [];
         const hr_bpm = Array.isArray(analysisSeries.hr_bpm) ? analysisSeries.hr_bpm : [];
         const cadence_spm = Array.isArray(analysisSeries.cadence_spm) ? analysisSeries.cadence_spm : [];
+        const elevation_m = smoothEma(elevation_m_raw, 0.18);
         const validElevCount = elevation_m.filter((v: any) => Number.isFinite(v)).length;
         const hasUsableElev = validElevCount >= 3 && distance_m.length >= 3;
         if (hasUsableElev) {
           const N = Math.max(distance_m.length, elevation_m.length, pace_s_per_km.length, hr_bpm.length, cadence_spm.length, t.length);
-          const out: Array<{ distance: number; absoluteElevation: number | null; metricValue: number | null }> = [];
+          let out: Array<{ distance: number; absoluteElevation: number | null; metricValue: number | null }> = [];
           let baseElevation: number | null = null;
           for (let i = 0; i < N; i += 1) {
             const distMi = Number.isFinite(distance_m[i]) ? (distance_m[i] / 1609.34) : (Number.isFinite(distance_m[i]) ? (distance_m[i] as number) : 0);
@@ -162,25 +183,20 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             }
             out.push({ distance: parseFloat((distMi || 0).toFixed(2)), absoluteElevation: elev, metricValue: metric });
           }
-          return out;
+          return downsampleTo(out, 900);
         }
       } catch {}
     }
 
     if (!gpsTrack || gpsTrack.length === 0) return [];
     
-    // Sample GPS track based on selected metric for optimal smoothness
-    let targetSamples = 1000; // Default for heart rate and VAM
-    if (selectedMetric === 'pace') {
-      targetSamples = 500; // Super smooth for pace
-    }
-    
-    const sampledGpsTrack = sampleData(gpsTrack, targetSamples);
+    // Sample GPS track and then smooth elevation
+    const sampledGpsTrack = sampleData(gpsTrack, 1200);
     
     let cumulativeDistance = 0;
     let baseElevation = null;
     
-    return sampledGpsTrack.map((point, index) => {
+    const mapped = sampledGpsTrack.map((point, index) => {
       // Calculate cumulative distance
       if (index > 0) {
         const prevPoint = sampledGpsTrack[index - 1];
@@ -373,6 +389,12 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
         originalIndex: index
       };
     });
+
+    // Smooth absolute elevation via EMA and downsample for visual quality
+    const elevSeries = mapped.map(p => (typeof p.absoluteElevation === 'number' ? p.absoluteElevation : null));
+    const elevSm = smoothEma(elevSeries, 0.18);
+    const withSmooth = mapped.map((p, i) => ({ ...p, absoluteElevation: typeof elevSm[i] === 'number' ? (elevSm[i] as number) : p.absoluteElevation }));
+    return downsampleTo(withSmooth, 900);
   }, [gpsTrack, sensorData, selectedMetric, useImperial, analysisSeries]);
 
   // Debug logging
@@ -436,8 +458,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
         {chartData && chartData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 20, right: 0, left: 0, bottom: 0 }}>
-            <CartesianGrid horizontal={true} vertical={false} stroke={theme.grid} />
+            <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
+            <CartesianGrid horizontal={true} vertical={false} stroke={theme.grid} strokeDasharray="3 3" />
             
             {/* X Axis - Distance */}
             <XAxis 
@@ -447,17 +469,21 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               tickFormatter={(value) => `${value.toFixed(1)} mi`}
               stroke={theme.textSecondary}
               fontSize={10}
+              tickLine={false}
+              axisLine={false}
             />
             
             {/* Left Y Axis - Elevation */}
             <YAxis 
               yAxisId="left"
               orientation="left"
-              domain={['dataMin - 50', 'dataMax + 50']}
+              domain={['dataMin - 40', 'dataMax + 40']}
               tickFormatter={(value) => `${Math.round(value)} ${useImperial ? 'ft' : 'm'}`}
               stroke={theme.textSecondary}
               fontSize={10}
               width={40}
+              tickLine={false}
+              axisLine={false}
             />
             {/* Right Y Axis - Selected metric (hidden ticks) */}
             <YAxis yAxisId="right" orientation="right" hide domain={[ 'auto', 'auto' ]} />
@@ -468,8 +494,11 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
               type="monotone"
               dataKey="absoluteElevation"
               stroke={theme.elevStroke}
-              strokeWidth={1}
-              fill="transparent"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              fillOpacity={0.15}
+              fill={theme.elevStroke}
             />
 
             {/* Metric overlay intentionally removed; tooltip still uses metricValue */}
