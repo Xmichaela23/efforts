@@ -119,12 +119,54 @@ export default function EffortsViewerMapbox({
   compact = false,
 }: {
   mapboxToken: string;
-  samples: Sample[];
+  samples: any; // allow either Sample[] or raw series object at runtime
   trackLngLat: [number, number][];
   useMiles?: boolean;
   useFeet?: boolean;
   compact?: boolean;
 }) {
+  // Normalize samples to Sample[] regardless of upstream shape
+  const normalizedSamples: Sample[] = useMemo(() => {
+    const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
+    if (isSampleArray) return samples as Sample[];
+    const s = samples || {};
+    const time_s: number[] = Array.isArray(s.time_s) ? s.time_s : (Array.isArray(s.time) ? s.time : []);
+    const distance_m: number[] = Array.isArray(s.distance_m) ? s.distance_m : [];
+    const elevation_m: (number|null)[] = Array.isArray(s.elevation_m) ? s.elevation_m : [];
+    const pace_s_per_km: (number|null)[] = Array.isArray(s.pace_s_per_km) ? s.pace_s_per_km : [];
+    const hr_bpm: (number|null)[] = Array.isArray(s.hr_bpm) ? s.hr_bpm : [];
+    const len = Math.min(distance_m.length, time_s.length || distance_m.length);
+    const out: Sample[] = [];
+    let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
+    const a = 0.2;
+    for (let i=0;i<len;i++){
+      const t = Number(time_s?.[i] ?? i) || 0;
+      const d = Number(distance_m?.[i] ?? 0) || 0;
+      const e = typeof elevation_m?.[i] === 'number' ? Number(elevation_m[i]) : null;
+      if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
+      const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
+      let grade: number | null = null, vam: number | null = null;
+      if (lastE != null && lastD != null && lastT != null){
+        const dd = Math.max(1, d - lastD);
+        const dh = es - lastE;
+        const dt = Math.max(1, t - lastT);
+        grade = dh / dd;
+        vam = (dh/dt) * 3600;
+      }
+      out.push({
+        t_s: t,
+        d_m: d,
+        elev_m_sm: es,
+        pace_s_per_km: Number.isFinite(pace_s_per_km?.[i]) ? Number(pace_s_per_km[i]) : null,
+        hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
+        grade,
+        vam_m_per_h: vam
+      });
+      lastE = es; lastD = d; lastT = t;
+    }
+    return out;
+  }, [samples]);
+
   const [tab, setTab] = useState<MetricTab>("elev");
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
@@ -188,8 +230,8 @@ export default function EffortsViewerMapbox({
   }, [trackLngLat]);
 
   // Move cursor on scrub
-  const dTotal = samples.length ? samples[samples.length - 1].d_m : 1;
-  const distNow = samples[idx]?.d_m ?? 0;
+  const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
+  const distNow = normalizedSamples[idx]?.d_m ?? 0;
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const src = map.getSource(cursorSrc) as mapboxgl.GeoJSONSource | undefined;
@@ -200,11 +242,11 @@ export default function EffortsViewerMapbox({
 
   /** ----- Chart (responsive SVG with viewBox) ----- */
   const W = 700, H = 280, P = 28;
-  const tTotal = samples.length ? samples[samples.length - 1].t_s : 0; // (currently not drawn, but handy)
+  const tTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].t_s : 0; // (currently not drawn, but handy)
 
   // y-domain (absolute elevation when tab === 'elev')
   const yDomain = useMemo<[number, number]>(() => {
-    const vals = samples.map((s) =>
+    const vals = normalizedSamples.map((s) =>
       tab === "elev" ? (s.elev_m_sm ?? NaN)
       : tab === "pace" ? (s.pace_s_per_km ?? NaN)
       : tab === "bpm" ? (s.hr_bpm ?? NaN)
@@ -217,11 +259,11 @@ export default function EffortsViewerMapbox({
     const basePad = tab === "elev" ? (useFeet ? 3 / 3.28084 : 3) : 1; // ~3ft or 3m minimum pad on elev
     const pad = Math.max((hi - lo) * 0.1, basePad);
     return [lo - pad, hi + pad];
-  }, [samples, tab, useFeet]);
+  }, [normalizedSamples, tab, useFeet]);
 
   // Safe metric accessor with "hold-last" to avoid visual spikes on nulls
   const metricAt = (i: number, last: number | null): number => {
-    const s = samples[i];
+    const s = normalizedSamples[i];
     let v =
       tab === "elev" ? s.elev_m_sm
       : tab === "pace" ? s.pace_s_per_km
@@ -232,7 +274,7 @@ export default function EffortsViewerMapbox({
   };
 
   const linePath = useMemo(() => {
-    if (samples.length < 2) return "";
+    if (normalizedSamples.length < 2) return "";
     const [y0, y1] = yDomain;
     const x = (d: number) => P + (d / (dTotal || 1)) * (W - P * 2);
     const y = (v: number) => {
@@ -240,27 +282,27 @@ export default function EffortsViewerMapbox({
       return H - P - t * (H - P * 2);
     };
     let last = metricAt(0, null);
-    let d = `M ${x(samples[0].d_m)} ${y(last)}`;
-    for (let i = 1; i < samples.length; i++) {
+    let d = `M ${x(normalizedSamples[0].d_m)} ${y(last)}`;
+    for (let i = 1; i < normalizedSamples.length; i++) {
       last = metricAt(i, last);
-      d += ` L ${x(samples[i].d_m)} ${y(last)}`;
+      d += ` L ${x(normalizedSamples[i].d_m)} ${y(last)}`;
     }
     return d;
-  }, [samples, yDomain, dTotal, tab]);
+  }, [normalizedSamples, yDomain, dTotal, tab]);
 
   const elevArea = useMemo(() => {
-    if (tab !== "elev" || samples.length < 2) return "";
+    if (tab !== "elev" || normalizedSamples.length < 2) return "";
     const [y0, y1] = yDomain;
     const x = (d: number) => P + (d / (dTotal || 1)) * (W - P * 2);
     const y = (v: number) => {
       const t = (v - y0) / (y1 - y0 || 1);
       return H - P - t * (H - P * 2);
     };
-    let d = `M ${x(samples[0].d_m)} ${y((samples[0].elev_m_sm ?? 0) as number)}`;
-    for (let i = 1; i < samples.length; i++) d += ` L ${x(samples[i].d_m)} ${y((samples[i].elev_m_sm ?? 0) as number)}`;
-    d += ` L ${x(samples[samples.length - 1].d_m)} ${H - P} L ${x(samples[0].d_m)} ${H - P} Z`;
+    let d = `M ${x(normalizedSamples[0].d_m)} ${y((normalizedSamples[0].elev_m_sm ?? 0) as number)}`;
+    for (let i = 1; i < normalizedSamples.length; i++) d += ` L ${x(normalizedSamples[i].d_m)} ${y((normalizedSamples[i].elev_m_sm ?? 0) as number)}`;
+    d += ` L ${x(normalizedSamples[normalizedSamples.length - 1].d_m)} ${H - P} L ${x(normalizedSamples[0].d_m)} ${H - P} Z`;
     return d;
-  }, [samples, yDomain, dTotal, tab]);
+  }, [normalizedSamples, yDomain, dTotal, tab]);
 
   const yMap = (v: number) => {
     const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
@@ -272,7 +314,7 @@ export default function EffortsViewerMapbox({
   }, [yDomain]);
 
   // Splits + active split highlight
-  const splits = useMemo(() => computeSplits(samples, useMiles ? 1609.34 : 1000), [samples, useMiles]);
+  const splits = useMemo(() => computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000), [normalizedSamples, useMiles]);
   const activeSplitIx = useMemo(() => splits.findIndex(sp => idx >= sp.startIdx && idx <= sp.endIdx), [idx, splits]);
 
   // Scrub helpers (screen px → SVG coords)
@@ -284,19 +326,19 @@ export default function EffortsViewerMapbox({
     const ratio = clamp((pxSvg - P) / (W - 2 * P), 0, 1);
     const target = ratio * (dTotal || 1);
     // binary search in distance
-    let lo = 0, hi = samples.length - 1;
-    while (lo < hi) { const m = Math.floor((lo + hi) / 2); (samples[m].d_m < target) ? (lo = m + 1) : (hi = m); }
+    let lo = 0, hi = normalizedSamples.length - 1;
+    while (lo < hi) { const m = Math.floor((lo + hi) / 2); (normalizedSamples[m].d_m < target) ? (lo = m + 1) : (hi = m); }
     return lo;
   };
   const snapIdx = (i: number) => {
     if (!splits.length) return i;
-    const d = samples[i].d_m; let best: number | null = null, delta = Infinity;
+    const d = normalizedSamples[i].d_m; let best: number | null = null, delta = Infinity;
     for (const sp of splits) {
-      const a = samples[sp.startIdx].d_m, b = samples[sp.endIdx].d_m;
+      const a = normalizedSamples[sp.startIdx].d_m, b = normalizedSamples[sp.endIdx].d_m;
       for (const ed of [a, b]) { const dd = Math.abs(ed - d) / (dTotal || 1); if (dd < delta) { delta = dd; best = ed; } }
     }
     if (best != null && delta < 0.005) { // snap near edges
-      let lo = 0, hi = samples.length - 1; while (lo < hi) { const m = Math.floor((lo + hi) / 2); (samples[m].d_m < best) ? (lo = m + 1) : (hi = m); }
+      let lo = 0, hi = normalizedSamples.length - 1; while (lo < hi) { const m = Math.floor((lo + hi) / 2); (normalizedSamples[m].d_m < best) ? (lo = m + 1) : (hi = m); }
       return lo;
     }
     return i;
@@ -308,7 +350,7 @@ export default function EffortsViewerMapbox({
   };
 
   // Cursor X in SVG units
-  const s = samples[idx] || samples[samples.length - 1];
+  const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
   const cx = P + ((s?.d_m ?? 0) / (dTotal || 1)) * (W - P * 2);
   const currentVal =
     tab === "elev" ? (s?.elev_m_sm ?? 0)
