@@ -318,8 +318,18 @@ function computeComputedFromActivity(activity: any): any | null {
 }
 
 function mapGarminToWorkout(activity: any, userId: string) {
-  const startIso = activity.start_time || (activity.summary?.startTimeInSeconds ? new Date(activity.summary.startTimeInSeconds * 1000).toISOString() : null);
-  const dateIso = startIso ? startIso.split('T')[0] : null;
+  // Prefer provider-local timestamp when available
+  const startIsoUtc = activity.start_time
+    || (activity.summary?.startTimeInSeconds ? new Date(activity.summary.startTimeInSeconds * 1000).toISOString() : null);
+  // Garmin often provides local offset seconds; derive local date to avoid UTC day shift
+  const offsetSec = Number(activity.start_time_offset_seconds ?? activity.summary?.startTimeOffsetInSeconds);
+  const startMillisUtc = startIsoUtc ? Date.parse(startIsoUtc) : NaN;
+  const startMillisLocal = Number.isFinite(startMillisUtc)
+    ? (startMillisUtc + (Number.isFinite(offsetSec) ? offsetSec * 1000 : 0))
+    : NaN;
+  const dateIso = Number.isFinite(startMillisLocal)
+    ? new Date(startMillisLocal).toISOString().split('T')[0]
+    : (startIsoUtc ? startIsoUtc.split('T')[0] : null);
   const typeKey = (activity.activity_type || activity.summary?.activityType?.typeKey || '').toLowerCase();
   const type = typeKey.includes('run') ? 'run'
     : (typeKey.includes('bike') || typeKey.includes('bik') || typeKey.includes('cycl') || typeKey.includes('ride')) ? 'ride'
@@ -332,7 +342,7 @@ function mapGarminToWorkout(activity: any, userId: string) {
     name: activity.activity_name || activity.activity_type || `Garmin ${type}`,
     type,
     date: dateIso,
-    timestamp: startIso,
+    timestamp: startIsoUtc,
     duration: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
     moving_time: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
     elapsed_time: activity.duration_seconds != null ? Math.max(0, Math.round(activity.duration_seconds / 60)) : null,
