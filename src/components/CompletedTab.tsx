@@ -46,10 +46,32 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [poolLengthMeters, setPoolLengthMeters] = useState<number | null>(null);
   const [rememberDefault, setRememberDefault] = useState(false);
   const [hydrated, setHydrated] = useState<any>(workoutData);
+  const [analysisInvoked, setAnalysisInvoked] = useState(false);
   
   useEffect(() => {
     setHydrated(workoutData);
   }, [workoutData]);
+
+  // Ensure server analytics exist; trigger compute once if missing and we have an id
+  useEffect(() => {
+    (async () => {
+      try {
+        const wid = (hydrated as any)?.id || (workoutData as any)?.id;
+        const hasAnalysis = Boolean((hydrated as any)?.computed?.analysis);
+        if (!wid || hasAnalysis || analysisInvoked) return;
+        setAnalysisInvoked(true);
+        await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String(wid) } });
+        // Refresh computed
+        const { data } = await supabase
+          .from('workouts')
+          .select('computed')
+          .eq('id', String(wid))
+          .maybeSingle();
+        const cmp = (() => { try { return typeof (data as any)?.computed === 'string' ? JSON.parse((data as any).computed) : (data as any)?.computed; } catch { return (data as any)?.computed; } })();
+        if (cmp) setHydrated((prev:any) => ({ ...(prev || workoutData), computed: cmp }));
+      } catch {}
+    })();
+  }, [hydrated, workoutData, analysisInvoked]);
   
   // Dev hydration: if workout lacks samples but has a garmin_activity_id,
   // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
