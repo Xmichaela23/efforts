@@ -70,8 +70,15 @@ function buildSplit(samples:Sample[], s:number, e:number): Split {
   let sumHr=0,nHr=0,gain=0,sumG=0,nG=0;
   for (let i=s+1;i<=e;i++){
     const h=samples[i].hr_bpm; if (Number.isFinite(h)) {sumHr+=h!; nHr++;}
-    const dh=samples[i].elev_m_sm - samples[i-1].elev_m_sm; if (dh>0) gain += dh;
-    const g=samples[i].grade; if (Number.isFinite(g)) {sumG += g!; nG++;}
+    const e1 = Number.isFinite(samples[i].elev_m_sm as any) ? (samples[i].elev_m_sm as number) : (Number.isFinite(samples[i-1].elev_m_sm as any) ? (samples[i-1].elev_m_sm as number) : 0);
+    const e0 = Number.isFinite(samples[i-1].elev_m_sm as any) ? (samples[i-1].elev_m_sm as number) : e1;
+    const dh = e1 - e0; if (dh>0) gain += dh;
+    let g = samples[i].grade;
+    if (!Number.isFinite(g)) {
+      const dd = Math.max(1, samples[i].d_m - samples[i-1].d_m);
+      g = dh / dd;
+    }
+    if (Number.isFinite(g as number)) { sumG += (g as number); nG++; }
   }
   return {
     startIdx:s,endIdx:e,time_s:time,dist_m:dist,
@@ -184,18 +191,21 @@ export default function EffortsViewerMapbox({
   const tTotal = samples.length ? samples[samples.length-1].t_s : 0;
 
   const yDomain = useMemo(()=>{
-    const vals = samples.map(s => tab==='elev' ? s.elev_m_sm : tab==='pace' ? (s.pace_s_per_km ?? NaN) : tab==='bpm' ? (s.hr_bpm ?? NaN) : (s.vam_m_per_h ?? NaN)).filter(Number.isFinite);
+    const vals = samples.map(s => tab==='elev' ? (s.elev_m_sm ?? NaN) : tab==='pace' ? (s.pace_s_per_km ?? NaN) : tab==='bpm' ? (s.hr_bpm ?? NaN) : (s.vam_m_per_h ?? NaN)).filter(Number.isFinite);
     if (!vals.length) return [0,1] as [number,number];
     let lo=Math.min(...vals), hi=Math.max(...vals); if (lo===hi){lo-=1;hi+=1;}
-    const pad=(hi-lo)*0.1; return [lo-pad, hi+pad] as [number,number];
-  },[samples,tab]);
+    // Ensure a sensible elevation range in feet/meters
+    const basePad = tab==='elev' ? (useFeet ? 10 : 3) : 1;
+    const pad=Math.max((hi-lo)*0.1, basePad);
+    return [lo-pad, hi+pad] as [number,number];
+  },[samples,tab,useFeet]);
 
   const linePath = useMemo(()=>{
     if (samples.length<2) return '';
     const [y0,y1]=yDomain;
     const x = (d:number)=>P + (d/(dTotal||1))*(W-P*2);
     const y = (v:number)=>{const t=(v-y0)/(y1-y0||1);return H-P - t*(H-P*2);};
-    const metric=(s:Sample)=>tab==='elev'?s.elev_m_sm:tab==='pace'?(s.pace_s_per_km??0):tab==='bpm'?(s.hr_bpm??0):(s.vam_m_per_h??0);
+    const metric=(s:Sample)=>tab==='elev'?(s.elev_m_sm ?? 0):tab==='pace'?(s.pace_s_per_km??0):tab==='bpm'?(s.hr_bpm??0):(s.vam_m_per_h??0);
     let d=`M ${x(samples[0].d_m)} ${y(metric(samples[0]))}`;
     for (let i=1;i<samples.length;i++) d+=` L ${x(samples[i].d_m)} ${y(metric(samples[i]))}`;
     return d;
