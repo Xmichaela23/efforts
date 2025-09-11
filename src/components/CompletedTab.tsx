@@ -6,6 +6,7 @@ import { useWorkouts } from '@/hooks/useWorkouts';
 import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
+import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
 // Custom styles for range sliders
@@ -39,6 +40,7 @@ interface CompletedTabProps {
 
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
   const { useImperial } = useAppContext();
+  const compact = useCompact();
   const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
@@ -1512,181 +1514,204 @@ const formatPace = (paceValue: any): string => {
 
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
      <div className="w-full">
-       {/* 🗺️ MAP SECTION - Fixed height container */}
-       <div className="w-full mb-8">
-         <div className="h-64 relative">
-           <ActivityMap
-             gpsTrack={Array.isArray((hydrated||workoutData).gps_track) ? (hydrated||workoutData).gps_track : []}
-             activityName={(hydrated||workoutData).name || generateTitle()}
-             activityType={workoutType}
-             startLocation={(hydrated||workoutData).start_position_lat && (hydrated||workoutData).start_position_long ? {
-               lat: (hydrated||workoutData).start_position_lat,
-               lng: (hydrated||workoutData).start_position_long
-             } : null}
-           />
-         </div>
-       </div>
-       
-       {/* 📊 ELEVATION PROFILE SECTION - Starts below map with clear boundary */}
-       <div className="w-full">
-         {/* Chart container - clear separation from map */}
-         <div className="h-[500px] w-full">
-           <CleanElevationChart
-             gpsTrack={Array.isArray((hydrated||workoutData).gps_track) ? (hydrated||workoutData).gps_track : []}
-             sensorData={Array.isArray((hydrated||workoutData)?.sensor_data?.samples) ? (hydrated||workoutData).sensor_data.samples : (Array.isArray((hydrated||workoutData)?.sensor_data) ? (hydrated||workoutData).sensor_data : [])}
-             workoutType={workoutType}
-             selectedMetric={selectedMetric}
-             useImperial={useImperial}
-             analysisSeries={(hydrated||workoutData)?.computed?.analysis?.series || null}
-           />
-         </div>
-         {((hydrated||workoutData)?.computed?.analysis?.ui?.footnote) && (
-           <div className="px-4 py-2 text-xs text-gray-500">
-             {(hydrated||workoutData).computed.analysis.ui.footnote}
-           </div>
-         )}
-
-         {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
-         {(() => {
-           const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
-           const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
-           const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
-           const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
-           const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
-           const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-           if (!Array.isArray(distance_m) || distance_m.length < 2) return null;
-           const len = Math.min(distance_m.length, time_s.length || distance_m.length);
-           const samples = new Array(len).fill(0).map((_,i:number)=>({
-             t_s: Number(time_s?.[i] ?? i) || 0,
-             d_m: Number(distance_m?.[i] ?? 0) || 0,
-             elev_m_sm: Number.isFinite(elev?.[i]) ? Number(elev[i]) : null,
-             pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
-             hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
-             grade: null as number | null,
-             vam_m_per_h: null as number | null,
-           }));
-           for (let i=1;i<samples.length;i++) {
-             const a = samples[i-1], b = samples[i];
-             const dd = Math.max(0, (b.d_m - a.d_m));
-             const dt = Math.max(1, (b.t_s - a.t_s));
-             const de = (Number.isFinite(b.elev_m_sm as any) && Number.isFinite(a.elev_m_sm as any)) ? ((b.elev_m_sm as number) - (a.elev_m_sm as number)) : null;
-             if (dd > 0 && de != null) {
-               const g = de / dd; samples[i].grade = g; samples[i].vam_m_per_h = (dd/dt) * g * 3600;
+       {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
+       {(() => {
+         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
+         const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
+         const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
+         const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
+         const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
+         const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
+         if (!Array.isArray(distance_m) || distance_m.length < 2) return null;
+         const len = Math.min(distance_m.length, time_s.length || distance_m.length);
+         const samples = (()=>{
+           const out:any[] = [];
+           let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
+           const a = 0.2;
+           for (let i=0;i<len;i++){
+             const t = Number(time_s?.[i] ?? i) || 0;
+             const d = Number(distance_m?.[i] ?? 0) || 0;
+             const e = typeof elev?.[i] === 'number' ? Number(elev[i]) : null;
+             if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
+             const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
+             let grade: number | null = null, vam: number | null = null;
+             if (lastE != null && lastD != null && lastT != null){
+               const dd = Math.max(1, d - lastD);
+               const dh = es - lastE;
+               const dt = Math.max(1, t - lastT);
+               grade = dh / dd;
+               vam = (dh/dt) * 3600;
+             }
+             out.push({
+               t_s: t,
+               d_m: d,
+               elev_m_sm: es,
+               pace_s_per_km: Number.isFinite(pace?.[i]) ? Number(pace[i]) : null,
+               hr_bpm: Number.isFinite(hr?.[i]) ? Number(hr[i]) : null,
+               grade,
+               vam_m_per_h: vam
+             });
+             lastE = es; lastD = d; lastT = t;
+           }
+           return out;
+         })();
+         // Build GPS-derived track once (for route and optional elevation fallback)
+         const gpsRaw = (hydrated||workoutData)?.gps_track;
+         const gps = Array.isArray(gpsRaw)
+           ? gpsRaw
+           : (typeof gpsRaw === 'string' ? (()=>{ try { const v = JSON.parse(gpsRaw); return Array.isArray(v)? v : []; } catch { return []; } })() : []);
+         const track = gps
+           .map((p:any)=>{
+             const lng = p.lng ?? p.longitudeInDegree ?? p.longitude ?? p.lon;
+             const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
+             if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
+             return null;
+           })
+           .filter(Boolean) as [number,number][];
+         // diagnostics
+         try {
+           const elevVals = samples.map((s:any)=>s.elev_m_sm).filter((v:any)=>Number.isFinite(v));
+           const eMin = elevVals.length? Math.min(...elevVals) : null;
+           const eMax = elevVals.length? Math.max(...elevVals) : null;
+           // eslint-disable-next-line no-console
+           console.log('[viewer] track pts:', track.length, 'samples:', samples.length, 'elev count:', elevVals.length, 'elev range:', eMin, eMax);
+         } catch {}
+         // If series elevation is effectively missing, derive from gps_track altitude
+         try {
+           const elevFinite = samples.filter((s:any)=>Number.isFinite(s.elev_m_sm)).length;
+           if (elevFinite < Math.max(3, Math.floor(samples.length*0.2))) {
+             const pts = gps.map((p:any)=>({
+               lat: Number(p.lat ?? p.latitude ?? p.latitudeInDegree),
+               lon: Number(p.lng ?? p.lon ?? p.longitude ?? p.longitudeInDegree),
+               elev: (typeof p.elevation === 'number' ? Number(p.elevation) : (typeof p.altitude === 'number' ? Number(p.altitude) : NaN))
+             })).filter((p:any)=>[p.lat,p.lon].every(Number.isFinite));
+             if (pts.length > 1) {
+               const R = 6371000;
+               const hav = (a:any,b:any)=>{ const φ1=a.lat*Math.PI/180, φ2=b.lat*Math.PI/180; const dφ=(b.lat-a.lat)*Math.PI/180; const dλ=(b.lon-a.lon)*Math.PI/180; const s=Math.sin(dφ/2)**2 + Math.cos(φ1)*Math.cos(φ2)*Math.sin(dλ/2)**2; return 2*R*Math.atan2(Math.sqrt(s),Math.sqrt(1-s)); };
+               const cum:number[] = [0];
+               for (let i=1;i<pts.length;i++) cum[i] = cum[i-1] + hav(pts[i-1], pts[i]);
+               const nearestIdx = (target:number)=>{ let lo=0, hi=cum.length-1; while(lo<hi){ const m=(lo+hi)>>1; (cum[m]<target)?(lo=m+1):(hi=m); } return lo; };
+               for (let i=0;i<samples.length;i++) {
+                 const idx = nearestIdx(samples[i].d_m);
+                 const ei = pts[idx]?.elev;
+                 if (Number.isFinite(ei)) samples[i].elev_m_sm = Number(ei);
+               }
+               // recompute grade/vam after setting elevation
+               for (let i=1;i<samples.length;i++) {
+                 const aS = samples[i-1], bS = samples[i];
+                 const dd = Math.max(1, bS.d_m - aS.d_m);
+                 const dh = (Number(bS.elev_m_sm) - Number(aS.elev_m_sm));
+                 const dt = Math.max(1, bS.t_s - aS.t_s);
+                 bS.grade = dh / dd;
+                 bS.vam_m_per_h = (dh/dt) * 3600;
+               }
              }
            }
-           const gps = Array.isArray((hydrated||workoutData)?.gps_track) ? (hydrated||workoutData).gps_track : [];
-           const track = gps
-             .map((p:any)=>{
-               const lng = p.lng ?? p.longitudeInDegree ?? p.longitude;
-               const lat = p.lat ?? p.latitudeInDegree ?? p.latitude;
-               if ([lng,lat].every((v)=>Number.isFinite(v))) return [Number(lng), Number(lat)] as [number,number];
-               return null;
-             })
-             .filter(Boolean) as [number,number][];
-           const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
-           return (
-             <div className="mt-4">
-               <EffortsViewerMapbox
-                 mapboxToken={token}
-                 samples={samples as any}
-                 trackLngLat={track}
-                 useMiles={!!useImperial}
-                 useFeet={!!useImperial}
-               />
-             </div>
-           );
-         })()}
-         {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
-          <div className="px-4 py-2">
-            {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
-              <div className="mb-2">
-                <div className="text-sm mb-1">Splits · km</div>
-                <div className="space-y-1">
-                  {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any) => (
-                    <div key={`km-${s.n}`} className="flex items-baseline justify-between text-sm">
-                      <div className="text-[#666666]">{s.n}</div>
-                      <div className="flex items-baseline gap-4">
-                        {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
-                        {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
-                        <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(s.avgPace_s_per_km/60)}:${String(Math.round(s.avgPace_s_per_km%60)).padStart(2,'0')}/km` : '—'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            {useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.mi) && (hydrated||workoutData).computed.analysis.events.splits.mi.length > 0 && (
-              <div className="mb-2">
-                <div className="text-sm mb-1">Splits · mi</div>
-                <div className="space-y-1">
-                  {(hydrated||workoutData).computed.analysis.events.splits.mi.map((s:any) => (
-                    <div key={`mi-${s.n}`} className="flex items-baseline justify-between text-sm">
-                      <div className="text-[#666666]">{s.n}</div>
-                      <div className="flex items-baseline gap-4">
-                        {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
-                        {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
-                        <div className="font-mono">{s.avgPace_s_per_km != null ? (()=>{ const spm = s.avgPace_s_per_km * 1.60934; const mm = Math.floor(spm/60); const ss = Math.round(spm%60); return `${mm}:${String(ss).padStart(2,'0')}/mi`; })() : '—'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+         } catch {}
+        const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
+        return (
+          <div className="mt-4">
+            <EffortsViewerMapbox
+              mapboxToken={token}
+              samples={samples as any}
+              trackLngLat={track}
+              useMiles={!!useImperial}
+              useFeet={!!useImperial}
+              compact={compact}
+            />
           </div>
-        )}
-        {/* Zones histograms (minimal stacked bars) */}
-        {((hydrated||workoutData)?.computed?.analysis?.zones) && (
-          <div className="px-4 py-4 space-y-3">
-            {Array.isArray((hydrated||workoutData).computed.analysis.zones?.hr?.bins) && (hydrated||workoutData).computed.analysis.zones.hr.bins.length > 0 && (()=>{
-              const hrBins = (hydrated||workoutData).computed.analysis.zones.hr.bins as any[];
-              const total = hrBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
-              return (
-                <div>
-                  <div className="text-sm mb-1">HR zones</div>
-                  <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
-                    {hrBins.map((b:any, i:number) => (
-                      <div key={`hrz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
-                    ))}
-                  </div>
-                  <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.hr.schema}</div>
-                </div>
-              );
-            })()}
-            {Array.isArray((hydrated||workoutData).computed.analysis.zones?.pace?.bins) && (hydrated||workoutData).computed.analysis.zones.pace.bins.length > 0 && (()=>{
-              const pBins = (hydrated||workoutData).computed.analysis.zones.pace.bins as any[];
-              const total = pBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
-              return (
-                <div>
-                  <div className="text-sm mb-1">Pace bands</div>
-                  <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
-                    {pBins.map((b:any, i:number) => (
-                      <div key={`pcz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
-                    ))}
-                  </div>
-                  <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.pace.schema}</div>
-                </div>
-              );
-            })()}
-          </div>
-        )}
-        {((hydrated||workoutData)?.computed?.analysis?.bests) && (
-          <div className="px-4 py-2 space-y-1">
-            <div className="text-sm mb-1">Bests</div>
-            {Array.isArray((hydrated||workoutData).computed.analysis.bests?.pace_s_per_km) && (hydrated||workoutData).computed.analysis.bests.pace_s_per_km.length > 0 && (
-              <div className="text-sm">
-                {(hydrated||workoutData).computed.analysis.bests.pace_s_per_km.map((b:any, i:number) => (
-                  <div key={`bp-${i}`} className="flex items-baseline justify-between">
-                    <div className="text-[#666666]">{b.duration_s/60} min</div>
-                    <div className="font-mono">{`${Math.floor(b.value/60)}:${String(Math.round(b.value%60)).padStart(2,'0')}/km`}</div>
+        );
+      })()}
+      {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
+        <div className="px-4 py-2">
+          {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
+            <div className="mb-2">
+              <div className="text-sm mb-1">Splits · km</div>
+              <div className="space-y-1">
+                {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any) => (
+                  <div key={`km-${s.n}`} className="flex items-baseline justify-between text-sm">
+                    <div className="text-[#666666]">{s.n}</div>
+                    <div className="flex items-baseline gap-4">
+                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
+                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
+                      <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(s.avgPace_s_per_km/60)}:${String(Math.round(s.avgPace_s_per_km%60)).padStart(2,'0')}/km` : '—'}</div>
+                    </div>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        )}
-      </div>
-     </div>
-+   </div>
+            </div>
+          )}
+          {useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.mi) && (hydrated||workoutData).computed.analysis.events.splits.mi.length > 0 && (
+            <div className="mb-2">
+              <div className="text-sm mb-1">Splits · mi</div>
+              <div className="space-y-1">
+                {(hydrated||workoutData).computed.analysis.events.splits.mi.map((s:any) => (
+                  <div key={`mi-${s.n}`} className="flex items-baseline justify-between text-sm">
+                    <div className="text-[#666666]">{s.n}</div>
+                    <div className="flex items-baseline gap-4">
+                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
+                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
+                      <div className="font-mono">{s.avgPace_s_per_km != null ? (()=>{ const spm = s.avgPace_s_per_km * 1.60934; const mm = Math.floor(spm/60); const ss = Math.round(spm%60); return `${mm}:${String(ss).padStart(2,'0')}/mi`; })() : '—'}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      {/* Zones histograms (minimal stacked bars) */}
+      {((hydrated||workoutData)?.computed?.analysis?.zones) && (
+        <div className="px-4 py-4 space-y-3">
+          {Array.isArray((hydrated||workoutData).computed.analysis.zones?.hr?.bins) && (hydrated||workoutData).computed.analysis.zones.hr.bins.length > 0 && (()=>{
+            const hrBins = (hydrated||workoutData).computed.analysis.zones.hr.bins as any[];
+            const total = hrBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
+            return (
+              <div>
+                <div className="text-sm mb-1">HR zones</div>
+                <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
+                  {hrBins.map((b:any, i:number) => (
+                    <div key={`hrz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
+                  ))}
+                </div>
+                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.hr.schema}</div>
+              </div>
+            );
+          })()}
+          {Array.isArray((hydrated||workoutData).computed.analysis.zones?.pace?.bins) && (hydrated||workoutData).computed.analysis.zones.pace.bins.length > 0 && (()=>{
+            const pBins = (hydrated||workoutData).computed.analysis.zones.pace.bins as any[];
+            const total = pBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
+            return (
+              <div>
+                <div className="text-sm mb-1">Pace bands</div>
+                <div className="flex h-2 overflow-hidden" style={{ borderRadius: 2 }}>
+                  {pBins.map((b:any, i:number) => (
+                    <div key={`pcz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
+                  ))}
+                </div>
+                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.pace.schema}</div>
+              </div>
+            );
+          })()}
+        </div>
+      )}
+      {((hydrated||workoutData)?.computed?.analysis?.bests) && (
+        <div className="px-4 py-2 space-y-1">
+          <div className="text-sm mb-1">Bests</div>
+          {Array.isArray((hydrated||workoutData).computed.analysis.bests?.pace_s_per_km) && (hydrated||workoutData).computed.analysis.bests.pace_s_per_km.length > 0 && (
+            <div className="text-sm">
+              {(hydrated||workoutData).computed.analysis.bests.pace_s_per_km.map((b:any, i:number) => (
+                <div key={`bp-${i}`} className="flex items-baseline justify-between">
+                  <div className="text-[#666666]">{b.duration_s/60} min</div>
+                  <div className="font-mono">{`${Math.floor(b.value/60)}:${String(Math.round(b.value%60)).padStart(2,'0')}/km`}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+   </div>
  );
 };
 
