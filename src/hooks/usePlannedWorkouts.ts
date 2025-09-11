@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('*')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,completed_workout_id,computed')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -46,13 +46,16 @@ export const usePlannedWorkouts = () => {
 
       // Transform the data to match our PlannedWorkout interface
       const transformedWorkouts: PlannedWorkout[] = (data || [])
-        // Filter out optional-tagged planned until user activates (optional tag removed)
+        // Filter out optional-tagged planned and rows already linked to completed
         .filter((w: any) => {
           const raw = (w as any).tags;
           let tags: any[] = [];
           if (Array.isArray(raw)) tags = raw;
           else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
-          return !tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+          const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
+          const isCompleted = String((w as any).workout_status||'').toLowerCase()==='completed';
+          const hasCompletedId = !!(w as any)?.completed_workout_id;
+          return !isOptional && !isCompleted && !hasCompletedId;
         })
         .map(workout => {
         // Normalize JSONB fields that may come back as strings
