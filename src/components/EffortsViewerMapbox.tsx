@@ -191,23 +191,44 @@ export default function EffortsViewerMapbox({
     mapRef.current = map;
 
     map.on("load", () => {
+      try { map.setProjection({ name: 'mercator' } as any); } catch {}
+      try { (map as any).setFog?.(null); } catch {}
       if (!map.getSource(routeSrc)) {
-        map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: trackLngLat || [] } } as any });
+        map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
       }
       if (!map.getLayer(routeId)) {
-        map.addLayer({ id: routeId, type: "line", source: routeSrc, paint: { "line-color": "#3b82f6", "line-width": 3 } });
+        map.addLayer({ id: routeId, type: "line", source: routeSrc, layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#3b82f6", "line-width": 3 } });
       }
       const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
       if (!map.getSource(cursorSrc)) {
         map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
         map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       }
-      if (!hasFitRef.current && trackLngLat && trackLngLat.length > 1) {
-        const b = new mapboxgl.LngLatBounds(trackLngLat[0], trackLngLat[0]);
-        for (const c of trackLngLat) b.extend(c);
-        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-        hasFitRef.current = true;
-      }
+
+      // NEW: seed route immediately on load and fit once
+      try {
+        const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
+        const coords = Array.isArray(trackLngLat) ? (trackLngLat.filter(isValidCoord) as [number,number][]) : [];
+        if (coords.length > 1) {
+          const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+          src?.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
+          if (!hasFitRef.current) {
+            const b = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
+            for (const c of coords) b.extend(c as any);
+            map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
+            map.once('moveend', () => {
+              try {
+                const c = map.getCenter();
+                // @ts-ignore // This type is not in the original file, so we'll keep it as is.
+                lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
+              } catch {}
+              hasFitRef.current = true;
+              routeInitializedRef.current = true;
+              prevRouteLenRef.current = coords.length;
+            });
+          }
+        }
+      } catch {}
     });
 
     return () => { map.remove(); mapRef.current = null; };
