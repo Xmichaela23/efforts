@@ -274,6 +274,7 @@ export default function EffortsViewerMapbox({
   const hasFitRef = useRef(false);
   const prevRouteLenRef = useRef(0);
   const lastNonEmptyRouteRef = useRef<[number,number][]>([]);
+  const routeStableCountRef = useRef(0);
   const lockedCameraRef = useRef<{ center: [number,number], zoom: number } | null>(null);
   const routeInitializedRef = useRef(false);
   const routeSrc = "route-src", routeId = "route-line";
@@ -332,8 +333,13 @@ export default function EffortsViewerMapbox({
       const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
       if (src && hasNonEmpty(coords)) src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
 
+      // Track consecutive non-empty frames to avoid first-frame race
+      if (hasNonEmpty(coords)) routeStableCountRef.current = Math.min(routeStableCountRef.current + 1, 3);
+      else routeStableCountRef.current = 0;
+
       if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
         const doFit = () => {
+          if (routeStableCountRef.current < 2) return; // wait for a stable route
           const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
           for (const c of coords) b.extend(c);
           map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
@@ -488,7 +494,7 @@ export default function EffortsViewerMapbox({
       />
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 16, margin: "6px 6px 6px 6px", fontWeight: 700 }}>
+      <div style={{ display: "flex", gap: 16, margin: "6px 6px 6px 6px", fontWeight: 700, position: 'relative', zIndex: 5, pointerEvents: 'auto' }}>
         {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
           <button
             key={t}
