@@ -1,11 +1,8 @@
 // EffortsViewerMapbox.tsx
-// Drop-in, responsive, scrub-synced charts + Mapbox with "all-metrics" InfoCard.
-// npm i mapbox-gl
-// import "mapbox-gl/dist/mapbox-gl.css" once in your app.
+// Drop-in, responsive, scrub-synced charts + MapLibre mini-map with "all-metrics" InfoCard.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import mapboxgl from "mapbox-gl";
-import "mapbox-gl/dist/mapbox-gl.css";
+import MapEffort from "./MapEffort";
 
 /** ---------- Types ---------- */
 type Sample = {
@@ -50,32 +47,7 @@ const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.280
 const fmtPct = (x: number | null) => (x == null || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(1)}%`);
 const fmtVAM = (mPerH: number | null, useFeet = true) => (mPerH == null || !Number.isFinite(mPerH) ? "—" : useFeet ? `${Math.round(mPerH * 3.28084)} ft/h` : `${Math.round(mPerH)} m/h`);
 
-/** ---------- Geometry helpers for Mapbox cursor ---------- */
-const R = 6371000;
-function hav(a: [number, number], b: [number, number]) {
-  const [lon1, lat1] = a, [lon2, lat2] = b;
-  const φ1 = (lat1 * Math.PI) / 180, φ2 = (lat2 * Math.PI) / 180;
-  const dφ = ((lat2 - lat1) * Math.PI) / 180, dλ = ((lon2 - lon1) * Math.PI) / 180;
-  const s = Math.sin(dφ / 2) ** 2 + Math.cos(φ1) * Math.cos(φ2) * Math.sin(dλ / 2) ** 2;
-  return 2 * R * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
-}
-function prepLine(track: [number, number][]) {
-  const cum = [0];
-  for (let i = 1; i < track.length; i++) cum[i] = cum[i - 1] + hav(track[i - 1], track[i]);
-  return cum;
-}
-function pointAtDistance(track: [number, number][], cum: number[], target: number): [number, number] {
-  if (!track.length) return [0, 0];
-  const total = cum[cum.length - 1] || 1;
-  const t = clamp(target, 0, total);
-  let i = cum.findIndex((x) => x >= t);
-  if (i < 0) i = cum.length - 1;
-  if (i <= 0) return track[0];
-  const d0 = cum[i - 1], d1 = cum[i], segLen = Math.max(1e-6, d1 - d0);
-  const r = (t - d0) / segLen;
-  const [lon0, lat0] = track[i - 1], [lon1, lat1] = track[i];
-  return [lerp(lon0, lon1, r), lerp(lat0, lat1, r)];
-}
+/** ---------- Geometry helpers removed (handled in MapEffort) ---------- */
 
 /** ---------- Basic smoothing & robust domain helpers ---------- */
 const movAvg = (arr: number[], w = 5) => {
@@ -273,142 +245,9 @@ export default function EffortsViewerMapbox({
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
 
-  /** ----- Mapbox (stable camera, no globe snap) ----- */
-  const mapRef = useRef<mapboxgl.Map | null>(null);
-  const mapDivRef = useRef<HTMLDivElement>(null);
-  const hasFitRef = useRef(false);
-  const prevRouteLenRef = useRef(0);
-  const lastNonEmptyRouteRef = useRef<[number,number][]>([]);
-  const routeStableCountRef = useRef(0);
-  const lockedCameraRef = useRef<{ center: [number,number], zoom: number } | null>(null);
-  const routeInitializedRef = useRef(false);
-  const routeSrc = "route-src", routeId = "route-line";
-  const cursorSrc = "cursor-src", cursorId = "cursor-pt";
-  const [mapReady, setMapReady] = useState(false);
-
-  const lineCum = useMemo(() => prepLine(trackLngLat || []), [trackLngLat]);
-
-  useEffect(() => {
-    if (!mapDivRef.current || !mapboxToken || mapRef.current) return;
-    mapboxgl.accessToken = mapboxToken;
-    // Compute initial bounds so first frame is on the route
-    const valid = (pt:any)=> Array.isArray(pt)&&pt.length===2 && isFinite(pt[0])&&isFinite(pt[1]) && pt[0]>=-180&&pt[0]<=180 && pt[1]>=-90&&pt[1]<=90;
-    const initCoords = Array.isArray(trackLngLat) ? (trackLngLat.filter(valid) as [number,number][]) : [];
-    let initialOpts: any = {};
-    if (initCoords.length > 1) {
-      let b = new mapboxgl.LngLatBounds(initCoords[0], initCoords[0]);
-      for (const c of initCoords) b.extend(c);
-      initialOpts = { bounds: b, fitBoundsOptions: { padding: 28, maxZoom: 13, animate: false } };
-    }
-    const map = new mapboxgl.Map({
-      container: mapDivRef.current,
-      style: "mapbox://styles/mapbox/streets-v12",
-      interactive: false,
-      projection: { name: 'mercator' },
-      minZoom: 3,
-      maxZoom: 18,
-      renderWorldCopies: false,
-      ...initialOpts
-    });
-    mapRef.current = map;
-
-    map.on("load", () => {
-      if (!map.getSource(routeSrc)) {
-        map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
-      }
-      if (!map.getLayer(routeId)) {
-        map.addLayer({ id: routeId, type: "line", source: routeSrc, layout: { "line-join":"round", "line-cap":"round" }, paint: { "line-color": "#3b82f6", "line-width": 3 } });
-      }
-      const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
-      if (!map.getSource(cursorSrc)) {
-        map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
-        map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
-      }
-      // Seed route; rely on constructor bounds to avoid a second refit flash
-      if (initCoords.length > 1) {
-        const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-        src?.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: initCoords } } as any);
-        map.once('idle', () => {
-          try { const c = map.getCenter(); lockedCameraRef.current = { center: [c.lng,c.lat], zoom: map.getZoom() } as any; } catch {}
-          hasFitRef.current = true; routeInitializedRef.current = true; prevRouteLenRef.current = initCoords.length;
-          setMapReady(true);
-        });
-      } else {
-        map.once('idle', () => setMapReady(true));
-      }
-    });
-
-    const onResize = () => {
-      if (!mapRef.current) return;
-      mapRef.current.resize();
-      if (lockedCameraRef.current) {
-        const { center, zoom } = lockedCameraRef.current;
-        try { mapRef.current.jumpTo({ center, zoom }); } catch {}
-      }
-    };
-    map.on('resize', onResize);
-
-    return () => { map.off('resize', onResize); map.remove(); mapRef.current = null; };
-  }, [mapboxToken, trackLngLat]);
-
-  useEffect(() => {
-    const map = mapRef.current; if (!map) return;
-    const incoming = trackLngLat || [];
-    const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
-    const filtered = Array.isArray(incoming) ? (incoming.filter(isValidCoord) as [number,number][]) : [];
-    const hasNonEmpty = (arr:[number,number][]) => Array.isArray(arr) && arr.length > 1 && isValidCoord(arr[0]);
-    if (hasNonEmpty(filtered)) lastNonEmptyRouteRef.current = filtered;
-    const coords = hasNonEmpty(filtered) ? filtered : lastNonEmptyRouteRef.current;
-    if (routeInitializedRef.current && !hasNonEmpty(coords)) return;
-
-    try {
-      const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-      if (src && hasNonEmpty(coords)) {
-        // cheap guard: only update if length changed or last point moved
-        const lastLen = prevRouteLenRef.current;
-        const lastPt = (lastNonEmptyRouteRef.current || [])[lastLen - 1];
-        const newPt = coords[coords.length - 1];
-        const moved = !lastPt || Math.abs((lastPt[0]??0) - (newPt[0]??0)) > 1e-9 || Math.abs((lastPt[1]??0) - (newPt[1]??0)) > 1e-9;
-        if (coords.length !== lastLen || moved) {
-          src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
-        }
-      }
-
-      // Track consecutive non-empty frames to avoid first-frame race
-      if (hasNonEmpty(coords)) routeStableCountRef.current = Math.min(routeStableCountRef.current + 1, 3);
-      else routeStableCountRef.current = 0;
-
-      if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
-        const doFit = () => {
-          if (routeStableCountRef.current < 2) return; // wait for a stable route
-          const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
-          for (const c of coords) b.extend(c);
-          map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-          map.once('idle', () => {
-            try {
-              const c = map.getCenter();
-              lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
-            } catch {}
-            hasFitRef.current = true;
-            routeInitializedRef.current = true;
-          });
-        };
-        if (map.isStyleLoaded()) doFit(); // do not refit on styledata once locked
-      }
-      prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : 0;
-    } catch {}
-  }, [trackLngLat]);
-
-  // Move cursor on scrub
+  // Map rendering moved to MapEffort component
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
-  useEffect(() => {
-    const map = mapRef.current; if (!map) return;
-    const src = map.getSource(cursorSrc) as mapboxgl.GeoJSONSource | undefined;
-    if (!src) return;
-    const target = pointAtDistance(trackLngLat || [], lineCum, (lineCum[lineCum.length - 1] || 1) * (distNow / (dTotal || 1)));
-    src.setData({ type: "Feature", geometry: { type: "Point", coordinates: target } } as any);
-  }, [idx, distNow, dTotal, trackLngLat, lineCum]);
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260, P = 28;
@@ -528,10 +367,12 @@ export default function EffortsViewerMapbox({
 
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
-      {/* Map */}
-      <div
-        ref={mapDivRef}
-        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none", opacity: mapReady ? 1 : 0, transition: 'opacity 150ms ease' }}
+      {/* Map (MapLibre) */}
+      <MapEffort
+        trackLngLat={trackLngLat as any}
+        cursorDist_m={distNow}
+        totalDist_m={dTotal}
+        theme={"streets"}
       />
 
       {/* Tabs */}
