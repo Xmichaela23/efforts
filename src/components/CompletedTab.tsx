@@ -1613,18 +1613,14 @@ const formatPace = (paceValue: any): string => {
         const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
         return (
           <div className="mt-4">
-            <React.Suspense fallback={<div className="px-4 py-3 text-sm text-[#666666]">Loading map…</div>}>
-              <ViewerErrorBoundary fallback={null as any}>
-                <EffortsViewerMapbox
-                  mapboxToken={token}
-                  samples={samples as any}
-                  trackLngLat={track}
-                  useMiles={!!useImperial}
-                  useFeet={!!useImperial}
-                  compact={compact}
-                />
-              </ViewerErrorBoundary>
-            </React.Suspense>
+            <EffortsViewerMapbox
+              mapboxToken={token}
+              samples={samples as any}
+              trackLngLat={track}
+              useMiles={!!useImperial}
+              useFeet={!!useImperial}
+              compact={compact}
+            />
           </div>
         );
       })()}
@@ -1730,7 +1726,4 @@ class ViewerErrorBoundary extends React.Component<{ children: React.ReactNode, f
   render(){ if (this.state.hasError) return <div className="px-4 py-3 text-sm text-[#666666]">Map failed to load</div> as any; return this.props.children as any; }
 }
 
-const EffortsViewerMapbox = React.lazy(async () => {
-  const mod = await import('./EffortsViewerMapbox');
-  return { default: mod.default } as any;
-});
+import EffortsViewerMapbox from './EffortsViewerMapbox';
