@@ -577,4 +577,4 @@ export default function EffortsViewerMapbox({
   );
 }
 
-/* DUPLICATE REMOVED BELOW
+/* duplicate marker cleanup */
