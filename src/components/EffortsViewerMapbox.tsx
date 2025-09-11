@@ -137,10 +137,10 @@ function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
 /** ---------- Tiny UI atoms ---------- */
 const Pill = ({ label, value, active=false }: { label: string; value: string | number; active?: boolean }) => (
   <div style={{
-    padding: "6px 8px",
-    borderRadius: 10,
-    border: "1px solid #e2e8f0",
-    background: active ? "#f0f9ff" : "#fff",
+    padding: "2px 0",
+    borderRadius: 0,
+    border: "none",
+    background: "transparent",
     display: "flex",
     flexDirection: "column",
     gap: 2,
@@ -179,10 +179,10 @@ function InfoCard({
   return (
     <div style={{
       margin: "6px 6px 12px 6px",
-      padding: 12,
-      border: "1px solid #e2e8f0",
-      borderRadius: 12,
-      background: "#fff"
+      padding: 0,
+      border: "none",
+      borderRadius: 0,
+      background: "transparent"
     }}>
       <div style={{ fontWeight: 700 }}>
         {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
@@ -193,7 +193,7 @@ function InfoCard({
         <span style={{ fontSize: 22, fontWeight: 800, color: "#0ea5e9" }}>{primary}</span>
       </div>
 
-      <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 6 }}>
+      <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 8 }}>
         <Pill label="Pace"  value={vals.pace}  active={tab==="pace"} />
         <Pill label="HR"    value={vals.bpm}   active={tab==="bpm"} />
         <Pill label="VAM"   value={vals.vam}   active={tab==="vam"} />
@@ -285,6 +285,9 @@ export default function EffortsViewerMapbox({
   useEffect(() => {
     if (!mapDivRef.current || !mapboxToken || mapRef.current) return;
     mapboxgl.accessToken = mapboxToken;
+    // Precompute bounds to start on route
+    const valid = (pt:any)=> Array.isArray(pt)&&pt.length===2 && isFinite(pt[0])&&isFinite(pt[1]) && pt[0]>=-180&&pt[0]<=180 && pt[1]>=-90&&pt[1]<=90;
+    const initCoords = Array.isArray(trackLngLat) ? (trackLngLat.filter(valid) as [number,number][]) : [];
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
@@ -303,6 +306,18 @@ export default function EffortsViewerMapbox({
       if (!map.getSource(cursorSrc)) {
         map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
         map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
+      }
+      // Seed route and fit immediately if available
+      if (initCoords.length > 1) {
+        const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+        src?.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: initCoords } } as any);
+        const b = new mapboxgl.LngLatBounds(initCoords[0], initCoords[0]);
+        for (const c of initCoords) b.extend(c);
+        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
+        map.once('idle', () => {
+          try { const c = map.getCenter(); lockedCameraRef.current = { center: [c.lng,c.lat], zoom: map.getZoom() } as any; } catch {}
+          hasFitRef.current = true; routeInitializedRef.current = true; prevRouteLenRef.current = initCoords.length;
+        });
       }
     });
 
