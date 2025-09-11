@@ -81,6 +81,8 @@ export default function MapEffort({
       }
       layersAttachedRef.current = true;
     };
+    // Expose a safe reattach for later effects
+    (map as any).__attachEffortLayers = attachLayers;
 
     map.on('load', () => {
       attachLayers();
@@ -150,17 +152,19 @@ export default function MapEffort({
     const map = mapRef.current; if (!map || !ready) return;
     layersAttachedRef.current = false;
     try { map.setStyle(styleUrl(theme)); } catch {}
-    // After the new style loads, re-attach layers, restore camera, and reapply data
-    const onStyle = () => {
+    // After the new style fully loads and our layers are reattached, restore camera and data
+    const onIdle = () => {
       try {
-        if (savedCameraRef.current) map.jumpTo(savedCameraRef.current as any);
-        const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+        const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
+        if (reattach) reattach();
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
+        const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
         if (src && valid.length > 1) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+        if (savedCameraRef.current) map.jumpTo(savedCameraRef.current as any);
       } catch {}
     };
-    map.once('styledata', onStyle);
-    return () => { try { map.off('styledata', onStyle); } catch {} };
+    map.once('idle', onIdle);
+    return () => { try { map.off('idle', onIdle); } catch {} };
   }, [theme, ready, coords]);
 
   // Simple SVG fallback when no coords
