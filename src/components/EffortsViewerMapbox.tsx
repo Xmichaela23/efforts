@@ -210,22 +210,27 @@ export default function EffortsViewerMapbox({
         const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
         const coords = Array.isArray(trackLngLat) ? (trackLngLat.filter(isValidCoord) as [number,number][]) : [];
         if (coords.length > 1) {
-          const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+          let src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+          if (!src) {
+            map.addSource(routeSrc, { type: 'geojson', data: { type: 'Feature', properties:{}, geometry: { type: 'LineString', coordinates: [] } } as any });
+            src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
+          }
           src?.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
           if (!hasFitRef.current) {
             const b = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
             for (const c of coords) b.extend(c as any);
             map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-            map.once('moveend', () => {
+            const onFirstMoveEnd = () => {
               try {
                 const c = map.getCenter();
-                // @ts-ignore // This type is not in the original file, so we'll keep it as is.
-                lockedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any;
+                lockedCameraRef.current = { center: [c.lng, c.lat], zoom: Math.floor(map.getZoom()) } as any; // floor zoom to avoid globe
               } catch {}
               hasFitRef.current = true;
               routeInitializedRef.current = true;
               prevRouteLenRef.current = coords.length;
-            });
+              map.off('moveend', onFirstMoveEnd);
+            };
+            map.on('moveend', onFirstMoveEnd);
           }
         }
       } catch {}
@@ -240,13 +245,31 @@ export default function EffortsViewerMapbox({
     const coords = trackLngLat || [];
     try {
       const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-      if (src) src.setData({ type: "Feature", geometry: { type: "LineString", coordinates: coords } } as any);
-      if (!hasFitRef.current && coords.length > 1) {
-        const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
-        for (const c of coords) b.extend(c);
-        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
-        hasFitRef.current = true;
+      if (src && hasNonEmpty(coords)) {
+        src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
       }
+
+      // Fit once after style is ready and we have a valid route
+      if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
+        const doFit = () => {
+          const b = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
+          for (const c of coords) b.extend(c as any);
+          map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
+          const onFirstMoveEnd = () => {
+            try {
+              const c = map.getCenter();
+              lockedCameraRef.current = { center: [c.lng, c.lat], zoom: Math.floor(map.getZoom()) } as any;
+            } catch {}
+            hasFitRef.current = true;
+            routeInitializedRef.current = true;
+            map.off('moveend', onFirstMoveEnd);
+          };
+          map.on('moveend', onFirstMoveEnd);
+        };
+        if (map.isStyleLoaded()) doFit(); else map.once('styledata', doFit);
+      }
+
+      prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : prevRouteLenRef.current;
     } catch {}
   }, [trackLngLat]);
 
