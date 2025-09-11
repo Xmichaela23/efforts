@@ -34,10 +34,11 @@ export function usePlannedRange(fromISO: string, toISO: string) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [invalidateTs, setInvalidateTs] = useState<number>(0);
+  const DEBOUNCE_MS = 200;
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    const timer = setTimeout(async () => {
       try {
         if (!readStorage(cacheKey('', fromISO, toISO))) setLoading(true);
         setError(null);
@@ -59,18 +60,29 @@ export function usePlannedRange(fromISO: string, toISO: string) {
           // revalidate in background
         }
         // Revalidate (SWR)
-        const { data, error } = await supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status,description,duration,computed,week_number,day_number,training_plan_id,tags,completed_workout_id')
-          .eq('user_id', user.id)
-          .gte('date', fromISO)
-          .lte('date', toISO)
-          .order('date', { ascending: true });
-        if (error) throw error;
+        const [plannedRes, completedRes] = await Promise.all([
+          supabase
+            .from('planned_workouts')
+            .select('id,name,type,date,workout_status,description,duration,computed,week_number,day_number,training_plan_id,tags,completed_workout_id')
+            .eq('user_id', user.id)
+            .gte('date', fromISO)
+            .lte('date', toISO)
+            .order('date', { ascending: true }),
+          supabase
+            .from('workouts')
+            .select('id,date,type,name,computed,planned_id')
+            .eq('user_id', user.id)
+            .gte('date', fromISO)
+            .lte('date', toISO)
+            .order('date', { ascending: true })
+        ]);
+        if (plannedRes.error) throw plannedRes.error;
+        if (completedRes.error) throw completedRes.error;
         if (cancelled) return;
-        const safeAll = Array.isArray(data) ? data : [];
-        // Filter out completed planned rows and optional-tagged rows
-        const safe = safeAll.filter((w: any) => {
+        const plannedAll = Array.isArray(plannedRes.data) ? plannedRes.data : [];
+        const completedAll = Array.isArray(completedRes.data) ? completedRes.data : [];
+        // Active planned only (exclude optional/completed)
+        const plannedActive = plannedAll.filter((w: any) => {
           const raw = (w as any).tags;
           let tags: any[] = [];
           if (Array.isArray(raw)) tags = raw;
@@ -80,17 +92,32 @@ export function usePlannedRange(fromISO: string, toISO: string) {
           const hasCompletedId = !!(w as any)?.completed_workout_id;
           return !isOptional && !isCompleted && !hasCompletedId;
         });
-        setRows(safe);
-        const payload = { ts: Date.now(), rows: safe };
+        // Map of planned replaced by completed
+        const replaced = new Set<string>(completedAll.map((c:any)=>String(c.planned_id||'')).filter(Boolean));
+        const plannedFinal = plannedActive.filter((p:any)=> !replaced.has(String(p.id)));
+        // Map completed to calendar-row shape, completed wins
+        const completedRows = completedAll.map((c:any)=>({
+          id: c.id,
+          name: c.name || 'Completed',
+          type: c.type,
+          date: c.date,
+          workout_status: 'completed',
+          completed_workout_id: c.id,
+          computed: c.computed,
+          planned_id: c.planned_id
+        }));
+        const merged = [...plannedFinal, ...completedRows].sort((a:any,b:any)=> String(a.date).localeCompare(String(b.date)));
+        setRows(merged);
+        const payload = { ts: Date.now(), rows: merged };
         memoryCache.set(key, payload);
-        writeStorage(key, safe);
+        writeStorage(key, merged);
       } catch (e: any) {
         if (!cancelled) setError(e?.message || 'Failed to load planned range');
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
-    return () => { cancelled = true; };
+    }, DEBOUNCE_MS);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [fromISO, toISO, invalidateTs]);
 
   useEffect(() => {
@@ -110,7 +137,7 @@ export function usePlannedRange(fromISO: string, toISO: string) {
     return () => window.removeEventListener('planned:invalidate', handler);
   }, [fromISO, toISO]);
 
-  // Realtime: invalidate when planned_workouts change for this user
+  // Realtime: invalidate when planned_workouts or workouts change for this user
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let active = true;
@@ -133,6 +160,13 @@ export function usePlannedRange(fromISO: string, toISO: string) {
               const d = String((payload.new as any)?.date || (payload.old as any)?.date || '').slice(0,10);
               if (d && d >= fromISO && d <= toISO) await invalidate();
               else await invalidate(); // conservative: invalidate anyway
+            } catch { await invalidate(); }
+          })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, async (payload) => {
+            try {
+              const d = String((payload.new as any)?.date || (payload.old as any)?.date || '').slice(0,10);
+              if (d && d >= fromISO && d <= toISO) await invalidate();
+              else await invalidate();
             } catch { await invalidate(); }
           })
           .subscribe();
