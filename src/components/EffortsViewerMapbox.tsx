@@ -2,10 +2,11 @@
 // Drop-in, responsive, scrub-synced elevation/pace/BPM/VAM + Mapbox cursor
 // Copy-paste into Cursor.
 // Requires: npm i mapbox-gl
-// Ensure mapbox-gl CSS is imported globally (e.g., in src/index.css)
+// Also ensure: import "mapbox-gl/dist/mapbox-gl.css" once in your app.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
+import "mapbox-gl/dist/mapbox-gl.css";
 
 /** ---------- Types ---------- */
 type Sample = {
@@ -124,7 +125,6 @@ export default function EffortsViewerMapbox({
   useFeet?: boolean;
   compact?: boolean;
 }) {
-  const tokenMissing = !mapboxToken;
   // Normalize samples to Sample[] regardless of upstream shape
   const normalizedSamples: Sample[] = useMemo(() => {
     const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
@@ -153,13 +153,11 @@ export default function EffortsViewerMapbox({
         grade = dh / dd;
         vam = (dh/dt) * 3600;
       }
-      const rawPace = pace_s_per_km?.[i];
-      const secPerKm = Number.isFinite(rawPace as any) ? ((rawPace as number) < 30 ? (rawPace as number) * 60 : (rawPace as number)) : null;
       out.push({
         t_s: t,
         d_m: d,
         elev_m_sm: es,
-        pace_s_per_km: secPerKm,
+        pace_s_per_km: Number.isFinite(pace_s_per_km?.[i]) ? Number(pace_s_per_km[i]) : null,
         hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
         grade,
         vam_m_per_h: vam
@@ -195,7 +193,7 @@ export default function EffortsViewerMapbox({
       interactive: false,
       minZoom: 3,
       maxZoom: 18,
-      projection: { name: 'mercator' } as any
+      projection: { name: 'mercator' }
     });
     mapRef.current = map;
 
@@ -206,7 +204,7 @@ export default function EffortsViewerMapbox({
         map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
       }
       if (!map.getLayer(routeId)) {
-        map.addLayer({ id: routeId, type: "line", source: routeSrc, layout: { "line-join": "round", "line-cap": "round" }, paint: { "line-color": "#3b82f6", "line-width": 3 } });
+        map.addLayer({ id: routeId, type: "line", source: routeSrc, paint: { "line-color": "#3b82f6", "line-width": 3 } });
       }
       const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
       if (!map.getSource(cursorSrc)) {
@@ -215,6 +213,7 @@ export default function EffortsViewerMapbox({
       }
     });
 
+    // Keep camera on resize only (not each update)
     const onResize = () => {
       if (!mapRef.current) return;
       mapRef.current.resize();
@@ -225,7 +224,11 @@ export default function EffortsViewerMapbox({
     };
     map.on('resize', onResize);
 
-    return () => { try { map.off('resize', onResize); } catch {}; try { map.remove(); } catch {}; mapRef.current = null; };
+    return () => {
+      try { map.off('resize', onResize); } catch {}
+      try { map.remove(); } catch {}
+      mapRef.current = null;
+    };
   }, [mapboxToken]);
 
   // Update map sources when route changes (validate; fit once after style ready; lock camera after moveend)
@@ -255,8 +258,8 @@ export default function EffortsViewerMapbox({
       // Fit once after style is ready and we have a valid route
       if (!hasFitRef.current && hasNonEmpty(coords) && prevRouteLenRef.current === 0) {
         const doFit = () => {
-          const b = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
-          for (const c of coords) b.extend(c as any);
+          const b = new mapboxgl.LngLatBounds(coords[0], coords[0]);
+          for (const c of coords) b.extend(c);
           map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
           map.once('moveend', () => {
             try {
@@ -281,6 +284,7 @@ export default function EffortsViewerMapbox({
     if (!src) return;
     const route = (trackLngLat && trackLngLat.length > 1) ? trackLngLat : lastNonEmptyRouteRef.current;
     if (!route || route.length < 2) return;
+
     const distNow = normalizedSamples[idx]?.d_m ?? (normalizedSamples[normalizedSamples.length - 1]?.d_m ?? 0);
 
     const cum = prepLine(route);
@@ -418,14 +422,8 @@ export default function EffortsViewerMapbox({
       {/* Map */}
       <div
         ref={mapDivRef}
-        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none", position:'relative' }}
-      >
-        {tokenMissing && (
-          <div style={{position:'absolute', inset:0, display:'flex', alignItems:'center', justifyContent:'center', color:'#64748b', fontSize:13, background:'#f8fafc'}}>
-            Map unavailable (missing token)
-          </div>
-        )}
-      </div>
+        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none" }}
+      />
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 16, margin: "6px 6px 10px 6px", fontWeight: 600 }}>
