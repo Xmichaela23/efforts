@@ -43,6 +43,7 @@ export default function MapEffort({
   const lastNonEmptyRef = useRef<LngLat[]>([]);
   const [ready, setReady] = useState(false);
   const styleCacheRef = useRef<Record<string, any>>({});
+  const [visible, setVisible] = useState(false);
 
   const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
@@ -145,6 +146,8 @@ export default function MapEffort({
       map.once('idle', () => {
         try { const c = map.getCenter(); savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any; } catch {}
         fittedRef.current = true;
+        // Fade in after first stable frame
+        requestAnimationFrame(() => setVisible(true));
       });
     }
   }, [coords, ready, theme]);
@@ -172,6 +175,7 @@ export default function MapEffort({
       else map.setStyle(styleUrl(theme));
     } catch {}
     // Reattach quickly on styledata, then finalize on idle (smoother)
+    setVisible(false);
     const onStyleData = () => {
       try {
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
@@ -185,6 +189,7 @@ export default function MapEffort({
       try {
         if (savedCameraRef.current) map.jumpTo(savedCameraRef.current as any);
       } catch {}
+      requestAnimationFrame(() => setVisible(true));
     };
     map.once('styledata', onStyleData);
     map.once('idle', onIdle);
@@ -194,7 +199,7 @@ export default function MapEffort({
   // Simple SVG fallback when no coords
   if ((coords?.length ?? 0) < 2) {
     return (
-      <div className={className} style={{ height }}>
+      <div className={className} style={{ height, opacity: 1 }}>
         <svg width="100%" height="100%" viewBox="0 0 700 160" style={{ display: 'block', background: '#fff', borderRadius: 12, border: '1px solid #eef2f7' }}>
           <text x={12} y={22} fill="#94a3b8" fontSize={12}>No route data</text>
         </svg>
@@ -202,7 +207,7 @@ export default function MapEffort({
     );
   }
 
-  return <div ref={divRef} className={className} style={{ height, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,.06)' }} />;
+  return <div ref={divRef} className={className} style={{ height, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,.06)', opacity: visible ? 1 : 0, transition: 'opacity 180ms ease' }} />;
 }
 
 
