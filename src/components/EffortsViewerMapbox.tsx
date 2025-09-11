@@ -35,13 +35,28 @@ const fmtTime = (sec: number) => {
   const s = Math.floor(sec % 60);
   return h > 0 ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}` : `${m}:${s.toString().padStart(2, "0")}`;
 };
+// Convert pace (sec/km) -> sec per chosen unit
+const toSecPerUnit = (secPerKm: number, useMiles: boolean) => (useMiles ? secPerKm * 1.60934 : secPerKm);
+// Robust formatter: 0-pad seconds and handle 60s carry
 const fmtPace = (secPerKm: number | null, useMi = true) => {
-  if (secPerKm == null || !Number.isFinite(secPerKm)) return "—";
-  const spm = useMi ? secPerKm * 1.60934 : secPerKm; // convert to min/mi if requested
-  const m = Math.floor(spm / 60);
-  const s = Math.round(spm % 60);
-  return `${m}:${s.toString().padStart(2, "0")}/${useMi ? "mi" : "km"}`;
+  if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
+  let spU = toSecPerUnit(secPerKm, useMi);
+  let m = Math.floor(spU / 60);
+  let s = Math.round(spU % 60);
+  if (s === 60) { m += 1; s = 0; }
+  return `${m}:${String(s).padStart(2, "0")}/${useMi ? "mi" : "km"}`;
 };
+// Generate “nice” tick values for pace in whole seconds (15s/30s/60s steps)
+function nicePaceTicks(minSec: number, maxSec: number) {
+  const range = Math.max(1, maxSec - minSec);
+  const candidates = [15, 30, 60, 120, 180];
+  let step = candidates.find((s) => range / s <= 5) ?? 300;
+  const start = Math.ceil(minSec / step) * step;
+  const ticks: number[] = [];
+  for (let v = start; v <= maxSec + 0.0001; v += step) ticks.push(v);
+  if (ticks.length < 2) ticks.push(start + step);
+  return ticks;
+}
 const fmtDist = (m: number, useMi = true) => (useMi ? `${(m / 1609.34).toFixed(1)} mi` : `${(m / 1000).toFixed(2)} km`);
 const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
 const fmtPct = (x: number | null) => (x == null ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -139,6 +154,8 @@ export default function EffortsViewerMapbox({
     const out: Sample[] = [];
     let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
     const a = 0.2;
+    // pace EMA
+    let paceEma: number | null = null; const ap = 0.25;
     for (let i=0;i<len;i++){
       const t = Number(time_s?.[i] ?? i) || 0;
       const d = Number(distance_m?.[i] ?? 0) || 0;
@@ -153,11 +170,14 @@ export default function EffortsViewerMapbox({
         grade = dh / dd;
         vam = (dh/dt) * 3600;
       }
+      const rawPace = pace_s_per_km?.[i];
+      const secPerKm = Number.isFinite(rawPace as any) ? ((rawPace as number) < 30 ? (rawPace as number) * 60 : (rawPace as number)) : null;
+      if (secPerKm != null) paceEma = paceEma == null ? secPerKm : ap * secPerKm + (1 - ap) * paceEma;
       out.push({
         t_s: t,
         d_m: d,
         elev_m_sm: es,
-        pace_s_per_km: Number.isFinite(pace_s_per_km?.[i]) ? Number(pace_s_per_km[i]) : null,
+        pace_s_per_km: paceEma,
         hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
         grade,
         vam_m_per_h: vam
@@ -312,25 +332,44 @@ export default function EffortsViewerMapbox({
   }, [idx, distNow, dTotal, trackLngLat, lineCum]);
 
   /** ----- Chart (responsive SVG with viewBox) ----- */
-  const W = 700, H = 280, P = 28;
+  const [isSmall, setIsSmall] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 480px)');
+    const on = () => setIsSmall(!!mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  const W = 700, H = isSmall ? 360 : 280, P = 28;
   const tTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].t_s : 0; // (currently not drawn, but handy)
+  const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 0;
 
   // y-domain (absolute elevation when tab === 'elev')
   const yDomain = useMemo<[number, number]>(() => {
-    const vals = normalizedSamples.map((s) =>
-      tab === "elev" ? (s.elev_m_sm ?? NaN)
-      : tab === "pace" ? (s.pace_s_per_km ?? NaN)
-      : tab === "bpm" ? (s.hr_bpm ?? NaN)
-      : (s.vam_m_per_h ?? NaN)
-    ).filter(Number.isFinite) as number[];
-
+    const vals = normalizedSamples
+      .map((s) => tab === 'elev' ? (s.elev_m_sm ?? NaN)
+        : tab === 'pace' ? (s.pace_s_per_km ?? NaN)
+        : tab === 'bpm' ? (s.hr_bpm ?? NaN)
+        : (s.vam_m_per_h ?? NaN))
+      .filter(Number.isFinite) as number[];
     if (!vals.length) return [0, 1];
-    let lo = Math.min(...vals), hi = Math.max(...vals);
-    if (lo === hi) { lo -= 1; hi += 1; }
-    const basePad = tab === "elev" ? (useFeet ? 3 / 3.28084 : 3) : 1; // ~3ft or 3m minimum pad on elev
-    const pad = Math.max((hi - lo) * 0.1, basePad);
-    return [lo - pad, hi + pad];
-  }, [normalizedSamples, tab, useFeet]);
+
+    let lo: number, hi: number;
+    if (tab === 'pace') {
+      const secs = vals.map(v => toSecPerUnit(v, useMiles)).sort((a,b)=>a-b);
+      const q = (p:number) => secs[Math.floor(p * (secs.length - 1))];
+      lo = q(0.05); hi = q(0.95);
+      if (!(hi > lo)) { lo = secs[0]; hi = secs[secs.length-1]; }
+      const padS = Math.max(10, (hi - lo) * 0.08);
+      lo -= padS; hi += padS;
+    } else {
+      lo = Math.min(...vals); hi = Math.max(...vals);
+      if (lo === hi) { lo -= 1; hi += 1; }
+      const basePad = tab === 'elev' ? (useFeet ? 3 / 3.28084 : 3) : 1;
+      const pad = Math.max((hi - lo) * 0.1, basePad);
+      lo -= pad; hi += pad;
+    }
+    return [lo, hi];
+  }, [normalizedSamples, tab, useFeet, useMiles]);
 
   // Safe metric accessor with "hold-last" to avoid visual spikes on nulls
   const metricAt = (i: number, last: number | null): number => {
@@ -380,9 +419,11 @@ export default function EffortsViewerMapbox({
     return H - P - t * (H - P * 2);
   };
   const yTicks = useMemo(() => {
-    const [a, b] = yDomain; const step = (b - a) / 4;
+    const [a, b] = yDomain;
+    if (tab === 'pace') return nicePaceTicks(a, b);
+    const step = (b - a) / 4;
     return new Array(5).fill(0).map((_, i) => a + i * step);
-  }, [yDomain]);
+  }, [yDomain, tab]);
 
   // Splits + active split highlight
   const splits = useMemo(() => computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000), [normalizedSamples, useMiles]);
@@ -500,7 +541,7 @@ export default function EffortsViewerMapbox({
           onTouchStart={onTouch}
           onTouchMove={onTouch}
           onDoubleClick={() => setLocked((l) => !l)}
-          style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair" }}
+          style={{ display: "block", borderRadius: 12, background: "#fff", touchAction: "none", cursor: "crosshair", minHeight: isSmall ? 220 : 180 }}
         >
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
@@ -511,7 +552,7 @@ export default function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={P} x2={W - P} y1={yMap(v)} y2={yMap(v)} stroke="#eef2f7" />
-              <text x={8} y={yMap(v) - 4} fill="#94a3b8" fontSize={11}>
+              <text x={8} y={yMap(v) - 4} fill="#94a3b8" fontSize={10.5}>
                 {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
             </g>
@@ -520,7 +561,11 @@ export default function EffortsViewerMapbox({
           {/* elevation fill */}
           {tab === "elev" && <path d={elevArea} fill="#e2f2ff" opacity={0.65} />}
           {/* metric line */}
-          <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={2} />
+          <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={2.25} strokeLinejoin="round" strokeLinecap="round" />
+
+          {tab === 'pace' && (
+            <text x={P} y={P - 10} fill="#94a3b8" fontSize={10}>{`slower ↑   faster ↓`}</text>
+          )}
 
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
