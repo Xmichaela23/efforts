@@ -373,6 +373,7 @@ export default function EffortsViewerMapbox({
         cursorDist_m={distNow}
         totalDist_m={dTotal}
         theme={"streets"}
+        height={200}
       />
 
       {/* Tabs */}

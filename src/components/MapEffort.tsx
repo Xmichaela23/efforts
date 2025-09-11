@@ -123,13 +123,7 @@ export default function MapEffort({
       // Tighter framing: smaller padding and allow slightly higher max zoom
       map.fitBounds(b, { padding: 14, maxZoom: 16, duration: 0 });
       map.once('idle', () => {
-        try {
-          const c = map.getCenter();
-          // Nudge zoom in a bit after fit to fill the card better
-          const targetZ = Math.min((map.getZoom() || 0) + 0.6, 17);
-          try { map.jumpTo({ center: c, zoom: targetZ }); } catch {}
-          savedCameraRef.current = { center: [c.lng, c.lat], zoom: targetZ } as any;
-        } catch {}
+        try { const c = map.getCenter(); savedCameraRef.current = { center: [c.lng, c.lat], zoom: map.getZoom() } as any; } catch {}
         fittedRef.current = true;
       });
     }
