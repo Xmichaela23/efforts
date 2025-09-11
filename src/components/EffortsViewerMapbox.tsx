@@ -186,12 +186,15 @@ export default function EffortsViewerMapbox({
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      interactive: false
+      interactive: true,
+      minZoom: 3,
+      maxZoom: 18,
+      projection: { name: 'mercator' } as any
     });
     mapRef.current = map;
+    try { map.scrollZoom.disable(); } catch {}
 
     map.on("load", () => {
-      try { map.setProjection({ name: 'mercator' } as any); } catch {}
       try { (map as any).setFog?.(null); } catch {}
       if (!map.getSource(routeSrc)) {
         map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
