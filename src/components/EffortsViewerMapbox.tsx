@@ -577,6 +577,7 @@ export default function EffortsViewerMapbox({
   );
 }
 
+/* DUPLICATE REMOVED BELOW
 // EffortsViewerMapbox.tsx
 // Drop-in, responsive, scrub-synced elevation/pace/BPM/VAM + Mapbox cursor
 // Copy-paste into Cursor.
