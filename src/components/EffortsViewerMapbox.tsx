@@ -244,6 +244,16 @@ export default function EffortsViewerMapbox({
   const [tab, setTab] = useState<MetricTab>("pace");
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [showAttrib, setShowAttrib] = useState(true);
+
+  // Only show attribution once per page/view
+  useEffect(() => {
+    try {
+      const anyWin = window as any;
+      if (anyWin.__efforts_map_attrib_shown) setShowAttrib(false);
+      else { anyWin.__efforts_map_attrib_shown = true; setShowAttrib(true); }
+    } catch {}
+  }, []);
 
   // Map rendering moved to MapEffort component
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
@@ -375,11 +385,13 @@ export default function EffortsViewerMapbox({
           totalDist_m={dTotal}
           theme={"streets"}
         />
-        <small style={{ display: 'block', margin: '6px 4px 0', fontSize: 11, color: '#94a3b8' }}>
-          © <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">MapTiler</a>
-          &nbsp;•&nbsp;
-          © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
-        </small>
+        {showAttrib && (
+          <small style={{ display: 'block', margin: '6px 4px 0', fontSize: 10, color: '#9aa6b2', fontWeight: 500 }}>
+            © <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">MapTiler</a>
+            &nbsp;•&nbsp;
+            © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
+          </small>
+        )}
       </div>
 
       {/* Tabs */}
