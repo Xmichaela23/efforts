@@ -105,7 +105,10 @@ export function usePlannedRange(fromISO: string, toISO: string) {
           computed: c.computed,
           planned_id: c.planned_id
         }));
-        const merged = [...plannedFinal, ...completedRows].sort((a:any,b:any)=> String(a.date).localeCompare(String(b.date)));
+        // Heuristic suppression: remove any planned that shares date+type with a completed row
+        const completedKeys = new Set(completedRows.map((c:any)=> `${String(c.date)}|${String(c.type||'').toLowerCase()}`));
+        const plannedSuppressed = plannedFinal.filter((p:any)=> !completedKeys.has(`${String(p.date)}|${String(p.type||'').toLowerCase()}`));
+        const merged = [...plannedSuppressed, ...completedRows].sort((a:any,b:any)=> String(a.date).localeCompare(String(b.date)));
         setRows(merged);
         const payload = { ts: Date.now(), rows: merged };
         memoryCache.set(key, payload);
