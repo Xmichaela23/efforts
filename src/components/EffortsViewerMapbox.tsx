@@ -156,19 +156,34 @@ export default function EffortsViewerMapbox({
     const a = 0.2;
     // pace EMA
     let paceEma: number | null = null; const ap = 0.25;
+    // rolling-grade window state
+    const windowMeters = 30;       // compute grade over ~30 m
+    const minDeltaMeters = 5;      // ignore tiny dd that cause spikes
+    const maxAbsGrade = 0.35;      // clamp unrealistic spikes (~35%)
+    const dHist: number[] = [];
+    const eHist: number[] = [];
+    let winStart = 0;
     for (let i=0;i<len;i++){
       const t = Number(time_s?.[i] ?? i) || 0;
       const d = Number(distance_m?.[i] ?? 0) || 0;
       const e = typeof elevation_m?.[i] === 'number' ? Number(elevation_m[i]) : null;
       if (e != null) ema = (ema==null ? e : a*e + (1-a)*ema);
       const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
+      // update window
+      dHist.push(d); eHist.push(es);
+      while (winStart < dHist.length - 1 && (d - dHist[winStart]) > windowMeters) winStart++;
+      // rolling grade over window (fallback to prev segment if needed)
       let grade: number | null = null, vam: number | null = null;
-      if (lastE != null && lastD != null && lastT != null){
-        const dd = Math.max(1, d - lastD);
-        const dh = es - lastE;
+      const ddw = d - dHist[winStart];
+      if (ddw >= minDeltaMeters) {
+        grade = (es - eHist[winStart]) / ddw;
+      } else if (lastE != null && lastD != null) {
+        const dd = d - lastD; if (dd >= minDeltaMeters) grade = (es - lastE) / dd; else grade = null;
+      }
+      if (grade != null) grade = Math.max(-maxAbsGrade, Math.min(maxAbsGrade, grade));
+      if (lastE != null && lastT != null) {
         const dt = Math.max(1, t - lastT);
-        grade = dh / dd;
-        vam = (dh/dt) * 3600;
+        vam = ((es - (lastE as number)) / dt) * 3600;
       }
       const rawPace = pace_s_per_km?.[i];
       const secPerKm = Number.isFinite(rawPace as any) ? ((rawPace as number) < 30 ? (rawPace as number) * 60 : (rawPace as number)) : null;
