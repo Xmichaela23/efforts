@@ -42,10 +42,24 @@ export default function MapEffort({
   const savedCameraRef = useRef<{ center: [number, number]; zoom: number } | null>(null);
   const lastNonEmptyRef = useRef<LngLat[]>([]);
   const [ready, setReady] = useState(false);
+  const styleCacheRef = useRef<Record<string, any>>({});
 
   const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
   const dTotal = useMemo(() => (typeof totalDist_m === 'number' && totalDist_m > 0 ? totalDist_m : (lineCum[lineCum.length - 1] || 1)), [totalDist_m, lineCum]);
+
+  // Prefetch both styles for smoother switching
+  useEffect(() => {
+    const key = (import.meta as any).env?.VITE_MAPTILER_KEY as string | undefined;
+    const urls: Record<string, string> = {
+      streets: `https://api.maptiler.com/maps/streets/style.json?key=${key || ''}`,
+      hybrid: `https://api.maptiler.com/maps/hybrid/style.json?key=${key || ''}`,
+    };
+    const needed = ["streets", "hybrid"].filter((k) => !styleCacheRef.current[k]);
+    needed.forEach(async (k) => {
+      try { const r = await fetch(urls[k]); if (r.ok) styleCacheRef.current[k] = await r.json(); } catch {}
+    });
+  }, []);
 
   // Create map once
   useEffect(() => {
@@ -57,6 +71,7 @@ export default function MapEffort({
       dragRotate: false,
       doubleClickZoom: false,
       renderWorldCopies: false,
+      fadeDuration: 0,
       attributionControl: false,
       minZoom: 3,
       maxZoom: 18,
@@ -151,20 +166,29 @@ export default function MapEffort({
   useEffect(() => {
     const map = mapRef.current; if (!map || !ready) return;
     layersAttachedRef.current = false;
-    try { map.setStyle(styleUrl(theme)); } catch {}
-    // After the new style fully loads and our layers are reattached, restore camera and data
-    const onIdle = () => {
+    try {
+      const cached = styleCacheRef.current[theme];
+      if (cached) map.setStyle(cached as any, { diff: true });
+      else map.setStyle(styleUrl(theme));
+    } catch {}
+    // Reattach quickly on styledata, then finalize on idle (smoother)
+    const onStyleData = () => {
       try {
         const reattach = (map as any).__attachEffortLayers as (() => void) | undefined;
         if (reattach) reattach();
         const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
         const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
         if (src && valid.length > 1) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+      } catch {}
+    };
+    const onIdle = () => {
+      try {
         if (savedCameraRef.current) map.jumpTo(savedCameraRef.current as any);
       } catch {}
     };
+    map.once('styledata', onStyleData);
     map.once('idle', onIdle);
-    return () => { try { map.off('idle', onIdle); } catch {} };
+    return () => { try { map.off('styledata', onStyleData); map.off('idle', onIdle); } catch {} };
   }, [theme, ready, coords]);
 
   // Simple SVG fallback when no coords
