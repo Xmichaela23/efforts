@@ -1715,6 +1715,14 @@ const formatPace = (paceValue: any): string => {
           )}
         </div>
       )}
+      {/* Single page-level attribution for map tiles */}
+      <div className="px-4 pt-2 pb-6">
+        <small style={{ display: 'block', fontSize: 10, color: '#9aa6b2' }}>
+          © <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">MapTiler</a>
+          &nbsp;•&nbsp;
+          © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
+        </small>
+      </div>
     </div>
    </div>
  );
