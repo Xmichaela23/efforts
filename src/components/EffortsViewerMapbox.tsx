@@ -183,18 +183,32 @@ export default function EffortsViewerMapbox({
   useEffect(() => {
     if (!mapDivRef.current || !mapboxToken || mapRef.current) return;
     mapboxgl.accessToken = mapboxToken;
+    // Precompute valid coords and initial camera
+    const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
+    const initCoords = Array.isArray(trackLngLat) ? (trackLngLat.filter(isValidCoord) as [number,number][]) : [];
+    let initialOpts: any = {};
+    if (initCoords.length > 1) {
+      let b = new mapboxgl.LngLatBounds(initCoords[0] as any, initCoords[0] as any);
+      for (const c of initCoords) b.extend(c as any);
+      initialOpts = { bounds: b, fitBoundsOptions: { padding: 28, maxZoom: 13, animate: false } };
+    } else {
+      const startCoord = trackLngLat?.[0] ?? [-118.15, 34.11];
+      initialOpts = { center: startCoord as any, zoom: 12 };
+    }
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
       interactive: true,
       minZoom: 3,
       maxZoom: 18,
-      projection: { name: 'mercator' } as any
+      projection: { name: 'mercator' } as any,
+      ...initialOpts
     });
     mapRef.current = map;
     try { map.scrollZoom.disable(); } catch {}
 
     map.on("load", () => {
+      try { map.setProjection({ name: 'mercator' } as any); } catch {}
       try { (map as any).setFog?.(null); } catch {}
       if (!map.getSource(routeSrc)) {
         map.addSource(routeSrc, { type: "geojson", data: { type: "Feature", geometry: { type: "LineString", coordinates: [] }, properties: {} } as any });
@@ -210,8 +224,7 @@ export default function EffortsViewerMapbox({
 
       // NEW: seed route immediately on load and fit once
       try {
-        const isValidCoord = (pt:any) => Array.isArray(pt) && pt.length===2 && isFinite(pt[0]) && isFinite(pt[1]) && pt[0]>=-180 && pt[0]<=180 && pt[1]>=-90 && pt[1]<=90;
-        const coords = Array.isArray(trackLngLat) ? (trackLngLat.filter(isValidCoord) as [number,number][]) : [];
+        const coords = initCoords;
         if (coords.length > 1) {
           let src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
           if (!src) {
@@ -220,9 +233,6 @@ export default function EffortsViewerMapbox({
           }
           src?.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
           if (!hasFitRef.current) {
-            const b = new mapboxgl.LngLatBounds(coords[0] as any, coords[0] as any);
-            for (const c of coords) b.extend(c as any);
-            map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
             const onFirstMoveEnd = () => {
               try {
                 const c = map.getCenter();
@@ -239,8 +249,22 @@ export default function EffortsViewerMapbox({
       } catch {}
     });
 
-    return () => { map.remove(); mapRef.current = null; };
-  }, [mapboxToken, trackLngLat]);
+    // Reassert projection on style reloads to avoid globe flash
+    const onStyle = () => { try { map.setProjection({ name: 'mercator' } as any); (map as any).setFog?.(null); } catch {} };
+    map.on('styledata', onStyle);
+
+    const onResize = () => {
+      if (!mapRef.current) return;
+      mapRef.current.resize();
+      if (lockedCameraRef.current) {
+        const { center, zoom } = lockedCameraRef.current;
+        try { mapRef.current.jumpTo({ center, zoom }); } catch {}
+      }
+    };
+    map.on('resize', onResize);
+
+    return () => { try { map.off('resize', onResize); map.off('styledata', onStyle); } catch {}; try { map.remove(); } catch {}; mapRef.current = null; };
+  }, [mapboxToken]);
 
   // Update map sources on data change
   useEffect(() => {
