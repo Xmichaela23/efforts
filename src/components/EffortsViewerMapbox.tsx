@@ -362,7 +362,16 @@ export default function EffortsViewerMapbox({
 
     try {
       const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
-      if (src && hasNonEmpty(coords)) src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
+      if (src && hasNonEmpty(coords)) {
+        // cheap guard: only update if length changed or last point moved
+        const lastLen = prevRouteLenRef.current;
+        const lastPt = (lastNonEmptyRouteRef.current || [])[lastLen - 1];
+        const newPt = coords[coords.length - 1];
+        const moved = !lastPt || Math.abs((lastPt[0]??0) - (newPt[0]??0)) > 1e-9 || Math.abs((lastPt[1]??0) - (newPt[1]??0)) > 1e-9;
+        if (coords.length !== lastLen || moved) {
+          src.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: coords } } as any);
+        }
+      }
 
       // Track consecutive non-empty frames to avoid first-frame race
       if (hasNonEmpty(coords)) routeStableCountRef.current = Math.min(routeStableCountRef.current + 1, 3);
@@ -383,7 +392,7 @@ export default function EffortsViewerMapbox({
             routeInitializedRef.current = true;
           });
         };
-        if (map.isStyleLoaded()) doFit(); else map.once('styledata', doFit);
+        if (map.isStyleLoaded()) doFit(); // do not refit on styledata once locked
       }
       prevRouteLenRef.current = hasNonEmpty(coords) ? coords.length : 0;
     } catch {}
