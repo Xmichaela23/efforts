@@ -63,7 +63,7 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         const [plannedRes, completedRes] = await Promise.all([
           supabase
             .from('planned_workouts')
-            .select('id,name,type,date,workout_status,description,duration,computed,week_number,day_number,training_plan_id,tags,completed_workout_id')
+            .select('id,name,type,date,workout_status,description,duration,computed,week_number,day_number,training_plan_id,tags')
             .eq('user_id', user.id)
             .gte('date', fromISO)
             .lte('date', toISO)
@@ -89,8 +89,7 @@ export function usePlannedRange(fromISO: string, toISO: string) {
           else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
           const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
           const isCompleted = String((w as any).workout_status || '').toLowerCase() === 'completed';
-          const hasCompletedId = !!(w as any)?.completed_workout_id;
-          return !isOptional && !isCompleted && !hasCompletedId;
+          return !isOptional && !isCompleted;
         });
         // Map of planned replaced by completed
         const replaced = new Set<string>(completedAll.map((c:any)=>String(c.planned_id||'')).filter(Boolean));

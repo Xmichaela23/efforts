@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,completed_workout_id,computed')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,computed')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -54,8 +54,7 @@ export const usePlannedWorkouts = () => {
           else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
           const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
           const isCompleted = String((w as any).workout_status||'').toLowerCase()==='completed';
-          const hasCompletedId = !!(w as any)?.completed_workout_id;
-          return !isOptional && !isCompleted && !hasCompletedId;
+          return !isOptional && !isCompleted;
         })
         .map(workout => {
         // Normalize JSONB fields that may come back as strings
