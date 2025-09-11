@@ -1,7 +1,22 @@
 // @ts-nocheck
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-const ANALYSIS_VERSION = 'v0.1.0'; // initial server analytics version
+const ANALYSIS_VERSION = 'v0.1.1'; // pace/elevation smoothing
+
+function smoothEMA(values: (number|null)[], alpha = 0.25): (number|null)[] {
+  let ema: number | null = null;
+  const out: (number|null)[] = new Array(values.length);
+  for (let i = 0; i < values.length; i++) {
+    const v = values[i];
+    if (typeof v === 'number' && Number.isFinite(v)) {
+      ema = ema == null ? v : alpha * v + (1 - alpha) * ema;
+      out[i] = ema;
+    } else {
+      out[i] = ema; // hold last for continuity; UI can still smooth further
+    }
+  }
+  return out;
+}
 
 Deno.serve(async (req) => {
   // CORS
@@ -188,8 +203,9 @@ Deno.serve(async (req) => {
         if (i>0) {
           const dt = Math.max(0, (rows[i].t||0) - (rows[i-1].t||0));
           const dd = Math.max(0, (rows[i].d||0) - (rows[i-1].d||0));
-          if (dt > 0 && dd > 1) {
-            pace_s_per_km.push((dt) / (dd/1000));
+          const MIN_DD = 2.5; // meters
+          if (dt > 0 && dd > MIN_DD) {
+            pace_s_per_km.push(dt / (dd / 1000));
           } else {
             pace_s_per_km.push(pace_s_per_km[pace_s_per_km.length-1] ?? null);
           }
@@ -223,11 +239,15 @@ Deno.serve(async (req) => {
       return out;
     }
 
+    // Light smoothing for elevation and pace to reduce noise/spikes
+    const elevation_sm = hasRows ? smoothEMA(elevation_m, 0.25) : [];
+    const pace_sm = hasRows ? smoothEMA(pace_s_per_km, 0.25) : [];
+
     const analysis: any = {
       version: ANALYSIS_VERSION,
       computedAt: new Date().toISOString(),
       input,
-      series: hasRows ? { time_s, distance_m, elevation_m, pace_s_per_km, hr_bpm, cadence_spm } : { sampling: { strategy: 'empty', targetPoints: 0 } },
+      series: hasRows ? { time_s, distance_m, elevation_m: elevation_sm, pace_s_per_km: pace_sm, hr_bpm, cadence_spm } : { sampling: { strategy: 'empty', targetPoints: 0 } },
       events: {
         laps: Array.isArray(laps) ? laps.slice(0, 50) : [],
         splits: { km: computeSplits(1000), mi: computeSplits(1609.34) }

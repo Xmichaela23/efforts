@@ -236,6 +236,8 @@ export default function EffortsViewerMapbox({
     const out: Sample[] = [];
     let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
     const a = 0.2; // elevation EMA factor
+    // pace EMA (server-only)
+    let paceEma: number | null = null; const ap = 0.25;
     for (let i=0;i<len;i++){
       const t = Number(time_s?.[i] ?? i) || 0;
       const d = Number(distance_m?.[i] ?? 0) || 0;
@@ -250,11 +252,14 @@ export default function EffortsViewerMapbox({
         grade = dh / dd;
         vam = (dh/dt) * 3600;
       }
+      // Only use server pace; no client derivation
+      const paceVal: number | null = Number.isFinite(pace_s_per_km?.[i] as any) ? Number(pace_s_per_km[i]) : null;
+      if (paceVal != null) paceEma = paceEma == null ? paceVal : ap * paceVal + (1 - ap) * paceEma;
       out.push({
         t_s: t,
         d_m: d,
         elev_m_sm: es,
-        pace_s_per_km: Number.isFinite(pace_s_per_km?.[i]) ? Number(pace_s_per_km[i]) : null,
+        pace_s_per_km: paceEma ?? null,
         hr_bpm: Number.isFinite(hr_bpm?.[i]) ? Number(hr_bpm[i]) : null,
         grade,
         vam_m_per_h: vam
@@ -285,13 +290,20 @@ export default function EffortsViewerMapbox({
   useEffect(() => {
     if (!mapDivRef.current || !mapboxToken || mapRef.current) return;
     mapboxgl.accessToken = mapboxToken;
-    // Precompute bounds to start on route
+    // Compute initial bounds so first frame is on the route
     const valid = (pt:any)=> Array.isArray(pt)&&pt.length===2 && isFinite(pt[0])&&isFinite(pt[1]) && pt[0]>=-180&&pt[0]<=180 && pt[1]>=-90&&pt[1]<=90;
     const initCoords = Array.isArray(trackLngLat) ? (trackLngLat.filter(valid) as [number,number][]) : [];
+    let initialOpts: any = {};
+    if (initCoords.length > 1) {
+      let b = new mapboxgl.LngLatBounds(initCoords[0], initCoords[0]);
+      for (const c of initCoords) b.extend(c);
+      initialOpts = { bounds: b, fitBoundsOptions: { padding: 28, maxZoom: 13, animate: false } };
+    }
     const map = new mapboxgl.Map({
       container: mapDivRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      interactive: false
+      interactive: false,
+      ...initialOpts
     });
     mapRef.current = map;
 
