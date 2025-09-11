@@ -115,8 +115,11 @@ export default function MapEffort({
     const valid = coords.length > 1 ? coords : lastNonEmptyRef.current;
     if (coords.length > 1) lastNonEmptyRef.current = coords;
     const has = valid.length > 1;
-    const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
-    if (src && has) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+    const applyData = () => {
+      const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+      if (src && has) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+    };
+    applyData();
     if (!fittedRef.current && has) {
       const b = new maplibregl.LngLatBounds(valid[0], valid[0]);
       for (const c of valid) b.extend(c);
@@ -127,7 +130,7 @@ export default function MapEffort({
         fittedRef.current = true;
       });
     }
-  }, [coords, ready]);
+  }, [coords, ready, theme]);
 
   // Cursor updates
   useEffect(() => {
@@ -147,7 +150,18 @@ export default function MapEffort({
     const map = mapRef.current; if (!map || !ready) return;
     layersAttachedRef.current = false;
     try { map.setStyle(styleUrl(theme)); } catch {}
-  }, [theme, ready]);
+    // After the new style loads, re-attach layers, restore camera, and reapply data
+    const onStyle = () => {
+      try {
+        if (savedCameraRef.current) map.jumpTo(savedCameraRef.current as any);
+        const src = map.getSource(ROUTE_SRC) as maplibregl.GeoJSONSource | undefined;
+        const valid = (coords.length > 1 ? coords : lastNonEmptyRef.current);
+        if (src && valid.length > 1) src.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: valid }, properties: {} } as any);
+      } catch {}
+    };
+    map.once('styledata', onStyle);
+    return () => { try { map.off('styledata', onStyle); } catch {} };
+  }, [theme, ready, coords]);
 
   // Simple SVG fallback when no coords
   if ((coords?.length ?? 0) < 2) {
