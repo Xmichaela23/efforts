@@ -10,15 +10,6 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    exclude: ['mapbox-gl']
-  },
-  build: {
-    commonjsOptions: { transformMixedEsModules: true }
-  },
-  ssr: {
-    noExternal: ['mapbox-gl']
-  },
   server: {
     port: 8080,
     proxy: {
