@@ -206,10 +206,17 @@ export default function WorkoutCalendar({
   const prevEnd = addDays(prevStart, 6);
   const nextStart = addDays(weekStart, 7);
   const nextEnd = addDays(nextStart, 6);
-  usePlannedRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
-  usePlannedRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
-  useWorkoutsRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
-  useWorkoutsRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
+  useEffect(() => {
+    const idle = (cb: () => void) => {
+      try { (window as any).requestIdleCallback ? (window as any).requestIdleCallback(cb, { timeout: 500 }) : setTimeout(cb, 150); } catch { setTimeout(cb, 150); }
+    };
+    idle(() => {
+      usePlannedRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
+      usePlannedRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
+      useWorkoutsRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
+      useWorkoutsRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
+    });
+  }, [fromISO, toISO]);
 
   // Convert workouts to calendar events
   const events = useMemo(() => {
@@ -477,8 +484,10 @@ export default function WorkoutCalendar({
     map.get(key)!.push(evt);
   }
 
-  console.log('WorkoutCalendar - events:', events);
-  console.log('WorkoutCalendar - map:', map);
+  if (import.meta.env?.DEV) {
+    console.log('WorkoutCalendar - events:', events);
+    console.log('WorkoutCalendar - map:', map);
+  }
 
   const weekdayFmt = new Intl.DateTimeFormat('en-US', { weekday: "short" });
   const monthFmt = new Intl.DateTimeFormat('en-US', { month: "short" });

@@ -63,7 +63,7 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         const [plannedRes, completedRes] = await Promise.all([
           supabase
             .from('planned_workouts')
-            .select('id,name,type,date,workout_status,description,duration,computed,week_number,day_number,training_plan_id,tags')
+            .select('id,name,type,date,workout_status,description,duration,week_number,day_number,training_plan_id,tags')
             .eq('user_id', user.id)
             .gte('date', fromISO)
             .lte('date', toISO)
