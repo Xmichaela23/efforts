@@ -244,6 +244,13 @@ export default function EffortsViewerMapbox({
   const [tab, setTab] = useState<MetricTab>("pace");
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
+  const [theme, setTheme] = useState<'streets' | 'hybrid'>(() => {
+    try {
+      const v = typeof window !== 'undefined' ? window.localStorage.getItem('map_theme') : null;
+      return (v === 'hybrid' || v === 'streets') ? (v as any) : 'streets';
+    } catch { return 'streets'; }
+  });
+  useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
   // Map rendering moved to MapEffort component
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
@@ -372,7 +379,7 @@ export default function EffortsViewerMapbox({
         trackLngLat={trackLngLat as any}
         cursorDist_m={distNow}
         totalDist_m={dTotal}
-        theme={"streets"}
+        theme={theme}
         height={200}
       />
 
@@ -390,6 +397,13 @@ export default function EffortsViewerMapbox({
             {t.toUpperCase()}
           </button>
         ))}
+        <button
+          onClick={() => setTheme(theme === 'streets' ? 'hybrid' : 'streets')}
+          style={{ marginLeft: 8, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          aria-label="Toggle map style"
+        >
+          {theme === 'streets' ? 'Satellite' : 'Streets'}
+        </button>
         <div style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{unitsHint}</div>
       </div>
 
