@@ -284,6 +284,7 @@ export default function EffortsViewerMapbox({
   const routeInitializedRef = useRef(false);
   const routeSrc = "route-src", routeId = "route-line";
   const cursorSrc = "cursor-src", cursorId = "cursor-pt";
+  const [mapReady, setMapReady] = useState(false);
 
   const lineCum = useMemo(() => prepLine(trackLngLat || []), [trackLngLat]);
 
@@ -329,7 +330,10 @@ export default function EffortsViewerMapbox({
         map.once('idle', () => {
           try { const c = map.getCenter(); lockedCameraRef.current = { center: [c.lng,c.lat], zoom: map.getZoom() } as any; } catch {}
           hasFitRef.current = true; routeInitializedRef.current = true; prevRouteLenRef.current = initCoords.length;
+          setMapReady(true);
         });
+      } else {
+        map.once('idle', () => setMapReady(true));
       }
     });
 
@@ -517,7 +521,7 @@ export default function EffortsViewerMapbox({
       {/* Map */}
       <div
         ref={mapDivRef}
-        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none" }}
+        style={{ height: 160, borderRadius: 12, overflow: "hidden", marginBottom: 12, boxShadow: "0 2px 10px rgba(0,0,0,.06)", userSelect: "none", opacity: mapReady ? 1 : 0, transition: 'opacity 150ms ease' }}
       />
 
       {/* Tabs */}
