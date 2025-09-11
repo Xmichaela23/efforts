@@ -368,12 +368,19 @@ export default function EffortsViewerMapbox({
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Map (MapLibre) */}
-      <MapEffort
-        trackLngLat={trackLngLat as any}
-        cursorDist_m={distNow}
-        totalDist_m={dTotal}
-        theme={"streets"}
-      />
+      <div>
+        <MapEffort
+          trackLngLat={trackLngLat as any}
+          cursorDist_m={distNow}
+          totalDist_m={dTotal}
+          theme={"streets"}
+        />
+        <small style={{ display: 'block', margin: '6px 4px 0', fontSize: 11, color: '#94a3b8' }}>
+          © <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noopener noreferrer">MapTiler</a>
+          &nbsp;•&nbsp;
+          © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap contributors</a>
+        </small>
+      </div>
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: 16, margin: "6px 6px 6px 6px", fontWeight: 700, position: 'relative', zIndex: 5, pointerEvents: 'auto' }}>
