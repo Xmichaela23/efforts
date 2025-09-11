@@ -304,6 +304,10 @@ export default function EffortsViewerMapbox({
       container: mapDivRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
       interactive: false,
+      projection: { name: 'mercator' },
+      minZoom: 3,
+      maxZoom: 18,
+      renderWorldCopies: false,
       ...initialOpts
     });
     mapRef.current = map;
@@ -320,13 +324,10 @@ export default function EffortsViewerMapbox({
         map.addSource(cursorSrc, { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: startCoord } } as any });
         map.addLayer({ id: cursorId, type: "circle", source: cursorSrc, paint: { "circle-radius": 6, "circle-color": "#0ea5e9", "circle-stroke-color": "#fff", "circle-stroke-width": 2 } });
       }
-      // Seed route and fit immediately if available
+      // Seed route; rely on constructor bounds to avoid a second refit flash
       if (initCoords.length > 1) {
         const src = map.getSource(routeSrc) as mapboxgl.GeoJSONSource | undefined;
         src?.setData({ type: "Feature", properties:{}, geometry: { type: "LineString", coordinates: initCoords } } as any);
-        const b = new mapboxgl.LngLatBounds(initCoords[0], initCoords[0]);
-        for (const c of initCoords) b.extend(c);
-        map.fitBounds(b, { padding: 28, maxZoom: 13, animate: false });
         map.once('idle', () => {
           try { const c = map.getCenter(); lockedCameraRef.current = { center: [c.lng,c.lat], zoom: map.getZoom() } as any; } catch {}
           hasFitRef.current = true; routeInitializedRef.current = true; prevRouteLenRef.current = initCoords.length;
