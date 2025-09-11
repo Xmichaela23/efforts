@@ -57,11 +57,13 @@ export default function MapEffort({
       dragRotate: false,
       doubleClickZoom: false,
       renderWorldCopies: false,
-      attributionControl: true,
+      attributionControl: false,
       minZoom: 3,
       maxZoom: 18,
     });
     mapRef.current = map;
+    // Compact attribution (required by providers) → small info icon only
+    try { map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right'); } catch {}
 
     const attachLayers = () => {
       if (!map.getSource(ROUTE_SRC)) {
