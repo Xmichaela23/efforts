@@ -321,15 +321,15 @@ export default function EffortsViewerMapbox({
   }, [trackLngLat]);
 
   // Move cursor on scrub
-  const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
+  const dTotalCursor = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
   useEffect(() => {
     const map = mapRef.current; if (!map) return;
     const src = map.getSource(cursorSrc) as mapboxgl.GeoJSONSource | undefined;
     if (!src) return;
-    const target = pointAtDistance(trackLngLat || [], lineCum, (lineCum[lineCum.length - 1] || 1) * (distNow / (dTotal || 1)));
+    const target = pointAtDistance(trackLngLat || [], lineCum, (lineCum[lineCum.length - 1] || 1) * (distNow / (dTotalCursor || 1)));
     src.setData({ type: "Feature", geometry: { type: "Point", coordinates: target } } as any);
-  }, [idx, distNow, dTotal, trackLngLat, lineCum]);
+  }, [idx, distNow, dTotalCursor, trackLngLat, lineCum]);
 
   /** ----- Chart (responsive SVG with viewBox) ----- */
   const [isSmall, setIsSmall] = useState(false);
