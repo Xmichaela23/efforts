@@ -208,6 +208,8 @@ function EffortsViewerMapbox({
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260, P = 48; // Slightly larger left padding to avoid label overlap
+  const LEFT_INSET = 8;  // small visual gap between Y labels and data line
+  const RIGHT_INSET = 0; // keep right edge tight
 
   // cumulative positive gain (m), used for the InfoCard
   const cumGain_m = useMemo(() => {
@@ -265,7 +267,7 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - map first sample to left, last to right
+  // Helpers to map to SVG - map first sample to left, last to right (with small left inset)
   const xFromDist = (d: number) => {
     if (!normalizedSamples.length) return P;
     const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
@@ -273,7 +275,8 @@ function EffortsViewerMapbox({
     const maxDist = Math.max(...distances);
     const range = maxDist - minDist || 1;
     const ratio = (d - minDist) / range;
-    return P + ratio * (W - P * 2);
+    const drawable = (W - P * 2) - LEFT_INSET - RIGHT_INSET;
+    return P + LEFT_INSET + ratio * drawable;
   };
   const yFromValue = (v: number) => {
     const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
@@ -332,7 +335,7 @@ function EffortsViewerMapbox({
     const rect = svg.getBoundingClientRect();
     const pxScreen = clamp(clientX - rect.left, 0, rect.width);
     const pxSvg = (pxScreen / rect.width) * W;
-    const ratio = clamp((pxSvg - P) / (W - 2 * P), 0, 1);
+    const ratio = clamp((pxSvg - P - LEFT_INSET) / ((W - 2 * P) - LEFT_INSET - RIGHT_INSET), 0, 1);
     const target = ratio * (dTotal || 1);
     let lo = 0, hi = normalizedSamples.length - 1;
     while (lo < hi) { const m = Math.floor((lo + hi) / 2); (normalizedSamples[m].d_m < target) ? (lo = m + 1) : (hi = m); }
