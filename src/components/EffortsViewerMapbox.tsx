@@ -365,10 +365,12 @@ function EffortsViewerMapbox({
           <div style={{ 
             fontWeight: 700, 
             fontSize: 18, 
-            minWidth: "140px", 
+            width: "180px", // Fixed width instead of minWidth
             textAlign: "center",
             fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
-            letterSpacing: "0.5px"
+            letterSpacing: "0.5px",
+            overflow: "hidden", // Prevent any overflow
+            whiteSpace: "nowrap" // Keep on single line
           }}>
             {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
           </div>
