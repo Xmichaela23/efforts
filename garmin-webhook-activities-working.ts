@@ -98,6 +98,12 @@ async function fetchActivityDetails(summaryId, userId) {
   }
 }
 
+// Normalize Garmin summaryId: range details often append "-detail"; summary endpoints expect the base id
+function normalizeSummaryId(rawId: string): string {
+  if (!rawId) return rawId;
+  return String(rawId).replace(/-detail$/i, '');
+}
+
 // Try single-activity summary endpoints to get TE/RD rollups when activityDetails range lacks them
 async function fetchActivitySummary(summaryId: string, accessToken: string) {
   const tryFetch = async (url: string) => {
@@ -106,13 +112,18 @@ async function fetchActivitySummary(summaryId: string, accessToken: string) {
     try { return await res.json(); } catch { return null; }
   };
   // Common variants observed in Garmin Wellness/Connect
-  const bases = [
-    'https://apis.garmin.com/wellness-api/rest/activity/',
-    'https://apis.garmin.com/wellness-api/rest/activities/'
+  const id = normalizeSummaryId(summaryId);
+  const candidates = [
+    // wellness single-activity
+    `https://apis.garmin.com/wellness-api/rest/activity/${encodeURIComponent(id)}`,
+    `https://apis.garmin.com/wellness-api/rest/activities/${encodeURIComponent(id)}`,
+    // some tenants expose explicit summary endpoints
+    `https://apis.garmin.com/wellness-api/rest/activity/${encodeURIComponent(id)}/summary`,
+    `https://apis.garmin.com/wellness-api/rest/activities/${encodeURIComponent(id)}/summary`,
   ];
-  for (const base of bases) {
+  for (const url of candidates) {
     try {
-      const data = await tryFetch(base + encodeURIComponent(summaryId));
+      const data = await tryFetch(url);
       if (data) return data;
     } catch { /* continue */ }
   }
@@ -430,7 +441,9 @@ async function processActivityDetails(activityDetails) {
             avg_temperature: avgTemperature ?? (activityDetail as any)?.summary?.avgTemperatureCelcius ?? null,
             max_temperature: maxTemperature ?? null,
             steps: (activityDetail as any)?.summary?.steps ?? activity.steps ?? null,
-            // Training effect (aerobic/anaerobic) – passed through for workouts mapping
+            // Training effect (aerobic/anaerobic) – normalized keys preferred; include legacy for compatibility
+            aerobic_training_effect: (activityDetail as any)?.summary?.aerobicTrainingEffect ?? (activityDetail as any)?.summary?.aerobic_training_effect ?? null,
+            anaerobic_training_effect: (activityDetail as any)?.summary?.anaerobicTrainingEffect ?? (activityDetail as any)?.summary?.anaerobic_training_effect ?? null,
             total_training_effect: (activityDetail as any)?.summary?.aerobicTrainingEffect ?? (activityDetail as any)?.summary?.aerobic_training_effect ?? null,
             total_anaerobic_effect: (activityDetail as any)?.summary?.anaerobicTrainingEffect ?? (activityDetail as any)?.summary?.anaerobic_training_effect ?? null,
             // Multisport linkage

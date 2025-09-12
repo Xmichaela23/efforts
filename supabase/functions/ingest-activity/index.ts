@@ -416,10 +416,17 @@ function mapGarminToWorkout(activity: any, userId: string) {
     // Embed training effect in computed.metrics-lite area for UI pickup
     metrics: (() => {
       try {
-        const aerobic = activity.total_training_effect ?? activity.aerobic_training_effect ?? activity.aerobicTrainingEffect ?? null;
-        const anaerobic = activity.total_anaerobic_effect ?? activity.anaerobic_training_effect ?? activity.anaerobicTrainingEffect ?? null;
+        // Prefer normalized keys first; fall back to legacy and provider-style names
+        const aerobic = activity.aerobic_training_effect ?? activity.total_training_effect ?? activity.aerobicTrainingEffect ?? null;
+        const anaerobic = activity.anaerobic_training_effect ?? activity.total_anaerobic_effect ?? activity.anaerobicTrainingEffect ?? null;
         if (aerobic == null && anaerobic == null) return null;
-        return JSON.stringify({ total_training_effect: aerobic ?? null, total_anaerobic_effect: anaerobic ?? null });
+        // Write both normalized and legacy keys for backward compatibility
+        return JSON.stringify({
+          aerobic_training_effect: aerobic ?? null,
+          anaerobic_training_effect: anaerobic ?? null,
+          total_training_effect: aerobic ?? null,
+          total_anaerobic_effect: anaerobic ?? null,
+        });
       } catch { return null; }
     })(),
     updated_at: new Date().toISOString(),
