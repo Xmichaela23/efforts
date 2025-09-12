@@ -1693,7 +1693,7 @@ const formatPace = (paceValue: any): string => {
                 <HRZoneChart
                   samples={samples.map((s: any, i: number) => ({
                     t: i, // assuming 1 sample per second
-                    hr: s.hr_bpm || s.heart_rate || s.hr || null
+                    hr: s.hr_bpm || null
                   }))}
                   age={30} // TODO: get from user profile
                   sex="male" // TODO: get from user profile
