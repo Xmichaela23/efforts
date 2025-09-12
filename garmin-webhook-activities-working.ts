@@ -98,6 +98,27 @@ async function fetchActivityDetails(summaryId, userId) {
   }
 }
 
+// Try single-activity summary endpoints to get TE/RD rollups when activityDetails range lacks them
+async function fetchActivitySummary(summaryId: string, accessToken: string) {
+  const tryFetch = async (url: string) => {
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
+    if (!res.ok) return null;
+    try { return await res.json(); } catch { return null; }
+  };
+  // Common variants observed in Garmin Wellness/Connect
+  const bases = [
+    'https://apis.garmin.com/wellness-api/rest/activity/',
+    'https://apis.garmin.com/wellness-api/rest/activities/'
+  ];
+  for (const base of bases) {
+    try {
+      const data = await tryFetch(base + encodeURIComponent(summaryId));
+      if (data) return data;
+    } catch { /* continue */ }
+  }
+  return null;
+}
+
 // Enhanced function for activities with API call for details
 async function processActivities(activities) {
   if (!activities || activities.length === 0) {
@@ -326,6 +347,26 @@ async function processActivityDetails(activityDetails) {
 
       }
       
+      // Enrich summary with TE/RD if available from single-activity endpoint
+      try {
+        const supa = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+        const { data: connRow } = await supa
+          .from('user_connections')
+          .select('connection_data')
+          .eq('provider', 'garmin')
+          .eq('connection_data->>user_id', activity.userId)
+          .single();
+        const token = connRow?.connection_data?.access_token as string | undefined;
+        if (token) {
+          const single = await fetchActivitySummary(String(activity.summaryId), token);
+          const singleSummary = (single as any)?.summary || single;
+          if (singleSummary && typeof singleSummary === 'object') {
+            // Prefer values from single activity summary if present
+            (activityDetail as any).summary = { ...(activityDetail as any).summary, ...singleSummary };
+          }
+        }
+      } catch { /* non-fatal */ }
+
       // Convert Garmin activity to our format with ALL available fields
       const activityRecord = {
         user_id: connection.user_id,
@@ -360,6 +401,8 @@ async function processActivityDetails(activityDetails) {
         training_stress_score: activityDetail?.summary?.trainingStressScore || null,
         intensity_factor: activityDetail?.summary?.intensityFactor || null,
         normalized_power: activityDetail?.summary?.normalizedPower || null,
+        total_training_effect: activityDetail?.summary?.aerobicTrainingEffect ?? activityDetail?.summary?.aerobic_training_effect ?? null,
+        total_anaerobic_effect: activityDetail?.summary?.anaerobicTrainingEffect ?? activityDetail?.summary?.anaerobic_training_effect ?? null,
         avg_vam: activityDetail?.summary?.avgVam || null,
         avg_temperature: avgTemperature || null,
         max_temperature: maxTemperature || null,
@@ -436,6 +479,9 @@ async function processActivityDetails(activityDetails) {
               avg_temperature: avgTemperature ?? (activityDetail as any)?.summary?.avgTemperatureCelcius ?? null,
               max_temperature: maxTemperature ?? null,
               steps: (activityDetail as any)?.summary?.steps ?? activity.steps ?? null,
+              // Training effect (aerobic/anaerobic)
+              total_training_effect: (activityDetail as any)?.summary?.aerobicTrainingEffect ?? (activityDetail as any)?.summary?.aerobic_training_effect ?? null,
+              total_anaerobic_effect: (activityDetail as any)?.summary?.anaerobicTrainingEffect ?? (activityDetail as any)?.summary?.anaerobic_training_effect ?? null,
               // Multisport linkage
               is_parent: activity.isParent ?? null,
               parentSummaryId: activity.parentSummaryId ?? null,

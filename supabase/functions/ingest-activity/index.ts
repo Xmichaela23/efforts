@@ -413,6 +413,15 @@ function mapGarminToWorkout(activity: any, userId: string) {
         return c ? JSON.stringify(c) : null;
       } catch { return null; }
     })(),
+    // Embed training effect in computed.metrics-lite area for UI pickup
+    metrics: (() => {
+      try {
+        const aerobic = activity.total_training_effect ?? activity.aerobic_training_effect ?? activity.aerobicTrainingEffect ?? null;
+        const anaerobic = activity.total_anaerobic_effect ?? activity.anaerobic_training_effect ?? activity.anaerobicTrainingEffect ?? null;
+        if (aerobic == null && anaerobic == null) return null;
+        return JSON.stringify({ total_training_effect: aerobic ?? null, total_anaerobic_effect: anaerobic ?? null });
+      } catch { return null; }
+    })(),
     updated_at: new Date().toISOString(),
     created_at: new Date().toISOString(),
   };
