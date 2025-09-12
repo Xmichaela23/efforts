@@ -7,6 +7,7 @@ import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
+import ToggleZoneChart from './ToggleZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
@@ -1703,6 +1704,49 @@ const formatPace = (paceValue: any): string => {
           })()}
         </div>
       )}
+
+      {/* Power/Cadence Zone Chart */}
+      {(workoutType === 'run' || workoutType === 'ride') && (() => {
+        // Try multiple data sources for sensor data
+        let samples = [];
+        if (Array.isArray((hydrated||workoutData)?.sensor_data?.samples)) {
+          samples = (hydrated||workoutData).sensor_data.samples;
+        } else if (Array.isArray((hydrated||workoutData)?.sensor_data)) {
+          samples = (hydrated||workoutData).sensor_data;
+        } else if (Array.isArray((hydrated||workoutData)?.time_series_data)) {
+          samples = (hydrated||workoutData).time_series_data;
+        }
+        
+        if (samples.length > 0) {
+          // Extract power and cadence data
+          const powerData = samples
+            .map((s: any) => s.power || s.watts || null)
+            .filter((p: any) => p !== null && p !== undefined);
+          
+          const cadenceData = samples
+            .map((s: any) => s.cadence || s.rpm || s.spm || null)
+            .filter((c: any) => c !== null && c !== undefined);
+          
+          // Get FTP
+          const ftp = (hydrated||workoutData)?.functional_threshold_power || 
+                     (hydrated||workoutData)?.threshold_power;
+          
+          // Only show if we have power or cadence data
+          if (powerData.length > 0 || cadenceData.length > 0) {
+            return (
+              <div className="mb-4">
+                <ToggleZoneChart
+                  power={powerData.length > 0 ? powerData : undefined}
+                  cadence={cadenceData.length > 0 ? cadenceData : undefined}
+                  ftp={ftp}
+                  initial={powerData.length > 0 ? "power" : "cadence"}
+                />
+              </div>
+            );
+          }
+        }
+        return null;
+      })()}
       {/* Zones histograms (minimal stacked bars) */}
       {((hydrated||workoutData)?.computed?.analysis?.zones) && (
         <div className="mx-[-16px] px-3 py-3 space-y-3">

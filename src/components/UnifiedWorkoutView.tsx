@@ -293,13 +293,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     if (!isNaN(d.getTime())) {
                       const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                       const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                      return (
-                        <span className="inline-flex items-baseline">
-                          <span>{dateStr}</span>
-                          <span className="mx-1">at</span>
-                          <span>{timeStr}</span>
-                        </span>
-                      );
+                      return `${dateStr} at ${timeStr}`;
                     }
                   }
                   
