@@ -204,11 +204,13 @@ function EffortsViewerMapbox({
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
   
-  // Ensure we use the full chart width by using the actual data range
+  // Use the full chart width by normalizing to 0-1 range
   const actualDataRange = useMemo(() => {
     if (!normalizedSamples.length) return { min: 0, max: 1 };
+    // Always use 0 to max distance to ensure full width usage
     const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
-    return { min: Math.min(...distances), max: Math.max(...distances) };
+    const maxDist = Math.max(...distances);
+    return { min: 0, max: maxDist };
   }, [normalizedSamples]);
 
   /** ----- Chart prep ----- */
