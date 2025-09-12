@@ -1,7 +1,7 @@
 // EffortsViewerMapbox.tsx
 // Drop-in, responsive, scrub-synced charts + MapLibre mini-map with "all-metrics" InfoCard.
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import MapEffort from "./MapEffort";
 
 /** ---------- Types ---------- */
@@ -200,17 +200,30 @@ function EffortsViewerMapbox({
   });
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
-  // Map rendering moved to MapEffort component
-  const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
-  const distNow = normalizedSamples[idx]?.d_m ?? 0;
-  
-  // Remove complex data range calculation - use simple approach
+  // Build a monotonic distance series to avoid GPS glitches (backwards/zero)
+  const distCalc = useMemo(() => {
+    if (!normalizedSamples.length) return { distMono: [] as number[], d0: 0, dN: 1 };
+    const distRaw = normalizedSamples.map(s => (Number.isFinite(s.d_m as any) ? (s.d_m as number) : 0));
+    const distMono: number[] = new Array(distRaw.length);
+    let runMax = distRaw[0] ?? 0;
+    for (let i = 0; i < distRaw.length; i++) {
+      runMax = Math.max(runMax, distRaw[i] ?? 0);
+      distMono[i] = runMax;
+    }
+    const d0 = distMono[0] ?? 0;
+    const dN = distMono[distMono.length - 1] ?? Math.max(1, d0 + 1);
+    return { distMono, d0, dN };
+  }, [normalizedSamples]);
+
+  // Map rendering moved to MapEffort component (use dN for total)
+  const dTotal = distCalc.dN;
+  const distNow = distCalc.distMono[idx] ?? distCalc.d0;
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260;           // overall SVG size (in SVG units)
   const P = 24;                     // vertical padding (top/bottom)
-  const PL = 56;                    // left padding (space for Y labels)
-  const PR = 8;                     // right padding (tight)
+  const [pl, setPl] = useState(56); // left padding (space for Y labels)
+  const pr = 8;                     // right padding (tight)
 
   // cumulative positive gain (m), used for the InfoCard
   const cumGain_m = useMemo(() => {
@@ -268,16 +281,12 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - map first sample to left, last to right using PL/PR
+  // Helpers to map to SVG - consistent domain [d0..dN] from monotonic distance
   const xFromDist = (d: number) => {
     if (!normalizedSamples.length) return PL;
-    const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
-    const minDist = Math.min(...distances);
-    const maxDist = Math.max(...distances);
-    const range = maxDist - minDist || 1;
-    const ratio = (d - minDist) / range;
-    const drawable = (W - PL - PR);
-    return PL + ratio * drawable;
+    const range = Math.max(1, distCalc.dN - distCalc.d0);
+    const ratio = (d - distCalc.d0) / range;
+    return pl + ratio * (W - pl - pr);
   };
   const yFromValue = (v: number) => {
     const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
@@ -293,12 +302,17 @@ function EffortsViewerMapbox({
   // Build path from smoothed metric
   const linePath = useMemo(() => {
     if (normalizedSamples.length < 2) return "";
-    const y0 = Number.isFinite(metricRaw[0]) ? metricRaw[0] : 0;
-    let d = `M ${xFromDist(normalizedSamples[0].d_m)} ${yFromValue(y0)}`;
-    for (let i = 1; i < normalizedSamples.length; i++) {
-      const yv = Number.isFinite(metricRaw[i]) ? metricRaw[i] : 0;
-      const y = yFromValue(yv);
-      d += ` L ${xFromDist(normalizedSamples[i].d_m)} ${y}`;
+    const n = normalizedSamples.length;
+    // Optional guard: if total span very small, fallback to index spacing
+    const useIndex = (distCalc.dN - distCalc.d0) < 5;
+    const xFromIndex = (i: number) => pl + (i / Math.max(1, n - 1)) * (W - pl - pr);
+    const x0 = useIndex ? xFromIndex(0) : xFromDist(distCalc.distMono[0]);
+    const y0 = Number.isFinite(metricRaw[0]) ? (metricRaw[0] as number) : 0;
+    let d = `M ${x0} ${yFromValue(y0)}`;
+    for (let i = 1; i < n; i++) {
+      const xv = useIndex ? xFromIndex(i) : xFromDist(distCalc.distMono[i]);
+      const yv = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : 0;
+      d += ` L ${xv} ${yFromValue(yv)}`;
     }
     
     // Debug: log the actual data range being used
@@ -315,16 +329,17 @@ function EffortsViewerMapbox({
     }
     
     return d;
-  }, [normalizedSamples, metricRaw, yDomain, dTotal]);
+  }, [normalizedSamples, metricRaw, yDomain, distCalc, pl, pr]);
 
   // Elevation fill
   const elevArea = useMemo(() => {
     if (tab !== "elev" || normalizedSamples.length < 2) return "";
-    let d = `M ${xFromDist(normalizedSamples[0].d_m)} ${yFromValue(normalizedSamples[0].elev_m_sm ?? 0)}`;
-    for (let i = 1; i < normalizedSamples.length; i++) d += ` L ${xFromDist(normalizedSamples[i].d_m)} ${yFromValue(normalizedSamples[i].elev_m_sm ?? 0)}`;
-    d += ` L ${xFromDist(normalizedSamples[normalizedSamples.length - 1].d_m)} ${H - P} L ${xFromDist(normalizedSamples[0].d_m)} ${H - P} Z`;
+    const n = normalizedSamples.length;
+    let d = `M ${xFromDist(distCalc.distMono[0])} ${yFromValue(normalizedSamples[0].elev_m_sm ?? 0)}`;
+    for (let i = 1; i < n; i++) d += ` L ${xFromDist(distCalc.distMono[i])} ${yFromValue(normalizedSamples[i].elev_m_sm ?? 0)}`;
+    d += ` L ${xFromDist(distCalc.distMono[n - 1])} ${H - P} L ${xFromDist(distCalc.distMono[0])} ${H - P} Z`;
     return d;
-  }, [normalizedSamples, yDomain, tab]);
+  }, [normalizedSamples, yDomain, tab, distCalc, pl, pr]);
 
   // Splits + active split
   const splits = useMemo(() => computeSplits(normalizedSamples, useMiles ? 1609.34 : 1000), [normalizedSamples, useMiles]);
@@ -332,14 +347,31 @@ function EffortsViewerMapbox({
 
   // Scrub helpers
   const svgRef = useRef<SVGSVGElement>(null);
+  // Measure y-label width to auto-adjust left padding for perfect fit
+  useLayoutEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    try {
+      const labels = svg.querySelectorAll('text');
+      let maxLabelX = 0;
+      labels.forEach((n: any) => {
+        const bb = n.getBBox?.();
+        if (bb) maxLabelX = Math.max(maxLabelX, bb.x + bb.width);
+      });
+      // Add 8px gap after longest label, clamp to sane bounds
+      const desiredPl = Math.min(Math.max(Math.ceil(maxLabelX) + 8, 44), 80);
+      if (Number.isFinite(desiredPl) && desiredPl !== pl) setPl(desiredPl);
+    } catch {}
+  });
   const toIdxFromClientX = (clientX: number, svg: SVGSVGElement) => {
     const rect = svg.getBoundingClientRect();
     const pxScreen = clamp(clientX - rect.left, 0, rect.width);
     const pxSvg = (pxScreen / rect.width) * W;
-    const ratio = clamp((pxSvg - PL) / (W - PL - PR), 0, 1);
-    const target = ratio * (dTotal || 1);
-    let lo = 0, hi = normalizedSamples.length - 1;
-    while (lo < hi) { const m = Math.floor((lo + hi) / 2); (normalizedSamples[m].d_m < target) ? (lo = m + 1) : (hi = m); }
+    const ratio = clamp((pxSvg - pl) / (W - pl - pr), 0, 1);
+    const target = distCalc.d0 + ratio * (distCalc.dN - distCalc.d0);
+    // Binary search on distMono (monotonic)
+    let lo = 0, hi = distCalc.distMono.length - 1;
+    while (lo < hi) { const m = (lo + hi) >> 1; (distCalc.distMono[m] < target) ? (lo = m + 1) : (hi = m); }
     return lo;
   };
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => { if (locked) return; setIdx(toIdxFromClientX(e.clientX, svgRef.current!)); };
@@ -425,13 +457,13 @@ function EffortsViewerMapbox({
         >
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
-            const x = PL + i * ((W - PL - PR) / 4);
+            const x = pl + i * ((W - pl - pr) / 4);
             return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
           })}
           {/* horizontal ticks */}
           {yTicks.map((v, i) => (
             <g key={i}>
-              <line x1={PL} x2={W - PR} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
+              <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={12} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700}>
                 {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
