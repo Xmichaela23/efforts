@@ -133,10 +133,10 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
    // Simple check: what fields are actually in workoutData?
   useEffect(() => {
     if (workoutData && workoutData.gps_track) {
-      console.log('📊 workoutData loaded:', workoutData.name, 'GPS:', workoutData.gps_track?.length, 'Sensors:', workoutData.sensor_data?.length);
+      if (import.meta.env?.DEV) console.log('📊 workoutData loaded:', workoutData.name, 'GPS:', workoutData.gps_track?.length, 'Sensors:', (Array.isArray((workoutData as any)?.sensor_data?.samples) ? (workoutData as any).sensor_data.samples.length : (workoutData as any)?.sensor_data?.length));
       
       // Debug: Check what data we have
-      console.log('🔍 CompletedTab workoutData debug:', {
+      if (import.meta.env?.DEV) console.log('🔍 CompletedTab workoutData debug:', {
         hasGpsTrack: !!workoutData.gps_track,
         gpsTrackLength: workoutData.gps_track?.length,
         hasSensorData: !!workoutData.sensor_data,
@@ -146,9 +146,9 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
       });
       
       // Additional debug: Check what we're about to pass to CleanElevationChart
-      console.log('🔍 DEBUG - About to pass to CleanElevationChart:', {
+      if (import.meta.env?.DEV) console.log('🔍 DEBUG - About to pass to CleanElevationChart:', {
         gpsTrack: workoutData.gps_track?.length,
-        sensorData: workoutData.sensor_data?.length,
+        sensorData: (Array.isArray((workoutData as any)?.sensor_data?.samples) ? (workoutData as any).sensor_data.samples.length : (workoutData as any)?.sensor_data?.length),
         sensorDataType: typeof workoutData.sensor_data,
         workoutDataKeys: Object.keys(workoutData || {})
       });

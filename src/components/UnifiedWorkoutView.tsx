@@ -68,16 +68,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
         // 2) Otherwise try to find by completed_workout_id
         {
-          const { data } = await supabase
-            .from('planned_workouts')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('completed_workout_id', (workout as any).id)
-            .limit(1);
-          if (Array.isArray(data) && data.length) {
-            if (!cancelled) setLinkedPlanned(data[0]);
-            return;
-          }
+          try {
+            const cid = (workout as any)?.id ? String((workout as any).id) : null;
+            if (cid) {
+              const { data, error } = await supabase
+                .from('planned_workouts')
+                .select('*')
+                .eq('user_id', user.id)
+                .eq('completed_workout_id', cid)
+                .limit(1);
+              if (!error && Array.isArray(data) && data.length) {
+                if (!cancelled) setLinkedPlanned(data[0]);
+                return;
+              }
+            }
+          } catch {}
         }
 
         // 3) Fallback: look for a same-day planned of same type
