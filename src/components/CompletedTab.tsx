@@ -222,16 +222,6 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
           {/* Duration */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.duration ? `${Math.floor(workoutData.duration / 60)}:${(workoutData.duration % 60).toString().padStart(2, '0')}` : 'N/A'}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Duration</div>
-            </div>
-          </div>
-
-          {/* Distance */}
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
                 return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
@@ -664,7 +654,7 @@ const formatPace = (paceValue: any): string => {
       },
       {
         label: 'Duration', 
-        value: formatDuration(workoutData.duration)
+        value: formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration)
       },
       {
         label: 'Heart Rate',
@@ -1269,7 +1259,7 @@ const formatPace = (paceValue: any): string => {
        {/* Row 1: Duration, Avg HR, Avg Pace */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-           {formatDuration(workoutData.duration)}
+           {formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration)}
          </div>
          <div className="text-xs text-[#666666] font-normal">
            <div className="font-medium">Duration</div>

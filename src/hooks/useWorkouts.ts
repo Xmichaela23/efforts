@@ -324,8 +324,8 @@ export const useWorkouts = () => {
                 start_position_long: activity.starting_longitude || (activity.gps_track?.[0]?.longitude || null),
                 friendly_name: `Garmin ${activity.garmin_activity_id}`,
                 provider_sport: (activity.activity_type || '').toLowerCase(),
-                moving_time: activity.duration_seconds, // FIXED: Use duration_seconds
-                elapsed_time: activity.duration_seconds,
+                moving_time: activity.duration_seconds,
+                elapsed_time: (activity as any).elapsed_seconds ?? (activity as any).clockDurationInSeconds ?? activity.duration_seconds,
                 // CORRECT: Use the right pace fields
                 avg_pace: workoutType === 'run' || workoutType === 'walk' ? 
                   (activity.avg_pace_min_per_km ? activity.avg_pace_min_per_km * 60 : undefined) : undefined, // Convert min/km to seconds
@@ -382,10 +382,10 @@ export const useWorkouts = () => {
                   max_temperature: activity.max_temperature,
                   
                   // Time data - FIXED: Use correct field names
-                  total_timer_time: activity.duration_seconds, // Use duration_seconds as moving time
-                  total_elapsed_time: activity.duration_seconds,
-                  moving_time: activity.duration_seconds, // Use duration_seconds as moving time
-                  elapsed_time: activity.duration_seconds,
+                  total_timer_time: activity.duration_seconds,
+                  total_elapsed_time: (activity as any).elapsed_seconds ?? (activity as any).clockDurationInSeconds ?? activity.duration_seconds,
+                  moving_time: activity.duration_seconds,
+                  elapsed_time: (activity as any).elapsed_seconds ?? (activity as any).clockDurationInSeconds ?? activity.duration_seconds,
                   
                   // Steps for running/walking
                   steps: workoutType === 'run' || workoutType === 'walk' ? activity.steps : undefined,
@@ -1160,7 +1160,7 @@ export const useWorkouts = () => {
             
             // Time data
             moving_time: Math.round(activity.duration_seconds || 0),
-            elapsed_time: Math.round(activity.duration_seconds || 0),
+            elapsed_time: Math.round(((activity as any).elapsed_seconds ?? (activity as any).clockDurationInSeconds ?? activity.duration_seconds) || 0),
             
             // Create metrics object for CompletedTab compatibility - FLAT STRUCTURE
             metrics: {
