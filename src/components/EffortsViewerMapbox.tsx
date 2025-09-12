@@ -205,7 +205,7 @@ function EffortsViewerMapbox({
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 260, P = 60; // Increased left padding to move chart line right
+  const W = 700, H = 260, P = 75; // Increased left padding to move chart line further right
 
   // cumulative positive gain (m), used for the InfoCard
   const cumGain_m = useMemo(() => {
@@ -399,7 +399,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={P} x2={W - P} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
-              <text x={8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={14} fontWeight={600}>
+              <text x={4} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={15} fontWeight={700}>
                 {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
             </g>
