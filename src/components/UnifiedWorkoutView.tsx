@@ -284,7 +284,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </div>
           <div>
             <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
-            <p className="text-sm text-muted-foreground leading-snug tabular-nums [font-variant-numeric:lining-nums_tabular-nums]">
+            <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums]">
               {(() => {
                 try {
                   // For completed workouts, try to get timestamp for time
