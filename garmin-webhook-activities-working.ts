@@ -395,56 +395,61 @@ async function processActivityDetails(activityDetails) {
 
       }
       
-      // Enrich summary with TE/RD if available from single-activity endpoint
+      // Enrich summary with TE/RD only when explicitly enabled by env flag
       try {
-        const supa = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-        // Prefer selecting by our internal user_id linkage
-        let token: string | undefined;
-        try {
-          const byUid = await supa
-            .from('user_connections')
-            .select('access_token, connection_data')
-            .eq('provider', 'garmin')
-            .eq('user_id', connection.user_id)
-            .maybeSingle();
-          token = (byUid.data as any)?.access_token || (byUid.data as any)?.connection_data?.access_token;
-        } catch {}
-        // Fallback: match by Garmin userId in connection_data
-        if (!token) {
+        const enableSingleSummary = String(Deno.env.get('GARMIN_ENABLE_SINGLE_SUMMARY') || 'false').toLowerCase() === 'true';
+        if (enableSingleSummary) {
+          const supa = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+          // Prefer selecting by our internal user_id linkage
+          let token: string | undefined;
           try {
-            const byGid = await supa
+            const byUid = await supa
               .from('user_connections')
               .select('access_token, connection_data')
               .eq('provider', 'garmin')
-              .eq('connection_data->>user_id', activity.userId)
-              .maybeSingle();
-            token = (byGid.data as any)?.access_token || (byGid.data as any)?.connection_data?.access_token;
-          } catch {}
-        }
-        // Fallback: device_connections
-        if (!token && connection?.user_id) {
-          try {
-            const { data: devConn } = await supa
-              .from('device_connections')
-              .select('access_token, connection_data')
-              .eq('provider', 'garmin')
               .eq('user_id', connection.user_id)
-              .single();
-            token = (devConn?.access_token || (devConn as any)?.connection_data?.access_token) as string | undefined;
+              .maybeSingle();
+            token = (byUid.data as any)?.access_token || (byUid.data as any)?.connection_data?.access_token;
           } catch {}
-        }
-        if (token) {
-          // Prefer activityId when available; fallback to summaryId
-          const single = await fetchActivitySummary(String(activity.activityId ?? activity.summaryId), token);
-          // Always store status even if body is empty
-          (activityDetail as any).single_summary_status = single?.status ?? null;
-          const singleSummary = (single?.data as any)?.summary || single?.data;
-          if (singleSummary && typeof singleSummary === 'object') {
-            // Keep a copy for diagnostics
-            (activityDetail as any).single_summary = singleSummary;
-            // Prefer values from single activity summary if present
-            (activityDetail as any).summary = { ...(activityDetail as any).summary, ...singleSummary };
+          // Fallback: match by Garmin userId in connection_data
+          if (!token) {
+            try {
+              const byGid = await supa
+                .from('user_connections')
+                .select('access_token, connection_data')
+                .eq('provider', 'garmin')
+                .eq('connection_data->>user_id', activity.userId)
+                .maybeSingle();
+              token = (byGid.data as any)?.access_token || (byGid.data as any)?.connection_data?.access_token;
+            } catch {}
           }
+          // Fallback: device_connections
+          if (!token && connection?.user_id) {
+            try {
+              const { data: devConn } = await supa
+                .from('device_connections')
+                .select('access_token, connection_data')
+                .eq('provider', 'garmin')
+                .eq('user_id', connection.user_id)
+                .single();
+              token = (devConn?.access_token || (devConn as any)?.connection_data?.access_token) as string | undefined;
+            } catch {}
+          }
+          if (token) {
+            // Prefer activityId when available; fallback to summaryId
+            const single = await fetchActivitySummary(String(activity.activityId ?? activity.summaryId), token);
+            // Always store status even if body is empty
+            (activityDetail as any).single_summary_status = single?.status ?? null;
+            const singleSummary = (single?.data as any)?.summary || single?.data;
+            if (singleSummary && typeof singleSummary === 'object') {
+              // Keep a copy for diagnostics
+              (activityDetail as any).single_summary = singleSummary;
+              // Prefer values from single activity summary if present
+              (activityDetail as any).summary = { ...(activityDetail as any).summary, ...singleSummary };
+            }
+          }
+        } else {
+          (activityDetail as any).single_summary_status = 'disabled';
         }
       } catch { /* non-fatal */ }
 
@@ -481,6 +486,17 @@ async function processActivityDetails(activityDetails) {
         // Laps may appear at root or under summary depending on source
         const laps = (activityDetail as any)?.laps ?? (activityDetail as any)?.summary?.laps ?? null;
 
+        // Compute robust local/UTC timing values for correct local date derivation downstream
+        const sIn = Number(activity.startTimeInSeconds ?? NaN);
+        const sOffRaw = Number(activity.startTimeOffsetInSeconds ?? NaN);
+        const sLoc = Number(
+          (activity as any)?.localStartTimeInSeconds ??
+          (Number.isFinite(sIn) && Number.isFinite(sOffRaw) ? (sIn + sOffRaw) : NaN)
+        );
+        const sOff = Number.isFinite(sOffRaw)
+          ? sOffRaw
+          : (Number.isFinite(sIn) && Number.isFinite(sLoc) ? (sLoc - sIn) : 0);
+
         const payload = {
           userId: connection.user_id,
           provider: 'garmin',
@@ -488,8 +504,9 @@ async function processActivityDetails(activityDetails) {
             garmin_activity_id: String(activity.summaryId ?? activity.activityId ?? ''),
             activity_type: activity.activityType,
             start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
-            start_time_in_seconds: activity.startTimeInSeconds ?? null,
-            start_time_offset_seconds: activity.startTimeOffsetInSeconds ?? 0,
+            start_time_in_seconds: Number.isFinite(sIn) ? sIn : null,
+            start_time_offset_seconds: sOff,
+            local_start_time_in_seconds: Number.isFinite(sLoc) ? sLoc : null,
             start_time_local: (activity as any)?.startTimeLocal ?? null,
             duration_seconds: activity.durationInSeconds,
             distance_meters: activity.distanceInMeters ?? null,
