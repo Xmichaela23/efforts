@@ -301,7 +301,6 @@ function EffortsViewerMapbox({
         dTotal,
         firstDist: normalizedSamples[0]?.d_m,
         lastDist: normalizedSamples[normalizedSamples.length - 1]?.d_m,
-        actualRange: actualDataRange,
         firstX: xFromDist(normalizedSamples[0].d_m),
         lastX: xFromDist(normalizedSamples[normalizedSamples.length - 1].d_m),
         chartWidth: W - P * 2
@@ -309,7 +308,7 @@ function EffortsViewerMapbox({
     }
     
     return d;
-  }, [normalizedSamples, metricRaw, yDomain, dTotal, actualDataRange]);
+  }, [normalizedSamples, metricRaw, yDomain, dTotal]);
 
   // Elevation fill
   const elevArea = useMemo(() => {
