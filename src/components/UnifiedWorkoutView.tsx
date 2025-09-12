@@ -284,7 +284,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </div>
           <div>
             <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-muted-foreground leading-tight">
               {(() => {
                 try {
                   // For completed workouts, try to get timestamp for time
@@ -293,7 +293,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     if (!isNaN(d.getTime())) {
                       const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                       const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                      return `${dateStr} at ${timeStr}`;
+                      return (
+                        <span className="inline-flex items-baseline">
+                          <span>{dateStr}</span>
+                          <span className="mx-1">at</span>
+                          <span>{timeStr}</span>
+                        </span>
+                      );
                     }
                   }
                   
