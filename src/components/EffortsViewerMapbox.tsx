@@ -399,7 +399,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={P} x2={W - P} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
-              <text x={12} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={14} fontWeight={600}>
+              <text x={20} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700}>
                 {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
             </g>
