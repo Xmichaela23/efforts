@@ -186,9 +186,19 @@ export default function ToggleZoneChart({
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as any)} className={className}>
-      <TabsList className="w-full grid grid-cols-2">
-        <TabsTrigger value="power">Power</TabsTrigger>
-        <TabsTrigger value="cadence">Cadence</TabsTrigger>
+      <TabsList className="w-full grid grid-cols-2 bg-gray-100">
+        <TabsTrigger 
+          value="power" 
+          className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm"
+        >
+          Power
+        </TabsTrigger>
+        <TabsTrigger 
+          value="cadence" 
+          className="data-[state=active]:bg-white data-[state=active]:text-black data-[state=active]:shadow-sm"
+        >
+          Cadence
+        </TabsTrigger>
       </TabsList>
 
       <TabsContent value="power" className="mt-3">
