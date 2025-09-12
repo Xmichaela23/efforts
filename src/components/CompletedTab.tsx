@@ -380,7 +380,7 @@ const formatMaxSpeed = (speedValue: any): string => {
 
  const formatSpeed = (speedValue: any): string => {
   // 🚨 TESTING: This is the UPDATED formatSpeed function - if you see this log, the fix is loaded!
-  console.log('🚨 UPDATED formatSpeed function is running!');
+  if (import.meta.env?.DEV) console.log('🚨 UPDATED formatSpeed function is running!');
   
   // 🔧 FIXED: This function should actually be looking for BEST PACE, not speed
   // For running/walking, we want the fastest pace (lowest time per km)
@@ -391,7 +391,7 @@ const formatMaxSpeed = (speedValue: any): string => {
     const maxPaceSecondsPerKm = Number(workoutData.max_pace);
     const avgPaceSecondsPerKm = Number(workoutData.avg_pace);
     
-    console.log('🔍 formatSpeed (RUN/WALK) - looking for best pace:', {
+    if (import.meta.env?.DEV) console.log('🔍 formatSpeed (RUN/WALK) - looking for best pace:', {
       max_pace: workoutData.max_pace,
       avg_pace: workoutData.avg_pace,
       maxPaceSecondsPerKm,
@@ -407,7 +407,7 @@ const formatMaxSpeed = (speedValue: any): string => {
       const minutes = Math.floor(paceSecondsPerMile / 60);
       const seconds = Math.round(paceSecondsPerMile % 60);
       const paceString = `${minutes}:${seconds.toString().padStart(2, '0')}/mi`;
-      console.log('🔍 formatSpeed returning best pace:', paceString);
+      if (import.meta.env?.DEV) console.log('🔍 formatSpeed returning best pace:', paceString);
       return paceString;
     }
   } else {
@@ -415,7 +415,7 @@ const formatMaxSpeed = (speedValue: any): string => {
     const maxSpeedKmh = Number(workoutData.max_speed);
     const avgSpeedKmh = Number(workoutData.avg_speed);
     
-    console.log('🔍 formatSpeed (CYCLE) - looking for fastest speed:', {
+    if (import.meta.env?.DEV) console.log('🔍 formatSpeed (CYCLE) - looking for fastest speed:', {
       max_speed: workoutData.max_speed,
       avg_speed: workoutData.avg_speed,
       maxSpeedKmh,
@@ -428,12 +428,12 @@ const formatMaxSpeed = (speedValue: any): string => {
     if (speedKmh && speedKmh > 0) {
       // Convert km/h to mph: multiply by 0.621371
       const speedMph = speedKmh * 0.621371;
-      console.log('🔍 formatSpeed returning fastest speed:', speedMph.toFixed(1), 'mph');
+      if (import.meta.env?.DEV) console.log('🔍 formatSpeed returning fastest speed:', speedMph.toFixed(1), 'mph');
       return `${speedMph.toFixed(1)} mph`;
     }
   }
   
-  console.log('🔍 formatSpeed returning N/A - no pace/speed data found');
+  if (import.meta.env?.DEV) console.log('🔍 formatSpeed returning N/A - no pace/speed data found');
   return 'N/A';
 };
 
@@ -448,7 +448,7 @@ const formatMaxSpeed = (speedValue: any): string => {
  };
 
  const formatTemperature = (c: any): string => {
-   console.log('🔍 formatTemperature called with:', c, typeof c);
+   if (import.meta.env?.DEV) console.log('🔍 formatTemperature called with:', c, typeof c);
    
    // 🔧 GARMIN DATA EXTRACTION: Try all possible temperature sources
    const temp = c || 
@@ -459,13 +459,13 @@ const formatMaxSpeed = (speedValue: any): string => {
    const num = Number(temp);
    
    if (!num || isNaN(num)) {
-     console.log('🔍 formatTemperature returning N/A because num is:', num, 'isNaN:', isNaN(num));
+     if (import.meta.env?.DEV) console.log('🔍 formatTemperature returning N/A because num is:', num, 'isNaN:', isNaN(num));
      return 'N/A';
    }
    
    // Always show Fahrenheit for now (settings toggle later)
    const f = Math.round((num * 9/5) + 32);
-   console.log('🔍 formatTemperature converting:', num, '°C to', f, '°F');
+   if (import.meta.env?.DEV) console.log('🔍 formatTemperature converting:', num, '°C to', f, '°F');
    return `${f}°F`;
  };
 
@@ -510,7 +510,7 @@ const formatPace = (paceValue: any): string => {
  };
 
  const formatTime = (timestamp: any): string => {
-   console.log('🔍 formatTime called with:', timestamp, typeof timestamp);
+   if (import.meta.env?.DEV) console.log('🔍 formatTime called with:', timestamp, typeof timestamp);
    
    // 🔧 GARMIN DATA EXTRACTION: Try multiple timestamp sources
    const timeValue = timestamp || 
@@ -526,7 +526,7 @@ const formatPace = (paceValue: any): string => {
      minute: '2-digit',
      hour12: true 
    });
-   console.log('🔍 formatTime result:', result);
+   if (import.meta.env?.DEV) console.log('🔍 formatTime result:', result);
    return result;
  };
 
@@ -535,7 +535,7 @@ const formatPace = (paceValue: any): string => {
    const dateValue = dateStr || workoutData.date || workoutData.start_date;
    if (!dateValue) return 'N/A';
    
-   console.log('🔍 formatDate debugging:', {
+   if (import.meta.env?.DEV) console.log('🔍 formatDate debugging:', {
      input: dateStr,
      dateValue,
      type: typeof dateValue
@@ -544,7 +544,7 @@ const formatPace = (paceValue: any): string => {
    // Create Date object - handle UTC timestamps properly
    const date = new Date(dateValue);
    
-   console.log('🔍 Date object created:', {
+   if (import.meta.env?.DEV) console.log('🔍 Date object created:', {
      date: date.toString(),
      utc: date.toUTCString(),
      local: date.toLocaleString(),
@@ -559,13 +559,13 @@ const formatPace = (paceValue: any): string => {
    };
    
    const result = date.toLocaleDateString('en-US', options);
-   console.log('🔍 formatDate result:', result);
+   if (import.meta.env?.DEV) console.log('🔍 formatDate result:', result);
    
    return result;
  };
 
  const getCityFromCoordinates = (lat: any, lng: any): string => {
-   console.log('🔍 getCityFromCoordinates called with:', lat, lng);
+   if (import.meta.env?.DEV) console.log('🔍 getCityFromCoordinates called with:', lat, lng);
    
    // 🔧 GARMIN DATA EXTRACTION: Try all possible coordinate sources
    const latNum = Number(lat || 
@@ -578,12 +578,12 @@ const formatPace = (paceValue: any): string => {
                         workoutData.start_lng);
    
    if (!latNum || !lngNum) {
-     console.log('🔍 getCityFromCoordinates returning Unknown - no valid coords');
+     if (import.meta.env?.DEV) console.log('🔍 getCityFromCoordinates returning Unknown - no valid coords');
      return 'Unknown';
    }
    
    // Location detection - coordinates will show actual location
-   console.log('🔍 getCityFromCoordinates returning Unknown - no location detection implemented');
+   if (import.meta.env?.DEV) console.log('🔍 getCityFromCoordinates returning Unknown - no location detection implemented');
    return 'Unknown';
  };
 
@@ -592,8 +592,8 @@ const formatPace = (paceValue: any): string => {
    const date = formatDate(workoutData.timestamp || workoutData.date);
    const city = getCityFromCoordinates(workoutData.start_position_lat, workoutData.start_position_long);
    const title = `${date} ${city} ${workoutData.type}`;
-   console.log('🔍 generateTitle result:', title);
-   console.log('🔍 generateTitle debugging:', {
+   if (import.meta.env?.DEV) console.log('🔍 generateTitle result:', title);
+   if (import.meta.env?.DEV) console.log('🔍 generateTitle debugging:', {
      timestamp: workoutData.timestamp,
      date: workoutData.date,
      start_position_lat: workoutData.start_position_lat,
@@ -953,7 +953,7 @@ const formatPace = (paceValue: any): string => {
 
  // 🏠 TRAINING METRICS - Pull real data from FIT file, remove Weighted Avg Power
  const calculateTotalWork = () => {
-   console.log('🔍 calculateTotalWork - total_work:', workoutData.metrics?.total_work);
+   if (import.meta.env?.DEV) console.log('🔍 calculateTotalWork - total_work:', workoutData.metrics?.total_work);
    
    // 🔧 GARMIN DATA EXTRACTION: Try all possible work sources
    const totalWork = workoutData.metrics?.total_work || 
@@ -963,7 +963,7 @@ const formatPace = (paceValue: any): string => {
    // Use total_work from FIT file if available (in Joules), convert to kJ
    if (totalWork) {
      const kj = Math.round(Number(totalWork) / 1000);
-     console.log('✅ calculateTotalWork using total_work:', kj, 'kJ');
+     if (import.meta.env?.DEV) console.log('✅ calculateTotalWork using total_work:', kj, 'kJ');
      return `${kj} kJ`;
    }
    // Fallback calculation if total_work not available
@@ -971,15 +971,15 @@ const formatPace = (paceValue: any): string => {
      // Convert duration from minutes to seconds for proper kJ calculation
      const durationSeconds = workoutData.duration * 60;
      const kj = Math.round((workoutData.metrics.avg_power * durationSeconds) / 1000);
-     console.log('✅ calculateTotalWork using fallback calc:', kj, 'kJ');
+     if (import.meta.env?.DEV) console.log('✅ calculateTotalWork using fallback calc:', kj, 'kJ');
      return `${kj} kJ`;
    }
-   console.log('✅ calculateTotalWork returning N/A');
+   if (import.meta.env?.DEV) console.log('✅ calculateTotalWork returning N/A');
    return 'N/A';
  };
 
  const calculateVAM = () => {
-   console.log('🔍 calculateVAM - avg_vam:', workoutData.metrics?.avg_vam);
+   if (import.meta.env?.DEV) console.log('🔍 calculateVAM - avg_vam:', workoutData.metrics?.avg_vam);
    
    // 🔧 GARMIN DATA EXTRACTION: Try all possible VAM sources
    const avgVam = workoutData.metrics?.avg_vam || 
@@ -989,7 +989,7 @@ const formatPace = (paceValue: any): string => {
    // Use avg_vam from FIT file if available
    if (avgVam) {
      const vam = Math.round(Number(avgVam) * 1000); // Convert to m/h
-     console.log('✅ calculateVAM using avg_vam:', vam, 'm/h');
+     if (import.meta.env?.DEV) console.log('✅ calculateVAM using avg_vam:', vam, 'm/h');
      return `${vam} m/h`;
    }
    // Fallback calculation
@@ -998,10 +998,10 @@ const formatPace = (paceValue: any): string => {
      // workoutData.duration is in MINUTES, convert to hours
      const durationHours = (workoutData.duration * 60) / 3600;
      const vam = Math.round(elevationM / durationHours);
-     console.log('✅ calculateVAM using fallback calc:', vam, 'm/h');
+     if (import.meta.env?.DEV) console.log('✅ calculateVAM using fallback calc:', vam, 'm/h');
      return `${vam} m/h`;
    }
-   console.log('✅ calculateVAM returning N/A');
+   if (import.meta.env?.DEV) console.log('✅ calculateVAM returning N/A');
    return 'N/A';
  };
 
@@ -1050,9 +1050,9 @@ const formatPace = (paceValue: any): string => {
 
  // Calculate Grade Adjusted Pace (GAP) using proper Strava formula
  const calculateGradeAdjustedPace = () => {
-   console.log('🔍 GAP calculation - workoutType:', workoutType);
+   if (import.meta.env?.DEV) console.log('🔍 GAP calculation - workoutType:', workoutType);
    if (workoutType !== 'run' && workoutType !== 'walk') {
-     console.log('❌ GAP calculation skipped - not a run/walk:', workoutType);
+     if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - not a run/walk:', workoutType);
      return null;
    }
    
@@ -1060,10 +1060,10 @@ const formatPace = (paceValue: any): string => {
    const duration = workoutData.duration;
    const elevationGain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain;
    
-   console.log('🔍 GAP calculation - data:', { distance, duration, elevationGain });
+   if (import.meta.env?.DEV) console.log('🔍 GAP calculation - data:', { distance, duration, elevationGain });
    
    if (!distance || !duration || !elevationGain) {
-     console.log('❌ GAP calculation skipped - missing data');
+     if (import.meta.env?.DEV) console.log('❌ GAP calculation skipped - missing data');
      return null;
    }
    
@@ -1075,31 +1075,31 @@ const formatPace = (paceValue: any): string => {
    // If distance is in km, convert to miles
    if (distanceMiles > 10) { // Likely in km if > 10
      distanceMiles = distanceMiles * 0.621371; // km to miles
-     console.log('🔍 Converted distance from km to miles:', distanceMiles);
+     if (import.meta.env?.DEV) console.log('🔍 Converted distance from km to miles:', distanceMiles);
    }
    
    // If duration is in seconds, convert to minutes
    if (durationMinutes > 60) { // Likely in seconds if > 60
      durationMinutes = durationMinutes / 60; // seconds to minutes
-     console.log('🔍 Converted duration from seconds to minutes:', durationMinutes);
+     if (import.meta.env?.DEV) console.log('🔍 Converted duration from seconds to minutes:', durationMinutes);
    }
    
    // If elevation is in meters, convert to feet
    if (elevationFeet > 1000) { // Likely in meters if > 1000
      elevationFeet = elevationFeet * 3.28084; // meters to feet
-     console.log('🔍 Converted elevation from meters to feet:', elevationFeet);
+     if (import.meta.env?.DEV) console.log('🔍 Converted elevation from meters to feet:', elevationFeet);
    }
    
-   console.log('🔍 GAP calculation - converted units:', { distanceMiles, durationMinutes, elevationFeet });
+   if (import.meta.env?.DEV) console.log('🔍 GAP calculation - converted units:', { distanceMiles, durationMinutes, elevationFeet });
    
    // Calculate actual pace (min/mi)
    const actualPaceMinutes = durationMinutes / distanceMiles;
-   console.log('🔍 Actual pace (min/mi):', actualPaceMinutes);
+   if (import.meta.env?.DEV) console.log('🔍 Actual pace (min/mi):', actualPaceMinutes);
    
    // Proper Strava GAP formula
    // Elevation gain per mile affects pace
    const elevationPerMile = elevationFeet / distanceMiles;
-   console.log('🔍 Elevation per mile:', elevationPerMile);
+   if (import.meta.env?.DEV) console.log('🔍 Elevation per mile:', elevationPerMile);
    
    // Strava's GAP adjustment: more sophisticated than simple linear
    // Accounts for both uphill and downhill effects
@@ -1109,27 +1109,27 @@ const formatPace = (paceValue: any): string => {
      // Uphill: slows you down more than simple linear
      // Strava uses a curve that increases impact for steeper grades
      gapAdjustment = (elevationPerMile / 100) * 1.2; // 20% more impact than linear
-     console.log('🔍 Uphill adjustment:', gapAdjustment);
+     if (import.meta.env?.DEV) console.log('🔍 Uphill adjustment:', gapAdjustment);
    } else if (elevationPerMile < 0) {
      // Downhill: speeds you up, but not as much as uphill slows you down
      gapAdjustment = (Math.abs(elevationPerMile) / 100) * 0.8; // 80% of uphill benefit
-     console.log('🔍 Downhill adjustment:', gapAdjustment);
+     if (import.meta.env?.DEV) console.log('🔍 Downhill adjustment:', gapAdjustment);
    }
    
    // Calculate GAP
    // Uphill: add penalty (slower pace), Downhill: subtract benefit (faster pace)
    const gapPaceMinutes = actualPaceMinutes + gapAdjustment;
-   console.log('🔍 GAP pace (min/mi):', gapPaceMinutes);
+   if (import.meta.env?.DEV) console.log('🔍 GAP pace (min/mi):', gapPaceMinutes);
    
    // Format GAP pace (don't go below 0)
    const gapPace = formatPace(Math.max(0, gapPaceMinutes));
-   console.log('🔍 Final GAP pace:', gapPace);
+   if (import.meta.env?.DEV) console.log('🔍 Final GAP pace:', gapPace);
    
    return gapPace;
  };
 
  const formatMovingTime = () => {
-   console.log('🔍 formatMovingTime checking:', {
+   if (import.meta.env?.DEV) console.log('🔍 formatMovingTime checking:', {
      total_timer_time: workoutData.metrics?.total_timer_time,
      moving_time: workoutData.moving_time,
      elapsed_time: workoutData.elapsed_time
@@ -1147,16 +1147,16 @@ const formatPace = (paceValue: any): string => {
    
    // Use total_timer_time from FIT file - this is the actual moving time
    if (timerTime) {
-     console.log('🔍 formatMovingTime using total_timer_time');
+     if (import.meta.env?.DEV) console.log('🔍 formatMovingTime using total_timer_time');
      return formatDuration(timerTime);
    } else if (movingTime) {
-     console.log('🔍 formatMovingTime using moving_time');
+     if (import.meta.env?.DEV) console.log('🔍 formatMovingTime using moving_time');
      return formatDuration(movingTime);
    } else if (elapsedTime) {
-     console.log('🔍 formatMovingTime using elapsed_time');
+     if (import.meta.env?.DEV) console.log('🔍 formatMovingTime using elapsed_time');
      return formatDuration(elapsedTime);
    }
-   console.log('🔍 formatMovingTime returning N/A');
+   if (import.meta.env?.DEV) console.log('🔍 formatMovingTime returning N/A');
    return 'N/A';
  };
 
