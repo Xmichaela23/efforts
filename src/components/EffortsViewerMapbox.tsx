@@ -221,8 +221,8 @@ function EffortsViewerMapbox({
 
   // Weather data
   const { weather, loading: weatherLoading } = useWeather({
-    lat: workoutData?.start_position_lat || workoutData?.latitude,
-    lng: workoutData?.start_position_long || workoutData?.longitude,
+    lat: workoutData?.start_position_lat,
+    lng: workoutData?.start_position_long,
     timestamp: workoutData?.timestamp,
     workoutId: workoutData?.id,
     enabled: !!(workoutData?.start_position_lat && workoutData?.start_position_long && workoutData?.timestamp)
@@ -348,7 +348,7 @@ function EffortsViewerMapbox({
 
   // Helpers to map to SVG - consistent domain [d0..dN] from monotonic distance
   const xFromDist = (d: number) => {
-    if (!normalizedSamples.length) return PL;
+    if (!normalizedSamples.length) return pl;
     const range = Math.max(1, distCalc.dN - distCalc.d0);
     const ratio = (d - distCalc.d0) / range;
     return pl + ratio * (W - pl - pr);

@@ -1,7 +1,7 @@
-# Data Structure Guide
+# Data Structure Guide - Complete Data Map
 
 ## Overview
-This document maps where different types of workout data are stored in the database and how to access them in the frontend.
+This document shows ALL the data we collect and exactly where it's stored. No more guessing - just say "make an FTP chart" and we know exactly where to find the data.
 
 ## Database Tables
 
@@ -35,7 +35,129 @@ default_max_heart_rate, resting_heart_rate
 
 -- Device info
 device_name, device_info, provider_sport, category
+
+-- Weather data
+weather_data, avg_temperature, max_temperature
 ```
+
+## 🎯 Complete Data Map - What We Have & Where
+
+### **Power Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **FTP** | `workouts.functional_threshold_power` | `functional_threshold_power` | User's FTP in watts |
+| **Threshold Power** | `workouts.threshold_power` | `threshold_power` | Threshold power in watts |
+| **Avg Power** | `workouts.avg_power` | `avg_power` | Average power during workout |
+| **Max Power** | `workouts.max_power` | `max_power` | Maximum power during workout |
+| **Normalized Power** | `workouts.normalized_power` | `normalized_power` | Normalized power (NP) |
+| **Power Over Time** | `workouts.sensor_data` | `sensor_data[].power` | Power samples every second |
+| **Power Zones** | `workouts.computed.analysis.zones` | `computed.analysis.zones.power` | Power zone breakdown |
+
+### **Heart Rate Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Avg HR** | `workouts.avg_heart_rate` | `avg_heart_rate` | Average heart rate (BPM) |
+| **Max HR** | `workouts.max_heart_rate` | `max_heart_rate` | Maximum heart rate (BPM) |
+| **HR Over Time** | `workouts.sensor_data` | `sensor_data[].hr_bpm` | HR samples every second |
+| **HR Zones** | `workouts.heart_rate_zones` | `heart_rate_zones` | HR zone breakdown |
+| **HR Zones (Computed)** | `workouts.computed.analysis.zones` | `computed.analysis.zones.hr` | Computed HR zones |
+| **Resting HR** | `workouts.resting_heart_rate` | `resting_heart_rate` | User's resting HR |
+| **Max HR** | `workouts.default_max_heart_rate` | `default_max_heart_rate` | User's max HR |
+
+### **Pace/Speed Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Avg Pace** | `workouts.avg_pace` | `avg_pace` | Average pace (min/km) |
+| **Max Pace** | `workouts.max_pace` | `max_pace` | Maximum pace (min/km) |
+| **Avg Speed** | `workouts.avg_speed` | `avg_speed` | Average speed (km/h) |
+| **Max Speed** | `workouts.max_speed` | `max_speed` | Maximum speed (km/h) |
+| **Pace Over Time** | `workouts.sensor_data` | `sensor_data[].pace_s_per_km` | Pace samples every second |
+| **GAP** | `workouts.gap_pace_s_per_mi` | `gap_pace_s_per_mi` | Grade adjusted pace |
+
+### **Cadence Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Avg Cadence** | `workouts.avg_cadence` | `avg_cadence` | Average cadence (RPM/steps/min) |
+| **Max Cadence** | `workouts.max_cadence` | `max_cadence` | Maximum cadence (RPM/steps/min) |
+| **Cadence Over Time** | `workouts.sensor_data` | `sensor_data[].cadence` | Cadence samples every second |
+| **Run Cadence** | `workouts.avg_run_cadence` | `avg_run_cadence` | Running-specific cadence |
+| **Bike Cadence** | `workouts.avg_bike_cadence` | `avg_bike_cadence` | Cycling-specific cadence |
+
+### **Elevation Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Elevation Gain** | `workouts.elevation_gain` | `elevation_gain` | Total elevation gain (m) |
+| **Elevation Loss** | `workouts.elevation_loss` | `elevation_loss` | Total elevation loss (m) |
+| **Elevation Over Time** | `workouts.gps_track` | `gps_track[].elevation` | Elevation samples |
+| **Elevation Over Time** | `workouts.sensor_data` | `sensor_data[].elev_m_sm` | Smoothed elevation samples |
+| **VAM** | `workouts.avg_vam` | `avg_vam` | Average vertical ascent rate |
+| **VAM Over Time** | `workouts.sensor_data` | `sensor_data[].vam_m_per_h` | VAM samples every second |
+
+### **GPS Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Start Lat** | `workouts.start_position_lat` | `start_position_lat` | Starting latitude |
+| **Start Lng** | `workouts.start_position_long` | `start_position_long` | Starting longitude |
+| **GPS Track** | `workouts.gps_track` | `gps_track` | Full GPS track (lat/lng/elevation) |
+| **GPS Trackpoints** | `workouts.gps_trackpoints` | `gps_trackpoints` | GPS polyline string |
+| **Distance** | `workouts.distance` | `distance` | Total distance (km) |
+
+### **Training Effect Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Aerobic TE** | `workouts.total_training_effect` | `total_training_effect` | Aerobic training effect |
+| **Anaerobic TE** | `workouts.total_anaerobic_effect` | `total_anaerobic_effect` | Anaerobic training effect |
+
+### **Running Dynamics (Garmin)**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Ground Contact Time** | `workouts.garmin_data` | `garmin_data.running_dynamics.ground_contact_time` | Ground contact time |
+| **Vertical Oscillation** | `workouts.garmin_data` | `garmin_data.running_dynamics.vertical_oscillation` | Vertical oscillation |
+| **Running Dynamics Balance** | `workouts.garmin_data` | `garmin_data.running_dynamics.balance` | Left/right balance |
+| **Vertical Ratio** | `workouts.garmin_data` | `garmin_data.running_dynamics.vertical_ratio` | Vertical ratio |
+
+### **Swim Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Pool Length** | `workouts.pool_length` | `pool_length` | Pool length (m) |
+| **Strokes** | `workouts.strokes` | `strokes` | Total stroke count |
+| **Swim Cadence** | `workouts.avg_swim_cadence` | `avg_swim_cadence` | Average swim cadence |
+| **Active Lengths** | `workouts.number_of_active_lengths` | `number_of_active_lengths` | Number of active lengths |
+| **Swim Data** | `workouts.swim_data` | `swim_data` | Detailed swim metrics |
+
+### **Time Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Duration** | `workouts.duration` | `duration` | Planned duration (min) |
+| **Elapsed Time** | `workouts.elapsed_time` | `elapsed_time` | Total elapsed time (min) |
+| **Moving Time** | `workouts.moving_time` | `moving_time` | Moving time (min) |
+| **Total Timer Time** | `workouts.total_timer_time` | `total_timer_time` | Total timer time (min) |
+| **Timestamp** | `workouts.timestamp` | `timestamp` | Workout start time |
+
+### **Weather Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Weather Data** | `workouts.weather_data` | `weather_data` | Complete weather conditions |
+| **Device Temp** | `workouts.avg_temperature` | `avg_temperature` | Average temperature from device |
+| **Max Temp** | `workouts.max_temperature` | `max_temperature` | Maximum temperature from device |
+
+### **User Profile Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Age** | `workouts.age` | `age` | User age |
+| **Weight** | `workouts.weight` | `weight` | User weight (kg) |
+| **Height** | `workouts.height` | `height` | User height (cm) |
+| **Gender** | `workouts.gender` | `gender` | User gender |
+| **Max HR** | `workouts.default_max_heart_rate` | `default_max_heart_rate` | User's max HR |
+| **Resting HR** | `workouts.resting_heart_rate` | `resting_heart_rate` | User's resting HR |
+
+### **Computed Analysis Data**
+| Data Type | Location | Field Name | Description |
+|-----------|----------|------------|-------------|
+| **Analysis** | `workouts.computed.analysis` | `computed.analysis` | Complete analysis object |
+| **Zones** | `workouts.computed.analysis.zones` | `computed.analysis.zones` | Power/HR zone breakdown |
+| **Events** | `workouts.computed.analysis.events` | `computed.analysis.events` | Workout events and splits |
+| **Series** | `workouts.computed.analysis.series` | `computed.analysis.series` | Time series analysis data |
 
 ### `user_baselines` table
 User fitness assessment and baseline data.
@@ -216,6 +338,8 @@ const splits = events.splits || {};
 - **Chart data**: `sensor_data` samples with `hr_bpm`, `pace_s_per_km`, etc.
 - **Map data**: `gps_track` with lat/lng coordinates
 - **Elevation**: `elev_m_sm` (smoothed elevation) in samples
+- **Weather data**: `start_position_lat`, `start_position_long`, `timestamp` for weather lookup
+- **Weather display**: `weather_data` JSONB or `avg_temperature` fallback
 
 ### HRZoneChart.tsx
 - **Heart rate samples**: `sensor_data` array with `hr_bpm` field

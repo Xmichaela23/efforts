@@ -78,6 +78,8 @@ Plan Catalog → Accept Plan → Week 1 (instant)
 - **Backend**: Supabase (PostgreSQL + Edge Functions)
 - **Plan Engine**: Week-by-week baker with smart caching
 - **Data**: Garmin Connect integration via webhooks
+- **Maps**: MapTiler with MapLibre GL JS (no longer Mapbox)
+- **Weather**: OpenWeatherMap API integration for historical weather data
 
 ## 🚀 Quick Start
 
@@ -92,7 +94,7 @@ Create `.env.local` in the repo root:
 ```
 VITE_SUPABASE_URL=your_supabase_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
-VITE_MAPBOX_ACCESS_TOKEN=your_mapbox_token
+VITE_MAPTILER_KEY=your_maptiler_token
 ```
 
 ## 🚀 Deploy Frontend (Netlify)
@@ -124,6 +126,29 @@ supabase functions deploy send-workout-to-garmin --project-ref yyriamwvtvzlkumqr
 - **Inter Font** - Modern, readable typography
 - **Responsive Layout** - Works on all device sizes
 
+## 🌤️ Weather System
+
+The app automatically fetches and displays historical weather data for completed workouts:
+
+### **How It Works:**
+1. **GPS Detection**: When viewing a workout with GPS coordinates (`start_position_lat`, `start_position_long`)
+2. **Weather Lookup**: Calls OpenWeatherMap API using workout timestamp and location
+3. **Data Storage**: Stores weather data in `workouts.weather_data` JSONB column
+4. **UI Display**: Shows temperature, condition, humidity, wind above the map
+
+### **Weather Data Includes:**
+- Temperature (with fallback to device temperature if available)
+- Weather condition (sunny, cloudy, rainy, etc.)
+- Humidity percentage
+- Wind speed and direction
+- Precipitation data
+
+### **Technical Implementation:**
+- **Edge Function**: `get-weather` function in Supabase
+- **Database**: `weather_data` JSONB column in `workouts` table
+- **Frontend**: `useWeather` hook + `WeatherDisplay` component
+- **API**: OpenWeatherMap One Call API 3.0
+
 ## 📚 Documentation
 
 - **`APP_BIBLE.md`** - Complete development philosophy and design rules
@@ -134,7 +159,8 @@ supabase functions deploy send-workout-to-garmin --project-ref yyriamwvtvzlkumqr
 
 ## 🔑 Environment Variables
 
-- `VITE_MAPBOX_ACCESS_TOKEN` - For GPS route maps
+- `VITE_MAPTILER_KEY` - For GPS route maps (MapTiler API key)
+- `OPENWEATHER_API_KEY` - For historical weather data (set in Supabase environment)
 - Supabase credentials for database and auth
 
 ---
