@@ -367,151 +367,101 @@ async function processActivityDetails(activityDetails) {
         }
       } catch { /* non-fatal */ }
 
-      // Convert Garmin activity to our format with ALL available fields
-      const activityRecord = {
-        user_id: connection.user_id,
-        garmin_activity_id: activity.summaryId,
-        garmin_user_id: activity.userId,
-        activity_id: activity.activityId || null,
-        activity_type: activity.activityType,
-        // 🔧 FIX: Store UTC timestamp - let frontend handle timezone conversion
-        start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
-        start_time_offset_seconds: activity.startTimeOffsetInSeconds || 0,
-        duration_seconds: activity.durationInSeconds,
-        distance_meters: activity.distanceInMeters || null,
-        calories: activity.activeKilocalories || null,
-        avg_speed_mps: activity.averageSpeedInMetersPerSecond || null,
-        max_speed_mps: activity.maxSpeedInMetersPerSecond || null,
-        avg_pace_min_per_km: activity.averagePaceInMinutesPerKilometer || null,
-        max_pace_min_per_km: activity.maxPaceInMinutesPerKilometer || null,
-        avg_heart_rate: avgHeartRate || activity.averageHeartRateInBeatsPerMinute || null,
-        max_heart_rate: maxHeartRate || activity.maxHeartRateInBeatsPerMinute || null,
-        avg_bike_cadence: avgCadence || activity.averageBikeCadenceInRoundsPerMinute || null,
-        max_bike_cadence: maxCadence || activity.maxBikeCadenceInRoundsPerMinute || null,
-        avg_run_cadence: activity.averageRunCadenceInStepsPerMinute || null,
-        max_run_cadence: activity.maxRunCadenceInStepsPerMinute || null,
-        avg_swim_cadence: activity.averageSwimCadenceInStrokesPerMinute || null,
-        avg_push_cadence: activity.averagePushCadenceInPushesPerMinute || null,
-        max_push_cadence: activity.maxPushCadenceInPushesPerMinute || null,
-        avg_power: avgPower || null,
-        max_power: maxPower || null,
-        // 🔧 FIX: Use official Garmin total ascent from summary.totalElevationGainInMeters
-        elevation_gain_meters: Number(activityDetail?.summary?.totalElevationGainInMeters) || null,
-        // 🔧 ADD: Advanced training metrics from Garmin - use summary object like elevation gain
-        training_stress_score: activityDetail?.summary?.trainingStressScore || null,
-        intensity_factor: activityDetail?.summary?.intensityFactor || null,
-        normalized_power: activityDetail?.summary?.normalizedPower || null,
-        total_training_effect: activityDetail?.summary?.aerobicTrainingEffect ?? activityDetail?.summary?.aerobic_training_effect ?? null,
-        total_anaerobic_effect: activityDetail?.summary?.anaerobicTrainingEffect ?? activityDetail?.summary?.anaerobic_training_effect ?? null,
-        avg_vam: activityDetail?.summary?.avgVam || null,
-        avg_temperature: avgTemperature || null,
-        max_temperature: maxTemperature || null,
-        starting_latitude: activity.startingLatitudeInDegree || null,
-        starting_longitude: activity.startingLongitudeInDegree || null,
-        steps: activity.steps || null,
-        pushes: activity.pushes || null,
-        number_of_active_lengths: activity.numberOfActiveLengths || null,
-        device_name: activity.deviceName || null,
-        is_parent: activity.isParent || false,
-        parent_summary_id: activity.parentSummaryId || null,
-        manual: activity.manual || false,
-        is_web_upload: activity.isWebUpload || false,
-        samples_data: samples.length > 0 ? samples : null,
-        sensor_data: allSensorData.length > 0 ? allSensorData : null,
-        gps_track: gpsTrack.length > 0 ? gpsTrack : null,
-        raw_data: activityDetail,
-        created_at: new Date().toISOString()
-      };
-      
-      // Insert or update the activity
-      const { error } = await supabase
-        .from('garmin_activities')
-        .upsert(activityRecord, {
-          onConflict: 'garmin_activity_id'
+      // Update existing activity minimally to avoid schema mismatches (only rely on guaranteed columns)
+      try {
+        const updateFields: any = { raw_data: activityDetail };
+        if (gpsTrack.length > 0) updateFields.gps_track = gpsTrack;
+        if (allSensorData.length > 0) updateFields.sensor_data = allSensorData;
+        if (samples.length > 0) updateFields.samples_data = samples;
+        const gain = Number((activityDetail as any)?.summary?.totalElevationGainInMeters);
+        if (Number.isFinite(gain)) updateFields.elevation_gain_meters = gain;
+        if (avgTemperature !== null) updateFields.avg_temperature = avgTemperature;
+        if (maxTemperature !== null) updateFields.max_temperature = maxTemperature;
+        const { error: updateErr } = await supabase
+          .from('garmin_activities')
+          .update(updateFields)
+          .eq('garmin_activity_id', activity.summaryId);
+        if (updateErr) console.warn('Non-fatal: update garmin_activities failed', updateErr);
+      } catch (uErr) {
+        console.warn('Non-fatal: exception updating garmin_activities', uErr);
+      }
+
+      // Mirror into workouts via ingest-activity (idempotent upsert by user_id,garmin_activity_id)
+      try {
+        const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ingest-activity`;
+        const swim_data = (activityDetail as any)?.lengths ? { lengths: (activityDetail as any).lengths } : null;
+        // Laps may appear at root or under summary depending on source
+        const laps = (activityDetail as any)?.laps ?? (activityDetail as any)?.summary?.laps ?? null;
+
+        const payload = {
+          userId: connection.user_id,
+          provider: 'garmin',
+          activity: {
+            garmin_activity_id: String(activity.summaryId ?? activity.activityId ?? ''),
+            activity_type: activity.activityType,
+            start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
+            start_time_in_seconds: activity.startTimeInSeconds ?? null,
+            start_time_offset_seconds: activity.startTimeOffsetInSeconds ?? 0,
+            start_time_local: (activity as any)?.startTimeLocal ?? null,
+            duration_seconds: activity.durationInSeconds,
+            distance_meters: activity.distanceInMeters ?? null,
+            avg_heart_rate: avgHeartRate ?? activity.averageHeartRateInBeatsPerMinute ?? null,
+            max_heart_rate: maxHeartRate ?? activity.maxHeartRateInBeatsPerMinute ?? null,
+            avg_speed_mps: activity.averageSpeedInMetersPerSecond ?? null,
+            max_speed_mps: activity.maxSpeedInMetersPerSecond ?? null,
+            calories: activity.activeKilocalories ?? null,
+            elevation_gain_meters: (activityDetail as any)?.summary?.totalElevationGainInMeters ?? null,
+            starting_latitude: activity.startingLatitudeInDegree ?? null,
+            starting_longitude: activity.startingLongitudeInDegree ?? null,
+            // Swim specifics if present
+            pool_length: activity.poolLengthInMeters ?? activity.pool_length ?? null,
+            strokes: activity.totalNumberOfStrokes ?? activity.strokes ?? null,
+            number_of_active_lengths: activity.numberOfActiveLengths ?? null,
+            avg_swim_cadence: activity.averageSwimCadenceInStrokesPerMinute ?? null,
+            // Run/Bike cadence
+            avg_bike_cadence: activity.averageBikeCadenceInRoundsPerMinute ?? null,
+            max_bike_cadence: activity.maxBikeCadenceInRoundsPerMinute ?? null,
+            avg_run_cadence: activity.averageRunCadenceInStepsPerMinute ?? null,
+            max_run_cadence: activity.maxRunCadenceInStepsPerMinute ?? null,
+            // Power (if any sensors)
+            avg_power: avgPower ?? (activityDetail as any)?.summary?.averagePowerInWatts ?? null,
+            max_power: maxPower ?? (activityDetail as any)?.summary?.maxPowerInWatts ?? null,
+            // Temps & steps
+            avg_temperature: avgTemperature ?? (activityDetail as any)?.summary?.avgTemperatureCelcius ?? null,
+            max_temperature: maxTemperature ?? null,
+            steps: (activityDetail as any)?.summary?.steps ?? activity.steps ?? null,
+            // Training effect (aerobic/anaerobic) – passed through for workouts mapping
+            total_training_effect: (activityDetail as any)?.summary?.aerobicTrainingEffect ?? (activityDetail as any)?.summary?.aerobic_training_effect ?? null,
+            total_anaerobic_effect: (activityDetail as any)?.summary?.anaerobicTrainingEffect ?? (activityDetail as any)?.summary?.anaerobic_training_effect ?? null,
+            // Multisport linkage
+            is_parent: activity.isParent ?? null,
+            parentSummaryId: activity.parentSummaryId ?? null,
+            // Rich JSON
+            gps_track: gpsTrack.length ? gpsTrack : null,
+            sensor_data: allSensorData.length ? { samples: allSensorData } : null,
+            swim_data,
+            laps,
+          },
+        };
+
+        const authKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        const res = await fetch(fnUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authKey}`,
+            'apikey': authKey,
+          },
+          body: JSON.stringify(payload),
         });
-      
-      if (error) {
-        console.error('Error saving activity:', error);
-      } else {
-        console.log(`✅ SAVED COMPLETE ACTIVITY: ${activity.activityType} - ${activity.summaryId} ${avgPower ? `Power: ${avgPower}W avg` : 'No power'} ${avgHeartRate ? `HR: ${avgHeartRate} avg` : 'No HR'} ${gpsTrack.length > 0 ? `GPS: ${gpsTrack.length} points` : 'No GPS'} ${allSensorData.length > 0 ? `Sensors: ${allSensorData.length} samples` : 'No sensors'}`);
-
-        // Mirror into workouts via ingest-activity (idempotent upsert by user_id,garmin_activity_id)
-        try {
-          const fnUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/ingest-activity`;
-          const swim_data = (activityDetail as any)?.lengths ? { lengths: (activityDetail as any).lengths } : null;
-          // Laps may appear at root or under summary depending on source
-          const laps = (activityDetail as any)?.laps ?? (activityDetail as any)?.summary?.laps ?? null;
-
-          const payload = {
-            userId: connection.user_id,
-            provider: 'garmin',
-            activity: {
-              garmin_activity_id: String(activity.summaryId ?? activity.activityId ?? ''),
-              activity_type: activity.activityType,
-              start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
-              start_time_in_seconds: activity.startTimeInSeconds ?? null,
-              start_time_offset_seconds: activity.startTimeOffsetInSeconds ?? 0,
-              start_time_local: (activity as any)?.startTimeLocal ?? null,
-              duration_seconds: activity.durationInSeconds,
-              distance_meters: activity.distanceInMeters ?? null,
-              avg_heart_rate: avgHeartRate ?? activity.averageHeartRateInBeatsPerMinute ?? null,
-              max_heart_rate: maxHeartRate ?? activity.maxHeartRateInBeatsPerMinute ?? null,
-              avg_speed_mps: activity.averageSpeedInMetersPerSecond ?? null,
-              max_speed_mps: activity.maxSpeedInMetersPerSecond ?? null,
-              calories: activity.activeKilocalories ?? null,
-              elevation_gain_meters: (activityDetail as any)?.summary?.totalElevationGainInMeters ?? null,
-              starting_latitude: activity.startingLatitudeInDegree ?? null,
-              starting_longitude: activity.startingLongitudeInDegree ?? null,
-              // Swim specifics if present
-              pool_length: activity.poolLengthInMeters ?? activity.pool_length ?? null,
-              strokes: activity.totalNumberOfStrokes ?? activity.strokes ?? null,
-              number_of_active_lengths: activity.numberOfActiveLengths ?? null,
-              avg_swim_cadence: activity.averageSwimCadenceInStrokesPerMinute ?? null,
-              // Run/Bike cadence
-              avg_bike_cadence: activity.averageBikeCadenceInRoundsPerMinute ?? null,
-              max_bike_cadence: activity.maxBikeCadenceInRoundsPerMinute ?? null,
-              avg_run_cadence: activity.averageRunCadenceInStepsPerMinute ?? null,
-              max_run_cadence: activity.maxRunCadenceInStepsPerMinute ?? null,
-              // Power (if any sensors)
-              avg_power: avgPower ?? (activityDetail as any)?.summary?.averagePowerInWatts ?? null,
-              max_power: maxPower ?? (activityDetail as any)?.summary?.maxPowerInWatts ?? null,
-              // Temps & steps
-              avg_temperature: avgTemperature ?? (activityDetail as any)?.summary?.avgTemperatureCelcius ?? null,
-              max_temperature: maxTemperature ?? null,
-              steps: (activityDetail as any)?.summary?.steps ?? activity.steps ?? null,
-              // Training effect (aerobic/anaerobic)
-              total_training_effect: (activityDetail as any)?.summary?.aerobicTrainingEffect ?? (activityDetail as any)?.summary?.aerobic_training_effect ?? null,
-              total_anaerobic_effect: (activityDetail as any)?.summary?.anaerobicTrainingEffect ?? (activityDetail as any)?.summary?.anaerobic_training_effect ?? null,
-              // Multisport linkage
-              is_parent: activity.isParent ?? null,
-              parentSummaryId: activity.parentSummaryId ?? null,
-              // Rich JSON
-              gps_track: gpsTrack.length ? gpsTrack : null,
-              sensor_data: allSensorData.length ? { samples: allSensorData } : null,
-              swim_data,
-              laps,
-            },
-          };
-
-          const authKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-          const res = await fetch(fnUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${authKey}`,
-              'apikey': authKey,
-            },
-            body: JSON.stringify(payload),
-          });
-          if (!res.ok) {
-            const txt = await res.text().catch(() => '');
-            console.warn('⚠️ ingest-activity responded non-OK:', res.status, txt);
-          } else {
-            console.log('🧩 Mirrored into workouts via ingest-activity');
-          }
-        } catch (ingErr) {
-          console.error('❌ Failed to mirror into workouts via ingest-activity:', ingErr);
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          console.warn('⚠️ ingest-activity responded non-OK:', res.status, txt);
+        } else {
+          console.log('🧩 Mirrored into workouts via ingest-activity');
         }
+      } catch (ingErr) {
+        console.error('❌ Failed to mirror into workouts via ingest-activity:', ingErr);
       }
     } catch (error) {
       console.error('Error processing individual activity detail:', error);
