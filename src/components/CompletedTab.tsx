@@ -1684,19 +1684,25 @@ const formatPace = (paceValue: any): string => {
           )}
           {/* Heart Rate Zone Chart - replaces legacy splits */}
           {workoutType === 'run' && (() => {
-            const samples = Array.isArray((hydrated||workoutData)?.sensor_data?.samples)
-              ? (hydrated||workoutData).sensor_data.samples
-              : (Array.isArray((hydrated||workoutData)?.sensor_data) ? (hydrated||workoutData).sensor_data : []);
+            // Try multiple data sources
+            let samples = [];
+            if (Array.isArray((hydrated||workoutData)?.sensor_data?.samples)) {
+              samples = (hydrated||workoutData).sensor_data.samples;
+            } else if (Array.isArray((hydrated||workoutData)?.sensor_data)) {
+              samples = (hydrated||workoutData).sensor_data;
+            } else if (Array.isArray((hydrated||workoutData)?.time_series_data)) {
+              samples = (hydrated||workoutData).time_series_data;
+            }
             
             return samples.length > 0 && (
               <div className="mb-4">
                 <HRZoneChart
                   samples={samples.map((s: any, i: number) => ({
-                    t: i, // assuming 1 sample per second
-                    hr: s.hr_bpm || null
+                    t: i,
+                    hr: s.hr_bpm || s.heartRate || s.heart_rate || s.hr || s.bpm || s.heart_rate_bpm || null
                   }))}
-                  age={30} // TODO: get from user profile
-                  sex="male" // TODO: get from user profile
+                  age={30}
+                  sex="male"
                   zonePreset="run"
                   title="Heart Rate Zones"
                 />
