@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, start_time_in_seconds, start_time_offset_seconds, local_start_time_in_seconds')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       if ((w as any)?.garmin_activity_id && (w as any)?.user_id) {
         const { data } = await supabase
           .from('garmin_activities')
-          .select('sensor_data,samples_data,gps_track,start_time,start_time_offset_seconds')
+          .select('sensor_data,samples_data,gps_track,start_time,start_time_offset_seconds,raw_data')
           .eq('user_id', (w as any).user_id)
           .eq('garmin_activity_id', (w as any).garmin_activity_id)
           .maybeSingle();
@@ -86,20 +86,24 @@ Deno.serve(async (req) => {
 
     // Correct workouts.date to provider-local date (prefer explicit local seconds if present)
     try {
-      const src = String((w as any)?.source || '').toLowerCase();
       const tsIso: string | null = (w as any)?.timestamp || null;
-      const sIn = Number((w as any)?.start_time_in_seconds);
-      const sOff = Number((w as any)?.start_time_offset_seconds);
-      const sLoc = Number((w as any)?.local_start_time_in_seconds);
       let expectedLocal: string | null = null;
-      if (Number.isFinite(sLoc)) {
-        expectedLocal = new Date(sLoc * 1000).toISOString().split('T')[0];
-      } else if (Number.isFinite(sIn) && Number.isFinite(sOff)) {
-        expectedLocal = new Date((sIn + sOff) * 1000).toISOString().split('T')[0];
-      } else if (tsIso && Number.isFinite(Date.parse(tsIso)) && Number.isFinite(sOff)) {
-        expectedLocal = new Date(Date.parse(tsIso) + sOff * 1000).toISOString().split('T')[0];
-      } else if (ga?.start_time && Number.isFinite(ga?.start_time_offset_seconds)) {
-        expectedLocal = new Date(Date.parse(ga.start_time) + Number(ga.start_time_offset_seconds) * 1000).toISOString().split('T')[0];
+      if (ga) {
+        // Fallback: parse from raw_data if columns are not present
+        try {
+          const raw = parseJson(ga.raw_data) || {};
+          const gSummary = raw?.summary || raw;
+          const gIn = Number(gSummary?.startTimeInSeconds ?? raw?.startTimeInSeconds);
+          const gOff = Number(gSummary?.startTimeOffsetInSeconds ?? raw?.startTimeOffsetInSeconds ?? ga.start_time_offset_seconds);
+          if (Number.isFinite(gIn) && Number.isFinite(gOff)) {
+            expectedLocal = new Date((gIn + gOff) * 1000).toISOString().split('T')[0];
+          } else if (ga.start_time && Number.isFinite(ga.start_time_offset_seconds)) {
+            expectedLocal = new Date(Date.parse(ga.start_time) + Number(ga.start_time_offset_seconds) * 1000).toISOString().split('T')[0];
+          }
+        } catch {}
+      } else if (tsIso) {
+        // As a last resort, treat timestamp as local already
+        try { expectedLocal = new Date(tsIso).toISOString().split('T')[0]; } catch {}
       }
       if (expectedLocal && expectedLocal !== (w as any)?.date) {
         await supabase.from('workouts').update({ date: expectedLocal }).eq('id', (w as any).id);

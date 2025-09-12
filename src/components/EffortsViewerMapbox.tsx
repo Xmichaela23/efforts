@@ -179,7 +179,7 @@ function InfoCard({
 }
 
 /** ---------- Main Component ---------- */
-export default function EffortsViewerMapbox({
+function EffortsViewerMapbox({
   mapboxToken,
   samples,
   trackLngLat,
@@ -386,7 +386,13 @@ export default function EffortsViewerMapbox({
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
       {/* Map (MapLibre) */}
       <MapEffort
-        trackLngLat={trackLngLat as any}
+        trackLngLat={useMemo(() => {
+          try {
+            // Deep-stable memo: only change if content changes
+            const key = JSON.stringify(trackLngLat);
+            return (JSON.parse(key) as [number, number][]);
+          } catch { return Array.isArray(trackLngLat) ? trackLngLat : []; }
+        }, [JSON.stringify(trackLngLat)]) as any}
         cursorDist_m={distNow}
         totalDist_m={dTotal}
         theme={theme}
