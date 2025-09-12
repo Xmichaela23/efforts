@@ -204,10 +204,7 @@ function EffortsViewerMapbox({
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
   
-  // Use dTotal for full width - this should be the actual total distance
-  const actualDataRange = useMemo(() => {
-    return { min: 0, max: dTotal || 1 };
-  }, [dTotal]);
+  // Remove complex data range calculation - use simple approach
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260, P = 75; // Increased left padding to move chart line further right
@@ -268,12 +265,11 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - force full width usage
+  // Helpers to map to SVG - simple full width approach
   const xFromDist = (d: number) => {
     if (!normalizedSamples.length) return P;
-    // Always map from 0 to the last sample's distance to ensure full width
-    const lastDist = normalizedSamples[normalizedSamples.length - 1].d_m;
-    const ratio = d / (lastDist || 1);
+    // Simple approach: map from 0 to dTotal for full width
+    const ratio = d / (dTotal || 1);
     return P + ratio * (W - P * 2);
   };
   const yFromValue = (v: number) => {
@@ -430,7 +426,7 @@ function EffortsViewerMapbox({
           {yTicks.map((v, i) => (
             <g key={i}>
               <line x1={P} x2={W - P} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
-              <text x={4} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={15} fontWeight={700}>
+              <text x={12} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700}>
                 {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
             </g>
