@@ -265,12 +265,14 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - force full width by using actual data range
+  // Helpers to map to SVG - map first sample to left, last to right
   const xFromDist = (d: number) => {
     if (!normalizedSamples.length) return P;
-    // Find the actual max distance from the data samples
-    const maxDist = Math.max(...normalizedSamples.map(s => s.d_m).filter(Number.isFinite));
-    const ratio = d / maxDist;
+    const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
+    const minDist = Math.min(...distances);
+    const maxDist = Math.max(...distances);
+    const range = maxDist - minDist || 1;
+    const ratio = (d - minDist) / range;
     return P + ratio * (W - P * 2);
   };
   const yFromValue = (v: number) => {
