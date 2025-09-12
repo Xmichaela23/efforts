@@ -497,3 +497,5 @@ function EffortsViewerMapbox({
 }
 
 /* duplicate marker cleanup */
+
+export default React.memo(EffortsViewerMapbox);
