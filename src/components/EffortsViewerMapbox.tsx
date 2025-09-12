@@ -350,9 +350,9 @@ function EffortsViewerMapbox({
       />
 
       {/* Data pills above chart */}
-      <div style={{ marginTop: 12, padding: "0 6px" }}>
+      <div style={{ marginTop: 16, padding: "0 6px" }}>
         {/* Current metric values */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 8, justifyContent: "center" }}>
+        <div style={{ display: "flex", gap: 16, marginBottom: 16, justifyContent: "center" }}>
           <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
           <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
@@ -361,19 +361,20 @@ function EffortsViewerMapbox({
         </div>
         
         {/* Distance and time with fixed width to prevent jumping */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 8 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
           <div style={{ 
             fontWeight: 700, 
-            fontSize: 16, 
-            minWidth: "120px", 
+            fontSize: 18, 
+            minWidth: "140px", 
             textAlign: "center",
-            fontFeatureSettings: '"tnum"' // Use tabular numbers for consistent spacing
+            fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
+            letterSpacing: "0.5px"
           }}>
             {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
           </div>
         </div>
         
-        <div style={{ marginBottom: 8, fontSize: 11, color: "#94a3b8", textAlign: "center" }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
+        <div style={{ marginBottom: 12, fontSize: 12, color: "#94a3b8", textAlign: "center", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
       </div>
 
       {/* Chart */}
