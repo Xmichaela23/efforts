@@ -281,8 +281,16 @@ export default function EffortsViewerMapbox({
       : (s.vam_m_per_h ?? NaN)
     ).map(v => (Number.isFinite(v) ? (v as number) : NaN));
     // light smoothing except elevation (already smoothed via EMA)
-    if (tab === "elev") return arr;
-    return movAvg(arr, 7);
+    if (tab === "elev") {
+      // If elevation is fully flat/NaN, return zeros to avoid NaN path
+      const finite = arr.filter(Number.isFinite) as number[];
+      if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) {
+        return new Array(arr.length).fill(0);
+      }
+      return arr;
+    }
+    const sm = movAvg(arr, 7);
+    return sm.map(v => (Number.isFinite(v) ? v : 0));
   }, [normalizedSamples, tab]);
 
   // Robust domain (trim outliers)
@@ -318,9 +326,11 @@ export default function EffortsViewerMapbox({
   // Build path from smoothed metric
   const linePath = useMemo(() => {
     if (normalizedSamples.length < 2) return "";
-    let d = `M ${xFromDist(normalizedSamples[0].d_m)} ${yFromValue(metricRaw[0])}`;
+    const y0 = Number.isFinite(metricRaw[0]) ? metricRaw[0] : 0;
+    let d = `M ${xFromDist(normalizedSamples[0].d_m)} ${yFromValue(y0)}`;
     for (let i = 1; i < normalizedSamples.length; i++) {
-      const y = yFromValue(metricRaw[i]);
+      const yv = Number.isFinite(metricRaw[i]) ? metricRaw[i] : 0;
+      const y = yFromValue(yv);
       d += ` L ${xFromDist(normalizedSamples[i].d_m)} ${y}`;
     }
     return d;
@@ -360,7 +370,7 @@ export default function EffortsViewerMapbox({
   // Cursor & current values
   const s = normalizedSamples[idx] || normalizedSamples[normalizedSamples.length - 1];
   const cx = xFromDist(s?.d_m ?? 0);
-  const cy = yFromValue(metricRaw[Math.min(idx, metricRaw.length - 1)] ?? 0);
+  const cy = yFromValue(Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : 0);
   const gainNow_m = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
   const altNow_m  = (s?.elev_m_sm ?? 0);
 
@@ -415,7 +425,7 @@ export default function EffortsViewerMapbox({
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units
-          width="100%" height="auto"
+          width="100%" height={H}
           onMouseMove={onMove}
           onTouchStart={onTouch}
           onTouchMove={onTouch}
