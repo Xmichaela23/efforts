@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 
 const mem = new Map<string, { ts: number; rows: any[] }>();
@@ -25,48 +26,38 @@ function write(keyStr: string, rows: any[]) {
 }
 
 export function useWorkoutsRange(fromISO: string, toISO: string) {
-  const [rows, setRows] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [invalidateTs, setInvalidateTs] = useState<number>(0);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) { setRows([]); setLoading(false); return; }
-        const k = key(user.id, fromISO, toISO);
-        const m = !CACHE_DISABLED ? mem.get(k) : null;
-        if (m && Date.now() - m.ts <= TTL) { setRows(m.rows); setLoading(false); return; }
-        const s = !CACHE_DISABLED ? read(k) : null;
-        if (s) { setRows(s.rows); setLoading(false); }
-        const { data, error } = await supabase
-          .from('workouts')
-          .select('id,type,date,distance,workout_status,planned_id')
-          .eq('user_id', user.id)
-          .gte('date', fromISO)
-          .lte('date', toISO)
-          .order('date', { ascending: true });
-        if (error) throw error;
-        if (cancelled) return;
-        const safe = Array.isArray(data) ? data : [];
-        setRows(safe);
-        const payload = { ts: Date.now(), rows: safe };
-        mem.set(k, payload);
-        write(k, safe);
-      } catch (e: any) {
-        if (!cancelled) setError(e?.message || 'Failed to load workouts range');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [fromISO, toISO, invalidateTs]);
+  const queryKeyBase = ['workoutsRange', 'me', fromISO, toISO] as const;
 
-  // Realtime invalidate on workouts changes (attach/complete)
+  const query = useQuery({
+    queryKey: queryKeyBase,
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [] as any[];
+      const k = key(user.id, fromISO, toISO);
+      const m = !CACHE_DISABLED ? mem.get(k) : null;
+      if (m && Date.now() - m.ts <= TTL) return m.rows;
+      const { data, error } = await supabase
+        .from('workouts')
+        .select('id,type,date,distance,workout_status,planned_id')
+        .eq('user_id', user.id)
+        .gte('date', fromISO)
+        .lte('date', toISO)
+        .order('date', { ascending: true });
+      if (error) throw error;
+      const safe = Array.isArray(data) ? data : [];
+      const payload = { ts: Date.now(), rows: safe };
+      mem.set(k, payload);
+      write(k, safe);
+      return safe;
+    },
+    staleTime: (import.meta.env?.DEV ? 5 : 60) * 60 * 1000,
+    gcTime: 6 * 60 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+  });
+
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let active = true;
@@ -77,7 +68,7 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
         const k = key(user.id, fromISO, toISO);
         const invalidate = () => {
           try { mem.delete(k); localStorage.removeItem(`workoutsRange:${k}`); } catch {}
-          setInvalidateTs(Date.now());
+          queryClient.invalidateQueries({ queryKey: queryKeyBase });
         };
         channel = supabase.channel(`workouts-range-${user.id}`)
           .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, () => invalidate())
@@ -87,5 +78,5 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
     return () => { active = false; try { channel?.unsubscribe(); } catch {} };
   }, [fromISO, toISO]);
 
-  return { rows, loading, error };
+  return { rows: query.data || [], loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
 }
