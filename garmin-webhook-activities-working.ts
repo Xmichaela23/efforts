@@ -50,18 +50,33 @@ async function fetchActivityDetails(summaryId, userId) {
     
     const { data: connections } = await supabase
       .from('user_connections')
-      .select('user_id, connection_data')
+      .select('user_id, access_token, connection_data')
       .eq('provider', 'garmin')
       .eq('connection_data->>user_id', userId)
       .limit(1);
     
     const connection = connections?.[0];
-    if (!connection?.connection_data?.access_token) {
-      console.log(`No access token found for user: ${userId}`);
+    // Primary token source: user_connections.access_token (top-level), fallback to connection_data.access_token
+    let accessToken = (connection as any)?.access_token as string | undefined;
+    if (!accessToken) {
+      accessToken = connection?.connection_data?.access_token as string | undefined;
+    }
+    // Fallback: device_connections (either top-level or in connection_data)
+    if (!accessToken && connection?.user_id) {
+      try {
+        const { data: devConn } = await supabase
+          .from('device_connections')
+          .select('access_token, connection_data')
+          .eq('provider', 'garmin')
+          .eq('user_id', connection.user_id)
+          .single();
+        accessToken = (devConn?.access_token || (devConn as any)?.connection_data?.access_token) as string | undefined;
+      } catch {}
+    }
+    if (!accessToken) {
+      console.log(`No Garmin access token available for userId=${userId}`);
       return null;
     }
-    
-    const accessToken = connection.connection_data.access_token;
     
     // Calculate time range (last 7 days) to capture older resends
     const now = Math.floor(Date.now() / 1000);
@@ -107,9 +122,23 @@ function normalizeSummaryId(rawId: string): string {
 // Try single-activity summary endpoints to get TE/RD rollups when activityDetails range lacks them
 async function fetchActivitySummary(summaryId: string, accessToken: string) {
   const tryFetch = async (url: string) => {
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
-    if (!res.ok) return null;
-    try { return await res.json(); } catch { return null; }
+    try {
+      const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
+      const status = res.status;
+      if (!res.ok) {
+        console.log('single-activity summary fetch not ok', status, url);
+        return null;
+      }
+      try {
+        const data = await res.json();
+        return { data, status, url };
+      } catch {
+        return { data: null, status, url };
+      }
+    } catch (e) {
+      console.log('single-activity summary fetch exception', String(e));
+      return null;
+    }
   };
   // Common variants observed in Garmin Wellness/Connect
   const id = normalizeSummaryId(summaryId);
@@ -123,8 +152,8 @@ async function fetchActivitySummary(summaryId: string, accessToken: string) {
   ];
   for (const url of candidates) {
     try {
-      const data = await tryFetch(url);
-      if (data) return data;
+      const resp = await tryFetch(url);
+      if (resp) return resp;
     } catch { /* continue */ }
   }
   return null;
@@ -361,40 +390,64 @@ async function processActivityDetails(activityDetails) {
       // Enrich summary with TE/RD if available from single-activity endpoint
       try {
         const supa = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
+        // Try user_connections first
         const { data: connRow } = await supa
           .from('user_connections')
-          .select('connection_data')
+          .select('user_id, access_token, connection_data')
           .eq('provider', 'garmin')
           .eq('connection_data->>user_id', activity.userId)
           .single();
-        const token = connRow?.connection_data?.access_token as string | undefined;
+        let token = (connRow as any)?.access_token as string | undefined;
+        if (!token) token = connRow?.connection_data?.access_token as string | undefined;
+        // Fallback: device_connections
+        if (!token && connRow?.user_id) {
+          try {
+            const { data: devConn } = await supa
+              .from('device_connections')
+              .select('access_token, connection_data')
+              .eq('provider', 'garmin')
+              .eq('user_id', connRow.user_id)
+              .single();
+            token = (devConn?.access_token || (devConn as any)?.connection_data?.access_token) as string | undefined;
+          } catch {}
+        }
         if (token) {
           const single = await fetchActivitySummary(String(activity.summaryId), token);
-          const singleSummary = (single as any)?.summary || single;
+          const singleSummary = (single?.data as any)?.summary || single?.data;
           if (singleSummary && typeof singleSummary === 'object') {
+            // Keep a copy for diagnostics
+            (activityDetail as any).single_summary = singleSummary;
+            (activityDetail as any).single_summary_status = single?.status ?? null;
             // Prefer values from single activity summary if present
             (activityDetail as any).summary = { ...(activityDetail as any).summary, ...singleSummary };
           }
         }
       } catch { /* non-fatal */ }
 
-      // Update existing activity minimally to avoid schema mismatches (only rely on guaranteed columns)
+      // Ensure a row exists in garmin_activities even if it was deleted (use minimal upsert)
       try {
-        const updateFields: any = { raw_data: activityDetail };
-        if (gpsTrack.length > 0) updateFields.gps_track = gpsTrack;
-        if (allSensorData.length > 0) updateFields.sensor_data = allSensorData;
-        if (samples.length > 0) updateFields.samples_data = samples;
+        const baseRecord: any = {
+          user_id: connection.user_id,
+          garmin_activity_id: activity.summaryId,
+          garmin_user_id: activity.userId,
+          activity_type: activity.activityType,
+          start_time: new Date(activity.startTimeInSeconds * 1000).toISOString(),
+          raw_data: activityDetail,
+          created_at: new Date().toISOString(),
+        };
+        if (gpsTrack.length > 0) baseRecord.gps_track = gpsTrack;
+        if (allSensorData.length > 0) baseRecord.sensor_data = allSensorData;
+        if (samples.length > 0) baseRecord.samples_data = samples;
         const gain = Number((activityDetail as any)?.summary?.totalElevationGainInMeters);
-        if (Number.isFinite(gain)) updateFields.elevation_gain_meters = gain;
-        if (avgTemperature !== null) updateFields.avg_temperature = avgTemperature;
-        if (maxTemperature !== null) updateFields.max_temperature = maxTemperature;
-        const { error: updateErr } = await supabase
+        if (Number.isFinite(gain)) baseRecord.elevation_gain_meters = gain;
+        if (avgTemperature !== null) baseRecord.avg_temperature = avgTemperature;
+        if (maxTemperature !== null) baseRecord.max_temperature = maxTemperature;
+        const { error: upsertErr } = await supabase
           .from('garmin_activities')
-          .update(updateFields)
-          .eq('garmin_activity_id', activity.summaryId);
-        if (updateErr) console.warn('Non-fatal: update garmin_activities failed', updateErr);
+          .upsert(baseRecord, { onConflict: 'garmin_activity_id' });
+        if (upsertErr) console.warn('Non-fatal: upsert garmin_activities failed', upsertErr);
       } catch (uErr) {
-        console.warn('Non-fatal: exception updating garmin_activities', uErr);
+        console.warn('Non-fatal: exception upserting garmin_activities', uErr);
       }
 
       // Mirror into workouts via ingest-activity (idempotent upsert by user_id,garmin_activity_id)

@@ -323,6 +323,40 @@ const handleGarminOAuthSuccess = async (code: string) => {
     const tokenData = await tokenResponse.json();
     
 
+    // CRITICAL: Persist Garmin OAuth tokens to user_connections so server can fetch single-activity TE
+    try {
+      // Save minimal token info immediately
+      await supabase
+        .from('user_connections')
+        .upsert({
+          provider: 'garmin',
+          access_token: tokenData.access_token,
+          refresh_token: tokenData.refresh_token,
+          expires_at: tokenData.expires_at || new Date(Date.now() + (Number(tokenData.expires_in || 0) * 1000)).toISOString(),
+          connection_data: {
+            ...(typeof tokenData.scope === 'string' ? { scope: tokenData.scope } : {}),
+            token_type: tokenData.token_type || 'bearer'
+          }
+        });
+
+      // Try to enrich with Garmin user_id (non-fatal)
+      try {
+        const path = '/wellness-api/rest/user/id';
+        const url = `https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/swift-task?path=${encodeURIComponent(path)}&token=${tokenData.access_token}`;
+        const respUser = await fetch(url, { headers: { 'Authorization': `Bearer ${session.access_token}` } });
+        if (respUser.ok) {
+          const body = await respUser.json();
+          const garminUserId = body?.userId;
+          if (garminUserId) {
+            await supabase
+              .from('user_connections')
+              .update({ connection_data: { scope: tokenData.scope, token_type: tokenData.token_type || 'bearer', user_id: garminUserId, access_token: tokenData.access_token } })
+              .eq('provider', 'garmin');
+          }
+        }
+      } catch {}
+    } catch (_) {}
+
     // CRITICAL: Set both state and localStorage with the new token
     setGarminAccessToken(tokenData.access_token);
     setGarminConnected(true);
