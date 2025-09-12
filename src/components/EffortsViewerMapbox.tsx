@@ -268,11 +268,12 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - use actual data range for better space utilization
+  // Helpers to map to SVG - force full width usage
   const xFromDist = (d: number) => {
-    const { min, max } = actualDataRange;
-    const range = max - min || 1;
-    const ratio = (d - min) / range;
+    if (!normalizedSamples.length) return P;
+    // Always map from 0 to the last sample's distance to ensure full width
+    const lastDist = normalizedSamples[normalizedSamples.length - 1].d_m;
+    const ratio = d / (lastDist || 1);
     return P + ratio * (W - P * 2);
   };
   const yFromValue = (v: number) => {
