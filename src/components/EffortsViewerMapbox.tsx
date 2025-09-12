@@ -354,7 +354,7 @@ function EffortsViewerMapbox({
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
         {/* Current metric values */}
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, padding: "0 8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
           <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
           <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
@@ -362,23 +362,20 @@ function EffortsViewerMapbox({
           <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
         </div>
         
-        {/* Distance and time with fixed width to prevent jumping */}
-        <div style={{ display: "flex", justifyContent: "center", marginBottom: 12 }}>
+        {/* Distance, time, and altitude on same line */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
+          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
           <div style={{ 
             fontWeight: 700, 
             fontSize: 18, 
-            width: "180px", // Fixed width instead of minWidth
-            textAlign: "center",
+            textAlign: "center", 
             fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
-            letterSpacing: "0.5px",
-            overflow: "hidden", // Prevent any overflow
-            whiteSpace: "nowrap" // Keep on single line
+            letterSpacing: "0.5px"
           }}>
             {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
           </div>
+          <div style={{ width: "60px" }}></div> {/* Spacer to balance the layout */}
         </div>
-        
-        <div style={{ marginBottom: 12, fontSize: 12, color: "#94a3b8", textAlign: "center", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
       </div>
 
       {/* Chart */}
@@ -420,7 +417,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Metric buttons */}
-      <div style={{ marginTop: 12, padding: "0 6px" }}>
+      <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
           {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
             <button
