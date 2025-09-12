@@ -535,13 +535,15 @@ export const useWorkouts = () => {
         strength_exercises: (() => {
           // For strength workouts, read from strength_exercises field first, then fall back to description
           if (w.type === 'strength') {
-            console.log(`🔍 DEBUG - Strength workout found: "${w.name}"`, {
-              type: w.type,
-              description: w.description,
-              hasDescription: !!w.description,
-              strength_exercises: w.strength_exercises,
-              hasStrengthExercises: !!w.strength_exercises
-            });
+            if (import.meta.env?.DEV) {
+              console.log(`🔍 DEBUG - Strength workout found: "${w.name}"`, {
+                type: w.type,
+                description: w.description,
+                hasDescription: !!w.description,
+                strength_exercises: w.strength_exercises,
+                hasStrengthExercises: !!w.strength_exercises
+              });
+            }
             
             // First, try to read from the actual strength_exercises field
             if (w.strength_exercises) {
@@ -551,7 +553,7 @@ export const useWorkouts = () => {
                   : w.strength_exercises;
                 
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                  console.log(`🔍 Found strength_exercises data for "${w.name}":`, parsed);
+                  if (import.meta.env?.DEV) console.log(`🔍 Found strength_exercises data for "${w.name}":`, parsed);
                   
                   // Transform the logged exercise data to match our interface
                   return parsed.map((exercise: any, index) => ({
@@ -579,7 +581,7 @@ export const useWorkouts = () => {
             
             // Fallback: parse from description field if strength_exercises is empty
             if (w.description) {
-              console.log(`🔍 Falling back to description parsing for "${w.name}":`, w.description);
+              if (import.meta.env?.DEV) console.log(`🔍 Falling back to description parsing for "${w.name}":`, w.description);
               
               // Create a custom structure that will work with StrengthCompletedView
               // Transform the description into proper exercise format with sets array

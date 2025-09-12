@@ -206,17 +206,7 @@ export default function WorkoutCalendar({
   const prevEnd = addDays(prevStart, 6);
   const nextStart = addDays(weekStart, 7);
   const nextEnd = addDays(nextStart, 6);
-  useEffect(() => {
-    const idle = (cb: () => void) => {
-      try { (window as any).requestIdleCallback ? (window as any).requestIdleCallback(cb, { timeout: 500 }) : setTimeout(cb, 150); } catch { setTimeout(cb, 150); }
-    };
-    idle(() => {
-      usePlannedRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
-      usePlannedRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
-      useWorkoutsRange(toDateOnlyString(prevStart), toDateOnlyString(prevEnd));
-      useWorkoutsRange(toDateOnlyString(nextStart), toDateOnlyString(nextEnd));
-    });
-  }, [fromISO, toISO]);
+  // Prefetching prev/next weeks is disabled to avoid extra work on first paint and to keep hooks stable.
 
   // Convert workouts to calendar events
   const events = useMemo(() => {
