@@ -387,7 +387,7 @@ const connectGarmin = async () => {
     sessionStorage.setItem('garmin_code_verifier', codeVerifier);
     
     const authUrl = 'https://connect.garmin.com/oauth2Confirm';
-    const clientId = '17e358e3-9e6c-45ae-9267-91a06d126e4b';
+    const clientId = (import.meta as any).env?.VITE_GARMIN_CLIENT_ID || '';
     const redirectUri = 'https://efforts.work/auth/garmin/callback';
     
     const params = new URLSearchParams({

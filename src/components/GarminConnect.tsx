@@ -81,7 +81,7 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
       sessionStorage.setItem('garmin_code_verifier', codeVerifier);
       
       const authUrl = 'https://connect.garmin.com/oauth2Confirm';
-      const clientId = '17e358e3-9e6c-45ae-9267-91a06d126e4b';
+      const clientId = (import.meta as any).env?.VITE_GARMIN_CLIENT_ID || '';
       const redirectUri = 'http://localhost:8080/auth/garmin/callback';
       
       const params = new URLSearchParams({
@@ -125,8 +125,8 @@ const GarminConnect: React.FC<GarminConnectProps> = ({ onWorkoutsImported }) => 
         },
         body: new URLSearchParams({
           grant_type: 'authorization_code',
-          client_id: '17e358e3-9e6c-45ae-9267-91a06d126e4b',
-          client_secret: (import.meta as any).env.VITE_GARMIN_CLIENT_SECRET,
+          client_id: (import.meta as any).env?.VITE_GARMIN_CLIENT_ID || '',
+          client_secret: (import.meta as any).env?.VITE_GARMIN_CLIENT_SECRET || '',
           code: code,
           code_verifier: codeVerifier,
           redirect_uri: 'http://localhost:8080/auth/garmin/callback'

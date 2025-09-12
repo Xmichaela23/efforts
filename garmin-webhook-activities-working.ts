@@ -120,14 +120,14 @@ function normalizeSummaryId(rawId: string): string {
 }
 
 // Try single-activity summary endpoints to get TE/RD rollups when activityDetails range lacks them
-async function fetchActivitySummary(summaryId: string, accessToken: string) {
+async function fetchActivitySummary(idLike: string, accessToken: string) {
   const tryFetch = async (url: string) => {
     try {
       const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}`, 'Content-Type': 'application/json' } });
       const status = res.status;
       if (!res.ok) {
         console.log('single-activity summary fetch not ok', status, url);
-        return null;
+        return { data: null, status, url };
       }
       try {
         const data = await res.json();
@@ -137,11 +137,11 @@ async function fetchActivitySummary(summaryId: string, accessToken: string) {
       }
     } catch (e) {
       console.log('single-activity summary fetch exception', String(e));
-      return null;
+      return { data: null, status: 0, url };
     }
   };
   // Common variants observed in Garmin Wellness/Connect
-  const id = normalizeSummaryId(summaryId);
+  const id = normalizeSummaryId(idLike);
   const candidates = [
     // wellness single-activity
     `https://apis.garmin.com/wellness-api/rest/activity/${encodeURIComponent(id)}`,
@@ -149,14 +149,22 @@ async function fetchActivitySummary(summaryId: string, accessToken: string) {
     // some tenants expose explicit summary endpoints
     `https://apis.garmin.com/wellness-api/rest/activity/${encodeURIComponent(id)}/summary`,
     `https://apis.garmin.com/wellness-api/rest/activities/${encodeURIComponent(id)}/summary`,
+    // connect modern activity summary by numeric activityId
+    `https://connectapi.garmin.com/modern/proxy/activity-service/activity/${encodeURIComponent(id)}`,
+    `https://connectapi.garmin.com/modern/proxy/activity-service/activity/${encodeURIComponent(id)}/details`,
   ];
+  let lastResp: any = null;
   for (const url of candidates) {
     try {
       const resp = await tryFetch(url);
-      if (resp) return resp;
+      if (resp) {
+        // Return immediately if we got data; otherwise remember status and keep trying other endpoints
+        if (resp.data) return resp;
+        lastResp = resp;
+      }
     } catch { /* continue */ }
   }
-  return null;
+  return lastResp;
 }
 
 // Enhanced function for activities with API call for details
@@ -390,34 +398,50 @@ async function processActivityDetails(activityDetails) {
       // Enrich summary with TE/RD if available from single-activity endpoint
       try {
         const supa = createClient(Deno.env.get('SUPABASE_URL'), Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'));
-        // Try user_connections first
-        const { data: connRow } = await supa
-          .from('user_connections')
-          .select('user_id, access_token, connection_data')
-          .eq('provider', 'garmin')
-          .eq('connection_data->>user_id', activity.userId)
-          .single();
-        let token = (connRow as any)?.access_token as string | undefined;
-        if (!token) token = connRow?.connection_data?.access_token as string | undefined;
+        // Prefer selecting by our internal user_id linkage
+        let token: string | undefined;
+        try {
+          const byUid = await supa
+            .from('user_connections')
+            .select('access_token, connection_data')
+            .eq('provider', 'garmin')
+            .eq('user_id', connection.user_id)
+            .maybeSingle();
+          token = (byUid.data as any)?.access_token || (byUid.data as any)?.connection_data?.access_token;
+        } catch {}
+        // Fallback: match by Garmin userId in connection_data
+        if (!token) {
+          try {
+            const byGid = await supa
+              .from('user_connections')
+              .select('access_token, connection_data')
+              .eq('provider', 'garmin')
+              .eq('connection_data->>user_id', activity.userId)
+              .maybeSingle();
+            token = (byGid.data as any)?.access_token || (byGid.data as any)?.connection_data?.access_token;
+          } catch {}
+        }
         // Fallback: device_connections
-        if (!token && connRow?.user_id) {
+        if (!token && connection?.user_id) {
           try {
             const { data: devConn } = await supa
               .from('device_connections')
               .select('access_token, connection_data')
               .eq('provider', 'garmin')
-              .eq('user_id', connRow.user_id)
+              .eq('user_id', connection.user_id)
               .single();
             token = (devConn?.access_token || (devConn as any)?.connection_data?.access_token) as string | undefined;
           } catch {}
         }
         if (token) {
-          const single = await fetchActivitySummary(String(activity.summaryId), token);
+          // Prefer activityId when available; fallback to summaryId
+          const single = await fetchActivitySummary(String(activity.activityId ?? activity.summaryId), token);
+          // Always store status even if body is empty
+          (activityDetail as any).single_summary_status = single?.status ?? null;
           const singleSummary = (single?.data as any)?.summary || single?.data;
           if (singleSummary && typeof singleSummary === 'object') {
             // Keep a copy for diagnostics
             (activityDetail as any).single_summary = singleSummary;
-            (activityDetail as any).single_summary_status = single?.status ?? null;
             // Prefer values from single activity summary if present
             (activityDetail as any).summary = { ...(activityDetail as any).summary, ...singleSummary };
           }
