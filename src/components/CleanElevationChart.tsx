@@ -81,6 +81,14 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
   }, [externalSelectedMetric]);
 
 
+  // Normalize sensor data shape (object with samples[] → array)
+  const sensorSamples: any[] | null = useMemo(() => {
+    if (!sensorData) return null;
+    if (Array.isArray(sensorData)) return sensorData;
+    const samples = (sensorData as any)?.samples;
+    return Array.isArray(samples) ? samples : null;
+  }, [sensorData]);
+
   // Early return only if neither server series nor GPS data exists
   const hasServerSeries = analysisSeries && (Array.isArray((analysisSeries as any).distance_m) || Array.isArray((analysisSeries as any).time_s));
   if (!hasServerSeries && (!gpsTrack || gpsTrack.length === 0)) {
@@ -170,7 +178,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
           let baseElevation: number | null = null;
           for (let i = 0; i < N; i += 1) {
             const distMi = Number.isFinite(distance_m[i]) ? (distance_m[i] / 1609.34) : (Number.isFinite(distance_m[i]) ? (distance_m[i] as number) : 0);
-            const elevVal = Number.isFinite(elevation_m[i]) ? (useImperial ? elevation_m[i] * 3.28084 : elevation_m[i]) : null;
+            const elevValRaw = Number.isFinite(elevation_m[i]) ? (elevation_m[i] as number) : NaN;
+            const elevVal = Number.isFinite(elevValRaw) ? (useImperial ? elevValRaw * 3.28084 : elevValRaw) : null;
             if (baseElevation == null && elevVal != null) baseElevation = elevVal;
             const elev = elevVal;
             let metric: number | null = null;
@@ -183,7 +192,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             }
             out.push({ distance: parseFloat((distMi || 0).toFixed(2)), absoluteElevation: elev, metricValue: metric });
           }
-          return downsampleTo(out, 900);
+          return downsampleTo(out, 900).filter(p => Number.isFinite(p.distance) && (p.absoluteElevation == null || Number.isFinite(p.absoluteElevation)));
         }
       } catch {}
     }
@@ -211,7 +220,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
       }
       
       // Get elevation data
-      const elevationMeters = point.elevation || point.altitude || 0;
+      const elevationMetersRaw = Number(point.elevation ?? point.altitude ?? 0);
+      const elevationMeters = Number.isFinite(elevationMetersRaw) ? elevationMetersRaw : 0;
       const elevationImperial = useImperial ? elevationMeters * 3.28084 : elevationMeters;
       
       // Set base elevation to first point
@@ -288,7 +298,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             hrValue = point.heartRate || point.heart_rate || point.hr;
           }
           // Then try sensor data with wider time window
-          else if (sensorData && sensorData.length > 0) {
+          else if (sensorSamples && sensorSamples.length > 0) {
             const gpsTime = point.timestamp || point.startTimeInSeconds;
             
             // Debug: Log the first few sensor points to see the structure
@@ -297,10 +307,10 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                 gpsTime,
                 gpsPoint: point
               });
-              console.log('🔍 Heart Rate Debug - First 3 sensor points:', sensorData.slice(0, 3));
+              console.log('🔍 Heart Rate Debug - First 3 sensor points:', sensorSamples.slice(0, 3));
             }
             
-            let sensorPoint = sensorData.find(sensor => 
+            let sensorPoint = sensorSamples.find(sensor => 
               sensor.timestamp === gpsTime || 
               sensor.startTimeInSeconds === gpsTime ||
               sensor.timestamp === point.startTimeInSeconds
@@ -309,7 +319,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
             // If no exact match, find closest within 60 seconds (wider window)
             if (!sensorPoint) {
               if (gpsTime) {
-                sensorPoint = sensorData.reduce((closest, sensor) => {
+                sensorPoint = sensorSamples.reduce((closest: any, sensor: any) => {
                   const sensorTime = sensor.timestamp || sensor.startTimeInSeconds;
                   if (!sensorTime) return closest;
                   
@@ -335,7 +345,7 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
                 gpsTime,
                 foundSensorPoint: sensorPoint,
                 hrValue,
-                sensorDataLength: sensorData.length
+                sensorDataLength: sensorSamples.length
               });
             }
           }
@@ -381,11 +391,14 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
         }
       }
       
+      const distMiSafe = Number.isFinite(cumulativeDistance) ? parseFloat(cumulativeDistance.toFixed(2)) : 0;
+      const base = typeof baseElevation === 'number' ? baseElevation : 0;
+      const absElev = Number.isFinite(elevationImperial) ? elevationImperial : 0;
       return {
-        distance: parseFloat(cumulativeDistance.toFixed(2)),
-        elevation: elevationImperial - baseElevation,
-        absoluteElevation: elevationImperial,
-        metricValue: metricValue,
+        distance: distMiSafe,
+        elevation: absElev - base,
+        absoluteElevation: absElev,
+        metricValue: Number.isFinite(metricValue as any) ? (metricValue as number) : null,
         originalIndex: index
       };
     });
@@ -393,8 +406,8 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     // Smooth absolute elevation via EMA and downsample for visual quality
     const elevSeries = mapped.map(p => (typeof p.absoluteElevation === 'number' ? p.absoluteElevation : null));
     const elevSm = smoothEma(elevSeries, 0.18);
-    const withSmooth = mapped.map((p, i) => ({ ...p, absoluteElevation: typeof elevSm[i] === 'number' ? (elevSm[i] as number) : p.absoluteElevation }));
-    return downsampleTo(withSmooth, 900);
+    const withSmooth = mapped.map((p, i) => ({ ...p, absoluteElevation: typeof elevSm[i] === 'number' ? (elevSm[i] as number) : (Number.isFinite(p.absoluteElevation as any) ? (p.absoluteElevation as number) : 0) }));
+    return downsampleTo(withSmooth, 900).filter(p => Number.isFinite(p.distance) && Number.isFinite(p.absoluteElevation as any));
   }, [gpsTrack, sensorData, selectedMetric, useImperial, analysisSeries]);
 
   // Debug logging
@@ -454,10 +467,10 @@ const CleanElevationChart: React.FC<CleanElevationChartProps> = ({
     <div className="h-full flex flex-col">
 
       
-      {/* Chart Container - full-bleed, minimal */}
-      <div className="flex-1" style={{ minHeight: '400px', height: '400px' }}>
+      {/* Chart Container - fixed numeric height to avoid SVG auto height issues */}
+      <div className="flex-1" style={{ height: 280 }}>
         {chartData && chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height={280}>
             <ComposedChart data={chartData} margin={{ top: 8, right: 0, left: 0, bottom: 0 }}>
             <CartesianGrid horizontal={true} vertical={false} stroke={theme.grid} strokeDasharray="3 3" />
             
