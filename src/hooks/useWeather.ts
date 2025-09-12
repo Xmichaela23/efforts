@@ -24,7 +24,10 @@ export function useWeather({ lat, lng, timestamp, workoutId, enabled = true }: U
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    console.log('useWeather effect:', { enabled, lat, lng, timestamp, workoutId });
+    
     if (!enabled || !lat || !lng || !timestamp) {
+      console.log('Weather fetch disabled:', { enabled, lat, lng, timestamp });
       setWeather(null);
       return;
     }
@@ -53,6 +56,7 @@ export function useWeather({ lat, lng, timestamp, workoutId, enabled = true }: U
         }
 
         const data = await response.json();
+        console.log('Weather API response:', data);
         
         if (data.weather) {
           setWeather(data.weather);

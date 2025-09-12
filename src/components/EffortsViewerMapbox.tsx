@@ -220,6 +220,7 @@ function EffortsViewerMapbox({
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
 
   // Weather data
+  console.log('EffortsViewerMapbox workoutData:', workoutData);
   const { weather, loading: weatherLoading } = useWeather({
     lat: workoutData?.start_position_lat,
     lng: workoutData?.start_position_long,
