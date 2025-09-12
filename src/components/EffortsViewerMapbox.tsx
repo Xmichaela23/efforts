@@ -116,10 +116,12 @@ const Pill = ({ label, value, active=false }: { label: string; value: string | n
     display: "flex",
     flexDirection: "column",
     gap: 2,
-    minWidth: 0
+    width: "60px", // Fixed width for each pill
+    textAlign: "center",
+    overflow: "hidden"
   }}>
     <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>{label}</span>
-    <span style={{ fontSize: 13, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap" }}>{value}</span>
+    <span style={{ fontSize: 13, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
   </div>
 );
 
@@ -352,7 +354,7 @@ function EffortsViewerMapbox({
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
         {/* Current metric values */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 16, justifyContent: "center" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16, padding: "0 8px" }}>
           <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
           <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
