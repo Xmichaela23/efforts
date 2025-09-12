@@ -205,7 +205,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   // 🆕 STRAVA WORKOUT HANDLING - Separate from Garmin
   if (workoutData.source === 'strava') {
     return (
-      <div className="space-y-6 px-4 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
+      <div className="space-y-4 px-3 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
         {/* Strava Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
@@ -1194,10 +1194,10 @@ const formatPace = (paceValue: any): string => {
  ];
 
  return (
-  <div className="space-y-6 px-4 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
+  <div className="space-y-4 px-3 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
      
      {/* 🏠 WEATHER HEADER - Simplified, no redundant title */}
-     <div className="flex items-center justify-end gap-4 text-lg">
+     <div className="flex items-center justify-end gap-2 text-base">
        {workoutData.avg_temperature && (
          <span className="text-black">
            {formatTemperature(workoutData.avg_temperature)}
@@ -1251,8 +1251,8 @@ const formatPace = (paceValue: any): string => {
        </div>
      )}
      
-     {/* 🏠 ALL METRICS - 3-column grid with proper row alignment */}
-     <div className="grid grid-cols-3 gap-3">
+     {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
+     <div className="grid grid-cols-3 gap-2">
        {/* Distance */}
        <div className="px-2 py-1">
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1628,7 +1628,7 @@ const formatPace = (paceValue: any): string => {
         );
       })()}
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
-        <div className="px-4 py-2">
+        <div className="mx-[-12px] px-3 py-2">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">
               <div className="text-sm mb-1">Splits · km</div>
@@ -1667,7 +1667,7 @@ const formatPace = (paceValue: any): string => {
       )}
       {/* Zones histograms (minimal stacked bars) */}
       {((hydrated||workoutData)?.computed?.analysis?.zones) && (
-        <div className="px-4 py-4 space-y-3">
+        <div className="mx-[-12px] px-3 py-3 space-y-3">
           {Array.isArray((hydrated||workoutData).computed.analysis.zones?.hr?.bins) && (hydrated||workoutData).computed.analysis.zones.hr.bins.length > 0 && (()=>{
             const hrBins = (hydrated||workoutData).computed.analysis.zones.hr.bins as any[];
             const total = hrBins.reduce((a:number,b:any)=>a + (Number(b.t_s)||0), 0) || 1;
@@ -1701,7 +1701,7 @@ const formatPace = (paceValue: any): string => {
         </div>
       )}
       {((hydrated||workoutData)?.computed?.analysis?.bests) && (
-        <div className="px-4 py-2 space-y-1">
+        <div className="mx-[-12px] px-3 py-2 space-y-1">
           <div className="text-sm mb-1">Bests</div>
           {Array.isArray((hydrated||workoutData).computed.analysis.bests?.pace_s_per_km) && (hydrated||workoutData).computed.analysis.bests.pace_s_per_km.length > 0 && (
             <div className="text-sm">
