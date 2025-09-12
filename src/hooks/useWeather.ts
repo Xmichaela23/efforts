@@ -37,7 +37,7 @@ export function useWeather({ lat, lng, timestamp, workoutId, enabled = true }: U
       setError(null);
 
       try {
-        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-weather`, {
+        const response = await fetch(`https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/get-weather`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
