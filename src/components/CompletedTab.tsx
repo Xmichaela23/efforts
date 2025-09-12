@@ -6,6 +6,7 @@ import { useWorkouts } from '@/hooks/useWorkouts';
 import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
+import HRZoneChart from './HRZoneChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
@@ -1681,21 +1682,19 @@ const formatPace = (paceValue: any): string => {
               </div>
             </div>
           )}
-          {useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.mi) && (hydrated||workoutData).computed.analysis.events.splits.mi.length > 0 && (
-            <div className="mb-2">
-              <div className="text-sm mb-1">Splits · mi</div>
-              <div className="space-y-1">
-                {(hydrated||workoutData).computed.analysis.events.splits.mi.map((s:any) => (
-                  <div key={`mi-${s.n}`} className="flex items-baseline justify-between text-sm">
-                    <div className="text-[#666666]">{s.n}</div>
-                    <div className="flex items-baseline gap-4">
-                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
-                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
-                      <div className="font-mono">{s.avgPace_s_per_km != null ? (()=>{ const spm = s.avgPace_s_per_km * 1.60934; const mm = Math.floor(spm/60); const ss = Math.round(spm%60); return `${mm}:${String(ss).padStart(2,'0')}/mi`; })() : '—'}</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+          {/* Heart Rate Zone Chart - replaces legacy splits */}
+          {workoutType === 'run' && (hydrated||workoutData)?.sensor_data?.samples && (
+            <div className="mb-4">
+              <HRZoneChart
+                samples={(hydrated||workoutData).sensor_data.samples.map((s: any, i: number) => ({
+                  t: i, // assuming 1 sample per second
+                  hr: s.hr_bpm || null
+                }))}
+                age={30} // TODO: get from user profile
+                sex="male" // TODO: get from user profile
+                zonePreset="run"
+                title="Heart Rate Zones"
+              />
             </div>
           )}
         </div>
