@@ -265,11 +265,12 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - simple full width approach
+  // Helpers to map to SVG - force full width by using actual data range
   const xFromDist = (d: number) => {
     if (!normalizedSamples.length) return P;
-    // Simple approach: map from 0 to dTotal for full width
-    const ratio = d / (dTotal || 1);
+    // Find the actual max distance from the data samples
+    const maxDist = Math.max(...normalizedSamples.map(s => s.d_m).filter(Number.isFinite));
+    const ratio = d / maxDist;
     return P + ratio * (W - P * 2);
   };
   const yFromValue = (v: number) => {
