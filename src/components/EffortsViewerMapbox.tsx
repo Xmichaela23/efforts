@@ -207,9 +207,10 @@ function EffortsViewerMapbox({
   // Remove complex data range calculation - use simple approach
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 260, P = 48; // Slightly larger left padding to avoid label overlap
-  const LEFT_INSET = 8;  // small visual gap between Y labels and data line
-  const RIGHT_INSET = 0; // keep right edge tight
+  const W = 700, H = 260;           // overall SVG size (in SVG units)
+  const P = 24;                     // vertical padding (top/bottom)
+  const PL = 56;                    // left padding (space for Y labels)
+  const PR = 8;                     // right padding (tight)
 
   // cumulative positive gain (m), used for the InfoCard
   const cumGain_m = useMemo(() => {
@@ -267,16 +268,16 @@ function EffortsViewerMapbox({
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG - map first sample to left, last to right (with small left inset)
+  // Helpers to map to SVG - map first sample to left, last to right using PL/PR
   const xFromDist = (d: number) => {
-    if (!normalizedSamples.length) return P;
+    if (!normalizedSamples.length) return PL;
     const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
     const minDist = Math.min(...distances);
     const maxDist = Math.max(...distances);
     const range = maxDist - minDist || 1;
     const ratio = (d - minDist) / range;
-    const drawable = (W - P * 2) - LEFT_INSET - RIGHT_INSET;
-    return P + LEFT_INSET + ratio * drawable;
+    const drawable = (W - PL - PR);
+    return PL + ratio * drawable;
   };
   const yFromValue = (v: number) => {
     const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
@@ -335,7 +336,7 @@ function EffortsViewerMapbox({
     const rect = svg.getBoundingClientRect();
     const pxScreen = clamp(clientX - rect.left, 0, rect.width);
     const pxSvg = (pxScreen / rect.width) * W;
-    const ratio = clamp((pxSvg - P - LEFT_INSET) / ((W - 2 * P) - LEFT_INSET - RIGHT_INSET), 0, 1);
+    const ratio = clamp((pxSvg - PL) / (W - PL - PR), 0, 1);
     const target = ratio * (dTotal || 1);
     let lo = 0, hi = normalizedSamples.length - 1;
     while (lo < hi) { const m = Math.floor((lo + hi) / 2); (normalizedSamples[m].d_m < target) ? (lo = m + 1) : (hi = m); }
@@ -424,13 +425,13 @@ function EffortsViewerMapbox({
         >
           {/* vertical grid */}
           {[0, 1, 2, 3, 4].map((i) => {
-            const x = P + i * ((W - P * 2) / 4);
+            const x = PL + i * ((W - PL - PR) / 4);
             return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
           })}
           {/* horizontal ticks */}
           {yTicks.map((v, i) => (
             <g key={i}>
-              <line x1={P} x2={W - P} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
+              <line x1={PL} x2={W - PR} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={12} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700}>
                 {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
