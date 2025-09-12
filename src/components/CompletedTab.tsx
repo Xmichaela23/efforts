@@ -42,6 +42,7 @@ interface CompletedTabProps {
 const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData }) => {
   const { useImperial } = useAppContext();
   const compact = useCompact();
+  
   const { updateWorkout } = useWorkouts();
   const [selectedMetric, setSelectedMetric] = useState('speed'); // Start with pace/speed
   const [activeAnalyticsTab, setActiveAnalyticsTab] = useState('powercurve');
@@ -1226,14 +1227,6 @@ const formatPace = (paceValue: any): string => {
  return (
   <div className="space-y-2 px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
      
-     {/* 🏠 WEATHER HEADER - Simplified, no redundant title */}
-     <div className="flex items-center justify-end gap-1 text-sm">
-       {workoutData.avg_temperature && (
-         <span className="text-black">
-           {formatTemperature(workoutData.avg_temperature)}
-         </span>
-       )}
-     </div>
      
      {/* 🏠 SWIM SETTINGS (Pool length editor) */}
      {workoutType === 'swim' && (
@@ -1649,16 +1642,15 @@ const formatPace = (paceValue: any): string => {
              }
            }
          } catch {}
-        const token = (import.meta as any).env?.VITE_MAPBOX_ACCESS_TOKEN || (window as any)?.MAPBOX_TOKEN || '';
         return (
           <div className="mt-1 mx-[-16px]">
             <EffortsViewerMapbox
-              mapboxToken={token}
               samples={samples as any}
               trackLngLat={track}
               useMiles={!!useImperial}
               useFeet={!!useImperial}
               compact={compact}
+              workoutData={workoutData}
             />
           </div>
         );

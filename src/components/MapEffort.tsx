@@ -44,6 +44,8 @@ export default function MapEffort({
   const [ready, setReady] = useState(false);
   const styleCacheRef = useRef<Record<string, any>>({});
   const [visible, setVisible] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const isScrollingRef = useRef(false);
 
   const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
@@ -106,6 +108,68 @@ export default function MapEffort({
       onMapReady?.();
     });
 
+    // Touch gesture handling for better mobile UX
+    const handleTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        const touch = e.touches[0];
+        touchStartRef.current = {
+          x: touch.clientX,
+          y: touch.clientY,
+          time: Date.now()
+        };
+        isScrollingRef.current = false;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (!touchStartRef.current || e.touches.length !== 1) return;
+      
+      const touch = e.touches[0];
+      const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+      const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+      const deltaTime = Date.now() - touchStartRef.current.time;
+      
+      // If we haven't determined scroll direction yet
+      if (!isScrollingRef.current && deltaTime > 50) {
+        // If primarily vertical movement, allow page scroll
+        if (deltaY > deltaX && deltaY > 10) {
+          isScrollingRef.current = true;
+          // Disable map interaction temporarily
+          map.dragPan.disable();
+          map.scrollZoom.disable();
+          map.boxZoom.disable();
+          map.dragRotate.disable();
+          map.doubleClickZoom.disable();
+        }
+        // If primarily horizontal movement, enable map interaction
+        else if (deltaX > deltaY && deltaX > 10) {
+          isScrollingRef.current = true;
+          // Keep map interaction enabled
+        }
+      }
+    };
+
+    const handleTouchEnd = () => {
+      // Re-enable all map interactions after touch ends
+      setTimeout(() => {
+        map.dragPan.enable();
+        map.scrollZoom.enable();
+        map.boxZoom.enable();
+        map.dragRotate.enable();
+        map.doubleClickZoom.enable();
+        isScrollingRef.current = false;
+        touchStartRef.current = null;
+      }, 100);
+    };
+
+    // Add touch event listeners to the map container
+    const container = divRef.current;
+    if (container) {
+      container.addEventListener('touchstart', handleTouchStart, { passive: true });
+      container.addEventListener('touchmove', handleTouchMove, { passive: true });
+      container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    }
+
     // When style changes (theme), re-attach layers
     map.on('styledata', () => {
       if (!layersAttachedRef.current) attachLayers();
@@ -124,6 +188,13 @@ export default function MapEffort({
       map.off('resize', onResize);
       map.remove();
       mapRef.current = null;
+      
+      // Clean up touch event listeners
+      if (container) {
+        container.removeEventListener('touchstart', handleTouchStart);
+        container.removeEventListener('touchmove', handleTouchMove);
+        container.removeEventListener('touchend', handleTouchEnd);
+      }
     };
   }, [theme, onMapReady]);
 

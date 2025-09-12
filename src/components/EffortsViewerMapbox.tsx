@@ -3,6 +3,8 @@
 
 import React, { useEffect, useMemo, useRef, useState, useLayoutEffect } from "react";
 import MapEffort from "./MapEffort";
+import WeatherDisplay from "./WeatherDisplay";
+import { useWeather } from "../hooks/useWeather";
 
 /** ---------- Types ---------- */
 type Sample = {
@@ -145,19 +147,19 @@ const Pill = ({ label, value, active=false }: { label: string; value: string | n
 
 /** ---------- Main Component ---------- */
 function EffortsViewerMapbox({
-  mapboxToken,
   samples,
   trackLngLat,
   useMiles = true,
   useFeet = true,
   compact = false,
+  workoutData,
 }: {
-  mapboxToken: string;
   samples: any; // either Sample[] or raw series object {time_s, distance_m, elevation_m, pace_s_per_km, hr_bpm}
   trackLngLat: [number, number][];
   useMiles?: boolean;
   useFeet?: boolean;
   compact?: boolean;
+  workoutData?: any;
 }) {
   /** Normalize samples to Sample[] regardless of upstream shape */
   const normalizedSamples: Sample[] = useMemo(() => {
@@ -216,6 +218,15 @@ function EffortsViewerMapbox({
     } catch { return 'streets'; }
   });
   useEffect(() => { try { window.localStorage.setItem('map_theme', theme); } catch {} }, [theme]);
+
+  // Weather data
+  const { weather, loading: weatherLoading } = useWeather({
+    lat: workoutData?.start_position_lat || workoutData?.latitude,
+    lng: workoutData?.start_position_long || workoutData?.longitude,
+    timestamp: workoutData?.timestamp,
+    workoutId: workoutData?.id,
+    enabled: !!(workoutData?.start_position_lat && workoutData?.start_position_long && workoutData?.timestamp)
+  });
 
   // Build a monotonic distance series to avoid GPS glitches (backwards/zero)
   const distCalc = useMemo(() => {
@@ -444,8 +455,13 @@ function EffortsViewerMapbox({
 
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
-      {/* Map theme toggle */}
-      <div style={{ display: "flex", justifyContent: "flex-end", margin: "0 6px 6px 6px" }}>
+      {/* Map header with weather and theme toggle */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", margin: "0 6px 6px 6px" }}>
+        <WeatherDisplay 
+          weather={weather}
+          loading={weatherLoading}
+          fallbackTemperature={workoutData?.avg_temperature ? Number(workoutData.avg_temperature) : undefined}
+        />
         <button
           onClick={() => setTheme(theme === 'streets' ? 'hybrid' : 'streets')}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}

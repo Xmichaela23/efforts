@@ -287,6 +287,17 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             <p className="text-sm text-muted-foreground">
               {(() => {
                 try {
+                  // For completed workouts, try to get timestamp for time
+                  if (workout.workout_status === 'completed' && workout.timestamp) {
+                    const d = new Date(workout.timestamp);
+                    if (!isNaN(d.getTime())) {
+                      const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                      const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                      return `${dateStr} at ${timeStr}`;
+                    }
+                  }
+                  
+                  // Fallback to date only
                   const ds = String(workout.date || '').trim();
                   if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
                     const d = new Date(ds + 'T00:00:00');
