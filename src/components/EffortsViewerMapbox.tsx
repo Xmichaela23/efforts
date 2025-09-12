@@ -323,6 +323,17 @@ function EffortsViewerMapbox({
 
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
+      {/* Map theme toggle */}
+      <div style={{ display: "flex", justifyContent: "flex-end", margin: "0 6px 6px 6px" }}>
+        <button
+          onClick={() => setTheme(theme === 'streets' ? 'hybrid' : 'streets')}
+          style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          aria-label="Toggle map style"
+        >
+          {theme === 'streets' ? 'Satellite' : 'Streets'}
+        </button>
+      </div>
+
       {/* Map (MapLibre) */}
       <MapEffort
         trackLngLat={useMemo(() => {
@@ -337,17 +348,6 @@ function EffortsViewerMapbox({
         theme={theme}
         height={200}
       />
-
-      {/* Map theme toggle */}
-      <div style={{ display: "flex", justifyContent: "flex-end", margin: "6px 6px 6px 6px" }}>
-        <button
-          onClick={() => setTheme(theme === 'streets' ? 'hybrid' : 'streets')}
-          style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
-          aria-label="Toggle map style"
-        >
-          {theme === 'streets' ? 'Satellite' : 'Streets'}
-        </button>
-      </div>
 
       {/* Chart */}
       <div style={{ position: "relative" }}>

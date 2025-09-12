@@ -1531,14 +1531,9 @@ const formatPace = (paceValue: any): string => {
          <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {calculateVAM()}
          </div>
-         <div className="text-xs text-[#666666] font-normal">
-           <div className="font-medium">VAM</div>
-           {workoutType === 'run' && (
-             <div className="text-xs text-gray-500 mt-1">
-               Climbing speed
-             </div>
-           )}
-         </div>
+        <div className="text-xs text-[#666666] font-normal">
+          <div className="font-medium">VAM</div>
+        </div>
        </div>
        
        {/* Moving Time - Final metric */}
