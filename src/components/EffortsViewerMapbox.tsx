@@ -389,13 +389,26 @@ function EffortsViewerMapbox({
 
       {/* Metric buttons and current values */}
       <div style={{ marginTop: 12, padding: "0 6px" }}>
-        {/* Current distance and time */}
-        <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}>
-          {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
+        {/* Current distance and time with metric pills on same line */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>
+            {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
+          </div>
+          
+          {/* Current metric values */}
+          <div style={{ display: "flex", gap: 8 }}>
+            <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
+            <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
+            <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
+            <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
+            <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
+          </div>
         </div>
         
+        <div style={{ marginBottom: 8, fontSize: 11, color: "#94a3b8" }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
+        
         {/* Metric buttons */}
-        <div style={{ display: "flex", gap: 16, marginBottom: 8, fontWeight: 700 }}>
+        <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
           {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
             <button
               key={t}
@@ -409,17 +422,6 @@ function EffortsViewerMapbox({
             </button>
           ))}
         </div>
-
-        {/* Current metric values */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 8 }}>
-          <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
-          <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
-          <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
-          <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
-          <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
-        </div>
-        
-        <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8" }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
       </div>
 
       {/* Splits */}
