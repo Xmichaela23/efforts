@@ -50,6 +50,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [rememberDefault, setRememberDefault] = useState(false);
   const [hydrated, setHydrated] = useState<any>(workoutData);
   const [analysisInvoked, setAnalysisInvoked] = useState(false);
+  const [showAdvancedRunDyn, setShowAdvancedRunDyn] = useState(false);
+  const [showPower, setShowPower] = useState(false);
   
   useEffect(() => {
     setHydrated(workoutData);
@@ -1294,8 +1296,8 @@ const formatPace = (paceValue: any): string => {
        </div>
 
        {/* Row 1: Duration, Avg HR, Avg Pace */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+       <div className="px-1 py-0.5">
+         <div className="text-sm font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration)}
          </div>
          <div className="text-xs text-[#666666] font-normal">
@@ -1343,7 +1345,7 @@ const formatPace = (paceValue: any): string => {
 
        {/* Row 2: GAP, Max Speed, Avg Cadence */}
       {workoutType === 'run' && (
-        <div className="px-2 py-1">
+        <div className="px-1 py-0.5">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {(() => {
               const gapSec = (workoutData as any)?.computed?.overall?.gap_pace_s_per_mi
@@ -1540,8 +1542,8 @@ const formatPace = (paceValue: any): string => {
        </div>
        
        {/* Moving Time - Final metric */}
-       <div className="px-2 py-1">
-         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+       <div className="px-1 py-0.5">
+         <div className="text-sm font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
            {formatMovingTime()}
          </div>
          <div className="text-xs text-[#666666] font-normal">
@@ -1764,6 +1766,59 @@ const formatPace = (paceValue: any): string => {
     </div>
    </div>
  );
+};
+
+// --- Training Effect helpers ---
+const getTrainingEffect = () => {
+  const aerobic = (workoutData as any)?.metrics?.total_training_effect ?? (workoutData as any)?.total_training_effect ?? null;
+  const anaerobic = (workoutData as any)?.metrics?.total_anaerobic_effect ?? (workoutData as any)?.total_anaerobic_effect ?? null;
+  return {
+    aerobic: Number.isFinite(aerobic) ? Number(aerobic) : null,
+    anaerobic: Number.isFinite(anaerobic) ? Number(anaerobic) : null,
+  };
+};
+
+// --- Running dynamics rollups (avg from samples when available) ---
+const getRunDynamics = () => {
+  const samples = Array.isArray((hydrated as any)?.sensor_data?.samples)
+    ? (hydrated as any).sensor_data.samples
+    : (Array.isArray((hydrated as any)?.sensor_data) ? (hydrated as any).sensor_data : []);
+  if (!Array.isArray(samples) || samples.length < 5) return null;
+  const take = (keyList: string[], scale: (n:number)=>number = (n)=>n) => {
+    const vals = samples
+      .map((s:any)=>{
+        for (const k of keyList) {
+          const v = (s as any)[k]; if (Number.isFinite(v)) return scale(Number(v));
+        }
+        return NaN;
+      })
+      .filter((n:number)=>Number.isFinite(n));
+    if (vals.length < 5) return null;
+    return vals.reduce((a:number,b:number)=>a+b,0)/vals.length;
+  };
+  const gct_ms = take(['groundContactTimeMs','ground_contact_time_ms']);
+  const vo_mm = take(['verticalOscillationMm','vertical_oscillation_mm']);
+  const vr_ratio = take(['verticalRatio','vertical_ratio']);
+  const balance = take(['leftRightBalance','run_balance','left_right_balance']);
+  const any = [gct_ms,vo_mm,vr_ratio,balance].some(v=>Number.isFinite(v as any));
+  if (!any) return null;
+  return { gct_ms, vo_mm, vr_ratio, balance };
+};
+
+// --- Power presence ---
+const getPowerSummary = () => {
+  const avg = (workoutData as any)?.avg_power ?? (workoutData as any)?.metrics?.avg_power ?? null;
+  const max = (workoutData as any)?.max_power ?? (workoutData as any)?.metrics?.max_power ?? null;
+  const np = (workoutData as any)?.normalized_power ?? (workoutData as any)?.metrics?.normalized_power ?? null;
+  const weightKg = (()=>{
+    const w = (workoutData as any)?.weight; // kg expected if from Garmin
+    return Number.isFinite(w) ? Number(w) : null;
+  })();
+  const wkg = Number.isFinite(avg) && Number.isFinite(weightKg) && (weightKg as number) > 0 ? (Number(avg)/Number(weightKg)) : null;
+  const zones = (hydrated as any)?.computed?.analysis?.zones?.power ?? null;
+  const hasAny = [avg,max,np,wkg].some(v=>Number.isFinite(v as any)) || !!zones;
+  if (!hasAny) return null;
+  return { avg, max, np, wkg, zones };
 };
 
 export default CompletedTab;
