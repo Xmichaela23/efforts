@@ -203,6 +203,13 @@ function EffortsViewerMapbox({
   // Map rendering moved to MapEffort component
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
+  
+  // Ensure we use the full chart width by using the actual data range
+  const actualDataRange = useMemo(() => {
+    if (!normalizedSamples.length) return { min: 0, max: 1 };
+    const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
+    return { min: Math.min(...distances), max: Math.max(...distances) };
+  }, [normalizedSamples]);
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260, P = 75; // Increased left padding to move chart line further right
@@ -237,29 +244,39 @@ function EffortsViewerMapbox({
       }
       return arr;
     }
-    const sm = movAvg(arr, 7);
+    // Reduce smoothing for better line accuracy - use 3-point instead of 7
+    const sm = movAvg(arr, 3);
     return sm.map(v => (Number.isFinite(v) ? v : 0));
   }, [normalizedSamples, tab]);
 
-  // Robust domain (trim outliers)
+  // Better domain calculation for full space utilization
   const yDomain = useMemo<[number, number]>(() => {
     const vals = metricRaw.filter((v) => Number.isFinite(v)) as number[];
     if (!vals.length) return [0, 1];
-    let lo = pct(vals, 2), hi = pct(vals, 98);
+    
+    // Use 5th and 95th percentiles for better space usage, but be more aggressive
+    let lo = pct(vals, 5), hi = pct(vals, 95);
     if (lo === hi) { lo -= 1; hi += 1; }
+    
     // special handling:
     if (tab === "vam") { // include zero and symmetric-ish
       const maxAbs = Math.max(Math.abs(lo), Math.abs(hi), 10);
       lo = -maxAbs; hi = maxAbs;
     }
     if (tab === "bpm") { lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5; }
-    // pad a bit
-    const pad = (hi - lo) * 0.08;
+    
+    // Less padding for better space utilization
+    const pad = (hi - lo) * 0.05;
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
-  // Helpers to map to SVG
-  const xFromDist = (d: number) => P + (d / (dTotal || 1)) * (W - P * 2);
+  // Helpers to map to SVG - use actual data range for better space utilization
+  const xFromDist = (d: number) => {
+    const { min, max } = actualDataRange;
+    const range = max - min || 1;
+    const ratio = (d - min) / range;
+    return P + ratio * (W - P * 2);
+  };
   const yFromValue = (v: number) => {
     const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
     return H - P - t * (H - P * 2);
