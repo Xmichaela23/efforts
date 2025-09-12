@@ -123,60 +123,6 @@ const Pill = ({ label, value, active=false }: { label: string; value: string | n
   </div>
 );
 
-function InfoCard({
-  tab, s, useMiles, useFeet, gain_m, alt_m,
-}: {
-  tab: MetricTab;
-  s: Sample | undefined;
-  useMiles: boolean;
-  useFeet: boolean;
-  gain_m: number;
-  alt_m: number;
-}) {
-  const vals = {
-    pace:  fmtPace(s?.pace_s_per_km ?? null, useMiles),
-    bpm:   s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—",
-    vam:   fmtVAM(s?.vam_m_per_h ?? null, useFeet),
-    gain:  fmtAlt(gain_m, useFeet),
-    alt:   fmtAlt(alt_m, useFeet),
-    grade: fmtPct(s?.grade ?? null),
-  };
-
-  const primary     = tab === "elev" ? vals.gain
-                      : tab === "pace" ? vals.pace
-                      : tab === "bpm"  ? vals.bpm
-                      : vals.vam;
-  const primaryLabel = tab === "elev" ? "GAIN" : tab.toUpperCase();
-
-  return (
-    <div style={{
-      margin: "6px 6px 12px 6px",
-      padding: 0,
-      border: "none",
-      borderRadius: 0,
-      background: "transparent"
-    }}>
-      <div style={{ fontWeight: 700 }}>
-        {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
-      </div>
-
-      <div style={{ marginTop: 4, display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 12, color: "#94a3b8", fontWeight: 700 }}>{primaryLabel}</span>
-        <span style={{ fontSize: 22, fontWeight: 800, color: "#0ea5e9" }}>{primary}</span>
-      </div>
-
-      <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 8 }}>
-        <Pill label="Pace"  value={vals.pace}  active={tab==="pace"} />
-        <Pill label="HR"    value={vals.bpm}   active={tab==="bpm"} />
-        <Pill label="VAM"   value={vals.vam}   active={tab==="vam"} />
-        <Pill label="Gain"  value={vals.gain}  active={tab==="elev"} />
-        <Pill label="Grade" value={vals.grade} />
-      </div>
-
-      <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8" }}>Alt {vals.alt}</div>
-    </div>
-  );
-}
 
 /** ---------- Main Component ---------- */
 function EffortsViewerMapbox({
@@ -374,13 +320,6 @@ function EffortsViewerMapbox({
   const gainNow_m = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
   const altNow_m  = (s?.elev_m_sm ?? 0);
 
-  // Units hint on the right of tabs
-  const unitsHint = useMemo(() => {
-    if (tab === "pace") return `${useMiles ? "mi/ft" : "km/m"} • min/${useMiles ? "mi" : "km"}`;
-    if (tab === "bpm")  return `${useMiles ? "mi/ft" : "km/m"} • bpm`;
-    if (tab === "vam")  return `${useMiles ? "mi/ft" : "km/m"} • VAM`;
-    return `${useMiles ? "mi/ft" : "km/m"} • alt`;
-  }, [tab, useMiles]);
 
   return (
     <div style={{ maxWidth: 780, margin: "0 auto", fontFamily: "Inter, system-ui, sans-serif" }}>
@@ -399,32 +338,16 @@ function EffortsViewerMapbox({
         height={200}
       />
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: 16, margin: "6px 6px 6px 6px", fontWeight: 700, position: 'relative', zIndex: 5, pointerEvents: 'auto' }}>
-        {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              border: "none", background: "transparent", color: tab === t ? "#0f172a" : "#64748b", cursor: "pointer",
-              padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
-            }}
-          >
-            {t.toUpperCase()}
-          </button>
-        ))}
+      {/* Map theme toggle */}
+      <div style={{ display: "flex", justifyContent: "flex-end", margin: "6px 6px 6px 6px" }}>
         <button
           onClick={() => setTheme(theme === 'streets' ? 'hybrid' : 'streets')}
-          style={{ marginLeft: 8, border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
+          style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 8px', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 600 }}
           aria-label="Toggle map style"
         >
           {theme === 'streets' ? 'Satellite' : 'Streets'}
         </button>
-        <div style={{ marginLeft: "auto", fontSize: 12, color: "#94a3b8" }}>{unitsHint}</div>
       </div>
-
-      {/* INFO CARD (all metrics, highlight selected) */}
-      <InfoCard tab={tab} s={s} useMiles={useMiles} useFeet={useFeet} gain_m={gainNow_m} alt_m={altNow_m} />
 
       {/* Chart */}
       <div style={{ position: "relative" }}>
@@ -462,6 +385,41 @@ function EffortsViewerMapbox({
           <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
           <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
         </svg>
+      </div>
+
+      {/* Metric buttons and current values */}
+      <div style={{ marginTop: 12, padding: "0 6px" }}>
+        {/* Current distance and time */}
+        <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 16 }}>
+          {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
+        </div>
+        
+        {/* Metric buttons */}
+        <div style={{ display: "flex", gap: 16, marginBottom: 8, fontWeight: 700 }}>
+          {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                border: "none", background: "transparent", color: tab === t ? "#0f172a" : "#64748b", cursor: "pointer",
+                padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
+              }}
+            >
+              {t.toUpperCase()}
+            </button>
+          ))}
+        </div>
+
+        {/* Current metric values */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(0,1fr))", gap: 8 }}>
+          <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
+          <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
+          <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
+          <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
+          <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
+        </div>
+        
+        <div style={{ marginTop: 6, fontSize: 11, color: "#94a3b8" }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
       </div>
 
       {/* Splits */}
