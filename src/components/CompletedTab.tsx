@@ -978,6 +978,43 @@ const formatPace = (paceValue: any): string => {
    return 'N/A';
  };
 
+ // Derive average stride length for runs/walks (meters)
+ const deriveStrideLengthMeters = (): number | null => {
+   try {
+     // Already provided?
+     const metricVal = (workoutData as any)?.metrics?.avg_stride_length_m || (workoutData as any)?.avg_stride_length_m;
+     if (Number.isFinite(metricVal)) return Number(metricVal);
+     // From samples
+     const samples = Array.isArray((hydrated as any)?.sensor_data?.samples)
+       ? (hydrated as any).sensor_data.samples
+       : (Array.isArray((hydrated as any)?.sensor_data) ? (hydrated as any).sensor_data : []);
+     const arr = samples
+       .map((s: any) => s.strideLengthInMeters ?? s.stride_length_m ?? s.strideLength ?? null)
+       .filter((v: any) => Number.isFinite(v));
+     if (arr.length > 10) {
+       const avg = arr.reduce((a: number, b: number) => a + Number(b), 0) / arr.length;
+       if (Number.isFinite(avg) && avg > 0) return avg;
+     }
+     // From distance and steps
+     const km = computeDistanceKm(workoutData);
+     const steps = Number((workoutData as any)?.steps ?? (workoutData as any)?.metrics?.steps);
+     if (Number.isFinite(km) && Number.isFinite(steps) && steps > 0) {
+       return (Number(km) * 1000) / steps;
+     }
+   } catch {}
+   return null;
+ };
+
+ const formatStrideLength = (meters: number | null): string => {
+   if (!Number.isFinite(meters as any) || (meters as any) <= 0) return 'N/A';
+   const m = Number(meters);
+   if (useImperial) {
+     const inches = m * 39.3701;
+     return `${inches.toFixed(1)} in`;
+   }
+   return `${(m * 100).toFixed(1)} cm`;
+ };
+
  const calculateVAM = () => {
    if (import.meta.env?.DEV) console.log('🔍 calculateVAM - avg_vam:', workoutData.metrics?.avg_vam);
    
@@ -1425,26 +1462,37 @@ const formatPace = (paceValue: any): string => {
       )}
       
       {/* Row 3: Elevation, Calories, Max HR */}
-      <div className="px-2 py-1">
-        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+      <div className="px-1 py-0.5">
+        <div className="text-sm font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
         </div>
         <div className="text-xs text-[#666666] font-normal">
           <div className="font-medium">Climbed</div>
         </div>
       </div>
-      
-      <div className="px-2 py-1">
-        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+ 
+      <div className="px-1 py-0.5">
+        <div className="text-sm font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
         </div>
         <div className="text-xs text-[#666666] font-normal">
           <div className="font-medium">Calories</div>
         </div>
       </div>
-      
-      <div className="px-2 py-1">
-        <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+ 
+      {(workoutType === 'run' || workoutType === 'walk') && (
+        <div className="px-1 py-0.5">
+          <div className="text-sm font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+            {formatStrideLength(deriveStrideLengthMeters())}
+          </div>
+          <div className="text-xs text-[#666666] font-normal">
+            <div className="font-medium">Stride Length</div>
+          </div>
+        </div>
+      )}
+ 
+      <div className="px-1 py-0.5">
+        <div className="text-sm font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
         </div>
         <div className="text-xs text-[#666666] font-normal">
