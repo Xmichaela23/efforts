@@ -207,7 +207,7 @@ function EffortsViewerMapbox({
   // Remove complex data range calculation - use simple approach
 
   /** ----- Chart prep ----- */
-  const W = 700, H = 260, P = 40; // Balanced padding to use more right-side space
+  const W = 700, H = 260, P = 48; // Slightly larger left padding to avoid label overlap
 
   // cumulative positive gain (m), used for the InfoCard
   const cumGain_m = useMemo(() => {
