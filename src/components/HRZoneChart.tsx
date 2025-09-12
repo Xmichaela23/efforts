@@ -13,7 +13,6 @@ import {
   YAxis,
   Legend,
 } from "recharts";
-import { HeartPulse } from "lucide-react";
 
 /**
  * Heart Rate Zone Chart — Running-first
@@ -223,8 +222,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
     return (
       <Card className="w-full">
         <CardHeader className="pb-3">
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <HeartPulse className="h-5 w-5" />
+          <CardTitle className="text-lg">
             {title}
           </CardTitle>
         </CardHeader>
@@ -238,8 +236,7 @@ const HRZoneChart: React.FC<HRZoneChartProps> = ({
   return (
     <Card className="w-full">
       <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <HeartPulse className="h-5 w-5" />
+        <CardTitle className="text-lg">
           {title}
         </CardTitle>
       </CardHeader>
