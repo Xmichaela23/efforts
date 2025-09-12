@@ -71,6 +71,23 @@ const pct = (vals: number[], p: number) => {
   return a[i];
 };
 
+// Simple median filter with odd window size
+function medianFilter(arr: (number|null)[], w: number): (number|null)[] {
+  if (w < 3 || arr.length === 0) return arr.slice();
+  const half = Math.floor(w / 2);
+  const out: (number|null)[] = new Array(arr.length);
+  for (let i = 0; i < arr.length; i++) {
+    const window: number[] = [];
+    for (let k = -half; k <= half; k++) {
+      const j = i + k;
+      const v = arr[j];
+      if (j >= 0 && j < arr.length && Number.isFinite(v as any)) window.push(v as number);
+    }
+    out[i] = window.length ? window.sort((a,b)=>a-b)[Math.floor(window.length/2)] : arr[i];
+  }
+  return out;
+}
+
 /** ---------- Splits ---------- */
 function buildSplit(samples: Sample[], s: number, e: number): Split {
   const S = samples[s], E = samples[e];
@@ -240,40 +257,77 @@ function EffortsViewerMapbox({
 
   // Which raw metric array are we plotting?
   const metricRaw: number[] = useMemo(() => {
-    const arr = normalizedSamples.map((s) =>
-      tab === "elev" ? (s.elev_m_sm ?? NaN)
-      : tab === "pace" ? (s.pace_s_per_km ?? NaN)
-      : tab === "bpm" ? (s.hr_bpm ?? NaN)
-      : (s.vam_m_per_h ?? NaN)
-    ).map(v => (Number.isFinite(v) ? (v as number) : NaN));
-    // light smoothing except elevation (already smoothed via EMA)
+    // Elevation (already EMA smoothed when building samples)
     if (tab === "elev") {
-      // If elevation is fully flat/NaN, return zeros to avoid NaN path
-      const finite = arr.filter(Number.isFinite) as number[];
-      if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) {
-        return new Array(arr.length).fill(0);
-      }
-      return arr;
+      const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
+      const finite = elev.filter(Number.isFinite) as number[];
+      if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
+      return elev;
     }
-    // Reduce smoothing for better line accuracy - use 3-point instead of 7
-    const sm = movAvg(arr, 3);
-    return sm.map(v => (Number.isFinite(v) ? v : 0));
-  }, [normalizedSamples, tab]);
+    // Pace
+    if (tab === "pace") {
+      const pace = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
+      return movAvg(pace, 3).map(v => (Number.isFinite(v) ? v : NaN));
+    }
+    // Heart rate
+    if (tab === "bpm") {
+      const hr = normalizedSamples.map(s => Number.isFinite(s.hr_bpm as any) ? (s.hr_bpm as number) : NaN);
+      return movAvg(hr, 3).map(v => (Number.isFinite(v) ? v : NaN));
+    }
+    // VAM: compute over window, moving-only, stabilized
+    // prerequisites
+    const n = normalizedSamples.length;
+    const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
+    const dist = distCalc.distMono; // monotonic distance
+    const time = normalizedSamples.map(s => Number.isFinite(s.t_s as any) ? (s.t_s as number) : NaN);
+    const windowSec = 7; // 7-11s works well
+    const out = new Array(n).fill(NaN) as number[];
+    for (let i = 0; i < n; i++) {
+      const t1 = time[i]; if (!Number.isFinite(t1)) continue;
+      // find j where time[j] ~ t1 - windowSec
+      let j = i;
+      while (j > 0 && Number.isFinite(time[j - 1]) && (t1 - (time[j - 1] as number)) < windowSec) j--;
+      const dt = (t1 - (time[j] ?? t1));
+      const dd = (dist[i] - (dist[j] ?? dist[i]));
+      const de = (elev[i] - (elev[j] ?? elev[i]));
+      const speed = dt > 0 ? dd / dt : 0; // m/s
+      if (!(dt >= 3 && dd >= 5 && speed >= 0.5)) continue; // moving-only
+      // stabilized grade, clamp +/-30%
+      const grade = clamp((dd > 0 ? de / dd : 0), -0.30, 0.30);
+      const vam_m_per_h = grade * speed * 3600; // m/h
+      out[i] = vam_m_per_h;
+    }
+    // median then MA
+    const med = medianFilter(out, 11) as (number|null)[];
+    const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
+    const smooth = movAvg(medNum, 5);
+    // hard cap
+    for (let i = 0; i < smooth.length; i++) {
+      const v = smooth[i];
+      if (!Number.isFinite(v) || Math.abs(v as number) > 3000) smooth[i] = NaN; // >3000 m/h considered bad
+    }
+    return smooth;
+  }, [normalizedSamples, tab, distCalc]);
 
   // Better domain calculation for full space utilization
   const yDomain = useMemo<[number, number]>(() => {
     const vals = metricRaw.filter((v) => Number.isFinite(v)) as number[];
     if (!vals.length) return [0, 1];
-    
-    // Use 5th and 95th percentiles for better space usage, but be more aggressive
-    let lo = pct(vals, 5), hi = pct(vals, 95);
+    let lo: number, hi: number;
+    // VAM: symmetric domain using abs-percentile
+    if (tab === "vam") {
+      const abs = vals.map(v => Math.abs(v));
+      const P = pct(abs, 90); // P90 abs
+      const floor = 450; // m/h minimum span (~1500 ft/h)
+      const span = Math.max(P, floor);
+      lo = -span; hi = span;
+    } else {
+      // Use 5th and 95th percentiles for better space usage
+      lo = pct(vals, 5); hi = pct(vals, 95);
+    }
     if (lo === hi) { lo -= 1; hi += 1; }
     
     // special handling:
-    if (tab === "vam") { // include zero and symmetric-ish
-      const maxAbs = Math.max(Math.abs(lo), Math.abs(hi), 10);
-      lo = -maxAbs; hi = maxAbs;
-    }
     if (tab === "bpm") { lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5; }
     
     // Less padding for better space utilization
