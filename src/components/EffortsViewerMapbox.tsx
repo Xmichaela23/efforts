@@ -204,14 +204,10 @@ function EffortsViewerMapbox({
   const dTotal = normalizedSamples.length ? normalizedSamples[normalizedSamples.length - 1].d_m : 1;
   const distNow = normalizedSamples[idx]?.d_m ?? 0;
   
-  // Use the full chart width by normalizing to 0-1 range
+  // Use dTotal for full width - this should be the actual total distance
   const actualDataRange = useMemo(() => {
-    if (!normalizedSamples.length) return { min: 0, max: 1 };
-    // Always use 0 to max distance to ensure full width usage
-    const distances = normalizedSamples.map(s => s.d_m).filter(Number.isFinite);
-    const maxDist = Math.max(...distances);
-    return { min: 0, max: maxDist };
-  }, [normalizedSamples]);
+    return { min: 0, max: dTotal || 1 };
+  }, [dTotal]);
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260, P = 75; // Increased left padding to move chart line further right
@@ -300,8 +296,23 @@ function EffortsViewerMapbox({
       const y = yFromValue(yv);
       d += ` L ${xFromDist(normalizedSamples[i].d_m)} ${y}`;
     }
+    
+    // Debug: log the actual data range being used
+    if (import.meta.env?.DEV) {
+      console.log('Chart debug:', {
+        samples: normalizedSamples.length,
+        dTotal,
+        firstDist: normalizedSamples[0]?.d_m,
+        lastDist: normalizedSamples[normalizedSamples.length - 1]?.d_m,
+        actualRange: actualDataRange,
+        firstX: xFromDist(normalizedSamples[0].d_m),
+        lastX: xFromDist(normalizedSamples[normalizedSamples.length - 1].d_m),
+        chartWidth: W - P * 2
+      });
+    }
+    
     return d;
-  }, [normalizedSamples, metricRaw, yDomain, dTotal]);
+  }, [normalizedSamples, metricRaw, yDomain, dTotal, actualDataRange]);
 
   // Elevation fill
   const elevArea = useMemo(() => {
@@ -398,7 +409,7 @@ function EffortsViewerMapbox({
       </div>
 
       {/* Chart */}
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", marginTop: 4 }}>
         <svg
           ref={svgRef}
           viewBox={`0 0 ${W} ${H}`}   // responsive: all drawn in SVG units
