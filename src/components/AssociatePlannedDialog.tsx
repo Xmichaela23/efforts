@@ -39,7 +39,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
 
         const { data } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,workout_status,completed_workout_id')
+          .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id,completed_workout_id')
           .eq('user_id', user.id)
           .eq('type', type)
           .in('workout_status', ['planned','in_progress','completed'])
@@ -59,35 +59,6 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           workoutDate: workout?.date
         });
 
-        // Debug: Check for strength workouts specifically around 8/12
-        const { data: strengthWeek } = await supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status,strength_exercises')
-          .eq('user_id', user.id)
-          .eq('type', 'strength')
-          .gte('date', '2025-08-05')
-          .lte('date', '2025-08-19')
-          .order('date', { ascending: true });
-        console.log('🔍 Strength workouts around 8/12:', strengthWeek);
-
-        // Debug: Check the specific completed workout from 8/12
-        const { data: completed812 } = await supabase
-          .from('workouts')
-          .select('id,name,type,date,workout_status,planned_id,strength_exercises')
-          .eq('user_id', user.id)
-          .eq('type', 'strength')
-          .eq('date', '2025-08-12')
-          .order('date', { ascending: true });
-        console.log('🔍 Completed strength workout on 8/12:', completed812);
-
-        // Debug: Also check what planned workouts exist for this user (any type, any date)
-        const { data: allPlanned } = await supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status')
-          .eq('user_id', user.id)
-          .order('date', { ascending: true })
-          .limit(20);
-        console.log('🔍 All planned workouts for user:', allPlanned);
 
         // Filter out completed planned workouts that are already linked to other completed workouts
         const filteredCandidates = (Array.isArray(data) ? data : []).filter(planned => {

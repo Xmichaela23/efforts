@@ -753,36 +753,11 @@ export const useWorkouts = () => {
 
       const candidates = Array.isArray(planned) ? planned : [];
       if (!candidates.length) {
-        console.log('❌ No planned workouts found for auto-attach. Debugging...');
-        
-        // Debug: Check what planned workouts exist for this user
-        const { data: allPlanned } = await supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status')
-          .eq('user_id', user.id)
-          .order('date', { ascending: true })
-          .limit(10);
-        console.log('🔍 All planned workouts for user:', allPlanned);
-        
-        // Debug: Check planned workouts of this type
-        const { data: typePlanned } = await supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status')
-          .eq('user_id', user.id)
-          .eq('type', String(completed.type || '').toLowerCase())
-          .order('date', { ascending: true })
-          .limit(10);
-        console.log(`🔍 Planned workouts of type '${String(completed.type || '').toLowerCase()}':`, typePlanned);
-        
-        // Debug: Check planned workouts in date range
-        const { data: datePlanned } = await supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status')
-          .eq('user_id', user.id)
-          .gte('date', from)
-          .lte('date', to)
-          .order('date', { ascending: true });
-        console.log(`🔍 Planned workouts in date range ${from} to ${to}:`, datePlanned);
+        console.log('❌ No planned workouts found for auto-attach. Check if planned workout exists for:', {
+          type: completed.type,
+          date: completed.date,
+          searchRange: `${from} to ${to}`
+        });
         
         return;
       }

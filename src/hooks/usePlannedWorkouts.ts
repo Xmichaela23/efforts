@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,completed_workout_id')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -131,6 +131,8 @@ export const usePlannedWorkouts = () => {
           training_plan_id: workout.training_plan_id,
           week_number: workout.week_number,
           day_number: workout.day_number,
+          // ensure association is visible to consumers
+          completed_workout_id: (workout as any).completed_workout_id || null,
           
           // expose tags for UI filters
           // @ts-ignore
