@@ -163,7 +163,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
   
   // Session persistence key based on target date - use consistent date format
-  const getTodayDateString = () => {
+  const getStrengthLoggerDateString = () => {
     const now = new Date();
     const year = now.getFullYear();
     const month = String(now.getMonth() + 1).padStart(2, '0');
@@ -171,7 +171,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return `${year}-${month}-${day}`;
   };
   
-  const sessionKey = `strength_logger_session_${targetDate || getTodayDateString()}`;
+  const sessionKey = `strength_logger_session_${targetDate || getStrengthLoggerDateString()}`;
   
   // Save session progress to localStorage
   const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
@@ -700,7 +700,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // If no scheduled workout provided, do a FRESH check for selected date's planned workout
     if (!workoutToLoad) {
       console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
-      const todayDate = getTodayDateString();
+      const todayDate = getStrengthLoggerDateString();
       
       // Prefer planned_workouts table
       const todaysPlanned = (plannedWorkouts || []).filter(w => w.date === todayDate && w.type === 'strength' && w.workout_status === 'planned');
@@ -791,7 +791,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Direct fetch as a safety net (does not overwrite if already filled)
     (async () => {
       try {
-        const date = getTodayDateString();
+        const date = getStrengthLoggerDateString();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const { data } = await supabase
@@ -1160,11 +1160,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     // FIXED: Use consistent PST timezone and move cross-day selections to TODAY
     // If this log was sourced from a planned workout (via Workouts menu), always save to today
-    const workoutDate = sourcePlannedId ? getTodayDateString() : (scheduledWorkout?.date || getTodayDateString());
+    const workoutDate = sourcePlannedId ? getStrengthLoggerDateString() : (scheduledWorkout?.date || getStrengthLoggerDateString());
     
     // 🔍 DEBUG: Log the exact date being used
     console.log('🔍 DEBUG - Date details:');
-    console.log('  - getTodayDateString():', getTodayDateString());
+    console.log('  - getStrengthLoggerDateString():', getStrengthLoggerDateString());
     console.log('  - scheduledWorkout?.date:', scheduledWorkout?.date);
     console.log('  - Final workoutDate:', workoutDate);
     console.log('  - Current local time:', new Date().toString());
@@ -1307,7 +1307,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <div className="max-h-56 overflow-y-auto" onMouseDown={(e)=>e.preventDefault()}>
                   {(Array.isArray(plannedWorkouts)? plannedWorkouts: [])
                     .filter(w=>String((w as any).type).toLowerCase()==='strength')
-                    .filter(w=> withinWeek(w.date, startOfWeek(getTodayDateString())))
+                    .filter(w=> withinWeek(w.date, startOfWeek(getStrengthLoggerDateString())))
                     .sort((a:any,b:any)=> a.date.localeCompare(b.date))
                     .map((w:any)=> (
                       <button key={w.id} onClick={()=>{ 
