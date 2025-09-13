@@ -806,7 +806,27 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       {(() => {
         const ver = completedComputed?.version || completedComputed?.computed_version || null;
         const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : 'waiting for server';
-        return <div className="text-[11px] text-gray-500 mb-2">Source: {label}</div>;
+        return (
+          <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
+            <div>Source: {label}</div>
+            {!hasServerComputed && ((completed as any)?.id || (planned as any)?.completed_workout_id) && (
+              <button
+                className="ml-2 text-[11px] px-2 py-[2px] rounded border border-gray-200 hover:bg-gray-50 text-gray-700"
+                onClick={async ()=>{
+                  try {
+                    const wid = (completed as any)?.id || String((planned as any)?.completed_workout_id);
+                    if (!wid) return;
+                    setComputeInvoked(true);
+                    await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
+                    try { await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } }); } catch {}
+                  } catch {}
+                }}
+              >
+                Force compute now
+              </button>
+            )}
+          </div>
+        );
       })()}
       <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned Pace</div>
