@@ -62,6 +62,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             .select('*')
             .eq('id', pid)
             .single();
+          console.log('🔍 Fetched linkedPlanned by planned_id:', {
+            id: data?.id,
+            name: data?.name,
+            hasStrengthExercises: !!data?.strength_exercises,
+            strengthExercises: data?.strength_exercises
+          });
           if (!cancelled) setLinkedPlanned(data || null);
           return;
         }
@@ -78,6 +84,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 .eq('completed_workout_id', cid)
                 .limit(1);
               if (!error && Array.isArray(data) && data.length) {
+                console.log('🔍 Fetched linkedPlanned by completed_workout_id:', {
+                  id: data[0]?.id,
+                  name: data[0]?.name,
+                  hasStrengthExercises: !!data[0]?.strength_exercises,
+                  strengthExercises: data[0]?.strength_exercises
+                });
                 if (!cancelled) setLinkedPlanned(data[0]);
                 return;
               }

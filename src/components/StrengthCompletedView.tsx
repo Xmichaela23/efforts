@@ -44,12 +44,17 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
   const plannedWorkout = useMemo(() => {
     // If this is a planned workout, use it directly
     if (String(workoutData?.workout_status).toLowerCase() === 'planned') return workoutData;
-    
+
     // If this is a completed workout, use the passed planned workout if available
     if (String(workoutData?.workout_status).toLowerCase() === 'completed') {
+      console.log('🔍 StrengthCompletedView plannedWorkout useMemo:', {
+        passedPlannedWorkout: passedPlannedWorkout,
+        hasStrengthExercises: !!passedPlannedWorkout?.strength_exercises,
+        strengthExercises: passedPlannedWorkout?.strength_exercises
+      });
       return passedPlannedWorkout || null;
     }
-    
+
     return null;
   }, [workoutData, passedPlannedWorkout]);
 
@@ -192,6 +197,16 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
             const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
             const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+            
+            console.log('🔍 Mapping planned exercise:', {
+              original: ex,
+              setsArr,
+              setsNum,
+              repsNum,
+              weightNum,
+              mapped: { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum }
+            });
+            
             return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
           })}
           completed={completedExercises.map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))}
