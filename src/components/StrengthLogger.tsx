@@ -1286,16 +1286,43 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
           <button 
-            onClick={() => {
-              // Clear all caches and refresh
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-              try { window.dispatchEvent(new CustomEvent('nav:pullrefresh')); } catch {}
-              // Force page refresh
-              window.location.reload();
+            onClick={async () => {
+              try {
+                // Clear all possible caches
+                console.log('🧹 Clearing all caches...');
+                
+                // Clear localStorage
+                const keys = Object.keys(localStorage);
+                keys.forEach(key => {
+                  if (key.includes('workouts') || key.includes('planned') || key.includes('range')) {
+                    localStorage.removeItem(key);
+                    console.log('🗑️ Cleared localStorage:', key);
+                  }
+                });
+                
+                // Clear sessionStorage
+                const sessionKeys = Object.keys(sessionStorage);
+                sessionKeys.forEach(key => {
+                  if (key.includes('workouts') || key.includes('planned') || key.includes('range')) {
+                    sessionStorage.removeItem(key);
+                    console.log('🗑️ Cleared sessionStorage:', key);
+                  }
+                });
+                
+                // Dispatch events
+                window.dispatchEvent(new CustomEvent('planned:invalidate'));
+                window.dispatchEvent(new CustomEvent('nav:pullrefresh'));
+                
+                // Force hard refresh
+                window.location.reload();
+              } catch (e) {
+                console.error('Cache clear failed:', e);
+                window.location.reload();
+              }
             }}
             className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded"
           >
-            Refresh Cache
+            Clear All Cache
           </button>
           <div className="relative">
             <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
