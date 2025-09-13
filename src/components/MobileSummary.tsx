@@ -725,6 +725,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // -------- Strict mode: if workout is attached to a plan, do NOT render client fallback. --------
   const isAttachedToPlan = !!planned && !!(planned as any)?.id;
   const [computeInvoked, setComputeInvoked] = useState(false);
+  const [forceComputing, setForceComputing] = useState(false);
   useEffect(() => {
     (async () => {
       try {
@@ -811,18 +812,31 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             <div>Source: {label}</div>
             {!hasServerComputed && ((completed as any)?.id || (planned as any)?.completed_workout_id) && (
               <button
-                className="ml-2 text-[11px] px-2 py-[2px] rounded border border-gray-200 hover:bg-gray-50 text-gray-700"
+                className={`ml-2 text-[11px] px-2 py-[2px] rounded border border-gray-200 ${forceComputing? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700`}
+                disabled={forceComputing}
                 onClick={async ()=>{
                   try {
                     const wid = (completed as any)?.id || String((planned as any)?.completed_workout_id);
                     if (!wid) return;
+                    setForceComputing(true);
                     setComputeInvoked(true);
                     await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
                     try { await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } }); } catch {}
+                    // quick poll burst for immediate feedback
+                    for (let i=0;i<6;i++) {
+                      const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
+                      const compd = (data as any)?.computed;
+                      if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+                        setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
+                        break;
+                      }
+                      await new Promise(r=>setTimeout(r, 600));
+                    }
                   } catch {}
+                  finally { setForceComputing(false); }
                 }}
               >
-                Force compute now
+                {forceComputing ? 'Computing…' : 'Force compute now'}
               </button>
             )}
           </div>
@@ -848,8 +862,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const secPerMi = row?.executed?.avg_pace_s_per_mi;
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
                 }
-                const r = renderCompletedFor(st) as any;
-                return <div>{typeof r === 'string' ? r : (r?.paceText || '—')}</div>;
+                return <div>—</div>;
               })()}
             </div>
             <div className="text-gray-900">
@@ -862,8 +875,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const dur = row?.executed?.duration_s;
                   return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
                 }
-                const r = renderCompletedFor(st) as any;
-                return <div>{typeof r === 'string' ? r : (r?.durationSec ? fmtTime(r.durationSec) : '—')}</div>;
+                return <div>—</div>;
               })()}
             </div>
             <div className="text-gray-900">
@@ -876,8 +888,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const hr = row?.executed?.avg_hr;
                   return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
                 }
-                const r = renderCompletedFor(st) as any;
-                return <div className="text-xs text-gray-700">{typeof r === 'string' ? '—' : (r?.hr != null ? `${Math.round(r.hr)} bpm` : '—')}</div>;
+                return <div className="text-xs text-gray-700">—</div>;
               })()}
             </div>
           </div>
