@@ -47,12 +47,14 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
 
     // If this is a completed workout, use the passed planned workout if available
     if (String(workoutData?.workout_status).toLowerCase() === 'completed') {
-      console.log('🔍 StrengthCompletedView plannedWorkout useMemo:', {
-        passedPlannedWorkout: passedPlannedWorkout,
-        hasStrengthExercises: !!passedPlannedWorkout?.strength_exercises,
-        strengthExercises: passedPlannedWorkout?.strength_exercises
-      });
-      return passedPlannedWorkout || null;
+      // If we have a passed planned workout, use it
+      if (passedPlannedWorkout) {
+        return passedPlannedWorkout;
+      }
+      
+      // Otherwise, if this completed workout has a planned_id, we need to fetch the planned data
+      // For now, return null - the parent component should handle fetching
+      return null;
     }
 
     return null;

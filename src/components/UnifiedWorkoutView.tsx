@@ -36,7 +36,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
   }
 
-  const { deletePlannedWorkout } = usePlannedWorkouts();
+  const { deletePlannedWorkout, plannedWorkouts } = usePlannedWorkouts();
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
   const [assocOpen, setAssocOpen] = useState(false);
@@ -47,85 +47,64 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        if (!isCompleted) { setLinkedPlanned(null); return; }
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+    if (!isCompleted) { 
+      setLinkedPlanned(null); 
+      return; 
+    }
 
-        // 1) If workout already has planned_id, fetch by id
-        const pid = (workout as any)?.planned_id as string | undefined;
-        if (pid) {
-          const { data } = await supabase
-            .from('planned_workouts')
-            .select('*')
-            .eq('id', pid)
-            .single();
-          console.log('🔍 Fetched linkedPlanned by planned_id:', {
-            id: data?.id,
-            name: data?.name,
-            hasStrengthExercises: !!data?.strength_exercises,
-            strengthExercises: data?.strength_exercises
-          });
-          if (!cancelled) setLinkedPlanned(data || null);
-          return;
-        }
+    // 1) If workout already has planned_id, find it in the planned workouts context
+    const pid = (workout as any)?.planned_id as string | undefined;
+    if (pid) {
+      const planned = plannedWorkouts.find(p => p.id === pid);
+      console.log('🔍 Found linkedPlanned by planned_id in context:', {
+        id: planned?.id,
+        name: planned?.name,
+        hasStrengthExercises: !!planned?.strength_exercises,
+        strengthExercises: planned?.strength_exercises
+      });
+      setLinkedPlanned(planned || null);
+      return;
+    }
 
-        // 2) Otherwise try to find by completed_workout_id
-        {
-          try {
-            const cid = (workout as any)?.id ? String((workout as any).id) : null;
-            if (cid) {
-              const { data, error } = await supabase
-                .from('planned_workouts')
-                .select('*')
-                .eq('user_id', user.id)
-                .eq('completed_workout_id', cid)
-                .limit(1);
-              if (!error && Array.isArray(data) && data.length) {
-                console.log('🔍 Fetched linkedPlanned by completed_workout_id:', {
-                  id: data[0]?.id,
-                  name: data[0]?.name,
-                  hasStrengthExercises: !!data[0]?.strength_exercises,
-                  strengthExercises: data[0]?.strength_exercises
-                });
-                if (!cancelled) setLinkedPlanned(data[0]);
-                return;
-              }
-            }
-          } catch {}
-        }
+    // 2) Otherwise try to find by completed_workout_id in the context
+    const cid = (workout as any)?.id ? String((workout as any).id) : null;
+    if (cid) {
+      const planned = plannedWorkouts.find(p => p.completed_workout_id === cid);
+      console.log('🔍 Found linkedPlanned by completed_workout_id in context:', {
+        id: planned?.id,
+        name: planned?.name,
+        hasStrengthExercises: !!planned?.strength_exercises,
+        strengthExercises: planned?.strength_exercises
+      });
+      setLinkedPlanned(planned || null);
+      return;
+    }
 
-        // 3) Fallback: look for a same-day planned of same type
-        //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
-        if (suppressRelinkUntil.current > Date.now()) {
-          if (!cancelled) setLinkedPlanned(null);
-          return;
-        }
-        if ((workout as any).date && (workout as any).type) {
-          const { data } = await supabase
-            .from('planned_workouts')
-            .select('*')
-            .eq('user_id', user.id)
-            .eq('type', (workout as any).type)
-            .eq('date', String((workout as any).date).slice(0,10))
-            .limit(1);
-          if (Array.isArray(data) && data.length) {
-            if (!cancelled) setLinkedPlanned(data[0]);
-            return;
-          }
-        }
-        if (!cancelled) setLinkedPlanned(null);
-      } catch {
-        if (!cancelled) setLinkedPlanned(null);
-      }
-    };
-    load();
-    const handler = () => load();
-    window.addEventListener('planned:invalidate', handler);
-    return () => { cancelled = true; window.removeEventListener('planned:invalidate', handler); };
-  }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type]);
+    // 3) Fallback: look for a same-day planned of same type in the context
+    //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
+    if (suppressRelinkUntil.current > Date.now()) {
+      setLinkedPlanned(null);
+      return;
+    }
+    
+    if ((workout as any).date && (workout as any).type) {
+      const planned = plannedWorkouts.find(p => 
+        p.type === (workout as any).type && 
+        p.date === String((workout as any).date).slice(0,10) &&
+        ['planned', 'in_progress'].includes(p.workout_status)
+      );
+      console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
+        id: planned?.id,
+        name: planned?.name,
+        hasStrengthExercises: !!planned?.strength_exercises,
+        strengthExercises: planned?.strength_exercises
+      });
+      setLinkedPlanned(planned || null);
+      return;
+    }
+
+    setLinkedPlanned(null);
+  }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type, plannedWorkouts]);
 
   // Auto-materialize planned row if Summary is opened and computed steps are missing
   useEffect(() => {
