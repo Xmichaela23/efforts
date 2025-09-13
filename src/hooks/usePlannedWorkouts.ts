@@ -46,15 +46,15 @@ export const usePlannedWorkouts = () => {
 
       // Transform the data to match our PlannedWorkout interface
       const transformedWorkouts: PlannedWorkout[] = (data || [])
-        // Filter out optional-tagged planned and rows already linked to completed
+        // Filter out optional-tagged planned workouts, but keep completed ones for association
         .filter((w: any) => {
           const raw = (w as any).tags;
           let tags: any[] = [];
           if (Array.isArray(raw)) tags = raw;
           else if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) tags = p; } catch {} }
           const isOptional = tags.map(String).map((t:string)=>t.toLowerCase()).includes('optional');
-          const isCompleted = String((w as any).workout_status||'').toLowerCase()==='completed';
-          return !isOptional && !isCompleted;
+          // Keep completed planned workouts for association purposes
+          return !isOptional;
         })
         .map(workout => {
         // Normalize JSONB fields that may come back as strings
