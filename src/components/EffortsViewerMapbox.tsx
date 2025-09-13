@@ -360,7 +360,14 @@ function EffortsViewerMapbox({
     return pl + ratio * (W - pl - pr);
   };
   const yFromValue = (v: number) => {
-    const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
+    const [a, b] = yDomain; 
+    let t = (v - a) / (b - a || 1);
+    
+    // For cycling speed, invert the Y-axis since we're displaying speed but using pace data
+    if (workoutData?.type === 'ride' && tab === 'pace') {
+      t = 1 - t; // Invert the Y-axis
+    }
+    
     return H - P - t * (H - P * 2);
   };
 

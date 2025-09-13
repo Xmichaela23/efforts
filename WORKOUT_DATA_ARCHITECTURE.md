@@ -169,11 +169,59 @@ Different workout types have different metric calculations:
 ### 4. Chart and Visualization Components
 The completed tab includes multiple visualization components:
 
-- **`EffortsViewerMapbox`** - Interactive map with GPS track
+- **`EffortsViewerMapbox`** - Interactive map with GPS track, splits display, and metric charts
 - **`CleanElevationChart`** - Elevation profile
 - **`HRZoneChart`** - Heart rate zone distribution
 - **`PowerCadenceChart`** - Power and cadence over time
 - **`ActivityMap`** - Static map display
+
+#### EffortsViewerMapbox - The Main Chart Component
+This is the most complex visualization component, handling:
+
+**Data Processing:**
+- Normalizes samples from multiple data sources
+- Converts GPS coordinates to display format
+- Calculates splits (mile/km segments)
+- Processes pace/speed data for different workout types
+
+**Interactive Features:**
+- Scrub-synced charts (drag to see data at specific points)
+- Tab switching (PACE, BPM, VAM, ELEV)
+- Split highlighting and selection
+- Lock/unlock chart interaction
+
+**Workout Type Specific Logic:**
+- **Running/Walking:** Shows pace (min/mi, min/km)
+- **Cycling:** Shows speed (mph, km/h) - converts from pace data
+- **Swimming:** Shows pace per 100m/100yd
+
+**Splits Display:**
+- Mile or kilometer segments based on user preference
+- Shows time, pace/speed, elevation gain, grade for each split
+- Dynamic column headers (Pace vs Speed)
+- Real-time data pills showing current values
+
+**Data Sources:**
+- Primary: `workoutData.computed.analysis.events.splits`
+- Fallback: Calculated from raw sensor data
+- GPS: `workoutData.gps_track` for map display
+
+#### Data Flow to Charts
+```
+Workout Data → CompletedTab → EffortsViewerMapbox
+    ↓
+1. Data Hydration (dev mode: load from garmin_activities)
+2. Sample Normalization (convert to standard format)
+3. Split Calculation (mile/km segments)
+4. Metric Processing (pace/speed conversion)
+5. Chart Rendering (interactive visualization)
+```
+
+#### Key Data Transformations
+- **Pace → Speed:** `3600 / secPerKm * 0.621371` for mph
+- **GPS Normalization:** Multiple coordinate formats → `{lat, lng, elevation}`
+- **Split Processing:** Raw samples → `{time_s, dist_m, avgPace_s_per_km, gain_m}`
+- **Metric Formatting:** Raw values → display strings with units
 
 ### 5. Data Format Challenges
 

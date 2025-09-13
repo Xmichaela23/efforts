@@ -130,9 +130,9 @@ export default function MapEffort({
       const deltaTime = Date.now() - touchStartRef.current.time;
       
       // If we haven't determined scroll direction yet
-      if (!isScrollingRef.current && deltaTime > 50) {
-        // If primarily vertical movement, allow page scroll
-        if (deltaY > deltaX && deltaY > 10) {
+      if (!isScrollingRef.current && deltaTime > 100) {
+        // If primarily vertical movement, allow page scroll (more strict thresholds)
+        if (deltaY > deltaX && deltaY > 30) {
           isScrollingRef.current = true;
           // Disable map interaction temporarily
           map.dragPan.disable();
@@ -142,7 +142,7 @@ export default function MapEffort({
           map.doubleClickZoom.disable();
         }
         // If primarily horizontal movement, enable map interaction
-        else if (deltaX > deltaY && deltaX > 10) {
+        else if (deltaX > deltaY && deltaX > 30) {
           isScrollingRef.current = true;
           // Keep map interaction enabled
         }
