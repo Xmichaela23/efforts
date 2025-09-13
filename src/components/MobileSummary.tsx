@@ -726,6 +726,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const isAttachedToPlan = !!planned && !!(planned as any)?.id;
   const [computeInvoked, setComputeInvoked] = useState(false);
   const [forceComputing, setForceComputing] = useState(false);
+  const [computeError, setComputeError] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
       try {
@@ -806,10 +807,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     <div className="w-full">
       {(() => {
         const ver = completedComputed?.version || completedComputed?.computed_version || null;
-        const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : 'waiting for server';
+        const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : (forceComputing ? 'computing…' : 'waiting for server');
         return (
           <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
-            <div>Source: {label}</div>
+            <div>Source: {label}{computeError ? <span className="ml-2 text-red-600">{computeError}</span> : null}</div>
             {!hasServerComputed && ((completed as any)?.id || (planned as any)?.completed_workout_id) && (
               <button
                 className={`ml-2 text-[11px] px-2 py-[2px] rounded border border-gray-200 ${forceComputing? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700`}
@@ -820,11 +821,17 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                     if (!wid) return;
                     setForceComputing(true);
                     setComputeInvoked(true);
-                    await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
-                    try { await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } }); } catch {}
+                    setComputeError(null);
+                    const r1 = await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
+                    if ((r1 as any)?.error) setComputeError(String((r1 as any).error?.message || 'compute failed'));
+                    try {
+                      const r2 = await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
+                      if ((r2 as any)?.error) setComputeError(prev=> prev || String((r2 as any).error?.message || 'analysis failed'));
+                    } catch (e:any) { /* ignore */ }
                     // quick poll burst for immediate feedback
                     for (let i=0;i<6;i++) {
-                      const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
+                      const { data, error } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
+                      if (error) { setComputeError(String(error.message||error)); }
                       const compd = (data as any)?.computed;
                       if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
                         setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
