@@ -162,8 +162,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
   
-  // Session persistence key based on target date
-  const sessionKey = `strength_logger_session_${targetDate || new Date().toISOString().split('T')[0]}`;
+  // Session persistence key based on target date - use consistent date format
+  const getTodayDateString = () => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+  
+  const sessionKey = `strength_logger_session_${targetDate || getTodayDateString()}`;
   
   // Save session progress to localStorage
   const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
@@ -179,9 +187,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         sourcePlannedDate
       };
       localStorage.setItem(sessionKey, JSON.stringify(sessionData));
-      console.log('💾 Session progress saved:', sessionData);
+      console.log('💾 Session progress saved with key:', sessionKey, 'data:', sessionData);
     } catch (error) {
       console.error('❌ Failed to save session progress:', error);
+      // Try to clear potentially corrupted data
+      try {
+        localStorage.removeItem(sessionKey);
+        console.log('🗑️ Cleared potentially corrupted session data');
+      } catch (clearError) {
+        console.error('❌ Failed to clear corrupted session data:', clearError);
+      }
     }
   };
   
@@ -190,19 +205,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     try {
       console.log('🔍 Checking for saved session with key:', sessionKey);
       const saved = localStorage.getItem(sessionKey);
+      console.log('🔍 Raw saved data:', saved ? 'found' : 'not found');
       if (saved) {
         const sessionData = JSON.parse(saved);
-        // Check if session is from today (not stale)
-        const today = new Date().toISOString().split('T')[0];
-        const sessionDate = new Date(sessionData.timestamp).toISOString().split('T')[0];
-        console.log('🔍 Session date check - today:', today, 'session:', sessionDate);
-        if (sessionDate === today) {
+        // Check if session is recent (within last 24 hours) - more lenient validation
+        const now = new Date();
+        const sessionTimestamp = new Date(sessionData.timestamp);
+        const hoursDiff = Math.abs(now.getTime() - sessionTimestamp.getTime()) / (1000 * 60 * 60);
+        
+        console.log('🔍 Session age check - hours since session:', hoursDiff.toFixed(2));
+        
+        if (hoursDiff < 24) {
           console.log('🔄 Session progress restored:', sessionData);
           return sessionData;
         } else {
-          // Clear stale session data
+          // Clear stale session data (older than 24 hours)
           localStorage.removeItem(sessionKey);
-          console.log('🗑️ Cleared stale session data');
+          console.log('🗑️ Cleared stale session data (older than 24 hours)');
         }
       } else {
         console.log('🔍 No saved session found');
