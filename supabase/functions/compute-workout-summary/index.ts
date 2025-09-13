@@ -355,6 +355,7 @@ Deno.serve(async (req) => {
       const segSec = Math.max(1, endT - startT);
       const pace = paceSecPerMiFromMetersSeconds(segMeters, segSec);
       const gap  = gapSecPerMi(rows, sIdx, eIdx);
+      const role = stepRole(st);
       const hrVals:number[] = [], cadVals:number[] = [];
       for (let j=sIdx;j<=eIdx;j++) {
         const h = rows[j].hr; if (typeof h === 'number' && h >= 50 && h <= 220) hrVals.push(h);

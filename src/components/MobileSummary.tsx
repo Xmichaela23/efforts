@@ -824,20 +824,29 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                     setComputeError(null);
                     const r1 = await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
                     if ((r1 as any)?.error) setComputeError(String((r1 as any).error?.message || 'compute failed'));
+                    // If function returned computed, use it immediately without waiting on DB write
+                    try {
+                      const immediate = (r1 as any)?.data?.computed;
+                      if (immediate && Array.isArray(immediate?.intervals) && immediate.intervals.length) {
+                        setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: immediate }));
+                      }
+                    } catch {}
                     try {
                       const r2 = await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
                       if ((r2 as any)?.error) setComputeError(prev=> prev || String((r2 as any).error?.message || 'analysis failed'));
                     } catch (e:any) { /* ignore */ }
-                    // quick poll burst for immediate feedback
-                    for (let i=0;i<6;i++) {
-                      const { data, error } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
-                      if (error) { setComputeError(String(error.message||error)); }
-                      const compd = (data as any)?.computed;
-                      if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-                        setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
-                        break;
+                    // quick poll burst for immediate feedback (skip if immediate already set)
+                    if (!(r1 as any)?.data?.computed) {
+                      for (let i=0;i<6;i++) {
+                        const { data, error } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
+                        if (error) { setComputeError(String(error.message||error)); }
+                        const compd = (data as any)?.computed;
+                        if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+                          setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
+                          break;
+                        }
+                        await new Promise(r=>setTimeout(r, 600));
                       }
-                      await new Promise(r=>setTimeout(r, 600));
                     }
                   } catch {}
                   finally { setForceComputing(false); }
