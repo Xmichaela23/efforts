@@ -619,6 +619,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     }
     const hrAvg = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
     const km = dMeters/1000;
+    // Compute average speed early so it can be used below for multiple fallbacks
+    const speedVals = seg
+      .map(s => (typeof (s as any).speedMps === 'number' ? (s as any).speedMps : NaN))
+      .filter(n => Number.isFinite(n) && n >= 0.3);
+    const avgSpeedMps = speedVals.length ? (speedVals.reduce((a,b)=>a+b,0)/speedVals.length) : null;
     const plannedMetersForPace = (Number.isFinite(stDistanceMeters) && stDistanceMeters>0) ? (stDistanceMeters as number) : (fallbackWorkMeters || 0);
     const milesMeasured = (km * 0.621371);
     const milesPlanned = plannedMetersForPace > 0 ? (plannedMetersForPace/1609.34) : 0;
@@ -629,10 +634,6 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     }
     const paceMinPerMile = miles>0 ? (timeSec/60)/miles : null;
     // Fallback: compute from avg speed when distance integration is unavailable
-    const speedVals = seg
-      .map(s => (typeof (s as any).speedMps === 'number' ? (s as any).speedMps : NaN))
-      .filter(n => Number.isFinite(n) && n >= 0.3);
-    const avgSpeedMps = speedVals.length ? (speedVals.reduce((a,b)=>a+b,0)/speedVals.length) : null;
 
     // If segmentation produced a tiny duration but the plan had a real duration, honor planned time (prevents 0:01 artifacts)
     if (timeSec < 5 && plannedDurSec > 0) {
