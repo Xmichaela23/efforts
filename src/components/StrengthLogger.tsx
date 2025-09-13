@@ -694,12 +694,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     
     // Clear any existing lock when no saved session
     setLockManualPrefill(false);
-    
-    if (lockManualPrefill) {
-      // Respect manual selection: do not reinitialize/clear
-      if (!isInitialized) setIsInitialized(true);
-      return;
-    }
+    setIsInitialized(true);
     
     // Always start fresh - clear any existing state
     setExercises([]);
@@ -840,7 +835,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         if (or2 && or2.length>1) setPendingOrOptions(prev => prev || or2);
       } catch {}
     })();
-  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate, performanceNumbers, lockManualPrefill, isInitialized]);
+  }, [scheduledWorkout, workouts, plannedWorkouts, targetDate, performanceNumbers]);
+
+  // Handle manual prefill lock - separate effect to avoid infinite loops
+  useEffect(() => {
+    if (lockManualPrefill && !isInitialized) {
+      setIsInitialized(true);
+    }
+  }, [lockManualPrefill, isInitialized]);
 
   // Ensure timers exist for current sets (default 90s)
   useEffect(() => {
