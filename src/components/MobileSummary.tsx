@@ -785,7 +785,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       try {
         const { data } = await supabase
           .from('workouts')
-          .select('id,computed,computed_version,computed_at')
+          .select('computed')
           .eq('id', cid)
           .maybeSingle();
         const compd = (data as any)?.computed;
