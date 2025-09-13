@@ -44,8 +44,6 @@ export default function MapEffort({
   const [ready, setReady] = useState(false);
   const styleCacheRef = useRef<Record<string, any>>({});
   const [visible, setVisible] = useState(false);
-  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
-  const isScrollingRef = useRef(false);
 
   const coords = useMemo(() => sanitizeLngLat(trackLngLat), [trackLngLat]);
   const lineCum = useMemo(() => cumulativeMeters(coords), [coords]);
@@ -81,6 +79,59 @@ export default function MapEffort({
     });
     mapRef.current = map;
 
+    // ↓↓↓ ADD: tame wheel + touch so page scroll wins
+    // 1) Wheel: require Ctrl/⌘ to zoom; otherwise let page scroll
+    map.scrollZoom.disable();
+    map.dragPan.disable();
+    map.touchZoomRotate.disableRotation();
+    
+    // Disable keyboard pan/zoom so arrow keys/± don't nudge the map while typing
+    // @ts-ignore
+    map.keyboard?.disable?.();
+    let wheelTimer: number | undefined;
+    const canvas = map.getCanvas();
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        map.scrollZoom.enable();
+        // (optional) slower wheel zoom if supported
+        // @ts-ignore
+        map.scrollZoom.setWheelZoomRate?.(1 / 900);
+        clearTimeout(wheelTimer);
+        wheelTimer = window.setTimeout(() => map.scrollZoom.disable(), 700);
+      } else {
+        // no map zoom; let the page handle the wheel
+        map.scrollZoom.disable();
+      }
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: true });
+
+    // 2) Touch: single-finger = page scroll, two-finger = pan/zoom map
+    const container = map.getCanvasContainer();
+    container.style.touchAction = 'pan-y'; // allow vertical page scroll
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length >= 2) {
+        map.dragPan.enable();
+        map.touchZoomRotate.enable();
+      } else {
+        map.dragPan.disable();
+        map.touchZoomRotate.disableRotation();
+      }
+    };
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) {
+        map.dragPan.disable();
+        map.touchZoomRotate.disableRotation();
+      }
+    };
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove',  onTouchStart, { passive: true });
+    container.addEventListener('touchend',   onTouchEnd,   { passive: true });
+
+    // (optional) If supported, also slow trackpad/gesture zoom
+    // @ts-ignore
+    map.scrollZoom.setWheelZoomRate?.(1 / 900);
+    // ↑↑↑ END ADD
+
     const attachLayers = () => {
       if (!map.getSource(ROUTE_SRC)) {
         map.addSource(ROUTE_SRC, { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} } as any });
@@ -108,72 +159,6 @@ export default function MapEffort({
       onMapReady?.();
     });
 
-    // Touch gesture handling for better mobile UX
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length === 1) {
-        const touch = e.touches[0];
-        touchStartRef.current = {
-          x: touch.clientX,
-          y: touch.clientY,
-          time: Date.now()
-        };
-        isScrollingRef.current = false;
-        console.log('🗺️ MapEffort touch start:', { x: touch.clientX, y: touch.clientY });
-      }
-    };
-
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!touchStartRef.current || e.touches.length !== 1) return;
-      
-      const touch = e.touches[0];
-      const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
-      const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
-      const deltaTime = Date.now() - touchStartRef.current.time;
-      
-      console.log('🗺️ MapEffort touch move:', { deltaX, deltaY, deltaTime, isScrolling: isScrollingRef.current });
-      
-      // Always prevent default initially to stop map from responding
-      e.preventDefault();
-      e.stopPropagation();
-      
-      // If we haven't determined scroll direction yet
-      if (!isScrollingRef.current && deltaTime > 200) {
-        // If primarily vertical movement, allow page scroll
-        if (deltaY > deltaX && deltaY > 50) {
-          console.log('🗺️ Allowing page scroll - vertical movement detected');
-          isScrollingRef.current = true;
-          // Don't re-enable map interactions
-        }
-        // If primarily horizontal movement, enable map interaction
-        else if (deltaX > deltaY && deltaX > 50) {
-          console.log('🗺️ Enabling map interaction - horizontal movement detected');
-          isScrollingRef.current = true;
-          // Re-enable map interactions for horizontal movement
-          map.dragPan.enable();
-          map.scrollZoom.enable();
-          map.boxZoom.enable();
-          map.dragRotate.enable();
-          map.doubleClickZoom.enable();
-        }
-      }
-    };
-
-    const handleTouchEnd = () => {
-      // Reset state after touch ends
-      setTimeout(() => {
-        isScrollingRef.current = false;
-        touchStartRef.current = null;
-        // Don't automatically re-enable map interactions - let the next touch determine behavior
-      }, 100);
-    };
-
-    // Add touch event listeners to the map container
-    const container = divRef.current;
-    if (container) {
-      container.addEventListener('touchstart', handleTouchStart, { passive: true });
-      container.addEventListener('touchmove', handleTouchMove, { passive: false });
-      container.addEventListener('touchend', handleTouchEnd, { passive: true });
-    }
 
     // When style changes (theme), re-attach layers
     map.on('styledata', () => {
@@ -190,16 +175,13 @@ export default function MapEffort({
     map.on('resize', onResize);
 
     return () => {
+      canvas.removeEventListener('wheel', onWheel as any);
+      container.removeEventListener('touchstart', onTouchStart as any);
+      container.removeEventListener('touchmove',  onTouchStart as any);
+      container.removeEventListener('touchend',   onTouchEnd as any);
       map.off('resize', onResize);
       map.remove();
       mapRef.current = null;
-      
-      // Clean up touch event listeners
-      if (container) {
-        container.removeEventListener('touchstart', handleTouchStart);
-        container.removeEventListener('touchmove', handleTouchMove);
-        container.removeEventListener('touchend', handleTouchEnd);
-      }
     };
   }, [theme, onMapReady]);
 
@@ -237,7 +219,7 @@ export default function MapEffort({
     const p = pointAtDistance(coords, lineCum, Math.max(0, Math.min(cursorDist_m, total)));
     src.setData({ type: 'Feature', geometry: { type: 'Point', coordinates: p } } as any);
     if (followCursor && fittedRef.current) {
-      try { map.easeTo({ center: p as any, duration: 250, maxDuration: 300 }); } catch {}
+      try { map.easeTo({ center: p as any, duration: 250 }); } catch {}
     }
   }, [cursorDist_m, dTotal, coords, lineCum, followCursor, ready]);
 
@@ -283,7 +265,7 @@ export default function MapEffort({
     );
   }
 
-  return <div ref={divRef} className={className} style={{ height, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,.06)', opacity: visible ? 1 : 0, transition: 'opacity 180ms ease', touchAction: 'manipulation' }} />;
+  return <div ref={divRef} className={className} style={{ height, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,.06)', opacity: visible ? 1 : 0, transition: 'opacity 180ms ease' }} />;
 }
 
 
