@@ -14,11 +14,9 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
   const [candidates, setCandidates] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const windowDays = 3;
+  const windowDays = 7; // Increased from 3 to 7 days to catch more planned workouts
 
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
+  const searchForCandidates = async () => {
       try {
         setLoading(true);
         setError(null);
@@ -49,13 +47,26 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           .lte('date', to)
           .order('date', { ascending: true });
 
+        console.log('🔍 AssociatePlannedDialog search results:', {
+          type,
+          date: d,
+          from,
+          to,
+          candidates: data,
+          count: Array.isArray(data) ? data.length : 0
+        });
+
         setCandidates(Array.isArray(data) ? data : []);
       } catch (e: any) {
         setError(e?.message || 'Failed to load candidates');
       } finally {
         setLoading(false);
       }
-    })();
+  };
+
+  useEffect(() => {
+    if (!open) return;
+    searchForCandidates();
   }, [open, workout?.id]);
 
   const associate = async (planned: any) => {
@@ -155,7 +166,15 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
             ))}
           </div>
         )}
-        <div className="flex justify-end gap-2 pt-2">
+        <div className="flex justify-between gap-2 pt-2">
+          <Button 
+            variant="ghost" 
+            onClick={searchForCandidates} 
+            disabled={loading}
+            size="sm"
+          >
+            Refresh
+          </Button>
           <Button variant="ghost" onClick={onClose} disabled={loading}>Cancel</Button>
         </div>
       </div>

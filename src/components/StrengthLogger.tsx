@@ -1154,9 +1154,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     })));
 
     if (validExercises.length === 0) {
+      console.log('❌ Validation failed - no valid exercises found');
+      console.log('❌ All exercises:', exercises);
       alert('Please add at least one exercise with a name to save the workout.');
       return;
     }
+
+    console.log('✅ Validation passed - proceeding with save');
+    console.log('✅ Valid exercises:', validExercises);
 
     // FIXED: Use consistent PST timezone and move cross-day selections to TODAY
     // If this log was sourced from a planned workout (via Workouts menu), always save to today

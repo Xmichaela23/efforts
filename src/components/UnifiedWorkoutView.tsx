@@ -418,17 +418,22 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     onClick={async()=>{
                       try {
                         const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
+                        console.log('🔍 Unattaching workout:', { workoutId: workout.id, plannedId: pid, linkedPlanned });
                         if (!pid) return;
                         // 1) Detach primary planned row
-                        await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
+                        const { error: plannedError } = await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
+                        console.log('🔍 Planned workout update result:', plannedError);
                         // 2) Safety: detach any planned rows pointing at this workout id
-                        await supabase.from('planned_workouts').update({ completed_workout_id: null }).eq('completed_workout_id', workout.id);
+                        const { error: safetyError } = await supabase.from('planned_workouts').update({ completed_workout_id: null }).eq('completed_workout_id', workout.id);
+                        console.log('🔍 Safety detach result:', safetyError);
                         // 3) Clear workout link and any stale computed summary so client re-slices or recomputes
-                        await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
+                        const { error: workoutError } = await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
+                        console.log('🔍 Workout update result:', workoutError);
                         try { (workout as any).planned_id = null; } catch {}
                         setLinkedPlanned(null);
                         // Prevent immediate fallback re-link detection for a short window
                         suppressRelinkUntil.current = Date.now() + 15000; // 15s
+                        console.log('🔍 Unattach complete, suppression until:', new Date(suppressRelinkUntil.current));
                         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                         try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                       } catch {}
