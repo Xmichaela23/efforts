@@ -1285,59 +1285,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
-          <button 
-            onClick={() => {
-              console.log('🚨 NUCLEAR OPTION - Clearing everything...');
-              
-              try {
-                // Nuclear option - clear absolutely everything
-                console.log('🧹 Step 1: Clearing all storage...');
-                localStorage.clear();
-                sessionStorage.clear();
-                
-                // Clear IndexedDB if it exists
-                if ('indexedDB' in window) {
-                  indexedDB.databases().then(databases => {
-                    databases.forEach(db => {
-                      if (db.name) {
-                        indexedDB.deleteDatabase(db.name);
-                        console.log('🗑️ Cleared IndexedDB:', db.name);
-                      }
-                    });
-                  }).catch(() => {});
-                }
-                
-                // Clear service worker caches
-                if ('caches' in window) {
-                  caches.keys().then(names => {
-                    names.forEach(name => {
-                      caches.delete(name);
-                      console.log('🗑️ Cleared cache:', name);
-                    });
-                  }).catch(() => {});
-                }
-                
-                console.log('🧹 Step 2: Dispatching events...');
-                // Dispatch all possible invalidation events
-                window.dispatchEvent(new CustomEvent('planned:invalidate'));
-                window.dispatchEvent(new CustomEvent('nav:pullrefresh'));
-                window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-                window.dispatchEvent(new CustomEvent('cache:clear'));
-                
-                console.log('🧹 Step 3: Force reload...');
-                // Force hard reload with cache bypass
-                window.location.href = window.location.href + '?t=' + Date.now();
-                
-              } catch (e) {
-                console.error('Nuclear clear failed:', e);
-                // Last resort - direct reload
-                window.location.href = window.location.origin + window.location.pathname;
-              }
-            }}
-            className="text-xs px-2 py-1 bg-red-600 text-white rounded font-bold"
-          >
-            NUCLEAR CLEAR
-          </button>
           <div className="relative">
             <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
             {showWorkoutsMenu && (
