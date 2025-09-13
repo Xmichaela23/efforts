@@ -5,6 +5,7 @@ import { Dumbbell } from 'lucide-react';
 
 interface StrengthCompletedViewProps {
   workoutData: any;
+  plannedWorkout?: any; // Optional planned workout data for comparison
 }
 
 interface CompletedExercise {
@@ -21,7 +22,7 @@ interface CompletedExercise {
   weight?: number;
 }
 
-const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData }) => {
+const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutData, plannedWorkout: passedPlannedWorkout }) => {
   console.log('🔍 StrengthCompletedView received workoutData:', workoutData);
   console.log('🔍 strength_exercises:', workoutData.strength_exercises);
   console.log('🔍 completed_exercises:', workoutData.completed_exercises);
@@ -39,11 +40,18 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
     return date.toISOString().split('T')[0];
   };
 
-  // Prefer the provided object as planned when it is a planned row
+  // Find the planned workout - either the provided object if it's planned, or use passed planned workout
   const plannedWorkout = useMemo(() => {
+    // If this is a planned workout, use it directly
     if (String(workoutData?.workout_status).toLowerCase() === 'planned') return workoutData;
+    
+    // If this is a completed workout, use the passed planned workout if available
+    if (String(workoutData?.workout_status).toLowerCase() === 'completed') {
+      return passedPlannedWorkout || null;
+    }
+    
     return null;
-  }, [workoutData]);
+  }, [workoutData, passedPlannedWorkout]);
 
   // Find completed strength workout for the same date (logger save)
   const completedForDay = useMemo(() => {

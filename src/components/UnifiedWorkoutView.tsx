@@ -473,22 +473,25 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   <div className="p-4">
                     <h3 className="font-semibold mb-4">Strength Workout Completed</h3>
                     {/* Use StrengthCompletedView for strength workouts with sanitized sets */}
-                    <StrengthCompletedView workoutData={{
-                      ...workout,
-                      strength_exercises: Array.isArray((workout as any).strength_exercises)
-                        ? (workout as any).strength_exercises.map((ex: any) => ({
-                            ...ex,
-                            sets: Array.isArray(ex?.sets)
-                              ? ex.sets.map((s: any) => ({
-                                  reps: Number((s?.reps as any) ?? 0) || 0,
-                                  weight: Number((s?.weight as any) ?? 0) || 0,
-                                  rir: typeof s?.rir === 'number' ? s.rir : undefined,
-                                  completed: Boolean(s?.completed)
-                                }))
-                              : []
-                          }))
-                        : []
-                    }} />
+                    <StrengthCompletedView 
+                      workoutData={{
+                        ...workout,
+                        strength_exercises: Array.isArray((workout as any).strength_exercises)
+                          ? (workout as any).strength_exercises.map((ex: any) => ({
+                              ...ex,
+                              sets: Array.isArray(ex?.sets)
+                                ? ex.sets.map((s: any) => ({
+                                    reps: Number((s?.reps as any) ?? 0) || 0,
+                                    weight: Number((s?.weight as any) ?? 0) || 0,
+                                    rir: typeof s?.rir === 'number' ? s.rir : undefined,
+                                    completed: Boolean(s?.completed)
+                                  }))
+                                : []
+                            }))
+                          : []
+                      }}
+                      plannedWorkout={linkedPlanned}
+                    />
                     {assocOpen && (
                       <AssociatePlannedDialog
                         workout={workout}
