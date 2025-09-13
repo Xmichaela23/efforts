@@ -1724,7 +1724,7 @@ const formatPace = (paceValue: any): string => {
             .filter((p: any) => p !== null && p !== undefined);
           
           const cadenceData = samples
-            .map((s: any) => s.cadence || s.rpm || s.spm || s.run_cadence || s.bike_cadence || s.steps_per_minute || null)
+            .map((s: any) => s.cadence || s.cadence_rpm || s.cadenceInRpm || null)
             .filter((c: any) => c !== null && c !== undefined);
           
           // Only show if we have power or cadence data
@@ -1735,21 +1735,21 @@ const formatPace = (paceValue: any): string => {
                   initial="PWR"
                   onRender={(metric, el) => {
                     // Debug: log what data we have
-                    console.log('Power/Cadence chart render for metric:', metric, {
-                      samplesLength: samples.length,
-                      powerDataLength: powerData.length,
-                      cadenceDataLength: cadenceData.length,
-                      sampleKeys: samples.length > 0 ? Object.keys(samples[0]) : [],
-                      firstSample: samples.length > 0 ? samples[0] : null,
-                      cadenceFields: samples.length > 0 ? {
+                    console.log('=== POWER/CADENCE CHART DEBUG ===');
+                    console.log('Metric:', metric);
+                    console.log('Samples length:', samples.length);
+                    console.log('Power data length:', powerData.length);
+                    console.log('Cadence data length:', cadenceData.length);
+                    console.log('Sample keys:', samples.length > 0 ? Object.keys(samples[0]) : []);
+                    if (samples.length > 0) {
+                      console.log('First sample:', samples[0]);
+                      console.log('Cadence field values:', {
                         cadence: samples[0].cadence,
-                        rpm: samples[0].rpm,
-                        spm: samples[0].spm,
-                        run_cadence: samples[0].run_cadence,
-                        bike_cadence: samples[0].bike_cadence,
-                        steps_per_minute: samples[0].steps_per_minute
-                      } : null
-                    });
+                        cadence_rpm: samples[0].cadence_rpm,
+                        cadenceInRpm: samples[0].cadenceInRpm
+                      });
+                    }
+                    console.log('=== END DEBUG ===');
                     
                     // Show placeholder for power/cadence chart
                     el.innerHTML = `
