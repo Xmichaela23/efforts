@@ -1729,42 +1729,46 @@ const formatPace = (paceValue: any): string => {
           
           // Only show if we have power or cadence data
           if (powerData.length > 0 || cadenceData.length > 0) {
+            // Calculate averages for header
+            const avgPower = powerData.length > 0 ? Math.round(powerData.reduce((a, b) => a + b, 0) / powerData.length) : 0;
+            const avgCadence = cadenceData.length > 0 ? Math.round(cadenceData.reduce((a, b) => a + b, 0) / cadenceData.length) : 0;
+
             return (
               <div className="mb-4">
                 <RunLineChartPanel
                   initial="PWR"
-                  onRender={(metric, el) => {
-                    // Debug: log what data we have
-                    console.log('=== POWER/CADENCE CHART DEBUG ===');
-                    console.log('Metric:', metric);
-                    console.log('Samples length:', samples.length);
-                    console.log('Power data length:', powerData.length);
-                    console.log('Cadence data length:', cadenceData.length);
-                    console.log('Sample keys:', samples.length > 0 ? Object.keys(samples[0]) : []);
-                    if (samples.length > 0) {
-                      console.log('First sample:', samples[0]);
-                      console.log('Cadence field values:', {
-                        bikeCadence: samples[0].bikeCadence,
-                        runCadence: samples[0].runCadence,
-                        swimCadence: samples[0].swimCadence,
-                        wheelchairCadence: samples[0].wheelchairCadence
-                      });
-                    }
-                    console.log('=== END DEBUG ===');
+                  header={
+                    <div className="mb-2 grid grid-cols-2 gap-4 px-1">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Power</div>
+                        <div className="text-lg font-semibold tabular-nums">{avgPower} W</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Cadence</div>
+                        <div className="text-lg font-semibold tabular-nums">{avgCadence} spm</div>
+                      </div>
+                    </div>
+                  }
+                  onRender={React.useCallback((metric, el) => {
+                    // Create power/cadence series for the selected metric
+                    const series = metric === "PWR" ? powerData : cadenceData;
+                    const yUnit = metric === "PWR" ? "W" : "spm";
                     
-                    // Show placeholder for power/cadence chart
+                    // For now, show a simple placeholder with data info
                     el.innerHTML = `
                       <div class="h-full w-full flex items-center justify-center text-muted-foreground p-4">
                         <div class="text-center">
                           <div class="text-lg font-semibold mb-2">${metric} Chart</div>
                           <div class="text-sm">
-                            ${metric === 'PWR' ? `Power data: ${powerData.length} samples` : ''}
-                            ${metric === 'CAD' ? `Cadence data: ${cadenceData.length} samples` : ''}
+                            ${series.length} samples • ${yUnit}
                           </div>
                         </div>
                       </div>
                     `;
-                  }}
+                    
+                    // Return cleanup function (even though it's not needed for innerHTML)
+                    return () => {};
+                  }, [powerData, cadenceData])}
                 />
               </div>
             );

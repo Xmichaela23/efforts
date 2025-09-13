@@ -6,12 +6,14 @@ export type MetricKey = "PWR" | "CAD";
 
 export default function RunLineChartPanel({
   initial = "PWR",
-  onRender, // (metric, el) => mount your existing line chart
+  header,
+  onRender, // memoize in parent: useCallback((metric, el) => {...}, [])
   className = "",
   height = 210,
 }: {
   initial?: MetricKey;
-  onRender: (metric: MetricKey, el: HTMLDivElement) => void;
+  header?: React.ReactNode;
+  onRender: (metric: MetricKey, el: HTMLDivElement) => void | (() => void);
   className?: string;
   height?: number;
 }) {
@@ -19,21 +21,32 @@ export default function RunLineChartPanel({
   const mountRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
-    if (!mountRef.current) return;
-    // clear any previous drawing
-    mountRef.current.innerHTML = "";
-    onRender(tab, mountRef.current);
-    // unmount hook (optional): if your renderer returns a destroy function, call it here
-  }, [tab, onRender]);
+    const el = mountRef.current;
+    if (!el) return;
+    el.innerHTML = "";
+    const cleanup = onRender(tab, el);
+    return () => {
+      try { cleanup && cleanup(); } catch {}
+      if (el) el.innerHTML = "";
+    };
+    // ⬇️ rely on parent to memoize onRender
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab]);
 
   return (
     <div className={clsx("mt-2", className)}>
-      {/* Chart card (same look) */}
+      {/* Header with metrics */}
+      {header && (
+        <div className="mb-2">
+          {header}
+        </div>
+      )}
+
       <div className="rounded-2xl border bg-card">
         <div
           ref={mountRef}
-          className="w-full"
-          style={{ height }}
+          className="w-full h-[210px]"   // match other panel's fixed height
+          style={{ height }}              // override via prop if needed
           aria-label={`${tab} chart`}
         />
       </div>
