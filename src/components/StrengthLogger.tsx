@@ -188,12 +188,14 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Restore session progress from localStorage
   const restoreSessionProgress = (): { exercises: LoggedExercise[]; addons: AttachedAddon[]; notes: string; rpe: number | ''; sourcePlannedName: string; sourcePlannedId: string | null; sourcePlannedDate: string | null } | null => {
     try {
+      console.log('🔍 Checking for saved session with key:', sessionKey);
       const saved = localStorage.getItem(sessionKey);
       if (saved) {
         const sessionData = JSON.parse(saved);
         // Check if session is from today (not stale)
         const today = new Date().toISOString().split('T')[0];
         const sessionDate = new Date(sessionData.timestamp).toISOString().split('T')[0];
+        console.log('🔍 Session date check - today:', today, 'session:', sessionDate);
         if (sessionDate === today) {
           console.log('🔄 Session progress restored:', sessionData);
           return sessionData;
@@ -202,6 +204,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           localStorage.removeItem(sessionKey);
           console.log('🗑️ Cleared stale session data');
         }
+      } else {
+        console.log('🔍 No saved session found');
       }
     } catch (error) {
       console.error('❌ Failed to restore session progress:', error);
@@ -687,6 +691,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       setIsInitialized(true);
       return;
     }
+    
+    // Clear any existing lock when no saved session
+    setLockManualPrefill(false);
     
     if (lockManualPrefill) {
       // Respect manual selection: do not reinitialize/clear
@@ -1275,7 +1282,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
             {showWorkoutsMenu && (
               <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
-                <div className="text-xs font-semibold text-gray-500 px-1 pb-1">Strength (This week)</div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-gray-500">Strength (This week)</div>
+                  <button 
+                    onClick={() => {
+                      clearSessionProgress();
+                      setExercises([createEmptyExercise()]);
+                      setAttachedAddons([]);
+                      setNotesText('');
+                      setNotesRpe('');
+                      setSourcePlannedName('');
+                      setSourcePlannedId(null);
+                      setSourcePlannedDate(null);
+                      setLockManualPrefill(false);
+                      setShowWorkoutsMenu(false);
+                    }}
+                    className="text-xs text-blue-600 hover:text-blue-800"
+                  >
+                    Start Fresh
+                  </button>
+                </div>
                 <div className="max-h-56 overflow-y-auto" onMouseDown={(e)=>e.preventDefault()}>
                   {(Array.isArray(plannedWorkouts)? plannedWorkouts: [])
                     .filter(w=>String((w as any).type).toLowerCase()==='strength')
