@@ -732,18 +732,31 @@ export const useWorkouts = () => {
 
       const { data: planned } = await supabase
         .from('planned_workouts')
-        .select('id,user_id,type,date,name,duration,rendered_description,description,computed,intervals,workout_status,targets_summary')
+        .select('id,user_id,type,date,name,duration,rendered_description,description,computed,intervals,workout_status,targets_summary,completed_workout_id')
         .eq('user_id', user.id)
         .eq('type', completed.type)
-        .in('workout_status', ['planned','in_progress'])
+        .in('workout_status', ['planned','in_progress','completed'])
         .gte('date', from)
         .lte('date', to);
 
       const candidates = Array.isArray(planned) ? planned : [];
       if (!candidates.length) return;
 
+      // Filter out completed planned workouts that are already linked to other completed workouts
+      const filteredCandidates = candidates.filter(planned => {
+        // If it's completed, only show it if it's not linked to any completed workout
+        // OR if it's linked to the current workout (re-association)
+        if (planned.workout_status === 'completed') {
+          return !planned.completed_workout_id || planned.completed_workout_id === (completed as any).id;
+        }
+        // Show all planned and in_progress workouts
+        return true;
+      });
+
+      if (!filteredCandidates.length) return;
+
       // Same‑day candidates
-      const sameDay = candidates.filter((c:any)=> c.date === date);
+      const sameDay = filteredCandidates.filter((c:any)=> c.date === date);
       const derivePlannedStats = (r:any) => {
         // Derive seconds and km from computed.steps or intervals or duration
         let secs = 0; let km = 0;
@@ -801,8 +814,8 @@ export const useWorkouts = () => {
       let target = pickByHeuristics(sameDay);
       if (!target) {
         // No same-day clear match → single candidate in ±2 days
-        const single = candidates.length === 1 ? candidates[0] : null;
-        if (single) target = single; else target = pickByHeuristics(candidates);
+        const single = filteredCandidates.length === 1 ? filteredCandidates[0] : null;
+        if (single) target = single; else target = pickByHeuristics(filteredCandidates);
       }
       if (!target) return;
 

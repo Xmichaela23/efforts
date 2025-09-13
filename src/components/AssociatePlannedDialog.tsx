@@ -56,6 +56,15 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           count: Array.isArray(data) ? data.length : 0
         });
 
+        // Debug: Also check what planned workouts exist for this user (any type, any date)
+        const { data: allPlanned } = await supabase
+          .from('planned_workouts')
+          .select('id,name,type,date,workout_status')
+          .eq('user_id', user.id)
+          .order('date', { ascending: true })
+          .limit(20);
+        console.log('🔍 All planned workouts for user:', allPlanned);
+
         // Filter out completed planned workouts that are already linked to other completed workouts
         const filteredCandidates = (Array.isArray(data) ? data : []).filter(planned => {
           // If it's completed, only show it if it's not linked to any completed workout
