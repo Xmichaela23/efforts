@@ -730,6 +730,13 @@ export const useWorkouts = () => {
       const from = around(date, -2);
       const to = around(date, 2);
 
+      console.log('🔍 Auto-attach debugging for workout:', {
+        completedDate: date,
+        completedType: completed.type,
+        searchFrom: from,
+        searchTo: to
+      });
+
       const { data: planned } = await supabase
         .from('planned_workouts')
         .select('id,user_id,type,date,name,duration,rendered_description,description,computed,intervals,workout_status,targets_summary,completed_workout_id')
@@ -738,6 +745,8 @@ export const useWorkouts = () => {
         .in('workout_status', ['planned','in_progress','completed'])
         .gte('date', from)
         .lte('date', to);
+
+      console.log('🔍 Auto-attach found planned workouts:', planned);
 
       const candidates = Array.isArray(planned) ? planned : [];
       if (!candidates.length) return;
