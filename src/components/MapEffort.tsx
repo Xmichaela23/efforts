@@ -81,68 +81,6 @@ export default function MapEffort({
     });
     mapRef.current = map;
 
-    // ↓↓↓ ADD: tame wheel + touch so page scroll wins
-    // 1) Wheel: require Ctrl/⌘ to zoom; otherwise let page scroll
-    map.scrollZoom.disable();
-    map.touchZoomRotate.disableRotation();
-    
-    // Disable keyboard pan/zoom so arrow keys/± don't nudge the map while typing
-    // @ts-ignore
-    map.keyboard?.disable?.();
-    let wheelTimer: number | undefined;
-    const canvas = map.getCanvas();
-    const onWheel = (e: WheelEvent) => {
-      if (e.ctrlKey || e.metaKey) {
-        map.scrollZoom.enable();
-        // (optional) slower wheel zoom if supported
-        // @ts-ignore
-        map.scrollZoom.setWheelZoomRate?.(1 / 900);
-        clearTimeout(wheelTimer);
-        wheelTimer = window.setTimeout(() => map.scrollZoom.disable(), 700);
-      } else {
-        // no map zoom; let the page handle the wheel
-        map.scrollZoom.disable();
-      }
-    };
-    canvas.addEventListener('wheel', onWheel, { passive: true });
-
-    // 2) Touch: single-finger = page scroll, two-finger = pan/zoom map
-    map.touchZoomRotate.disableRotation(); // no two-finger rotate
-    
-    const container = map.getCanvasContainer();
-    const setTA = (v: string) => {
-      container.style.touchAction = v;
-      map.getCanvas().style.touchAction = v;
-    };
-    setTA('pan-y'); // default: let the page scroll vertically
-    
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.touches.length >= 2) {
-        setTA('none');                 // allow 2D gestures inside the map
-        map.dragPan.enable();
-        map.touchZoomRotate.enable();
-        map.touchZoomRotate.disableRotation(); // keep rotation off
-      } else {
-        setTA('pan-y');                // 1 finger: page scroll
-        map.dragPan.disable();
-        map.touchZoomRotate.disableRotation();
-      }
-    };
-    const onTouchEnd = (e: TouchEvent) => {
-      if (e.touches.length === 0) {
-        setTA('pan-y');                // back to page scroll
-        map.dragPan.enable();          // desktop mouse/trackpad can still pan
-        map.touchZoomRotate.disableRotation();
-      }
-    };
-    container.addEventListener('touchstart', onTouchStart, { passive: true });
-    container.addEventListener('touchend',   onTouchEnd,   { passive: true });
-    container.addEventListener('touchcancel', onTouchEnd,  { passive: true });
-
-    // (optional) If supported, also slow trackpad/gesture zoom
-    // @ts-ignore
-    map.scrollZoom.setWheelZoomRate?.(1 / 900);
-    // ↑↑↑ END ADD
 
     const attachLayers = () => {
       if (!map.getSource(ROUTE_SRC)) {
@@ -167,7 +105,15 @@ export default function MapEffort({
 
     map.on('load', () => {
       attachLayers();
-      map.dragPan.enable();   // ← ensure enabled for mouse/trackpad
+      // Keep zoom centered at the pinch midpoint to avoid horizontal "slide"
+      // @ts-ignore – MapLibre supports this option
+      map.touchZoomRotate.enable({ around: 'pinch' });
+      map.touchZoomRotate.disableRotation(); // no rotate
+      map.dragPan.enable();                  // allow pan
+      // Let 1-finger gestures scroll the page when over the map
+      const container = map.getCanvasContainer();
+      container.style.touchAction = 'pan-y';
+      map.getCanvas().style.touchAction = 'pan-y';
       setReady(true);
       onMapReady?.();
     });
@@ -188,11 +134,6 @@ export default function MapEffort({
     map.on('resize', onResize);
 
     return () => {
-      clearTimeout(wheelTimer);
-      canvas.removeEventListener('wheel', onWheel as any);
-      container.removeEventListener('touchstart', onTouchStart as any);
-      container.removeEventListener('touchend',   onTouchEnd as any);
-      container.removeEventListener('touchcancel', onTouchEnd as any);
       map.off('resize', onResize);
       map.remove();
       mapRef.current = null;
