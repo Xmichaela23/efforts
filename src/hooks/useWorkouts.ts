@@ -739,7 +739,7 @@ export const useWorkouts = () => {
 
       const { data: planned } = await supabase
         .from('planned_workouts')
-        .select('id,user_id,type,date,name,duration,rendered_description,description,computed,intervals,workout_status,targets_summary,completed_workout_id')
+        .select('id,user_id,type,date,name,workout_status,completed_workout_id')
         .eq('user_id', user.id)
         .eq('type', completed.type)
         .in('workout_status', ['planned','in_progress','completed'])
