@@ -161,6 +161,64 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   type AddonStep = { move: string; time_sec: number };
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
+  
+  // Session persistence key based on target date
+  const sessionKey = `strength_logger_session_${targetDate || new Date().toISOString().split('T')[0]}`;
+  
+  // Save session progress to localStorage
+  const saveSessionProgress = (exercisesData: LoggedExercise[], addonsData: AttachedAddon[], notes: string, rpe: number | '') => {
+    try {
+      const sessionData = {
+        exercises: exercisesData,
+        addons: addonsData,
+        notes,
+        rpe,
+        timestamp: Date.now(),
+        sourcePlannedName,
+        sourcePlannedId,
+        sourcePlannedDate
+      };
+      localStorage.setItem(sessionKey, JSON.stringify(sessionData));
+      console.log('💾 Session progress saved:', sessionData);
+    } catch (error) {
+      console.error('❌ Failed to save session progress:', error);
+    }
+  };
+  
+  // Restore session progress from localStorage
+  const restoreSessionProgress = (): { exercises: LoggedExercise[]; addons: AttachedAddon[]; notes: string; rpe: number | ''; sourcePlannedName: string; sourcePlannedId: string | null; sourcePlannedDate: string | null } | null => {
+    try {
+      const saved = localStorage.getItem(sessionKey);
+      if (saved) {
+        const sessionData = JSON.parse(saved);
+        // Check if session is from today (not stale)
+        const today = new Date().toISOString().split('T')[0];
+        const sessionDate = new Date(sessionData.timestamp).toISOString().split('T')[0];
+        if (sessionDate === today) {
+          console.log('🔄 Session progress restored:', sessionData);
+          return sessionData;
+        } else {
+          // Clear stale session data
+          localStorage.removeItem(sessionKey);
+          console.log('🗑️ Cleared stale session data');
+        }
+      }
+    } catch (error) {
+      console.error('❌ Failed to restore session progress:', error);
+    }
+    return null;
+  };
+  
+  // Clear session progress (when workout is completed)
+  const clearSessionProgress = () => {
+    try {
+      localStorage.removeItem(sessionKey);
+      console.log('🗑️ Session progress cleared');
+    } catch (error) {
+      console.error('❌ Failed to clear session progress:', error);
+    }
+  };
+  
   const addonCatalog: Record<string, { name: string; duration_min: number; variants: string[] }> = {
     'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1','v2'] },
     'addon_strength_wu_10': { name: 'Warm‑Up (10m)', duration_min: 10, variants: ['v1','v2'] },
@@ -613,6 +671,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   useEffect(() => {
     console.log('🔄 StrengthLogger initializing...');
+    
+    // Try to restore session progress first
+    const savedSession = restoreSessionProgress();
+    if (savedSession) {
+      console.log('🔄 Restoring saved session progress...');
+      setExercises(savedSession.exercises);
+      setAttachedAddons(savedSession.addons);
+      setNotesText(savedSession.notes);
+      setNotesRpe(savedSession.rpe);
+      setSourcePlannedName(savedSession.sourcePlannedName);
+      setSourcePlannedId(savedSession.sourcePlannedId);
+      setSourcePlannedDate(savedSession.sourcePlannedDate);
+      setLockManualPrefill(true);
+      setIsInitialized(true);
+      return;
+    }
+    
     if (lockManualPrefill) {
       // Respect manual selection: do not reinitialize/clear
       if (!isInitialized) setIsInitialized(true);
@@ -778,6 +853,20 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     if (JSON.stringify(next) !== JSON.stringify(timers)) setTimers(next);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercises]);
+  
+  // Save session progress when notes or RPE change
+  useEffect(() => {
+    if (isInitialized && exercises.length > 0) {
+      saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
+    }
+  }, [notesText, notesRpe]);
+  
+  // Save session progress when addons change
+  useEffect(() => {
+    if (isInitialized && exercises.length > 0) {
+      saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
+    }
+  }, [attachedAddons]);
 
   // Tick timers
   useEffect(() => {
@@ -904,14 +993,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   // Cleanup when component unmounts
   useEffect(() => {
     return () => {
-      console.log('🧹 StrengthLogger cleanup - clearing state');
+      console.log('🧹 StrengthLogger cleanup - saving session progress');
+      // Save current progress before unmounting
+      if (exercises.length > 0) {
+        saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
+      }
       setExercises([]);
       setExpandedPlates({});
       setExpandedExercises({});
       setCurrentExercise('');
       setShowSuggestions(false);
     };
-  }, []);
+  }, [exercises, attachedAddons, notesText, notesRpe]);
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
@@ -993,14 +1086,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const updateSet = (exerciseId: string, setIndex: number, updates: Partial<LoggedSet>) => {
-    setExercises(exercises.map(exercise => {
+    const updatedExercises = exercises.map(exercise => {
       if (exercise.id === exerciseId) {
         const newSets = [...exercise.sets];
         newSets[setIndex] = { ...newSets[setIndex], ...updates };
         return { ...exercise, sets: newSets };
       }
       return exercise;
-    }));
+    });
+    
+    setExercises(updatedExercises);
+    
+    // Save progress to localStorage whenever a set is updated
+    saveSessionProgress(updatedExercises, attachedAddons, notesText, notesRpe);
   };
 
   const addSet = (exerciseId: string) => {
@@ -1049,6 +1147,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
+    // Clear session progress when workout is completed
+    clearSessionProgress();
+    
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
