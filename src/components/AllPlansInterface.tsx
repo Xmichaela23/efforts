@@ -228,6 +228,72 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [adjustmentLimit] = useState(3);
   const [showPlanDesc, setShowPlanDesc] = useState(false);
 
+  // Calculate current week based on plan start date and today's date
+  const calculateCurrentWeek = async (planId: string): Promise<number> => {
+    try {
+      // Get plan's start date from planned_workouts (Week 1 Monday)
+      const { data: w1 } = await supabase
+        .from('planned_workouts')
+        .select('date, day_number')
+        .eq('training_plan_id', planId)
+        .eq('week_number', 1)
+        .order('day_number', { ascending: true })
+        .limit(1);
+      
+      if (Array.isArray(w1) && w1.length > 0) {
+        const anchor = w1[0] as any;
+        const startDate = new Date(anchor.date);
+        const today = new Date();
+        
+        // Calculate days difference
+        const diffTime = today.getTime() - startDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        
+        // Calculate week number (1-based)
+        const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
+        
+        console.log('📅 Current week calculation:', {
+          startDate: anchor.date,
+          today: today.toISOString().split('T')[0],
+          diffDays,
+          calculatedWeek: weekNumber
+        });
+        
+        return weekNumber;
+      }
+      
+      // Fallback: try to get start date from plan config
+      const { data: planRow } = await supabase
+        .from('plans')
+        .select('config')
+        .eq('id', planId)
+        .maybeSingle();
+      
+      if (planRow?.config?.user_selected_start_date) {
+        const startDate = new Date(planRow.config.user_selected_start_date);
+        const today = new Date();
+        
+        const diffTime = today.getTime() - startDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
+        
+        console.log('📅 Current week calculation (from config):', {
+          startDate: planRow.config.user_selected_start_date,
+          today: today.toISOString().split('T')[0],
+          diffDays,
+          calculatedWeek: weekNumber
+        });
+        
+        return weekNumber;
+      }
+    } catch (error) {
+      console.error('Error calculating current week:', error);
+    }
+    
+    // Default to week 1 if calculation fails
+    return 1;
+  };
+
   const handlePlanClick = async (planId: string) => {
     // Guard: if we already have this plan open in detail view, skip expensive re-load
     if (selectedPlanDetail?.id === planId && currentView === 'detail') {
@@ -619,8 +685,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         }
       }
 
+      // Calculate and set the current week based on plan start date
+      const calculatedCurrentWeek = await calculateCurrentWeek(planId);
+      
+      // Update the plan detail with the calculated current week
+      pd.currentWeek = calculatedCurrentWeek;
+      
       setSelectedPlanDetail(pd);
-      setSelectedWeek(pd.currentWeek || 1);
+      setSelectedWeek(calculatedCurrentWeek);
+      
       setPlanStatus(pd.status || 'active');
       setCurrentView('detail');
     } else {
@@ -1406,9 +1479,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                       <button
                         key={wn}
                         onClick={() => setSelectedWeek(wn)}
-                        className={`whitespace-nowrap px-2 py-1 rounded ${isSelected ? 'bg-gray-100 text-black' : 'text-gray-700 hover:text-black'}`}
+                        className={`whitespace-nowrap px-2 py-1 rounded flex items-center gap-1 ${
+                          isSelected 
+                            ? 'bg-gray-100 text-black' 
+                            : isCurrent 
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200' 
+                              : 'text-gray-700 hover:text-black'
+                        }`}
                       >
                         <span className="text-sm">Week {wn}</span>
+                        {isCurrent && (
+                          <span className="text-xs bg-blue-100 text-blue-600 px-1.5 py-0.5 rounded-full">
+                            Current
+                          </span>
+                        )}
                       </button>
                     );
                   })}
