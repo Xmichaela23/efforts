@@ -438,33 +438,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     'Cable Crunch', 'Ab Machine Crunch', "Captain’s Chair Knee Raise", 'Roman Chair Sit-Up', 'GHD Sit-Up'
   ];
 
-  // Get today's date string - FIXED: Use PST timezone to avoid date shifting
-  const getTodayDateString = () => {
-    // If a date was selected from calendar, prefer that
-    if (targetDate && /\d{4}-\d{2}-\d{2}/.test(targetDate)) {
-      return targetDate;
-    }
-    // Use a more direct approach to get PST date
-    const now = new Date();
-    
-    // Get the current time in PST
-    const pstTime = new Date(now.toLocaleString("en-US", {timeZone: "America/Los_Angeles"}));
-    
-    // Format as YYYY-MM-DD
-    const year = pstTime.getFullYear();
-    const month = String(pstTime.getMonth() + 1).padStart(2, '0');
-    const day = String(pstTime.getDate()).padStart(2, '0');
-    const dateString = `${year}-${month}-${day}`;
-    
-    // 🔍 DEBUG: Log what this function is returning
-    console.log('🔍 getTodayDateString() debug:');
-    console.log('  - new Date():', now);
-    console.log('  - pstTime:', pstTime);
-    console.log('  - year:', year, 'month:', month, 'day:', day);
-    console.log('  - Final return value:', dateString);
-    
-    return dateString;
-  };
 
   // Calculate simple total volume for save button
   const currentTotalVolume = React.useMemo(() => {
