@@ -1723,9 +1723,28 @@ const formatPace = (paceValue: any): string => {
             .map((s: any) => s.power || s.watts || null)
             .filter((p: any) => p !== null && p !== undefined);
           
+          // Normalize cadence data
+          const normalizeRunCadence = (v: any) => {
+            let n = Number(v);
+            if (!Number.isFinite(n)) return null;
+            if (n < 10) n *= 60;     // steps/sec -> steps/min
+            if (n < 130) n *= 2;     // strides/min -> steps/min
+            return Math.round(n);
+          };
+
+          const pickCadenceSample = (s: any, sport: 'run'|'ride'|'walk') => {
+            if (sport === 'ride') {
+              return s.bikeCadence ?? s.cadence ?? null;   // rpm
+            }
+            // run/walk
+            return normalizeRunCadence(
+              s.runCadence ?? s.cadence ?? s.strideRate ?? s.stride_cadence
+            );
+          };
+
           const cadenceData = samples
-            .map((s: any) => s.bikeCadence || s.runCadence || s.swimCadence || s.wheelchairCadence || null)
-            .filter((c: any) => c !== null && c !== undefined);
+            .map(s => pickCadenceSample(s, workoutType === 'ride' ? 'ride' : 'run'))
+            .filter(v => v != null);
           
           // Only show if we have power or cadence data
           if (powerData.length > 0 || cadenceData.length > 0) {

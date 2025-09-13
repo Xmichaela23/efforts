@@ -98,6 +98,7 @@ export default function PowerCadenceChart({
                 tick={{ fontSize: 10 }}
                 tickLine={false}
                 axisLine={false}
+                domain={tab === "PWR" ? [0, 600] : [0, 200]}
                 tickFormatter={(v) => (tab === "PWR" ? `${v} W` : `${v} spm`)}
               />
               {/* Hide default bubble tooltip; we use header + reference line */}
