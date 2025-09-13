@@ -39,7 +39,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
 
         const { data } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id,completed_workout_id')
+          .select('id,name,type,date,workout_status,completed_workout_id')
           .eq('user_id', user.id)
           .eq('type', type)
           .in('workout_status', ['planned','in_progress','completed'])
