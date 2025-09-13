@@ -863,19 +863,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exercises]);
   
-  // Save session progress when notes or RPE change
-  useEffect(() => {
-    if (isInitialized && exercises.length > 0) {
-      saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
-    }
-  }, [notesText, notesRpe]);
-  
-  // Save session progress when addons change
-  useEffect(() => {
-    if (isInitialized && exercises.length > 0) {
-      saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
-    }
-  }, [attachedAddons]);
 
   // Tick timers
   useEffect(() => {
@@ -922,7 +909,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const versionList = meta.variants; const version = versionList[0];
     const seconds = meta.duration_min * 60;
     const def = getAddonDef(tokenBase, version);
-    setAttachedAddons(prev => [...prev, { token: `${tokenBase}.${version}`, name: meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false, sequence: def?.sequence || [], expanded: true }]);
+    const newAddon = { token: `${tokenBase}.${version}`, name: meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false, sequence: def?.sequence || [], expanded: true };
+    setAttachedAddons(prev => [...prev, newAddon]);
+    if (isInitialized && exercises.length > 0) {
+      saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
+    }
     setShowWorkoutsMenu(false);
   };
 
@@ -1007,13 +998,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       if (exercises.length > 0) {
         saveSessionProgress(exercises, attachedAddons, notesText, notesRpe);
       }
-      setExercises([]);
-      setExpandedPlates({});
-      setExpandedExercises({});
-      setCurrentExercise('');
-      setShowSuggestions(false);
     };
-  }, [exercises, attachedAddons, notesText, notesRpe]);
+  }, []); // Empty dependency array - only run on mount/unmount
 
   const togglePlateCalc = (exerciseId: string, setIndex: number) => {
     const key = `${exerciseId}-${setIndex}`;
@@ -1369,7 +1355,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">{formatSeconds(a.seconds)}</span>
                     {!a.completed ? (
-                      <button onClick={()=>setAttachedAddons(prev=>prev.map((x,i)=> i===idx?{...x, running: !x.running }:x))} className="px-2 py-1 text-xs border rounded">
+                      <button onClick={()=>{
+                        const updatedAddons = attachedAddons.map((x,i)=> i===idx?{...x, running: !x.running }:x);
+                        setAttachedAddons(updatedAddons);
+                        if (isInitialized && exercises.length > 0) {
+                          saveSessionProgress(exercises, updatedAddons, notesText, notesRpe);
+                        }
+                      }} className="px-2 py-1 text-xs border rounded">
                         {a.running? 'Pause' : 'Start'}
                       </button>
                     ) : (
@@ -1734,11 +1726,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="space-y-3">
               <div>
                 <label className="text-sm text-gray-600">Notes</label>
-                <textarea value={notesText} onChange={(e)=>setNotesText(e.target.value)} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Anything noteworthy…" />
+                <textarea value={notesText} onChange={(e)=>{
+                  setNotesText(e.target.value);
+                  if (isInitialized && exercises.length > 0) {
+                    saveSessionProgress(exercises, attachedAddons, e.target.value, notesRpe);
+                  }
+                }} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Anything noteworthy…" />
               </div>
               <div>
                 <label className="text-sm text-gray-600">RPE (1–10)</label>
-                <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>setNotesRpe(e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '')} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
+                <input type="number" min={1} max={10} value={notesRpe} onChange={(e)=>{
+                  const newRpe = e.target.value?Math.max(1, Math.min(10, parseInt(e.target.value)||0)): '';
+                  setNotesRpe(newRpe);
+                  if (isInitialized && exercises.length > 0) {
+                    saveSessionProgress(exercises, attachedAddons, notesText, newRpe);
+                  }
+                }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
               </div>
             </div>
             <div className="mt-4 sticky bottom-0 bg-white pt-3">
