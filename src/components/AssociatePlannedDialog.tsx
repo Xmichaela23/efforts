@@ -39,10 +39,10 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
 
         const { data } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id')
+          .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id,completed_workout_id')
           .eq('user_id', user.id)
           .eq('type', type)
-          .in('workout_status', ['planned','in_progress'])
+          .in('workout_status', ['planned','in_progress','completed'])
           .gte('date', from)
           .lte('date', to)
           .order('date', { ascending: true });
@@ -56,7 +56,24 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           count: Array.isArray(data) ? data.length : 0
         });
 
-        setCandidates(Array.isArray(data) ? data : []);
+        // Filter out completed planned workouts that are already linked to other completed workouts
+        const filteredCandidates = (Array.isArray(data) ? data : []).filter(planned => {
+          // If it's completed, only show it if it's not linked to any completed workout
+          // OR if it's linked to the current workout (re-association)
+          if (planned.workout_status === 'completed') {
+            return !planned.completed_workout_id || planned.completed_workout_id === workout.id;
+          }
+          // Show all planned and in_progress workouts
+          return true;
+        });
+
+        console.log('🔍 Filtered candidates:', {
+          original: data?.length || 0,
+          filtered: filteredCandidates.length,
+          candidates: filteredCandidates
+        });
+
+        setCandidates(filteredCandidates);
       } catch (e: any) {
         setError(e?.message || 'Failed to load candidates');
       } finally {
