@@ -152,6 +152,12 @@ export default function MapEffort({
           // Keep map interaction enabled
         }
       }
+      
+      // If we've determined this is a vertical scroll, prevent the event from reaching the map
+      if (isScrollingRef.current) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
     };
 
     const handleTouchEnd = () => {
@@ -171,7 +177,7 @@ export default function MapEffort({
     const container = divRef.current;
     if (container) {
       container.addEventListener('touchstart', handleTouchStart, { passive: true });
-      container.addEventListener('touchmove', handleTouchMove, { passive: true });
+      container.addEventListener('touchmove', handleTouchMove, { passive: false });
       container.addEventListener('touchend', handleTouchEnd, { passive: true });
     }
 
