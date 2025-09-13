@@ -1285,6 +1285,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
+          <button 
+            onClick={() => {
+              // Clear all caches and refresh
+              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              try { window.dispatchEvent(new CustomEvent('nav:pullrefresh')); } catch {}
+              // Force page refresh
+              window.location.reload();
+            }}
+            className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded"
+          >
+            Refresh Cache
+          </button>
           <div className="relative">
             <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
             {showWorkoutsMenu && (
