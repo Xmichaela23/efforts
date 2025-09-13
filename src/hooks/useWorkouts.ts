@@ -742,7 +742,7 @@ export const useWorkouts = () => {
 
       const { data: planned } = await supabase
         .from('planned_workouts')
-        .select('id,user_id,type,date,name,workout_status,completed_workout_id')
+        .select('id,user_id,type,date,name,workout_status')
         .eq('user_id', user.id)
         .eq('type', String(completed.type || '').toLowerCase())
         .in('workout_status', ['planned','in_progress','completed'])
@@ -762,16 +762,8 @@ export const useWorkouts = () => {
         return;
       }
 
-      // Filter out completed planned workouts that are already linked to other completed workouts
-      const filteredCandidates = candidates.filter(planned => {
-        // If it's completed, only show it if it's not linked to any completed workout
-        // OR if it's linked to the current workout (re-association)
-        if (planned.workout_status === 'completed') {
-          return !planned.completed_workout_id || planned.completed_workout_id === (completed as any).id;
-        }
-        // Show all planned and in_progress workouts
-        return true;
-      });
+      // Keep all candidates; server truth for existing links lives on workouts.planned_id
+      const filteredCandidates = candidates;
 
       if (!filteredCandidates.length) {
         console.log('❌ No valid candidates after filtering. Original candidates:', candidates.length, 'Filtered:', 0);
@@ -854,20 +846,10 @@ export const useWorkouts = () => {
       });
 
       // Mark the authored planned row as completed (no date move) and link both ways
-      // Guard: if planned row already linked to a different completed workout, do nothing
-      try {
-        const { data: already } = await supabase
-          .from('planned_workouts')
-          .select('id, completed_workout_id')
-          .eq('id', target.id)
-          .maybeSingle();
-        if (already && already.completed_workout_id && already.completed_workout_id !== (completed as any).id) {
-          return; // avoid creating multiple links
-        }
-      } catch {}
+      // Mark planned as completed (no reverse id column used)
       await supabase
         .from('planned_workouts')
-        .update({ workout_status: 'completed', completed_workout_id: (completed as any).id })
+        .update({ workout_status: 'completed' })
         .eq('id', target.id);
       try {
         await supabase
