@@ -1286,58 +1286,26 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
           <button 
-            onClick={async () => {
+            onClick={() => {
+              console.log('🔍 Debug button clicked');
+              
+              // Simple approach - just clear everything and reload
               try {
-                // First, let's check what's actually in the database
-                console.log('🔍 Checking database state...');
-                const { data: { user } } = await supabase.auth.getUser();
-                if (user) {
-                  // Check workouts table
-                  const { data: workouts } = await supabase
-                    .from('workouts')
-                    .select('id,name,type,date,workout_status')
-                    .eq('user_id', user.id)
-                    .eq('type', 'strength')
-                    .gte('date', '2025-08-10')
-                    .lte('date', '2025-08-15');
-                  console.log('🔍 Workouts in DB:', workouts);
-                  
-                  // Check planned_workouts table
-                  const { data: planned } = await supabase
-                    .from('planned_workouts')
-                    .select('id,name,type,date,workout_status,completed_workout_id')
-                    .eq('user_id', user.id)
-                    .eq('type', 'strength')
-                    .gte('date', '2025-08-10')
-                    .lte('date', '2025-08-15');
-                  console.log('🔍 Planned workouts in DB:', planned);
-                }
-                
-                // Clear all possible caches
                 console.log('🧹 Clearing all caches...');
                 
-                // Clear localStorage
-                const keys = Object.keys(localStorage);
-                keys.forEach(key => {
-                  if (key.includes('workouts') || key.includes('planned') || key.includes('range')) {
-                    localStorage.removeItem(key);
-                    console.log('🗑️ Cleared localStorage:', key);
-                  }
-                });
+                // Clear all localStorage
+                localStorage.clear();
+                console.log('🗑️ Cleared all localStorage');
                 
-                // Clear sessionStorage
-                const sessionKeys = Object.keys(sessionStorage);
-                sessionKeys.forEach(key => {
-                  if (key.includes('workouts') || key.includes('planned') || key.includes('range')) {
-                    sessionStorage.removeItem(key);
-                    console.log('🗑️ Cleared sessionStorage:', key);
-                  }
-                });
+                // Clear all sessionStorage  
+                sessionStorage.clear();
+                console.log('🗑️ Cleared all sessionStorage');
                 
                 // Dispatch events
                 window.dispatchEvent(new CustomEvent('planned:invalidate'));
                 window.dispatchEvent(new CustomEvent('nav:pullrefresh'));
                 
+                console.log('🔄 Reloading page...');
                 // Force hard refresh
                 window.location.reload();
               } catch (e) {
@@ -1347,7 +1315,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             }}
             className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded"
           >
-            Debug & Clear
+            Clear All
           </button>
           <div className="relative">
             <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
