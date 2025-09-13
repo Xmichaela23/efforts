@@ -275,7 +275,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </div>
           <div>
             <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
-            <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums]">
+            <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
                   // For completed workouts, try to get timestamp for time
@@ -284,7 +284,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     if (!isNaN(d.getTime())) {
                       const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
                       const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
-                      return `${dateStr} at ${timeStr}`;
+                      return (
+                        <>
+                          <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{dateStr}</span>
+                          <span className="mx-1">at</span>
+                          <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{timeStr}</span>
+                        </>
+                      );
                     }
                   }
                   
@@ -292,7 +298,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   const ds = String(workout.date || '').trim();
                   if (/^\d{4}-\d{2}-\d{2}$/.test(ds)) {
                     const d = new Date(ds + 'T00:00:00');
-                    if (!isNaN(d.getTime())) return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                    if (!isNaN(d.getTime())) {
+                      const dateStr = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+                      return <span className="[font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1]">{dateStr}</span>;
+                    }
                   }
                   const dn = Number((workout as any)?.day_number);
                   if (dn >= 1 && dn <= 7) {

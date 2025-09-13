@@ -72,6 +72,48 @@ const movAvg = (arr: number[], w = 5) => {
   }
   return out;
 };
+
+// Enhanced smoothing with outlier detection and clamping
+const smoothWithOutlierHandling = (arr: number[], windowSize = 7, outlierThreshold = 3) => {
+  if (arr.length === 0) return arr.slice();
+  
+  // First pass: detect outliers using robust statistics
+  const finite = arr.filter(v => Number.isFinite(v));
+  if (finite.length < 3) return arr.slice();
+  
+  // Calculate robust percentiles for outlier detection
+  const sorted = [...finite].sort((a, b) => a - b);
+  const q1 = sorted[Math.floor(sorted.length * 0.25)];
+  const q3 = sorted[Math.floor(sorted.length * 0.75)];
+  const iqr = q3 - q1;
+  const outlierThresholdValue = outlierThreshold * iqr;
+  
+  // Clamp outliers
+  const clamped = arr.map(v => {
+    if (!Number.isFinite(v)) return v;
+    if (v < q1 - outlierThresholdValue) return q1 - outlierThresholdValue;
+    if (v > q3 + outlierThresholdValue) return q3 + outlierThresholdValue;
+    return v;
+  });
+  
+  // Apply moving average with larger window for better smoothing
+  return movAvg(clamped, windowSize);
+};
+
+// Winsorize data using robust percentiles
+const winsorize = (arr: number[], lowerPct = 5, upperPct = 95) => {
+  const finite = arr.filter(v => Number.isFinite(v));
+  if (finite.length < 3) return arr.slice();
+  
+  const sorted = [...finite].sort((a, b) => a - b);
+  const lower = sorted[Math.floor(sorted.length * lowerPct / 100)];
+  const upper = sorted[Math.floor(sorted.length * upperPct / 100)];
+  
+  return arr.map(v => {
+    if (!Number.isFinite(v)) return v;
+    return Math.max(lower, Math.min(upper, v));
+  });
+};
 const pct = (vals: number[], p: number) => {
   if (!vals.length) return 0;
   const a = vals.slice().sort((x, y) => x - y);
@@ -281,15 +323,19 @@ function EffortsViewerMapbox({
       if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
       return elev;
     }
-    // Pace
+    // Pace - enhanced smoothing with outlier handling
     if (tab === "pace") {
       const pace = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
-      return movAvg(pace, 3).map(v => (Number.isFinite(v) ? v : NaN));
+      // Apply winsorizing first, then enhanced smoothing
+      const winsorized = winsorize(pace, 5, 95);
+      return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // Heart rate
+    // Heart rate - enhanced smoothing with outlier handling
     if (tab === "bpm") {
       const hr = normalizedSamples.map(s => Number.isFinite(s.hr_bpm as any) ? (s.hr_bpm as number) : NaN);
-      return movAvg(hr, 3).map(v => (Number.isFinite(v) ? v : NaN));
+      // Apply winsorizing first, then enhanced smoothing
+      const winsorized = winsorize(hr, 5, 95);
+      return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
     // VAM: compute over window, moving-only, stabilized
     // prerequisites
@@ -314,41 +360,64 @@ function EffortsViewerMapbox({
       const vam_m_per_h = grade * speed * 3600; // m/h
       out[i] = vam_m_per_h;
     }
-    // median then MA
+    // median then MA with enhanced outlier handling
     const med = medianFilter(out, 11) as (number|null)[];
     const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
-    const smooth = movAvg(medNum, 5);
-    // hard cap
+    
+    // Apply winsorizing for VAM (symmetric domain)
+    const winsorized = winsorize(medNum, 5, 95);
+    const smooth = smoothWithOutlierHandling(winsorized, 7, 2.0);
+    
+    // Enhanced outlier clamping for VAM
     for (let i = 0; i < smooth.length; i++) {
       const v = smooth[i];
-      if (!Number.isFinite(v) || Math.abs(v as number) > 3000) smooth[i] = NaN; // >3000 m/h considered bad
+      if (!Number.isFinite(v)) continue;
+      // More aggressive clamping for VAM outliers
+      if (Math.abs(v as number) > 10000) { // >10,000 ft/h → null
+        smooth[i] = NaN;
+      } else if (Math.abs(v as number) > 3000) { // >3000 m/h clamp to reasonable max
+        smooth[i] = v > 0 ? 3000 : -3000;
+      }
     }
     return smooth;
   }, [normalizedSamples, tab, distCalc]);
 
-  // Better domain calculation for full space utilization
+  // Enhanced domain calculation with robust percentiles and outlier handling
   const yDomain = useMemo<[number, number]>(() => {
     const vals = metricRaw.filter((v) => Number.isFinite(v)) as number[];
     if (!vals.length) return [0, 1];
+    
+    // Apply additional winsorizing to domain calculation for even more robust percentiles
+    const winsorized = winsorize(vals, 2, 98); // Use 2nd-98th percentiles for domain
+    
     let lo: number, hi: number;
     // VAM: symmetric domain using abs-percentile
     if (tab === "vam") {
-      const abs = vals.map(v => Math.abs(v));
+      const abs = winsorized.map(v => Math.abs(v));
       const P = pct(abs, 90); // P90 abs
       const floor = 450; // m/h minimum span (~1500 ft/h)
       const span = Math.max(P, floor);
       lo = -span; hi = span;
     } else {
-      // Use 5th and 95th percentiles for better space usage
-      lo = pct(vals, 5); hi = pct(vals, 95);
+      // Use more robust percentiles for better space usage
+      lo = pct(winsorized, 2); hi = pct(winsorized, 98);
     }
-    if (lo === hi) { lo -= 1; hi += 1; }
+    
+    // Ensure minimum span
+    if (lo === hi) { 
+      const center = (lo + hi) / 2;
+      lo = center - 1; 
+      hi = center + 1; 
+    }
     
     // special handling:
-    if (tab === "bpm") { lo = Math.floor(lo / 5) * 5; hi = Math.ceil(hi / 5) * 5; }
+    if (tab === "bpm") { 
+      lo = Math.floor(lo / 5) * 5; 
+      hi = Math.ceil(hi / 5) * 5; 
+    }
     
-    // Less padding for better space utilization
-    const pad = (hi - lo) * 0.05;
+    // Minimal padding for better space utilization
+    const pad = Math.max((hi - lo) * 0.02, 1); // At least 1 unit padding
     return [lo - pad, hi + pad];
   }, [metricRaw, tab]);
 
