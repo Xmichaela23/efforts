@@ -1794,14 +1794,6 @@ const formatPace = (paceValue: any): string => {
                             axisLine: false,
                             tickFormatter: (value) => `${value} ${yUnit}`
                           }),
-                          React.createElement(Tooltip, {
-                            formatter: (value) => [`${value} ${yUnit}`, metric],
-                            labelFormatter: (time) => {
-                              const minutes = Math.floor(time / 60);
-                              const seconds = time % 60;
-                              return `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
-                            }
-                          }),
                           React.createElement(Line, {
                             type: "monotone",
                             dataKey: "value",
