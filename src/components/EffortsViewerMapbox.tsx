@@ -44,6 +44,12 @@ const fmtPace = (secPerKm: number | null, useMi = true) => {
   if (s === 60) { m += 1; s = 0; }
   return `${m}:${String(s).padStart(2, "0")}/${useMi ? "mi" : "km"}`;
 };
+const fmtSpeed = (secPerKm: number | null, useMi = true) => {
+  if (secPerKm == null || !Number.isFinite(secPerKm) || secPerKm <= 0) return "—";
+  const kmPerH = 3600 / secPerKm;
+  const speed = useMi ? kmPerH * 0.621371 : kmPerH;
+  return `${speed.toFixed(1)} ${useMi ? "mph" : "km/h"}`;
+};
 const fmtDist = (m: number, useMi = true) => (useMi ? `${(m / 1609.34).toFixed(1)} mi` : `${(m / 1000).toFixed(2)} km`);
 const fmtAlt = (m: number, useFeet = true) => (useFeet ? `${Math.round(m * 3.28084)} ft` : `${Math.round(m)} m`);
 const fmtPct = (x: number | null) => (x == null || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(1)}%`);
@@ -490,7 +496,11 @@ function EffortsViewerMapbox({
       <div style={{ marginTop: 16, padding: "0 6px" }}>
         {/* Current metric values */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
-          <Pill label="Pace"  value={fmtPace(s?.pace_s_per_km ?? null, useMiles)}  active={tab==="pace"} />
+          <Pill 
+            label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
+            value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
+            active={tab==="pace"} 
+          />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
           <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
           <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
@@ -535,7 +545,7 @@ function EffortsViewerMapbox({
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={12} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700}>
-                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? fmtPace(v, useMiles) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
+                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles)) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
             </g>
           ))}
@@ -575,7 +585,9 @@ function EffortsViewerMapbox({
         <div style={{ display: "grid", gridTemplateColumns: "64px 1fr 1fr 1fr 1fr", gap: 8, fontSize: 14 }}>
           <div style={{ fontWeight: 600, color: "#64748b" }}>#</div>
           <div style={{ fontWeight: 600, color: "#64748b" }}>Time</div>
-          <div style={{ fontWeight: 600, color: "#64748b" }}>Pace</div>
+          <div style={{ fontWeight: 600, color: "#64748b" }}>
+            {workoutData?.type === 'ride' ? 'Speed' : 'Pace'}
+          </div>
           <div style={{ fontWeight: 600, color: "#64748b" }}>Gain</div>
           <div style={{ fontWeight: 600, color: "#64748b" }}>Grade</div>
           {splits.map((sp, i) => {
@@ -585,7 +597,7 @@ function EffortsViewerMapbox({
               <React.Fragment key={i}>
                 {cell(i + 1)}
                 {cell(fmtTime(sp.time_s))}
-                {cell(fmtPace(sp.avgPace_s_per_km, useMiles))}
+                {cell(workoutData?.type === 'ride' ? fmtSpeed(sp.avgPace_s_per_km, useMiles) : fmtPace(sp.avgPace_s_per_km, useMiles))}
                 {cell(fmtAlt(sp.gain_m, useFeet))}
                 {cell(fmtPct(sp.avgGrade))}
               </React.Fragment>
