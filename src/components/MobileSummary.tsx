@@ -827,7 +827,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const secPerMi = row?.executed?.avg_pace_s_per_mi;
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
                 }
-                return <div>—</div>;
+                const r = renderCompletedFor(st) as any;
+                return <div>{typeof r === 'string' ? r : (r?.paceText || '—')}</div>;
               })()}
             </div>
             <div className="text-gray-900">
@@ -840,7 +841,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const dur = row?.executed?.duration_s;
                   return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
                 }
-                return <div>—</div>;
+                const r = renderCompletedFor(st) as any;
+                return <div>{typeof r === 'string' ? r : (r?.durationSec ? fmtTime(r.durationSec) : '—')}</div>;
               })()}
             </div>
             <div className="text-gray-900">
@@ -853,7 +855,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const hr = row?.executed?.avg_hr;
                   return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
                 }
-                return <div className="text-xs text-gray-700">—</div>;
+                const r = renderCompletedFor(st) as any;
+                return <div className="text-xs text-gray-700">{typeof r === 'string' ? '—' : (r?.hr != null ? `${Math.round(r.hr)} bpm` : '—')}</div>;
               })()}
             </div>
           </div>
