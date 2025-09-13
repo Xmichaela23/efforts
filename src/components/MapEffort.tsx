@@ -130,9 +130,9 @@ export default function MapEffort({
       const deltaTime = Date.now() - touchStartRef.current.time;
       
       // If we haven't determined scroll direction yet
-      if (!isScrollingRef.current && deltaTime > 150) {
+      if (!isScrollingRef.current && deltaTime > 500) {
         // If primarily vertical movement, allow page scroll (much more strict thresholds)
-        if (deltaY > deltaX && deltaY > 50) {
+        if (deltaY > deltaX && deltaY > 150) {
           isScrollingRef.current = true;
           // Disable map interaction temporarily
           map.dragPan.disable();
@@ -142,7 +142,7 @@ export default function MapEffort({
           map.doubleClickZoom.disable();
         }
         // If primarily horizontal movement, enable map interaction
-        else if (deltaX > deltaY && deltaX > 50) {
+        else if (deltaX > deltaY && deltaX > 150) {
           isScrollingRef.current = true;
           // Keep map interaction enabled
         }
@@ -278,7 +278,7 @@ export default function MapEffort({
     );
   }
 
-  return <div ref={divRef} className={className} style={{ height, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,.06)', opacity: visible ? 1 : 0, transition: 'opacity 180ms ease' }} />;
+  return <div ref={divRef} className={className} style={{ height, borderRadius: 12, overflow: 'hidden', boxShadow: '0 2px 10px rgba(0,0,0,.06)', opacity: visible ? 1 : 0, transition: 'opacity 180ms ease', touchAction: 'manipulation' }} />;
 }
 
 
