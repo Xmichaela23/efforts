@@ -17,7 +17,7 @@ function normalizeName(raw: string): string {
 }
 
 function calcVolume(sets: StrengthSet[]): number {
-  return sets.filter(s => (s.reps || 0) > 0 && (s.weight || 0) > 0)
+  return sets.filter(s => (s.reps || 0) > 0)
     .reduce((sum, s) => sum + (s.reps || 0) * (s.weight || 0), 0);
 }
 

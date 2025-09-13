@@ -34,8 +34,8 @@ const calculateTotalVolume = (exercises: LoggedExercise[]): number => {
   return exercises
     .filter(ex => ex.name.trim() && ex.sets.length > 0)
     .reduce((total, exercise) => {
-      // Count all sets that have actual reps and weight (not just completed ones)
-      const setsWithData = exercise.sets.filter(set => set.reps > 0 && set.weight > 0);
+      // Count all sets that have actual reps (weight can be 0 for bodyweight exercises)
+      const setsWithData = exercise.sets.filter(set => set.reps > 0);
       const exerciseVolume = setsWithData.reduce((sum, set) => sum + (set.reps * set.weight), 0);
       return total + exerciseVolume;
     }, 0);
@@ -1177,7 +1177,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       type: 'strength' as const,
       date: workoutDate,
       description: validExercises
-        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.reps > 0 && s.weight > 0).length}/${ex.sets.length} sets`)
+        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.reps > 0).length}/${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
       strength_exercises: validExercises,

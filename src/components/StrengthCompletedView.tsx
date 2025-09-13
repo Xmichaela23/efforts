@@ -186,7 +186,14 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
       {/* Exercises */}
       {showComparison && plannedWorkout ? (
         <StrengthCompareTable
-          planned={(plannedWorkout.strength_exercises || []).map((ex: any)=>({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight }))}
+          planned={(plannedWorkout.strength_exercises || []).map((ex: any)=>{
+            // Normalize planned fields - handle both array and individual value formats
+            const setsArr = Array.isArray(ex.sets) ? ex.sets : [];
+            const setsNum = setsArr.length || (typeof ex.sets === 'number' ? ex.sets : 0);
+            const repsNum = typeof ex.reps === 'number' ? ex.reps : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.reps)||0), 0) / setsArr.length) : 0);
+            const weightNum = typeof ex.weight === 'number' ? ex.weight : (setsArr.length ? Math.round(setsArr.reduce((s:any, st:any)=> s + (Number(st?.weight)||0), 0) / setsArr.length) : 0);
+            return { name: ex.name, sets: setsNum, reps: repsNum, weight: weightNum };
+          })}
           completed={completedExercises.map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] }))}
         />
       ) : (
