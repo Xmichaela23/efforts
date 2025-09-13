@@ -736,6 +736,18 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           try {
             await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: (completed as any).id } });
           } catch {}
+          // Immediate fetch to hydrate UI without waiting for polling
+          try {
+            const { data: fresh } = await supabase
+              .from('workouts')
+              .select('computed')
+              .eq('id', (completed as any).id)
+              .maybeSingle();
+            const compd = (fresh as any)?.computed;
+            if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+              setHydratedCompleted((prev:any) => ({ ...(prev || completed), computed: compd }));
+            }
+          } catch {}
         }
         // If we are viewing a planned row that is linked to a completed workout, but we didn't
         // receive the completed object here, trigger compute for that completed id.
@@ -744,6 +756,19 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((planned as any).completed_workout_id) } });
           try {
             await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String((planned as any).completed_workout_id) } });
+          } catch {}
+          // Immediate fetch to hydrate UI without waiting for polling
+          try {
+            const cid = String((planned as any).completed_workout_id);
+            const { data: fresh } = await supabase
+              .from('workouts')
+              .select('computed')
+              .eq('id', cid)
+              .maybeSingle();
+            const compd = (fresh as any)?.computed;
+            if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+              setHydratedCompleted((prev:any) => ({ ...(prev || {}), id: cid, computed: compd }));
+            }
           } catch {}
         }
       } catch {}
@@ -835,6 +860,18 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                       const r2 = await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
                       if ((r2 as any)?.error) setComputeError(prev=> prev || String((r2 as any).error?.message || 'analysis failed'));
                     } catch (e:any) { /* ignore */ }
+                    // Immediate fetch to ensure UI updates even if function returns without computed payload
+                    try {
+                      const { data: fresh } = await supabase
+                        .from('workouts')
+                        .select('computed')
+                        .eq('id', wid)
+                        .maybeSingle();
+                      const compd = (fresh as any)?.computed;
+                      if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
+                        setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
+                      }
+                    } catch {}
                     // quick poll burst for immediate feedback (skip if immediate already set)
                     if (!(r1 as any)?.data?.computed) {
                       for (let i=0;i<6;i++) {

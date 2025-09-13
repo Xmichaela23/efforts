@@ -306,6 +306,14 @@ Deno.serve(async (req) => {
     }
     const laps: Lap[] = normalizeLaps((w as any)?.laps);
 
+    // Lightweight diagnostics to aid field forensics (safe to leave enabled)
+    try {
+      const sampleCount = Array.isArray(samples) ? samples.length : 0;
+      const plannedStepsDbg: number = (Array.isArray(planned?.computed?.steps) ? planned.computed.steps.length : (Array.isArray(planned?.intervals) ? planned.intervals.length : 0));
+      // eslint-disable-next-line no-console
+      console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} user=${w.user_id} sport=${sport} samples=${sampleCount} rows=${rows.length} laps=${laps.length} plannedSteps=${plannedStepsDbg}`);
+    } catch {}
+
     // Movement gate: skip initial non-movement (WU contamination)
     let startIdx = 0;
     while (startIdx + 1 < rows.length) {
@@ -529,6 +537,8 @@ Deno.serve(async (req) => {
         .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
         .eq('id', workout_id);
 
+      // eslint-disable-next-line no-console
+      try { console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} mode=${laps.length ? 'laps-no-plan' : 'splits-no-plan'} intervals=${outIntervals.length}`); } catch {}
       return new Response(JSON.stringify({ success:true, computed, mode: laps.length ? 'laps-no-plan' : 'splits-no-plan' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
@@ -752,6 +762,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
 
   } catch (e:any) {
+    // eslint-disable-next-line no-console
+    try { console.error('[compute-summary:error]', String(e)); } catch {}
     return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
   }
 });
