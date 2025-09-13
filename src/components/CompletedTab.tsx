@@ -7,7 +7,7 @@ import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
-import { RunChartPanelWithPower } from './RunChartPanelWithPower';
+import RunLineChartPanel from './RunLineChartPanel';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
@@ -1705,7 +1705,7 @@ const formatPace = (paceValue: any): string => {
         </div>
       )}
 
-      {/* Power Zone Chart - integrated with existing PACE/BPM/VAM/ELEV tabs */}
+      {/* SEPARATE Power/Cadence Chart - at the bottom */}
       {(workoutType === 'run' || workoutType === 'ride') && (() => {
         // Try multiple data sources for sensor data
         let samples = [];
@@ -1718,31 +1718,42 @@ const formatPace = (paceValue: any): string => {
         }
         
         if (samples.length > 0) {
-          // Extract power data
+          // Extract power and cadence data
           const powerData = samples
             .map((s: any) => s.power || s.watts || null)
             .filter((p: any) => p !== null && p !== undefined);
           
-          // Get FTP
-          const ftp = (hydrated||workoutData)?.functional_threshold_power || 
-                     (hydrated||workoutData)?.threshold_power;
+          const cadenceData = samples
+            .map((s: any) => s.cadence || s.rpm || s.spm || null)
+            .filter((c: any) => c !== null && c !== undefined);
           
-          // Only show if we have power data
-          if (powerData.length > 0) {
+          // Only show if we have power or cadence data
+          if (powerData.length > 0 || cadenceData.length > 0) {
             return (
               <div className="mb-4">
-                <RunChartPanelWithPower
-                  initial="PACE"
-                  power={powerData}
-                  ftp={ftp}
-                  renderLineChart={(tab) => {
-                    // This would integrate with your existing chart rendering
-                    // For now, return a placeholder that matches the existing chart structure
-                    return (
-                      <div className="h-full w-full flex items-center justify-center text-muted-foreground">
-                        {tab} Chart (integrate with existing chart system)
+                <RunLineChartPanel
+                  initial="PWR"
+                  onRender={(metric, el) => {
+                    // Debug: log what data we have
+                    console.log('Power/Cadence chart render for metric:', metric, {
+                      samplesLength: samples.length,
+                      powerDataLength: powerData.length,
+                      cadenceDataLength: cadenceData.length,
+                      sampleKeys: samples.length > 0 ? Object.keys(samples[0]) : []
+                    });
+                    
+                    // Show placeholder for power/cadence chart
+                    el.innerHTML = `
+                      <div class="h-full w-full flex items-center justify-center text-muted-foreground p-4">
+                        <div class="text-center">
+                          <div class="text-lg font-semibold mb-2">${metric} Chart</div>
+                          <div class="text-sm">
+                            ${metric === 'PWR' ? `Power data: ${powerData.length} samples` : ''}
+                            ${metric === 'CAD' ? `Cadence data: ${cadenceData.length} samples` : ''}
+                          </div>
+                        </div>
                       </div>
-                    );
+                    `;
                   }}
                 />
               </div>
