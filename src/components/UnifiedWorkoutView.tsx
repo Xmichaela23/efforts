@@ -314,6 +314,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       const pid = String(workout.planned_id);
                       await supabase.from('planned_workouts').update({ workout_status: 'planned' }).eq('id', pid);
                       await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
+                      // Kick off server summary so GAP/distance repopulate
+                      try { await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String(workout.id) } }); } catch {}
                       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
                       try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                       // Force local UI to reflect detach by clearing field on object reference if present
@@ -415,6 +417,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         // 2) Clear workout link and any stale computed summary so client re-slices or recomputes
                         const { error: workoutError } = await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
                         console.log('🔍 Workout update result:', workoutError);
+                        // Kick off server summary so GAP/distance repopulate
+                        try { await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String(workout.id) } }); } catch {}
                         try { (workout as any).planned_id = null; } catch {}
                         setLinkedPlanned(null);
                         // Prevent immediate fallback re-link detection for a short window
