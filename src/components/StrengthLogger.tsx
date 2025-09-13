@@ -1143,6 +1143,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Filter out exercises with no name or no sets
     const validExercises = exercises.filter(ex => ex.name.trim() && ex.sets.length > 0);
 
+    console.log('🔍 Exercise validation:');
+    console.log('  - Total exercises:', exercises.length);
+    console.log('  - Valid exercises:', validExercises.length);
+    console.log('  - Exercise details:', exercises.map(ex => ({
+      name: ex.name,
+      nameTrimmed: ex.name.trim(),
+      setsCount: ex.sets.length,
+      isValid: ex.name.trim() && ex.sets.length > 0
+    })));
+
     if (validExercises.length === 0) {
       alert('Please add at least one exercise with a name to save the workout.');
       return;
@@ -1192,9 +1202,21 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Use the app context to save and navigate with the DB-saved workout (has id)
     let saved: any = null;
     try {
+      console.log('🔍 Attempting to save workout with addWorkout...');
+      console.log('🔍 addWorkout function available:', typeof addWorkout);
+      console.log('🔍 completedWorkout data:', completedWorkout);
+      
       saved = await addWorkout(completedWorkout);
+      console.log('✅ Save successful, returned:', saved);
     } catch (e) {
-      console.error('❌ Save failed:', e);
+      console.error('❌ Save failed with error:', e);
+      console.error('❌ Error details:', {
+        message: e.message,
+        stack: e.stack,
+        name: e.name
+      });
+      alert(`Failed to save workout: ${e.message}`);
+      return; // Don't proceed with navigation if save failed
     }
 
     // Navigate to completed view (prefer saved row if available)
