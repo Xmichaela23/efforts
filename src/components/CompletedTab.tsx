@@ -1737,20 +1737,20 @@ const formatPace = (paceValue: any): string => {
 
             return (
               <div className="mb-4">
-                {/* Fixed data card above chart */}
-                <div className="mb-2 grid grid-cols-2 gap-4 px-1">
-                  <div>
-                    <div className="text-xs text-muted-foreground">Power</div>
-                    <div className="text-lg font-semibold tabular-nums">{avgPower} W</div>
-                  </div>
-                  <div>
-                    <div className="text-xs text-muted-foreground">Cadence</div>
-                    <div className="text-lg font-semibold tabular-nums">{avgCadence} spm</div>
-                  </div>
-                </div>
-                
                 <RunLineChartPanel
                   initial="PWR"
+                  header={
+                    <div className="mb-2 grid grid-cols-2 gap-4 px-1">
+                      <div>
+                        <div className="text-xs text-muted-foreground">Power</div>
+                        <div className="text-lg font-semibold tabular-nums">{avgPower} W</div>
+                      </div>
+                      <div>
+                        <div className="text-xs text-muted-foreground">Cadence</div>
+                        <div className="text-lg font-semibold tabular-nums">{avgCadence} spm</div>
+                      </div>
+                    </div>
+                  }
                   onRender={(metric, el) => {
                     // Create power/cadence series for the selected metric
                     const series = metric === "PWR" ? powerData : cadenceData;
