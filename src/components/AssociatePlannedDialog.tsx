@@ -56,6 +56,17 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           count: Array.isArray(data) ? data.length : 0
         });
 
+        // Debug: Check for strength workouts specifically in week 8/7-8/13
+        const { data: strengthWeek } = await supabase
+          .from('planned_workouts')
+          .select('id,name,type,date,workout_status,strength_exercises')
+          .eq('user_id', user.id)
+          .eq('type', 'strength')
+          .gte('date', '2025-08-07')
+          .lte('date', '2025-08-13')
+          .order('date', { ascending: true });
+        console.log('🔍 Strength workouts for week 8/7-8/13:', strengthWeek);
+
         // Debug: Also check what planned workouts exist for this user (any type, any date)
         const { data: allPlanned } = await supabase
           .from('planned_workouts')
