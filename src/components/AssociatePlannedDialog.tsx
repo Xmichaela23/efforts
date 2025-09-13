@@ -39,7 +39,7 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
 
         const { data } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id,completed_workout_id')
+          .select('id,name,type,date,week_number,day_number,workout_status,training_plan_id')
           .eq('user_id', user.id)
           .eq('type', type)
           .in('workout_status', ['planned','in_progress','completed'])
@@ -60,14 +60,21 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         });
 
 
-        // Filter out completed planned workouts that are already linked to other completed workouts
-        const filteredCandidates = (Array.isArray(data) ? data : []).filter(planned => {
-          // If it's completed, only show it if it's not linked to any completed workout
-          // OR if it's linked to the current workout (re-association)
-          if (planned.workout_status === 'completed') {
-            return !planned.completed_workout_id || planned.completed_workout_id === workout.id;
-          }
-          // Show all planned and in_progress workouts
+        // Determine which planned rows are already linked using workouts.planned_id
+        const plannedIds = (Array.isArray(data) ? data : []).map((p:any)=>p.id);
+        const { data: linked } = plannedIds.length ? await supabase
+          .from('workouts')
+          .select('id,planned_id')
+          .eq('user_id', user.id)
+          .in('planned_id', plannedIds)
+          : { data: [] as any[] } as any;
+        const usedBy = new Map<string,string>();
+        (Array.isArray(linked)?linked:[]).forEach((w:any)=>{ if (w?.planned_id) usedBy.set(String(w.planned_id), String(w.id)); });
+
+        // Filter out planned rows used by a different completed workout. Allow re-association to this workout.
+        const filteredCandidates = (Array.isArray(data) ? data : []).filter((planned:any) => {
+          const usedById = usedBy.get(String(planned.id));
+          if (usedById && usedById !== String(workout?.id||'')) return false;
           return true;
         });
 
@@ -147,13 +154,15 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
         completedId = inserted.id as string;
       }
 
-      // Flip planned to completed and link ids
+      // Flip planned to completed and link via single-link model
       await supabase.from('planned_workouts')
-        .update({ workout_status: 'completed', completed_workout_id: completedId })
-        .eq('id', planned.id);
+        .update({ workout_status: 'completed' })
+        .eq('id', planned.id)
+        .eq('user_id', user.id);
       await supabase.from('workouts')
         .update({ planned_id: planned.id })
-        .eq('id', completedId);
+        .eq('id', completedId)
+        .eq('user_id', user.id);
       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       onAssociated?.(planned.id);
       // Also update the resolved view users by emitting invalidate
