@@ -1313,7 +1313,8 @@ const formatPace = (paceValue: any): string => {
            <div className="px-2 py-1">
              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                {(() => {
-                 const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
+                 const src = (hydrated || workoutData);
+                 const km = (computeDistanceKm(src) ?? Number(src?.distance)) || 0;
                  return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
                })()}
              </div>
@@ -1379,8 +1380,8 @@ const formatPace = (paceValue: any): string => {
         <div className="px-2 py-1">
           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
             {(() => {
-              const gapSec = (workoutData as any)?.computed?.overall?.gap_pace_s_per_mi
-                ?? (workoutData as any)?.metrics?.gap_pace_s_per_mi;
+              const src = (hydrated || workoutData) as any;
+              const gapSec = src?.computed?.overall?.gap_pace_s_per_mi ?? src?.metrics?.gap_pace_s_per_mi;
               if (Number.isFinite(gapSec) && (gapSec as number) > 0) {
                 const sec = Number(gapSec);
                 return `${Math.floor(sec/60)}:${String(Math.round(sec%60)).padStart(2,'0')}/mi`;
