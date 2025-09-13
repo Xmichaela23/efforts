@@ -1749,7 +1749,7 @@ const formatPace = (paceValue: any): string => {
                       </div>
                     </div>
                   }
-                  onRender={React.useCallback((metric, el) => {
+                  onRender={(metric, el) => {
                     // Create power/cadence series for the selected metric
                     const series = metric === "PWR" ? powerData : cadenceData;
                     const yUnit = metric === "PWR" ? "W" : "spm";
@@ -1768,7 +1768,7 @@ const formatPace = (paceValue: any): string => {
                     
                     // Return cleanup function (even though it's not needed for innerHTML)
                     return () => {};
-                  }, [powerData, cadenceData])}
+                  }}
                 />
               </div>
             );
