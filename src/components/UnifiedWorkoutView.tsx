@@ -66,19 +66,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       return;
     }
 
-    // 2) Otherwise try to find by completed_workout_id in the context
-    const cid = (workout as any)?.id ? String((workout as any).id) : null;
-    if (cid) {
-      const planned = plannedWorkouts.find(p => p.completed_workout_id === cid);
-      console.log('🔍 Found linkedPlanned by completed_workout_id in context:', {
-        id: planned?.id,
-        name: planned?.name,
-        hasStrengthExercises: !!planned?.strength_exercises,
-        strengthExercises: planned?.strength_exercises
-      });
-      setLinkedPlanned(planned || null);
-      return;
-    }
+    // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
 
     // 3) Fallback: look for a same-day planned of same type in the context
     //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
@@ -322,11 +310,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   onClick={async () => {
                     try {
                       setUndoing(true);
-                      // Detach both sides
+                      // Detach both sides (single-link): revert planned status and clear workouts.planned_id
                       const pid = String(workout.planned_id);
-                      await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
-                      await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
+                      await supabase.from('planned_workouts').update({ workout_status: 'planned' }).eq('id', pid);
+                      await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
                       try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                       // Force local UI to reflect detach by clearing field on object reference if present
                       (workout as any).planned_id = null;
                     } catch (e) {
@@ -420,13 +409,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
                         console.log('🔍 Unattaching workout:', { workoutId: workout.id, plannedId: pid, linkedPlanned });
                         if (!pid) return;
-                        // 1) Detach primary planned row
-                        const { error: plannedError } = await supabase.from('planned_workouts').update({ completed_workout_id: null, workout_status: 'planned' }).eq('id', pid);
+                        // 1) Detach primary planned row (single-link)
+                        const { error: plannedError } = await supabase.from('planned_workouts').update({ workout_status: 'planned' }).eq('id', pid);
                         console.log('🔍 Planned workout update result:', plannedError);
-                        // 2) Safety: detach any planned rows pointing at this workout id
-                        const { error: safetyError } = await supabase.from('planned_workouts').update({ completed_workout_id: null }).eq('completed_workout_id', workout.id);
-                        console.log('🔍 Safety detach result:', safetyError);
-                        // 3) Clear workout link and any stale computed summary so client re-slices or recomputes
+                        // 2) Clear workout link and any stale computed summary so client re-slices or recomputes
                         const { error: workoutError } = await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
                         console.log('🔍 Workout update result:', workoutError);
                         try { (workout as any).planned_id = null; } catch {}
