@@ -1724,7 +1724,7 @@ const formatPace = (paceValue: any): string => {
             .filter((p: any) => p !== null && p !== undefined);
           
           const cadenceData = samples
-            .map((s: any) => s.cadence || s.cadence_rpm || s.cadenceInRpm || null)
+            .map((s: any) => s.bikeCadence || s.runCadence || s.swimCadence || s.wheelchairCadence || null)
             .filter((c: any) => c !== null && c !== undefined);
           
           // Only show if we have power or cadence data
@@ -1744,9 +1744,10 @@ const formatPace = (paceValue: any): string => {
                     if (samples.length > 0) {
                       console.log('First sample:', samples[0]);
                       console.log('Cadence field values:', {
-                        cadence: samples[0].cadence,
-                        cadence_rpm: samples[0].cadence_rpm,
-                        cadenceInRpm: samples[0].cadenceInRpm
+                        bikeCadence: samples[0].bikeCadence,
+                        runCadence: samples[0].runCadence,
+                        swimCadence: samples[0].swimCadence,
+                        wheelchairCadence: samples[0].wheelchairCadence
                       });
                     }
                     console.log('=== END DEBUG ===');
