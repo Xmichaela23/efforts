@@ -1724,7 +1724,7 @@ const formatPace = (paceValue: any): string => {
             .filter((p: any) => p !== null && p !== undefined);
           
           const cadenceData = samples
-            .map((s: any) => s.cadence || s.rpm || s.spm || null)
+            .map((s: any) => s.cadence || s.rpm || s.spm || s.run_cadence || s.bike_cadence || s.steps_per_minute || null)
             .filter((c: any) => c !== null && c !== undefined);
           
           // Only show if we have power or cadence data
@@ -1739,7 +1739,16 @@ const formatPace = (paceValue: any): string => {
                       samplesLength: samples.length,
                       powerDataLength: powerData.length,
                       cadenceDataLength: cadenceData.length,
-                      sampleKeys: samples.length > 0 ? Object.keys(samples[0]) : []
+                      sampleKeys: samples.length > 0 ? Object.keys(samples[0]) : [],
+                      firstSample: samples.length > 0 ? samples[0] : null,
+                      cadenceFields: samples.length > 0 ? {
+                        cadence: samples[0].cadence,
+                        rpm: samples[0].rpm,
+                        spm: samples[0].spm,
+                        run_cadence: samples[0].run_cadence,
+                        bike_cadence: samples[0].bike_cadence,
+                        steps_per_minute: samples[0].steps_per_minute
+                      } : null
                     });
                     
                     // Show placeholder for power/cadence chart
