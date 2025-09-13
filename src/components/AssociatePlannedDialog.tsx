@@ -53,7 +53,10 @@ export default function AssociatePlannedDialog({ workout, open, onClose, onAssoc
           from,
           to,
           candidates: data,
-          count: Array.isArray(data) ? data.length : 0
+          count: Array.isArray(data) ? data.length : 0,
+          workoutObject: workout,
+          workoutType: workout?.type,
+          workoutDate: workout?.date
         });
 
         // Debug: Check for strength workouts specifically around 8/12

@@ -733,15 +733,18 @@ export const useWorkouts = () => {
       console.log('🔍 Auto-attach debugging for workout:', {
         completedDate: date,
         completedType: completed.type,
+        completedTypeLower: String(completed.type || '').toLowerCase(),
         searchFrom: from,
-        searchTo: to
+        searchTo: to,
+        workoutId: (completed as any).id,
+        workoutName: (completed as any).name
       });
 
       const { data: planned } = await supabase
         .from('planned_workouts')
         .select('id,user_id,type,date,name,workout_status,completed_workout_id')
         .eq('user_id', user.id)
-        .eq('type', completed.type)
+        .eq('type', String(completed.type || '').toLowerCase())
         .in('workout_status', ['planned','in_progress','completed'])
         .gte('date', from)
         .lte('date', to);
@@ -749,7 +752,40 @@ export const useWorkouts = () => {
       console.log('🔍 Auto-attach found planned workouts:', planned);
 
       const candidates = Array.isArray(planned) ? planned : [];
-      if (!candidates.length) return;
+      if (!candidates.length) {
+        console.log('❌ No planned workouts found for auto-attach. Debugging...');
+        
+        // Debug: Check what planned workouts exist for this user
+        const { data: allPlanned } = await supabase
+          .from('planned_workouts')
+          .select('id,name,type,date,workout_status')
+          .eq('user_id', user.id)
+          .order('date', { ascending: true })
+          .limit(10);
+        console.log('🔍 All planned workouts for user:', allPlanned);
+        
+        // Debug: Check planned workouts of this type
+        const { data: typePlanned } = await supabase
+          .from('planned_workouts')
+          .select('id,name,type,date,workout_status')
+          .eq('user_id', user.id)
+          .eq('type', String(completed.type || '').toLowerCase())
+          .order('date', { ascending: true })
+          .limit(10);
+        console.log(`🔍 Planned workouts of type '${String(completed.type || '').toLowerCase()}':`, typePlanned);
+        
+        // Debug: Check planned workouts in date range
+        const { data: datePlanned } = await supabase
+          .from('planned_workouts')
+          .select('id,name,type,date,workout_status')
+          .eq('user_id', user.id)
+          .gte('date', from)
+          .lte('date', to)
+          .order('date', { ascending: true });
+        console.log(`🔍 Planned workouts in date range ${from} to ${to}:`, datePlanned);
+        
+        return;
+      }
 
       // Filter out completed planned workouts that are already linked to other completed workouts
       const filteredCandidates = candidates.filter(planned => {
@@ -762,7 +798,10 @@ export const useWorkouts = () => {
         return true;
       });
 
-      if (!filteredCandidates.length) return;
+      if (!filteredCandidates.length) {
+        console.log('❌ No valid candidates after filtering. Original candidates:', candidates.length, 'Filtered:', 0);
+        return;
+      }
 
       // Same‑day candidates
       const sameDay = filteredCandidates.filter((c:any)=> c.date === date);
@@ -826,7 +865,18 @@ export const useWorkouts = () => {
         const single = filteredCandidates.length === 1 ? filteredCandidates[0] : null;
         if (single) target = single; else target = pickByHeuristics(filteredCandidates);
       }
-      if (!target) return;
+      if (!target) {
+        console.log('❌ No target selected for auto-attach. Same day candidates:', sameDay.length, 'All candidates:', filteredCandidates.length);
+        return;
+      }
+      
+      console.log('✅ Auto-attach target selected:', {
+        id: target.id,
+        name: target.name,
+        type: target.type,
+        date: target.date,
+        status: target.workout_status
+      });
 
       // Mark the authored planned row as completed (no date move) and link both ways
       // Guard: if planned row already linked to a different completed workout, do nothing
