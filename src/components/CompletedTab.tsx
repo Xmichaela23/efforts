@@ -1,7 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import ReactDOM from 'react-dom/client';
 import { Button } from '@/components/ui/button';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
@@ -9,7 +7,7 @@ import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
-import RunLineChartPanel from './RunLineChartPanel';
+import PowerCadenceChart from './PowerCadenceChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
@@ -1731,134 +1729,13 @@ const formatPace = (paceValue: any): string => {
           
           // Only show if we have power or cadence data
           if (powerData.length > 0 || cadenceData.length > 0) {
-            // Calculate averages for fixed data card
-            const avgPower = powerData.length > 0 ? Math.round(powerData.reduce((a, b) => a + b, 0) / powerData.length) : 0;
-            const avgCadence = cadenceData.length > 0 ? Math.round(cadenceData.reduce((a, b) => a + b, 0) / cadenceData.length) : 0;
 
             return (
               <div className="mb-4">
-                <RunLineChartPanel
+                <PowerCadenceChart 
+                  power={powerData}
+                  cadence={cadenceData}
                   initial="PWR"
-                  onRender={(metric, el) => {
-                    // Create power/cadence series for the selected metric
-                    const series = metric === "PWR" ? powerData : cadenceData;
-                    const yUnit = metric === "PWR" ? "W" : "spm";
-                    
-                    if (series.length === 0) {
-                      el.innerHTML = `
-                        <div class="h-full w-full flex items-center justify-center text-muted-foreground p-4">
-                          <div class="text-center">
-                            <div class="text-lg font-semibold mb-2">No ${metric} Data</div>
-                            <div class="text-sm">No ${yUnit} samples available</div>
-                          </div>
-                        </div>
-                      `;
-                      return () => {};
-                    }
-
-                    // Create chart data with time index
-                    const chartData = series.map((value, index) => ({
-                      time: index,
-                      value: value
-                    }));
-
-                    // Create SVG chart like the other charts
-                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-                    svg.setAttribute("width", "100%");
-                    svg.setAttribute("height", "100%");
-                    svg.setAttribute("viewBox", "0 0 400 200");
-                    
-                    // Add grid lines
-                    for (let i = 0; i <= 4; i++) {
-                      const y = 20 + (i * 40);
-                      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                      line.setAttribute("x1", "40");
-                      line.setAttribute("y1", y.toString());
-                      line.setAttribute("x2", "380");
-                      line.setAttribute("y2", y.toString());
-                      line.setAttribute("stroke", "rgba(0,0,0,0.1)");
-                      line.setAttribute("stroke-dasharray", "3 3");
-                      svg.appendChild(line);
-                    }
-                    
-                    // Add line path
-                    if (chartData.length > 1) {
-                      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                      const maxValue = Math.max(...chartData.map(d => d.value));
-                      const minValue = Math.min(...chartData.map(d => d.value));
-                      const range = maxValue - minValue || 1;
-                      
-                      let pathData = "";
-                      chartData.forEach((point, index) => {
-                        const x = 40 + (index / (chartData.length - 1)) * 340;
-                        const y = 20 + ((maxValue - point.value) / range) * 160;
-                        if (index === 0) {
-                          pathData += `M ${x} ${y}`;
-                        } else {
-                          pathData += ` L ${x} ${y}`;
-                        }
-                      });
-                      
-                      path.setAttribute("d", pathData);
-                      path.setAttribute("stroke", metric === "PWR" ? "#3b82f6" : "#10b981");
-                      path.setAttribute("stroke-width", "2");
-                      path.setAttribute("fill", "none");
-                      svg.appendChild(path);
-                    }
-                    
-                    // Add cursor line and data card
-                    const cursorGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
-                    cursorGroup.setAttribute("class", "cursor-group");
-                    
-                    const cursorLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
-                    cursorLine.setAttribute("x1", "200");
-                    cursorLine.setAttribute("y1", "20");
-                    cursorLine.setAttribute("x2", "200");
-                    cursorLine.setAttribute("y2", "180");
-                    cursorLine.setAttribute("stroke", metric === "PWR" ? "#3b82f6" : "#10b981");
-                    cursorLine.setAttribute("stroke-width", "1");
-                    cursorLine.setAttribute("opacity", "0.5");
-                    cursorGroup.appendChild(cursorLine);
-                    
-                    // Data card - FIXED position above chart
-                    const card = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-                    card.setAttribute("x", "150");
-                    card.setAttribute("y", "5");
-                    card.setAttribute("width", "100");
-                    card.setAttribute("height", "40");
-                    card.setAttribute("fill", "white");
-                    card.setAttribute("stroke", "#e5e7eb");
-                    card.setAttribute("rx", "4");
-                    cursorGroup.appendChild(card);
-                    
-                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    text.setAttribute("x", "200");
-                    text.setAttribute("y", "25");
-                    text.setAttribute("text-anchor", "middle");
-                    text.setAttribute("font-size", "12");
-                    text.setAttribute("font-weight", "bold");
-                    text.textContent = `${metric}: 317 ${yUnit}`;
-                    cursorGroup.appendChild(text);
-                    
-                    const timeText = document.createElementNS("http://www.w3.org/2000/svg", "text");
-                    timeText.setAttribute("x", "200");
-                    timeText.setAttribute("y", "40");
-                    timeText.setAttribute("text-anchor", "middle");
-                    timeText.setAttribute("font-size", "10");
-                    timeText.setAttribute("fill", "#666");
-                    timeText.textContent = "Time: 25:28";
-                    cursorGroup.appendChild(timeText);
-                    
-                    svg.appendChild(cursorGroup);
-                    el.appendChild(svg);
-                    
-                    // Return cleanup function
-                    return () => {
-                      if (el.contains(svg)) {
-                        el.removeChild(svg);
-                      }
-                    };
-                  }}
                 />
               </div>
             );
