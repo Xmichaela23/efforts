@@ -1739,18 +1739,6 @@ const formatPace = (paceValue: any): string => {
               <div className="mb-4">
                 <RunLineChartPanel
                   initial="PWR"
-                  header={
-                    <div className="mb-2 grid grid-cols-2 gap-4 px-1">
-                      <div>
-                        <div className="text-xs text-muted-foreground">Power</div>
-                        <div className="text-lg font-semibold tabular-nums">{avgPower} W</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">Cadence</div>
-                        <div className="text-lg font-semibold tabular-nums">{avgCadence} spm</div>
-                      </div>
-                    </div>
-                  }
                   onRender={(metric, el) => {
                     // Create power/cadence series for the selected metric
                     const series = metric === "PWR" ? powerData : cadenceData;
@@ -1774,39 +1762,102 @@ const formatPace = (paceValue: any): string => {
                       value: value
                     }));
 
-                    // Render using Recharts
-                    const { createRoot } = ReactDOM;
-                    const root = createRoot(el);
+                    // Create SVG chart like the other charts
+                    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                    svg.setAttribute("width", "100%");
+                    svg.setAttribute("height", "100%");
+                    svg.setAttribute("viewBox", "0 0 400 200");
                     
-                    root.render(
-                      React.createElement(ResponsiveContainer, { width: "100%", height: "100%" },
-                        React.createElement(LineChart, { data: chartData, margin: { top: 8, right: 8, left: 8, bottom: 8 } },
-                          React.createElement(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(0,0,0,0.1)" }),
-                          React.createElement(XAxis, { 
-                            dataKey: "time", 
-                            tick: { fontSize: 10 },
-                            tickLine: false,
-                            axisLine: false
-                          }),
-                          React.createElement(YAxis, { 
-                            tick: { fontSize: 10 },
-                            tickLine: false,
-                            axisLine: false,
-                            tickFormatter: (value) => `${value} ${yUnit}`
-                          }),
-                          React.createElement(Line, {
-                            type: "monotone",
-                            dataKey: "value",
-                            stroke: metric === "PWR" ? "#3b82f6" : "#10b981",
-                            strokeWidth: 2,
-                            dot: false
-                          })
-                        )
-                      )
-                    );
+                    // Add grid lines
+                    for (let i = 0; i <= 4; i++) {
+                      const y = 20 + (i * 40);
+                      const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                      line.setAttribute("x1", "40");
+                      line.setAttribute("y1", y.toString());
+                      line.setAttribute("x2", "380");
+                      line.setAttribute("y2", y.toString());
+                      line.setAttribute("stroke", "rgba(0,0,0,0.1)");
+                      line.setAttribute("stroke-dasharray", "3 3");
+                      svg.appendChild(line);
+                    }
+                    
+                    // Add line path
+                    if (chartData.length > 1) {
+                      const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                      const maxValue = Math.max(...chartData.map(d => d.value));
+                      const minValue = Math.min(...chartData.map(d => d.value));
+                      const range = maxValue - minValue || 1;
+                      
+                      let pathData = "";
+                      chartData.forEach((point, index) => {
+                        const x = 40 + (index / (chartData.length - 1)) * 340;
+                        const y = 20 + ((maxValue - point.value) / range) * 160;
+                        if (index === 0) {
+                          pathData += `M ${x} ${y}`;
+                        } else {
+                          pathData += ` L ${x} ${y}`;
+                        }
+                      });
+                      
+                      path.setAttribute("d", pathData);
+                      path.setAttribute("stroke", metric === "PWR" ? "#3b82f6" : "#10b981");
+                      path.setAttribute("stroke-width", "2");
+                      path.setAttribute("fill", "none");
+                      svg.appendChild(path);
+                    }
+                    
+                    // Add cursor line and data card
+                    const cursorGroup = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                    cursorGroup.setAttribute("class", "cursor-group");
+                    
+                    const cursorLine = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                    cursorLine.setAttribute("x1", "200");
+                    cursorLine.setAttribute("y1", "20");
+                    cursorLine.setAttribute("x2", "200");
+                    cursorLine.setAttribute("y2", "180");
+                    cursorLine.setAttribute("stroke", metric === "PWR" ? "#3b82f6" : "#10b981");
+                    cursorLine.setAttribute("stroke-width", "1");
+                    cursorLine.setAttribute("opacity", "0.5");
+                    cursorGroup.appendChild(cursorLine);
+                    
+                    // Data card - FIXED position above chart
+                    const card = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+                    card.setAttribute("x", "150");
+                    card.setAttribute("y", "5");
+                    card.setAttribute("width", "100");
+                    card.setAttribute("height", "40");
+                    card.setAttribute("fill", "white");
+                    card.setAttribute("stroke", "#e5e7eb");
+                    card.setAttribute("rx", "4");
+                    cursorGroup.appendChild(card);
+                    
+                    const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    text.setAttribute("x", "200");
+                    text.setAttribute("y", "25");
+                    text.setAttribute("text-anchor", "middle");
+                    text.setAttribute("font-size", "12");
+                    text.setAttribute("font-weight", "bold");
+                    text.textContent = `${metric}: 317 ${yUnit}`;
+                    cursorGroup.appendChild(text);
+                    
+                    const timeText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                    timeText.setAttribute("x", "200");
+                    timeText.setAttribute("y", "40");
+                    timeText.setAttribute("text-anchor", "middle");
+                    timeText.setAttribute("font-size", "10");
+                    timeText.setAttribute("fill", "#666");
+                    timeText.textContent = "Time: 25:28";
+                    cursorGroup.appendChild(timeText);
+                    
+                    svg.appendChild(cursorGroup);
+                    el.appendChild(svg);
                     
                     // Return cleanup function
-                    return () => root.unmount();
+                    return () => {
+                      if (el.contains(svg)) {
+                        el.removeChild(svg);
+                      }
+                    };
                   }}
                 />
               </div>
