@@ -1731,26 +1731,26 @@ const formatPace = (paceValue: any): string => {
           
           // Only show if we have power or cadence data
           if (powerData.length > 0 || cadenceData.length > 0) {
-            // Calculate averages for header
+            // Calculate averages for fixed data card
             const avgPower = powerData.length > 0 ? Math.round(powerData.reduce((a, b) => a + b, 0) / powerData.length) : 0;
             const avgCadence = cadenceData.length > 0 ? Math.round(cadenceData.reduce((a, b) => a + b, 0) / cadenceData.length) : 0;
 
             return (
               <div className="mb-4">
+                {/* Fixed data card above chart */}
+                <div className="mb-2 grid grid-cols-2 gap-4 px-1">
+                  <div>
+                    <div className="text-xs text-muted-foreground">Power</div>
+                    <div className="text-lg font-semibold tabular-nums">{avgPower} W</div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Cadence</div>
+                    <div className="text-lg font-semibold tabular-nums">{avgCadence} spm</div>
+                  </div>
+                </div>
+                
                 <RunLineChartPanel
                   initial="PWR"
-                  header={
-                    <div className="mb-2 grid grid-cols-2 gap-4 px-1">
-                      <div>
-                        <div className="text-xs text-muted-foreground">Power</div>
-                        <div className="text-lg font-semibold tabular-nums">{avgPower} W</div>
-                      </div>
-                      <div>
-                        <div className="text-xs text-muted-foreground">Cadence</div>
-                        <div className="text-lg font-semibold tabular-nums">{avgCadence} spm</div>
-                      </div>
-                    </div>
-                  }
                   onRender={(metric, el) => {
                     // Create power/cadence series for the selected metric
                     const series = metric === "PWR" ? powerData : cadenceData;
@@ -1796,7 +1796,11 @@ const formatPace = (paceValue: any): string => {
                           }),
                           React.createElement(Tooltip, {
                             formatter: (value) => [`${value} ${yUnit}`, metric],
-                            labelFormatter: (time) => `Time: ${time}s`
+                            labelFormatter: (time) => {
+                              const minutes = Math.floor(time / 60);
+                              const seconds = time % 60;
+                              return `Time: ${minutes}:${seconds.toString().padStart(2, '0')}`;
+                            }
                           }),
                           React.createElement(Line, {
                             type: "monotone",

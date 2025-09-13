@@ -60,7 +60,7 @@ export default function RunLineChartPanel({
             className={clsx(
               "px-3 py-1.5 rounded-lg text-sm font-semibold tracking-wide uppercase",
               "text-gray-500",
-              tab === k && "text-black border-2 border-amber-400"
+              tab === k && "text-black underline decoration-2 underline-offset-4"
             )}
           >
             {k}
