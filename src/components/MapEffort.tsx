@@ -82,7 +82,6 @@ export default function MapEffort({
     // ↓↓↓ ADD: tame wheel + touch so page scroll wins
     // 1) Wheel: require Ctrl/⌘ to zoom; otherwise let page scroll
     map.scrollZoom.disable();
-    map.dragPan.disable();
     map.touchZoomRotate.disableRotation();
     
     // Disable keyboard pan/zoom so arrow keys/± don't nudge the map while typing
@@ -107,19 +106,27 @@ export default function MapEffort({
 
     // 2) Touch: single-finger = page scroll, two-finger = pan/zoom map
     const container = map.getCanvasContainer();
-    container.style.touchAction = 'pan-y'; // allow vertical page scroll
+    const setTA = (v: string) => {
+      container.style.touchAction = v;
+      map.getCanvas().style.touchAction = v; // cover canvas too
+    };
+    setTA('pan-y'); // default: page scroll wins
+    
     const onTouchStart = (e: TouchEvent) => {
       if (e.touches.length >= 2) {
+        setTA('none');                    // allow full 2D pan/zoom
         map.dragPan.enable();
         map.touchZoomRotate.enable();
       } else {
+        setTA('pan-y');                   // single finger = page scroll
         map.dragPan.disable();
         map.touchZoomRotate.disableRotation();
       }
     };
     const onTouchEnd = (e: TouchEvent) => {
       if (e.touches.length === 0) {
-        map.dragPan.disable();
+        setTA('pan-y');                   // back to page scroll
+        map.dragPan.enable();             // mouse/trackpad can pan
         map.touchZoomRotate.disableRotation();
       }
     };
@@ -155,6 +162,7 @@ export default function MapEffort({
 
     map.on('load', () => {
       attachLayers();
+      map.dragPan.enable();   // ← ensure enabled for mouse/trackpad
       setReady(true);
       onMapReady?.();
     });
@@ -175,6 +183,7 @@ export default function MapEffort({
     map.on('resize', onResize);
 
     return () => {
+      clearTimeout(wheelTimer);
       canvas.removeEventListener('wheel', onWheel as any);
       container.removeEventListener('touchstart', onTouchStart as any);
       container.removeEventListener('touchmove',  onTouchStart as any);
