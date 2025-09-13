@@ -98,12 +98,17 @@ export function usePlannedRange(fromISO: string, toISO: string) {
           const k = cacheKey(user.id, fromISO, toISO);
           memoryCache.delete(k);
           localStorage.removeItem(`plannedRange:${k}`);
+          console.log('🗑️ Cleared plannedRange cache for:', k);
         }
       } catch {}
       queryClient.invalidateQueries({ queryKey: queryKeyBase });
     };
     window.addEventListener('planned:invalidate', handler);
-    return () => window.removeEventListener('planned:invalidate', handler);
+    window.addEventListener('workouts:invalidate', handler); // Also listen for workout changes
+    return () => {
+      window.removeEventListener('planned:invalidate', handler);
+      window.removeEventListener('workouts:invalidate', handler);
+    };
   }, [fromISO, toISO]);
 
   useEffect(() => {

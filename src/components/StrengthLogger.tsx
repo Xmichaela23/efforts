@@ -1285,6 +1285,27 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
+          <button 
+            onClick={() => {
+              console.log('🧹 Clearing plannedRange caches...');
+              // Clear all plannedRange caches
+              const keys = Object.keys(localStorage);
+              keys.forEach(key => {
+                if (key.includes('plannedRange')) {
+                  localStorage.removeItem(key);
+                  console.log('🗑️ Cleared localStorage:', key);
+                }
+              });
+              // Dispatch invalidation events
+              window.dispatchEvent(new CustomEvent('planned:invalidate'));
+              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
+              // Force reload
+              window.location.reload();
+            }}
+            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
+          >
+            Clear Cache
+          </button>
           <div className="relative">
             <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
             {showWorkoutsMenu && (
@@ -1310,9 +1331,24 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   </button>
                 </div>
                 <div className="max-h-56 overflow-y-auto" onMouseDown={(e)=>e.preventDefault()}>
-                  {(Array.isArray(plannedWorkouts)? plannedWorkouts: [])
-                    .filter(w=>String((w as any).type).toLowerCase()==='strength')
-                    .filter(w=> withinWeek(w.date, startOfWeek(getStrengthLoggerDateString())))
+                  {(() => {
+                    const allStrength = (Array.isArray(plannedWorkouts)? plannedWorkouts: [])
+                      .filter(w=>String((w as any).type).toLowerCase()==='strength');
+                    const inWeek = allStrength.filter(w=> withinWeek(w.date, startOfWeek(getStrengthLoggerDateString())));
+                    const notCompleted = inWeek.filter(w=> String((w as any).workout_status||'').toLowerCase() !== 'completed');
+                    
+                    console.log('🔍 Planned workouts debug:', {
+                      total: plannedWorkouts?.length || 0,
+                      strength: allStrength.length,
+                      inWeek: inWeek.length,
+                      notCompleted: notCompleted.length,
+                      allStrength: allStrength.map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status })),
+                      inWeek: inWeek.map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status })),
+                      notCompleted: notCompleted.map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status }))
+                    });
+                    
+                    return notCompleted;
+                  })()
                     .sort((a:any,b:any)=> a.date.localeCompare(b.date))
                     .map((w:any)=> (
                       <button key={w.id} onClick={()=>{ 
@@ -1326,7 +1362,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                         setShowWorkoutsMenu(false); 
                       }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
                         <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
-                        <span className={`text-2xs px-1.5 py-0.5 rounded border ${String(w.workout_status).toLowerCase()==='completed'?'border-green-200 text-green-700':'border-gray-200 text-gray-600'}`}>{String(w.workout_status||'planned')}</span>
+                        <span className="text-2xs px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">{String(w.workout_status||'planned')}</span>
                       </button>
                     ))}
                 </div>
