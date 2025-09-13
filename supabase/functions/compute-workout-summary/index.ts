@@ -517,13 +517,15 @@ Deno.serve(async (req) => {
       const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
       const overallSec    = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
 
+      const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
       const computed = {
         version: COMPUTED_VERSION,
         intervals: outIntervals,
         overall: {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),
-          avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec)
+          avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
+          gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
         },
         quality: {
           mode: laps.length ? 'lap' : 'split',
@@ -546,13 +548,15 @@ Deno.serve(async (req) => {
     if (snapped && snapped.length) {
       const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
       const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
+      const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
       const computed = {
         version: COMPUTED_VERSION,
         intervals: snapped,
         overall: {
           duration_s_moving: overallSec,
           distance_m: Math.round(overallMeters),
-          avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec)
+          avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
+          gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
         }
       };
       await supabase
@@ -743,13 +747,15 @@ Deno.serve(async (req) => {
     const overallMeters = rows.length ? Math.max(0, (rows[rows.length-1].d || 0) - (rows[0].d || 0)) : 0;
     const overallSec = rows.length ? Math.max(1, (rows[rows.length-1].t || 0) - (rows[0].t || 0)) : 0;
 
+    const overallGap = gapSecPerMi(rows, 0, Math.max(1, rows.length - 1));
     const computed = {
       version: COMPUTED_VERSION,
       intervals: outIntervals,
       overall: {
         duration_s_moving: overallSec,
         distance_m: Math.round(overallMeters),
-        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec)
+        avg_pace_s_per_mi: paceSecPerMiFromMetersSeconds(overallMeters, overallSec),
+        gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
       }
     };
 

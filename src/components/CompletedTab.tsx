@@ -334,27 +334,32 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
  };
 
  const computeDistanceKm = (w: any): number | null => {
-   // Prefer explicit meters → km if present
-   const meters = w?.distance_meters ?? w?.metrics?.distance_meters ?? w?.strava_data?.original_activity?.distance;
-   if (typeof meters === 'number' && meters > 0) return meters / 1000;
-   // Else, if distance is already km (normalized), use as-is. If it's suspiciously large (meters), convert.
-   if (typeof w?.distance === 'number' && w.distance > 0) return w.distance > 2000 ? w.distance / 1000 : w.distance;
-   const track = Array.isArray(w?.gps_track) ? w.gps_track : null;
-   if (track && track.length > 1) {
-     let meters = 0;
-     for (let i = 1; i < track.length; i++) {
-       const a = track[i - 1];
-       const b = track[i];
-       if (a?.lat != null && a?.lng != null && b?.lat != null && b?.lng != null) {
-         meters += haversine(a.lat, a.lng, b.lat, b.lng);
-       }
-     }
-     if (meters > 0) return meters / 1000;
-   }
-   const steps = w?.steps ?? w?.metrics?.steps;
-   if (typeof steps === 'number' && steps > 0) return (steps * 0.78) / 1000;
-   return null;
- };
+  // Prefer server-computed overall distance (meters) when available
+  try {
+    const computedMeters = (w as any)?.computed?.overall?.distance_m;
+    if (typeof computedMeters === 'number' && computedMeters > 0) return computedMeters / 1000;
+  } catch {}
+  // Prefer explicit meters → km if present
+  const meters = (w as any)?.distance_meters ?? (w as any)?.metrics?.distance_meters ?? (w as any)?.strava_data?.original_activity?.distance;
+  if (typeof meters === 'number' && meters > 0) return (meters as number) / 1000;
+  // Else, if distance is already km (normalized), use as-is. If it's suspiciously large (meters), convert.
+  if (typeof (w as any)?.distance === 'number' && (w as any).distance > 0) return (w as any).distance > 2000 ? (w as any).distance / 1000 : (w as any).distance;
+  const track = Array.isArray((w as any)?.gps_track) ? (w as any).gps_track : null;
+  if (track && track.length > 1) {
+    let meters = 0;
+    for (let i = 1; i < track.length; i++) {
+      const a = track[i - 1];
+      const b = track[i];
+      if (a?.lat != null && a?.lng != null && b?.lat != null && b?.lng != null) {
+        meters += haversine(a.lat, a.lng, b.lat, b.lng);
+      }
+    }
+    if (meters > 0) return meters / 1000;
+  }
+  const steps = (w as any)?.steps ?? (w as any)?.metrics?.steps;
+  if (typeof steps === 'number' && steps > 0) return (steps * 0.78) / 1000;
+  return null;
+};
 
  const formatDistance = (km: any): string => {
    const num = Number(km);
