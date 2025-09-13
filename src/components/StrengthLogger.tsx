@@ -867,12 +867,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   const prefillFromPlanned = (row: any) => {
     try {
+      console.log('🔧 prefillFromPlanned called with row:', row);
       setLockManualPrefill(true);
+      
       if (row?.computed?.steps && Array.isArray(row.computed.steps)){
+        console.log('📊 Found computed steps, parsing...', row.computed.steps);
         const exs = parseFromComputed(row.computed);
-        if (exs.length) { setExercises(exs); return; }
+        console.log('📊 Parsed exercises from computed:', exs);
+        if (exs.length) { 
+          setExercises(exs); 
+          console.log('✅ Set exercises from computed steps');
+          return; 
+        }
       }
+      
       const se = Array.isArray(row?.strength_exercises)? row.strength_exercises : [];
+      console.log('📊 Found strength_exercises:', se);
       if (se.length){
         const mapped: LoggedExercise[] = se.map((exercise: any, index: number) => ({
           id: `ex-${Date.now()}-${index}-${Math.random().toString(36).substr(2, 9)}`,
@@ -880,9 +890,15 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           expanded: true,
           sets: Array.from({ length: exercise.sets || 3 }, () => ({ reps: exercise.reps || 0, weight: exercise.weight || 0, barType: 'standard', rir: undefined, completed: false }))
         }));
+        console.log('📊 Mapped strength exercises:', mapped);
         setExercises(mapped);
+        console.log('✅ Set exercises from strength_exercises');
+      } else {
+        console.log('⚠️ No strength_exercises found in row');
       }
-    } catch {}
+    } catch (error) {
+      console.error('❌ Error in prefillFromPlanned:', error);
+    }
   };
 
   // Cleanup when component unmounts
@@ -1165,7 +1181,16 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     .filter(w=> withinWeek(w.date, startOfWeek(getTodayDateString())))
                     .sort((a:any,b:any)=> a.date.localeCompare(b.date))
                     .map((w:any)=> (
-                      <button key={w.id} onClick={()=>{ prefillFromPlanned(w); setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); setSourcePlannedId(w.id); setSourcePlannedDate(w.date); setShowWorkoutsMenu(false); }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
+                      <button key={w.id} onClick={()=>{ 
+                        console.log('🔧 Selected planned workout:', w);
+                        console.log('🔧 Has computed?', !!w.computed);
+                        console.log('🔧 Has strength_exercises?', !!w.strength_exercises, w.strength_exercises);
+                        prefillFromPlanned(w); 
+                        setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); 
+                        setSourcePlannedId(w.id); 
+                        setSourcePlannedDate(w.date); 
+                        setShowWorkoutsMenu(false); 
+                      }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
                         <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
                         <span className={`text-2xs px-1.5 py-0.5 rounded border ${String(w.workout_status).toLowerCase()==='completed'?'border-green-200 text-green-700':'border-gray-200 text-gray-600'}`}>{String(w.workout_status||'planned')}</span>
                       </button>
