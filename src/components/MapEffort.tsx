@@ -132,44 +132,38 @@ export default function MapEffort({
       
       console.log('🗺️ MapEffort touch move:', { deltaX, deltaY, deltaTime, isScrolling: isScrollingRef.current });
       
+      // Always prevent default initially to stop map from responding
+      e.preventDefault();
+      e.stopPropagation();
+      
       // If we haven't determined scroll direction yet
-      if (!isScrollingRef.current && deltaTime > 500) {
-        // If primarily vertical movement, allow page scroll (much more strict thresholds)
-        if (deltaY > deltaX && deltaY > 150) {
-          console.log('🗺️ Disabling map interaction - vertical scroll detected');
+      if (!isScrollingRef.current && deltaTime > 200) {
+        // If primarily vertical movement, allow page scroll
+        if (deltaY > deltaX && deltaY > 50) {
+          console.log('🗺️ Allowing page scroll - vertical movement detected');
           isScrollingRef.current = true;
-          // Disable map interaction temporarily
-          map.dragPan.disable();
-          map.scrollZoom.disable();
-          map.boxZoom.disable();
-          map.dragRotate.disable();
-          map.doubleClickZoom.disable();
+          // Don't re-enable map interactions
         }
         // If primarily horizontal movement, enable map interaction
-        else if (deltaX > deltaY && deltaX > 150) {
-          console.log('🗺️ Keeping map interaction enabled - horizontal movement detected');
+        else if (deltaX > deltaY && deltaX > 50) {
+          console.log('🗺️ Enabling map interaction - horizontal movement detected');
           isScrollingRef.current = true;
-          // Keep map interaction enabled
+          // Re-enable map interactions for horizontal movement
+          map.dragPan.enable();
+          map.scrollZoom.enable();
+          map.boxZoom.enable();
+          map.dragRotate.enable();
+          map.doubleClickZoom.enable();
         }
-      }
-      
-      // If we've determined this is a vertical scroll, prevent the event from reaching the map
-      if (isScrollingRef.current) {
-        e.preventDefault();
-        e.stopPropagation();
       }
     };
 
     const handleTouchEnd = () => {
-      // Re-enable all map interactions after touch ends
+      // Reset state after touch ends
       setTimeout(() => {
-        map.dragPan.enable();
-        map.scrollZoom.enable();
-        map.boxZoom.enable();
-        map.dragRotate.enable();
-        map.doubleClickZoom.enable();
         isScrollingRef.current = false;
         touchStartRef.current = null;
+        // Don't automatically re-enable map interactions - let the next touch determine behavior
       }, 100);
     };
 
