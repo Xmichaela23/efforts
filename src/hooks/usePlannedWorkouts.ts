@@ -46,7 +46,12 @@ export const usePlannedWorkouts = () => {
 
       // Transform the data to match our PlannedWorkout interface
       const transformedWorkouts: PlannedWorkout[] = (data || [])
-        // Don't filter anything - show all planned workouts
+        // Include all planned workouts (including completed) for auto-attachment
+        // But exclude optional workouts from UI context
+        .filter(workout => {
+          const tags = Array.isArray(workout.tags) ? workout.tags : [];
+          return !tags.map(t => String(t).toLowerCase()).includes('optional');
+        })
         .map(workout => {
         // Normalize JSONB fields that may come back as strings
         const parseMaybeJson = (v: any) => {

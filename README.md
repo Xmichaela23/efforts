@@ -151,11 +151,14 @@ The app automatically fetches and displays historical weather data for completed
 
 ## 📚 Documentation
 
-- **`APP_BIBLE.md`** - Complete development philosophy and design rules
-- **`CURRENT_OPTIMIZATION_STATUS.md`** - Technical details for developers
-- **`PERFORMANCE_DATA_STRUCTURE.md`** - Performance data access patterns
-- **`GARMIN_ACTIVITY_API.md`** - Garmin Connect integration details
+- **`QUICK_START_FOR_NEW_CHAT.md`** - Essential context for new AI assistants
+- **`SYSTEM_ARCHITECTURE_DIAGRAM.md`** - Visual overview of the four systems and how they work together
+- **`PLANNED_WORKOUTS_SYSTEM.md`** - Complete guide to planned workout architecture
+- **`OPTIONAL_WORKOUTS_SYSTEM.md`** - Complete guide to optional workout activation system
 - **`PLAN_AUTHORING.md`** - How to create training plans
+- **`DATA_STRUCTURE_GUIDE.md`** - Complete data map and access patterns
+- **`GARMIN_ACTIVITY_API.md`** - Garmin Connect integration details
+- **`APP_BIBLE.md`** - Complete development philosophy and design rules (archived)
 
 ## 🔑 Environment Variables
 
