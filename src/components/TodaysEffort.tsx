@@ -58,9 +58,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
-    // Only show activated workouts (no 'optional' tag)
+    // Split into activated (no 'optional') and optional
     const activated = dateWorkoutsMemo.filter((w:any)=> !(Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')));
-    setDisplayWorkouts([...activated]);
+    const optionals = dateWorkoutsMemo.filter((w:any)=> Array.isArray(w?.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'));
+    setDisplayWorkouts([...activated, ...optionals]);
   }, [dateWorkoutsMemo]);
   // Helper to clean authored codes from text (mirrors PlannedWorkoutView)
   const stripCodes = (text?: string) => String(text || '')
