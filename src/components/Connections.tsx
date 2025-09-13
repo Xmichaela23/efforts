@@ -119,15 +119,23 @@ const Connections: React.FC = () => {
         return;
       }
       
-      // Load existing connections from database (for Garmin)
-      const { data: userConnections } = await supabase
+      // Load existing connections from database (check both tables)
+      const { data: deviceConnections } = await supabase
         .from('device_connections')
         .select('*')
         .eq('user_id', authUser.id);
+        
+      const { data: userConnections } = await supabase
+        .from('user_connections')
+        .select('*')
+        .eq('user_id', authUser.id);
+        
+      // Combine both connection sources
+      const allConnections = [...(deviceConnections || []), ...(userConnections || [])];
 
-      if (userConnections) {
+      if (allConnections.length > 0) {
         const updatedConnections = connections.map(conn => {
-          const existing = userConnections.find(uc => uc.provider === conn.provider);
+          const existing = allConnections.find(uc => uc.provider === conn.provider);
           return {
             ...conn,
             connected: !!existing,

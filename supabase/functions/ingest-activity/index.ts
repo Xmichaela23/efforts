@@ -347,7 +347,7 @@ function computeComputedFromActivity(activity: any): any | null {
   }
 }
 
-function mapGarminToWorkout(activity: any, userId: string) {
+async function mapGarminToWorkout(activity: any, userId: string) {
   const { date, timestamp } = garminLocalDateAndTimestamp(activity);
   const typeKey = (activity.activity_type || activity.summary?.activityType?.typeKey || '').toLowerCase();
   const type = typeKey.includes('run') ? 'run'
@@ -355,6 +355,35 @@ function mapGarminToWorkout(activity: any, userId: string) {
     : typeKey.includes('swim') ? 'swim'
     : typeKey.includes('walk') ? 'walk'
     : 'strength';
+
+  // Load rich power/cadence data from garmin_activities table
+  let enrichedData = {};
+  try {
+    const garminActivityId = activity.garmin_activity_id || activity.summaryId || activity.activityId;
+    if (garminActivityId) {
+      const { data: gaData } = await supabase
+        .from('garmin_activities')
+        .select('avg_power, max_power, avg_bike_cadence, max_bike_cadence, avg_run_cadence, max_run_cadence, sensor_data')
+        .eq('user_id', userId)
+        .eq('garmin_activity_id', garminActivityId)
+        .maybeSingle();
+      
+      if (gaData) {
+        enrichedData = {
+          avg_power: gaData.avg_power,
+          max_power: gaData.max_power,
+          avg_bike_cadence: gaData.avg_bike_cadence,
+          max_bike_cadence: gaData.max_bike_cadence,
+          avg_run_cadence: gaData.avg_run_cadence,
+          max_run_cadence: gaData.max_run_cadence,
+          sensor_data: gaData.sensor_data
+        };
+        console.log(`🔋 Enriched Garmin data for ${garminActivityId}: Power=${gaData.avg_power}W, Cadence=${gaData.avg_bike_cadence || gaData.avg_run_cadence}`);
+      }
+    }
+  } catch (error) {
+    console.log('⚠️ Could not load enriched Garmin data:', error);
+  }
 
   return {
     user_id: userId,
@@ -376,15 +405,25 @@ function mapGarminToWorkout(activity: any, userId: string) {
     elevation_gain: Number.isFinite(activity.elevation_gain_meters) ? Math.round(activity.elevation_gain_meters) : null,
     calories: Number.isFinite(activity.calories) ? Math.round(activity.calories) : null,
     provider_sport: activity.activity_type || null,
-    // Additional common metrics if provided
-    avg_power: Number.isFinite(activity.average_watts) ? Math.round(activity.average_watts) : (Number.isFinite(activity.avg_power) ? Math.round(activity.avg_power) : null),
-    max_power: Number.isFinite(activity.max_watts) ? Math.round(activity.max_watts) : (Number.isFinite(activity.max_power) ? Math.round(activity.max_power) : null),
+    // Additional common metrics if provided - prioritize enriched data from garmin_activities
+    avg_power: Number.isFinite(enrichedData.avg_power) ? Math.round(enrichedData.avg_power) : 
+               (Number.isFinite(activity.average_watts) ? Math.round(activity.average_watts) : 
+                (Number.isFinite(activity.avg_power) ? Math.round(activity.avg_power) : null)),
+    max_power: Number.isFinite(enrichedData.max_power) ? Math.round(enrichedData.max_power) : 
+               (Number.isFinite(activity.max_watts) ? Math.round(activity.max_watts) : 
+                (Number.isFinite(activity.max_power) ? Math.round(activity.max_power) : null)),
     avg_cadence: (() => {
-      const v = activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_run_cadence ?? activity.avg_bike_cadence;
+      // Prioritize enriched data, then fall back to activity data
+      const enriched = enrichedData.avg_bike_cadence ?? enrichedData.avg_run_cadence;
+      const activity = activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_run_cadence ?? activity.avg_bike_cadence;
+      const v = enriched ?? activity;
       return roundInt(v);
     })(),
     max_cadence: (() => {
-      const v = activity.max_running_cadence ?? activity.max_run_cadence ?? activity.max_bike_cadence;
+      // Prioritize enriched data, then fall back to activity data
+      const enriched = enrichedData.max_bike_cadence ?? enrichedData.max_run_cadence;
+      const activity = activity.max_running_cadence ?? activity.max_run_cadence ?? activity.max_bike_cadence;
+      const v = enriched ?? activity;
       return roundInt(v);
     })(),
     strokes: Number.isFinite(activity.strokes) ? activity.strokes : null,
@@ -401,9 +440,10 @@ function mapGarminToWorkout(activity: any, userId: string) {
     // Location (prefer explicit, fallback to first gps_track point)
     start_position_lat: (activity.starting_latitude ?? (Array.isArray(activity.gps_track) ? (activity.gps_track[0]?.lat ?? activity.gps_track[0]?.latitude ?? activity.gps_track[0]?.latitudeInDegree ?? null) : null)) ?? null,
     start_position_long: (activity.starting_longitude ?? (Array.isArray(activity.gps_track) ? (activity.gps_track[0]?.lng ?? activity.gps_track[0]?.longitude ?? activity.gps_track[0]?.longitudeInDegree ?? null) : null)) ?? null,
-    // Heavy JSON fields stored directly on workouts
+    // Heavy JSON fields stored directly on workouts - prioritize enriched sensor data
     gps_track: activity.gps_track ? JSON.stringify(activity.gps_track) : null,
-    sensor_data: activity.sensor_data ? JSON.stringify(activity.sensor_data) : null,
+    sensor_data: enrichedData.sensor_data ? JSON.stringify(enrichedData.sensor_data) : 
+                 (activity.sensor_data ? JSON.stringify(activity.sensor_data) : null),
     swim_data: activity.swim_data ? JSON.stringify(activity.swim_data) : null,
     laps: activity.laps ? JSON.stringify(activity.laps) : null,
     // Server-computed summary for UI (intervals + overall)
@@ -450,7 +490,7 @@ Deno.serve(async (req) => {
       row = mapStravaToWorkout(activity, userId);
       onConflict = 'user_id,strava_activity_id';
     } else if (provider === 'garmin') {
-      row = mapGarminToWorkout(activity, userId);
+      row = await mapGarminToWorkout(activity, userId);
       onConflict = 'user_id,garmin_activity_id';
     } else {
       return new Response(JSON.stringify({ error: 'Unsupported provider' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
