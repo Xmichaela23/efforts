@@ -55,11 +55,35 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [analysisInvoked, setAnalysisInvoked] = useState(false);
   const [showAdvancedRunDyn, setShowAdvancedRunDyn] = useState(false);
   const [showPower, setShowPower] = useState(false);
+  const [summaryFetched, setSummaryFetched] = useState(false);
   
   useEffect(() => {
     setHydrated(workoutData);
   }, [workoutData]);
 
+  // Silent fetch: hydrate computed summary (gap/distance) from DB on open (no compute trigger)
+  useEffect(() => {
+    (async () => {
+      try {
+        if (summaryFetched) return;
+        const wid = (hydrated as any)?.id || (workoutData as any)?.id;
+        if (!wid) return;
+        const needGap = !((hydrated as any)?.computed?.overall?.gap_pace_s_per_mi);
+        const needDist = !((hydrated as any)?.computed?.overall?.distance_m);
+        if (!needGap && !needDist) return;
+        setSummaryFetched(true);
+        const { data } = await supabase
+          .from('workouts')
+          .select('computed')
+          .eq('id', String(wid))
+          .maybeSingle();
+        const cmp = (() => { try { return typeof (data as any)?.computed === 'string' ? JSON.parse((data as any).computed) : (data as any)?.computed; } catch { return (data as any)?.computed; } })();
+        if (cmp) setHydrated((prev:any) => ({ ...(prev || workoutData), computed: cmp }));
+      } catch {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrated?.id, workoutData?.id]);
+  
   // Ensure server analytics exist; trigger compute once if missing and we have an id
   useEffect(() => {
     (async () => {
