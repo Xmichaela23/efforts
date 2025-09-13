@@ -1,5 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
 import { Button } from '@/components/ui/button';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 
 import { useAppContext } from '@/contexts/AppContext';
 import { useWorkouts } from '@/hooks/useWorkouts';
@@ -1754,20 +1756,61 @@ const formatPace = (paceValue: any): string => {
                     const series = metric === "PWR" ? powerData : cadenceData;
                     const yUnit = metric === "PWR" ? "W" : "spm";
                     
-                    // For now, show a simple placeholder with data info
-                    el.innerHTML = `
-                      <div class="h-full w-full flex items-center justify-center text-muted-foreground p-4">
-                        <div class="text-center">
-                          <div class="text-lg font-semibold mb-2">${metric} Chart</div>
-                          <div class="text-sm">
-                            ${series.length} samples • ${yUnit}
+                    if (series.length === 0) {
+                      el.innerHTML = `
+                        <div class="h-full w-full flex items-center justify-center text-muted-foreground p-4">
+                          <div class="text-center">
+                            <div class="text-lg font-semibold mb-2">No ${metric} Data</div>
+                            <div class="text-sm">No ${yUnit} samples available</div>
                           </div>
                         </div>
-                      </div>
-                    `;
+                      `;
+                      return () => {};
+                    }
+
+                    // Create chart data with time index
+                    const chartData = series.map((value, index) => ({
+                      time: index,
+                      value: value
+                    }));
+
+                    // Render using Recharts
+                    const { createRoot } = ReactDOM;
+                    const root = createRoot(el);
                     
-                    // Return cleanup function (even though it's not needed for innerHTML)
-                    return () => {};
+                    root.render(
+                      React.createElement(ResponsiveContainer, { width: "100%", height: "100%" },
+                        React.createElement(LineChart, { data: chartData, margin: { top: 8, right: 8, left: 8, bottom: 8 } },
+                          React.createElement(CartesianGrid, { strokeDasharray: "3 3", stroke: "rgba(0,0,0,0.1)" }),
+                          React.createElement(XAxis, { 
+                            dataKey: "time", 
+                            tick: { fontSize: 10 },
+                            tickLine: false,
+                            axisLine: false
+                          }),
+                          React.createElement(YAxis, { 
+                            tick: { fontSize: 10 },
+                            tickLine: false,
+                            axisLine: false,
+                            tickFormatter: (value) => `${value} ${yUnit}`
+                          }),
+                          React.createElement(Tooltip, {
+                            formatter: (value) => [`${value} ${yUnit}`, metric],
+                            labelFormatter: (time) => `Time: ${time}s`
+                          }),
+                          React.createElement(Line, {
+                            type: "monotone",
+                            dataKey: "value",
+                            stroke: metric === "PWR" ? "#3b82f6" : "#10b981",
+                            strokeWidth: 2,
+                            dot: false
+                          })
+                        )
+                      )
+                    );
+                    
+                    // Return cleanup function
+                    return () => root.unmount();
                   }}
                 />
               </div>
