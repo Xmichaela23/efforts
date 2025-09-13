@@ -72,7 +72,6 @@ export function usePlannedRange(fromISO: string, toISO: string) {
         type: c.type,
         date: c.date,
         workout_status: 'completed',
-        completed_workout_id: c.id,
         computed: c.computed,
         planned_id: c.planned_id
       }));

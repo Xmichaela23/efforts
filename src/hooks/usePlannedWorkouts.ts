@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,completed_workout_id')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -173,7 +173,7 @@ export const usePlannedWorkouts = () => {
     queryFn: fetchPlannedWorkouts,
     // small stale window; avoid refetch on focus to keep UI snappy
     staleTime: 1000 * 60 * 3,
-    cacheTime: 1000 * 60 * 15,
+    gcTime: 1000 * 60 * 15,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
   });
