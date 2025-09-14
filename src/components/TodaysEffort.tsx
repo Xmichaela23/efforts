@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '@/lib/supabase';
+import { useWeather } from '@/hooks/useWeather';
+import { saveUserLocation } from '@/services/getLocation';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
@@ -23,10 +26,56 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   const [baselines, setBaselines] = useState<any | null>(null);
+  const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
+  const [locTried, setLocTried] = useState(false);
 
   // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const activeDate = selectedDate || today;
+
+  // Load explicit user-provided location for this day (no fallbacks)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from('user_locations')
+          .select('lat,lng')
+          .eq('date', activeDate)
+          .maybeSingle();
+        if (!cancelled) setDayLoc(data ? { lat: Number(data.lat), lng: Number(data.lng) } : null);
+      } catch { if (!cancelled) setDayLoc(null); }
+    })();
+    return () => { cancelled = true; };
+  }, [activeDate]);
+
+  const { weather } = useWeather({
+    lat: dayLoc?.lat,
+    lng: dayLoc?.lng,
+    timestamp: `${activeDate}T12:00:00`,
+    enabled: !!dayLoc,
+  });
+
+  // If today and no explicit location yet, ask once and save via edge function
+  useEffect(() => {
+    (async () => {
+      if (locTried) return;
+      if (activeDate !== today) return;
+      if (dayLoc) return;
+      setLocTried(true);
+      try {
+        const ok = await saveUserLocation({ date: activeDate });
+        if (ok) {
+          const { data } = await supabase
+            .from('user_locations')
+            .select('lat,lng')
+            .eq('date', activeDate)
+            .maybeSingle();
+          if (data) setDayLoc({ lat: Number(data.lat), lng: Number(data.lng) });
+        }
+      } catch {}
+    })();
+  }, [activeDate, today, dayLoc, locTried]);
 
   const dateWorkoutsMemo = useMemo(() => {
     // Show only planned rows from planned_workouts; completed planned rows are hidden
@@ -409,6 +458,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           {displayWorkouts.length > 0 && (
             <span className="text-xs text-muted-foreground">
               · {displayWorkouts.length} effort{displayWorkouts.length !== 1 ? 's' : ''}
+            </span>
+          )}
+          {/* Weather chip (explicit-location only) */}
+          {weather && (
+            <span className="text-xs text-muted-foreground">
+              · {Math.round(weather.temperature)}°F {weather.condition}
             </span>
           )}
         </div>

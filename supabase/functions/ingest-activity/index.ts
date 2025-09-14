@@ -56,8 +56,17 @@ function garminLocalDateAndTimestamp(a: any): { date: string | null; timestamp: 
       ? (sIn + sOff) * 1000
       : (typeof localStr === 'string' ? Date.parse(String(localStr).replace(' ', 'T')) : NaN);
 
+  // Build YYYY-MM-DD from the localized epoch value without reapplying timezone
+  const ymdFromMs = (t:number) => {
+    const d = new Date(t);
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth()+1).padStart(2,'0');
+    const dd = String(d.getUTCDate()).padStart(2,'0');
+    return `${y}-${m}-${dd}`;
+  };
+
   const date = Number.isFinite(localMs)
-    ? new Date(localMs).toISOString().slice(0, 10)
+    ? ymdFromMs(localMs)
     : (typeof localStr === 'string' && localStr.includes('T'))
       ? String(localStr).split('T')[0]
       : (typeof utcStr === 'string' && utcStr.includes('T'))
