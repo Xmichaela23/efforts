@@ -64,8 +64,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       if (dayLoc) return;
       setLocTried(true);
       try {
-        const ok = await saveUserLocation({ date: activeDate });
-        if (ok) {
+        const res = await saveUserLocation({ date: activeDate });
+        if (res.ok) {
+          setDayLoc({ lat: Number(res.lat), lng: Number(res.lng) });
           const { data } = await supabase
             .from('user_locations')
             .select('lat,lng')
