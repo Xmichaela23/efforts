@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+import { usePlannedWorkouts, usePlannedWorkoutsToday } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -30,6 +30,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const activeDate = selectedDate || today;
+
+  // Fast planned lookup for Today to avoid heavy payloads
+  const { plannedToday } = usePlannedWorkoutsToday(activeDate);
 
   // No persistence: we will use ephemeral geolocation below for today's weather
 
@@ -70,7 +73,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const dateWorkoutsMemo = useMemo(() => {
     // Show only planned rows from planned_workouts; completed planned rows are hidden
     const plannedOnly = (plannedWorkouts || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
-    const allWorkouts = [...(workouts || []), ...plannedOnly];
+    const plannedFast = (plannedToday || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
+    // Prefer Today-only fast data when available
+    const plannedSource = plannedFast?.length ? plannedFast : plannedOnly;
+    const allWorkouts = [...(workouts || []), ...plannedSource];
     // Filter by date
     const sameDate = allWorkouts.filter((w: any) => w.date === activeDate);
     // De‑dupe by type/date: prefer completed workout over planned
@@ -93,7 +99,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       }
     }
     return Array.from(byKey.values());
-  }, [workouts, plannedWorkouts, activeDate]);
+  }, [workouts, plannedWorkouts, plannedToday, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {

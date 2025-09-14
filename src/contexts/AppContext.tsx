@@ -186,20 +186,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // ✅ FIXED: Plans get their own auth management similar to useWorkouts
   useEffect(() => {
-    // Load plans data bundle (science data) at boot; fail hard if invalid
-    (async () => {
-      try {
-        const active = (import.meta as any).env?.VITE_PLANS_ACTIVE_BUNDLE || (import.meta as any).env?.PLANS_ACTIVE_BUNDLE || 'plans.v1.0.0';
-        if (!active) throw new Error('PLANS_ACTIVE_BUNDLE not set');
-        await loadPlansBundle(active);
-        setPlansBundleReady(true);
-        setPlansBundleError(null);
-      } catch (err: any) {
-        console.error('Plan data bundle failed validation:', err);
-        setPlansBundleReady(false);
-        setPlansBundleError('Plan data bundle failed validation. Contact support.');
-      }
-    })();
+    // Optional: Defer plan bundle on boot unless explicitly enabled
+    const DEFER_BUNDLE = ((import.meta as any).env?.VITE_DEFER_PLAN_BUNDLE ?? 'true') !== 'false';
+    if (!DEFER_BUNDLE) {
+      (async () => {
+        try {
+          const active = (import.meta as any).env?.VITE_PLANS_ACTIVE_BUNDLE || (import.meta as any).env?.PLANS_ACTIVE_BUNDLE || 'plans.v1.0.0';
+          if (!active) throw new Error('PLANS_ACTIVE_BUNDLE not set');
+          await loadPlansBundle(active);
+          setPlansBundleReady(true);
+          setPlansBundleError(null);
+        } catch (err: any) {
+          console.error('Plan data bundle failed validation:', err);
+          setPlansBundleReady(false);
+          setPlansBundleError('Plan data bundle failed validation. Contact support.');
+        }
+      })();
+    }
 
     let mounted = true;
 

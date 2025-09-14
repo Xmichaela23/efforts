@@ -996,11 +996,12 @@ export const useWorkouts = () => {
   // ⏱️ Polling + focus refresh as a safety net if realtime is disabled on the table
   useEffect(() => {
     if (!authReady) return;
+    const ENABLE_FOCUS_REFRESH = ((import.meta as any).env?.VITE_REFRESH_ON_FOCUS ?? 'false') === 'true';
+    if (!ENABLE_FOCUS_REFRESH) return;
     let t: number | null = null;
     const onFocus = () => {
       if (t) window.clearTimeout(t);
-      // Do not fetch providers on focus; keep it light
-      t = window.setTimeout(() => fetchWorkouts(false), 500);
+      t = window.setTimeout(() => fetchWorkouts(false), 800);
     };
     window.addEventListener('focus', onFocus);
     return () => { if (t) window.clearTimeout(t); window.removeEventListener('focus', onFocus); };

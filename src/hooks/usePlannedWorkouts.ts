@@ -171,11 +171,12 @@ export const usePlannedWorkouts = () => {
   const { refetch } = useQuery({
     queryKey: ['planned', 'windowed'],
     queryFn: fetchPlannedWorkouts,
-    // small stale window; avoid refetch on focus to keep UI snappy
-    staleTime: 1000 * 60 * 3,
-    gcTime: 1000 * 60 * 15,
+    // longer cache to avoid churn; no refetch on focus/mount
+    staleTime: 1000 * 60 * 10,
+    gcTime: 1000 * 60 * 30,
     refetchOnWindowFocus: false,
     refetchOnReconnect: true,
+    refetchOnMount: false,
   });
 
   // Add a new planned workout
@@ -353,10 +354,7 @@ export const usePlannedWorkouts = () => {
     }
   };
 
-  // Initialize on mount (first fetch)
-  useEffect(() => {
-    fetchPlannedWorkouts();
-  }, [fetchPlannedWorkouts]);
+  // Removed extra on-mount fetch; React Query owns fetching
 
   // Refresh when other views broadcast invalidation
   useEffect(() => {
@@ -381,4 +379,38 @@ export const usePlannedWorkouts = () => {
     getPlannedWorkoutsByStatus,
     refresh: async () => { await queryClient.invalidateQueries({ queryKey: ['planned'] }); await refetch(); }
   };
+};
+
+// Lightweight Today-only planned query for fast initial render
+export const usePlannedWorkoutsToday = (dateIso: string) => {
+  const [rows, setRows] = useState<Array<Pick<PlannedWorkout, 'id' | 'name' | 'type' | 'date' | 'workout_status'>>>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { setRows([]); return; }
+        const { data, error } = await supabase
+          .from('planned_workouts')
+          .select('id,name,type,date,workout_status')
+          .eq('user_id', user.id)
+          .eq('date', dateIso)
+          .limit(50);
+        if (error) throw error;
+        if (!cancelled) setRows((data || []) as any);
+      } catch (e:any) {
+        if (!cancelled) setError(e?.message || 'Failed to load planned workouts');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [dateIso]);
+
+  return { plannedToday: rows, loading, error };
 };
