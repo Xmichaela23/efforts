@@ -730,47 +730,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   useEffect(() => {
     (async () => {
       try {
-        if (isAttachedToPlan && !hasServerComputed && completed && (completed as any)?.id && !computeInvoked) {
-          setComputeInvoked(true);
-          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: (completed as any).id } });
-          try {
-            await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: (completed as any).id } });
-          } catch {}
-          // Immediate fetch to hydrate UI without waiting for polling
-          try {
-            const { data: fresh } = await supabase
-              .from('workouts')
-              .select('computed')
-              .eq('id', (completed as any).id)
-              .maybeSingle();
-            const compd = (fresh as any)?.computed;
-            if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-              setHydratedCompleted((prev:any) => ({ ...(prev || completed), computed: compd }));
-            }
-          } catch {}
-        }
+        // Server now computes on attach; rely on polling below only
         // If we are viewing a planned row that is linked to a completed workout, but we didn't
         // receive the completed object here, trigger compute for that completed id.
-        if (isAttachedToPlan && !hasServerComputed && !completed && (planned as any)?.completed_workout_id && !computeInvoked) {
-          setComputeInvoked(true);
-          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((planned as any).completed_workout_id) } });
-          try {
-            await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: String((planned as any).completed_workout_id) } });
-          } catch {}
-          // Immediate fetch to hydrate UI without waiting for polling
-          try {
-            const cid = String((planned as any).completed_workout_id);
-            const { data: fresh } = await supabase
-              .from('workouts')
-              .select('computed')
-              .eq('id', cid)
-              .maybeSingle();
-            const compd = (fresh as any)?.computed;
-            if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-              setHydratedCompleted((prev:any) => ({ ...(prev || {}), id: cid, computed: compd }));
-            }
-          } catch {}
-        }
+        // no-op
       } catch {}
     })();
   }, [isAttachedToPlan, hasServerComputed, completed, computeInvoked]);
@@ -836,62 +799,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         return (
           <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
             <div>Source: {label}{computeError ? <span className="ml-2 text-red-600">{computeError}</span> : null}</div>
-            {!hasServerComputed && ((completed as any)?.id || (planned as any)?.completed_workout_id) && (
-              <button
-                className={`ml-2 text-[11px] px-2 py-[2px] rounded border border-gray-200 ${forceComputing? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-50'} text-gray-700`}
-                disabled={forceComputing}
-                onClick={async ()=>{
-                  try {
-                    const wid = (completed as any)?.id || String((planned as any)?.completed_workout_id);
-                    if (!wid) return;
-                    setForceComputing(true);
-                    setComputeInvoked(true);
-                    setComputeError(null);
-                    const r1 = await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
-                    if ((r1 as any)?.error) setComputeError(String((r1 as any).error?.message || 'compute failed'));
-                    // If function returned computed, use it immediately without waiting on DB write
-                    try {
-                      const immediate = (r1 as any)?.data?.computed;
-                      if (immediate && Array.isArray(immediate?.intervals) && immediate.intervals.length) {
-                        setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: immediate }));
-                      }
-                    } catch {}
-                    try {
-                      const r2 = await supabase.functions.invoke('compute-workout-analysis', { body: { workout_id: wid } });
-                      if ((r2 as any)?.error) setComputeError(prev=> prev || String((r2 as any).error?.message || 'analysis failed'));
-                    } catch (e:any) { /* ignore */ }
-                    // Immediate fetch to ensure UI updates even if function returns without computed payload
-                    try {
-                      const { data: fresh } = await supabase
-                        .from('workouts')
-                        .select('computed')
-                        .eq('id', wid)
-                        .maybeSingle();
-                      const compd = (fresh as any)?.computed;
-                      if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-                        setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
-                      }
-                    } catch {}
-                    // quick poll burst for immediate feedback (skip if immediate already set)
-                    if (!(r1 as any)?.data?.computed) {
-                      for (let i=0;i<6;i++) {
-                        const { data, error } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
-                        if (error) { setComputeError(String(error.message||error)); }
-                        const compd = (data as any)?.computed;
-                        if (compd && Array.isArray(compd?.intervals) && compd.intervals.length) {
-                          setHydratedCompleted((prev:any)=>({ ...(prev||completed||{}), id: wid, computed: compd }));
-                          break;
-                        }
-                        await new Promise(r=>setTimeout(r, 600));
-                      }
-                    }
-                  } catch {}
-                  finally { setForceComputing(false); }
-                }}
-              >
-                {forceComputing ? 'Computing…' : 'Force compute now'}
-              </button>
-            )}
+            {/* Force compute button removed; rely on server compute and polling */}
           </div>
         );
       })()}

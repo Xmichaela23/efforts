@@ -74,7 +74,7 @@ Deno.serve(async (req) => {
     const toDay = base ? new Date(base.getFullYear(), base.getMonth(), base.getDate() + 1) : null;
     const { data: plannedList } = await supabase
       .from('planned_workouts')
-      .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id')
+      .select('id,user_id,type,date,name,computed,intervals,workout_status,completed_workout_id,pool_length_m,pool_unit,pool_label,environment')
       .eq('user_id', w.user_id)
       .eq('type', sport)
       .gte('date', fromDay ? toISO(fromDay) : day)
@@ -91,6 +91,13 @@ Deno.serve(async (req) => {
     // Score candidates
     let best: any = null; let bestScore = -1e9; let bestDurPct: number | null = null; let bestDistPct: number | null = null;
     for (const p of candidates) {
+      const hasSteps = (() => {
+        try {
+          const steps = Array.isArray((p as any)?.computed?.steps) ? (p as any).computed.steps : null;
+          const intervals = Array.isArray((p as any)?.intervals) ? (p as any).intervals : null;
+          return (Array.isArray(steps) && steps.length>0) || (Array.isArray(intervals) && intervals.length>0);
+        } catch { return false; }
+      })();
       const totals = sumPlanned(p);
       let score = 0;
       // Time window: if both have timestamp, reward closeness within 2h
@@ -115,6 +122,9 @@ Deno.serve(async (req) => {
         }
       } catch {}
 
+      // Prefer plans that are materialized (have steps) and exact-day matches
+      if (hasSteps) score += 1.0; else score -= 2.0; // strong penalty for non-materialized
+
       // Duration closeness (primary)
       let durPct: number | null = null;
       if (totals.seconds && wSec>0) {
@@ -131,12 +141,13 @@ Deno.serve(async (req) => {
         if (distPct <= tolTgt) score += (distPct <= 0.15 ? (1.5 - (distPct/0.15)) : (0.4 - Math.max(0, (distPct-0.15))/0.35));
         else score -= distPct;
       }
-      if (score > bestScore) { bestScore = score; best = p; bestDurPct = durPct; bestDistPct = distPct; }
+      if (score > bestScore) { bestScore = score; best = p; (best as any)._hasSteps = hasSteps; bestDurPct = durPct; bestDistPct = distPct; }
     }
 
     // Threshold to attach: accept if best is reasonably close on duration or distance
     const softMatch = (bestDurPct != null && bestDurPct <= 0.50) || (bestDistPct != null && bestDistPct <= 0.50);
-    if (!best || (!softMatch && bestScore < 0.5)) {
+    // Do not attach to non-materialized candidates
+    if (!best || (!softMatch && bestScore < 0.5) || !(best as any)._hasSteps) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'score_too_low', bestScore }), { headers: { 'Content-Type': 'application/json' } });
     }
 
@@ -153,11 +164,42 @@ Deno.serve(async (req) => {
       .update({ workout_status: 'completed', completed_workout_id: w.id })
       .eq('id', best.id)
       .eq('user_id', w.user_id);
-    await supabase
-      .from('workouts')
-      .update({ planned_id: best.id })
-      .eq('id', w.id)
-      .eq('user_id', w.user_id);
+    // Copy swim context from plan to workout if applicable
+    try {
+      const env = (best as any)?.environment as string | undefined;
+      const poolLenM = (best as any)?.pool_length_m as number | undefined;
+      const poolUnit = (best as any)?.pool_unit as string | undefined;
+      const poolLabel = (best as any)?.pool_label as string | undefined;
+      const updates: any = { planned_id: best.id };
+      if (String((best as any)?.type||'').toLowerCase()==='swim') {
+        if (env === 'open_water') {
+          updates.environment = 'open_water';
+          // do not set pool fields for open water
+        } else {
+          updates.environment = 'pool';
+          if (Number.isFinite(poolLenM as any)) updates.pool_length_m = poolLenM;
+          if (poolUnit) updates.pool_unit = poolUnit;
+          updates.pool_length_source = 'user_plan';
+          updates.pool_confidence = 'high';
+          updates.pool_conflict = false;
+          if (Number.isFinite(poolLenM as any)) updates.plan_pool_length_m = poolLenM;
+          if (poolUnit) updates.plan_pool_unit = poolUnit;
+          if (poolLabel) updates.plan_pool_label = poolLabel;
+        }
+      }
+      await supabase
+        .from('workouts')
+        .update(updates)
+        .eq('id', w.id)
+        .eq('user_id', w.user_id);
+    } catch {
+      // fallback to minimal link
+      await supabase
+        .from('workouts')
+        .update({ planned_id: best.id })
+        .eq('id', w.id)
+        .eq('user_id', w.user_id);
+    }
 
     // Compute server summary
     try {

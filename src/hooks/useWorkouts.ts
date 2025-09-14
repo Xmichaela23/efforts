@@ -858,22 +858,7 @@ export const useWorkouts = () => {
           .eq('id', (completed as any).id)
           .eq('user_id', user.id);
       } catch {}
-      // Trigger server-side materialization of executed vs planned summary
-      try {
-        await supabase.functions.invoke('compute-workout-summary', {
-          body: { workout_id: (completed as any).id }
-        });
-      } catch (e) {
-        console.log('⚠️ compute-workout-summary invoke failed (continuing):', e);
-      }
-      // Trigger analytics computation (provider-agnostic series/splits/zones/bests)
-      try {
-        await supabase.functions.invoke('compute-workout-analysis', {
-          body: { workout_id: (completed as any).id }
-        });
-      } catch (e) {
-        console.log('ℹ️ compute-workout-analysis invoke skipped:', e);
-      }
+      // Server attach flow now computes summary; no client invocation needed
       // Optionally tag completed workout with friendly name
       if (completed.name && completed.name !== target.name) {
         await supabase.from('workouts').update({ description: completed.description || '', name: target.name }).eq('id', completed.id).eq('user_id', user.id);

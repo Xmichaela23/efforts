@@ -227,7 +227,7 @@ const ALIGN = {
 } as const;
 
 // Unified version tag expected by UI and Summary
-const COMPUTED_VERSION = 'v1.0.3';
+const COMPUTED_VERSION = 'v1.0.4';
 // Database column `computed_version` is an integer; keep JSON as string, column as int
 const COMPUTED_VERSION_INT = 1003;
 
@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
     // Load workout + planned link
     const { data: w } = await supabase
       .from('workouts')
-      .select('id,user_id,planned_id,computed,gps_track,sensor_data,swim_data,laps,type')
+      .select('id,user_id,planned_id,computed,gps_track,sensor_data,swim_data,laps,type,pool_length_m,plan_pool_length_m,environment')
       .eq('id', workout_id)
       .maybeSingle();
 
@@ -741,6 +741,55 @@ Deno.serve(async (req) => {
     }
 
     // Materialize intervals
+    const poolLenM: number | null = (() => {
+      try {
+        const a = Number((w as any)?.pool_length_m);
+        const b = Number((w as any)?.plan_pool_length_m);
+        if (Number.isFinite(a) && a > 0) return a;
+        if (Number.isFinite(b) && b > 0) return b;
+      } catch {}
+      return null;
+    })();
+
+    function passStateFor(sport:Sport, role:string, plannedM:number|null, plannedS:number|null, segMeters:number|null, segSec:number|null): 'pass'|'partial'|'skip' {
+      const roleNorm = String(role||'').toLowerCase();
+      if (roleNorm==='pre_extra' || roleNorm==='post_extra') return 'skip';
+      if (roleNorm==='warmup' || roleNorm==='cooldown') return (segSec && segSec>0) ? 'pass' : 'skip';
+      if (plannedM && plannedM>0 && segMeters!=null) {
+        if (sport==='swim') {
+          const tol = (poolLenM && poolLenM>0) ? poolLenM : 25; // ±1 pool length fallback
+          const ok = Math.abs(segMeters - plannedM) <= tol;
+          return ok ? 'pass' : (segMeters>0 ? 'partial' : 'skip');
+        }
+        if (sport==='run' || sport==='walk') {
+          const tol = plannedM <= 1000 ? 10 : plannedM * 0.02;
+          const ok = Math.abs(segMeters - plannedM) <= tol;
+          return ok ? 'pass' : (segMeters>0 ? 'partial' : 'skip');
+        }
+        if (sport==='ride') {
+          const tol = Math.max(10, plannedM * 0.02); // long reps 2%, floor 10 m
+          const ok = Math.abs(segMeters - plannedM) <= tol;
+          return ok ? 'pass' : (segMeters>0 ? 'partial' : 'skip');
+        }
+      }
+      if (plannedS && plannedS>0 && segSec!=null) {
+        if (sport==='run' || sport==='walk') {
+          const eps = (roleNorm==='recovery') ? 8 : 3;
+          const ok = Math.abs(segSec - plannedS) <= eps;
+          return ok ? 'pass' : (segSec>0 ? 'partial' : 'skip');
+        }
+        if (sport==='ride') {
+          const eps = (roleNorm==='recovery') ? 8 : 3;
+          const ok = Math.abs(segSec - plannedS) <= eps;
+          return ok ? 'pass' : (segSec>0 ? 'partial' : 'skip');
+        }
+        if (sport==='swim') {
+          // MVP: no strict pass/fail on swim time; count as pass if any execution
+          return (segSec>0) ? 'pass' : 'skip';
+        }
+      }
+      return (segSec && segSec>0) ? 'partial' : 'skip';
+    }
     const outIntervals: any[] = [];
     for (const info of infos) {
       const st = info.st;
@@ -818,7 +867,10 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
           avg_hr: segHr,
           avg_cadence_spm: segCad
-        }
+        },
+        pass_state: passStateFor(sport, info.role, deriveMetersFromPlannedStep(st), deriveSecondsFromPlannedStep(st), segMetersMeasured, segSec),
+        sample_idx_start: sIdx,
+        sample_idx_end: eIdx
       });
     }
 
