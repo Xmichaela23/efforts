@@ -186,6 +186,8 @@ export default function PlanSelect() {
   const [error, setError] = useState<string|null>(null);
   const [libPlan, setLibPlan] = useState<any|null>(null);
   const [startDate, setStartDate] = useState<string>('');
+  const [raceDate, setRaceDate] = useState<string>('');
+  const [strengthTrack, setStrengthTrack] = useState<string>('');
   // Default to authored anchors; we will set these after loading the plan
   const [longRunDay, setLongRunDay] = useState<string>('');
   const [longRideDay, setLongRideDay] = useState<string>('');
@@ -279,6 +281,62 @@ export default function PlanSelect() {
     })();
   }, [id]);
 
+  // Tri acceptance variables derived from template (if present)
+  const triVars = useMemo(() => {
+    const t = libPlan?.template || {};
+    const minWeeks = typeof t.min_weeks === 'number' ? t.min_weeks : null;
+    const maxWeeks = typeof t.max_weeks === 'number' ? t.max_weeks : null;
+    const blueprint = t.phase_blueprint || null;
+    const strengthTracks = Array.isArray(t.strength_tracks) ? t.strength_tracks : [];
+    return { minWeeks, maxWeeks, blueprint, strengthTracks } as { minWeeks: number|null; maxWeeks: number|null; blueprint: any; strengthTracks: string[] };
+  }, [libPlan]);
+
+  // Compute weeks_to_race from today in user's local TZ
+  const weeksToRace = useMemo(() => {
+    try {
+      if (!raceDate) return null;
+      const parts = raceDate.split('-').map(x=>parseInt(x,10));
+      const rd = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
+      const today = new Date();
+      // Zero time components to local midnight for both
+      const d0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const diffDays = Math.ceil((rd.getTime() - d0.getTime()) / (1000*60*60*24));
+      const w = Math.ceil(diffDays / 7);
+      return Math.max(0, w);
+    } catch { return null; }
+  }, [raceDate]);
+
+  // When raceDate and min/max are set and valid, auto-derive start Monday to align last week with race week
+  useEffect(() => {
+    const minW = triVars.minWeeks, maxW = triVars.maxWeeks;
+    if (!raceDate || !weeksToRace || !minW || !maxW) return;
+    if (weeksToRace < minW || weeksToRace > maxW) return;
+    const mondayOf = (iso: string): string => {
+      const p = iso.split('-').map(x=>parseInt(x,10));
+      const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
+      const jsDow = d.getDay();
+      const daysFromMonday = (jsDow + 6) % 7;
+      const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+      const y = mon.getFullYear();
+      const m = String(mon.getMonth()+1).padStart(2,'0');
+      const dd = String(mon.getDate()).padStart(2,'0');
+      return `${y}-${m}-${dd}`;
+    };
+    const addDays = (iso: string, n: number): string => {
+      const p = iso.split('-').map(x=>parseInt(x,10));
+      const base = new Date(p[0], (p[1]||1)-1, p[2]||1);
+      base.setDate(base.getDate() + n);
+      const y = base.getFullYear();
+      const m = String(base.getMonth()+1).padStart(2,'0');
+      const dd = String(base.getDate()).padStart(2,'0');
+      return `${y}-${m}-${dd}`;
+    };
+    // Last week Monday is Monday of race week; start Monday is that minus (weeksToRace-1)*7 days
+    const lastWeekMonday = mondayOf(raceDate);
+    const startMonday = addDays(lastWeekMonday, -7 * ((weeksToRace || 1) - 1));
+    setStartDate(startMonday);
+  }, [raceDate, weeksToRace, triVars.minWeeks, triVars.maxWeeks]);
+
   const hasRun = useMemo(() => {
     if (!libPlan?.template?.sessions_by_week) return false;
     return Object.values(libPlan.template.sessions_by_week).some((arr: any) => (arr as any[]).some(isRun));
@@ -292,6 +350,44 @@ export default function PlanSelect() {
   async function save() {
     if (!libPlan) return;
     try {
+      // If tri acceptance variables are present, validate race_date window first
+      const tMin = triVars.minWeeks;
+      const tMax = triVars.maxWeeks;
+      const hasTriVars = typeof tMin === 'number' && typeof tMax === 'number';
+      let targetDurationWeeks: number | null = null;
+      let derivedStartMonday: string | null = null;
+      const mondayOf = (iso: string): string => {
+        const p = iso.split('-').map(x=>parseInt(x,10));
+        const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
+        const jsDow = d.getDay();
+        const daysFromMonday = (jsDow + 6) % 7;
+        const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+        const y = mon.getFullYear();
+        const m = String(mon.getMonth()+1).padStart(2,'0');
+        const dd = String(mon.getDate()).padStart(2,'0');
+        return `${y}-${m}-${dd}`;
+      };
+      const addDaysISO = (iso: string, n: number): string => {
+        const p = iso.split('-').map(x=>parseInt(x,10));
+        const base = new Date(p[0], (p[1]||1)-1, p[2]||1);
+        base.setDate(base.getDate() + n);
+        const y = base.getFullYear();
+        const m = String(base.getMonth()+1).padStart(2,'0');
+        const dd = String(base.getDate()).padStart(2,'0');
+        return `${y}-${m}-${dd}`;
+      };
+      if (hasTriVars) {
+        if (!raceDate) { setError('Please choose a race date'); return; }
+        if (!weeksToRace || weeksToRace <= 0) { setError('Race date must be in the future'); return; }
+        if ((weeksToRace as number) < (tMin as number) || (weeksToRace as number) > (tMax as number)) {
+          setError(`This plan requires ${tMin}–${tMax} weeks from today to race day.`);
+          return;
+        }
+        targetDurationWeeks = weeksToRace as number;
+        const lastWeekMonday = mondayOf(raceDate);
+        derivedStartMonday = addDaysISO(lastWeekMonday, -7 * (targetDurationWeeks - 1));
+      }
+
       const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
       
       // Use baselines loaded on mount
@@ -451,7 +547,18 @@ export default function PlanSelect() {
       };
       // Expand any swim DSL (main/extra) to steps_preset using plan defaults
       const planDefaults = (libPlan.template?.defaults as any) || DEFAULTS_FALLBACK;
-      for (const [wk, sessions] of Object.entries<any>(remapped.sessions_by_week||{})) {
+      // Optionally reduce or reindex weeks to match targetDurationWeeks (tri acceptance)
+      const sourceWeeksEntries = Object.entries<any>(remapped.sessions_by_week || {})
+        .map(([wk, sessions]) => [parseInt(String(wk),10), sessions] as [number, any[]])
+        .sort((a,b)=>a[0]-b[0]);
+      const selectedWeeks = (() => {
+        if (targetDurationWeeks && sourceWeeksEntries.length >= targetDurationWeeks) {
+          return sourceWeeksEntries.slice(-targetDurationWeeks);
+        }
+        return sourceWeeksEntries;
+      })();
+
+      for (const [wkNum, sessions] of selectedWeeks) {
         const outWeek: any[] = [];
         for (const s of sessions as any[]) {
           let expanded = { ...s } as any;
@@ -489,7 +596,15 @@ export default function PlanSelect() {
           const copy = { ...expanded, description: desc };
           outWeek.push(copy);
         }
-        (mapped.sessions_by_week as any)[wk] = outWeek;
+        (mapped.sessions_by_week as any)[wkNum] = outWeek;
+      }
+
+      // Reindex weeks to start at 1 if we sliced
+      if (targetDurationWeeks) {
+        const re: any = {};
+        const keys = Object.keys(mapped.sessions_by_week).map(k=>parseInt(k,10)).sort((a,b)=>a-b);
+        keys.forEach((oldIdx, i) => { re[String(i+1)] = mapped.sessions_by_week[String(oldIdx)]; });
+        mapped.sessions_by_week = re;
       }
 
       // --- Translate with deterministic baker at import-time ---
@@ -571,17 +686,55 @@ export default function PlanSelect() {
         return `${y}-${m}-${dd}`;
       };
 
-      const anchorMonday = computeMondayOf(startDate);
+      const anchorMonday = (derivedStartMonday || computeMondayOf(startDate));
 
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
-        duration_weeks: mapped.duration_weeks,
+        duration_weeks: (targetDurationWeeks || mapped.duration_weeks),
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
-        // Preserve the exact user-chosen date for Week 1 trimming (anchor Monday derived at materialization time)
-        config: { source: 'catalog', preferences: { longRunDay, longRideDay }, catalog_id: libPlan.id, user_selected_start_date: startDate },
+        // Preserve acceptance metadata; Week 1 anchor derived above
+        config: { 
+          source: 'catalog', 
+          preferences: { longRunDay, longRideDay }, 
+          catalog_id: libPlan.id, 
+          user_selected_start_date: anchorMonday,
+          ...(hasTriVars ? { 
+            tri_acceptance: {
+              race_date: raceDate,
+              weeks_to_race: targetDurationWeeks,
+              strength_track: strengthTrack || null,
+              phase_blueprint: triVars.blueprint || null,
+              phases_by_week: (()=>{
+                try {
+                  const total = targetDurationWeeks || 0;
+                  if (!total) return [];
+                  const bp = triVars.blueprint || {};
+                  const findWeeks = (name:string, def:number) => {
+                    try { 
+                      if (Array.isArray(bp?.phases)) {
+                        const ph = bp.phases.find((p:any)=>String(p?.name||'').toLowerCase()===name.toLowerCase());
+                        if (ph && typeof ph.weeks === 'number') return Math.max(0, ph.weeks);
+                      }
+                      const k = `${name.toLowerCase()}_weeks`;
+                      if (typeof bp?.[k] === 'number') return Math.max(0, bp?.[k]);
+                    } catch {}
+                    return def;
+                  };
+                  const taperW = findWeeks('Taper', 2);
+                  const peakW = findWeeks('Peak', 2);
+                  const buildW = Math.max(0, total - taperW - peakW);
+                  const arr = new Array(total).fill('Build');
+                  for (let i=0;i<peakW;i++) arr[total - taperW - peakW + i] = 'Peak';
+                  for (let i=0;i<taperW;i++) arr[total - taperW + i] = 'Taper';
+                  return arr;
+                } catch { return []; }
+              })()
+            }
+          } : {})
+        },
         weeks: [],
         sessions_by_week: mapped.sessions_by_week,
         notes_by_week: mapped.notes_by_week || {},
@@ -782,6 +935,24 @@ export default function PlanSelect() {
           <div className="p-3 border rounded space-y-3">
         <div className="text-sm font-medium">Scheduling Preferences</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* Triathlon acceptance fields (race date + optional strength track) */}
+          {triVars.minWeeks && triVars.maxWeeks && (
+            <>
+              <div>
+                <div className="text-xs text-gray-700 mb-1">Race date</div>
+                <input type="date" value={raceDate} onChange={e=>setRaceDate(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+              </div>
+              {Array.isArray(triVars.strengthTracks) && triVars.strengthTracks.length > 0 && (
+                <div>
+                  <div className="text-xs text-gray-700 mb-1">Strength focus (optional)</div>
+                  <select value={strengthTrack} onChange={e=>setStrengthTrack(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
+                    <option value="">No preference</option>
+                    {triVars.strengthTracks.map((t: string) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
+              )}
+            </>
+          )}
           <div>
             <div className="text-xs text-gray-700 mb-1">Start date</div>
             <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
@@ -806,7 +977,9 @@ export default function PlanSelect() {
         </div>
         {error && <div className="text-sm text-red-600">{error}</div>}
             <div>
-              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50">Save Plan</button>
+              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50" disabled={Boolean(triVars.minWeeks && triVars.maxWeeks && (!raceDate || !weeksToRace || weeksToRace < (triVars.minWeeks as number) || weeksToRace > (triVars.maxWeeks as number)))}>
+                Save Plan
+              </button>
             </div>
           </div>
         </div>
