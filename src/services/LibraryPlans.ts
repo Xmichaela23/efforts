@@ -4,7 +4,7 @@ export type LibraryPlan = {
   id: string;
   name: string;
   description: string;
-  discipline: 'run'|'ride'|'swim'|'strength'|'hybrid';
+  discipline: 'run'|'ride'|'swim'|'strength'|'triathlon'|'hybrid';
   duration_weeks: number;
   tags?: string[];
   status: 'published'|'draft';
