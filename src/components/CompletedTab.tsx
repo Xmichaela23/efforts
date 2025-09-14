@@ -1546,6 +1546,23 @@ const formatPace = (paceValue: any): string => {
               <div className="font-medium">Max HR</div>
             </div>
           </div>
+
+          {/* Duration (Elapsed) */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+              {(() => {
+                const s = (workoutData as any)?.metrics?.total_elapsed_time
+                      ?? (workoutData as any)?.total_elapsed_time
+                      ?? (workoutData as any)?.elapsed_time
+                      ?? (workoutData as any)?.metrics?.elapsed_time
+                      ?? (typeof (workoutData as any)?.duration === 'number' ? (workoutData as any).duration * 60 : null);
+                return formatDuration(s || 0);
+              })()}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Duration</div>
+            </div>
+          </div>
         </>
       ) : (
         <div className="px-2 py-1">
