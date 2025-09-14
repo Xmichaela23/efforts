@@ -11,7 +11,7 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
   const [planPreview, setPlanPreview] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [discipline, setDiscipline] = useState<'run'|'ride'|'swim'|'strength'|'hybrid'>('run');
+  const [discipline, setDiscipline] = useState<'run'|'ride'|'swim'|'strength'|'triathlon'|'hybrid'>('run');
   // Acceptance preferences
   const [startDate, setStartDate] = useState<string>('');
   const [longRunDay, setLongRunDay] = useState<string>('Sunday');
@@ -117,12 +117,35 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
   async function handleValidate(input: any) {
     setError(null);
     setPlanPreview(null);
-    // Preprocess DSL (e.g., swim main/extra) → steps_preset and strip unsupported fields
-    const cleaned = preprocessForSchema(input);
-    const res = validateUniversalPlan(cleaned);
-    if (!res.ok) {
-      setError(res.errors);
-      return;
+    // If this looks like a tri blueprint (no sessions_by_week; has min/max and phase_blueprint), accept without universal schema
+    const isTriBlueprint = (
+      input && typeof input === 'object' &&
+      !input.sessions_by_week &&
+      (typeof input.min_weeks === 'number') &&
+      (typeof input.max_weeks === 'number') &&
+      input.phase_blueprint
+    );
+    let res: any = null;
+    if (isTriBlueprint) {
+      try {
+        const triPreview = JSON.parse(JSON.stringify(input));
+        // Provide duration_weeks for catalog display
+        if (typeof triPreview.duration_weeks !== 'number') triPreview.duration_weeks = triPreview.max_weeks;
+        res = { ok: true, plan: triPreview };
+        setDiscipline('triathlon');
+      } catch (e: any) {
+        setError(e?.message || 'Invalid tri blueprint');
+        return;
+      }
+    } else {
+      // Preprocess DSL (e.g., swim main/extra) → steps_preset and strip unsupported fields
+      const cleaned = preprocessForSchema(input);
+      const v = validateUniversalPlan(cleaned);
+      if (!v.ok) {
+        setError(v.errors);
+        return;
+      }
+      res = v;
     }
     // Minimal sanity checks: week count matches max key
     const keys = Object.keys(res.plan.sessions_by_week).map(k => parseInt(k, 10)).filter(n => Number.isFinite(n));
@@ -280,9 +303,13 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
     return out;
   }
 
-  const totalSessions = planPreview
-    ? Object.values(planPreview.sessions_by_week).reduce((t: number, arr: any) => t + (Array.isArray(arr) ? arr.length : 0), 0)
-    : 0;
+  const totalSessions = (() => {
+    try {
+      if (!planPreview || !planPreview.sessions_by_week) return 0;
+      const vals = Object.values(planPreview.sessions_by_week as any);
+      return vals.reduce((t: number, arr: any) => t + (Array.isArray(arr) ? arr.length : 0), 0);
+    } catch { return 0; }
+  })();
 
   const DAY_ORDER = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
   function byDay(a: any, b: any) {
@@ -378,7 +405,7 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
               <div>
                 <div className="text-xs text-gray-700 mb-1">Discipline</div>
                 <select value={discipline} onChange={e=>setDiscipline(e.target.value as any)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
-                  {['run','ride','swim','strength','hybrid'].map(d => <option key={d} value={d}>{d}</option>)}
+                  {['run','ride','swim','strength','triathlon','hybrid'].map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
             </div>
@@ -386,42 +413,52 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
           {/* Read-only plan preview for admins before publishing */}
           <div className="p-3 border border-gray-200 rounded space-y-2">
             <div className="text-sm font-medium">Plan Preview (read-only)</div>
-            <div className="space-y-3 max-h-96 overflow-auto">
-              {Object.keys(planPreview.sessions_by_week).sort((a,b)=>parseInt(a,10)-parseInt(b,10)).map(week => {
-                const sessions = (planPreview.sessions_by_week[week] || []).slice().sort(byDay);
-                const mins = sessions.reduce((t: number, s: any) => t + (typeof s.duration === 'number' ? s.duration : 0), 0);
-                return (
-                  <div key={week} className="border rounded p-2">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm font-medium">Week {week}</div>
-                      <div className="text-xs text-gray-600">{sessions.length} sessions{mins>0?` • ${mins} min`:''}</div>
+            {planPreview.sessions_by_week ? (
+              <div className="space-y-3 max-h-96 overflow-auto">
+                {Object.keys(planPreview.sessions_by_week).sort((a,b)=>parseInt(a,10)-parseInt(b,10)).map(week => {
+                  const sessions = (planPreview.sessions_by_week[week] || []).slice().sort(byDay);
+                  const mins = sessions.reduce((t: number, s: any) => t + (typeof s.duration === 'number' ? s.duration : 0), 0);
+                  return (
+                    <div key={week} className="border rounded p-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">Week {week}</div>
+                        <div className="text-xs text-gray-600">{sessions.length} sessions{mins>0?` • ${mins} min`:''}</div>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 gap-1">
+                        {sessions.map((s: any, i: number) => {
+                          const fallback = [s.discipline || s.type || '']
+                            .concat((s.type && s.type!==s.discipline) ? [`• ${s.type}`] : [])
+                            .concat(typeof s.duration === 'number' ? [`• ${s.duration} min`] : [])
+                            .filter(Boolean)
+                            .join(' ')
+                            .trim();
+                          const label = s.description ? s.description : fallback;
+                          const hasSwimSteps = (s.discipline||s.type||'').toLowerCase()==='swim' && Array.isArray(s.steps) && s.steps.length>0;
+                          return (
+                            <div key={i} className="text-xs text-gray-700">
+                              <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}
+                              {hasSwimSteps && (
+                                <div className="text-[11px] text-gray-500 mt-1">
+                                  Swim steps: {s.steps.reduce((count: number, st: any) => count + Math.max(1, Number(st.repeat||1)), 0)} segments
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="mt-2 grid grid-cols-1 gap-1">
-                      {sessions.map((s: any, i: number) => {
-                        const fallback = [s.discipline || s.type || '']
-                          .concat((s.type && s.type!==s.discipline) ? [`• ${s.type}`] : [])
-                          .concat(typeof s.duration === 'number' ? [`• ${s.duration} min`] : [])
-                          .filter(Boolean)
-                          .join(' ')
-                          .trim();
-                        const label = s.description ? s.description : fallback;
-                        const hasSwimSteps = (s.discipline||s.type||'').toLowerCase()==='swim' && Array.isArray(s.steps) && s.steps.length>0;
-                        return (
-                          <div key={i} className="text-xs text-gray-700">
-                            <span className="font-medium">{s.day}</span>{label ? ` — ${label}` : ''}
-                            {hasSwimSteps && (
-                              <div className="text-[11px] text-gray-500 mt-1">
-                                Swim steps: {s.steps.reduce((count: number, st: any) => count + Math.max(1, Number(st.repeat||1)), 0)} segments
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="space-y-2 text-sm text-gray-700">
+                <div>Triathlon blueprint detected.</div>
+                <div>Window: {planPreview.min_weeks}–{planPreview.max_weeks} weeks</div>
+                {planPreview?.phase_blueprint?.order && (
+                  <div>Phases: {planPreview.phase_blueprint.order.join(' → ')}</div>
+                )}
+              </div>
+            )}
           </div>
           <div>
             <button disabled={saving} onClick={savePlan} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 disabled:opacity-50">{saving? 'Publishing...' : 'Publish to catalog'}</button>
