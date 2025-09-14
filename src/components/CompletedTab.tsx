@@ -1387,13 +1387,13 @@ const formatPace = (paceValue: any): string => {
       
       {workoutType === 'ride' ? (
         <>
-          {/* Distance */}
+          {/* Avg Speed (top-left) */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatDistance((computeDistanceKm(workoutData) ?? Number(workoutData.distance) ?? 0))}
+              {formatAvgSpeed(workoutData.avg_speed)}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Distance</div>
+              <div className="font-medium">Avg Speed</div>
             </div>
           </div>
 
@@ -1407,23 +1407,23 @@ const formatPace = (paceValue: any): string => {
             </div>
           </div>
 
-          {/* Elevation Gain */}
+          {/* Distance */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
+              {formatDistance((computeDistanceKm(workoutData) ?? Number(workoutData.distance) ?? 0))}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Climbed</div>
+              <div className="font-medium">Distance</div>
             </div>
           </div>
 
-          {/* Avg Speed */}
+          {/* Max Speed (between Distance and Avg Power) */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatAvgSpeed(workoutData.avg_speed)}
+              {workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg Speed</div>
+              <div className="font-medium">Max Speed</div>
             </div>
           </div>
 
@@ -1508,15 +1508,7 @@ const formatPace = (paceValue: any): string => {
             </div>
           </div>
 
-          {/* Max Speed */}
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Max Speed</div>
-            </div>
-          </div>
+          {/* Removed duplicate Max Speed row previously here */}
 
           {/* Max Cadence */}
           <div className="px-2 py-1">
