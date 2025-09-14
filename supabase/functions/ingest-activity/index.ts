@@ -423,16 +423,16 @@ async function mapGarminToWorkout(activity: any, userId: string) {
                 (Number.isFinite(activity.max_power) ? Math.round(activity.max_power) : null)),
     avg_cadence: (() => {
       // Prioritize enriched data, then fall back to activity data
-      const enriched = enrichedData.avg_bike_cadence ?? enrichedData.avg_run_cadence;
-      const activity = activity.avg_swim_cadence ?? activity.avg_running_cadence ?? activity.avg_run_cadence ?? activity.avg_bike_cadence;
-      const v = enriched ?? activity;
+      const enriched = (enrichedData as any).avg_bike_cadence ?? (enrichedData as any).avg_run_cadence;
+      const actCad = (activity as any).avg_swim_cadence ?? (activity as any).avg_running_cadence ?? (activity as any).avg_run_cadence ?? (activity as any).avg_bike_cadence;
+      const v = enriched ?? actCad;
       return roundInt(v);
     })(),
     max_cadence: (() => {
       // Prioritize enriched data, then fall back to activity data
-      const enriched = enrichedData.max_bike_cadence ?? enrichedData.max_run_cadence;
-      const activity = activity.max_running_cadence ?? activity.max_run_cadence ?? activity.max_bike_cadence;
-      const v = enriched ?? activity;
+      const enriched = (enrichedData as any).max_bike_cadence ?? (enrichedData as any).max_run_cadence;
+      const actMaxCad = (activity as any).max_running_cadence ?? (activity as any).max_run_cadence ?? (activity as any).max_bike_cadence;
+      const v = enriched ?? actMaxCad;
       return roundInt(v);
     })(),
     strokes: Number.isFinite(activity.strokes) ? activity.strokes : null,

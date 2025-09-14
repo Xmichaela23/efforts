@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
 
 interface WeatherData {
   temperature: number;
@@ -24,7 +25,8 @@ export function useWeather({ lat, lng, timestamp, workoutId, enabled = true }: U
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!enabled || !lat || !lng || !timestamp) {
+    // Basic guards: require all inputs and numeric coords
+    if (!enabled || lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng) || !timestamp) {
       setWeather(null);
       return;
     }
@@ -34,30 +36,20 @@ export function useWeather({ lat, lng, timestamp, workoutId, enabled = true }: U
       setError(null);
 
       try {
-        const response = await fetch(`https://yyriamwvtvzlkumqrvpm.supabase.co/functions/v1/get-weather`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5cmlhbXd2dHZ6bGt1bXFydnBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA2OTIxNTgsImV4cCI6MjA2NjI2ODE1OH0.yltCi8CzSejByblpVC9aMzFhi3EOvRacRf6NR0cFJNY`,
-          },
-          body: JSON.stringify({
-            lat,
-            lng,
+        const { data, error: fnError } = await (supabase.functions.invoke as any)('get-weather', {
+          body: {
+            lat: Number(lat),
+            lng: Number(lng),
             timestamp,
             workout_id: workoutId,
-          }),
+          },
         });
-
-        if (!response.ok) {
-          throw new Error(`Weather fetch failed: ${response.status}`);
-        }
-
-        const data = await response.json();
+        if (fnError) throw fnError;
         
-        if (data.weather) {
-          setWeather(data.weather);
-        } else if (data.error) {
-          setError(data.error);
+        if (data?.weather) {
+          setWeather(data.weather as WeatherData);
+        } else if (data?.error) {
+          setError(String(data.error));
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Unknown error');
