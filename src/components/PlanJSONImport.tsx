@@ -147,12 +147,14 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       }
       res = v;
     }
-    // Minimal sanity checks: week count matches max key
-    const keys = Object.keys(res.plan.sessions_by_week).map(k => parseInt(k, 10)).filter(n => Number.isFinite(n));
-    const maxWeek = keys.length ? Math.max(...keys) : 0;
-    if (res.plan.duration_weeks < maxWeek) {
-      setError(`duration_weeks (${res.plan.duration_weeks}) is less than last week key (${maxWeek})`);
-      return;
+    // Minimal sanity checks for universal plans only
+    if (res.plan && res.plan.sessions_by_week) {
+      const keys = Object.keys(res.plan.sessions_by_week).map(k => parseInt(k, 10)).filter(n => Number.isFinite(n));
+      const maxWeek = keys.length ? Math.max(...keys) : 0;
+      if (res.plan.duration_weeks < maxWeek) {
+        setError(`duration_weeks (${res.plan.duration_weeks}) is less than last week key (${maxWeek})`);
+        return;
+      }
     }
     // Infer discipline from sessions for convenience
     try {
