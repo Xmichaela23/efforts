@@ -1378,10 +1378,12 @@ const formatPace = (paceValue: any): string => {
                 if (workoutType === 'walk' && secPerMile < 360) return 'N/A';
                 return formatPace(secPerKm);
               })()
-            : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A')}
+            : (workoutType === 'ride'
+              ? formatAvgSpeed(workoutData.avg_speed)
+              : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'))}
         </div>
         <div className="text-xs text-[#666666] font-normal">
-          <div className="font-medium">{(workoutType === 'run' || workoutType === 'walk') ? 'Max Pace' : 'Max Speed'}</div>
+          <div className="font-medium">{(workoutType === 'run' || workoutType === 'walk') ? 'Max Pace' : (workoutType === 'ride' ? 'Avg Speed' : 'Max Speed')}</div>
         </div>
       </div>
       

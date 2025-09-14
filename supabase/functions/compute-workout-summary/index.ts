@@ -747,13 +747,16 @@ Deno.serve(async (req) => {
       let sIdx = info.startIdx; let eIdx = info.endIdx != null ? info.endIdx : Math.min(rows.length-1, info.startIdx+1);
       if (eIdx <= sIdx) eIdx = Math.min(rows.length-1, sIdx+1);
 
-      // For work steps, trim edges with very low speed to avoid jog bleed
+      // For distance-based work steps only, trim edges with very low speed to avoid jog bleed
       if (info.role === 'work') {
-        const plannedSecPerMi = derivePlannedPaceSecPerMi(st);
-        const plannedMps = plannedSecPerMi ? (1609.34 / plannedSecPerMi) : null;
-        const floorMps = plannedMps ? plannedMps * 0.80 : 2.0; // ~8:04/mi default floor
-        while (sIdx < eIdx && (!(rows[sIdx].v > 0) || rows[sIdx].v < floorMps)) sIdx++;
-        while (eIdx > sIdx && (!(rows[eIdx].v > 0) || rows[eIdx].v < floorMps)) eIdx--;
+        const plannedMetersForThis = deriveMetersFromPlannedStep(st);
+        if (plannedMetersForThis && plannedMetersForThis > 0) {
+          const plannedSecPerMi = derivePlannedPaceSecPerMi(st);
+          const plannedMps = plannedSecPerMi ? (1609.34 / plannedSecPerMi) : null;
+          const floorMps = plannedMps ? plannedMps * 0.80 : 2.0; // ~8:04/mi default floor
+          while (sIdx < eIdx && (!(rows[sIdx].v > 0) || rows[sIdx].v < floorMps)) sIdx++;
+          while (eIdx > sIdx && (!(rows[eIdx].v > 0) || rows[eIdx].v < floorMps)) eIdx--;
+        }
       }
 
       const startD = rows[sIdx]?.d || 0; const startT = rows[sIdx]?.t || 0;
