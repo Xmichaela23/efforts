@@ -835,7 +835,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           }
         }
         // If no power targets, keep existing rendered but strip any run-style pace suffix like "@ mm:ss/mi"
-        const stripRunPace = (txt:string) => txt.replace(/@\s*\d{1,2}:\d{2}\s*\/\s*(mi|km)/gi, '').trim();
+        // Strip any run-style pace suffix like "@ 10:30/mi", "@10:30 / km", or bare "@ 10:30"
+        const stripRunPace = (txt:string) => txt
+          .replace(/@\s*\d{1,2}:\d{2}\s*\/\s*(mi|km)/gi, '')
+          .replace(/@\s*\d{1,2}:\d{2}(?![^])/gi, '')
+          .trim();
         if (durTxt) {
           rendered = `1 × ${durTxt}${powTxt?` @ ${powTxt}`:''}`;
         } else {
