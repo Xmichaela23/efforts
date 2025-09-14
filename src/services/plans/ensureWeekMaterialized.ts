@@ -820,6 +820,31 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     }
     const totalDurSeconds = computedStepsV3 && computedStepsV3.length ? totalDurationSeconds(computedStepsV3 as any) : 0;
 
+    // Ride-friendly rendered description: prefer power over pace for bikes
+    if (mappedType === 'ride') {
+      try {
+        const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+        const durTxt = (totalDurSeconds>0 ? mmss(totalDurSeconds) : (typeof s?.duration === 'number' && s.duration>0 ? mmss(s.duration*60) : null));
+        const tgt = computedTargets as any;
+        let powTxt: string | null = null;
+        if (tgt && tgt.primary_target_type === 'power') {
+          if (typeof tgt.power_low === 'number' && typeof tgt.power_high === 'number' && tgt.power_low>0 && tgt.power_high>0) {
+            powTxt = `${tgt.power_low}–${tgt.power_high}W`;
+          } else if (typeof tgt.power_target_watts === 'number' && tgt.power_target_watts>0) {
+            powTxt = `${tgt.power_target_watts}W`;
+          }
+        }
+        // If no power targets, keep existing rendered but strip any run-style pace suffix like "@ mm:ss/mi"
+        const stripRunPace = (txt:string) => txt.replace(/@\s*\d{1,2}:\d{2}\s*\/\s*(mi|km)/gi, '').trim();
+        if (durTxt) {
+          rendered = `1 × ${durTxt}${powTxt?` @ ${powTxt}`:''}`;
+        } else {
+          rendered = stripRunPace(String(rendered||''));
+          if (powTxt) rendered = `${rendered}${rendered ? ' ' : ''}@ ${powTxt}`.trim();
+        }
+      } catch {}
+    }
+
     // STRICT: require computedStepsV3; if missing, fail fast for this session
     if (!computedStepsV3 || computedStepsV3.length === 0) {
       throw new Error(`Materialization failed: could not compute steps for ${String(s.name||s.description||'session')}`);
