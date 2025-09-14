@@ -60,7 +60,7 @@ export default function PlanCatalog() {
 
       <div className="space-y-2">
         {items.map(p => {
-          const isTriBlueprint = String(p.discipline||'').toLowerCase()==='triathlon' && (!p.template || !p.template.sessions_by_week);
+          const isTriBlueprint = (!!(p as any)?.template?.phase_blueprint) && !((p as any)?.template?.sessions_by_week);
           const displayDiscipline = isTriBlueprint ? 'triathlon' : (p.discipline as string);
           return (
             <div key={p.id} className="p-3 flex items-start justify-between hover:bg-gray-50">

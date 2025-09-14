@@ -292,7 +292,7 @@ export default function PlanSelect() {
     return { minWeeks, maxWeeks, blueprint, strengthTracks } as { minWeeks: number|null; maxWeeks: number|null; blueprint: any; strengthTracks: string[] };
   }, [libPlan]);
 
-  // Compute weeks_to_race from today in user's local TZ
+  // Compute weeks_to_race from user-provided start_date (if edited) to race_date
   const weeksToRace = useMemo(() => {
     try {
       if (!raceDate) return null;
@@ -315,7 +315,7 @@ export default function PlanSelect() {
       const w = Math.ceil(diffDays / 7);
       return Math.max(0, w);
     } catch { return null; }
-  }, [raceDate]);
+  }, [raceDate, startDate, startEdited]);
 
   // When raceDate and min/max are set and valid, auto-derive start Monday to align last week with race week
   useEffect(() => {
@@ -348,6 +348,10 @@ export default function PlanSelect() {
     const startMonday = addDays(lastWeekMonday, -7 * ((weeksToRace || 1) - 1));
     setStartDate(startMonday);
   }, [raceDate, weeksToRace, triVars.minWeeks, triVars.maxWeeks, startEdited]);
+
+  const isTriBlueprint = useMemo(() => {
+    try { return !!(libPlan?.template?.phase_blueprint) && !(libPlan?.template?.sessions_by_week); } catch { return false; }
+  }, [libPlan]);
 
   const hasRun = useMemo(() => {
     if (!libPlan?.template?.sessions_by_week) return false;
@@ -969,7 +973,7 @@ export default function PlanSelect() {
             <div className="text-xs text-gray-700 mb-1">Start date</div>
             <input type="date" value={startDate} onChange={e=>{ setStartDate(e.target.value); setStartEdited(true); }} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
           </div>
-          {hasRun && (
+          {(hasRun || isTriBlueprint) && (
             <div>
               <div className="text-xs text-gray-700 mb-1">Long run day</div>
               <select value={longRunDay} onChange={e=>setLongRunDay(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
@@ -977,7 +981,7 @@ export default function PlanSelect() {
               </select>
             </div>
           )}
-          {hasRide && (
+          {(hasRide || isTriBlueprint) && (
             <div>
               <div className="text-xs text-gray-700 mb-1">Long ride day</div>
               <select value={longRideDay} onChange={e=>setLongRideDay(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
