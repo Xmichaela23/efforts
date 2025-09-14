@@ -791,6 +791,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return () => { cancelled = true; };
   }, [isAttachedToPlan, hasServerComputed, planned]);
 
+  // Detect sport for display formatting
+  const sportType = String((completed?.type || planned?.type || '')).toLowerCase();
+  const isRideSport = /ride|bike|cycling/.test(sportType);
+
   return (
     <div className="w-full">
       {(() => {
@@ -803,15 +807,16 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           </div>
         );
       })()}
-      <div className="grid grid-cols-4 gap-4 text-xs text-gray-500">
+      <div className="grid grid-cols-5 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned Pace</div>
-        <div className="font-medium text-black">Executed Pace</div>
+        <div className="font-medium text-black">{isRideSport ? 'Executed Speed' : 'Executed Pace'}</div>
+        <div className="font-medium text-black">Distance</div>
         <div className="font-medium text-black">Time</div>
         <div className="font-medium text-black">BPM</div>
       </div>
       <div className="mt-2 divide-y divide-gray-100">
         {steps.map((st, idx) => (
-          <div key={idx} className="grid grid-cols-4 gap-4 py-2 text-sm">
+          <div key={idx} className="grid grid-cols-5 gap-4 py-2 text-sm">
             <div className="text-gray-800">{plannedPaceFor(st)}</div>
             <div className="text-gray-900">
               {(() => {
@@ -820,8 +825,34 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
                   const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
                   const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
-                  const secPerMi = row?.executed?.avg_pace_s_per_mi;
+                  const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
+                  if (isRideSport) {
+                    if (typeof secPerMi === 'number' && isFinite(secPerMi) && secPerMi > 0) {
+                      const mph = 3600 / secPerMi; // convert pace to speed
+                      return <div>{mph.toFixed(1)} mph</div>;
+                    }
+                    return <div>—</div>;
+                  }
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
+                }
+                return <div>—</div>;
+              })()}
+            </div>
+            <div className="text-gray-900">
+              {(() => {
+                if (hasServerComputed) {
+                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
+                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
+                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
+                  const distM = row?.executed?.distance_m as number | undefined;
+                  if (typeof distM === 'number' && distM > 0) {
+                    if (isRideSport || /run|walk/i.test(sportType)) {
+                      const mi = distM / 1609.34;
+                      return <div>{mi.toFixed(mi < 1 ? 2 : 1)} mi</div>;
+                    }
+                    const km = distM / 1000;
+                    return <div>{km.toFixed(km < 1 ? 2 : 1)} km</div>;
+                  }
                 }
                 return <div>—</div>;
               })()}
