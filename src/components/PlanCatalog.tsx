@@ -61,11 +61,12 @@ export default function PlanCatalog() {
       <div className="space-y-2">
         {items.map(p => {
           const isTriBlueprint = String(p.discipline||'').toLowerCase()==='triathlon' && (!p.template || !p.template.sessions_by_week);
+          const displayDiscipline = isTriBlueprint ? 'triathlon' : (p.discipline as string);
           return (
             <div key={p.id} className="p-3 flex items-start justify-between hover:bg-gray-50">
               <div className="max-w-[75%]">
                 <div className="font-medium">{p.name}</div>
-                <div className="text-xs text-gray-600">{p.duration_weeks} weeks • {p.discipline}{isTriBlueprint? ' • blueprint' : ''}</div>
+                <div className="text-xs text-gray-600">{p.duration_weeks} weeks • {displayDiscipline}{isTriBlueprint? ' • blueprint' : ''}</div>
                 {p.description && (
                   <div className="mt-1 text-xs text-gray-700 line-clamp-2">{p.description}</div>
                 )}
