@@ -38,6 +38,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     let cancelled = false;
     (async () => {
       try {
+        // Only query if authenticated; otherwise RLS returns 404/401
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess?.session) { if (!cancelled) setDayLoc(null); return; }
         const { data } = await supabase
           .from('user_locations')
           .select('lat,lng')
@@ -62,6 +65,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       if (locTried) return;
       if (activeDate !== today) return;
       if (dayLoc) return;
+      // Only attempt geolocation save if authenticated
+      try { const { data: sess } = await supabase.auth.getSession(); if (!sess?.session) return; } catch {}
       setLocTried(true);
       try {
         const res = await saveUserLocation({ date: activeDate });

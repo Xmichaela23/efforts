@@ -36,13 +36,23 @@ Deno.serve(async (req) => {
 
   try {
     const { lat, lng, timestamp, workout_id } = await req.json();
-    
-    if (!lat || !lng || !timestamp) {
-      return new Response(JSON.stringify({ 
-        error: 'lat, lng, and timestamp are required' 
-      }), { 
-        status: 400, 
-        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+
+    // Validate inputs strictly
+    const latNum = Number(lat);
+    const lngNum = Number(lng);
+    const tsStr = typeof timestamp === 'string' ? timestamp : new Date(timestamp).toISOString();
+    if (!Number.isFinite(latNum) || !Number.isFinite(lngNum) || !tsStr) {
+      return new Response(JSON.stringify({
+        error: 'Invalid lat, lng, or timestamp'
+      }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+      });
+    }
+    if (latNum < -90 || latNum > 90 || lngNum < -180 || lngNum > 180) {
+      return new Response(JSON.stringify({ error: 'lat/lng out of range' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
       });
     }
 
@@ -53,24 +63,21 @@ Deno.serve(async (req) => {
     );
 
     if (workout_id) {
-      const { data: existing } = await supabase
+      const { data: existing, error: existingErr } = await supabase
         .from('workouts')
         .select('weather_data')
         .eq('id', workout_id)
-        .single();
-      
-      if (existing?.weather_data) {
-        return new Response(JSON.stringify({ 
-          weather: existing.weather_data 
-        }), { 
-          status: 200, 
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+        .maybeSingle();
+      if (!existingErr && existing?.weather_data) {
+        return new Response(JSON.stringify({ weather: existing.weather_data }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
         });
       }
     }
 
     // Get weather data from OpenWeatherMap
-    const weatherData = await fetchWeatherData(lat, lng, timestamp);
+    const weatherData = await fetchWeatherData(latNum, lngNum, tsStr);
     
     if (!weatherData) {
       return new Response(JSON.stringify({ 
@@ -98,11 +105,9 @@ Deno.serve(async (req) => {
 
   } catch (error) {
     console.error('Weather lookup error:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error' 
-    }), { 
-      status: 500, 
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   }
 });

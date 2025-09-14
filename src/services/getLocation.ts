@@ -7,6 +7,11 @@ export async function saveUserLocation(opts?: { date?: string }): Promise<{ ok: 
       try {
         const { latitude: lat, longitude: lng, accuracy } = pos.coords as any;
         const d = opts?.date || new Date().toISOString().slice(0,10);
+        // If not authenticated, skip invoking the edge function
+        try {
+          const { data: sess } = await supabase.auth.getSession();
+          if (!sess?.session) return resolve({ ok: false });
+        } catch {}
         const { error } = await supabase.functions.invoke('save-location', {
           body: { lat, lng, accuracy_m: Math.round(accuracy || 0), date: d, source: 'browser' }
         });
