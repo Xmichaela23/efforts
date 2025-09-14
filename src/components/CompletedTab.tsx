@@ -1390,7 +1390,7 @@ const formatPace = (paceValue: any): string => {
           {/* Distance */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatDistance(workoutData.distance_km || workoutData.distance_m / 1000)}
+              {formatDistance((computeDistanceKm(workoutData) ?? Number(workoutData.distance) ?? 0))}
             </div>
             <div className="text-xs text-[#666666] font-normal">
               <div className="font-medium">Distance</div>

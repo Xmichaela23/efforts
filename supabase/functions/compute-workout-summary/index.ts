@@ -29,16 +29,22 @@ function normalizeSamples(samples: any[]) {
     const s = samples[i] || {};
     const ts = Number(
       s.startTimeInSeconds ??
+      s.timestampInSeconds ??
+      s.timestamp ??
       s.clockDurationInSeconds ??
       s.timerDurationInSeconds ??
       s.elapsed_s ??
+      s.time ??
       s.offsetInSeconds ??
       i
     );
     const t = Number(
       s.timerDurationInSeconds ??
+      s.timestampInSeconds ??
+      s.timestamp ??
       s.clockDurationInSeconds ??
       s.elapsed_s ??
+      s.time ??
       s.offsetInSeconds ??
       i
     );
@@ -48,6 +54,8 @@ function normalizeSamples(samples: any[]) {
               (typeof s.enhancedSpeedInMetersPerSecond === 'number' && s.enhancedSpeedInMetersPerSecond) ||
               (typeof s.currentSpeedInMetersPerSecond === 'number' && s.currentSpeedInMetersPerSecond) ||
               (typeof s.instantaneousSpeedInMetersPerSecond === 'number' && s.instantaneousSpeedInMetersPerSecond) ||
+              (typeof s.velocity_smooth === 'number' && s.velocity_smooth) ||
+              (typeof s.speed === 'number' && s.speed) ||
               (typeof s.speed_mps === 'number' && s.speed_mps) ||
               (typeof s.enhancedSpeed === 'number' && s.enhancedSpeed) ||
               (typeof s.pace_min_per_km === 'number' && (1000 / (s.pace_min_per_km * 60))) ||
@@ -57,6 +65,9 @@ function normalizeSamples(samples: any[]) {
     const d = (typeof s.totalDistanceInMeters === 'number' && s.totalDistanceInMeters) ||
               (typeof s.distanceInMeters === 'number' && s.distanceInMeters) ||
               (typeof s.cumulativeDistanceInMeters === 'number' && s.cumulativeDistanceInMeters) ||
+              (typeof s.distanceMeters === 'number' && s.distanceMeters) ||
+              (typeof s.distance_m === 'number' && s.distance_m) ||
+              (typeof s.cumulativeDistance === 'number' && s.cumulativeDistance) ||
               (typeof s.totalDistance === 'number' && s.totalDistance) ||
               (typeof s.distance === 'number' && s.distance) ||
               undefined;
@@ -69,10 +80,12 @@ function normalizeSamples(samples: any[]) {
     const elev = (typeof s.elevationInMeters === 'number' && s.elevationInMeters) ||
                  (typeof s.altitudeInMeters === 'number' && s.altitudeInMeters) ||
                  (typeof s.altitude === 'number' && s.altitude) ||
+                 (typeof s.elevation === 'number' && s.elevation) ||
                  undefined;
 
     const cad = (typeof s.stepsPerMinute === 'number' && s.stepsPerMinute) ||
                 (typeof s.runCadence === 'number' && s.runCadence) ||
+                (typeof s.cadence === 'number' && s.cadence) ||
                 (typeof s.bikeCadenceInRPM === 'number' && s.bikeCadenceInRPM) ||
                 (typeof s.swimCadenceInStrokesPerMinute === 'number' && s.swimCadenceInStrokesPerMinute) ||
                 (typeof s.avg_run_cadence === 'number' && s.avg_run_cadence) ||
@@ -215,23 +228,54 @@ const ALIGN = {
 
 // Unified version tag expected by UI and Summary
 const COMPUTED_VERSION = 'v1.0.3';
+// Database column `computed_version` is an integer; keep JSON as string, column as int
+const COMPUTED_VERSION_INT = 1003;
 
-// ---------- GAP approximation for runs ----------
+// ---------- GAP (Minetti model with elevation smoothing) ----------
 function gapSecPerMi(rows:any[], sIdx:number, eIdx:number) {
   if (!rows || eIdx <= sIdx) return null;
   let adjMeters = 0; let timeSec = 0;
+  const alpha = 0.1; // EMA smoothing (~10-15s at ~1 Hz)
+  function minettiCost(g:number){
+    const x = Math.max(-0.30, Math.min(0.30, g));
+    return (((155.4*x - 30.4)*x - 43.3)*x + 46.3)*x*x + 19.5*x + 3.6;
+  }
+  let ema:number|null = null;
   for (let i=sIdx+1;i<=eIdx;i+=1) {
     const a = rows[i-1], b = rows[i];
     const dt = Math.min(60, Math.max(0, (b.t||0)-(a.t||0)));
     if (!dt) continue; timeSec += dt;
-    const v = (b.v>0.5 ? b.v : (a.v>0.5 ? a.v : 0)); if (!v) continue;
-    const dMeters = v*dt;
-    const elevA = (typeof a.elev==='number'?a.elev:null);
-    const elevB = (typeof b.elev==='number'?b.elev:elevA);
-    const dElev = (elevA!=null && elevB!=null) ? (elevB - elevA) : 0;
-    const g = dMeters>0 ? Math.max(-0.10, Math.min(0.10, dElev/dMeters)) : 0;
-    const factor = 1 + 9*g;
-    const adj = dMeters / factor; adjMeters += adj;
+    // distance for segment
+    const dMeters = (() => {
+      const hasD = (typeof a.d === 'number') && (typeof b.d === 'number');
+      if (hasD) {
+        const dm = Math.max(0, (b.d as number) - (a.d as number));
+        if (dm > 0) return dm;
+      }
+      const v = (typeof b.v === 'number' && b.v > 0) ? b.v : ((typeof a.v === 'number' && a.v > 0) ? a.v : 0);
+      return v > 0 ? v * dt : 0;
+    })();
+    if (dMeters <= 0) continue;
+    // smoothed elevation delta
+    const elevRaw = (typeof b.elev === 'number') ? b.elev : (typeof a.elev === 'number' ? a.elev : null);
+    if (elevRaw != null) ema = (ema == null) ? elevRaw : (alpha * elevRaw + (1 - alpha) * ema);
+    const prevEma = ema;
+    // lookahead one more point when possible to get better delev; else use current diff
+    let delev = 0;
+    if (i+1 <= eIdx) {
+      const nb = rows[i+1];
+      const nextElevRaw = (typeof nb.elev === 'number') ? nb.elev : elevRaw;
+      const nextEma = (nextElevRaw != null) ? (alpha * nextElevRaw + (1 - alpha) * (ema ?? nextElevRaw)) : (ema ?? 0);
+      delev = nextEma - (prevEma ?? nextEma);
+      ema = nextEma;
+    } else {
+      delev = 0;
+    }
+    const g = dMeters > 0 ? Math.max(-0.30, Math.min(0.30, delev / dMeters)) : 0;
+    const ratio = minettiCost(g) / 3.6; // cost relative to flat
+    // safety clamp to avoid extreme adjustments
+    const safeRatio = Math.max(0.7, Math.min(2.5, ratio));
+    adjMeters += dMeters * safeRatio;
   }
   return paceSecPerMiFromMetersSeconds(adjMeters, timeSec);
 }
@@ -425,10 +469,20 @@ Deno.serve(async (req) => {
         // map lap window to rows indices
         let sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? rows[sIdx].ts) < L.start_ts) sIdx++;
         let eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? rows[eIdx].ts) < L.end_ts) eIdx++;
-        // tighten to moving edges
+        // tighten to moving edges (prefer distance increase; fallback to speed)
         const floor = ALIGN.idle_speed_mps;
-        while (sIdx < eIdx && !(rows[sIdx].v > floor)) sIdx++;
-        while (eIdx > sIdx && !(rows[eIdx].v > floor)) eIdx--;
+        while (sIdx < eIdx) {
+          const a2 = rows[sIdx], b2 = rows[sIdx+1];
+          const dInc = (typeof a2?.d === 'number' && typeof b2?.d === 'number') ? ((b2.d - a2.d) > 0) : false;
+          if (dInc || (rows[sIdx].v > floor)) break;
+          sIdx++;
+        }
+        while (eIdx > sIdx) {
+          const a2 = rows[eIdx-1], b2 = rows[eIdx];
+          const dInc = (typeof a2?.d === 'number' && typeof b2?.d === 'number') ? ((b2.d - a2.d) > 0) : false;
+          if (dInc || (rows[eIdx].v > floor)) break;
+          eIdx--;
+        }
         out.push(execIntervalFromWindow(st, sIdx, eIdx));
         i++; j++;
       }
@@ -439,10 +493,20 @@ Deno.serve(async (req) => {
     function windowIdxFromT(rows:any[], start_ts:number, end_ts:number): [number, number] {
       let sIdx = 0; while (sIdx + 1 < rows.length && (rows[sIdx].t ?? 0) < start_ts) sIdx++;
       let eIdx = sIdx; while (eIdx + 1 < rows.length && (rows[eIdx].t ?? 0) < end_ts) eIdx++;
-      // tighten to moving
+      // tighten to moving (prefer distance increase; fallback to speed)
       const floor = ALIGN.idle_speed_mps;
-      while (sIdx < eIdx && !(rows[sIdx].v > floor)) sIdx++;
-      while (eIdx > sIdx && !(rows[eIdx].v > floor)) eIdx--;
+      while (sIdx < eIdx) {
+        const a2 = rows[sIdx], b2 = rows[sIdx+1];
+        const dInc = (typeof a2?.d === 'number' && typeof b2?.d === 'number') ? ((b2.d - a2.d) > 0) : false;
+        if (dInc || (rows[sIdx].v > floor)) break;
+        sIdx++;
+      }
+      while (eIdx > sIdx) {
+        const a2 = rows[eIdx-1], b2 = rows[eIdx];
+        const dInc = (typeof a2?.d === 'number' && typeof b2?.d === 'number') ? ((b2.d - a2.d) > 0) : false;
+        if (dInc || (rows[eIdx].v > floor)) break;
+        eIdx--;
+      }
       return [sIdx, eIdx];
     }
 
@@ -534,10 +598,16 @@ Deno.serve(async (req) => {
         }
       };
 
-      await supabase
-        .from('workouts')
-        .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
-        .eq('id', workout_id);
+      {
+        const { data: up, error: upErr } = await supabase
+          .from('workouts')
+          .update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: new Date().toISOString() })
+          .eq('id', workout_id)
+          .select('id')
+          .single();
+        if (upErr) throw upErr;
+        if (!up) throw new Error('compute-workout-summary: update returned no row');
+      }
 
       // eslint-disable-next-line no-console
       try { console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} mode=${laps.length ? 'laps-no-plan' : 'splits-no-plan'} intervals=${outIntervals.length}`); } catch {}
@@ -559,10 +629,16 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: overallGap != null ? Math.round(overallGap) : null
         }
       };
-      await supabase
-        .from('workouts')
-        .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
-        .eq('id', workout_id);
+      {
+        const { data: up, error: upErr } = await supabase
+          .from('workouts')
+          .update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: new Date().toISOString() })
+          .eq('id', workout_id)
+          .select('id')
+          .single();
+        if (upErr) throw upErr;
+        if (!up) throw new Error('compute-workout-summary: update returned no row');
+      }
       return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
@@ -760,16 +836,30 @@ Deno.serve(async (req) => {
     };
 
     // Write to workouts
-    await supabase
-      .from('workouts')
-      .update({ computed, computed_version: COMPUTED_VERSION, computed_at: new Date().toISOString() })
-      .eq('id', workout_id);
+    {
+      const { data: up, error: upErr } = await supabase
+        .from('workouts')
+        .update({ computed, computed_version: COMPUTED_VERSION_INT, computed_at: new Date().toISOString() })
+        .eq('id', workout_id)
+        .select('id')
+        .single();
+      if (upErr) throw upErr;
+      if (!up) throw new Error('compute-workout-summary: update returned no row');
+    }
 
     return new Response(JSON.stringify({ success:true, computed }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
 
   } catch (e:any) {
     // eslint-disable-next-line no-console
-    try { console.error('[compute-summary:error]', String(e)); } catch {}
-    return new Response(JSON.stringify({ error: String(e) }), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
+    try {
+      const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : undefined;
+      const code = (e && (e.code || e.status || e.name)) ? (e.code || e.status || e.name) : undefined;
+      const details = (() => { try { return JSON.stringify(e); } catch { return String(e); } })();
+      console.error('[compute-summary:error]', { code, msg, details });
+    } catch {}
+    const payload:any = { error: (e && (e.message || e.msg)) || String(e) };
+    if (e && (e.code || e.status)) payload.code = e.code || e.status;
+    try { if (typeof e === 'object') payload.details = e; } catch {}
+    return new Response(JSON.stringify(payload), { status: 500, headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
   }
 });
