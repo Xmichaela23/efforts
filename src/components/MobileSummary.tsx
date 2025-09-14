@@ -445,6 +445,15 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         if (type === 'ride' || type === 'bike' || type === 'cycling') return 'Easy';
         return 'Jog';
       }
+      // Rides: prefer power targets if present
+      if (isRideSport) {
+        const pr = (st as any)?.power_range;
+        const pw = Number((st as any)?.power_target_watts);
+        if (pr && typeof pr.lower === 'number' && typeof pr.upper === 'number' && pr.lower>0 && pr.upper>0) {
+          return `${pr.lower}–${pr.upper}W`;
+        }
+        if (Number.isFinite(pw) && pw>0) return `${Math.round(pw)}W`;
+      }
       const direct = st.paceTarget || st.target_pace || st.pace;
       if (direct && String(direct).includes('/')) return String(direct);
       const p = Number(st.pace_sec_per_mi);
@@ -808,7 +817,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         );
       })()}
       <div className="grid grid-cols-5 gap-4 text-xs text-gray-500">
-        <div className="font-medium text-black">Planned Pace</div>
+        <div className="font-medium text-black">Planned</div>
         <div className="font-medium text-black">{isRideSport ? 'Executed Speed' : 'Executed Pace'}</div>
         <div className="font-medium text-black">Distance</div>
         <div className="font-medium text-black">Time</div>

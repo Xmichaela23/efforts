@@ -100,6 +100,13 @@ Deno.serve(async (req) => {
       })();
       const totals = sumPlanned(p);
       let score = 0;
+      // Optional deprioritization
+      const isOptional = (() => {
+        try {
+          const tags = Array.isArray((p as any)?.tags) ? (p as any).tags.map((x:any)=>String(x).toLowerCase()) : [];
+          return tags.includes('optional') || /\boptional\b/i.test(String((p as any)?.description||''));
+        } catch { return false; }
+      })();
       // Time window: if both have timestamp, reward closeness within 2h
       const ts = w.timestamp ? new Date(w.timestamp).getTime()/1000 : null;
       const planTs = null; // no explicit time for now
@@ -141,6 +148,8 @@ Deno.serve(async (req) => {
         if (distPct <= tolTgt) score += (distPct <= 0.15 ? (1.5 - (distPct/0.15)) : (0.4 - Math.max(0, (distPct-0.15))/0.35));
         else score -= distPct;
       }
+      // Small penalty if optional to prefer primary sessions when both match
+      if (isOptional) score -= 0.3;
       if (score > bestScore) { bestScore = score; best = p; (best as any)._hasSteps = hasSteps; bestDurPct = durPct; bestDistPct = distPct; }
     }
 
