@@ -186,6 +186,7 @@ export default function PlanSelect() {
   const [error, setError] = useState<string|null>(null);
   const [libPlan, setLibPlan] = useState<any|null>(null);
   const [startDate, setStartDate] = useState<string>('');
+  const [startEdited, setStartEdited] = useState<boolean>(false);
   const [raceDate, setRaceDate] = useState<string>('');
   const [strengthTrack, setStrengthTrack] = useState<string>('');
   // Default to authored anchors; we will set these after loading the plan
@@ -295,12 +296,22 @@ export default function PlanSelect() {
   const weeksToRace = useMemo(() => {
     try {
       if (!raceDate) return null;
-      const parts = raceDate.split('-').map(x=>parseInt(x,10));
-      const rd = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
-      const today = new Date();
-      // Zero time components to local midnight for both
-      const d0 = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const diffDays = Math.ceil((rd.getTime() - d0.getTime()) / (1000*60*60*24));
+      const mondayOf = (iso: string): string => {
+        const p = iso.split('-').map(x=>parseInt(x,10));
+        const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
+        const jsDow = d.getDay();
+        const daysFromMonday = (jsDow + 6) % 7;
+        const mon = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+        const y = mon.getFullYear();
+        const m = String(mon.getMonth()+1).padStart(2,'0');
+        const dd = String(mon.getDate()).padStart(2,'0');
+        return `${y}-${m}-${dd}`;
+      };
+      const startIso = (startEdited && startDate) ? startDate : (()=>{ const t=new Date(); const y=t.getFullYear(); const m=String(t.getMonth()+1).padStart(2,'0'); const d=String(t.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; })();
+      const rdMon = mondayOf(raceDate);
+      const stMon = mondayOf(startIso);
+      const toJs = (iso: string) => { const p = iso.split('-').map(x=>parseInt(x,10)); return new Date(p[0], (p[1]||1)-1, p[2]||1); };
+      const diffDays = Math.ceil((toJs(rdMon).getTime() - toJs(stMon).getTime()) / (1000*60*60*24));
       const w = Math.ceil(diffDays / 7);
       return Math.max(0, w);
     } catch { return null; }
@@ -311,6 +322,7 @@ export default function PlanSelect() {
     const minW = triVars.minWeeks, maxW = triVars.maxWeeks;
     if (!raceDate || !weeksToRace || !minW || !maxW) return;
     if (weeksToRace < minW || weeksToRace > maxW) return;
+    if (startEdited) return; // respect user's explicit start selection
     const mondayOf = (iso: string): string => {
       const p = iso.split('-').map(x=>parseInt(x,10));
       const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
@@ -335,7 +347,7 @@ export default function PlanSelect() {
     const lastWeekMonday = mondayOf(raceDate);
     const startMonday = addDays(lastWeekMonday, -7 * ((weeksToRace || 1) - 1));
     setStartDate(startMonday);
-  }, [raceDate, weeksToRace, triVars.minWeeks, triVars.maxWeeks]);
+  }, [raceDate, weeksToRace, triVars.minWeeks, triVars.maxWeeks, startEdited]);
 
   const hasRun = useMemo(() => {
     if (!libPlan?.template?.sessions_by_week) return false;
@@ -955,7 +967,7 @@ export default function PlanSelect() {
           )}
           <div>
             <div className="text-xs text-gray-700 mb-1">Start date</div>
-            <input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
+            <input type="date" value={startDate} onChange={e=>{ setStartDate(e.target.value); setStartEdited(true); }} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
           </div>
           {hasRun && (
             <div>
