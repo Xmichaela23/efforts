@@ -59,21 +59,28 @@ export default function PlanCatalog() {
       )}
 
       <div className="space-y-2">
-        {items.map(p => (
-          <div key={p.id} className="p-3 flex items-start justify-between hover:bg-gray-50">
-            <div className="max-w-[75%]">
-              <div className="font-medium">{p.name}</div>
-              <div className="text-xs text-gray-600">{p.duration_weeks} weeks • {p.discipline}</div>
-              {p.description && (
-                <div className="mt-1 text-xs text-gray-700 line-clamp-2">{p.description}</div>
-              )}
+        {items.map(p => {
+          const isTriBlueprint = String(p.discipline||'').toLowerCase()==='triathlon' && (!p.template || !p.template.sessions_by_week);
+          return (
+            <div key={p.id} className="p-3 flex items-start justify-between hover:bg-gray-50">
+              <div className="max-w-[75%]">
+                <div className="font-medium">{p.name}</div>
+                <div className="text-xs text-gray-600">{p.duration_weeks} weeks • {p.discipline}{isTriBlueprint? ' • blueprint' : ''}</div>
+                {p.description && (
+                  <div className="mt-1 text-xs text-gray-700 line-clamp-2">{p.description}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {isTriBlueprint ? (
+                  <span className="text-sm text-gray-400 cursor-not-allowed">Coming soon</span>
+                ) : (
+                  <a href={`/plans/select?id=${p.id}`} className="text-sm text-blue-600">Select</a>
+                )}
+                <button onClick={() => handleDelete(p.id)} className="text-sm text-red-600">Delete</button>
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              <a href={`/plans/select?id=${p.id}`} className="text-sm text-blue-600">Select</a>
-              <button onClick={() => handleDelete(p.id)} className="text-sm text-red-600">Delete</button>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
