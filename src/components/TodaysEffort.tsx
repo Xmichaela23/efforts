@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
-import { usePlannedWorkouts, usePlannedWorkoutsToday } from '@/hooks/usePlannedWorkouts';
+import { usePlannedWorkoutsToday } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -21,7 +21,6 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   onEditEffort 
 }) => {
   const { useImperial, workouts, loading, loadUserBaselines, detailedPlans } = useAppContext();
-  const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
   const [displayWorkouts, setDisplayWorkouts] = useState<any[]>([]);
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
@@ -32,7 +31,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const activeDate = selectedDate || today;
 
   // Fast planned lookup for Today to avoid heavy payloads
-  const { plannedToday } = usePlannedWorkoutsToday(activeDate);
+  const { plannedToday, loading: plannedTodayLoading } = usePlannedWorkoutsToday(activeDate);
 
   // No persistence: we will use ephemeral geolocation below for today's weather
 
@@ -72,10 +71,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
   const dateWorkoutsMemo = useMemo(() => {
     // Show only planned rows from planned_workouts; completed planned rows are hidden
-    const plannedOnly = (plannedWorkouts || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
-    const plannedFast = (plannedToday || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
-    // Prefer Today-only fast data when available
-    const plannedSource = plannedFast?.length ? plannedFast : plannedOnly;
+    const plannedSource = (plannedToday || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
     const allWorkouts = [...(workouts || []), ...plannedSource];
     // Filter by date
     const sameDate = allWorkouts.filter((w: any) => w.date === activeDate);
@@ -99,7 +95,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       }
     }
     return Array.from(byKey.values());
-  }, [workouts, plannedWorkouts, plannedToday, activeDate]);
+  }, [workouts, plannedToday, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
@@ -432,7 +428,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
 
 
-  if (loading || plannedLoading) {
+  const blockLoading = (loading && (!(workouts && workouts.length))) || (plannedTodayLoading && (!(plannedToday && plannedToday.length)));
+  if (blockLoading) {
     return (
       <div className="w-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>
         <p className="text-muted-foreground text-sm">Loading...</p>
