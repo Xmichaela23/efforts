@@ -305,31 +305,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-200">
                   Auto-linked to plan
                 </span>
-                <button
-                  disabled={undoing}
-                  onClick={async () => {
-                    try {
-                      setUndoing(true);
-                      // Detach both sides (single-link): revert planned status and clear workouts.planned_id
-                      const pid = String(workout.planned_id);
-                      await supabase.from('planned_workouts').update({ workout_status: 'planned' }).eq('id', pid);
-                      await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
-                      // Kick off server summary so GAP/distance repopulate
-                      try { await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String(workout.id) } }); } catch {}
-                      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                      try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                      // Force local UI to reflect detach by clearing field on object reference if present
-                      (workout as any).planned_id = null;
-                    } catch (e) {
-                      // noop
-                    } finally {
-                      setUndoing(false);
-                    }
-                  }}
-                  className="underline text-gray-600 hover:text-gray-900 disabled:opacity-50"
-                >
-                  Undo
-                </button>
               </div>
             )}
           </div>
@@ -412,13 +387,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                         console.log('🔍 Unattaching workout:', { workoutId: workout.id, plannedId: pid, linkedPlanned });
                         if (!pid) return;
                         // 1) Detach primary planned row (single-link)
-                        const { error: plannedError } = await supabase.from('planned_workouts').update({ workout_status: 'planned' }).eq('id', pid);
+                        const { error: plannedError } = await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
                         console.log('🔍 Planned workout update result:', plannedError);
-                        // 2) Clear workout link and any stale computed summary so client re-slices or recomputes
-                        const { error: workoutError } = await supabase.from('workouts').update({ planned_id: null, computed: null, computed_version: null, computed_at: null }).eq('id', workout.id);
+                        // 2) Clear workout link ONLY (preserve computed metrics)
+                        const { error: workoutError } = await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
                         console.log('🔍 Workout update result:', workoutError);
-                        // Kick off server summary so GAP/distance repopulate
-                        try { await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String(workout.id) } }); } catch {}
+                        // Optional: recompute summary is not required; keep metrics as-is
                         try { (workout as any).planned_id = null; } catch {}
                         setLinkedPlanned(null);
                         // Prevent immediate fallback re-link detection for a short window
