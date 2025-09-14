@@ -1,7 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { supabase } from '@/lib/supabase';
 import { useWeather } from '@/hooks/useWeather';
-import { saveUserLocation } from '@/services/getLocation';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
@@ -33,24 +31,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const activeDate = selectedDate || today;
 
-  // Load explicit user-provided location for this day (no fallbacks)
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        // Only query if authenticated; otherwise RLS returns 404/401
-        const { data: sess } = await supabase.auth.getSession();
-        if (!sess?.session) { if (!cancelled) setDayLoc(null); return; }
-        const { data } = await supabase
-          .from('user_locations')
-          .select('lat,lng')
-          .eq('date', activeDate)
-          .maybeSingle();
-        if (!cancelled) setDayLoc(data ? { lat: Number(data.lat), lng: Number(data.lng) } : null);
-      } catch { if (!cancelled) setDayLoc(null); }
-    })();
-    return () => { cancelled = true; };
-  }, [activeDate]);
+  // No persistence: we will use ephemeral geolocation below for today's weather
 
   const { weather } = useWeather({
     lat: dayLoc?.lat,
@@ -59,28 +40,31 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     enabled: !!dayLoc,
   });
 
-  // If today and no explicit location yet, ask once and save via edge function
+  // If today and no location yet, ask once and use ephemeral location (no persistence)
   useEffect(() => {
-    (async () => {
-      if (locTried) return;
-      if (activeDate !== today) return;
-      if (dayLoc) return;
-      // Only attempt geolocation save if authenticated
-      try { const { data: sess } = await supabase.auth.getSession(); if (!sess?.session) return; } catch {}
-      setLocTried(true);
-      try {
-        const res = await saveUserLocation({ date: activeDate });
-        if (res.ok) {
-          setDayLoc({ lat: Number(res.lat), lng: Number(res.lng) });
-          const { data } = await supabase
-            .from('user_locations')
-            .select('lat,lng')
-            .eq('date', activeDate)
-            .maybeSingle();
-          if (data) setDayLoc({ lat: Number(data.lat), lng: Number(data.lng) });
-        }
-      } catch {}
-    })();
+    if (locTried) return;
+    if (activeDate !== today) return;
+    if (dayLoc) return;
+    setLocTried(true);
+    try {
+      if (!('geolocation' in navigator)) return;
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setDayLoc({ lat: Number(pos.coords.latitude), lng: Number(pos.coords.longitude) });
+      }, () => { /* ignore */ }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 600000 });
+    } catch {}
+  }, [activeDate, today, dayLoc, locTried]);
+
+  // Secondary attempt: if initial geolocation didn't run (e.g., blocked), try once more on mount
+  useEffect(() => {
+    if (dayLoc) return;
+    if (activeDate !== today) return;
+    if (locTried) return;
+    try {
+      if (!('geolocation' in navigator)) return;
+      navigator.geolocation.getCurrentPosition((pos) => {
+        setDayLoc({ lat: Number(pos.coords.latitude), lng: Number(pos.coords.longitude) });
+      });
+    } catch {}
   }, [activeDate, today, dayLoc, locTried]);
 
   const dateWorkoutsMemo = useMemo(() => {
