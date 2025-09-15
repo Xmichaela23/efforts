@@ -78,6 +78,94 @@ function composePreviewFromBlueprint(template: any, targetWeeks: number): Record
   } catch { return {}; }
 }
 
+// Compose actionable sessions_by_week from tri blueprint with tokenized steps
+function composeSessionsFromBlueprint(template: any, totalWeeks: number): Record<string, any[]> {
+  try {
+    const bp = template?.phase_blueprint || {};
+    const blocks = template?.blocks || {};
+    const order: string[] = Array.isArray(bp.order) ? bp.order.map((s:string)=>String(s).toLowerCase()) : ['build','peak','taper'];
+    const fixed = {
+      peak: (bp?.peak?.fixed && Number.isFinite(bp.peak.fixed)) ? Math.max(0, bp.peak.fixed) : 0,
+      taper: (bp?.taper?.fixed && Number.isFinite(bp.taper.fixed)) ? Math.max(0, bp.taper.fixed) : 0,
+    };
+    const buildWeeks = Math.max(0, totalWeeks - fixed.peak - fixed.taper);
+    const peakBlocks: string[] = Array.isArray(bp?.peak?.blocks) ? bp.peak.blocks : [];
+    const taperBlocks: string[] = Array.isArray(bp?.taper?.blocks) ? bp.taper.blocks : [];
+    const buildRef: string | undefined = (bp?.build?.block_ref || bp?.build?.ref || 'block_build');
+
+    const weekBlocks: string[] = [];
+    order.forEach(phase => {
+      if (phase === 'build') {
+        for (let i=0;i<buildWeeks;i+=1) weekBlocks.push(buildRef || '');
+      } else if (phase === 'peak') {
+        for (let i=0;i<fixed.peak;i+=1) weekBlocks.push(peakBlocks[i % Math.max(1, peakBlocks.length)] || '');
+      } else if (phase === 'taper') {
+        for (let i=0;i<fixed.taper;i+=1) weekBlocks.push(taperBlocks[i % Math.max(1, taperBlocks.length)] || '');
+      }
+    });
+
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    const inferDisc = (kind: string): 'run'|'ride'|'swim'|'strength' => {
+      const k = String(kind||'').toLowerCase();
+      if (k.startsWith('run_')) return 'run';
+      if (k.startsWith('bike_')) return 'ride';
+      if (k.startsWith('swim_')) return 'swim';
+      return 'strength';
+    };
+    const kindToTokens = (kind: string, variant: any): string[] => {
+      const k = String(kind||'').toLowerCase();
+      if (k === 'bike_intervals') return ['warmup_bike_quality_15min_fastpedal','bike_vo2_6x5min_R3min','cooldown_bike_easy_10min'];
+      if (k === 'bike_tempo') return ['warmup_bike_quality_15min_fastpedal','bike_thr_2x20min_R5min','cooldown_bike_easy_10min'];
+      if (k === 'bike_long_progressive') return ['bike_endurance_120min'];
+      if (k === 'bike_easy' || k === 'bike_sharpen' || k==='bike_openers') return ['bike_endurance_60min'];
+      if (k === 'run_intervals') return ['warmup_run_quality_12min','interval_6x800m_5kpace_R2min','cooldown_easy_10min'];
+      if (k === 'run_tempo') return ['warmup_run_quality_12min','tempo_4mi','cooldown_easy_10min'];
+      if (k === 'run_openers') return ['strides_6x20s'];
+      if (k === 'run_brick_easy') return ['longrun_20min'];
+      if (k === 'run_easy') return ['longrun_40min'];
+      if (k === 'run_long') return ['longrun_90min'];
+      if (k === 'swim_technique' || k==='swim_easy_tech') return ['swim_warmup_200yd_easy','swim_drills_4x50yd_catchup','swim_drills_4x50yd_singlearm','swim_pull_2x100yd','swim_kick_2x100yd','swim_cooldown_200yd_easy'];
+      if (k === 'swim_intervals') return ['swim_warmup_200yd_easy','swim_aerobic_10x100yd','swim_cooldown_200yd_easy'];
+      if (k === 'swim_steady' || k==='swim_open_water_or_pool' || k==='swim_easy') return ['swim_warmup_200yd_easy','swim_aerobic_6x200yd','swim_cooldown_200yd_easy'];
+      // Strength kinds do not use steps tokens
+      return [];
+    };
+    const addTags = (k: string): string[] => {
+      const t: string[] = [];
+      const x = k.toLowerCase();
+      if (x === 'run_long') t.push('long_run');
+      if (x === 'bike_long_progressive') t.push('long_ride');
+      if (x === 'strength_lower') t.push('strength_lower');
+      return t;
+    };
+
+    const sessionsByWeek: Record<string, any[]> = {};
+    weekBlocks.forEach((bid, idx) => {
+      const block = blocks[bid] || {};
+      const sessSpec = block.sessions || {};
+      const week: any[] = [];
+      Object.keys(sessSpec).forEach(dow => {
+        const arr: any[] = Array.isArray(sessSpec[dow]) ? sessSpec[dow] : [];
+        arr.forEach((s:any, si:number) => {
+          const day = cap(dow);
+          const disc = inferDisc(String(s.kind||''));
+          const tokens = kindToTokens(String(s.kind||''), s);
+          const tags = addTags(String(s.kind||''));
+          const descr = String(s.main || s.scheme || s.kind || '').trim();
+          const out: any = { day, discipline: disc, description: descr };
+          if (tokens.length) out.steps_preset = tokens;
+          if (tags.length) out.tags = tags;
+          week.push(out);
+        });
+      });
+      const orderIdx = (d:string)=> DAYS.indexOf(cap(d));
+      week.sort((a,b)=> orderIdx(a.day) - orderIdx(b.day));
+      sessionsByWeek[String(idx+1)] = week;
+    });
+    return sessionsByWeek;
+  } catch { return {}; }
+}
+
 function inferDisciplineFromDescription(desc?: string): string | null {
   if (!desc) return null;
   const t = desc.toLowerCase();
@@ -474,7 +562,15 @@ export default function PlanSelect() {
         derivedStartMonday = addDaysISO(lastWeekMonday, -7 * (targetDurationWeeks - 1));
       }
 
-      const remapped = remapForPreferences(libPlan.template, { longRunDay, longRideDay, includeStrength: true });
+      // If this is a tri blueprint (no sessions_by_week), compose sessions first
+      const baseTemplate = (() => {
+        const hasSBW = !!(libPlan?.template?.sessions_by_week);
+        if (hasSBW) return libPlan.template;
+        const total = targetDurationWeeks || triVars.maxWeeks || 12;
+        const sbw = composeSessionsFromBlueprint(libPlan?.template || {}, total);
+        return { ...libPlan.template, sessions_by_week: sbw };
+      })();
+      const remapped = remapForPreferences(baseTemplate, { longRunDay, longRideDay, includeStrength: true });
       
       // Use baselines loaded on mount
       
@@ -777,7 +873,7 @@ export default function PlanSelect() {
       const payload = {
         name: libPlan.name,
         description: libPlan.description || '',
-        duration_weeks: (targetDurationWeeks || mapped.duration_weeks),
+        duration_weeks: (targetDurationWeeks || mapped.duration_weeks || Object.keys(mapped.sessions_by_week||{}).length || 12),
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
