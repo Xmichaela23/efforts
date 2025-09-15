@@ -109,6 +109,8 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
 
     // Remove authoring-only fields not present in schema
     delete out.defaults;
+    // Universal plan schema has no root discipline; set via selector later
+    if (typeof out.discipline !== 'undefined') delete out.discipline;
     // If author provided min/max weeks with sessions_by_week, strip before schema validate
     if (typeof out.min_weeks !== 'undefined') delete out.min_weeks;
     if (typeof out.max_weeks !== 'undefined') delete out.max_weeks;
