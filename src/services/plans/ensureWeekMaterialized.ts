@@ -811,7 +811,25 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       } catch {}
       return out;
     };
-    const computedTargets = deriveTargetColumns(computedStepsV3, mappedType);
+    let computedTargets = deriveTargetColumns(computedStepsV3, mappedType);
+
+    // Endurance power from FTP when zone suffix present on bike_endurance token
+    try {
+      if (mappedType === 'ride' && (!computedTargets || computedTargets.primary_target_type === 'none')) {
+        const toks = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.map((t:any)=>String(t).toLowerCase()).join(' ') : '';
+        const m = toks.match(/bike_endurance_(\d+)min(?:_(z1(?:-2)?|z2(?:-3)?))?(?:_cad(\d+)(?:-(\d+))?)?/i);
+        if (m) {
+          const zone = (m[2]||'').toLowerCase();
+          const ftp: number | undefined = typeof (perfNumbers as any)?.ftp === 'number' ? (perfNumbers as any).ftp : undefined;
+          if (ftp && (zone==='z1' || zone==='z1-2' || zone==='z2' || zone==='z2-3')) {
+            const pct = zone.startsWith('z1') ? [0.60, 0.65] : [0.65, 0.75];
+            const lo = Math.round(ftp * pct[0]);
+            const hi = Math.round(ftp * pct[1]);
+            computedTargets = { primary_target_type: 'power', power_low: lo, power_high: hi } as any;
+          }
+        }
+      }
+    } catch {}
 
     // Build structured strength exercises from st_* tokens
     const strengthFromTokens = (stepsPreset?: any[]): any[] | undefined => {
