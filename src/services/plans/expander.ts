@@ -99,9 +99,30 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
   // Generic parsing for new deterministic tokens (run/bike)
   for (const token of steps) {
     const t = String(token).toLowerCase();
+    // Run easy: run_easy_30min
+    let m = t.match(/^run_easy_(\d{2,3})min$/i);
+    if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: parseInt(m[1],10)*60, target: '{easy_pace}' }); continue; }
+    // Long run base: longrun_90min_easypace
+    m = t.match(/^longrun_(\d{2,3})min_easypace$/i);
+    if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: parseInt(m[1],10)*60, target: '{easy_pace}' }); continue; }
+    // Speed sets: speed_8x20s_R60s or speed_6x100m_R90s
+    m = t.match(/^speed_(\d+)x(\d+)(s|m)_r(\d+)(s|min)$/i);
+    if (m) {
+      const reps = parseInt(m[1],10);
+      const amt = parseInt(m[2],10);
+      const isTime = m[3].toLowerCase()==='s';
+      const restRaw = parseInt(m[4],10);
+      const rest = m[5].toLowerCase()==='min' ? restRaw*60 : restRaw;
+      for (let i=1;i<=reps;i+=1){
+        if (isTime) out.push({ id: makeId(idPrefix, ['speed','rep', String(i).padStart(2,'0')]), type: 'interval_work', duration_s: amt, target: 'fast' });
+        else out.push({ id: makeId(idPrefix, ['speed','rep', String(i).padStart(2,'0')]), type: 'interval_work', distance_m: amt, target: 'fast' });
+        if (i<reps) out.push({ id: makeId(idPrefix, ['speed','rest', String(i).padStart(2,'0')]), type: 'interval_rest', duration_s: rest });
+      }
+      continue;
+    }
     // Run intervals: interval_<reps>x<dist>(m|mi)_<paceTag>[_plusMM:SS]_r<restSeconds>
     // Accept rest in seconds (r120) or minutes (r2min)
-    let m = t.match(/^interval_(\d+)x(\d+)(m|mi)_([a-z0-9_]+?)(?:_plus(\d{1,2}:\d{2}))?_r(\d+)(?:min)?$/i);
+    m = t.match(/^interval_(\d+)x(\d+)(m|mi)_([a-z0-9_]+?)(?:_plus(\d{1,2}:\d{2}))?_r(\d+)(?:min)?$/i);
     if (m) {
       const reps = parseInt(m[1], 10);
       const distNum = parseInt(m[2], 10);
@@ -143,18 +164,30 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       pushInterval(reps, { duration_s: work_s, target }, { duration_s: rest });
       continue;
     }
+    // Bike tempo continuous: bike_tempo_20min
+    m = t.match(/^bike_tempo_(\d{2,3})min$/i);
+    if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: parseInt(m[1],10)*60, target: 'Z3' }); continue; }
+    // Bike SS single blocks: bike_ss_1x45min, bike_ss_1x60min
+    m = t.match(/^bike_ss_1x(\d+)min$/i);
+    if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: parseInt(m[1],10)*60, target: '{sweetspot_power}' }); continue; }
     // Bike endurance single-block: bike_endurance_<minutes>min[_z*]
-    m = t.match(/^bike_endurance_(\d+)min(?:_[a-z0-9-]+)?$/i);
-    if (m) {
-      const minutes = parseInt(m[1], 10);
-      out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: minutes * 60, target: 'Z2' });
-      continue;
-    }
+    m = t.match(/^bike_endurance_(\d+)min(?:_(z1|z1-2|z2|z2-3))?(?:_cad\d+(?:-\d+)?)?$/i);
+    if (m) { const minutes=parseInt(m[1],10); const zone=(m[2]||'Z2').toUpperCase(); out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: minutes*60, target: zone }); continue; }
+    // Bike recovery
+    m = t.match(/^bike_recovery_(\d{2,3})min(?:_(z1|z2))?$/i);
+    if (m) { const minutes=parseInt(m[1],10); const z=(m[2]||'z1').toUpperCase(); out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: minutes*60, target: z }); continue; }
+    // Bike warmup shorthand
+    m = t.match(/^bike_warmup_(\d{1,3})$/i);
+    if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'warmup', duration_s: parseInt(m[1],10)*60 }); continue; }
     // Bike warmup/cooldown generic durations
     m = t.match(/^warmup_bike_quality_(\d+)min_[a-z0-9_]+$/i);
     if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'warmup', duration_s: parseInt(m[1],10)*60 }); continue; }
     m = t.match(/^cooldown_bike_easy_(\d+)min$/i);
     if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'cooldown', duration_s: parseInt(m[1],10)*60 }); continue; }
+    // Bike race prep/openers
+    m = t.match(/^bike_race_prep_(\d+)x(\d+)(min|s)_race_pace$/i);
+    if (m) { const reps=parseInt(m[1],10); const amt=parseInt(m[2],10)*(m[3].toLowerCase()==='min'?60:1); for(let i=1;i<=reps;i+=1){ out.push({ id: makeId(idPrefix, ['bike','race-pace', String(i).padStart(2,'0')]), type: 'interval_work', duration_s: amt, target: 'race' }); if(i<reps) out.push({ id: makeId(idPrefix, ['bike','rest', String(i).padStart(2,'0')]), type: 'interval_rest', duration_s: 120 }); } continue; }
+    if (/^bike_openers$/i.test(t)) { for (let i=1;i<=3;i+=1){ out.push({ id: makeId(idPrefix, ['bike','opener', String(i).padStart(2,'0')]), type: 'interval_work', duration_s: 60 }); if(i<3) out.push({ id: makeId(idPrefix, ['bike','rest', String(i).padStart(2,'0')]), type: 'interval_rest', duration_s: 120 }); } continue; }
   }
 
   // Also parse swim tokens from steps_preset when present (fallback when swimMain is absent)

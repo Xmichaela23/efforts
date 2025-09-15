@@ -247,62 +247,44 @@ function remapForPreferences(plan: any, prefs: { longRunDay: string; longRideDay
     const lr = findByTag(s,'long_run'); if (lr) moveTo(lr, prefs.longRunDay);
     const lrd = findByTag(s,'long_ride'); if (lrd) moveTo(lrd, prefs.longRideDay);
 
-    // Bike intensity vs long ride
+    // Bike intensity vs long ride — no fallback moves/downgrades; flag conflicts only
     const bike = findByTag(s,'bike_intensity');
-    // Universal rule: do NOT move optional/XOR intensity bikes during remap.
     if (bike && !isOptional(bike) && !hasXor(bike)) {
-      if (prefs.longRideDay === 'Saturday') {
-        if (canPlace(s,bike,'Tuesday')) moveTo(bike,'Tuesday');
-        else if (wednesdayRunIsAerobic(s) && canPlace(s,bike,'Wednesday')) moveTo(bike,'Wednesday');
-        else { if (!deload) { ensureTag(bike,'downgraded'); bike.description = `${bike.description ? bike.description+ ' — ' : ''}Z2 45–60min`; emitNote(notesByWeek, wk, 'Friday bike set to Z2 to respect spacing with Saturday long ride.'); } moveTo(bike,'Friday'); }
-      } else {
-        moveTo(bike,'Friday');
+      const longRide = findByTag(s,'long_ride');
+      if (longRide) {
+        const hrs = hoursBetween(bike.day, longRide.day);
+        if (hrs < 36 && !deload) emitNote(notesByWeek, wk, `Authoring conflict: Bike intensity (${bike.day}) is within ${hrs}h of long ride (${longRide.day}).`);
       }
     }
 
-    // Strength gaps
+    // Strength gaps — do not move; flag conflicts only
     const strength = s.filter(x => hasTag(x,'strength_lower'));
     const longRun = findByTag(s,'long_run'); const longRide = findByTag(s,'long_ride');
     for (const st of strength) {
-      if (longRun && hoursBetween(st.day,longRun.day) < 48) {
-        // prefer Monday else Wednesday
-        if (canPlace(s,st,'Monday')) { moveTo(st,'Monday'); } else if (canPlace(s,st,'Wednesday')) moveTo(st,'Wednesday');
+      if (longRun) {
+        const hrs = hoursBetween(st.day,longRun.day);
+        if (hrs < 48 && !deload) emitNote(notesByWeek, wk, `Authoring conflict: Lower‑body strength (${st.day}) is within ${hrs}h of long run (${longRun.day}).`);
       }
-      if (longRide && hoursBetween(st.day,longRide.day) < 36) {
-        if (canPlace(s,st,'Friday')) moveTo(st,'Friday'); else if (canPlace(s,st,'Wednesday')) moveTo(st,'Wednesday');
-        if (longRide && hoursBetween(st.day,longRide.day) < 36) { if (!deload) { ensureTag(st,'lightened'); emitNote(notesByWeek, wk, 'Deadlift volume reduced to maintain 36h from long ride.'); } }
+      if (longRide) {
+        const hrs = hoursBetween(st.day,longRide.day);
+        if (hrs < 36 && !deload) emitNote(notesByWeek, wk, `Authoring conflict: Lower‑body strength (${st.day}) is within ${hrs}h of long ride (${longRide.day}).`);
       }
     }
 
-    // Hard runs vs long run
+    // Hard runs vs long run — do not move; flag conflicts only
     const hardRuns = s.filter(x => hasTag(x,'hard_run') && !isOptional(x) && !hasXor(x));
     for (const hr of hardRuns) {
-      if (longRun && hoursBetween(hr.day,longRun.day) < 24) {
-        if (isIntervals(hr) && canPlace(s,hr,'Monday')) { moveTo(hr,'Monday'); emitNote(notesByWeek, wk, 'Intervals moved to Monday to maintain 24h before long run.'); }
-        else if (isTempo(hr) && canPlace(s,hr,'Thursday')) { moveTo(hr,'Thursday'); emitNote(notesByWeek, wk, 'Tempo moved to Thursday to maintain 24h before long run.'); }
-      }
-      // General rule: if authored placement already satisfies spacing, keep authored day
-      if (longRun && hoursBetween(hr._origDay, longRun.day) >= 24) {
-        hr.day = hr._origDay;
+      if (longRun) {
+        const hrs = hoursBetween(hr.day,longRun.day);
+        if (hrs < 24 && !deload) emitNote(notesByWeek, wk, `Authoring conflict: Hard run (${hr.day}) is within ${hrs}h of long run (${longRun.day}).`);
       }
     }
 
-    // Final same-day collisions
+    // Final same-day collisions — do not adjust; flag conflicts only
     for (const d of DAYS) {
-      // Do not use optionals/XOR to trigger same-day collision moves
       const dayHard = s.filter(x => x.day===d && isHard(x) && !isOptional(x) && !hasXor(x));
-      if (dayHard.length > 1) {
-        const priority = ['long_run','strength_lower','hard_run','bike_intensity','long_ride'];
-        const hasBike = dayHard.some(x=>hasTag(x,'bike_intensity'));
-        if (hasBike) {
-          const b = dayHard.find(x=>hasTag(x,'bike_intensity'))!; if (!deload) { ensureTag(b,'downgraded'); b.description = `${b.description ? b.description+ ' — ' : ''}Z2 45–60min`; emitNote(notesByWeek, wk, `${d} bike set to Z2 due to same-day hard collision.`); }
-        } else {
-          const sorted = [...dayHard].sort((a,b)=> priority.findIndex(t=>hasTag(a,t)) - priority.findIndex(t=>hasTag(b,t)));
-          // Prefer moving a session that is not on its authored day to preserve author intent
-          let moveCandidate = sorted.reverse().find(x => x._origDay !== d) || sorted[sorted.length-1];
-          const di = dayIndex(d); const newDay = idxDay(di+1);
-          if (canPlace(s,moveCandidate,newDay)) moveTo(moveCandidate,newDay); else { ensureTag(moveCandidate,'warning'); emitNote(notesByWeek, wk, 'Couldn’t fully satisfy spacing; review Tue/Wed stack.'); }
-        }
+      if (dayHard.length > 1 && !deload) {
+        emitNote(notesByWeek, wk, `Authoring conflict: Multiple hard sessions scheduled on ${d}.`);
       }
     }
 

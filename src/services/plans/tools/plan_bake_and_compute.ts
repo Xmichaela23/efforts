@@ -218,6 +218,12 @@ const PRESET_MAP: Record<string, Step[]> = {
   "warmup_run_easy_10min":    [{ kind: "steady", ctrl: "time", val: 10 * 60, intensity: "easy", label: "WU" }],
   "cooldown_easy_10min":      [{ kind: "steady", ctrl: "time", val: 10 * 60, intensity: "easy", label: "CD" }],
 
+  // --- RUN EASY (time-based) ---
+  "run_easy_30min": [{ kind: "steady", ctrl: "time", val: 30 * 60, intensity: "easy" }],
+  "run_easy_35min": [{ kind: "steady", ctrl: "time", val: 35 * 60, intensity: "easy" }],
+  "run_easy_40min": [{ kind: "steady", ctrl: "time", val: 40 * 60, intensity: "easy" }],
+  "run_easy_45min": [{ kind: "steady", ctrl: "time", val: 45 * 60, intensity: "easy" }],
+
   // --- RUN INTERVALS ---
   "interval_6x800m_5kpace_R2min": [
     { kind: "repeat", times: 6, of: [

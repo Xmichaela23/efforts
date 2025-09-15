@@ -30,6 +30,12 @@ export const PRESETS: Record<string, Preset> = {
   interval_6x800m_10kpace_R2min: { kind: 'interval', reps: 6, work: { dist_m: 800, target: '{10k_pace}' }, rest: { duration_s: 120 } },
   interval_6x1mi_5kpace_R2min: { kind: 'interval', reps: 6, work: { dist_m: 1609, target: '{5k_pace}' }, rest: { duration_s: 120 } },
 
+  // Easy runs (time-based)
+  run_easy_30min: { kind: 'steady', duration_s: 30 * 60, target: '{easy_pace}' },
+  run_easy_35min: { kind: 'steady', duration_s: 35 * 60, target: '{easy_pace}' },
+  run_easy_40min: { kind: 'steady', duration_s: 40 * 60, target: '{easy_pace}' },
+  run_easy_45min: { kind: 'steady', duration_s: 45 * 60, target: '{easy_pace}' },
+
   // Cruise intervals
   'cruise_4x1_5mi_5kpace_plus0:10_R3min': { kind: 'interval', reps: 4, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
   'cruise_5x1_5mi_5kpace_plus0:10_R3min': { kind: 'interval', reps: 5, work: { dist_m: 2414, target: '{5k_pace}+0:10' }, rest: { duration_s: 180 } },
@@ -47,6 +53,8 @@ export const PRESETS: Record<string, Preset> = {
   'tempo_4mi_5kpace_plus1:00': { kind: 'tempo', dist_m: 6437, target: '{5k_pace}+1:00' },
 
   // Long runs
+  longrun_70min_easypace: { kind: 'longrun', duration_s: 70 * 60, target: '{easy_pace}' },
+  longrun_80min_easypace: { kind: 'longrun', duration_s: 80 * 60, target: '{easy_pace}' },
   longrun_90min_easypace_last10steady: { kind: 'longrun', duration_s: 90 * 60, target: '{easy_pace}' },
   longrun_100min_easypace: { kind: 'longrun', duration_s: 100 * 60, target: '{easy_pace}' },
   longrun_110min_easypace: { kind: 'longrun', duration_s: 110 * 60, target: '{easy_pace}' },

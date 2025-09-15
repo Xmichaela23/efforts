@@ -273,45 +273,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   let sessionsByWeek = (plan as any).sessions_by_week || {};
   const planDefaults = (plan as any)?.defaults || DEFAULTS_FALLBACK;
   let weekSessions: any[] = sessionsByWeek[String(weekNumber)] || [];
-  // Fallback: if week is empty, try to bake from library blueprint using acceptance metadata
-  if (!Array.isArray(weekSessions) || weekSessions.length === 0) {
-    try {
-      const catalogId = (plan as any)?.config?.catalog_id;
-      if (catalogId) {
-        const { data: lib } = await supabase.from('library_plans').select('template').eq('id', catalogId).maybeSingle();
-        const tmpl = lib?.template || {};
-        // Prefer template.sessions_by_week if authored
-        let baked: Record<string, any[]> | null = (tmpl?.sessions_by_week as any) || null;
-        if (!baked && tmpl?.phase_blueprint) {
-          try {
-            const { bakeBlueprintToSessions } = await import('@/services/plans/composeTri');
-            const tri = (plan as any)?.config?.tri_acceptance || {};
-            const total = Number((tri?.weeks_to_race || (plan as any)?.duration_weeks || 12));
-            const rd = String(tri?.race_date || '') || undefined;
-            const raceISO = rd || (() => {
-              // derive from selected start Monday + duration
-              const startIso = String((plan as any)?.config?.user_selected_start_date || '').trim();
-              if (!startIso) return undefined;
-              const p = startIso.split('-').map((x:string)=>parseInt(x,10));
-              const base = new Date(p[0], (p[1]||1)-1, p[2]||1);
-              base.setDate(base.getDate() + (total-1)*7 + 6); // end of final week (Sun)
-              const y = base.getFullYear();
-              const m = String(base.getMonth()+1).padStart(2,'0');
-              const d = String(base.getDate()).padStart(2,'0');
-              return `${y}-${m}-${d}`;
-            })();
-            if (raceISO) baked = bakeBlueprintToSessions(tmpl as any, total, raceISO);
-          } catch {}
-        }
-        if (baked && Object.keys(baked).length) {
-          // Persist baked sessions on plan for future materializations
-          await supabase.from('plans').update({ sessions_by_week: baked }).eq('id', planId);
-          sessionsByWeek = baked;
-          weekSessions = baked[String(weekNumber)] || [];
-        }
-      }
-    } catch {}
-  }
+  // Strict mode: if week has no authored sessions, do nothing
   if (!Array.isArray(weekSessions) || weekSessions.length === 0) return { inserted: 0 };
 
   // 4) Determine export_hints from library plan, if available
@@ -380,11 +342,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   for (const s0 of weekSessions) {
     // Expand swim DSL to steps_preset if present
     let s = { ...s0 } as any;
-    // Authoring defaults: infer tokens/tags from kind if minimally authored
-    try {
-      const { enrichSessionFromKind } = await import('@/services/plans/authoringDefaults');
-      s = enrichSessionFromKind(s);
-    } catch {}
+    // Strict mode: do not enrich sessions from kind; require authored tokens/DSL
     // Authoring sugar → tags: optional_kind, xor_key
     try {
       const addTag = (arr: string[], t: string) => { if (!arr.map(x=>x.toLowerCase()).includes(t.toLowerCase())) arr.push(t); };
@@ -878,16 +836,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     try {
       const atomic = expand(Array.isArray((s as any).steps_preset) ? (s as any).steps_preset : [], (s as any).main, (s as any).tags);
       let resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {}, mappedType) as any[];
-      // Ensure swim warm‑up/cool‑down are present so totals include them
-      if (mappedType === 'swim') {
-        const hasWU = Array.isArray(resolved) && resolved.some(st => /warmup|swim_warmup/i.test(String(st?.type)) || /warm/i.test(String((st as any)?.label||'')));
-        const hasCD = Array.isArray(resolved) && resolved.some(st => /cooldown|swim_cooldown/i.test(String(st?.type)) || /cool/i.test(String((st as any)?.label||'')));
-        const parseYd = (tok?: string): number | null => { try { const m = String(tok||'').match(/_(\d+)(yd|m)/i); if (!m) return null; const n = parseInt(m[1],10); return (m[2].toLowerCase()==='m') ? Math.round(n/0.9144/25)*25 : n; } catch { return null; } };
-        const wuToken = (planDefaults as any)?.swim?.wu; const cdToken = (planDefaults as any)?.swim?.cd;
-        const wuYd = parseYd(wuToken) || 0; const cdYd = parseYd(cdToken) || 0;
-        if (!hasWU && wuYd > 0) resolved = [{ type: 'swim_warmup', label: 'Warm‑up', distance_yd: wuYd }, ...(resolved||[])];
-        if (!hasCD && cdYd > 0) resolved = [...(resolved||[]), { type: 'swim_cooldown', label: 'Cool‑down', distance_yd: cdYd }];
-      }
+      // Strict mode: do not auto-add swim warm-up/cool-down; use authored steps only
       if (Array.isArray(resolved) && resolved.length) computedStepsV3 = resolved as any[];
     } catch {}
 
