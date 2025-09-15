@@ -109,6 +109,9 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
 
     // Remove authoring-only fields not present in schema
     delete out.defaults;
+    // If author provided min/max weeks with sessions_by_week, strip before schema validate
+    if (typeof out.min_weeks !== 'undefined') delete out.min_weeks;
+    if (typeof out.max_weeks !== 'undefined') delete out.max_weeks;
     // ui_text is not part of schema; strip for validation (we will reattach after validate)
     delete out.ui_text;
     return out;
@@ -139,6 +142,8 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       }
     } else {
       // Preprocess DSL (e.g., swim main/extra) → steps_preset and strip unsupported fields
+      const preserveMin = (typeof (input as any)?.min_weeks === 'number') ? (input as any).min_weeks : undefined;
+      const preserveMax = (typeof (input as any)?.max_weeks === 'number') ? (input as any).max_weeks : undefined;
       const cleaned = preprocessForSchema(input);
       const v = validateUniversalPlan(cleaned);
       if (!v.ok) {
@@ -146,6 +151,11 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
         return;
       }
       res = v;
+      // Reattach min/max for acceptance window
+      try {
+        if (typeof preserveMin === 'number') (res.plan as any).min_weeks = preserveMin;
+        if (typeof preserveMax === 'number') (res.plan as any).max_weeks = preserveMax;
+      } catch {}
     }
     // Minimal sanity checks for universal plans only
     if (res.plan && res.plan.sessions_by_week) {
