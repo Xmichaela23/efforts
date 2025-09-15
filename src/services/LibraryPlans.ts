@@ -25,12 +25,8 @@ export async function listLibraryPlans(discipline?: LibraryPlan['discipline']): 
   }
   const { data, error } = await q;
   if (error) throw error;
-  let rows = (data || []) as any[];
-  // For triathlon tab, only show entries that are actually triathlon or hybrid with a phase_blueprint
-  if (discipline === 'triathlon') {
-    rows = rows.filter((r:any)=> String(r.discipline||'').toLowerCase()==='triathlon' || (r.template && r.template.phase_blueprint));
-  }
-  return rows as LibraryPlan[];
+  // Show all triathlon + hybrid entries on the Triathlon tab (no extra filtering)
+  return (data || []) as LibraryPlan[];
 }
 
 export async function getLibraryPlan(id: string): Promise<LibraryPlan | null> {
