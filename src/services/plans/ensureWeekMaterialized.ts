@@ -499,12 +499,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
-    // Strength session-length preset (e.g., strength_main_45min)
+    // Strength session-length presets (e.g., strength_main_45min, strength_power_40min)
     const strengthPresetMinutes = (() => {
       try {
         if (mappedType !== 'strength') return null;
         const toks = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
-        if (toks.some((t:string)=>/strength_main_45min/.test(t))) return 45;
+        let best: number | null = null;
+        for (const t of toks) {
+          const m = t.match(/strength_(?:main|accessory|power|bodyweight)_(\d{2})min/);
+          if (m) { const mins = parseInt(m[1],10); best = Math.max(best ?? 0, mins); }
+        }
+        return best;
       } catch {}
       return null;
     })();
@@ -884,6 +889,25 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const est = (typeof orm==='number' && typeof pct==='number') ? round5(orm*(pct/100)) : undefined;
           ex.push({ name, sets, reps, percent: pctLo && pctHi ? `${pctLo}-${pctHi}%` : (pctLo? `${pctLo}%`: undefined), rest_s: rest, est_load_lb: est });
         }
+      }
+      // Shorthand accessories (row_4x6_8, chinups_3xAMRAP_RIR2, rollouts_3x15, lunges_3x10, pushups_3x15)
+      for (const tok of steps){
+        const t = tok.toLowerCase();
+        // row_4x6_8
+        let m = t.match(/^row_(\d+)x(\d+)(?:-(\d+))?$/);
+        if (m) { const sets=parseInt(m[1],10); const repsLo=parseInt(m[2],10); const repsHi=m[3]?parseInt(m[3],10):undefined; const name='Barbell Row'; const orm = pick1RM(name); const est = typeof orm==='number'? Math.round(orm*0.9/5)*5 : undefined; ex.push({ name, sets, reps: repsHi?`${repsLo}-${repsHi}`:repsLo, rest_s: 90, est_load_lb: est }); continue; }
+        // chinups_3xAMRAP_RIR2
+        m = t.match(/^chinups_(\d+)xamrap(?:_rir(\d+))?$/);
+        if (m) { const sets=parseInt(m[1],10); const rir = m[2]?parseInt(m[2],10):2; ex.push({ name:'Chin-ups', sets, reps: 'AMRAP', rir, rest_s: 120 }); continue; }
+        // rollouts_3x15
+        m = t.match(/^rollouts_(\d+)x(\d+)$/);
+        if (m) { ex.push({ name:'Ab Rollouts', sets: parseInt(m[1],10), reps: parseInt(m[2],10), rest_s: 90 }); continue; }
+        // lunges_3x10
+        m = t.match(/^lunges_(\d+)x(\d+)$/);
+        if (m) { ex.push({ name:'Walking Lunges', sets: parseInt(m[1],10), reps: `${parseInt(m[2],10)} each`, rest_s: 90 }); continue; }
+        // pushups_3x15
+        m = t.match(/^pushups_(\d+)x(\d+)$/);
+        if (m) { ex.push({ name:'Push-ups', sets: parseInt(m[1],10), reps: parseInt(m[2],10), rest_s: 75 }); continue; }
       }
       return ex.length? ex: undefined;
     };
