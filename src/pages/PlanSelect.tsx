@@ -455,8 +455,8 @@ export default function PlanSelect() {
       const startIso = (startEdited && startDate) ? startDate : (()=>{ const t=new Date(); const y=t.getFullYear(); const m=String(t.getMonth()+1).padStart(2,'0'); const d=String(t.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; })();
       const rdMon = mondayOf(raceDate);
       const stMon = mondayOf(startIso);
-      const toJs = (iso: string) => { const p = iso.split('-').map(x=>parseInt(x,10)); return new Date(p[0], (p[1]||1)-1, p[2]||1); };
-      const diffDays = Math.ceil((toJs(rdMon).getTime() - toJs(stMon).getTime()) / (1000*60*60*24));
+      const toLocalMs = (iso: string) => { const p = iso.split('-').map(x=>parseInt(x,10)); const d = new Date(p[0], (p[1]||1)-1, p[2]||1); return d.getTime(); };
+      const diffDays = Math.ceil((toLocalMs(rdMon) - toLocalMs(stMon)) / 86400000);
       const w = Math.ceil(diffDays / 7);
       return Math.max(0, w);
     } catch { return null; }
