@@ -472,12 +472,13 @@ export default function PlanSelect() {
     } catch { return null; }
   }, [raceDate, startDate, weeksToRace, triVars.minWeeks, triVars.maxWeeks]);
 
-  // When raceDate and min/max are set and valid, auto-derive start Monday to align last week with race week
+  // Optional auto-derive start Monday ONLY if user hasn't set any start date (keep user's date stable)
   useEffect(() => {
     const minW = triVars.minWeeks, maxW = triVars.maxWeeks;
     if (!raceDate || !weeksToRace || !minW || !maxW) return;
     if (weeksToRace < minW || weeksToRace > maxW) return;
     if (startEdited) return; // respect user's explicit start selection
+    if (startDate) return; // if we already have a start date (default or chosen), don't shift it
     const mondayOf = (iso: string): string => {
       const p = iso.split('-').map(x=>parseInt(x,10));
       const d = new Date(p[0], (p[1]||1)-1, p[2]||1);
