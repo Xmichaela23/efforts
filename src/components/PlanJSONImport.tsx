@@ -46,6 +46,10 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       for (const s0 of (sessions as any[])) {
         const s = { ...s0 } as any;
         const disc = String(s.discipline || s.type || '').toLowerCase();
+        // Author flexibility: normalize 'bike'/'cycling' to 'ride' for schema
+        if (disc === 'bike' || disc === 'cycling') {
+          s.discipline = 'ride';
+        }
         // Macro expansion (author convenience)
         const explicitMacro = typeof s.macro === 'string' ? s.macro : undefined;
         const descMacro = (!explicitMacro && typeof s.description === 'string' && /^@/.test(s.description.trim())) ? s.description.trim() : undefined;
