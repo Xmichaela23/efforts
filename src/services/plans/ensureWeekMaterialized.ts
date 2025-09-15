@@ -499,7 +499,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
-    const durationVal = typeof s.duration === 'number' && Number.isFinite(s.duration) ? s.duration : (totalSeconds ? Math.round(totalSeconds/60) : 0);
+    // Strength session-length preset (e.g., strength_main_45min)
+    const strengthPresetMinutes = (() => {
+      try {
+        if (mappedType !== 'strength') return null;
+        const toks = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
+        if (toks.some((t:string)=>/strength_main_45min/.test(t))) return 45;
+      } catch {}
+      return null;
+    })();
+    const durationValBase = typeof s.duration === 'number' && Number.isFinite(s.duration) ? s.duration : (totalSeconds ? Math.round(totalSeconds/60) : 0);
+    const durationVal = strengthPresetMinutes || durationValBase;
 
     const isOptional = Array.isArray(s?.tags) ? s.tags.some((t: any) => String(t).toLowerCase()==='optional') : /\[optional\]/i.test(String(s?.description||''));
     // Derive non-generic name from discipline and steps where possible
@@ -670,6 +680,16 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       if (st) {
         const reps = parseInt(st[1],10); const secEach = parseInt(st[2],10);
         for (let r=0;r<reps;r+=1) out.push({ effortLabel: 'interval', duration: secEach });
+      }
+
+      // Run drills macro: drills_A_B_skips_high_knees → short technique blocks
+      if (/drills_a_b_skips_high_knees/i.test(tokenStr)) {
+        const pushBlock = (label:string, reps:number, sec:number, rest:number) => {
+          for (let r=0;r<reps;r+=1){ out.push({ effortLabel: label, duration: sec }); if (rest && r<reps-1) out.push({ effortLabel:'rest', duration: rest }); }
+        };
+        pushBlock('drill — A-skips', 2, 30, 20);
+        pushBlock('drill — B-skips', 2, 30, 20);
+        pushBlock('drill — high knees', 4, 20, 20);
       }
 
       // Bike sets e.g., bike_vo2_6x3min_R3min, bike_thr_4x8min_R5min, bike_ss_2x20min_R6min
