@@ -965,7 +965,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         const n = name.toLowerCase();
         if (n.includes('dead')) return perfNumbers?.deadlift;
         if (n.includes('bench') || n.includes('pull-up')|| n.includes('pullup')|| n.includes('row')) return perfNumbers?.bench;
-        if (n.includes('overhead') || n.includes('ohp') || n.includes('press')) return perfNumbers?.overheadPress1RM || perfNumbers?.overhead;
+        // Anchor shoulder accessories to overhead press
+        if (n.includes('overhead') || n.includes('ohp') || n.includes('press') || n.includes('lateral raise') || n.includes('front raise') || n.includes('rear delt')) {
+          return perfNumbers?.overheadPress1RM || perfNumbers?.overhead;
+        }
         return perfNumbers?.squat;
       };
       const round5 = (n:number) => Math.round(n/5)*5;

@@ -83,7 +83,15 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     } else if ((preset as any).exercise) {
       const s = preset as any;
       for (let set=1; set<=Number(s.sets||1); set+=1){
-        out.push({ id: makeId(idPrefix, [s.exercise, 'set', String(set).padStart(2,'0')]), type: 'strength_work', exercise: s.exercise, set, reps: s.reps, intensity: s.intensity, rest_s: s.rest_s });
+        // Heuristic work duration: 3s per rep accessories, 4s compounds
+        const exName = String(s.exercise || '').toLowerCase();
+        const perRep = /(squat|deadlift|bench|ohp|press|row)/.test(exName) ? 4 : 3;
+        const repsNum = typeof s.reps === 'number' ? s.reps : (String(s.reps||'').toLowerCase()==='amrap' ? 8 : parseInt(String(s.reps||'0'),10));
+        const work_s = Number.isFinite(repsNum) ? Math.max(5, repsNum * perRep) : undefined;
+        out.push({ id: makeId(idPrefix, [s.exercise, 'set', String(set).padStart(2,'0')]), type: 'strength_work', exercise: s.exercise, set, reps: s.reps, intensity: s.intensity, rest_s: s.rest_s, duration_s: work_s } as any);
+        if (typeof s.rest_s === 'number' && s.rest_s>0) {
+          out.push({ id: makeId(idPrefix, [s.exercise, 'rest', String(set).padStart(2,'0')]), type: 'strength_rest', rest_s: s.rest_s, duration_s: s.rest_s } as any);
+        }
       }
     }
   }
