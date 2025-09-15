@@ -74,6 +74,24 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
           delete s.override_wu;
           delete s.override_cd;
         }
+        // Author flexibility: normalize common alias tokens → canonical tokens
+        try {
+          if (Array.isArray(s.steps_preset) && s.steps_preset.length > 0) {
+            s.steps_preset = s.steps_preset.map((tok: any) => {
+              const t = String(tok || '');
+              // bike_warmup_15 or bike_warmup_15min → warmup_bike_quality_15min_fastpedal
+              let m = t.match(/^bike_warmup_(\d+)(?:min)?$/i);
+              if (m) return `warmup_bike_quality_${m[1]}min_fastpedal`;
+              // swim_drill_catchup_6x50yd_r15 → swim_drills_6x50yd_catchup
+              m = t.match(/^swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r\d+)?$/i);
+              if (m) return `swim_drills_${m[2]}x${m[3]}${m[4]}_${m[1].toLowerCase()}`;
+              // swim_aerobic_6x100yd_r20 → swim_aerobic_6x100yd_easy
+              m = t.match(/^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r\d+)?$/i);
+              if (m) return `swim_aerobic_${m[1]}x${m[2]}${m[3]}_easy`;
+              return t;
+            });
+          }
+        } catch {}
         // Remove macro field/marker from sessions
         delete s.macro;
         outWeek.push(s);
