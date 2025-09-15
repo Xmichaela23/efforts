@@ -849,8 +849,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       } catch {}
     }
 
-    // STRICT: require computedStepsV3; if missing, fail fast for this session
-    if (!computedStepsV3 || computedStepsV3.length === 0) {
+    // STRICT: require computed steps for run/ride/swim; allow strength without computed steps
+    const requiresSteps = (mappedType === 'run' || mappedType === 'ride' || mappedType === 'swim');
+    if (requiresSteps && (!computedStepsV3 || computedStepsV3.length === 0)) {
       throw new Error(`Materialization failed: could not compute steps for ${String(s.name||s.description||'session')}`);
     }
     // Only include columns that exist in planned_workouts
