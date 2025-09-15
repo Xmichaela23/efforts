@@ -795,6 +795,20 @@ export default function PlanSelect() {
         mapped.sessions_by_week = re;
       }
 
+      // Safety net: if sessions_by_week is still empty, bake from blueprint now
+      const hasAnySessions = (() => {
+        try { return Object.values(mapped.sessions_by_week||{}).some((arr:any)=>Array.isArray(arr)&&arr.length>0); } catch { return false; }
+      })();
+      if (!hasAnySessions && libPlan?.template?.phase_blueprint) {
+        try {
+          const total = targetDurationWeeks || triVars.maxWeeks || 12;
+          const { bakeBlueprintToSessions } = await import('@/services/plans/composeTri');
+          const rd = raceDate || (()=>{ const d=new Date(); d.setDate(d.getDate()+Number(total)*7); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+          const baked = bakeBlueprintToSessions((libPlan?.template||{}) as any, Number(total), String(rd));
+          if (baked && Object.keys(baked).length) mapped.sessions_by_week = baked as any;
+        } catch {}
+      }
+
       // --- Translate with deterministic baker at import-time ---
       const toSecPerMi = (pace: string | null | undefined): number | null => {
         if (!pace) {
