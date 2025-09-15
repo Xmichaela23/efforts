@@ -21,6 +21,63 @@ function computeNextMonday(): string {
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 
+// Build a lightweight preview from a tri blueprint (no persistence)
+function composePreviewFromBlueprint(template: any, targetWeeks: number): Record<string, any[]> {
+  try {
+    const bp = template?.phase_blueprint || {};
+    const blocks = template?.blocks || {};
+    const order: string[] = Array.isArray(bp.order) ? bp.order.map((s:string)=>String(s).toLowerCase()) : ['build','peak','taper'];
+    const fixed = {
+      peak: (bp?.peak?.fixed && Number.isFinite(bp.peak.fixed)) ? Math.max(0, bp.peak.fixed) : 0,
+      taper: (bp?.taper?.fixed && Number.isFinite(bp.taper.fixed)) ? Math.max(0, bp.taper.fixed) : 0,
+    };
+    const buildWeeks = Math.max(0, targetWeeks - fixed.peak - fixed.taper);
+    const peakBlocks: string[] = Array.isArray(bp?.peak?.blocks) ? bp.peak.blocks : [];
+    const taperBlocks: string[] = Array.isArray(bp?.taper?.blocks) ? bp.taper.blocks : [];
+    const buildRef: string | undefined = (bp?.build?.block_ref || bp?.build?.ref || 'block_build');
+
+    const weekBlocks: string[] = [];
+    // Respect order: build → peak → taper
+    order.forEach(phase => {
+      if (phase === 'build') {
+        for (let i=0;i<buildWeeks;i+=1) weekBlocks.push(buildRef || '');
+      } else if (phase === 'peak') {
+        for (let i=0;i<fixed.peak;i+=1) weekBlocks.push(peakBlocks[i % Math.max(1, peakBlocks.length)] || '');
+      } else if (phase === 'taper') {
+        for (let i=0;i<fixed.taper;i+=1) weekBlocks.push(taperBlocks[i % Math.max(1, taperBlocks.length)] || '');
+      }
+    });
+
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+    const inferDisc = (kind: string): string => {
+      const k = String(kind||'').toLowerCase();
+      if (k.startsWith('run_')) return 'run';
+      if (k.startsWith('bike_')) return 'ride';
+      if (k.startsWith('swim_')) return 'swim';
+      if (k.startsWith('strength_')) return 'strength';
+      return 'session';
+    };
+    const sessionsByWeek: Record<string, any[]> = {};
+    weekBlocks.forEach((bid, idx) => {
+      const block = blocks[bid] || {};
+      const sessSpec = block.sessions || {};
+      const week: any[] = [];
+      Object.keys(sessSpec).forEach(dow => {
+        const arr: any[] = Array.isArray(sessSpec[dow]) ? sessSpec[dow] : [];
+        arr.forEach((s:any) => {
+          const desc = String(s.main || s.scheme || s.kind || '').trim();
+          week.push({ day: cap(dow), discipline: inferDisc(String(s.kind||'')), description: desc });
+        });
+      });
+      // Stable display order
+      const orderIdx = (d:string)=> DAYS.indexOf(cap(d));
+      week.sort((a,b)=> orderIdx(a.day) - orderIdx(b.day));
+      sessionsByWeek[String(idx+1)] = week;
+    });
+    return sessionsByWeek;
+  } catch { return {}; }
+}
+
 function inferDisciplineFromDescription(desc?: string): string | null {
   if (!desc) return null;
   const t = desc.toLowerCase();
@@ -944,14 +1001,43 @@ export default function PlanSelect() {
                 })}
             </div>
           ) : (
-            <div className="text-xs text-gray-700 space-y-1">
-              <div>Triathlon blueprint detected.</div>
-              {typeof triVars.minWeeks==='number' && typeof triVars.maxWeeks==='number' && (
-                <div>Window: {triVars.minWeeks}–{triVars.maxWeeks} weeks</div>
-              )}
-              {Array.isArray(triVars?.blueprint?.order) && (
-                <div>Phases: {triVars.blueprint.order.join(' → ')}</div>
-              )}
+            <div className="space-y-3 max-h-96 overflow-auto">
+              {(() => {
+                const total = (typeof triVars.maxWeeks==='number' ? triVars.maxWeeks : 12);
+                const preview = composePreviewFromBlueprint(libPlan?.template || {}, total);
+                const weeks = Object.keys(preview);
+                if (weeks.length === 0) {
+                  return (
+                    <div className="text-xs text-gray-700 space-y-1">
+                      <div>Triathlon blueprint detected.</div>
+                      {typeof triVars.minWeeks==='number' && typeof triVars.maxWeeks==='number' && (
+                        <div>Window: {triVars.minWeeks}–{triVars.maxWeeks} weeks</div>
+                      )}
+                      {Array.isArray(triVars?.blueprint?.order) && (
+                        <div>Phases: {triVars.blueprint.order.join(' → ')}</div>
+                      )}
+                    </div>
+                  );
+                }
+                return weeks.map((wk) => {
+                  const sess = (preview[wk] || []) as any[];
+                  return (
+                    <div key={wk} className="border rounded p-2">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm font-medium">Week {wk}</div>
+                        <div className="text-xs text-gray-600">{sess.length} sessions</div>
+                      </div>
+                      <div className="mt-2 grid grid-cols-1 gap-1">
+                        {sess.map((s:any, i:number) => (
+                          <div key={i} className="text-xs text-gray-700">
+                            <span className="font-medium">{s.day}</span>{s.description ? ` — ${cleanDesc(s.description)}` : ''}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
             </div>
           )}
         </div>
