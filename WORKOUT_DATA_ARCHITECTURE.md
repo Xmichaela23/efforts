@@ -326,3 +326,25 @@ computed: {
 ```
 
 This architecture handles complex workout data from multiple sources, processes it through edge functions, and displays it in a rich, interactive interface. The complexity comes from supporting multiple workout types, providers, and data formats while maintaining performance and user experience.
+
+---
+
+## Plans: Acceptance Metadata and Date Policy
+
+### `plans.config.tri_acceptance`
+Stored alongside a user plan to capture acceptance inputs and the baked blueprint snapshot:
+```
+tri_acceptance: {
+  race_date: string,            // YYYY-MM-DD (local date)
+  weeks_to_race: number,        // derived at acceptance
+  strength_track: string|null,  // optional, from template.strength_tracks
+  phase_blueprint: object|null, // snapshot from template
+  phases_by_week: string[]      // e.g., [Build, …, Peak, Taper]
+}
+```
+
+### Date math policy
+- All week alignment uses the user’s local timezone.
+- Weeks anchor on Monday; race week is the final baked week.
+- Acceptance shows a soft warning if outside the template’s `min_weeks..max_weeks`, but saving is allowed if a race date is set.
+

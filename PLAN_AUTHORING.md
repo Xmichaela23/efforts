@@ -85,3 +85,58 @@ Author training plans as deterministic JSON files that the app renders into frie
   }
 }
 ```
+
+## Triathlon Blueprint Plans (phase‑driven)
+
+Blueprint plans define phases and blocks, not pre‑baked weeks. The app bakes them into `sessions_by_week` at acceptance using a deterministic baker.
+
+### Required fields
+- `min_weeks` and `max_weeks`: allowed acceptance window
+- `phase_blueprint`:
+  - `order`: `["build","peak","taper"]`
+  - `build`: `{ block_ref: string, repeat_min: number, repeat_max: number }`
+  - `peak`: `{ fixed: number, blocks: string[] }`
+  - `taper`: `{ fixed: number, blocks: string[] }`
+- `blocks`: mapping of block id → `{ notes?, sessions: Record<day, SessionSpec[]> }`
+
+Example:
+```
+"phase_blueprint": {
+  "order": ["build","peak","taper"],
+  "build": { "repeat_min": 4, "repeat_max": 8, "block_ref": "block_build" },
+  "peak":  { "fixed": 2, "blocks": ["block_peak_1","block_peak_2"] },
+  "taper": { "fixed": 2, "blocks": ["block_taper_1","block_taper_2"] }
+}
+```
+
+### Variant rotation (deterministic variety)
+If a session defines `variants: [...]`, the baker selects
+```
+variants[(weekIndex + seed) % variants.length] // seed=0
+```
+This yields stable rotation across 8/10/12‑week bakes.
+
+### Alignment and phases
+- Final baked week aligns to the race week; taper is the last two weeks (fixed), peak precedes taper (fixed), build fills the remaining weeks.
+- Date math uses the user’s local timezone; weeks anchor on Monday.
+
+### Tagging conventions for remapping
+- `run_long` tag for long runs (e.g., kind `run_long`)
+- `long_ride` tag for long rides (e.g., kind `bike_long_progressive`)
+- `bike_intensity` for quality bike sessions (VO2/threshold)
+- `strength_lower` for heavy lower‑body lifts
+- Optional items: add `optional` (or author `optional_kind` → converted to tags)
+- XOR choices: `xor:<key>`
+
+### Discipline and catalog
+- Discipline is `triathlon`. While database constraints are being expanded, the importer may publish as `hybrid` behind the scenes; the Catalog still displays it under Triathlon.
+
+### Import & validation
+- Importer detects blueprints by presence of `min_weeks`, `max_weeks`, and `phase_blueprint` without `sessions_by_week` and skips universal schema validation.
+- For authored plans with `sessions_by_week`, validate against `universal_plan.schema.json` as usual.
+
+### Baker implementation
+- Source: `src/services/plans/composeTri.ts`
+- Input: template JSON (fields above), `weeksToRace`, `raceDate`
+- Output: `sessions_by_week` baked deterministically; no hardcoded dates inside templates
+

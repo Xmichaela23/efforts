@@ -341,6 +341,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   for (const s0 of weekSessions) {
     // Expand swim DSL to steps_preset if present
     let s = { ...s0 } as any;
+    // Authoring defaults: infer tokens/tags from kind if minimally authored
+    try {
+      const { enrichSessionFromKind } = await import('@/services/plans/authoringDefaults');
+      s = enrichSessionFromKind(s);
+    } catch {}
     // Authoring sugar → tags: optional_kind, xor_key
     try {
       const addTag = (arr: string[], t: string) => { if (!arr.map(x=>x.toLowerCase()).includes(t.toLowerCase())) arr.push(t); };

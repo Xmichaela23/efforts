@@ -21,3 +21,28 @@ This document states what users should experience from the Planned Workouts area
 - No instructions for deployment, debugging, or edits.
 
 (End of product‑level expectations.)
+
+---
+
+# Implementation Notes (Dev)
+
+These details complement the product expectations for developers working on plan baking and week materialization.
+
+## One‑week materialization strategy
+- On accept/open of a plan, Week 1 is materialized automatically if empty.
+- Subsequent weeks are materialized on demand to avoid server load.
+- Function: `src/services/plans/ensureWeekMaterialized.ts`.
+
+### Behavior guarantees
+- Idempotent per `(plan_id, week_index)`.
+- Run/ride/swim sessions insert even if full steps cannot be computed; minimal computed (labels/duration) prevents UI hangs.
+- Strength sessions never block materialization.
+- Swim warm‑up and cool‑down auto‑added from plan defaults if missing.
+
+## Blueprint coverage
+The materializer recognizes blueprint kinds used in triathlon race week and taper:
+- `run_openers`, `bike_openers`, `shakeout`, `swim_open_water_or_pool`, `race_day`
+
+## Acceptance metadata
+- Plans store acceptance in `plans.config.tri_acceptance` (see data architecture doc).
+

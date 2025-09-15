@@ -983,9 +983,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             return { ...w, day: dayName, duration, tags, steps_preset, export_hints, intervals, rendered_description: renderedDesc };
           });
           weekCacheRef.current.set(key, normalized);
-          const weeks = (selectedPlanDetail.weeks || []).map((wk: any) => (
-            wk.weekNumber === selectedWeek ? { ...wk, workouts: normalized } : wk
-          ));
+          let weeks: any[];
+          const existing = Array.isArray(selectedPlanDetail.weeks) ? selectedPlanDetail.weeks : [];
+          if (existing.length === 0) {
+            // Seed a minimal week structure so the detail view can render immediately
+            weeks = [{ weekNumber: selectedWeek, title: `Week ${selectedWeek}`, focus: '', workouts: normalized }];
+          } else if (!existing.some((wk: any) => wk.weekNumber === selectedWeek)) {
+            weeks = [...existing, { weekNumber: selectedWeek, title: `Week ${selectedWeek}`, focus: '', workouts: normalized }].sort((a:any,b:any)=>a.weekNumber-b.weekNumber);
+          } else {
+            weeks = existing.map((wk: any) => (wk.weekNumber === selectedWeek ? { ...wk, workouts: normalized } : wk));
+          }
           setSelectedPlanDetail((prev: any) => ({ ...prev, weeks }));
         }
       } catch {}
