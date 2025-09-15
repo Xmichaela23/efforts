@@ -969,6 +969,52 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         return perfNumbers?.squat;
       };
       const round5 = (n:number) => Math.round(n/5)*5;
+      const repBracketScale = (repsVal: number): number => {
+        if (!Number.isFinite(repsVal)) return 1;
+        if (repsVal <= 6) return 1.05;
+        if (repsVal <= 9) return 1.00;
+        if (repsVal <= 12) return 0.95;
+        if (repsVal <= 15) return 0.90;
+        return 0.85;
+      };
+      const estimateFromHeuristic = (slug: string, repsNum: number | undefined): number | undefined => {
+        const s = slug.toLowerCase();
+        const scaleByReps = repBracketScale(typeof repsNum==='number'? repsNum : 10);
+        const anchor = (kind: 'squat'|'bench'|'deadlift'|'overhead'): number | undefined => {
+          if (kind==='squat') return perfNumbers?.squat;
+          if (kind==='bench') return perfNumbers?.bench;
+          if (kind==='deadlift') return perfNumbers?.deadlift;
+          return perfNumbers?.overheadPress1RM || perfNumbers?.overhead;
+        };
+        let est: number | undefined;
+        if (s.includes('barbell_row')) {
+          const orm = anchor('bench'); if (orm) est = orm * 0.90;
+        } else if (s.includes('t_bar_row')) {
+          const orm = anchor('bench'); if (orm) est = orm * 0.80;
+        } else if (s.includes('chest_supported_row') || s.includes('cable_row')) {
+          const orm = anchor('bench'); if (orm) est = orm * 0.65;
+        } else if (s.includes('lat_pulldown')) {
+          const orm = anchor('bench'); if (orm) est = orm * 0.65;
+        } else if (s.includes('hip_thrust')) {
+          const orm = anchor('deadlift'); if (orm) est = orm * 0.80;
+        } else if (s.includes('glute_bridge')) {
+          const orm = anchor('deadlift'); if (orm) est = orm * 0.60;
+        } else if (s.includes('good_mornings') || s.includes('good_morning')) {
+          const orm = anchor('deadlift'); if (orm) est = orm * 0.45;
+        } else if (s.includes('leg_curl')) {
+          const orm = anchor('deadlift'); if (orm) est = orm * 0.40;
+        } else if (s.includes('bulgarian_split_squat')) {
+          const orm = anchor('squat'); if (orm) est = orm * 0.30;
+        } else if (s.includes('walking_lunge') || s.includes('reverse_lunge') || s.includes('step_ups') || s.includes('step_ups') || s.includes('step_ups')) {
+          const orm = anchor('squat'); if (orm) est = orm * 0.25;
+        } else if (s.includes('goblet_squat')) {
+          const orm = anchor('squat'); if (orm) est = orm * 0.30;
+        } else if (s.includes('leg_press')) {
+          const orm = anchor('squat'); if (orm) est = orm * 1.40;
+        }
+        if (typeof est === 'number' && isFinite(est)) return round5(est * scaleByReps);
+        return undefined;
+      };
       for (const tok of steps){
         const t = tok.toLowerCase();
         if (!/^st_/.test(t)) continue;
@@ -986,7 +1032,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const name = toTitle(slug.replace(/_/g,' '));
           const orm = pick1RM(name);
           const pct = (typeof pctLo==='number' && typeof pctHi==='number') ? ((pctLo+pctHi)/2) : pctLo;
-          const est = (typeof orm==='number' && typeof pct==='number') ? round5(orm*(pct/100)) : undefined;
+          let est = (typeof orm==='number' && typeof pct==='number') ? round5(orm*(pct/100)) : undefined;
+          if (typeof est === 'undefined' && !repsIsTime) {
+            const repsNum = typeof reps === 'number' ? reps : undefined;
+            est = estimateFromHeuristic(slug, repsNum);
+          }
           ex.push({ name, sets, reps, percent: pctLo && pctHi ? `${pctLo}-${pctHi}%` : (pctLo? `${pctLo}%`: undefined), rest_s: rest, est_load_lb: est });
         }
         // st_wu_5 → warm-up minutes; st_cool_3 → cool-down
