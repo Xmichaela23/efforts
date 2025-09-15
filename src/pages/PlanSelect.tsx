@@ -561,13 +561,21 @@ export default function PlanSelect() {
         derivedStartMonday = addDaysISO(lastWeekMonday, -7 * (targetDurationWeeks - 1));
       }
 
-      // If this is a tri blueprint (no sessions_by_week), compose sessions first
+      // If this is a tri blueprint (no sessions_by_week), compose/bake sessions first
       const baseTemplate = (() => {
         const hasSBW = !!(libPlan?.template?.sessions_by_week);
         if (hasSBW) return libPlan.template;
         const total = targetDurationWeeks || triVars.maxWeeks || 12;
-        const sbw = composeSessionsFromBlueprint(libPlan?.template || {}, total);
-        return { ...libPlan.template, sessions_by_week: sbw };
+        try {
+          // Prefer deterministic baker
+          const { bakeBlueprintToSessions } = require('@/services/plans/composeTri');
+          const rd = raceDate || (new Date(Date.now()+Number(total)*7*24*60*60*1000)).toISOString().slice(0,10);
+          const sbw = bakeBlueprintToSessions((libPlan?.template || {}) as any, Number(total), rd);
+          return { ...libPlan.template, sessions_by_week: sbw };
+        } catch {
+          const sbw = composeSessionsFromBlueprint(libPlan?.template || {}, Number(total));
+          return { ...libPlan.template, sessions_by_week: sbw };
+        }
       })();
       const remapped = remapForPreferences(baseTemplate, { longRunDay, longRideDay, includeStrength: true });
       
