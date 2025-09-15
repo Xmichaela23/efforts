@@ -499,14 +499,14 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
-    // Strength session-length presets (e.g., strength_main_45min, strength_power_40min)
+    // Strength session-length presets (e.g., strength_main_45min, strength_power_40min, strength_circuit_30min)
     const strengthPresetMinutes = (() => {
       try {
         if (mappedType !== 'strength') return null;
         const toks = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
         let best: number | null = null;
         for (const t of toks) {
-          const m = t.match(/strength_(?:main|accessory|power|bodyweight)_(\d{2})min/);
+          const m = t.match(/strength_(?:main|accessory|power|bodyweight|circuit)_(\d{2})min/);
           if (m) { const mins = parseInt(m[1],10); best = Math.max(best ?? 0, mins); }
         }
         return best;
@@ -623,6 +623,16 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       };
 
       const tokenStr = steps.join(' ').toLowerCase();
+      const addRest = (sec: number, pushIfLast = true) => { if (sec>0) out.push({ effortLabel: 'rest', duration: sec }); };
+      const parseRestSec = (s: string): number => {
+        // supports ..._R2min, ..._r120, and bare R2min/r120 anywhere in token
+        const mMin = s.match(/_r(\d+)(?:min)?\b/i) && !/_r\d+s\b/i.test(s) ? null : null; // placeholder
+        const mRmin = s.match(/_R(\d+)min/i);
+        const mrSec = s.match(/_r(\d+)(?![a-z])/i);
+        if (mRmin) return parseInt(mRmin[1],10)*60;
+        if (mrSec) return parseInt(mrSec[1],10);
+        return 0;
+      };
 
       // Warmup/Cooldown tokens
       steps.forEach((t) => {
@@ -631,36 +641,40 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; wuMin = Math.max(wuMin, Math.round((a+b)/2)); }
         m = s.match(/cooldown.*?(\d{1,3})(?:\s*(?:–|-|to)\s*(\d{1,3}))?\s*min/);
         if (m) { const a=parseInt(m[1],10); const b=m[2]?parseInt(m[2],10):a; cdMin = Math.max(cdMin, Math.round((a+b)/2)); }
+        // bike_warmup_10 or bike_warmup_15 → treat as minutes
+        m = s.match(/^bike_warmup_(\d{1,3})$/);
+        if (m) { wuMin = Math.max(wuMin, parseInt(m[1],10)); }
       });
       // Add warm-up at the start later; cooldown will be appended at the end
 
-      // Interval blocks e.g., interval_6x800m_5kpace_R2min
-      const iv = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?min)?/i);
-      if (iv) {
-        const reps = parseInt(iv[1],10);
-        const each = parseFloat(iv[2]);
-        const unit = (iv[3]||'m').toLowerCase() as 'm'|'mi';
-        const paceTag = String(iv[4]||'');
-        const plusTok = String(iv[5]||'');
-        const restA = iv[6]?parseInt(iv[6],10):0; const restB = iv[7]?parseInt(iv[7],10):restA; const restSec = Math.round(((restA||0)+(restB||0))/2)*60;
-        // Resolve run pace if applicable
+      // Interval blocks e.g., interval_6x800m_5kpace_R2min or ..._r120
+      steps.forEach((tok) => {
+        const s = tok.toLowerCase();
+        const m = s.match(/^interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?(?:_(r\d+|R\d+min))?$/i);
+        if (!m) return;
+        const reps = parseInt(m[1],10);
+        const each = parseFloat(m[2]);
+        const unit = (m[3]||'m').toLowerCase() as 'm'|'mi';
+        const paceTag = String(m[4]||'');
+        const plusTok = String(m[5]||'');
+        const restSec = parseRestSec(s);
         const paceForIntervals = (() => {
           if (!isRun) return undefined;
           let base = undefined as string | undefined;
           if (/5kpace/i.test(paceTag) && fivekPace) base = fivekPace;
+          else if (/10kpace/i.test(paceTag) && fivekPace) base = fivekPace; // fallback
           else if (/easy/i.test(paceTag) && easyPace) base = easyPace;
           else base = fivekPace || easyPace;
           if (!base) return undefined;
           if (plusTok) {
-            const m = plusTok.match(/plus(\d+)(?::(\d{2}))?/i);
-            if (m) {
-              const add = (parseInt(m[1],10) * 60) + (m[2]?parseInt(m[2],10):0);
-              const mmss = (sec:number)=>{ const mm=Math.floor(sec/60); const ss=sec%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+            const pm = plusTok.match(/plus(\d+)(?::(\d{2}))?/i);
+            if (pm) {
+              const add = (parseInt(pm[1],10) * 60) + (pm[2]?parseInt(pm[2],10):0);
               const parsed = base.match(/(\d+):(\d{2})\/(mi|km)/i);
               if (parsed) {
                 const baseSec = parseInt(parsed[1],10)*60+parseInt(parsed[2],10);
                 const unitTxt = parsed[3];
-                base = `${mmss(baseSec+add)}/${unitTxt}`;
+                base = `${Math.floor((baseSec+add)/60)}:${String((baseSec+add)%60).padStart(2,'0')}/${unitTxt}`;
               }
             }
           }
@@ -670,7 +684,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           out.push({ effortLabel: 'interval', distanceMeters: toMeters(unit==='mi'?each:each, unit), ...(paceForIntervals ? { paceTarget: paceForIntervals } : {}) });
           if (r<reps-1 && restSec>0) out.push({ effortLabel: 'rest', duration: restSec });
         }
-      }
+      });
 
       // Tempo blocks e.g., tempo_4mi_...
       const tm = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi/i);
@@ -680,11 +694,16 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         out.push({ effortLabel: 'tempo', distanceMeters: toMeters(miles, 'mi'), ...(paceForTempo ? { paceTarget: paceForTempo } : {}) });
       }
 
-      // Strides e.g., strides_6x20s
+      // Strides e.g., strides_6x20s or strides_6x100m
       const st = tokenStr.match(/strides_(\d+)x(\d+)s/i);
       if (st) {
         const reps = parseInt(st[1],10); const secEach = parseInt(st[2],10);
         for (let r=0;r<reps;r+=1) out.push({ effortLabel: 'interval', duration: secEach });
+      }
+      const stm = tokenStr.match(/strides_(\d+)x(\d+)(m)/i);
+      if (stm) {
+        const reps = parseInt(stm[1],10); const meters = parseInt(stm[2],10);
+        for (let r=0;r<reps;r+=1) out.push({ effortLabel: 'interval', distanceMeters: toMeters(meters, 'm') });
       }
 
       // Run drills macro: drills_A_B_skips_high_knees → short technique blocks
@@ -696,32 +715,81 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         pushBlock('drill — B-skips', 2, 30, 20);
         pushBlock('drill — high knees', 4, 20, 20);
       }
+      // Generic drills_foo_bar → 2x30s each with 20s rest between items
+      steps.forEach((tok)=>{
+        const s = tok.toLowerCase();
+        const m = s.match(/^drills_([a-z0-9_]+)$/);
+        if (!m) return;
+        const items = m[1].split('_').filter(Boolean);
+        items.forEach((name, idx) => {
+          out.push({ effortLabel: `drill — ${name.replace(/_/g,' ')}`, duration: 30 });
+          if (idx < items.length-1) out.push({ effortLabel: 'rest', duration: 20 });
+        });
+      });
 
       // Bike sets e.g., bike_vo2_6x3min_R3min, bike_thr_4x8min_R5min, bike_ss_2x20min_R6min
-      const bike = tokenStr.match(/bike_(vo2|thr|ss)_(\d+)x(\d+)min(?:_r(\d+)min)?/i);
-      if (bike) {
-        const kind = (bike[1]||'').toLowerCase();
-        const reps=parseInt(bike[2],10); const minEach=parseInt(bike[3],10); const rmin=bike[4]?parseInt(bike[4],10):0;
-        const powerForKind = (() => {
-          if (!isRide || !ftp) return undefined;
-          if (kind==='vo2') return Math.round(ftp*1.10);
-          if (kind==='thr') return Math.round(ftp*0.98);
-          if (kind==='ss') return Math.round(ftp*0.91);
-          return undefined;
-        })();
-        for (let r=0;r<reps;r+=1){
-          out.push({ effortLabel: 'interval', duration: minEach*60, ...(powerForKind ? { powerTarget: `${powerForKind}W` } : {}) });
-          if (r<reps-1 && rmin>0) out.push({ effortLabel: 'rest', duration: rmin*60 });
+      steps.forEach((tok)=>{
+        const s = tok.toLowerCase();
+        let m = s.match(/^bike_(vo2|thr|ss)_(\d+)x(\d+)(min)(?:_(r\d+|R\d+min))?$/i);
+        if (m) {
+          const kind = (m[1]||'').toLowerCase();
+          const reps=parseInt(m[2],10); const each=parseInt(m[3],10)*60; const restSec=parseRestSec(s);
+          const powerForKind = (() => {
+            if (!isRide || !ftp) return undefined;
+            if (kind==='vo2') return Math.round(ftp*1.10);
+            if (kind==='thr') return Math.round(ftp*0.98);
+            if (kind==='ss') return Math.round(ftp*0.91);
+            return undefined;
+          })();
+          for (let r=0;r<reps;r+=1){
+            out.push({ effortLabel: 'interval', duration: each, ...(powerForKind ? { powerTarget: `${powerForKind}W` } : {}) });
+            if (r<reps-1 && restSec>0) out.push({ effortLabel: 'rest', duration: restSec });
+          }
+          return;
         }
-      }
+        // Neuromuscular and Anaerobic e.g., bike_neuro_8x30s_R300s, bike_anaerobic_6x60s_R4min
+        m = s.match(/^bike_(neuro|anaerobic)_(\d+)x(\d+)(s|min)(?:_(r\d+|R\d+min))?$/i);
+        if (m) {
+          const reps = parseInt(m[2],10);
+          const dur = parseInt(m[3],10) * (m[4].toLowerCase()==='min'?60:1);
+          const restSec = parseRestSec(s);
+          for (let r=0;r<reps;r+=1){ out.push({ effortLabel: m[1].toLowerCase()==='neuro'?'neuromuscular':'anaerobic', duration: dur }); if (r<reps-1 && restSec>0) out.push({ effortLabel:'rest', duration: restSec }); }
+          return;
+        }
+      });
+
+      // Bike tempo simple durations
+      const btmp = tokenStr.match(/bike_tempo_(\d+)min/i);
+      if (btmp) out.push({ effortLabel: 'tempo', duration: parseInt(btmp[1],10)*60 });
 
       // Endurance bike single block e.g., bike_endurance_50min...
       const bend = tokenStr.match(/bike_endurance_(\d+)min(?:_z(?:1|2)(?:-(?:2|3))?)?(?:_cad\d+(?:-\d+)?)?/i);
       if (bend) out.push({ effortLabel: 'endurance', duration: parseInt(bend[1],10)*60 });
 
-      // Speed strides e.g., speed_8x20s_R60s
+      // Bike recovery
+      const brec = tokenStr.match(/bike_recovery_(\d+)min/i);
+      if (brec) out.push({ effortLabel: 'recovery', duration: parseInt(brec[1],10)*60 });
+
+      // Bike race prep
+      const brp = tokenStr.match(/bike_race_prep_(\d+)x(\d+)(min|s)_race_pace/i);
+      if (brp) {
+        const reps = parseInt(brp[1],10); const amt = parseInt(brp[2],10) * (brp[3].toLowerCase()==='min'?60:1);
+        for (let r=0;r<reps;r+=1){ out.push({ effortLabel: 'race pace', duration: amt }); if (r<reps-1) out.push({ effortLabel:'rest', duration: 120 }); }
+      }
+      // Bike openers
+      if (/\bbike_openers\b/i.test(tokenStr)) {
+        for (let r=0;r<3;r+=1){ out.push({ effortLabel:'opener', duration: 60 }); if (r<2) out.push({ effortLabel:'rest', duration: 120 }); }
+      }
+
+      // Speed strides e.g., speed_8x20s_R60s or speed_6x100m_R90s
       const spd = tokenStr.match(/speed_(\d+)x(\d+)s_r(\d+)s/i);
       if (spd) { const reps=parseInt(spd[1],10), sec=parseInt(spd[2],10), rest=parseInt(spd[3],10); for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'interval', duration: sec }); if(r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } }
+      const spdm = tokenStr.match(/speed_(\d+)x(\d+)m_(?:r(\d+)s|R(\d+)s|R(\d+)min|r(\d+))/i);
+      if (spdm) {
+        const reps=parseInt(spdm[1],10); const meters=parseInt(spdm[2],10);
+        const restSec = spdm[3]?parseInt(spdm[3],10): spdm[4]?parseInt(spdm[4],10): spdm[5]?parseInt(spdm[5],10)*60: spdm[6]?parseInt(spdm[6],10):0;
+        for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'interval', distanceMeters: toMeters(meters,'m') }); if(r<reps-1 && restSec>0) out.push({ effortLabel:'rest', duration: restSec }); }
+      }
 
       // Tempo with explicit 5k offset e.g., tempo_4mi_5kpace_plus0:45
       const tmp = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi(?:_5kpace_plus(\d+):(\d{2}))?/i);
@@ -740,17 +808,39 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       const lr = tokenStr.match(/longrun_(\d+)min/i);
       if (lr) out.push({ effortLabel: 'long run', duration: parseInt(lr[1],10)*60, ...(isRun && easyPace ? { paceTarget: easyPace } : {}) });
 
-      // Cruise reps (coarse support) e.g., cruise_4x2mi_5kpace_plus0:15_R3min
-      const cr = tokenStr.match(/cruise_(\d+)x(\d+(?:\.\d+)?)mi_5kpace_plus(\d+):(\d{2})_r(\d+)min/i);
-      if (cr) {
-        const reps=parseInt(cr[1],10); const miles=parseFloat(cr[2]); const addMin=parseInt(cr[3],10); const addSec=parseInt(cr[4],10); const rmin=parseInt(cr[5],10);
+      // Marathon pace finish segments within long runs (finish_XXmin_MP or NxXXmin_MP)
+      const mpFin = tokenStr.match(/finish_(\d+)min_mp/i);
+      if (mpFin) out.push({ effortLabel: 'MP finish', duration: parseInt(mpFin[1],10)*60 });
+      const mpReps = tokenStr.match(/(\d+)x(\d+)min_mp/i);
+      if (mpReps) { const reps=parseInt(mpReps[1],10), dur=parseInt(mpReps[2],10)*60; for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'MP', duration: dur }); if(r<reps-1) out.push({ effortLabel:'rest', duration: 60 }); } }
+
+      // Cruise reps (all variants) e.g., cruise_4x2mi_5kpace_plus0:15_R3min or ..._r180
+      steps.forEach((tok)=>{
+        const s = tok.toLowerCase();
+        const m = s.match(/^cruise_(\d+)x(\d+)(?:_(\d+))?mi_5kpace_plus(\d+):(\d{2})(?:_(r\d+|R\d+min))?$/i);
+        if (!m) return;
+        const reps = parseInt(m[1],10);
+        const miles = parseFloat(m[2] + (m[3]?`.${m[3]}`:''));
+        const addMin = parseInt(m[4],10); const addSec = parseInt(m[5],10);
+        const restSec = parseRestSec(s);
         let base = fivekPace || undefined;
         if (base) {
           const p = base.match(/(\d+):(\d{2})\/(mi|km)/i);
           if (p) { const sec = parseInt(p[1],10)*60+parseInt(p[2],10) + (addMin*60+addSec); base = `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/${p[3]}`; }
         }
-        for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'cruise', distanceMeters: toMeters(miles,'mi'), ...(base?{ paceTarget: base }: {}) }); if(r<reps-1) out.push({ effortLabel:'rest', duration: rmin*60 }); }
+        for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'cruise', distanceMeters: toMeters(miles,'mi'), ...(base?{ paceTarget: base }: {}) }); if(r<reps-1 && restSec>0) out.push({ effortLabel:'rest', duration: restSec }); }
+      });
+
+      // Fartlek e.g., fartlek_40min_10x2min_on_90s_off
+      const fl = tokenStr.match(/fartlek_(\d+)min_(\d+)x(\d+)(min|s)_on_(\d+)(min|s)_off/i);
+      if (fl) {
+        const reps=parseInt(fl[2],10); const on=parseInt(fl[3],10)*(fl[4].toLowerCase()==='min'?60:1); const off=parseInt(fl[5],10)*(fl[6].toLowerCase()==='min'?60:1);
+        for (let r=0;r<reps;r+=1){ out.push({ effortLabel:'fartlek on', duration: on }); if (r<reps-1) out.push({ effortLabel:'off', duration: off }); }
       }
+
+      // Progression run e.g., progression_6mi_start_easy_finish_tempo or ..._finish_5k
+      const pr = tokenStr.match(/progression_(\d+)mi_start_easy_finish_(tempo|5k)/i);
+      if (pr) { const miles=parseInt(pr[1],10); out.push({ effortLabel:'progression', distanceMeters: toMeters(miles,'mi') }); }
 
       // Swim simple translation from tokens expanded earlier (distances only)
       if (String(discipline||'').toLowerCase()==='swim'){
@@ -758,15 +848,23 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const s = String(t).toLowerCase();
           let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
           if (m){ const dist=parseInt(m[1],10); const u=(m[2]||'yd').toLowerCase() as any; out.push({ effortLabel: /warmup/i.test(s)?'warm up':'cool down', distanceMeters: toMeters(dist, u) }); return; }
+          // swim_rest_r15
+          m = s.match(/^swim_rest_r(\d+)/i);
+          if (m){ addRest(parseInt(m[1],10)); return; }
           // swim_drill tokens with rest/equipment suffixes: swim_drill_singlearm_4x50yd_r20_fins
           m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|snorkel|buoy))?/i);
           if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; const rest=m[5]?parseInt(m[5],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel: 'drill', distanceMeters: toMeters(each, u) }); if(rest && r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } return; }
-          m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i);
+          m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)(?:_([a-z0-9_]+))?/i);
           if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: 'drill', distanceMeters: toMeters(each, u) }); return; }
-          m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
-          if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: m[1]==='pull'?'pull':'kick', distanceMeters: toMeters(each, u) }); return; }
-          m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i);
-          if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: 'aerobic', distanceMeters: toMeters(each, u) }); return; }
+          m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|snorkel|buoy))?/i);
+          if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; const rest=m[5]?parseInt(m[5],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel: m[1]==='pull'?'pull':'kick', distanceMeters: toMeters(each, u) }); if (rest && r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } return; }
+          m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+          if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; const rest=m[4]?parseInt(m[4],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel: 'aerobic', distanceMeters: toMeters(each, u) }); if (rest && r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } return; }
+          // Threshold & Interval sets
+          m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)_r(\d+)/i);
+          if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; const rest=parseInt(m[4],10); for(let r=0;r<reps;r+=1){ out.push({ effortLabel: 'threshold', distanceMeters: toMeters(each, u) }); if (r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } return; }
+          m = s.match(/swim_interval_(\d+)x(\d+)(yd|m)_r(\d+)/i);
+          if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; const rest=parseInt(m[4],10); for(let r=0;r<reps;r+=1){ out.push({ effortLabel: 'interval', distanceMeters: toMeters(each, u) }); if (r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } return; }
         });
       }
 
@@ -874,21 +972,28 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       for (const tok of steps){
         const t = tok.toLowerCase();
         if (!/^st_/.test(t)) continue;
-        // st_main_bench_press_4x6_@pct75-80_rest120
-        const m = t.match(/^st_(?:main|acc)_([^@]+?)_(\d+)x(\d+)(?:_@pct(\d{1,3})(?:-(\d{1,3}))?)?(?:_rest(\d+))?$/i);
+        // st_main_bench_press_4x6_@pct75-80_rest120 and st_core_* variants
+        const m = t.match(/^st_(?:main|acc|core)_([^@]+?)_(\d+)x(\d+)(s)?(?:_@pct(\d{1,3})(?:-(\d{1,3}))?)?(?:_rest(\d+))?$/i);
         if (m){
           const slug = m[1].replace(/_rest\d+$/,'');
           const sets = parseInt(m[2],10);
-          const reps = parseInt(m[3],10);
-          const pctLo = m[4]?parseInt(m[4],10):undefined;
-          const pctHi = m[5]?parseInt(m[5],10):undefined;
-          const rest = m[6]?parseInt(m[6],10):undefined;
+          const repsRaw = m[3];
+          const repsIsTime = !!m[4];
+          const reps = repsIsTime ? `${parseInt(repsRaw,10)}s` : parseInt(repsRaw,10);
+          const pctLo = m[5]?parseInt(m[5],10):undefined;
+          const pctHi = m[6]?parseInt(m[6],10):undefined;
+          const rest = m[7]?parseInt(m[7],10):undefined;
           const name = toTitle(slug.replace(/_/g,' '));
           const orm = pick1RM(name);
           const pct = (typeof pctLo==='number' && typeof pctHi==='number') ? ((pctLo+pctHi)/2) : pctLo;
           const est = (typeof orm==='number' && typeof pct==='number') ? round5(orm*(pct/100)) : undefined;
           ex.push({ name, sets, reps, percent: pctLo && pctHi ? `${pctLo}-${pctHi}%` : (pctLo? `${pctLo}%`: undefined), rest_s: rest, est_load_lb: est });
         }
+        // st_wu_5 → warm-up minutes; st_cool_3 → cool-down
+        const wu = t.match(/^st_wu_(\d{1,2})$/);
+        if (wu) { ex.push({ name: 'General Warm-up', sets: 1, reps: parseInt(wu[1],10), unit: 'min' }); continue; }
+        const cool = t.match(/^st_cool_(\d{1,2})$/);
+        if (cool) { ex.push({ name: 'Cool-down', sets: 1, reps: parseInt(cool[1],10), unit: 'min' }); continue; }
       }
       // Shorthand accessories (row_4x6_8, chinups_3xAMRAP_RIR2, rollouts_3x15, lunges_3x10, pushups_3x15)
       for (const tok of steps){
@@ -899,6 +1004,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         // chinups_3xAMRAP_RIR2
         m = t.match(/^chinups_(\d+)xamrap(?:_rir(\d+))?$/);
         if (m) { const sets=parseInt(m[1],10); const rir = m[2]?parseInt(m[2],10):2; ex.push({ name:'Chin-ups', sets, reps: 'AMRAP', rir, rest_s: 120 }); continue; }
+        // pullups_3xAMRAP (optional _RIRn)
+        m = t.match(/^pullups_(\d+)xamrap(?:_rir(\d+))?$/);
+        if (m) { const sets=parseInt(m[1],10); const rir = m[2]?parseInt(m[2],10):2; ex.push({ name:'Pull-ups', sets, reps: 'AMRAP', rir, rest_s: 120 }); continue; }
         // rollouts_3x15
         m = t.match(/^rollouts_(\d+)x(\d+)$/);
         if (m) { ex.push({ name:'Ab Rollouts', sets: parseInt(m[1],10), reps: parseInt(m[2],10), rest_s: 90 }); continue; }
@@ -908,6 +1016,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         // pushups_3x15
         m = t.match(/^pushups_(\d+)x(\d+)$/);
         if (m) { ex.push({ name:'Push-ups', sets: parseInt(m[1],10), reps: parseInt(m[2],10), rest_s: 75 }); continue; }
+        // dips_3x10
+        m = t.match(/^dips_(\d+)x(\d+)$/);
+        if (m) { ex.push({ name:'Dips', sets: parseInt(m[1],10), reps: parseInt(m[2],10), rest_s: 90 }); continue; }
       }
       return ex.length? ex: undefined;
     };
