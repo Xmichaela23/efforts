@@ -468,9 +468,6 @@ export default function PlanSelect() {
       if (!raceDate) return null;
       const toJs = (iso: string) => { const p = iso.split('-').map(x=>parseInt(x,10)); return new Date(p[0], (p[1]||1)-1, p[2]||1); };
       if (startDate && toJs(startDate) > toJs(raceDate)) return 'Race date must be after start date.';
-      if (typeof weeksToRace === 'number' && typeof minW === 'number' && typeof maxW === 'number') {
-        if (weeksToRace < minW || weeksToRace > maxW) return `This plan requires ${minW}–${maxW} weeks from start to race.`;
-      }
       return null;
     } catch { return null; }
   }, [raceDate, startDate, weeksToRace, triVars.minWeeks, triVars.maxWeeks]);
@@ -1200,10 +1197,19 @@ export default function PlanSelect() {
           )}
           {/* Strength is included as authored; no toggle */}
         </div>
-        {validationMsg && <div className="text-sm text-red-600">{validationMsg}</div>}
+        {(() => {
+          if (!raceDate) return null;
+          const minW = triVars.minWeeks; const maxW = triVars.maxWeeks;
+          if (typeof weeksToRace === 'number' && typeof minW === 'number' && typeof maxW === 'number') {
+            if (weeksToRace < minW || weeksToRace > maxW) {
+              return <div className="text-sm text-amber-700">This plan is tuned for {minW}–{maxW} weeks; you are {weeksToRace} weeks out.</div>;
+            }
+          }
+          return null;
+        })()}
         {error && <div className="text-sm text-red-600">{error}</div>}
             <div>
-              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50" disabled={Boolean(triVars.minWeeks && triVars.maxWeeks && (!raceDate || !weeksToRace || weeksToRace < (triVars.minWeeks as number) || weeksToRace > (triVars.maxWeeks as number)))}>
+              <button onClick={save} className="px-3 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50" disabled={!raceDate}>
                 Save Plan
               </button>
             </div>
