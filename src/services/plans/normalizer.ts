@@ -8,6 +8,8 @@ export interface Baselines {
     fiveKPace?: string;
     fiveK?: string;
     easyPace?: string;
+    tenK_pace?: string;
+    tenKPace?: string;
     ftp?: number;
   };
 }
@@ -45,8 +47,10 @@ function resolvePaceToken(token: string, baselines: Baselines): string | null {
   const pn: any = baselines?.performanceNumbers || {};
   const fiveK_pace: string | undefined = pn.fiveK_pace || pn.fiveKPace;
   const easy: string | undefined = pn.easyPace || pn.easy_pace;
+  const tenK: string | undefined = pn.tenK_pace || pn.tenKPace;
   if (token.includes('5kpace') && fiveK_pace) return fiveK_pace;
   if (token.includes('easypace') && easy) return easy;
+  if (token.includes('10kpace') && tenK) return tenK;
   return null;
 }
 
@@ -286,6 +290,14 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       totalMin += reps * tmin + rmin * Math.max(0, reps - 1);
       summaryParts.push(`${reps} × ${tmin} min set${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
     }
+    // Seconds-based bike sets (e.g., bike_race_prep_4x90s_race_pace)
+    const gbs = tokenStr.match(/bike_[a-z0-9]+_(\d+)x(\d+)s/i);
+    if (gbs) {
+      const reps = parseInt(gbs[1], 10);
+      const secsEach = parseInt(gbs[2], 10);
+      totalMin += Math.round((reps * secsEach) / 60);
+      summaryParts.push(`${reps} × ${secsEach}s set`);
+    }
   }
 
   // Endurance bike (single or multiple blocks)
@@ -407,18 +419,44 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
           addDistance(parseInt(m[2], 10), m[3]);
           return;
         }
-        // Aerobic sets: swim_aerobic_4x200yd_easy
-        m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)_[a-z]+/i);
+        // Aerobic sets: swim_aerobic_4x200yd_easy or swim_aerobic_4x200yd or with explicit rest swim_aerobic_4x200yd_easy_r20
+        m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_[a-z]+)?(?:_r(\d+))?/i);
         if (m) {
           const reps = parseInt(m[1], 10);
           const distEach = parseInt(m[2], 10);
-          addDistance(reps * distEach, m[3]);
-          // Rest defaults based on distance
-          let restEach = 15;
-          if (distEach >= 400) restEach = 35; // :30–:40r → ~35s
-          else if (distEach >= 200) restEach = 22; // :20–:25r → ~22s
-          else restEach = 15; // 100s @ :15r
+          const unit = m[3];
+          const explicitRest = m[4] ? parseInt(m[4], 10) : undefined;
+          addDistance(reps * distEach, unit);
+          // Rest defaults based on distance if not explicitly authored
+          let restEach = typeof explicitRest === 'number' ? explicitRest : 15;
+          if (typeof explicitRest !== 'number') {
+            if (distEach >= 400) restEach = 35; // :30–:40r → ~35s
+            else if (distEach >= 200) restEach = 22; // :20–:25r → ~22s
+            else restEach = 15; // 100s @ :15r
+          }
           restSeconds += Math.max(0, reps - 1) * restEach;
+          return;
+        }
+        // Threshold sets: swim_threshold_6x100yd_r10
+        m = s.match(/swim_threshold_(\d+)x(\d+)(yd|m)_r(\d+)/i);
+        if (m) {
+          const reps = parseInt(m[1], 10);
+          const distEach = parseInt(m[2], 10);
+          const unit = m[3];
+          const r = parseInt(m[4], 10);
+          addDistance(reps * distEach, unit);
+          restSeconds += Math.max(0, reps - 1) * r;
+          return;
+        }
+        // Interval sets: swim_interval_12x50yd_r15
+        m = s.match(/swim_interval_(\d+)x(\d+)(yd|m)_r(\d+)/i);
+        if (m) {
+          const reps = parseInt(m[1], 10);
+          const distEach = parseInt(m[2], 10);
+          const unit = m[3];
+          const r = parseInt(m[4], 10);
+          addDistance(reps * distEach, unit);
+          restSeconds += Math.max(0, reps - 1) * r;
           return;
         }
       });

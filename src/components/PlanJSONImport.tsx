@@ -82,12 +82,19 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
               // bike_warmup_15 or bike_warmup_15min → warmup_bike_quality_15min_fastpedal
               let m = t.match(/^bike_warmup_(\d+)(?:min)?$/i);
               if (m) return `warmup_bike_quality_${m[1]}min_fastpedal`;
-              // swim_drill_catchup_6x50yd_r15 → swim_drills_6x50yd_catchup
-              m = t.match(/^swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r\d+)?$/i);
+              // swim_drill_catchup_6x50yd_r15[_fins] → swim_drills_6x50yd_catchup
+              m = t.match(/^swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r\d+)?(?:_[a-z0-9_]+)?$/i);
               if (m) return `swim_drills_${m[2]}x${m[3]}${m[4]}_${m[1].toLowerCase()}`;
-              // swim_aerobic_6x100yd_r20 → swim_aerobic_6x100yd_easy
-              m = t.match(/^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r\d+)?$/i);
-              if (m) return `swim_aerobic_${m[1]}x${m[2]}${m[3]}_easy`;
+              // swim_aerobic_6x100yd[_easy][_r20] → preserve rest; add _easy if no label provided
+              m = t.match(/^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_([a-z]+))?(?:_r(\d+))?$/i);
+              if (m) {
+                const reps = m[1];
+                const dist = m[2];
+                const unit = m[3];
+                const label = (m[4] ? m[4].toLowerCase() : 'easy');
+                const rest = m[5] ? `_r${m[5]}` : '';
+                return `swim_aerobic_${reps}x${dist}${unit}_${label}${rest}`;
+              }
               return t;
             });
           }
