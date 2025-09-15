@@ -552,11 +552,10 @@ export default function PlanSelect() {
       if (hasTriVars) {
         if (!raceDate) { setError('Please choose a race date'); return; }
         if (!weeksToRace || weeksToRace <= 0) { setError('Race date must be in the future'); return; }
-        if ((weeksToRace as number) < (tMin as number) || (weeksToRace as number) > (tMax as number)) {
-          setError(`This plan requires ${tMin}–${tMax} weeks from today to race day.`);
-          return;
-        }
-        targetDurationWeeks = weeksToRace as number;
+        const wtr = weeksToRace as number;
+        // Soft gate: bake with clamped duration, still allow saving
+        const clamp = (v:number, lo:number, hi:number) => Math.max(lo, Math.min(hi, v));
+        targetDurationWeeks = clamp(wtr, tMin as number, tMax as number);
         const lastWeekMonday = mondayOf(raceDate);
         derivedStartMonday = addDaysISO(lastWeekMonday, -7 * (targetDurationWeeks - 1));
       }
