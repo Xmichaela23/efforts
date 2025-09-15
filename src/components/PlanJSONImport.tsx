@@ -114,6 +114,20 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
     // If author provided min/max weeks with sessions_by_week, strip before schema validate
     if (typeof out.min_weeks !== 'undefined') delete out.min_weeks;
     if (typeof out.max_weeks !== 'undefined') delete out.max_weeks;
+    // Strip new authoring metadata before schema validate; will reattach after
+    if (typeof out.baselines_required !== 'undefined') delete out.baselines_required;
+    if (typeof out.units !== 'undefined') delete out.units;
+    if (typeof out.adaptive_scaling !== 'undefined') delete out.adaptive_scaling;
+    if (typeof out.progression_rules !== 'undefined') delete out.progression_rules;
+    if (typeof out.volume_distribution !== 'undefined') delete out.volume_distribution;
+    if (typeof out.weekly_frequency !== 'undefined') delete out.weekly_frequency;
+    if (typeof out.phase_adjustments !== 'undefined') delete out.phase_adjustments;
+    if (typeof out.recovery_patterns !== 'undefined') delete out.recovery_patterns;
+    if (typeof out.load_management !== 'undefined') delete out.load_management;
+    if (typeof out.equipment_scaling !== 'undefined') delete out.equipment_scaling;
+    if (typeof out.strength_progression !== 'undefined') delete out.strength_progression;
+    if (typeof out.endurance_progression !== 'undefined') delete out.endurance_progression;
+    if (typeof out.load_monitoring !== 'undefined') delete out.load_monitoring;
     // Strip other non-schema helpers that authors may include
     if (typeof out.id !== 'undefined') delete out.id;
     if (typeof out.plan_note !== 'undefined') delete out.plan_note;
@@ -140,6 +154,14 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
         const triPreview = JSON.parse(JSON.stringify(input));
         // Provide duration_weeks for catalog display
         if (typeof triPreview.duration_weeks !== 'number') triPreview.duration_weeks = triPreview.max_weeks;
+        // Preserve authoring metadata passthrough
+        if (input && typeof input === 'object') {
+          if (input.baselines_required) triPreview.baselines_required = JSON.parse(JSON.stringify(input.baselines_required));
+          if (typeof input.units === 'string') triPreview.units = String(input.units);
+          // Additional adaptive metadata passthrough
+          const metaKeys = ['adaptive_scaling','progression_rules','volume_distribution','weekly_frequency','phase_adjustments','recovery_patterns','load_management','equipment_scaling','strength_progression','endurance_progression','load_monitoring'];
+          for (const k of metaKeys) { if (typeof (input as any)[k] !== 'undefined') (triPreview as any)[k] = JSON.parse(JSON.stringify((input as any)[k])); }
+        }
         res = { ok: true, plan: triPreview };
         setDiscipline('triathlon');
       } catch (e: any) {
@@ -150,6 +172,11 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       // Preprocess DSL (e.g., swim main/extra) → steps_preset and strip unsupported fields
       const preserveMin = (typeof (input as any)?.min_weeks === 'number') ? (input as any).min_weeks : undefined;
       const preserveMax = (typeof (input as any)?.max_weeks === 'number') ? (input as any).max_weeks : undefined;
+      const preserveBR = (input && typeof input === 'object' && input.baselines_required) ? JSON.parse(JSON.stringify(input.baselines_required)) : undefined;
+      const preserveUnits = (typeof (input as any)?.units === 'string') ? String((input as any).units) : undefined;
+      const preserveMeta: any = {};
+      const metaKeys = ['adaptive_scaling','progression_rules','volume_distribution','weekly_frequency','phase_adjustments','recovery_patterns','load_management','equipment_scaling','strength_progression','endurance_progression','load_monitoring'];
+      for (const k of metaKeys) { if (typeof (input as any)[k] !== 'undefined') preserveMeta[k] = JSON.parse(JSON.stringify((input as any)[k])); }
       const cleaned = preprocessForSchema(input);
       const v = validateUniversalPlan(cleaned);
       if (!v.ok) {
@@ -161,6 +188,9 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
       try {
         if (typeof preserveMin === 'number') (res.plan as any).min_weeks = preserveMin;
         if (typeof preserveMax === 'number') (res.plan as any).max_weeks = preserveMax;
+        if (preserveBR) (res.plan as any).baselines_required = preserveBR;
+        if (preserveUnits) (res.plan as any).units = preserveUnits;
+        if (Object.keys(preserveMeta).length) Object.assign((res.plan as any), preserveMeta);
       } catch {}
     }
     // Minimal sanity checks for universal plans only

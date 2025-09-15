@@ -903,6 +903,21 @@ export default function PlanSelect() {
           preferences: { longRunDay, longRideDay }, 
           catalog_id: libPlan.id, 
           user_selected_start_date: anchorMonday,
+          // Persist authoring baselines metadata for runtime use
+          ...(libPlan?.template?.baselines_required ? { baselines_required: libPlan.template.baselines_required } : {}),
+          ...(typeof libPlan?.template?.units === 'string' ? { units: libPlan.template.units } : {}),
+          // Persist adaptive metadata for runtime
+          ...(libPlan?.template?.adaptive_scaling ? { adaptive_scaling: libPlan.template.adaptive_scaling } : {}),
+          ...(libPlan?.template?.progression_rules ? { progression_rules: libPlan.template.progression_rules } : {}),
+          ...(libPlan?.template?.volume_distribution ? { volume_distribution: libPlan.template.volume_distribution } : {}),
+          ...(libPlan?.template?.weekly_frequency ? { weekly_frequency: libPlan.template.weekly_frequency } : {}),
+          ...(libPlan?.template?.phase_adjustments ? { phase_adjustments: libPlan.template.phase_adjustments } : {}),
+          ...(libPlan?.template?.recovery_patterns ? { recovery_patterns: libPlan.template.recovery_patterns } : {}),
+          ...(libPlan?.template?.load_management ? { load_management: libPlan.template.load_management } : {}),
+          ...(libPlan?.template?.equipment_scaling ? { equipment_scaling: libPlan.template.equipment_scaling } : {}),
+          ...(libPlan?.template?.strength_progression ? { strength_progression: libPlan.template.strength_progression } : {}),
+          ...(libPlan?.template?.endurance_progression ? { endurance_progression: libPlan.template.endurance_progression } : {}),
+          ...(libPlan?.template?.load_monitoring ? { load_monitoring: libPlan.template.load_monitoring } : {}),
           ...(hasTriVars ? { 
             tri_acceptance: {
               race_date: raceDate,
