@@ -452,7 +452,7 @@ export default function PlanSelect() {
         const dd = String(mon.getDate()).padStart(2,'0');
         return `${y}-${m}-${dd}`;
       };
-      const startIso = (startEdited && startDate) ? startDate : (()=>{ const t=new Date(); const y=t.getFullYear(); const m=String(t.getMonth()+1).padStart(2,'0'); const d=String(t.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; })();
+      const startIso = (startDate && startDate.trim().length>0) ? startDate : (()=>{ const t=new Date(); const y=t.getFullYear(); const m=String(t.getMonth()+1).padStart(2,'0'); const d=String(t.getDate()).padStart(2,'0'); return `${y}-${m}-${d}`; })();
       const rdMon = mondayOf(raceDate);
       const stMon = mondayOf(startIso);
       const toLocalMs = (iso: string) => { const p = iso.split('-').map(x=>parseInt(x,10)); const d = new Date(p[0], (p[1]||1)-1, p[2]||1); return d.getTime(); };
