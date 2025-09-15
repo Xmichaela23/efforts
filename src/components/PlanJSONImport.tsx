@@ -114,6 +114,10 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
     // If author provided min/max weeks with sessions_by_week, strip before schema validate
     if (typeof out.min_weeks !== 'undefined') delete out.min_weeks;
     if (typeof out.max_weeks !== 'undefined') delete out.max_weeks;
+    // Strip other non-schema helpers that authors may include
+    if (typeof out.id !== 'undefined') delete out.id;
+    if (typeof out.plan_note !== 'undefined') delete out.plan_note;
+    if (typeof out.week_notes !== 'undefined') delete out.week_notes;
     // ui_text is not part of schema; strip for validation (we will reattach after validate)
     delete out.ui_text;
     return out;
