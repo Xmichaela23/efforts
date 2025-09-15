@@ -961,7 +961,8 @@ export default function PlanSelect() {
         <div className="text-sm font-medium">Scheduling Preferences</div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* Triathlon acceptance fields (race date + optional strength track) */}
-          {triVars.minWeeks && triVars.maxWeeks && (
+          {
+            true && (
             <>
               <div>
                 <div className="text-xs text-gray-700 mb-1">Race date</div>
@@ -982,7 +983,9 @@ export default function PlanSelect() {
             <div className="text-xs text-gray-700 mb-1">Start date</div>
             <input type="date" value={startDate} onChange={e=>{ setStartDate(e.target.value); setStartEdited(true); }} className="w-full border border-gray-300 rounded px-2 py-1 text-sm" />
           </div>
-          {(hasRun || isTriBlueprint) && (
+          {(
+            true
+          ) && (
             <div>
               <div className="text-xs text-gray-700 mb-1">Long run day</div>
               <select value={longRunDay} onChange={e=>setLongRunDay(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
@@ -990,7 +993,9 @@ export default function PlanSelect() {
               </select>
             </div>
           )}
-          {(hasRide || isTriBlueprint) && (
+          {(
+            true
+          ) && (
             <div>
               <div className="text-xs text-gray-700 mb-1">Long ride day</div>
               <select value={longRideDay} onChange={e=>setLongRideDay(e.target.value)} className="w-full border border-gray-300 rounded px-2 py-1 text-sm">
