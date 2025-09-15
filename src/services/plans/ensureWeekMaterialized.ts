@@ -780,6 +780,43 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       return out;
     };
     const computedTargets = deriveTargetColumns(computedStepsV3, mappedType);
+
+    // Build structured strength exercises from st_* tokens
+    const strengthFromTokens = (stepsPreset?: any[]): any[] | undefined => {
+      if (mappedType !== 'strength') return undefined;
+      const steps: string[] = Array.isArray(stepsPreset) ? stepsPreset.map((t:any)=>String(t)) : [];
+      if (!steps.length) return undefined;
+      const ex: any[] = [];
+      const toTitle = (slug: string) => slug.split('_').map(w => w.length? w[0].toUpperCase()+w.slice(1) : '').join(' ').replace(/Ohp/i,'Overhead Press').replace(/Bw/i,'BW');
+      const pick1RM = (name: string): number | undefined => {
+        const n = name.toLowerCase();
+        if (n.includes('dead')) return perfNumbers?.deadlift;
+        if (n.includes('bench') || n.includes('pull-up')|| n.includes('pullup')|| n.includes('row')) return perfNumbers?.bench;
+        if (n.includes('overhead') || n.includes('ohp') || n.includes('press')) return perfNumbers?.overheadPress1RM || perfNumbers?.overhead;
+        return perfNumbers?.squat;
+      };
+      const round5 = (n:number) => Math.round(n/5)*5;
+      for (const tok of steps){
+        const t = tok.toLowerCase();
+        if (!/^st_/.test(t)) continue;
+        // st_main_bench_press_4x6_@pct75-80_rest120
+        const m = t.match(/^st_(?:main|acc)_([^@]+?)_(\d+)x(\d+)(?:_@pct(\d{1,3})(?:-(\d{1,3}))?)?(?:_rest(\d+))?$/i);
+        if (m){
+          const slug = m[1].replace(/_rest\d+$/,'');
+          const sets = parseInt(m[2],10);
+          const reps = parseInt(m[3],10);
+          const pctLo = m[4]?parseInt(m[4],10):undefined;
+          const pctHi = m[5]?parseInt(m[5],10):undefined;
+          const rest = m[6]?parseInt(m[6],10):undefined;
+          const name = toTitle(slug.replace(/_/g,' '));
+          const orm = pick1RM(name);
+          const pct = (typeof pctLo==='number' && typeof pctHi==='number') ? ((pctLo+pctHi)/2) : pctLo;
+          const est = (typeof orm==='number' && typeof pct==='number') ? round5(orm*(pct/100)) : undefined;
+          ex.push({ name, sets, reps, percent: pctLo && pctHi ? `${pctLo}-${pctHi}%` : (pctLo? `${pctLo}%`: undefined), rest_s: rest, est_load_lb: est });
+        }
+      }
+      return ex.length? ex: undefined;
+    };
     // For swims, build a concise grouped summary for cards (Today/Weekly)
     if (mappedType === 'swim' && Array.isArray(computedStepsV3) && computedStepsV3.length>0) {
       try {
@@ -924,7 +961,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
       intervals: (buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers) || intervalsFromNorm),
-      strength_exercises: Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined,
+      strength_exercises: (Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined) || strengthFromTokens(s.steps_preset),
     });
   }
 
