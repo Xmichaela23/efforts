@@ -270,9 +270,48 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     .single();
   if (planErr || !plan) throw planErr || new Error('Plan not found');
 
-  const sessionsByWeek = (plan as any).sessions_by_week || {};
+  let sessionsByWeek = (plan as any).sessions_by_week || {};
   const planDefaults = (plan as any)?.defaults || DEFAULTS_FALLBACK;
-  const weekSessions: any[] = sessionsByWeek[String(weekNumber)] || [];
+  let weekSessions: any[] = sessionsByWeek[String(weekNumber)] || [];
+  // Fallback: if week is empty, try to bake from library blueprint using acceptance metadata
+  if (!Array.isArray(weekSessions) || weekSessions.length === 0) {
+    try {
+      const catalogId = (plan as any)?.config?.catalog_id;
+      if (catalogId) {
+        const { data: lib } = await supabase.from('library_plans').select('template').eq('id', catalogId).maybeSingle();
+        const tmpl = lib?.template || {};
+        // Prefer template.sessions_by_week if authored
+        let baked: Record<string, any[]> | null = (tmpl?.sessions_by_week as any) || null;
+        if (!baked && tmpl?.phase_blueprint) {
+          try {
+            const { bakeBlueprintToSessions } = await import('@/services/plans/composeTri');
+            const tri = (plan as any)?.config?.tri_acceptance || {};
+            const total = Number((tri?.weeks_to_race || (plan as any)?.duration_weeks || 12));
+            const rd = String(tri?.race_date || '') || undefined;
+            const raceISO = rd || (() => {
+              // derive from selected start Monday + duration
+              const startIso = String((plan as any)?.config?.user_selected_start_date || '').trim();
+              if (!startIso) return undefined;
+              const p = startIso.split('-').map((x:string)=>parseInt(x,10));
+              const base = new Date(p[0], (p[1]||1)-1, p[2]||1);
+              base.setDate(base.getDate() + (total-1)*7 + 6); // end of final week (Sun)
+              const y = base.getFullYear();
+              const m = String(base.getMonth()+1).padStart(2,'0');
+              const d = String(base.getDate()).padStart(2,'0');
+              return `${y}-${m}-${d}`;
+            })();
+            if (raceISO) baked = bakeBlueprintToSessions(tmpl as any, total, raceISO);
+          } catch {}
+        }
+        if (baked && Object.keys(baked).length) {
+          // Persist baked sessions on plan for future materializations
+          await supabase.from('plans').update({ sessions_by_week: baked }).eq('id', planId);
+          sessionsByWeek = baked;
+          weekSessions = baked[String(weekNumber)] || [];
+        }
+      }
+    } catch {}
+  }
   if (!Array.isArray(weekSessions) || weekSessions.length === 0) return { inserted: 0 };
 
   // 4) Determine export_hints from library plan, if available
