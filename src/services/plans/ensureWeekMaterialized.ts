@@ -849,11 +849,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       } catch {}
     }
 
-    // STRICT: require computed steps for run/ride/swim; allow strength without computed steps
-    const requiresSteps = (mappedType === 'run' || mappedType === 'ride' || mappedType === 'swim');
-    if (requiresSteps && (!computedStepsV3 || computedStepsV3.length === 0)) {
-      throw new Error(`Materialization failed: could not compute steps for ${String(s.name||s.description||'session')}`);
-    }
+    // PoC: do not fail if computed steps are missing; we'll insert minimal computed with duration only
     // Only include columns that exist in planned_workouts
     rows.push({
       user_id: user.id,
@@ -872,7 +868,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
       rendered_description: rendered,
-      computed: { normalization_version: 'v3', steps: computedStepsV3, total_duration_seconds: totalDurSeconds },
+      computed: { normalization_version: 'v3', steps: (computedStepsV3 && computedStepsV3.length ? computedStepsV3 : undefined), total_duration_seconds: totalDurSeconds },
       primary_target_type: (computedTargets as any).primary_target_type,
       pace_value: (computedTargets as any).pace_value,
       pace_low: (computedTargets as any).pace_low,

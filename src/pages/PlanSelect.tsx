@@ -107,9 +107,9 @@ function composeSessionsFromBlueprint(template: any, totalWeeks: number): Record
     const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
     const inferDisc = (kind: string): 'run'|'ride'|'swim'|'strength' => {
       const k = String(kind||'').toLowerCase();
-      if (k.startsWith('run_')) return 'run';
-      if (k.startsWith('bike_')) return 'ride';
-      if (k.startsWith('swim_')) return 'swim';
+      if (k.startsWith('run_') || k==='run_openers' || k==='run_brick_easy' || k==='run_tempo' || k==='run_easy' || k==='run_long' || k==='shakeout') return 'run';
+      if (k.startsWith('bike_') || k==='race_rehearsal_bike' || k==='bike_openers' || k==='bike_sharpen' || k==='bike_easy' || k==='bike_tempo' || k==='bike_long_progressive') return 'ride';
+      if (k.startsWith('swim_') || k==='swim_open_water_or_pool') return 'swim';
       return 'strength';
     };
     const kindToTokens = (kind: string, variant: any): string[] => {
@@ -118,10 +118,11 @@ function composeSessionsFromBlueprint(template: any, totalWeeks: number): Record
       if (k === 'bike_tempo') return ['warmup_bike_quality_15min_fastpedal','bike_thr_2x20min_R5min','cooldown_bike_easy_10min'];
       if (k === 'bike_long_progressive') return ['bike_endurance_120min'];
       if (k === 'bike_easy' || k === 'bike_sharpen' || k==='bike_openers') return ['bike_endurance_60min'];
+      if (k === 'race_rehearsal_bike') return ['bike_endurance_180min'];
       if (k === 'run_intervals') return ['warmup_run_quality_12min','interval_6x800m_5kpace_R2min','cooldown_easy_10min'];
       if (k === 'run_tempo') return ['warmup_run_quality_12min','tempo_4mi','cooldown_easy_10min'];
       if (k === 'run_openers') return ['strides_6x20s'];
-      if (k === 'run_brick_easy') return ['longrun_20min'];
+      if (k === 'run_brick_easy' || k==='shakeout') return ['longrun_20min'];
       if (k === 'run_easy') return ['longrun_40min'];
       if (k === 'run_long') return ['longrun_90min'];
       if (k === 'swim_technique' || k==='swim_easy_tech') return ['swim_warmup_200yd_easy','swim_drills_4x50yd_catchup','swim_drills_4x50yd_singlearm','swim_pull_2x100yd','swim_kick_2x100yd','swim_cooldown_200yd_easy'];
