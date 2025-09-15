@@ -691,12 +691,41 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       }
 
       // Endurance bike single block e.g., bike_endurance_50min...
-      const bend = tokenStr.match(/bike_endurance_(\d+)min/i);
+      const bend = tokenStr.match(/bike_endurance_(\d+)min(?:_z(?:1|2)(?:-(?:2|3))?)?(?:_cad\d+(?:-\d+)?)?/i);
       if (bend) out.push({ effortLabel: 'endurance', duration: parseInt(bend[1],10)*60 });
+
+      // Speed strides e.g., speed_8x20s_R60s
+      const spd = tokenStr.match(/speed_(\d+)x(\d+)s_r(\d+)s/i);
+      if (spd) { const reps=parseInt(spd[1],10), sec=parseInt(spd[2],10), rest=parseInt(spd[3],10); for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'interval', duration: sec }); if(r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } }
+
+      // Tempo with explicit 5k offset e.g., tempo_4mi_5kpace_plus0:45
+      const tmp = tokenStr.match(/tempo_(\d+(?:\.\d+)?)mi(?:_5kpace_plus(\d+):(\d{2}))?/i);
+      if (tmp) {
+        const miles = parseFloat(tmp[1]);
+        let base = fivekPace || easyPace || undefined;
+        if (base && tmp[2] && tmp[3]) {
+          const addMin = parseInt(tmp[2],10); const addSec = parseInt(tmp[3],10);
+          const p = base.match(/(\d+):(\d{2})\/(mi|km)/i);
+          if (p) { const sec = parseInt(p[1],10)*60+parseInt(p[2],10) + (addMin*60+addSec); base = `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/${p[3]}`; }
+        }
+        out.push({ effortLabel: 'tempo', distanceMeters: toMeters(miles, 'mi'), ...(base ? { paceTarget: base } : {}) });
+      }
 
       // Long run blocks e.g., longrun_90min...
       const lr = tokenStr.match(/longrun_(\d+)min/i);
       if (lr) out.push({ effortLabel: 'long run', duration: parseInt(lr[1],10)*60, ...(isRun && easyPace ? { paceTarget: easyPace } : {}) });
+
+      // Cruise reps (coarse support) e.g., cruise_4x2mi_5kpace_plus0:15_R3min
+      const cr = tokenStr.match(/cruise_(\d+)x(\d+(?:\.\d+)?)mi_5kpace_plus(\d+):(\d{2})_r(\d+)min/i);
+      if (cr) {
+        const reps=parseInt(cr[1],10); const miles=parseFloat(cr[2]); const addMin=parseInt(cr[3],10); const addSec=parseInt(cr[4],10); const rmin=parseInt(cr[5],10);
+        let base = fivekPace || undefined;
+        if (base) {
+          const p = base.match(/(\d+):(\d{2})\/(mi|km)/i);
+          if (p) { const sec = parseInt(p[1],10)*60+parseInt(p[2],10) + (addMin*60+addSec); base = `${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/${p[3]}`; }
+        }
+        for(let r=0;r<reps;r+=1){ out.push({ effortLabel:'cruise', distanceMeters: toMeters(miles,'mi'), ...(base?{ paceTarget: base }: {}) }); if(r<reps-1) out.push({ effortLabel:'rest', duration: rmin*60 }); }
+      }
 
       // Swim simple translation from tokens expanded earlier (distances only)
       if (String(discipline||'').toLowerCase()==='swim'){
@@ -704,6 +733,9 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           const s = String(t).toLowerCase();
           let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
           if (m){ const dist=parseInt(m[1],10); const u=(m[2]||'yd').toLowerCase() as any; out.push({ effortLabel: /warmup/i.test(s)?'warm up':'cool down', distanceMeters: toMeters(dist, u) }); return; }
+          // swim_drill tokens with rest/equipment suffixes: swim_drill_singlearm_4x50yd_r20_fins
+          m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|snorkel|buoy))?/i);
+          if (m){ const reps=parseInt(m[2],10), each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; const rest=m[5]?parseInt(m[5],10):0; for(let r=0;r<reps;r+=1){ out.push({ effortLabel: 'drill', distanceMeters: toMeters(each, u) }); if(rest && r<reps-1) out.push({ effortLabel:'rest', duration: rest }); } return; }
           m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i);
           if (m){ const reps=parseInt(m[1],10), each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; for(let r=0;r<reps;r+=1) out.push({ effortLabel: 'drill', distanceMeters: toMeters(each, u) }); return; }
           m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i);
