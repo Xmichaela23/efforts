@@ -1057,6 +1057,39 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           .eq('week_number', selectedWeek)
           .order('day_number', { ascending: true });
         if (Array.isArray(rows)) {
+          // Auto-rebake rows missing computed or with mismatched duration
+          try {
+            const { expand } = await import('@/services/plans/expander');
+            const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
+            const pn = (baselines as any)?.performanceNumbers || {};
+            const updates: any[] = [];
+            for (const r of rows as any[]) {
+              const type = String(r.type||'').toLowerCase();
+              const stepsPreset = (() => { try { return Array.isArray(r.steps_preset) ? r.steps_preset : JSON.parse(r.steps_preset||'[]'); } catch { return []; } })();
+              const computed = (r as any).computed || {};
+              const secRaw = computed?.total_duration_seconds as any;
+              const secNum = typeof secRaw === 'number' ? secRaw : (typeof secRaw === 'string' ? parseInt(secRaw, 10) : NaN);
+              const hasComputed = Array.isArray(computed?.steps) && computed.steps.length > 0 && Number.isFinite(secNum) && secNum > 0;
+              if (!hasComputed && Array.isArray(stepsPreset) && stepsPreset.length > 0) {
+                const atomic: any[] = expand(stepsPreset as any, (r as any).main, (r as any).tags);
+                const resolved: any[] = resolveTargets(atomic as any, pn, (r as any).export_hints || {}, type);
+                if (Array.isArray(resolved) && resolved.length) {
+                  const total = totalDurationSeconds(resolved as any);
+                  updates.push({ id: r.id, computed: { normalization_version: 'v3', steps: resolved, total_duration_seconds: total }, duration: Math.round(total/60) });
+                }
+              } else if (Number.isFinite(secNum)) {
+                const min = Math.round(secNum/60);
+                if (typeof r.duration !== 'number' || r.duration !== min) {
+                  updates.push({ id: r.id, duration: min });
+                }
+              }
+            }
+            if (updates.length) {
+              for (const u of updates) {
+                await supabase.from('planned_workouts').update(u).eq('id', u.id);
+              }
+            }
+          } catch {}
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const normalized = rows.map((w: any) => {
             const dayName = numToDay[(w as any).day_number as number] || (w as any).day || '';
@@ -1660,7 +1693,16 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                     <div className="flex-1">
                                       <div className="font-medium flex items-center gap-2">
                                         <span>{(()=>{ const nm=(workout.name||''); const t=(workout.type||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
-                                        {(() => { const sec = workout?.computed?.total_duration_seconds; const min = (typeof sec==='number' && sec>0) ? Math.round(sec/60) : (typeof workout.duration==='number' ? workout.duration : null); return (typeof min==='number') ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(min)}</span>) : null; })()}
+                                        {(() => {
+                                          const secRaw = (workout as any)?.computed?.total_duration_seconds as any;
+                                          const secNum = typeof secRaw === 'number' ? secRaw : (typeof secRaw === 'string' ? parseInt(secRaw, 10) : NaN);
+                                          const min = Number.isFinite(secNum) && secNum > 0
+                                            ? Math.round(secNum / 60)
+                                            : (typeof workout.duration === 'number' ? workout.duration : null);
+                                          return (typeof min === 'number')
+                                            ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(min)}</span>)
+                                            : null;
+                                        })()}
                                       </div>
                                       <div className="text-sm text-gray-600 mt-1">{buildWeeklySubtitle(workout)}</div>
                                     </div>
