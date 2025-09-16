@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { resolveTargets } from '@/services/plans/targets';
+import { expand } from '@/services/plans/expander';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -1577,7 +1580,35 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           </span>
                                         )}
                                       </div>
-                                      <div className="text-sm text-gray-600 mt-1">{(workout as any).rendered_description || workout.description}</div>
+                                      <div className="text-sm text-gray-600 mt-1">
+                                        {(() => {
+                                          try {
+                                            // Prefer tokens/computed to build a concise subtitle line
+                                            const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+                                            const comp: any = (workout as any).computed || {};
+                                            const hasV3 = Array.isArray(comp?.steps) && comp.steps.length>0;
+                                            if (hasV3) {
+                                              const res = normalizePlannedSession(
+                                                { ...workout, steps_preset: stepsPreset },
+                                                { performanceNumbers: {} },
+                                                (workout as any).export_hints || {}
+                                              );
+                                              if (res?.friendlySummary) return res.friendlySummary;
+                                            }
+                                            if (!hasV3 && stepsPreset.length>0) {
+                                              // Expand tokens on the fly to avoid any import/materialize timing issues
+                                              const atomic = expand(stepsPreset, (workout as any).main, (workout as any).tags);
+                                              const resolved = resolveTargets(atomic as any, ({} as any), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
+                                              if (Array.isArray(resolved) && resolved.length) {
+                                                const tmp = { computed: { steps: resolved, total_duration_seconds: resolved.reduce((s:any,x:any)=>s+(x?.duration_s||0),0) }, type: (workout as any).type } as any;
+                                                const res = normalizePlannedSession(tmp, { performanceNumbers: {} }, (workout as any).export_hints || {});
+                                                if (res?.friendlySummary) return res.friendlySummary;
+                                              }
+                                            }
+                                          } catch {}
+                                          return (workout as any).rendered_description || workout.description;
+                                        })()}
+                                      </div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
