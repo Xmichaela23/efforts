@@ -1242,7 +1242,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
 
   const handleWorkoutClick = (workout: any) => {
-    setSelectedWorkout(workout);
+    // Attach plan-level daily instructions so Planned view can show Guidance
+    const planDaily = (selectedPlanDetail as any)?.daily_instructions || (selectedPlanDetail as any)?.template?.daily_instructions || null;
+    setSelectedWorkout(planDaily ? { ...workout, plan_daily_instructions: planDaily } : workout);
     setWorkoutViewMode('summary');
     setCurrentView('day');
   };

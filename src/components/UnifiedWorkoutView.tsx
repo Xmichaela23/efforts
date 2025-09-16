@@ -330,7 +330,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             <Calendar className="h-4 w-4" />
           </div>
           <div>
-            <h2 className="font-semibold text-lg">{generateWorkoutTitle()}</h2>
+            <h2 className="font-semibold text-lg">
+              {(() => {
+                const st = String((hydratedPlanned as any)?.workout_structure?.title || (workout as any)?.workout_structure?.title || '').trim();
+                if (st) return st;
+                return generateWorkoutTitle();
+              })()}
+            </h2>
             <p className="text-sm text-muted-foreground leading-snug font-sans [font-variant-numeric:lining-nums_tabular-nums] [font-feature-settings:'lnum'_1,'tnum'_1] flex items-baseline">
               {(() => {
                 try {
