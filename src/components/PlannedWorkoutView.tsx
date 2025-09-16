@@ -581,7 +581,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             
             // Fallback C: parse strength tokens from steps_preset
             if (lines.length === 0) {
-              const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
+              const stepsPresetArr: string[] | undefined = readStepsPreset((workout as any).steps_preset);
               if (stepsPresetArr && stepsPresetArr.length) {
                 for (const t of stepsPresetArr) {
                   const s = String(t).toLowerCase();
@@ -616,7 +616,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         }
         // Strict authored: if tokens are present, rebuild from tokens even if computed exists
         try {
-          const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
+          const stepsPresetArr: string[] | undefined = readStepsPreset((workout as any).steps_preset);
           if (stepsPresetArr && stepsPresetArr.length > 0) {
             const { expand } = await import('@/services/plans/expander');
             const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
@@ -637,7 +637,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         } else {
           // Per-workout backfill: if we have tokens (preferred) or intervals but no computed, synthesize computed and persist
           try {
-            const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
+            const stepsPresetArr: string[] | undefined = readStepsPreset((workout as any).steps_preset);
             const intervalsRaw: any[] | undefined = Array.isArray((workout as any).intervals) ? (workout as any).intervals : undefined;
             if ((stepsPresetArr && stepsPresetArr.length > 0) || (workout as any).main) {
               // Use centralized expander + resolver for accurate targets and durations
@@ -678,7 +678,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             if (expanded.length) {
               // Prepend/append WU/CD from tokens if available, without duplicating
               const tokenLinesWUCD = interpretTokensPerRep(
-                (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
+                (readStepsPreset((workout as any).steps_preset) || ([] as string[])),
                 String((workout as any).type || ''),
                 ((workout as any).export_hints || {}),
                 (perfNumbers || {})
@@ -691,7 +691,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           }
           const perfObj = (pn || {});
           const tokenLines = interpretTokensPerRep(
-            (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
+            (readStepsPreset((workout as any).steps_preset) || ([] as string[])),
             String((workout as any).type || ''),
             ((workout as any).export_hints || {}),
             perfObj
@@ -1370,6 +1370,19 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
       pushSeg(cur, nxt);
     }
     return lines;
+  };
+
+  // Robust steps_preset reader: accepts array, object, or JSON string
+  const readStepsPreset = (src: any): string[] | undefined => {
+    try {
+      if (Array.isArray(src)) return src as string[];
+      if (src && typeof src === 'object') return src as string[];
+      if (typeof src === 'string' && src.trim().length) {
+        const parsed = JSON.parse(src);
+        return Array.isArray(parsed) ? (parsed as string[]) : undefined;
+      }
+    } catch {}
+    return undefined;
   };
 
   // Remove duplicate lines while preserving order
