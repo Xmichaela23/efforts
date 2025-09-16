@@ -203,6 +203,68 @@ export function generateDetailedWorkoutTemplate(
     return generateStrengthWorkoutTemplate(computed, baselines, workoutType, description);
   }
 
+  // V3 computed adapter: when steps carry `type`/`duration_s`/`distance_m` fields,
+  // render every step in order instead of summarizing. This preserves authored detail.
+  try {
+    const looksLikeV3 = Array.isArray(computed?.steps) && computed.steps.some((s: any) => typeof (s as any)?.type === 'string' || typeof (s as any)?.duration_s === 'number' || typeof (s as any)?.distance_m === 'number');
+    if (looksLikeV3) {
+      const stepsOut: WorkoutStep[] = [];
+      const toMiles = (m: number) => (m / 1609.34);
+      const fmtMiles = (mi: number) => {
+        const n = Math.abs(mi - Math.round(mi)) < 1e-6 ? Math.round(mi) : (mi < 1 ? parseFloat(mi.toFixed(2)) : parseFloat(mi.toFixed(1)));
+        return `${n} mi`;
+      };
+      const parsePower = (txt?: string): number | null => {
+        const m = String(txt || '').match(/(\d+)\s*w/i); return m ? parseInt(m[1], 10) : null;
+      };
+      const powerRangeStr = (low?: string, high?: string): string | undefined => {
+        const lo = parsePower(low); const hi = parsePower(high); if (lo && hi) return `${lo}–${hi}W`; return undefined;
+      };
+      const powerCenterStr = (val?: string): string | undefined => { const c = parsePower(val); return c ? `${c}W` : undefined; };
+      const typeLower = String(workoutType || '').toLowerCase();
+      (computed.steps as any[]).forEach((st: any) => {
+        const t = String(st?.type || '').toLowerCase();
+        const isWU = t === 'warmup' || t === 'swim_warmup';
+        const isCD = t === 'cooldown' || t === 'swim_cooldown';
+        const isWork = t === 'interval_work' || (t === 'steady' && (typeLower === 'ride' || typeLower === 'bike')) || /^swim_/.test(t) && !isWU && !isCD;
+        const isRest = t === 'interval_rest';
+        const duration = typeof st?.duration_s === 'number' && st.duration_s > 0 ? formatTime(st.duration_s) : undefined;
+        const distMiles = typeof st?.distance_m === 'number' && st.distance_m > 0 ? fmtMiles(toMiles(st.distance_m)) : undefined;
+        // Targets
+        let target: string | undefined; let range: string | undefined;
+        if (typeof st?.power_low === 'string' || typeof st?.power_high === 'string' || typeof st?.target_value === 'string') {
+          target = powerCenterStr(st?.target_value);
+          range = powerRangeStr(st?.power_low ?? st?.target_low, st?.power_high ?? st?.target_high);
+        } else if (typeof st?.pace_sec_per_mi === 'number') {
+          target = `@ ${formatPace(st.pace_sec_per_mi)}`;
+          if (st?.pace_range) range = `Range: ${formatPace(st.pace_range.lower)} – ${formatPace(st.pace_range.upper)}`;
+        }
+        if (isWU) {
+          stepsOut.push({ type: 'warmup', description: 'Warm-Up', duration, target, range });
+          return;
+        }
+        if (isCD) {
+          stepsOut.push({ type: 'cooldown', description: 'Cool-Down', duration, target, range });
+          return;
+        }
+        if (isRest) {
+          stepsOut.push({ type: 'recovery', description: 'Rest', duration });
+          return;
+        }
+        if (isWork) {
+          const body = distMiles ? distMiles : duration ? duration : '';
+          stepsOut.push({ type: 'main', description: `1 × ${body}`.trim(), target: target ? target.replace(/^@\s*/,'@ ') : undefined, range });
+          return;
+        }
+      });
+      return {
+        title: workoutType,
+        totalDuration: computed?.total_duration_seconds ? formatDuration(computed.total_duration_seconds) : 'Duration not specified',
+        steps: stepsOut.length ? stepsOut : [{ type: 'main', description: 'Workout details not available' }]
+      };
+    }
+  } catch {}
+
   // Check if this is an optional workout or has alternatives (always check description)
   const isOptional = description?.toLowerCase().includes('(optional)') || description?.toLowerCase().includes('optional');
   const hasAlternatives = description?.includes('Alternative:') || description?.includes('OR');
