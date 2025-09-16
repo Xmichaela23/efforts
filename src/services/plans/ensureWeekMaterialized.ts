@@ -369,6 +369,113 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         if (Array.isArray(steps) && steps.length) s.steps_preset = steps;
       }
     } catch {}
+    // Bridge: synthesize structured workout from tokens when authoring uses steps_preset
+    try {
+      const buildStructuredFromTokens = (stepsPreset?: any[], discipline?: string): any | null => {
+        const steps: string[] = Array.isArray(stepsPreset) ? stepsPreset.map((t:any)=>String(t)) : [];
+        if (!steps.length) return null;
+        const disc = String(discipline || s.discipline || s.type || '').toLowerCase();
+        const m = (re: RegExp) => steps.map(t=>t.toLowerCase().match(re)).find(Boolean) as RegExpMatchArray | undefined;
+        const mins = (n:number)=>`${n}min`;
+        const toInt = (x:string|undefined)=> x?parseInt(x,10):0;
+        const sumDur = (arr: string[]): number => arr.reduce((a,v)=>{
+          const mm = v.match(/(\d+)\s*min/i); return a + (mm?parseInt(mm[1],10):0);
+        },0);
+
+        // RUN — intervals
+        if (disc==='run') {
+          const wu = m(/warmup.*?(\d+)min/);
+          const cd = m(/cooldown.*?(\d+)min/);
+          const iv = m(/^interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([a-z0-9]+).*?(?:_r(\d+)(?:s|min)?)?/i);
+          const tp = m(/^tempo_(\d+)min_5kpace(?:_plus(\d+):(\d{2}))?/i);
+          const lr = m(/^longrun_(\d+)min_easypace/i) || m(/^run_easy_(\d+)min/i);
+          if (iv) {
+            const reps = toInt(iv[1]); const dist = `${iv[2]}${iv[3]}`; const rest = iv[5]? (/min/i.test(String(iv[0]))?`${iv[5]}min`:`${iv[5]}s`): undefined;
+            const ws: any = { type:'interval_session', total_duration_estimate: mins((wu?toInt(wu[1]):0)+(cd?toInt(cd[1]):0)), structure: [] as any[] };
+            if (wu) ws.structure.push({ type:'warmup', duration: mins(toInt(wu[1])), intensity:'easy' });
+            ws.structure.push({ type:'main_set', set_type:'intervals', repetitions: reps, work_segment: { distance: dist, target_pace:'user.fiveK_pace' }, recovery_segment: rest? { duration: rest, activity:'easy_jog', intensity:'recovery' } : undefined });
+            if (cd) ws.structure.push({ type:'cooldown', duration: mins(toInt(cd[1])), intensity:'easy' });
+            return ws;
+          }
+          if (tp) {
+            const dur = mins(toInt(tp[1])); const plus = (tp[2] && tp[3])? `+${tp[2]}:${tp[3]}/mile` : undefined;
+            const ws: any = { type:'tempo_session', total_duration_estimate: dur, structure: [] as any[] };
+            if (wu) ws.structure.push({ type:'warmup', duration: mins(toInt(wu[1])), intensity:'easy_building' });
+            ws.structure.push({ type:'main_set', set_type:'tempo_run', work_segment: { duration: dur, target_pace: plus? { baseline:'user.fiveK_pace', modifier: plus } : 'user.fiveK_pace' } });
+            if (cd) ws.structure.push({ type:'cooldown', duration: mins(toInt(cd[1])), intensity:'easy' });
+            return ws;
+          }
+          if (lr) {
+            const dur = mins(toInt(lr[1]));
+            return { type:'endurance_session', total_duration_estimate: dur, structure: [ { type:'main_effort', duration: dur, target_pace:'user.easyPace', intensity:'aerobic_base' } ] };
+          }
+        }
+
+        // BIKE — endurance & intervals
+        if (disc==='bike' || disc==='ride') {
+          const endu = m(/^bike_endurance_(\d+)min(?:_z(\d)(?:-(\d))?)?/i);
+          const ss = m(/^bike_ss_(\d+)x(\d+)min_(?:r(\d+)min)/i);
+          const thr = m(/^bike_thr_(\d+)x(\d+)min_(?:r(\d+)min)/i);
+          const vo2 = m(/^bike_vo2_(\d+)x(\d+)(?:min|s)_(?:r(\d+)(?:min|s))/i);
+          if (endu) {
+            const dur = mins(toInt(endu[1]));
+            const z = endu[2]? parseInt(endu[2],10) : 2;
+            const range = z===1? '60-65%' : '65-75%';
+            return { type:'endurance_session', total_duration_estimate: dur, structure:[ { type:'main_effort', duration: dur, target_power:{ zone:'endurance', baseline:'user.ftp', range }, intensity:'aerobic_base' } ] };
+          }
+          const buildBikeSet = (label:'sweet_spot_intervals'|'threshold_intervals'|'vo2_intervals', mm:RegExpMatchArray|undefined) => {
+            if (!mm) return null; const reps=toInt(mm[1]); const work=mins(toInt(mm[2])); const rest=mm[3]? `${mm[3]}min` : undefined; return { type:'bike_intervals', total_duration_estimate: work, structure:[ { type:'warmup', duration:'15min', intensity:'easy_with_openers' }, { type:'main_set', set_type:label, repetitions: reps, work_segment:{ duration: work, target_power:{ baseline:'user.ftp', range: label==='sweet_spot_intervals'?'85-95%': label==='threshold_intervals'?'95-105%':'105-120%' } }, recovery_segment: rest? { duration: rest, intensity:'easy_spin' } : undefined }, { type:'cooldown', duration:'10min', intensity:'easy' } ] };
+          };
+          return buildBikeSet('sweet_spot_intervals', ss) || buildBikeSet('threshold_intervals', thr) || buildBikeSet('vo2_intervals', vo2);
+        }
+
+        // SWIM
+        if (disc==='swim') {
+          const wu = m(/^swim_warmup_(\d+)(yd|m)/i);
+          const cd = m(/^swim_cooldown_(\d+)(yd|m)/i);
+          const drill = m(/^swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+          const aero = m(/^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+          const thr = m(/^swim_threshold_(\d+)x(\d+)(yd|m)_r(\d+)/i) || m(/^swim_interval_(\d+)x(\d+)(yd|m)_r(\d+)/i);
+          const ws: any = { type:'swim_session', total_duration_estimate: '30min', structure: [] as any[] };
+          if (wu) ws.structure.push({ type:'warmup', distance: `${wu[1]}${wu[2]}`, intensity:'easy' });
+          if (drill) ws.structure.push({ type:'drill_set', drill_type: drill[1], repetitions: toInt(drill[2]), distance: `${drill[3]}${drill[4]}`, rest: drill[5]? `${drill[5]}s` : '15s' });
+          if (aero) ws.structure.push({ type:'main_set', set_type:'aerobic_intervals', repetitions: toInt(aero[1]), distance: `${aero[2]}${aero[3]}`, rest: aero[4]? `${aero[4]}s` : '15s' });
+          if (thr) ws.structure.push({ type:'main_set', set_type:'threshold_intervals', repetitions: toInt(thr[1]), distance: `${thr[2]}${thr[3]}`, rest: `${thr[4]}s` });
+          if (cd) ws.structure.push({ type:'cooldown', distance: `${cd[1]}${cd[2]}`, intensity:'easy' });
+          if (ws.structure.length) return ws;
+        }
+
+        // STRENGTH
+        if (disc==='strength') {
+          const ws: any = { type:'strength_session', total_duration_estimate: '45min', structure: [] as any[] };
+          steps.forEach(t=>{
+            let m = t.match(/^st_wu_(\d+)/i); if (m) { ws.structure.push({ type:'warmup', duration: `${m[1]}min` }); return; }
+            m = t.match(/^st_main_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?(?:_rest(\d+))?/i);
+            if (m) { const ex=m[1]; const sets=toInt(m[2]); const reps=toInt(m[3]); const pct= m[4]? toInt(m[4]) : undefined; const rest = m[5]? `${m[5]}s` : undefined; const base = /bench/.test(ex)?'user.bench':/squat/.test(ex)?'user.squat':/deadlift/.test(ex)?'user.deadlift':'user.overheadPress1RM'; ws.structure.push({ type:'main_lift', exercise: ex, sets, reps, load: pct? { type:'percentage', baseline: base, percentage: pct } : undefined, rest }); return; }
+            m = t.match(/^st_acc_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?(?:_rest(\d+))?/i);
+            if (m) { const ex=m[1]; const sets=toInt(m[2]); const reps=toInt(m[3]); const pct= m[4]? toInt(m[4]) : undefined; const rest = m[5]? `${m[5]}s` : undefined; const base = /row/.test(ex)?'user.bench':'user.overheadPress1RM'; ws.structure.push({ type:'accessory', exercise: ex, sets, reps, load: pct? { type:'percentage', baseline: base, percentage: pct } : undefined, rest }); return; }
+          });
+          if (ws.structure.length) return ws;
+        }
+
+        // BRICK (bike + run tokens)
+        if (disc==='brick') {
+          const bike = steps.find(t=>/^bike_/.test(t.toLowerCase()));
+          const run = steps.find(t=>/^(run_easy_|longrun_|tempo_)/.test(t.toLowerCase()));
+          if (bike && run) {
+            const bikeDur = (():string=>{ const m=bike.toLowerCase().match(/_(\d+)min/); return m? `${m[1]}min` : '60min'; })();
+            const runDur = (():string=>{ const m=run.toLowerCase().match(/_(\d+)min/); return m? `${m[1]}min` : '20min'; })();
+            return { type:'brick_session', total_duration_estimate: mins(toInt(bikeDur)+toInt(runDur)), structure:[ { type:'bike_segment', duration: bikeDur, target_power:{ baseline:'user.ftp', zone:'endurance', range: /z1/i.test(bike)?'60-65%':'65-75%' } }, { type:'transition', duration:'2min' }, { type:'run_segment', duration: runDur, target_pace: /tempo_/.test(run.toLowerCase())? { baseline:'user.fiveK_pace', modifier:'+45s/mile' } : 'user.easyPace' } ] };
+          }
+        }
+        return null;
+      };
+      if (!s.workout_structure) {
+        const bridged = buildStructuredFromTokens(s.steps_preset, s.discipline);
+        if (bridged) s.workout_structure = bridged;
+      }
+    } catch {}
+
     const dow = dayIndex[(s.day as string) || 'Monday'] || 1;
     const date = addDays(startDate, (weekNumber - 1) * 7 + (dow - 1));
     // If this is Week 1 and the user selected a mid-week start, skip earlier days
