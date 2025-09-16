@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
 import { expandSession, DEFAULTS_FALLBACK } from '@/services/plans/plan_dsl';
 import { expand } from './expander';
 import { resolveTargets, totalDurationSeconds } from './targets';
@@ -392,9 +392,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     let rendered = String(s.description || '');
     let totalSeconds = 0;
     try {
-      const norm = normalizePlannedSession(s, { performanceNumbers: perfNumbers }, exportHints || {});
-      // Prefer friendly summary when available
-      rendered = (norm.friendlySummary || rendered).trim();
+      // Prefer structured normalization when present
+      const hasStructured = s && typeof (s as any).workout_structure === 'object' && (s as any).workout_structure;
+      if (hasStructured) {
+        const sr = normalizeStructuredSession(s, { performanceNumbers: perfNumbers });
+        rendered = (sr.friendlySummary || rendered).trim();
+        totalSeconds = Math.max(0, Math.round((sr.durationMinutes || 0) * 60));
+      } else {
+        const norm = normalizePlannedSession(s, { performanceNumbers: perfNumbers }, exportHints || {});
+        rendered = (norm.friendlySummary || rendered).trim();
+        totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
+      }
       // Inject strength loads from user baselines when missing
       if (mappedType === 'strength') {
         try {
@@ -454,7 +462,6 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           rendered = addLoads(rendered);
         } catch {}
       }
-      totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
     } catch {}
 
     // Strength session-length presets (e.g., strength_main_45min, strength_power_40min, strength_circuit_30min)
@@ -1160,6 +1167,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       // If we successfully computed steps, clear rendered_description so UI uses rich steps
       rendered_description: (computedStepsV3 && computedStepsV3.length) ? null : rendered,
       computed: { normalization_version: 'v3', steps: (computedStepsV3 && computedStepsV3.length ? computedStepsV3 : undefined), total_duration_seconds: totalDurSeconds },
+      // New fast-path columns for Weekly/Planned
+      workout_structure: (s as any).workout_structure || null,
+      workout_title: ((s as any)?.workout_structure?.title || (s as any)?.title) || null,
+      friendly_summary: rendered || null,
+      total_duration_seconds: (totalDurSeconds && totalDurSeconds>0) ? totalDurSeconds : (totalSeconds && totalSeconds>0 ? totalSeconds : null),
       primary_target_type: (computedTargets as any).primary_target_type,
       pace_value: (computedTargets as any).pace_value,
       pace_low: (computedTargets as any).pace_low,
