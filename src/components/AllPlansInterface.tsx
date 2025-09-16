@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { normalizePlannedSession } from '@/services/plans/normalizer';
+import { normalizePlannedSession, normalizeStructuredSession } from '@/services/plans/normalizer';
 import { resolveTargets } from '@/services/plans/targets';
 import { expand } from '@/services/plans/expander';
 import { supabase } from '@/lib/supabase';
@@ -241,12 +241,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     })();
   }, [loadUserBaselines]);
 
-  // Helper: build weekly subtitle from tokens/computed using baselines
+  // Helper: build weekly subtitle from structured/tokens/computed using baselines
   const buildWeeklySubtitle = (workout: any): string | undefined => {
     try {
       const pn = (baselines as any)?.performanceNumbers || {};
       const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
       const type = String((workout as any).type || '').toLowerCase();
+      // 0) Structured workout preferred
+      const structured = (workout as any)?.workout_structure;
+      if (structured && typeof structured === 'object') {
+        try {
+          const res = normalizeStructuredSession(workout, { performanceNumbers: pn });
+          if (res?.friendlySummary) return res.friendlySummary;
+        } catch {}
+      }
       // Prefer token-based normalizer first (keeps stable labels and strength text)
       if (stepsPreset.length) {
         const res = normalizePlannedSession(
@@ -1811,6 +1819,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                                   (workout as any).export_hints || {}
                                                 );
                                                 if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
+                                              }
+                                              if (minutes == null) {
+                                                const structured = (workout as any)?.workout_structure;
+                                                if (structured && typeof structured === 'object') {
+                                                  const res2 = normalizeStructuredSession(workout, { performanceNumbers: pn });
+                                                  if (typeof res2?.durationMinutes === 'number' && res2.durationMinutes > 0) minutes = res2.durationMinutes;
+                                                }
                                               }
                                             } catch {}
                                           }

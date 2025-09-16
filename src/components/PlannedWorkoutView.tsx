@@ -614,6 +614,20 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             }
           } catch {}
         }
+        // Structured JSON: build lines first
+        try {
+          const ws: any = (workout as any)?.workout_structure;
+          if (ws && typeof ws === 'object') {
+            const { normalizeStructuredSession } = await import('@/services/plans/normalizer');
+            const res = normalizeStructuredSession(workout, { performanceNumbers: (perfNumbers || {}) });
+            if (Array.isArray(res?.stepLines) && res.stepLines.length) {
+              setStepLines(res.stepLines);
+              if (typeof res.durationMinutes === 'number' && res.durationMinutes > 0) setResolvedDuration(res.durationMinutes);
+              return;
+            }
+          }
+        } catch {}
+
         // Strict authored: if tokens are present, rebuild from tokens even if computed exists
         try {
           const stepsPresetArr: string[] | undefined = readStepsPreset((workout as any).steps_preset);
