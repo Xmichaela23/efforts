@@ -121,6 +121,58 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         return out;
       };
 
+        // Bridge helper: synthesize minimal workout_structure from tokens for existing rows
+        const buildStructuredFromTokens = (row: any): any | null => {
+          try {
+            const steps: string[] = Array.isArray(row?.steps_preset) ? (row.steps_preset as any[]).map((t:any)=>String(t)) : [];
+            if (!steps.length) return null;
+            const disc = String(row?.type || '').toLowerCase();
+            const m = (re: RegExp) => steps.map(t=>String(t).toLowerCase().match(re)).find(Boolean) as RegExpMatchArray | undefined;
+            const mins = (n:number)=>`${n}min`;
+            const toInt = (x:string|undefined)=> x?parseInt(x,10):0;
+            // RUN
+            if (disc==='run') {
+              const wu = m(/warmup.*?(\d+)min/);
+              const cd = m(/cooldown.*?(\d+)min/);
+              const iv = m(/^interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([a-z0-9]+).*?(?:_r(\d+)(?:s|min)?)?/i);
+              const lr = m(/^(?:longrun_|run_easy_)(\d+)min/i);
+              if (iv) {
+                const reps = toInt(iv[1]); const dist = `${iv[2]}${iv[3]}`; const rest = iv[5]? (/min/i.test(String(iv[0]))?`${iv[5]}min`:`${iv[5]}s`): undefined;
+                const ws: any = { type:'interval_session', total_duration_estimate: mins((wu?toInt(wu[1]):0)+(cd?toInt(cd[1]):0)), structure: [] as any[] };
+                if (wu) ws.structure.push({ type:'warmup', duration: mins(toInt(wu[1])), intensity:'easy' });
+                ws.structure.push({ type:'main_set', set_type:'intervals', repetitions: reps, work_segment: { distance: dist, target_pace:'user.fiveK_pace' }, recovery_segment: rest? { duration: rest, activity:'easy_jog', intensity:'recovery' } : undefined });
+                if (cd) ws.structure.push({ type:'cooldown', duration: mins(toInt(cd[1])), intensity:'easy' });
+                return ws;
+              }
+              if (lr) {
+                const dur = mins(toInt(lr[1]));
+                return { type:'endurance_session', total_duration_estimate: dur, structure: [ { type:'main_effort', duration: dur, target_pace:'user.easyPace', intensity:'aerobic_base' } ] };
+              }
+            }
+            // BIKE
+            if (disc==='ride' || disc==='bike') {
+              const endu = m(/^bike_endurance_(\d+)min(?:_z(\d)(?:-(\d))?)?/i);
+              if (endu) {
+                const dur = mins(toInt(endu[1]));
+                const z = endu[2]? parseInt(endu[2],10) : 2; const range = z===1? '60-65%' : '65-75%';
+                return { type:'endurance_session', total_duration_estimate: dur, structure:[ { type:'main_effort', duration: dur, target_power:{ zone:'endurance', baseline:'user.ftp', range }, intensity:'aerobic_base' } ] };
+              }
+            }
+            // BRICK
+            if (disc==='brick') {
+              const bike = steps.find(t=>/^bike_/.test(String(t).toLowerCase()));
+              const run = steps.find(t=>/^(run_easy_|longrun_|tempo_)/.test(String(t).toLowerCase()));
+              if (bike && run) {
+                const bd = (():string=>{ const mm=bike.toLowerCase().match(/_(\d+)min/); return mm? `${mm[1]}min` : '60min'; })();
+                const rd = (():string=>{ const mm=run.toLowerCase().match(/_(\d+)min/); return mm? `${mm[1]}min` : '20min'; })();
+                return { type:'brick_session', total_duration_estimate: mins(toInt(bd)+toInt(rd)), structure:[ { type:'bike_segment', duration: bd, target_power:{ baseline:'user.ftp', zone:'endurance', range: /z1/i.test(bike)?'60-65%':'65-75%' } }, { type:'transition', duration:'2min' }, { type:'run_segment', duration: rd, target_pace: /tempo_/.test(run.toLowerCase())? { baseline:'user.fiveK_pace', modifier:'+45s/mile' } : 'user.easyPace' } ] };
+              }
+            }
+            // SWIM and STRENGTH skipped in upgrade path (usually already fine without structured)
+            return null;
+          } catch { return null; }
+        };
+
       // Upgrade: populate computed.steps strictly from tokens (no synthesis from intervals). If tokens missing → fail
       const parsePace = (p?: string): { secPerMi: number | null } => {
         if (!p) return { secPerMi: null };
@@ -191,6 +243,22 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             await supabase.from('planned_workouts').update({ intervals: enriched }).eq('id', row.id);
           }
         } catch {}
+
+          // Bridge structured for existing rows if missing
+          try {
+            if (!row?.workout_structure) {
+              const bridged = buildStructuredFromTokens(row);
+              if (bridged) {
+                const sr = normalizeStructuredSession({ discipline: row.type, workout_structure: bridged }, { performanceNumbers: perfNumbersUpgrade });
+                await supabase.from('planned_workouts').update({
+                  workout_structure: bridged,
+                  workout_title: bridged?.title || null,
+                  friendly_summary: (sr?.friendlySummary || row.rendered_description || row.description || '').trim() || null,
+                  total_duration_seconds: Math.max(Number(row.total_duration_seconds||0), Math.round((sr?.durationMinutes||0)*60)) || null,
+                }).eq('id', row.id);
+              }
+            }
+          } catch {}
 
         // Strength loads retrofit: if rendered_description has % but no load, inject user 1RM load
         try {
