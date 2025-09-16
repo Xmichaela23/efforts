@@ -39,6 +39,35 @@
         "items": { "type": "string" }
       }
     },
+    "weekly_summaries": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[1-9][0-9]*$" },
+      "additionalProperties": {
+        "type": "object",
+        "properties": {
+          "focus": { "type": "string" },
+          "key_workouts": { "type": "array", "items": { "type": "string" } },
+          "estimated_hours": { "type": "number", "minimum": 0 },
+          "hard_sessions": { "type": "integer", "minimum": 0 },
+          "notes": { "type": "string" }
+        },
+        "additionalProperties": true
+      }
+    },
+    "daily_instructions": {
+      "type": "object",
+      "properties": {
+        "general": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "strength": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "running": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "run": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "cycling": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "bike": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "swimming": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } },
+        "swim": { "type": "object", "additionalProperties": { "type": ["string","number","boolean"] } }
+      },
+      "additionalProperties": true
+    },
     "export_hints": {
       "type": "object",
       "properties": {
@@ -54,12 +83,13 @@
   "definitions": {
     "session": {
       "type": "object",
-      "additionalProperties": false,
+      "additionalProperties": true,
       "required": ["day"],
       "properties": {
         "day": { "type": "string", "enum": ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] },
         "discipline": { "type": "string", "enum": ["run","bike","ride","swim","strength","brick","walk"] },
         "type": { "type": "string" },
+        "title": { "type": "string" },
         "name": { "type": "string" },
         "duration": { "type": "number", "minimum": 0 },
         "intensity": { "type": ["string","object"] },
@@ -77,6 +107,7 @@
           "type": "array",
           "items": { "type": "string" }
         },
+        "workout_structure": { "type": "object", "additionalProperties": true },
         "steps_preset": {
           "type": "array",
           "items": { "type": "string" },
