@@ -279,7 +279,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             if (!grouped[key]) grouped[key] = { name: it.name, sets: 0, reps: it.reps, pct: it.pct, load: it.load };
             grouped[key].sets += 1;
           }
-          const list = Object.values(grouped).slice(0, 2).map(it => {
+          const list = Object.values(grouped).map(it => {
             const repsTxt = it.reps ? `${it.reps}` : '';
             const pctTxt = typeof it.pct==='number' ? ` @ ${it.pct}%` : '';
             const loadTxt = typeof it.load==='number' ? ` — ${it.load} lb` : '';
@@ -1660,11 +1660,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                     <div className="flex-1">
                                       <div className="font-medium flex items-center gap-2">
                                         <span>{(()=>{ const nm=(workout.name||''); const t=(workout.type||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
-                                        {typeof workout.duration === 'number' && (
-                                          <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">
-                                            {formatDuration(workout.duration)}
-                                          </span>
-                                        )}
+                                        {(() => { const sec = workout?.computed?.total_duration_seconds; const min = (typeof sec==='number' && sec>0) ? Math.round(sec/60) : (typeof workout.duration==='number' ? workout.duration : null); return (typeof min==='number') ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(min)}</span>) : null; })()}
                                       </div>
                                       <div className="text-sm text-gray-600 mt-1">{buildWeeklySubtitle(workout)}</div>
                                     </div>
