@@ -1,6 +1,6 @@
 import React from 'react';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
-import PlannedWorkoutView from './PlannedWorkoutView';
+import StructuredPlannedView from './StructuredPlannedView';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
@@ -141,10 +141,8 @@ const PlannedWorkoutDemo: React.FC = () => {
           <div className="space-y-4">
             {plannedWorkouts.map((workout) => (
               <div key={workout.id} className="border rounded-lg">
-                <PlannedWorkoutView 
+                <StructuredPlannedView 
                   workout={workout}
-                  onEdit={() => console.log('Edit workout:', workout.id)}
-                  onComplete={() => console.log('Complete workout:', workout.id)}
                 />
                 <div className="p-4 border-t bg-gray-50">
                   <Button 
