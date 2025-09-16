@@ -115,6 +115,21 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
 
   // Intervals / Tempo / Bike sets
   const tokenStr = steps.join(' ').toLowerCase();
+  // Easy run blocks: run_easy_<minutes>min
+  const easyRun = tokenStr.match(/run_easy_(\d{1,3})min/i);
+  if (easyRun) {
+    const mins = parseInt(easyRun[1], 10);
+    totalMin += mins;
+    const easy = resolvePaceToken('easypace', baselines);
+    if (easy) {
+      const rng = paceRange(easy, hE);
+      const p = parsePace(easy)!;
+      summaryParts.push(`Easy ${mins} min @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`);
+      primary = primary ?? { type: 'pace', value: easy, range: rng };
+    } else {
+      summaryParts.push(`Easy ${mins} min`);
+    }
+  }
   // Intervals like interval_6x800m_5kpace_R2min
   // Important: pace tag must stop at the next underscore so it doesn't swallow _r2min
   const im = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_]+?)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?(?:min)?)?/i);
@@ -276,8 +291,9 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const tol = kind === 'vo2' ? hVO2 : hSS;
     const pr = powerRange(center, tol);
     totalMin += reps * tmin + rmin * Math.max(0, reps - 1);
-    summaryParts.push(`${reps} × ${tmin} min @ ${Math.round(center)} W${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
-    primary = { type: 'power', value: Math.round(center), range: pr };
+    const centerW = Math.round(center);
+    summaryParts.push(`${reps} × ${tmin} min @ ${centerW} W (${pr[0]}–${pr[1]} W)${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
+    primary = { type: 'power', value: centerW, range: pr };
   }
 
   // Remove generic bike fallback: only summarize specific known tokens
