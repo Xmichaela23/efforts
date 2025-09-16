@@ -51,10 +51,6 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     orGroup?: number;
     optionKey?: string;
   }> | null>(null);
-  // Inline strength editor state
-  const [editingStrength, setEditingStrength] = React.useState<boolean>(false);
-  const [editExercises, setEditExercises] = React.useState<any[] | null>(null);
-  const [savingStrength, setSavingStrength] = React.useState<boolean>(false);
   const [orSelections, setOrSelections] = React.useState<Record<string, string>>({});
   const [includeOptional, setIncludeOptional] = React.useState<Record<string, boolean>>({});
   const [completeOptional, setCompleteOptional] = React.useState<Record<string, boolean>>({});
@@ -1662,125 +1658,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           {(() => {
             const strength = Array.isArray(strengthLines) ? strengthLines : [];
             const lines = Array.isArray(stepLines) ? stepLines : [];
-            const isStrengthType = String((workout as any).type||'').toLowerCase()==='strength';
-            // Inline editor header for strength
-            if (isStrengthType) {
-              return (
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm font-medium text-gray-800">Strength Details</div>
-                    <div className="flex items-center gap-3">
-                      {!editingStrength && (
-                        <button
-                          className="text-sm text-blue-600 hover:underline"
-                          onClick={() => {
-                            try {
-                              const raw: any[] = Array.isArray((workout as any).strength_exercises) ? JSON.parse(JSON.stringify((workout as any).strength_exercises)) : [];
-                              setEditExercises(raw);
-                              setEditingStrength(true);
-                            } catch { setEditExercises([]); setEditingStrength(true); }
-                          }}
-                        >
-                          Adjust Weights
-                        </button>
-                      )}
-                      {editingStrength && (
-                        <>
-                          <button
-                            className="text-sm text-gray-600 hover:underline disabled:opacity-50"
-                            disabled={savingStrength}
-                            onClick={() => { setEditingStrength(false); setEditExercises(null); }}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            className="text-sm text-blue-600 hover:underline disabled:opacity-50"
-                            disabled={savingStrength}
-                            onClick={async ()=>{
-                              try {
-                                setSavingStrength(true);
-                                const next = Array.isArray(editExercises) ? editExercises : [];
-                                await supabase.from('planned_workouts').update({ strength_exercises: next }).eq('id', (workout as any).id);
-                                (workout as any).strength_exercises = next;
-                                const out: string[] = [];
-                                for (const ex of next){
-                                  const name = String(ex?.name||'Exercise').trim();
-                                  const setsArr = Array.isArray(ex?.sets) ? ex.sets : [];
-                                  const reps = typeof ex?.reps==='number'? ex.reps : undefined;
-                                  const defWeight = (typeof ex?.weight==='number' || typeof ex?.weight==='string') ? String(ex.weight) : undefined;
-                                  if (setsArr.length){
-                                    setsArr.forEach((s:any)=>{
-                                      const r = typeof s?.reps==='number'? String(s.reps) : (typeof reps==='number'? String(reps):'');
-                                      const w = (typeof s?.weight==='number'||typeof s?.weight==='string') ? String(s.weight) : defWeight;
-                                      out.push(`${name} 1 × ${r}${w?` @ ${w} lb`:''}`.trim());
-                                    });
-                                  } else if (typeof ex?.sets==='number' && ex.sets>0) {
-                                    for (let i=0;i<ex.sets;i+=1){ out.push(`${name} 1 × ${reps??''}${defWeight?` @ ${defWeight} lb`:''}`.trim()); }
-                                  }
-                                }
-                                setStrengthLines(out);
-                                setStrengthBlocks(null);
-                                setEditingStrength(false);
-                              } catch (e) {
-                              } finally { setSavingStrength(false); }
-                            }}
-                          >
-                            {savingStrength? 'Saving…' : 'Save'}
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  {editingStrength && (
-                    <div className="space-y-3">
-                      {(Array.isArray(editExercises)?editExercises:[]).map((ex:any, idx:number)=>{
-                        const setsArr = Array.isArray(ex?.sets) ? ex.sets : (typeof ex?.sets==='number' ? new Array(Math.max(1, ex.sets)).fill(null).map(()=>({ reps: (typeof ex?.reps==='number'?ex.reps:8), weight: (typeof ex?.weight==='number'?ex.weight:undefined) })) : []);
-                        return (
-                          <div key={idx} className="border rounded p-2">
-                            <div className="text-sm font-medium mb-2">{String(ex?.name||`Exercise ${idx+1}`)}</div>
-                            <div className="space-y-2">
-                              {setsArr.map((s:any, si:number)=> (
-                                <div key={si} className="flex items-center gap-3 text-sm">
-                                  <div className="w-12 text-gray-500">Set {si+1}</div>
-                                  <label className="flex items-center gap-1">
-                                    <span className="text-gray-600">Reps</span>
-                                    <input
-                                      type="number"
-                                      className="w-16 border rounded px-1 py-0.5"
-                                      value={typeof s?.reps==='number'?s.reps:''}
-                                      onChange={(e)=>{
-                                        const v = parseInt(e.target.value,10);
-                                        setEditExercises((prev:any)=>{ const cp = JSON.parse(JSON.stringify(prev||[])); cp[idx].sets = setsArr; cp[idx].sets[si].reps = Number.isFinite(v)?v:undefined; return cp; });
-                                      }}
-                                    />
-                                  </label>
-                                  <label className="flex items-center gap-1">
-                                    <span className="text-gray-600">Weight (lb)</span>
-                                    <input
-                                      type="number"
-                                      className="w-20 border rounded px-1 py-0.5"
-                                      value={typeof s?.weight==='number'?s.weight: (typeof s?.weight==='string'? s.weight : '')}
-                                      onChange={(e)=>{
-                                        const v = parseInt(e.target.value,10);
-                                        setEditExercises((prev:any)=>{ const cp = JSON.parse(JSON.stringify(prev||[])); cp[idx].sets = setsArr; cp[idx].sets[si].weight = Number.isFinite(v)?v:undefined; return cp; });
-                                      }}
-                                    />
-                                  </label>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        );
-                      })}
-                      {(!Array.isArray(editExercises) || editExercises.length===0) && (
-                        <div className="text-sm text-gray-600">No structured strength sets to edit for this workout.</div>
-                      )}
-                    </div>
-                  )}
-                  {/* fall-through to existing strength renders when not editing */}
-                </div>
-              );
-            }
+            // Fall through to existing strength renders (no inline editing; changes come from logger)
             // Structured strength headers (preferred)
             if (Array.isArray(strengthBlocks) && strengthBlocks.length > 0) {
               return (

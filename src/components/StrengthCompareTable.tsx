@@ -46,7 +46,8 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const cRepsAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.reps||0)) : 0;
     const cWAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.weight||0)) : 0;
     const cVol = Array.isArray(cSetsArr) ? calcVolume(cSetsArr) : 0;
-    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol };
+    const status: 'matched'|'skipped'|'swapped' = p && c ? 'matched' : (p && !c ? 'skipped' : (!p && c ? 'swapped' : 'matched'));
+    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
@@ -60,12 +61,16 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
         <div className="col-span-1 text-right">Δ</div>
       </div>
       <div className="space-y-2">
-        {rows.map((r, i)=> (
+        {rows.map((r: any, i)=> (
           <div key={i} className="grid grid-cols-12 text-sm">
-            <div className="col-span-5 text-gray-900">{r.name}</div>
+            <div className="col-span-5 text-gray-900 flex items-center gap-2">
+              <span>{r.name}</span>
+              {r.status==='skipped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-gray-100 text-gray-600 border border-gray-200">planned only</span>)}
+              {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-50 text-blue-700 border border-blue-200">completed only</span>)}
+            </div>
             <div className="col-span-3 text-gray-600">{r.pSets}×{r.pReps}{r.pW?` @ ${r.pW} lb`:''} <span className="text-gray-400">({r.pVol.toLocaleString()} lb)</span></div>
             <div className="col-span-3 text-gray-800">{r.cSets} sets{r.cRepsAvg?`, ${r.cRepsAvg} avg reps`:''}{r.cWAvg?`, ${r.cWAvg} lb avg`:''} <span className="text-gray-400">({r.cVol.toLocaleString()} lb)</span></div>
-            <div className={`col-span-1 text-right ${r.cVol - r.pVol >= 0 ? 'text-green-600':'text-red-600'}`}>{r.cVol - r.pVol >=0 ? '+' : ''}{(r.cVol - r.pVol).toLocaleString()}</div>
+            <div className="col-span-1 text-right text-gray-600">{r.cVol - r.pVol >=0 ? '+' : ''}{(r.cVol - r.pVol).toLocaleString()}</div>
           </div>
         ))}
       </div>
@@ -73,7 +78,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
         <div className="col-span-5">Totals</div>
         <div className="col-span-3 text-gray-600">{totals.pSets} sets • {totals.pVol.toLocaleString()} lb</div>
         <div className="col-span-3 text-gray-800">{totals.cSets} sets • {totals.cVol.toLocaleString()} lb</div>
-        <div className={`col-span-1 text-right ${totals.cVol - totals.pVol >=0 ? 'text-green-600':'text-red-600'}`}>{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()}</div>
+        <div className="col-span-1 text-right text-gray-700">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()}</div>
       </div>
     </div>
   );
