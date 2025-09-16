@@ -43,6 +43,31 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   };
   const type = String(ws?.type||'').toLowerCase();
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+  // Brick session: render stacked segments
+  if (type==='brick_session') {
+    let tIdx = 0;
+    for (const seg of struct) {
+      const k = String(seg?.type||'').toLowerCase();
+      if (k==='bike_segment') {
+        const s = toSec(String(seg?.duration||''));
+        lines.push(`Bike 1 × ${Math.floor(s/60)} min${seg?.target_power?.range?` @ ${seg.target_power.range}`:''}`);
+        continue;
+      }
+      if (k==='run_segment') {
+        const s = toSec(String(seg?.duration||''));
+        const pTxt = typeof seg?.target_pace==='string' && /^user\./i.test(seg.target_pace)
+          ? (pn[seg.target_pace.replace(/^user\./i,'')] || seg.target_pace)
+          : seg?.target_pace;
+        lines.push(`Run 1 × ${Math.floor(s/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual):''}`);
+        continue;
+      }
+      if (k==='transition') {
+        tIdx += 1; const s = toSec(String(seg?.duration||'')); lines.push(`T${tIdx} ${Math.floor(s/60)} min`); continue;
+      }
+      if (k==='swim_segment') { const s = toSec(String(seg?.duration||'')); lines.push(`Swim 1 × ${Math.floor(s/60)} min`); continue; }
+      if (k==='strength_segment') { const s = toSec(String(seg?.duration||'')); lines.push(`Strength 1 × ${Math.floor(s/60)} min`); continue; }
+    }
+  }
   for (const seg of struct) {
     const k = String(seg?.type||'').toLowerCase();
     if (k==='warmup' || k==='cooldown') {

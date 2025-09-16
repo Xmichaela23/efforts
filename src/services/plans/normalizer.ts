@@ -855,13 +855,68 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
   const parentDisc = String((session?.discipline || session?.type) || '').toLowerCase();
   const isRun = parentDisc === 'run';
 
+  // Brick session: iterate segments (bike_segment, run_segment, swim_segment, strength_segment, transition)
+  if (type === 'brick_session') {
+    let transitionCount = 0;
+    const tolFromPct = (pctRange: string | undefined, ftp?: number): string | undefined => {
+      try {
+        if (!pctRange) return undefined;
+        const m = String(pctRange).match(/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*%/);
+        if (!m) return `@ ${pctRange}`;
+        if (typeof ftp !== 'number' || !isFinite(ftp) || ftp <= 0) return `@ ${m[1]}–${m[2]}%`;
+        const lo = Math.round((parseInt(m[1],10)/100) * ftp);
+        const hi = Math.round((parseInt(m[2],10)/100) * ftp);
+        return `@ ${lo}–${hi} W`;
+      } catch { return pctRange ? `@ ${pctRange}` : undefined; }
+    };
+    const ftp: number | undefined = typeof (pn?.ftp) === 'number' ? pn.ftp : undefined;
+    for (const seg of struct) {
+      const segType = String(seg?.type || '').toLowerCase();
+      if (segType === 'transition') {
+        const s = toSec(String(seg?.duration||'')); totalSec += s; transitionCount += 1;
+        push(`T${transitionCount} ${mm(s)} min`);
+        continue;
+      }
+      if (segType === 'bike_segment') {
+        const s = toSec(String(seg?.duration||'')); totalSec += s;
+        const powTxt = seg?.target_power?.range ? tolFromPct(String(seg.target_power.range), ftp) : undefined;
+        push(`Bike ${mm(s)} min${powTxt?` ${powTxt}`:''}`);
+        continue;
+      }
+      if (segType === 'run_segment') {
+        const s = toSec(String(seg?.duration||'')); totalSec += s;
+        const p = resolvePace(seg?.target_pace);
+        push(`Run ${mm(s)} min${p?` @ ${p}`:''}`);
+        continue;
+      }
+      if (segType === 'swim_segment') {
+        const s = toSec(String(seg?.duration||'')); totalSec += s; push(`Swim ${mm(s)} min`); continue;
+      }
+      if (segType === 'strength_segment') {
+        const s = toSec(String(seg?.duration||'')); totalSec += s; push(`Strength ${mm(s)} min`); continue;
+      }
+    }
+    if (typeof ws.total_duration_estimate === 'string') {
+      const est = toSec(ws.total_duration_estimate); if (est > 0) totalSec = Math.max(totalSec, est);
+    }
+    const friendly = lines.join(' • ');
+    return { friendlySummary: friendly, durationMinutes: mm(totalSec), stepLines: lines };
+  }
+
   for (const seg of struct) {
     const kind = String(seg?.type || '').toLowerCase();
     if (kind === 'warmup' || kind === 'cooldown') {
-      const sec = toSec(seg.duration);
-      totalSec += sec;
-      const easy = isRun ? (resolvePace('user.easyPace') || resolvePace({ baseline: 'user.easyPace' })) : null;
-      push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${easy?` @ ${easy}`:''}`);
+      // For swims, emit distance-based WU/CD (e.g., "WU 200 yd", "CD 200 yd")
+      if (type === 'swim_session' && typeof seg?.distance === 'string' && seg.distance) {
+        const distTxt = String(seg.distance);
+        const yd = /yd/i.test(distTxt) ? ydToYd(distTxt) : mToYd(distTxt);
+        push(`${kind === 'warmup' ? 'WU' : 'CD'} ${yd} yd`);
+      } else {
+        const sec = toSec(seg.duration);
+        totalSec += sec;
+        const easy = isRun ? (resolvePace('user.easyPace') || resolvePace({ baseline: 'user.easyPace' })) : null;
+        push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${easy?` @ ${easy}`:''}`);
+      }
       continue;
     }
     if (type === 'strength_session') {
@@ -882,15 +937,17 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
       if (kind === 'drill_set') {
         const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||'');
         const yd = /yd/i.test(dist) ? ydToYd(dist) : mToYd(dist);
-        totalSec += Math.max(0, reps-1)*toSec(String(seg?.rest||''));
-        push(`Drill ${String(seg?.drill_type||'').replace(/_/g,' ')} ${reps}×${yd} yd${seg?.rest?` @ :${toSec(String(seg.rest))/60|0}r`:''}`);
+        const restS = toSec(String(seg?.rest||''));
+        totalSec += Math.max(0, reps-1)*restS;
+        push(`Drill ${String(seg?.drill_type||'').replace(/_/g,' ')} ${reps}×${yd} yd${restS>0?` @ :${restS}r`:''}`);
         continue;
       }
       if (kind === 'main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) {
         const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||'');
         const yd = /yd/i.test(dist) ? ydToYd(dist) : mToYd(dist);
-        totalSec += Math.max(0, reps-1)*toSec(String(seg?.rest||''));
-        push(`${reps}×${yd} yd aerobic${seg?.rest?` @ :${toSec(String(seg.rest))/60|0}r`:''}`);
+        const restS = toSec(String(seg?.rest||''));
+        totalSec += Math.max(0, reps-1)*restS;
+        push(`${reps}×${yd} yd aerobic${restS>0?` @ :${restS}r`:''}`);
         continue;
       }
       if (kind === 'cooldown' || kind === 'warmup') continue; // handled above

@@ -241,13 +241,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     })();
   }, [loadUserBaselines]);
 
-  // Helper: build weekly subtitle from structured/tokens/computed using baselines
   const buildWeeklySubtitle = (workout: any): string | undefined => {
     try {
       const pn = (baselines as any)?.performanceNumbers || {};
-      const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-      const type = String((workout as any).type || '').toLowerCase();
-      // 0) Structured workout preferred
       const structured = (workout as any)?.workout_structure;
       if (structured && typeof structured === 'object') {
         try {
@@ -255,129 +251,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           if (res?.friendlySummary) return res.friendlySummary;
         } catch {}
       }
-      // Prefer token-based normalizer first (keeps stable labels and strength text)
-      if (stepsPreset.length) {
-        const res = normalizePlannedSession(
-          { ...workout, steps_preset: stepsPreset },
-          { performanceNumbers: pn },
-          (workout as any).export_hints || {}
-        );
-        if (res?.friendlySummary) return res.friendlySummary;
-      }
-      // Prefer summarizing from saved computed steps so we always include ranges/loads
-      try {
-        const comp: any = (workout as any).computed || {};
-        const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
-        if (steps.length) {
-          const mmss = (s: number) => { const n=Math.max(1,Math.round(s)); const m=Math.floor(n/60); const r=n%60; return `${m}:${String(r).padStart(2,'0')}`; };
-          const mi = (m: number) => (Math.round((m/1609.34)*100)/100).toString();
-          const wu = steps.find((s:any)=>String(s?.type||'').toLowerCase().includes('warm'));
-          const cd = steps.find((s:any)=>String(s?.type||'').toLowerCase().includes('cool'));
-          const restSecs: number[] = [];
-          const works: any[] = [];
-          for (const s of steps) {
-            const k = String(s?.type||'').toLowerCase();
-            if (k==='interval_rest' && typeof s?.duration_s==='number') restSecs.push(s.duration_s);
-            if (k==='interval_work' || k==='steady') works.push(s);
-          }
-          // Group identical work reps by (distance|duration + target range)
-          const buckets: Record<string, { count:number; label:string }>= {};
-          for (const w of works) {
-            const dist = typeof w?.distance_m==='number' && w.distance_m>0 ? `${mi(w.distance_m)} mi` : null;
-            const dur = typeof w?.duration_s==='number' && w.duration_s>0 ? mmss(w.duration_s) : null;
-            const trg = (w?.target_value && w?.target_low && w?.target_high) ? `${w.target_value} (${w.target_low}–${w.target_high})` : '';
-            const lbl = `${dist||dur}${trg?` @ ${trg}`:''}`.trim();
-            if (!lbl) continue;
-            buckets[lbl] = buckets[lbl] ? { count: buckets[lbl].count+1, label: lbl } : { count: 1, label: lbl };
-          }
-          const parts: string[] = [];
-          if (wu && (wu.duration_s||wu.distance_m)) {
-            parts.push(`Warm‑up ${wu.duration_s?mmss(wu.duration_s): (wu.distance_m? `${Math.round(wu.distance_m)}m` : '')}`.trim());
-          }
-          // Run/Ride: primary block summary
-          const keys = Object.keys(buckets);
-          if (keys.length) {
-            // choose the longest label for display order consistency
-            const main = keys.map(k=>({k, c:buckets[k].count})).sort((a,b)=>b.c-a.c)[0];
-            if (main) {
-              const rest = restSecs.length ? ` with ${mmss(Math.round(restSecs.reduce((a,b)=>a+b,0)/Math.max(1,restSecs.length)))} easy` : '';
-              parts.push(`${buckets[main.k].count} × ${buckets[main.k].label}${(type==='ride'&&rest)?rest:''}`);
-            }
-          }
-          if (cd && (cd.duration_s||cd.distance_m)) {
-            parts.push(`Cool‑down ${cd.duration_s?mmss(cd.duration_s): (cd.distance_m? `${Math.round(cd.distance_m)}m` : '')}`.trim());
-          }
-          if (parts.length) return parts.join(' • ');
-        }
-      } catch {}
-      // Strength: summarize main lifts with loads if possible
-      if (type === 'strength') {
-        const comp: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-        const items: { name: string; sets: number; reps?: number|string; pct?: number; load?: number }[] = [];
-        const pick1RM = (name: string): number | undefined => {
-          const n = name.toLowerCase();
-          if (n.includes('dead')) return pn?.deadlift;
-          if (n.includes('bench')) return pn?.bench;
-          if (n.includes('squat')) return pn?.squat;
-          if (n.includes('ohp') || n.includes('overhead') || n.includes('press')) return pn?.overheadPress1RM || pn?.overhead;
-          if (n.includes('row')) return typeof pn?.bench === 'number' ? Math.round(pn.bench * 0.90) : undefined;
-          return pn?.squat;
-        };
-        if (comp.length) {
-          comp.forEach((st: any) => {
-            const t = String(st?.type || '').toLowerCase();
-            if (t !== 'strength_work') return;
-            const name = String(st?.exercise || '').trim();
-            const reps = st?.reps;
-            const sets = typeof st?.set === 'number' ? 1 : 1; // each entry is one set
-            const pct = (() => { const m = String(st?.intensity || '').match(/(\d{1,3})%/); return m ? parseInt(m[1],10) : undefined; })();
-            const orm = pick1RM(name);
-            const load = (typeof pct==='number' && typeof orm==='number') ? Math.round((orm * (pct/100))/5)*5 : undefined;
-            items.push({ name, sets, reps, pct, load });
-          });
-          // Group by name to count sets
-          const grouped: Record<string, { name: string; sets: number; reps?: any; pct?: number; load?: number }> = {};
-          for (const it of items) {
-            const key = it.name.toLowerCase();
-            if (!grouped[key]) grouped[key] = { name: it.name, sets: 0, reps: it.reps, pct: it.pct, load: it.load };
-            grouped[key].sets += 1;
-          }
-          const list = Object.values(grouped).map(it => {
-            const repsTxt = it.reps ? `${it.reps}` : '';
-            const pctTxt = typeof it.pct==='number' ? ` @ ${it.pct}%` : '';
-            const loadTxt = typeof it.load==='number' ? ` — ${it.load} lb` : '';
-            return `${it.name} ${it.sets}×${repsTxt}${pctTxt}${loadTxt}`.trim();
-          });
-          if (list.length) return list.join(' • ');
-        }
-        // Fallback: parse tokens for at least names/sets×reps
-        const toks = stepsPreset.filter(t => /^st_/.test(String(t).toLowerCase()));
-        if (toks.length) {
-          const list = toks.slice(0,2).map(t => {
-            const m = String(t).match(/^st_(?:main|acc|core)_([a-z0-9_]+)_(\d+)x(\d+|amrap)(?:_@pct(\d+))?/i);
-            if (!m) return undefined;
-            const name = m[1].replace(/_/g,' ');
-            const sets = m[2];
-            const reps = m[3].toUpperCase()==='AMRAP' ? 'AMRAP' : m[3];
-            const pct = m[4] ? ` @ ${m[4]}%` : '';
-            return `${name} ${sets}×${reps}${pct}`;
-          }).filter(Boolean) as string[];
-          if (list.length) return list.join(' • ');
-        }
-        return undefined;
-      }
-      // Run/Bike/Swim: prefer normalizer on tokens (uses baselines for targets)
-      if (stepsPreset.length) {
-        const res = normalizePlannedSession(
-          { ...workout, steps_preset: stepsPreset },
-          { performanceNumbers: pn },
-          (workout as any).export_hints || {}
-        );
-        if (res?.friendlySummary) return res.friendlySummary;
-      }
-      // Last resort: computed → summarize via normalizer with empty tokens doesn’t help; fallback to description
-      return (workout as any).rendered_description || (workout as any).description;
-    } catch { return (workout as any).rendered_description || (workout as any).description; }
+      const friendly = String((workout as any)?.friendly_summary || '').trim();
+      if (friendly) return friendly;
+      const desc = String((workout as any)?.description || '').trim();
+      return desc || undefined;
+    } catch { return undefined; }
   };
 
   // Weekly grouped renderer: show grouped summary lines (not every rep)
