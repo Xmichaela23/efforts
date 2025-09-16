@@ -1981,7 +1981,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             }
             if (lines.length === 0) {
               return (
-                <div className="text-sm text-gray-700">{friendlyDesc || stripCodes(workout.description)}</div>
+                <div className="text-sm text-gray-700">Not materialized — steps unavailable. Open from Plans/Calendar to bake details.</div>
               );
             }
             // Ensure warm-up first, then main, cooldown last

@@ -609,7 +609,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             // Optional view-scoped overrides and expansion specs (JSONB or string)
             const displayOverrides = parseMaybeJson((w as any).display_overrides) || null;
             const expandSpec = parseMaybeJson((w as any).expand_spec) || null;
-            const paceAnnotation = (w as any).pace_annotation || null;
+            const paceAnnotation = null; // DB column not present; may be derived from tags elsewhere
             
             const workout = {
               id: w.id,
