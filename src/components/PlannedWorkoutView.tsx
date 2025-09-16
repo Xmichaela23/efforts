@@ -618,17 +618,98 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         try {
           const ws: any = (workout as any)?.workout_structure;
           if (ws && typeof ws === 'object') {
-            const { normalizeStructuredSession } = await import('@/services/plans/normalizer');
-            const res = normalizeStructuredSession(workout, { performanceNumbers: (perfNumbers || {}) });
-            if (Array.isArray(res?.stepLines) && res.stepLines.length) {
-              setStepLines(res.stepLines);
-              if (typeof res.durationMinutes === 'number' && res.durationMinutes > 0) setResolvedDuration(res.durationMinutes);
-              return;
+            const type = String(ws?.type || '').toLowerCase();
+            const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+            const lines: string[] = [];
+            const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
+            const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+            const easy = String((perfNumbers||{})?.easyPace || '').trim() || undefined;
+            const pushWUCD = (kind:string, dur?:string) => { const s=toSec(dur); if (s>0) lines.push(`${kind==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${(kind==='warmup'||kind==='cooldown') && easy?` @ ${easy}`:''}`); };
+            for (const seg of struct) {
+              const k = String(seg?.type||'').toLowerCase();
+              if (k==='warmup' || k==='cooldown') { pushWUCD(k, seg?.duration); continue; }
+              // Run intervals
+              if ((type==='interval_session') || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
+                const reps = Number(seg?.repetitions)||0;
+                const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
+                const distTxt = String(work?.distance||'');
+                const restS = toSec(String(rec?.duration||''));
+                const pace = (() => {
+                  const p = work?.target_pace;
+                  if (typeof p === 'string') return p;
+                  if (p && typeof p === 'object' && typeof p.baseline === 'string') { const key = String(p.baseline).replace(/^user\./i,''); return (perfNumbers||{})[key]; }
+                  return undefined;
+                })();
+                const label = /mi\b/i.test(distTxt)
+                  ? `${parseFloat(distTxt)} mi${pace?` @ ${pace}`:''}`
+                  : /m\b/i.test(distTxt)
+                  ? `${distTxt}${pace?` @ ${pace}`:''}`
+                  : (work?.duration ? `${Math.floor(toSec(String(work.duration))/60)} min${pace?` @ ${pace}`:''}` : 'interval');
+                for (let r=0;r<Math.max(1,reps);r+=1){
+                  lines.push(`1 × ${label}`.trim());
+                  if (r<reps-1 && restS>0) lines.push(`Rest ${mmss(restS)}${easy?` @ ${easy}`:''}`);
+                }
+                continue;
+              }
+              // Run tempo
+              if (type==='tempo_session' && k==='main_set') {
+                const durS = toSec(String(seg?.work_segment?.duration||''));
+                const p = seg?.work_segment?.target_pace;
+                const pTxt = (()=>{ if (typeof p==='string') return p; if (p && typeof p==='object' && p.baseline) { const key=String(p.baseline).replace(/^user\./i,''); return (perfNumbers||{})[key]; } return undefined; })();
+                if (durS>0) lines.push(`1 × ${Math.floor(durS/60)} min${pTxt?` @ ${pTxt}`:''}`);
+                continue;
+              }
+              // Bike intervals
+              if (type==='bike_intervals' && k==='main_set') {
+                const reps = Number(seg?.repetitions)||0; const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
+                const ws = toSec(String(work?.duration||'')); const rs = toSec(String(rec?.duration||''));
+                for (let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${Math.floor(ws/60)} min${work?.target_power?.range?` @ ${work.target_power.range}`:''}`); if (r<reps-1 && rs>0) lines.push(`Rest ${Math.floor(rs/60)} min`); }
+                continue;
+              }
+              // Endurance main effort (bike/run)
+              if ((type==='endurance_session') && (k==='main_effort' || k==='main')) {
+                const s = toSec(String(seg?.duration||'')); if (s>0) lines.push(`1 × ${Math.floor(s/60)} min`); continue;
+              }
+              // Swim aerobic/drill sets already covered by computed elsewhere; render basic distance blocks
+              if (type==='swim_session') {
+                if (k==='drill_set') {
+                  const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||''); const yd = /yd/i.test(dist) ? parseInt(dist,10) : Math.round(parseInt(dist,10)/0.9144);
+                  for (let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — drill ${String(seg?.drill_type||'').replace(/_/g,' ')}`); if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`); }
+                  continue;
+                }
+                if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) {
+                  const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||''); const yd = /yd/i.test(dist) ? parseInt(dist,10) : Math.round(parseInt(dist,10)/0.9144);
+                  for (let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`); }
+                  continue;
+                }
+              }
+              // Strength session
+              if (type==='strength_session' && (k==='main_lift' || k==='accessory')) {
+                const name = String(seg?.exercise || '').replace(/_/g,' ');
+                const sets = Number(seg?.sets)||0; const reps = String(seg?.reps||'').toUpperCase();
+                const load = ((): string | undefined => {
+                  const ld = seg?.load; if (!ld || ld.type!=='percentage') return undefined; const pct = Number(ld.percentage)||0; const baseKey = String(ld.baseline||'').replace(/^user\./i,'');
+                  const orm = (perfNumbers||{})[baseKey]; if (typeof orm === 'number' && isFinite(orm) && pct>0){ const w = Math.max(5, Math.round((orm*(pct/100))/5)*5); return `${w} lb`; }
+                  return `${pct}%`;
+                })();
+                for (let r=0;r<Math.max(1,sets);r+=1){ lines.push(`${name} 1 × ${reps}${load?` @ ${load}`:''}`); if (r<sets-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`); }
+                continue;
+              }
             }
+            const est = typeof ws.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
+            setStepLines(lines.length ? lines : ["No structured steps found."]);
+            if (est>0) setResolvedDuration(Math.floor(est/60));
+            return; // trust structured; do not fall back
           }
         } catch {}
 
-        // Strict authored: if tokens are present, rebuild from tokens even if computed exists
+        // Prefer computed.v3 next (universal fallback)
+        if (computedSteps.length > 0) {
+          setStepLines(flattenSteps(computedSteps));
+          return;
+        }
+
+        // Strict authored: if tokens are present, rebuild from tokens even if computed missing
         try {
           const stepsPresetArr: string[] | undefined = readStepsPreset((workout as any).steps_preset);
           if (stepsPresetArr && stepsPresetArr.length > 0) {
@@ -646,9 +727,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             }
           }
         } catch {}
-        if (computedSteps.length > 0) {
-          setStepLines(flattenSteps(computedSteps));
-        } else {
+        {
           // Per-workout backfill: if we have tokens (preferred) or intervals but no computed, synthesize computed and persist
           try {
             const stepsPresetArr: string[] | undefined = readStepsPreset((workout as any).steps_preset);
