@@ -647,7 +647,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const resolved: any[] = resolveTargets(atomic as any, (pn || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
               if (Array.isArray(resolved) && resolved.length) {
                 const flat = flattenSteps(resolved);
-                setStepLines(dedupeLines(flat));
+                // Planned view: list every rep; do not dedupe/group
+                setStepLines(flat);
                 try {
                   const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
                   await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', (workout as any).id);
