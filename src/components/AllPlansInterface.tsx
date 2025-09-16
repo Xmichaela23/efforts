@@ -231,6 +231,92 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const [adjustmentLimit] = useState(3);
   const [showPlanDesc, setShowPlanDesc] = useState(false);
 
+  // Load baselines for weekly summaries (pace/power/loads)
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await loadUserBaselines?.();
+        if (b) setBaselines(b);
+      } catch {}
+    })();
+  }, [loadUserBaselines]);
+
+  // Helper: build weekly subtitle from tokens/computed using baselines
+  const buildWeeklySubtitle = (workout: any): string | undefined => {
+    try {
+      const pn = (baselines as any)?.performanceNumbers || {};
+      const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+      const type = String((workout as any).type || '').toLowerCase();
+      // Strength: summarize main lifts with loads if possible
+      if (type === 'strength') {
+        const comp: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+        const items: { name: string; sets: number; reps?: number|string; pct?: number; load?: number }[] = [];
+        const pick1RM = (name: string): number | undefined => {
+          const n = name.toLowerCase();
+          if (n.includes('dead')) return pn?.deadlift;
+          if (n.includes('bench')) return pn?.bench;
+          if (n.includes('squat')) return pn?.squat;
+          if (n.includes('ohp') || n.includes('overhead') || n.includes('press')) return pn?.overheadPress1RM || pn?.overhead;
+          if (n.includes('row')) return typeof pn?.bench === 'number' ? Math.round(pn.bench * 0.90) : undefined;
+          return pn?.squat;
+        };
+        if (comp.length) {
+          comp.forEach((st: any) => {
+            const t = String(st?.type || '').toLowerCase();
+            if (t !== 'strength_work') return;
+            const name = String(st?.exercise || '').trim();
+            const reps = st?.reps;
+            const sets = typeof st?.set === 'number' ? 1 : 1; // each entry is one set
+            const pct = (() => { const m = String(st?.intensity || '').match(/(\d{1,3})%/); return m ? parseInt(m[1],10) : undefined; })();
+            const orm = pick1RM(name);
+            const load = (typeof pct==='number' && typeof orm==='number') ? Math.round((orm * (pct/100))/5)*5 : undefined;
+            items.push({ name, sets, reps, pct, load });
+          });
+          // Group by name to count sets
+          const grouped: Record<string, { name: string; sets: number; reps?: any; pct?: number; load?: number }> = {};
+          for (const it of items) {
+            const key = it.name.toLowerCase();
+            if (!grouped[key]) grouped[key] = { name: it.name, sets: 0, reps: it.reps, pct: it.pct, load: it.load };
+            grouped[key].sets += 1;
+          }
+          const list = Object.values(grouped).slice(0, 2).map(it => {
+            const repsTxt = it.reps ? `${it.reps}` : '';
+            const pctTxt = typeof it.pct==='number' ? ` @ ${it.pct}%` : '';
+            const loadTxt = typeof it.load==='number' ? ` — ${it.load} lb` : '';
+            return `${it.name} ${it.sets}×${repsTxt}${pctTxt}${loadTxt}`.trim();
+          });
+          if (list.length) return list.join(' • ');
+        }
+        // Fallback: parse tokens for at least names/sets×reps
+        const toks = stepsPreset.filter(t => /^st_/.test(String(t).toLowerCase()));
+        if (toks.length) {
+          const list = toks.slice(0,2).map(t => {
+            const m = String(t).match(/^st_(?:main|acc|core)_([a-z0-9_]+)_(\d+)x(\d+|amrap)(?:_@pct(\d+))?/i);
+            if (!m) return undefined;
+            const name = m[1].replace(/_/g,' ');
+            const sets = m[2];
+            const reps = m[3].toUpperCase()==='AMRAP' ? 'AMRAP' : m[3];
+            const pct = m[4] ? ` @ ${m[4]}%` : '';
+            return `${name} ${sets}×${reps}${pct}`;
+          }).filter(Boolean) as string[];
+          if (list.length) return list.join(' • ');
+        }
+        return undefined;
+      }
+      // Run/Bike/Swim: prefer normalizer on tokens (uses baselines for targets)
+      if (stepsPreset.length) {
+        const res = normalizePlannedSession(
+          { ...workout, steps_preset: stepsPreset },
+          { performanceNumbers: pn },
+          (workout as any).export_hints || {}
+        );
+        if (res?.friendlySummary) return res.friendlySummary;
+      }
+      // Last resort: computed → summarize via normalizer with empty tokens doesn’t help; fallback to description
+      return (workout as any).rendered_description || (workout as any).description;
+    } catch { return (workout as any).rendered_description || (workout as any).description; }
+  };
+
   // Calculate current week based on plan start date and today's date
   const calculateCurrentWeek = async (planId: string): Promise<number> => {
     try {
@@ -1580,35 +1666,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           </span>
                                         )}
                                       </div>
-                                      <div className="text-sm text-gray-600 mt-1">
-                                        {(() => {
-                                          try {
-                                            // Prefer tokens/computed to build a concise subtitle line
-                                            const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                                            const comp: any = (workout as any).computed || {};
-                                            const hasV3 = Array.isArray(comp?.steps) && comp.steps.length>0;
-                                            if (hasV3) {
-                                              const res = normalizePlannedSession(
-                                                { ...workout, steps_preset: stepsPreset },
-                                                { performanceNumbers: {} },
-                                                (workout as any).export_hints || {}
-                                              );
-                                              if (res?.friendlySummary) return res.friendlySummary;
-                                            }
-                                            if (!hasV3 && stepsPreset.length>0) {
-                                              // Expand tokens on the fly to avoid any import/materialize timing issues
-                                              const atomic = expand(stepsPreset, (workout as any).main, (workout as any).tags);
-                                              const resolved = resolveTargets(atomic as any, ({} as any), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
-                                              if (Array.isArray(resolved) && resolved.length) {
-                                                const tmp = { computed: { steps: resolved, total_duration_seconds: resolved.reduce((s:any,x:any)=>s+(x?.duration_s||0),0) }, type: (workout as any).type } as any;
-                                                const res = normalizePlannedSession(tmp, { performanceNumbers: {} }, (workout as any).export_hints || {});
-                                                if (res?.friendlySummary) return res.friendlySummary;
-                                              }
-                                            }
-                                          } catch {}
-                                          return (workout as any).rendered_description || workout.description;
-                                        })()}
-                                      </div>
+                                      <div className="text-sm text-gray-600 mt-1">{buildWeeklySubtitle(workout)}</div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
