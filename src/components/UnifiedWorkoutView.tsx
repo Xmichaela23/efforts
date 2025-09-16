@@ -42,6 +42,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [linkedPlanned, setLinkedPlanned] = useState<any | null>(null);
+  const [hydratedPlanned, setHydratedPlanned] = useState<any | null>(null);
   // Suppress auto re-link fallback briefly after an explicit Unattach
   const suppressRelinkUntil = useRef<number>(0);
 
@@ -124,6 +125,73 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     const desired = initialTab || (isCompleted ? 'completed' : 'planned');
     setActiveTab(desired);
   }, [initialTab, isCompleted, workout?.id]);
+
+  // Helper to parse steps_preset that may be stored as JSON string
+  const readStepsPreset = (src: any): string[] | undefined => {
+    try {
+      if (Array.isArray(src)) return src as string[];
+      if (src && typeof src === 'object') return src as string[];
+      if (typeof src === 'string' && src.trim().length) {
+        const parsed = JSON.parse(src);
+        return Array.isArray(parsed) ? (parsed as string[]) : undefined;
+      }
+    } catch {}
+    return undefined;
+  };
+
+  // Hydrate planned rows (expand tokens → resolve targets → persist computed + duration) before rendering Planned tab
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab !== 'planned') return;
+        const plannedRow = isCompleted ? (linkedPlanned || null) : (workout?.workout_status === 'planned' ? workout : null);
+        if (!plannedRow || !plannedRow.id) { setHydratedPlanned(null); return; }
+
+        // If already hydrated (v3 with steps and total), use it
+        const hasV3 = (() => {
+          try { return Array.isArray(plannedRow?.computed?.steps) && plannedRow.computed.steps.length>0 && Number(plannedRow?.computed?.total_duration_seconds) > 0; } catch { return false; }
+        })();
+        let stepsPreset = readStepsPreset((plannedRow as any).steps_preset);
+        // Fetch latest row (in case caller provided a minimal object)
+        let row = plannedRow;
+        try {
+          const { data } = await supabase.from('planned_workouts').select('*').eq('id', String(plannedRow.id)).maybeSingle();
+          if (data) { row = data; stepsPreset = readStepsPreset((data as any).steps_preset) ?? stepsPreset; }
+        } catch {}
+
+        const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { return false; }})();
+        const needsHydrate = !rowHasV3 && Array.isArray(stepsPreset) && stepsPreset.length>0;
+
+        if (needsHydrate) {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) { setHydratedPlanned(row); return; }
+          let baselines: any = {};
+          try {
+            const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).maybeSingle();
+            baselines = ub?.performance_numbers || {};
+          } catch {}
+          try {
+            const { expand } = await import('@/services/plans/expander');
+            const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
+            const atomic: any[] = expand(stepsPreset || [], (row as any).main, (row as any).tags);
+            const resolved: any[] = resolveTargets(atomic as any, baselines, ((row as any).export_hints || {}), String((row as any).type||'').toLowerCase());
+            if (Array.isArray(resolved) && resolved.length) {
+              const total = totalDurationSeconds(resolved as any);
+              const update = {
+                computed: { normalization_version: 'v3', steps: resolved, total_duration_seconds: total },
+                duration: Math.round(total/60)
+              } as any;
+              await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
+              setHydratedPlanned({ ...row, ...update });
+              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              return;
+            }
+          } catch {}
+        }
+        setHydratedPlanned(row);
+      } catch { setHydratedPlanned(null); }
+    })();
+  }, [activeTab, workout?.id, linkedPlanned?.id]);
 
   const getWorkoutType = () => {
     // Handle Garmin activity types FIRST (more reliable than stored type)
@@ -349,7 +417,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-4">
             <PlannedWorkoutView 
-              workout={isCompleted ? (linkedPlanned || workout) : workout}
+              workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
               showHeader={false}
               onEdit={() => {
                 // TODO: Implement edit functionality

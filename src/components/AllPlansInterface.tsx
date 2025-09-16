@@ -247,6 +247,52 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const pn = (baselines as any)?.performanceNumbers || {};
       const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
       const type = String((workout as any).type || '').toLowerCase();
+      // Prefer summarizing from saved computed steps so we always include ranges/loads
+      try {
+        const comp: any = (workout as any).computed || {};
+        const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
+        if (steps.length) {
+          const mmss = (s: number) => { const n=Math.max(1,Math.round(s)); const m=Math.floor(n/60); const r=n%60; return `${m}:${String(r).padStart(2,'0')}`; };
+          const mi = (m: number) => (Math.round((m/1609.34)*100)/100).toString();
+          const wu = steps.find((s:any)=>String(s?.type||'').toLowerCase().includes('warm'));
+          const cd = steps.find((s:any)=>String(s?.type||'').toLowerCase().includes('cool'));
+          const restSecs: number[] = [];
+          const works: any[] = [];
+          for (const s of steps) {
+            const k = String(s?.type||'').toLowerCase();
+            if (k==='interval_rest' && typeof s?.duration_s==='number') restSecs.push(s.duration_s);
+            if (k==='interval_work' || k==='steady') works.push(s);
+          }
+          // Group identical work reps by (distance|duration + target range)
+          const buckets: Record<string, { count:number; label:string }>= {};
+          for (const w of works) {
+            const dist = typeof w?.distance_m==='number' && w.distance_m>0 ? `${mi(w.distance_m)} mi` : null;
+            const dur = typeof w?.duration_s==='number' && w.duration_s>0 ? mmss(w.duration_s) : null;
+            const trg = (w?.target_value && w?.target_low && w?.target_high) ? `${w.target_value} (${w.target_low}–${w.target_high})` : '';
+            const lbl = `${dist||dur}${trg?` @ ${trg}`:''}`.trim();
+            if (!lbl) continue;
+            buckets[lbl] = buckets[lbl] ? { count: buckets[lbl].count+1, label: lbl } : { count: 1, label: lbl };
+          }
+          const parts: string[] = [];
+          if (wu && (wu.duration_s||wu.distance_m)) {
+            parts.push(`Warm‑up ${wu.duration_s?mmss(wu.duration_s): (wu.distance_m? `${Math.round(wu.distance_m)}m` : '')}`.trim());
+          }
+          // Run/Ride: primary block summary
+          const keys = Object.keys(buckets);
+          if (keys.length) {
+            // choose the longest label for display order consistency
+            const main = keys.map(k=>({k, c:buckets[k].count})).sort((a,b)=>b.c-a.c)[0];
+            if (main) {
+              const rest = restSecs.length ? ` with ${mmss(Math.round(restSecs.reduce((a,b)=>a+b,0)/Math.max(1,restSecs.length)))} easy` : '';
+              parts.push(`${buckets[main.k].count} × ${buckets[main.k].label}${(type==='ride'&&rest)?rest:''}`);
+            }
+          }
+          if (cd && (cd.duration_s||cd.distance_m)) {
+            parts.push(`Cool‑down ${cd.duration_s?mmss(cd.duration_s): (cd.distance_m? `${Math.round(cd.distance_m)}m` : '')}`.trim());
+          }
+          if (parts.length) return parts.join(' • ');
+        }
+      } catch {}
       // Strength: summarize main lifts with loads if possible
       if (type === 'strength') {
         const comp: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
