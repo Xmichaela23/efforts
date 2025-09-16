@@ -1285,29 +1285,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
-          <button 
-            onClick={() => {
-              console.log('🧹 Clearing plannedRange caches...');
-              // Clear all plannedRange caches
-              const keys = Object.keys(localStorage);
-              keys.forEach(key => {
-                if (key.includes('plannedRange')) {
-                  localStorage.removeItem(key);
-                  console.log('🗑️ Cleared localStorage:', key);
-                }
-              });
-              // Dispatch invalidation events
-              window.dispatchEvent(new CustomEvent('planned:invalidate'));
-              window.dispatchEvent(new CustomEvent('workouts:invalidate'));
-              // Force reload
-              window.location.reload();
-            }}
-            className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded"
-          >
-            Clear Cache
-          </button>
+          {/* Clear Cache button removed per request */}
           <div className="relative">
-            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Workouts • Add‑ons</button>
+            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core • Mob</button>
             {showWorkoutsMenu && (
               <div className="absolute right-0 mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
                 <div className="flex items-center justify-between mb-2">

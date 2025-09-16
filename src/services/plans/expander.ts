@@ -274,12 +274,13 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
   // Parse strength tokens (st_*) into v3 steps so materializer has computedStepsV3
   for (const token of steps) {
     const t = String(token).toLowerCase();
-    // Warmup/Cooldown minutes: st_wu_8, st_cool_5
+    // Warmup/Cooldown minutes: st_wu_8, st_cool_5 → duration-based, not sets
     let m = t.match(/^st_(wu|cool)_(\d{1,3})$/i);
     if (m) {
       const kind = m[1].toLowerCase();
       const minutes = parseInt(m[2], 10);
-      out.push({ id: makeId(idPrefix, ['strength', kind]), type: 'strength_work', exercise: kind==='wu'?'warmup':'cooldown', set: 1, reps: 1, intensity: undefined, rest_s: undefined, duration_s: Math.max(1, minutes*60) } as any);
+      const type = kind === 'wu' ? 'warmup' : 'cooldown';
+      out.push({ id: makeId(idPrefix, ['strength', type]), type: type as any, duration_s: Math.max(1, minutes * 60) } as any);
       continue;
     }
     // Main/accessory/core: st_main_back_squat_5x5_@pct70_rest150, st_acc_barbell_row_4x6_rest75, st_core_rollouts_3x15_rest45

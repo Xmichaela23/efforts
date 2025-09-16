@@ -1187,7 +1187,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             if (isKickKind && hasBoard) return ' — board';
             return '';
           })();
-          lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
+          // For non-swim warm-up/cool-down, show minutes only (no "1 ×")
+          if (!isSwim && (isWarmV3 || isCoolV3)) {
+            lines.push(`${label} ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
+          } else {
+            lines.push(`${prefix}1 × ${base}${trg ? ` @ ${trg}` : ''}${equipAnn}`.trim());
+          }
           // Show rests only between reps (never after the last in a block)
           if (isSwim && typeof (seg as any).rest_s === 'number' && (seg as any).rest_s>0) {
             const nextLabel = (() => {
