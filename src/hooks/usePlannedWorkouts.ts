@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,display_overrides,expand_spec,pace_annotation,completed_workout_id')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -383,7 +383,7 @@ export const usePlannedWorkouts = () => {
 
 // Lightweight Today-only planned query for fast initial render
 export const usePlannedWorkoutsToday = (dateIso: string) => {
-  const [rows, setRows] = useState<Array<Pick<PlannedWorkout, 'id' | 'name' | 'type' | 'date' | 'workout_status'>>>([]);
+  const [rows, setRows] = useState<PlannedWorkout[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -397,12 +397,118 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
         if (!user) { setRows([]); return; }
         const { data, error } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,workout_status')
+          .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,display_overrides,expand_spec,pace_annotation,completed_workout_id')
           .eq('user_id', user.id)
           .eq('date', dateIso)
-          .limit(50);
+          .order('day_number', { ascending: true })
+          .limit(200);
         if (error) throw error;
-        if (!cancelled) setRows((data || []) as any);
+        // Transform to PlannedWorkout[] with normalized JSON fields to fully hydrate for Planned view
+        const parseMaybeJson = (v: any) => {
+          if (v == null) return v;
+          if (typeof v === 'string') {
+            try { return JSON.parse(v); } catch { return v; }
+          }
+          return v;
+        };
+        const transformed: PlannedWorkout[] = (data || []).map((w: any) => {
+          const parsedTags = (() => {
+            const raw = (w as any).tags;
+            if (Array.isArray(raw)) return raw as any[];
+            if (typeof raw === 'string') { try { const p = JSON.parse(raw); if (Array.isArray(p)) return p; } catch {} }
+            return [] as any[];
+          })();
+          const stepsPreset = Array.isArray(w.steps_preset)
+            ? w.steps_preset
+            : Array.isArray(parseMaybeJson(w.steps_preset))
+              ? parseMaybeJson(w.steps_preset)
+              : [];
+          const exportHints = parseMaybeJson(w.export_hints) || null;
+          const computed = parseMaybeJson((w as any).computed) || null;
+          const displayOverrides = parseMaybeJson((w as any).display_overrides) || null;
+          const expandSpecDb = parseMaybeJson((w as any).expand_spec) || null;
+          const paceAnnotationDb = (w as any).pace_annotation || null;
+          // Derive expand/display overrides from tags when DB columns are absent
+          const parseExpandSpecFromTags = (tagsArr: string[]) => {
+            const out: any = {};
+            const idPrefixTag = tagsArr.find(t=>/^idprefix:/i.test(String(t)));
+            if (idPrefixTag) out.id_prefix = String(idPrefixTag.split(':')[1]||'').trim();
+            const expandTag = tagsArr.find(t=>/^expand:/i.test(String(t)));
+            if (expandTag){
+              const body = expandTag.split(':')[1] || '';
+              const parts = body.split(';');
+              for (const p of parts){
+                const [k,v] = p.split('=');
+                const key = String(k||'').trim().toLowerCase();
+                const val = String(v||'').trim().toLowerCase();
+                if (!key) continue;
+                if (key === 'reps') out.reps = Number(val);
+                if (key === 'omit_last_rest') out.omit_last_rest = (val==='1' || val==='true');
+                if (key === 'work'){
+                  if (/^\d+\s*s$/.test(val)) { out.work = { time_s: Number(val.replace(/\D/g,'')) }; }
+                  else if (/^\d+\s*m$/.test(val)) { out.work = { distance_m: Number(val.replace(/\D/g,'')) }; }
+                  else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1609.34) }; }
+                  else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.work = { distance_m: Math.round(n*1000) }; }
+                }
+                if (key === 'rest'){
+                  if (/^\d+\s*s$/.test(val)) { out.rest = { time_s: Number(val.replace(/\D/g,'')) }; }
+                  else if (/^\d+\s*m$/.test(val)) { out.rest = { distance_m: Number(val.replace(/\D/g,'')) }; }
+                  else if (/^\d+\s*mi$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1609.34) }; }
+                  else if (/^\d+\s*km$/.test(val)) { const n = Number(val.replace(/\D/g,'')); out.rest = { distance_m: Math.round(n*1000) }; }
+                }
+              }
+            }
+            return (out.reps && (out.work || out.rest)) ? out : null;
+          };
+          const parseDisplayOverridesFromTags = (tagsArr: string[]) => {
+            const view = tagsArr.find(t=>/^view:/i.test(String(t)));
+            const pace = tagsArr.find(t=>/^pace_annotation:/i.test(String(t)));
+            const ov: any = {};
+            if (view && String(view.split(':')[1]||'').toLowerCase()==='unpack') ov.planned_detail = 'unpack';
+            const pa = pace ? String(pace.split(':')[1]||'').toLowerCase() : '';
+            return { overrides: Object.keys(ov).length?ov:null, pace_annotation: pa||null };
+          };
+          const { overrides: displayOverridesFromTags, pace_annotation: paceAnnoFromTags } = parseDisplayOverridesFromTags(parsedTags.map(String));
+          const expandSpecFromTags = parseExpandSpecFromTags(parsedTags.map(String));
+
+          return {
+            id: w.id,
+            name: w.name,
+            type: w.type,
+            date: w.date,
+            description: w.description,
+            duration: w.duration,
+            intervals: w.intervals || [],
+            strength_exercises: parseMaybeJson(w.strength_exercises) || [],
+            workout_status: w.workout_status,
+            source: w.source,
+            training_plan_id: w.training_plan_id,
+            week_number: w.week_number,
+            day_number: w.day_number,
+            // @ts-ignore
+            tags: parsedTags,
+            // @ts-ignore
+            steps_preset: stepsPreset,
+            // @ts-ignore
+            export_hints: exportHints,
+            // @ts-ignore
+            rendered_description: (w as any).rendered_description || undefined,
+            // @ts-ignore
+            computed,
+            // @ts-ignore
+            units: (w as any).units || undefined,
+            // View hints
+            // @ts-ignore
+            display_overrides: displayOverrides || displayOverridesFromTags || null,
+            // @ts-ignore
+            expand_spec: expandSpecDb || expandSpecFromTags || null,
+            // @ts-ignore
+            pace_annotation: paceAnnotationDb || paceAnnoFromTags || null,
+            // @ts-ignore
+            completed_workout_id: (w as any).completed_workout_id || null,
+          } as any;
+        });
+        if (!cancelled) setRows(transformed);
       } catch (e:any) {
         if (!cancelled) setError(e?.message || 'Failed to load planned workouts');
       } finally {

@@ -1860,7 +1860,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                             : null;
                                         })()}
                                       </div>
-                                      <div className="text-sm text-gray-600 mt-1">{buildWeeklySubtitle(workout)}</div>
+                                      <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
@@ -1916,8 +1916,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                           </div>
-                                          {/* Planned weekly subtitle: always show grouped description; avoid step-derived text */}
-                                          <div className="text-sm text-gray-600 mt-1">{(workout.rendered_description || workout.description)}</div>
+                                          {/* Planned weekly subtitle: grouped + targets per-step when available */}
+                                          <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
                                           {(() => {
                                             const planUi: any = (selectedPlanDetail as any)?.ui_text || (selectedPlanDetail as any)?.template?.ui_text || {};
                                             const copy = (planUi?.opt_kind_copy || {}) as Record<string,string>;
