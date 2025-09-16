@@ -851,6 +851,180 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
 
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);
 
+    // Build intervals from structured JSON so Garmin can ingest step-by-step
+    const intervalsFromStructured = (() => {
+      try {
+        const ws: any = (s as any).workout_structure;
+        if (!ws || typeof ws !== 'object') return undefined;
+        const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
+        const toMeters = (val: number, unit?: string) => {
+          const u = String(unit || '').toLowerCase();
+          if (u === 'm') return Math.floor(val);
+          if (u === 'yd') return Math.floor(val * 0.9144);
+          if (u === 'mi') return Math.floor(val * 1609.34);
+          if (u === 'km') return Math.floor(val * 1000);
+          return Math.floor(val || 0);
+        };
+        const resolvePace = (ref: any): string | undefined => {
+          if (!ref) return undefined;
+          if (typeof ref === 'string') {
+            if (/^user\./i.test(ref)) {
+              const key = ref.replace(/^user\./i,'');
+              const txt = (perfNumbers as any)?.[key];
+              return typeof txt === 'string' ? txt : undefined;
+            }
+            return ref;
+          }
+          if (ref && typeof ref === 'object' && typeof ref.baseline === 'string') {
+            const key = String(ref.baseline).replace(/^user\./i,'');
+            const txt = (perfNumbers as any)?.[key];
+            if (typeof txt === 'string') {
+              const mod = String(ref.modifier||'').trim();
+              return mod ? `${txt} ${mod}` : txt;
+            }
+          }
+          return undefined;
+        };
+        const parsePace = (txt?: string): { sec: number|null, unit?: 'mi'|'km' } => {
+          if (!txt) return { sec: null } as any;
+          const m = String(txt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+          if (!m) return { sec: null } as any;
+          return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+        };
+        const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+        const tolQual = (exportHints && typeof exportHints.pace_tolerance_quality==='number') ? exportHints.pace_tolerance_quality : 0.04;
+        const tolEasy = (exportHints && typeof exportHints.pace_tolerance_easy==='number') ? exportHints.pace_tolerance_easy : 0.06;
+        const tolSS = (exportHints && typeof exportHints.power_tolerance_SS_thr==='number') ? exportHints.power_tolerance_SS_thr : 0.05;
+        const tolVO2 = (exportHints && typeof exportHints.power_tolerance_VO2==='number') ? exportHints.power_tolerance_VO2 : 0.10;
+        const addPaceRange = (step: any, paceTxt?: string, tol = tolQual) => {
+          const p = parsePace(paceTxt);
+          if (p.sec && p.unit) {
+            step.paceTarget = `${mmss(p.sec)}/${p.unit}`;
+            step.pace_range = { lower: Math.round(p.sec*(1-tol)), upper: Math.round(p.sec*(1+tol)), unit: p.unit };
+          }
+        };
+        const addPowerRange = (step: any, pctRange?: string, ftp?: number, tol?: number) => {
+          if (!pctRange) return;
+          const m = String(pctRange).match(/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*%/);
+          if (m && typeof ftp === 'number' && isFinite(ftp) && ftp>0) {
+            const loPct = parseInt(m[1],10)/100;
+            const hiPct = parseInt(m[2],10)/100;
+            const lo = Math.round(ftp * loPct);
+            const hi = Math.round(ftp * hiPct);
+            step.power_range = { lower: lo, upper: hi };
+          } else if (m) {
+            // No FTP — still include percentage string
+            step.powerTarget = `${m[1]}–${m[2]}%`;
+          }
+        };
+        const out: any[] = [];
+
+        const pushWU = (durS: number, disc: string) => {
+          if (durS > 0) {
+            const step: any = { effortLabel: 'warm up', duration: durS };
+            if (disc==='run' && (perfNumbers as any)?.easyPace) addPaceRange(step, (perfNumbers as any).easyPace, tolEasy);
+            out.push(step);
+          }
+        };
+        const pushCD = (durS: number, disc: string) => {
+          if (durS > 0) {
+            const step: any = { effortLabel: 'cool down', duration: durS };
+            if (disc==='run' && (perfNumbers as any)?.easyPace) addPaceRange(step, (perfNumbers as any).easyPace, tolEasy);
+            out.push(step);
+          }
+        };
+        const discOf = (fallback: string): 'run'|'ride'|'swim'|'strength' => {
+          const d = String((s as any).discipline || (s as any).type || fallback || '').toLowerCase();
+          if (d === 'run') return 'run'; if (d==='ride'||d==='bike'||d==='cycling') return 'ride'; if (d==='swim') return 'swim'; if (d==='strength') return 'strength'; return 'run';
+        };
+
+        const handleSimpleSession = (disc: 'run'|'ride'|'swim'|'strength', type: string, struct: any[]) => {
+          for (const seg of struct) {
+            const k = String(seg?.type||'').toLowerCase();
+            if (k==='warmup') { pushWU(toSec(String(seg?.duration||'')), disc); continue; }
+            if (k==='cooldown') { pushCD(toSec(String(seg?.duration||'')), disc); continue; }
+            if (type==='interval_session' || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
+              const reps = Number(seg?.repetitions)||0; const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
+              const distTxt = String(work?.distance||'');
+              const restS = toSec(String(rec?.duration||''));
+              const paceTxt = disc==='run' ? resolvePace(work?.target_pace) : undefined;
+              const meters = /m\b/i.test(distTxt) ? toMeters(parseFloat(distTxt), 'm') : undefined;
+              const durS = toSec(String(work?.duration||''));
+              for (let r=0;r<Math.max(1,reps);r+=1) {
+                const step: any = { effortLabel: 'interval' };
+                if (typeof meters === 'number') step.distanceMeters = meters;
+                if (!meters && durS>0) step.duration = durS;
+                if (paceTxt) addPaceRange(step, paceTxt, tolQual);
+                out.push(step);
+                if (r<reps-1 && restS>0) {
+                  const restStep: any = { effortLabel: 'rest', duration: restS };
+                  if (disc==='run' && (perfNumbers as any)?.easyPace) addPaceRange(restStep, (perfNumbers as any).easyPace, tolEasy);
+                  out.push(restStep);
+                }
+              }
+              continue;
+            }
+            if (type==='bike_intervals' && k==='main_set') {
+              const reps = Number(seg?.repetitions)||0; const wsS = toSec(String(seg?.work_segment?.duration||'')); const rsS = toSec(String(seg?.recovery_segment?.duration||''));
+              const rangeTxt: string | undefined = (()=>{ const rng = seg?.work_segment?.target_power?.range; return rng? String(rng) : undefined; })();
+              for (let r=0;r<Math.max(1,reps);r+=1){
+                const step: any = { effortLabel: 'interval' };
+                if (wsS>0) step.duration = wsS;
+                if (rangeTxt) addPowerRange(step, rangeTxt, (perfNumbers as any)?.ftp, tolSS);
+                out.push(step);
+                if (r<reps-1 && rsS>0) out.push({ effortLabel: 'rest', duration: rsS });
+              }
+              continue;
+            }
+            if (type==='endurance_session' && (k==='main_effort' || k==='main')) {
+              const sDur = toSec(String(seg?.duration||''));
+              if (sDur>0) {
+                const step: any = { effortLabel: 'endurance', duration: sDur };
+                if (disc==='run' && (perfNumbers as any)?.easyPace) addPaceRange(step, (perfNumbers as any).easyPace, tolEasy);
+                if (disc==='ride' && ws?.structure) {
+                  const pow = (seg as any)?.target_power?.range ? String((seg as any).target_power.range) : undefined;
+                  if (pow) addPowerRange(step, pow, (perfNumbers as any)?.ftp, tolSS);
+                }
+                out.push(step);
+              }
+              continue;
+            }
+            if (type==='swim_session') {
+              if (k==='drill_set') {
+                const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||''); const yd = /yd/i.test(dist) ? parseInt(dist,10) : Math.round(parseInt(dist,10)/0.9144); const rs = toSec(String(seg?.rest||''));
+                for (let r=0;r<Math.max(1,reps);r+=1){ out.push({ effortLabel: 'drill', distanceMeters: toMeters(yd,'yd') }); if (r<reps-1 && rs>0) out.push({ effortLabel:'rest', duration: rs }); }
+                continue;
+              }
+              if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) {
+                const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||''); const yd = /yd/i.test(dist) ? parseInt(dist,10) : Math.round(parseInt(dist,10)/0.9144); const rs = toSec(String(seg?.rest||''));
+                for (let r=0;r<Math.max(1,reps);r+=1){ out.push({ effortLabel: 'aerobic', distanceMeters: toMeters(yd,'yd') }); if (r<reps-1 && rs>0) out.push({ effortLabel:'rest', duration: rs }); }
+                continue;
+              }
+            }
+          }
+        };
+
+        const type = String(ws?.type||'').toLowerCase();
+        if (type==='brick_session') {
+          let tIdx = 0;
+          const processBrickSeg = (seg: any) => {
+            const k = String(seg?.type||'').toLowerCase();
+            if (k==='transition') { const d = toSec(String(seg?.duration||'')); if (d>0) out.push({ effortLabel: `T${++tIdx}`, duration: d }); return; }
+            if (k==='bike_segment') { const d = toSec(String(seg?.duration||'')); if (d>0) { const step:any = { effortLabel: 'bike', duration: d }; const rng = String(seg?.target_power?.range||'')||undefined; if (rng) addPowerRange(step, rng, (perfNumbers as any)?.ftp, tolSS); out.push(step);} return; }
+            if (k==='run_segment') { const d = toSec(String(seg?.duration||'')); const pace = resolvePace(seg?.target_pace); if (d>0) { const step:any = { effortLabel: 'run', duration: d }; if (pace) addPaceRange(step, pace, tolEasy); out.push(step);} return; }
+            if (k==='swim_segment') { const d = toSec(String(seg?.duration||'')); if (d>0) out.push({ effortLabel: 'swim', duration: d }); return; }
+            if (k==='strength_segment') { const d = toSec(String(seg?.duration||'')); if (d>0) out.push({ effortLabel: 'strength', duration: d }); return; }
+          };
+          for (const seg of (Array.isArray(ws?.structure)? ws.structure : [])) processBrickSeg(seg);
+          return out.length ? out : undefined;
+        }
+
+        const disc = discOf(String((s as any).discipline||''));
+        handleSimpleSession(disc, String(ws?.type||''), Array.isArray(ws?.structure)? ws.structure : []);
+        return out.length ? out : undefined;
+      } catch { return undefined; }
+    })();
+
     // Derive primary target columns and equipment list from computed steps
     const deriveTargetColumns = (steps: any[] | undefined, discipline: 'run'|'ride'|'swim'|'strength') => {
       const out: any = { primary_target_type: 'none' };
@@ -1185,7 +1359,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       // Always generate per-rep intervals from computed V3 when available; else use token/normalized fallback
       intervals: (computedStepsV3 && computedStepsV3.length)
         ? buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers)
-        : intervalsFromNorm,
+        : (intervalsFromStructured || intervalsFromNorm),
       strength_exercises: (Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined) || strengthFromTokens(s.steps_preset),
     });
   }
