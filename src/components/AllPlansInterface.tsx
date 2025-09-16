@@ -372,105 +372,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     } catch { return (workout as any).rendered_description || (workout as any).description; }
   };
 
-  // Build full per-step lines for weekly cards with athlete-specific targets
-  const buildWeeklyStepLines = async (workout: any): Promise<string[]> => {
-    try {
-      const pn = (baselines as any)?.performanceNumbers || {};
-      const parseMaybeJson = (v: any) => {
-        if (Array.isArray(v)) return v; if (v && typeof v === 'object') return v; try { return JSON.parse(v); } catch { return v; }
-      };
-      const computed = parseMaybeJson((workout as any).computed) || {};
-      let steps: any[] = Array.isArray(computed?.steps) ? computed.steps : [];
-      if (!steps.length) {
-        const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-        if (stepsPreset.length) {
-          try {
-            const { expand } = await import('@/services/plans/expander');
-            const { resolveTargets } = await import('@/services/plans/targets');
-            const atomic: any[] = expand(stepsPreset || [], (workout as any).main, (workout as any).tags);
-            steps = resolveTargets(atomic as any, pn, (workout as any).export_hints || {}, String((workout as any).type||'').toLowerCase());
-          } catch {}
-        }
-      }
-      const mmss = (s: number) => { const n=Math.max(1,Math.round(s)); const m=Math.floor(n/60); const r=n%60; return `${m}:${String(r).padStart(2,'0')}`; };
-      const toMiles = (m: number) => Math.round((m/1609.34)*100)/100;
-      const formatBase = (seg: any, isRun: boolean, isSwim: boolean): string | undefined => {
-        if (typeof (seg as any)?.distance_yd === 'number' && isSwim) return `${Math.round((seg as any).distance_yd/25)*25} yd`;
-        if (typeof seg?.distance_m === 'number' && seg.distance_m > 0) {
-          if (isSwim) return `${Math.round(seg.distance_m / 0.9144 / 25) * 25} yd`;
-          if (isRun) return `${toMiles(seg.distance_m)} mi`;
-          return `${Math.round(seg.distance_m)} m`;
-        }
-        if (typeof seg?.duration_s === 'number' && seg.duration_s > 0) return mmss(seg.duration_s);
-        return undefined;
-      };
-      const lines: string[] = [];
-      const type = String((workout as any).type||'').toLowerCase();
-      const isRun = type==='run';
-      const isSwim = type==='swim';
-      for (let i=0;i<steps.length;i+=1){
-        const seg: any = steps[i];
-        const next: any = steps[i+1];
-        const kind = String(seg?.type||'').toLowerCase();
-        const base = formatBase(seg, isRun, isSwim);
-        const trg = (!isSwim && seg?.target_value && seg?.target_low && seg?.target_high)
-          ? `${seg.target_value} (${seg.target_low}–${seg.target_high})`
-          : undefined;
-        if (kind==='interval_rest') {
-          const s = typeof seg?.duration_s==='number'? seg.duration_s : 0; if (s>0) lines.push(`Rest ${mmss(s)}`); continue;
-        }
-        if (!base) continue;
-        // Strength load calculation if not included
-        let loadTxt: string | undefined = undefined;
-        if (kind==='strength_work') {
-          const pctMatch = String(seg?.intensity||seg?.label||seg?.target||'').match(/(\d{1,3})%/);
-          const pct = pctMatch ? parseInt(pctMatch[1],10) : undefined;
-          const name = String(seg?.exercise||'').toLowerCase();
-          const pick1RM = (): number | undefined => {
-            if (name.includes('dead')) return pn?.deadlift;
-            if (name.includes('bench')) return pn?.bench;
-            if (name.includes('squat')) return pn?.squat;
-            if (name.includes('ohp') || name.includes('overhead') || (name.includes('press') && !name.includes('bench'))) return pn?.overheadPress1RM || pn?.overhead || pn?.ohp;
-            if (name.includes('row')) return typeof pn?.bench==='number' ? Math.round(pn.bench*0.90) : (typeof pn?.deadlift==='number'? Math.round(pn.deadlift*0.55): undefined);
-            return pn?.squat;
-          };
-          const orm = pick1RM();
-          if (typeof orm==='number' && typeof pct==='number') {
-            const rounded = Math.max(5, Math.round((orm*(pct/100))/5)*5);
-            loadTxt = `${rounded} lb`;
-          }
-        }
-        const label = (()=>{ if (kind==='warmup'||kind==='swim_warmup') return 'Warm‑up'; if (kind==='cooldown'||kind==='swim_cooldown') return 'Cool‑down'; return ''; })();
-        const prefix = label ? `${label} `: '';
-        const end = loadTxt ? ` @ ${loadTxt}` : (trg ? ` @ ${trg}` : '');
-        if (!isSwim && (kind==='warmup'||kind==='cooldown')) lines.push(`${prefix}${base}${end}`.trim());
-        else lines.push(`${prefix}1 × ${base}${end}`.trim());
-        // Show swim explicit block rests inline
-        if (isSwim && typeof seg?.rest_s==='number' && seg.rest_s>0) lines.push(`Rest ${mmss(seg.rest_s)}`);
-      }
-      return lines;
-    } catch { return []; }
-  };
-
-  // Hook-safe renderer for weekly step lines
+  // Weekly grouped renderer: show grouped summary lines (not every rep)
   const WeeklyLines: React.FC<{ workout: any }> = ({ workout }) => {
-    const [lines, setLines] = useState<string[] | null>(null);
-    useEffect(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const arr = await buildWeeklyStepLines(workout);
-          if (!cancelled) setLines(arr);
-        } catch {
-          if (!cancelled) setLines(null);
-        }
-      })();
-      return () => { cancelled = true; };
-    }, [workout?.id, baselines]);
-    if (Array.isArray(lines) && lines.length) {
-      return (<span className="whitespace-pre-line">{lines.join('\n')}</span>);
-    }
-    return (<>{buildWeeklySubtitle(workout)}</>);
+    try {
+      const txt = buildWeeklySubtitle(workout) || '';
+      // Split friendly summary at bullets into stacked lines
+      const parts = String(txt).split(/\s•\s/g).filter(Boolean);
+      if (parts.length > 1) {
+        return (<span className="whitespace-pre-line">{parts.join('\n')}</span>);
+      }
+      return (<span>{txt}</span>);
+    } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
   };
 
   // Calculate current week based on plan start date and today's date
