@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,expand_spec,pace_annotation,completed_workout_id,workout_structure,workout_title,friendly_summary,total_duration_seconds')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,pace_annotation,completed_workout_id,workout_structure,workout_title,friendly_summary,total_duration_seconds')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
