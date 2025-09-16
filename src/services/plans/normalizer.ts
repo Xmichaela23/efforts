@@ -280,25 +280,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     primary = { type: 'power', value: Math.round(center), range: pr };
   }
 
-  // Generic bike set fallback (e.g., bike_taper_2x12min_Z3_R5min)
-  if (!bikeSet) {
-    const gb = tokenStr.match(/bike_[a-z0-9]+_(\d+)x(\d+)min(?:_r(\d+)min)?/i);
-    if (gb) {
-      const reps = parseInt(gb[1], 10);
-      const tmin = parseInt(gb[2], 10);
-      const rmin = gb[3] ? parseInt(gb[3], 10) : 0;
-      totalMin += reps * tmin + rmin * Math.max(0, reps - 1);
-      summaryParts.push(`${reps} × ${tmin} min set${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
-    }
-    // Seconds-based bike sets (e.g., bike_race_prep_4x90s_race_pace)
-    const gbs = tokenStr.match(/bike_[a-z0-9]+_(\d+)x(\d+)s/i);
-    if (gbs) {
-      const reps = parseInt(gbs[1], 10);
-      const secsEach = parseInt(gbs[2], 10);
-      totalMin += Math.round((reps * secsEach) / 60);
-      summaryParts.push(`${reps} × ${secsEach}s set`);
-    }
-  }
+  // Remove generic bike fallback: only summarize specific known tokens
 
   // Endurance bike (single or multiple blocks)
   const bendAll = tokenStr.match(/bike_endurance_(\d+)min/gi);
