@@ -247,6 +247,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const pn = (baselines as any)?.performanceNumbers || {};
       const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
       const type = String((workout as any).type || '').toLowerCase();
+      // Prefer token-based normalizer first (keeps stable labels and strength text)
+      if (stepsPreset.length) {
+        const res = normalizePlannedSession(
+          { ...workout, steps_preset: stepsPreset },
+          { performanceNumbers: pn },
+          (workout as any).export_hints || {}
+        );
+        if (res?.friendlySummary) return res.friendlySummary;
+      }
       // Prefer summarizing from saved computed steps so we always include ranges/loads
       try {
         const comp: any = (workout as any).computed || {};
