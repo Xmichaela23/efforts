@@ -619,7 +619,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             const atomic: any[] = expand(stepsPresetArr || [], (workout as any).main, (workout as any).tags);
             const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
             if (Array.isArray(resolved) && resolved.length) {
-              setStepLines(dedupeLines(flattenSteps(resolved)));
+              setStepLines(flattenSteps(resolved));
               try {
                 const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
                 await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', (workout as any).id);
@@ -642,7 +642,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const atomic: any[] = expand(stepsPresetArr || [], (workout as any).main, (workout as any).tags);
               const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
               if (Array.isArray(resolved) && resolved.length) {
-                setStepLines(dedupeLines(flattenSteps(resolved)));
+                const flat = flattenSteps(resolved);
+                setStepLines(dedupeLines(flat));
                 try {
                   const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
                   await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', (workout as any).id);
@@ -679,7 +680,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               ).filter((s)=>/^(Warm‑up|Cool‑down)\s/i.test(s));
               const warm = tokenLinesWUCD.filter((s)=>/^Warm‑up\s/i.test(s));
               const cool = tokenLinesWUCD.filter((s)=>/^Cool‑down\s/i.test(s));
-              setStepLines(dedupeLines([...(warm||[]), ...expanded, ...(cool||[])]));
+              setStepLines([...(warm||[]), ...expanded, ...(cool||[])]);
               return;
             }
           }
@@ -691,7 +692,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             perfObj
           );
           if (tokenLines && tokenLines.length) {
-            setStepLines(dedupeLines(tokenLines));
+            setStepLines(tokenLines);
           } else {
             setStepLines(["Not materialized — open from Plans/Calendar to bake details."]);
           }
@@ -1376,6 +1377,30 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         if (seen.has(key)) continue;
         seen.add(key);
         out.push(l);
+      }
+      return out;
+    } catch { return lines; }
+  };
+
+  // Compress consecutive identical reps: "1 × X" repeated N times → "N × X"
+  const compressRepeats = (lines: string[], discipline: string): string[] => {
+    try {
+      const out: string[] = [];
+      let i = 0;
+      while (i < lines.length) {
+        const line = String(lines[i] || '').trim();
+        const m = line.match(/^1\s×\s(.+)$/);
+        if (!m) { out.push(line); i += 1; continue; }
+        const body = m[1];
+        let count = 1;
+        let j = i + 1;
+        while (j < lines.length) {
+          const next = String(lines[j] || '').trim();
+          if (next === `1 × ${body}`) { count += 1; j += 1; }
+          else break;
+        }
+        out.push(`${count} × ${body}`);
+        i = j;
       }
       return out;
     } catch { return lines; }
