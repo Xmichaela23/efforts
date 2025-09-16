@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
-import { PlannedWorkout } from '@/components/PlannedWorkoutView';
+type PlannedWorkout = any;
 
 export const usePlannedWorkouts = () => {
   const [plannedWorkouts, setPlannedWorkouts] = useState<PlannedWorkout[]>([]);
@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,workout_structure,workout_title,friendly_summary,total_duration_seconds')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,rendered_description,units,source,workout_structure,workout_title,friendly_summary,total_duration_seconds')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -56,13 +56,9 @@ export const usePlannedWorkouts = () => {
           }
           return v;
         };
-        const stepsPreset = Array.isArray(workout.steps_preset)
-          ? workout.steps_preset
-          : Array.isArray(parseMaybeJson(workout.steps_preset))
-            ? parseMaybeJson(workout.steps_preset)
-            : [];
-        const exportHints = parseMaybeJson(workout.export_hints) || null;
-        const computed = parseMaybeJson((workout as any).computed) || null;
+        const stepsPreset: string[] = [];
+        const exportHints = null;
+        const computed = null;
         const rendered = (workout as any).rendered_description || undefined;
         const units = (workout as any).units || undefined;
         const parsedTags = (() => {
@@ -124,8 +120,8 @@ export const usePlannedWorkouts = () => {
           date: workout.date,
           description: workout.description,
           duration: workout.duration,
-          intervals: workout.intervals || [],
-          strength_exercises: parseMaybeJson(workout.strength_exercises) || [],
+          intervals: [],
+          strength_exercises: [],
           workout_status: workout.workout_status,
           source: workout.source,
           training_plan_id: workout.training_plan_id,
@@ -139,11 +135,8 @@ export const usePlannedWorkouts = () => {
           // expose for optional activation UI
           // @ts-ignore
           steps_preset: stepsPreset,
-          // @ts-ignore
           export_hints: exportHints,
-          // @ts-ignore
           rendered_description: rendered,
-          // @ts-ignore
           computed,
           // @ts-ignore
           units,

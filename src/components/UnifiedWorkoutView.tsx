@@ -7,7 +7,7 @@ import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
-import PlannedWorkoutView from './PlannedWorkoutView';
+import StructuredPlannedView from './StructuredPlannedView';
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { supabase } from '@/lib/supabase';
 
@@ -422,26 +422,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         <div className="flex-1 overflow-auto">
           {/* Planned Tab */}
           <TabsContent value="planned" className="flex-1 p-4">
-            <PlannedWorkoutView 
+            <StructuredPlannedView 
               workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
               showHeader={false}
-              onEdit={() => {
-                // TODO: Implement edit functionality
-              }}
-              onComplete={() => {
-                // TODO: Implement complete functionality
-              }}
-              onDelete={async () => {
-                if (confirm('Delete this planned workout? This action cannot be undone.')) {
-                  try {
-                    await deletePlannedWorkout(workout.id);
-                    onClose(); // Close the workout view after successful deletion
-                  } catch (error) {
-                    console.error('Error deleting workout:', error);
-                    // Don't close if deletion failed
-                  }
-                }
-              }}
             />
           </TabsContent>
 
