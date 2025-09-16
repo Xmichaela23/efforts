@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,display_overrides,expand_spec,pace_annotation,completed_workout_id')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,strength_exercises,computed,steps_preset,export_hints,rendered_description,units,intervals,source,expand_spec,pace_annotation,completed_workout_id,workout_structure,workout_title,friendly_summary,total_duration_seconds')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -148,6 +148,15 @@ export const usePlannedWorkouts = () => {
           computed,
           // @ts-ignore
           units,
+          // Structured fast-path fields
+          // @ts-ignore
+          workout_structure: parseMaybeJson((workout as any).workout_structure) || null,
+          // @ts-ignore
+          workout_title: (workout as any).workout_title || null,
+          // @ts-ignore
+          friendly_summary: (workout as any).friendly_summary || null,
+          // @ts-ignore
+          total_duration_seconds: (workout as any).total_duration_seconds || null,
           // View hints (DB columns take precedence over tag-encoded hints)
           // @ts-ignore
           display_overrides: displayOverrides || displayOverridesFromTags || null,

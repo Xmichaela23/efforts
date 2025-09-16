@@ -852,13 +852,16 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
 
   const type = String(ws.type || '').toLowerCase();
   const struct: any[] = Array.isArray(ws.structure) ? ws.structure : [];
+  const parentDisc = String((session?.discipline || session?.type) || '').toLowerCase();
+  const isRun = parentDisc === 'run';
 
   for (const seg of struct) {
     const kind = String(seg?.type || '').toLowerCase();
     if (kind === 'warmup' || kind === 'cooldown') {
       const sec = toSec(seg.duration);
       totalSec += sec;
-      push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min`);
+      const easy = isRun ? (resolvePace('user.easyPace') || resolvePace({ baseline: 'user.easyPace' })) : null;
+      push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${easy?` @ ${easy}`:''}`);
       continue;
     }
     if (type === 'strength_session') {
@@ -899,9 +902,32 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
       const distTxt = String(work?.distance||'');
       const pace = resolvePace(work?.target_pace) || resolvePace(work?.pace) || null;
       const restS = toSec(String(rec?.duration||''));
+      // accumulate rests
       totalSec += Math.max(0, reps-1)*restS;
-      if (/mi\b/i.test(distTxt)) push(`${reps} × ${parseFloat(distTxt)} mi${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog`:''}`);
-      else if (/m\b/i.test(distTxt)) push(`${reps} × ${distTxt}${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog`:''}`);
+      // accumulate work time when possible from pace + distance
+      if (/mi\b/i.test(distTxt) && pace) {
+        const miles = parseFloat(distTxt);
+        const pm = pace.match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+        if (pm) {
+          const per = parseInt(pm[1],10)*60 + parseInt(pm[2],10);
+          const unit = (pm[3]||'mi').toLowerCase();
+          const perMi = unit === 'km' ? Math.round(per*1.60934) : per;
+          totalSec += Math.max(0, Math.round(reps * miles * perMi));
+        }
+      } else if (/m\b/i.test(distTxt) && pace) {
+        const meters = parseFloat(distTxt.replace(/[^\d.]/g,''));
+        const pm = pace.match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+        if (pm) {
+          const per = parseInt(pm[1],10)*60 + parseInt(pm[2],10);
+          const unit = (pm[3]||'mi').toLowerCase();
+          const perMeter = unit === 'km' ? (per/1000) : (per/1609.34);
+          totalSec += Math.max(0, Math.round(reps * meters * perMeter));
+        }
+      }
+      // build text
+      const jogPace = isRun ? (resolvePace('user.easyPace') || resolvePace({ baseline: 'user.easyPace' })) : null;
+      if (/mi\b/i.test(distTxt)) push(`${reps} × ${parseFloat(distTxt)} mi${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog${jogPace?` @ ${jogPace}`:''}`:''}`);
+      else if (/m\b/i.test(distTxt)) push(`${reps} × ${distTxt}${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog${jogPace?` @ ${jogPace}`:''}`:''}`);
       else if (/s|min/i.test(String(work?.duration||''))) {
         const ws = toSec(String(work?.duration));
         totalSec += reps*ws;
@@ -939,7 +965,11 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
     }
   }
 
-  if (!totalSec && typeof ws.total_duration_estimate === 'string') totalSec = toSec(ws.total_duration_estimate);
+  // Duration: prefer a meaningful estimate over rest-only accumulation
+  if (typeof ws.total_duration_estimate === 'string') {
+    const est = toSec(ws.total_duration_estimate);
+    if (est > 0) totalSec = Math.max(totalSec, est);
+  }
   const friendly = lines.join(' • ');
   return { friendlySummary: friendly, durationMinutes: mm(totalSec), stepLines: lines };
 }
