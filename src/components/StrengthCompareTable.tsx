@@ -65,7 +65,6 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
           <div key={i} className="grid grid-cols-12 text-sm">
             <div className="col-span-5 text-gray-900 flex items-center gap-2">
               <span>{r.name}</span>
-              {r.status==='skipped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-gray-100 text-gray-600 border border-gray-200">planned only</span>)}
               {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-50 text-blue-700 border border-blue-200">completed only</span>)}
             </div>
             <div className="col-span-3 text-gray-600">{r.pSets}×{r.pReps}{r.pW?` @ ${r.pW} lb`:''} <span className="text-gray-400">({r.pVol.toLocaleString()} lb)</span></div>

@@ -1888,9 +1888,12 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const isSwim = String((workout as any).type||'').toLowerCase()==='swim';
               return out.map((s) => (needsTarget(s) && workoutTarget && !isSwim) ? `${s} @ ${workoutTarget}`.trim() : s);
             })();
+            // Final safety: dedupe identical lines while preserving order
+            const seen = new Set<string>();
+            const uniq = reordered.filter((ln)=>{ const k=String(ln).trim(); if(seen.has(k)) return false; seen.add(k); return true; });
             return (
               <ul className="list-none space-y-1">
-                {reordered.map((ln, i) => (
+                {uniq.map((ln, i) => (
                   <li key={i} className="text-sm text-gray-900">{ln}</li>
                 ))}
               </ul>
