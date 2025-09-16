@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAppContext } from '@/contexts/AppContext';
 import React from 'react';
 
 type StructuredPlannedViewProps = {
@@ -21,7 +22,19 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Minimal in-place renderer using structured JSON only
   const ws: any = (workout as any).workout_structure;
-  const pn: any = (workout as any)?.baselines || (workout as any)?.performanceNumbers || {};
+  const { loadUserBaselines } = useAppContext?.() || ({} as any);
+  const [ctxPN, setCtxPN] = useState<any | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!((workout as any)?.baselines || (workout as any)?.performanceNumbers)) {
+          const b = await loadUserBaselines?.();
+          if (b && b.performanceNumbers) setCtxPN(b.performanceNumbers);
+        }
+      } catch {}
+    })();
+  }, [loadUserBaselines, workout]);
+  const pn: any = (workout as any)?.baselines || (workout as any)?.performanceNumbers || ctxPN || {};
   const lines: string[] = [];
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
   const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
@@ -29,6 +42,37 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const hints: any = (workout as any)?.export_hints || {};
   const tolQual: number = typeof hints?.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
   const tolEasy: number = typeof hints?.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
+  const parsePace = (pTxt?: string): { sec: number|null, unit?: 'mi'|'km' } => {
+    if (!pTxt) return { sec: null } as any;
+    const m = String(pTxt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+    if (!m) return { sec: null } as any;
+    return { sec: parseInt(m[1],10)*60 + parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+  };
+  const addModToPace = (baseTxt?: string, mod?: string): string | undefined => {
+    if (!baseTxt) return undefined;
+    if (!mod) return baseTxt;
+    const p = parsePace(baseTxt);
+    if (!p.sec || !p.unit) return baseTxt;
+    const m1 = String(mod).match(/\+(\d+):(\d{2})/);
+    const m2 = String(mod).match(/\+(\d+)s/i);
+    const add = m1 ? (parseInt(m1[1],10)*60 + parseInt(m1[2],10)) : (m2 ? parseInt(m2[1],10) : 0);
+    if (!add) return baseTxt;
+    const newSec = p.sec + add;
+    return `${Math.floor(newSec/60)}:${String(newSec%60).padStart(2,'0')}/${p.unit}`;
+  };
+  const resolvePaceRef = (ref: any): string | undefined => {
+    if (!ref) return undefined;
+    if (typeof ref === 'string') {
+      if (/^user\./i.test(ref)) { const key = ref.replace(/^user\./i,''); return pn?.[key]; }
+      return ref;
+    }
+    if (typeof ref === 'object' && typeof ref.baseline === 'string') {
+      const key = String(ref.baseline).replace(/^user\./i,'');
+      const base = pn?.[key];
+      return addModToPace(base, String(ref.modifier||'').trim() || undefined);
+    }
+    return undefined;
+  };
   const buildPaceWithRange = (pTxt?: string, tol: number = tolQual): string => {
     if (!pTxt) return '';
     const m = String(pTxt).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
@@ -43,6 +87,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   };
   const type = String(ws?.type||'').toLowerCase();
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+  const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
   // Brick session: render stacked segments
   if (type==='brick_session') {
     let tIdx = 0;
@@ -93,7 +138,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       continue;
     }
     if (type==='tempo_session' && k==='main_set') {
-      const durS = toSec(String(seg?.work_segment?.duration||'')); if (durS>0) lines.push(`1 × ${Math.floor(durS/60)} min`);
+      const durS = toSec(String(seg?.work_segment?.duration||''));
+      const pTxt = resolvePaceRef(seg?.work_segment?.target_pace);
+      if (durS>0) lines.push(`1 × ${Math.floor(durS/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolQual):''}`);
       continue;
     }
     if (type==='bike_intervals' && k==='main_set') {
@@ -101,7 +148,12 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       for (let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${Math.floor(wsS/60)} min${seg?.work_segment?.target_power?.range?` @ ${seg.work_segment.target_power.range}`:''}`); if (r<reps-1 && rsS>0) lines.push(`Rest ${Math.floor(rsS/60)} min`); }
       continue;
     }
-    if (type==='endurance_session' && (k==='main_effort' || k==='main')) { const s=toSec(String(seg?.duration||'')); if (s>0) lines.push(`1 × ${Math.floor(s/60)} min`); continue; }
+    if (type==='endurance_session' && (k==='main_effort' || k==='main')) {
+      const sDur=toSec(String(seg?.duration||''));
+      const pTxt = parentDisc==='run' ? (easy || resolvePaceRef('user.easyPace')) : undefined;
+      if (sDur>0) lines.push(`1 × ${Math.floor(sDur/60)} min${pTxt?buildPaceWithRange(String(pTxt), tolEasy):''}`);
+      continue;
+    }
     if (type==='swim_session') {
       if (k==='drill_set') { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — drill ${String(seg?.drill_type||'').replace(/_/g,' ')}`); if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
       if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
