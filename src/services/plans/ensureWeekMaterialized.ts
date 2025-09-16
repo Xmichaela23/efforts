@@ -484,8 +484,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       if (mappedType === 'ride') {
         if (/bike_vo2|\bvo2\b/.test(toks)) return 'Ride — VO2';
         if (/bike_thr|threshold/.test(toks)) return 'Ride — Threshold';
-        if (/bike_ss|sweet\s*spot/.test(toks)) return 'Ride — Sweet Spot';
-        if (/endurance|z1|z2/.test(toks)) return 'Ride — Endurance';
+        if (/bike_endurance_|\bendurance\b|\bz2\b/.test(toks)) return 'Ride — Endurance';
+        if (/bike_ss_/.test(toks)) return 'Ride — Sweet Spot';
         return 'Ride';
       }
       if (mappedType === 'run') {

@@ -610,6 +610,24 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             }
           } catch {}
         }
+        // Strict authored: if tokens are present, rebuild from tokens even if computed exists
+        try {
+          const stepsPresetArr: string[] | undefined = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : undefined;
+          if (stepsPresetArr && stepsPresetArr.length > 0) {
+            const { expand } = await import('@/services/plans/expander');
+            const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
+            const atomic: any[] = expand(stepsPresetArr || [], (workout as any).main, (workout as any).tags);
+            const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
+            if (Array.isArray(resolved) && resolved.length) {
+              setStepLines(dedupeLines(flattenSteps(resolved)));
+              try {
+                const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
+                await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', (workout as any).id);
+              } catch {}
+              return;
+            }
+          }
+        } catch {}
         if (computedSteps.length > 0) {
           setStepLines(flattenSteps(computedSteps));
         } else {

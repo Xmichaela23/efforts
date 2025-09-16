@@ -120,6 +120,10 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       }
       continue;
     }
+    // Run drills bundles → warmup-style steady time blocks
+    if (/^drills_a_b_skips_high_knees$/i.test(t)) { out.push({ id: makeId(idPrefix, [token]), type: 'warmup', duration_s: 10*60, target: '{easy_pace}' }); continue; }
+    if (/^drills_butt_kicks_carioca$/i.test(t)) { out.push({ id: makeId(idPrefix, [token]), type: 'warmup', duration_s: 8*60, target: '{easy_pace}' }); continue; }
+    if (/^drills_leg_swings_dynamic$/i.test(t)) { out.push({ id: makeId(idPrefix, [token]), type: 'warmup', duration_s: 6*60, target: '{easy_pace}' }); continue; }
     // Run intervals: interval_<reps>x<dist>(m|mi)_<paceTag>[_plusMM:SS]_r<restSeconds>
     // Accept rest in seconds (r120) or minutes (r2min)
     m = t.match(/^interval_(\d+)x(\d+)(m|mi)_([a-z0-9_]+?)(?:_plus(\d{1,2}:\d{2}))?_r(\d+)(?:min)?$/i);
@@ -135,6 +139,18 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       const target = `{${mapped}}${plus?`+${plus}`:''}`;
       const idPrefixLocal = `${idPrefix}-${token}`;
       pushInterval(reps, { dist_m, target }, { duration_s: rest });
+      continue;
+    }
+    // Run tempo distance: tempo_<distMi>mi_<paceTag>[_plusMM:SS]
+    m = t.match(/^tempo_(\d+)mi_([a-z0-9_]+?)(?:_plus(\d{1,2}:\d{2}))?$/i);
+    if (m) {
+      const miles = parseInt(m[1], 10);
+      const paceTag = (m[2]||'').toLowerCase();
+      const plus = m[3] ? m[3] : undefined;
+      const dist_m = Math.round(miles * 1609);
+      const mapped = paceTag.replace('pace', '_pace');
+      const target = `{${mapped}}${plus?`+${plus}`:''}`;
+      out.push({ id: makeId(idPrefix, [token]), type: 'steady', distance_m: dist_m, target });
       continue;
     }
     // Cruise intervals: cruise_<reps>x<distMi>mi_<paceTag>[_plusMM:SS]_r<restSeconds>
@@ -167,6 +183,20 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     // Bike tempo continuous: bike_tempo_20min
     m = t.match(/^bike_tempo_(\d{2,3})min$/i);
     if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: parseInt(m[1],10)*60, target: 'Z3' }); continue; }
+    // Bike neuromuscular / anaerobic time-based reps: bike_(neuro|anaerobic)_Nx(15s|30s|45s|60s)_r(rest)
+    m = t.match(/^bike_(neuro|anaerobic)_(\d+)x(\d+)(s|min)_r(\d+)(?:min)?$/i);
+    if (m) {
+      const kind = m[1].toLowerCase();
+      const reps = parseInt(m[2],10);
+      const amt = parseInt(m[3],10) * (m[4].toLowerCase()==='min'?60:1);
+      const rest = parseInt(m[5],10) * (t.includes('min')?60:1);
+      const target = kind==='neuro' ? 'sprint' : 'Z5';
+      for (let i=1;i<=reps;i+=1){
+        out.push({ id: makeId(idPrefix, ['bike', kind, 'work', String(i).padStart(2,'0')]), type: 'interval_work', duration_s: amt, target });
+        if (i<reps) out.push({ id: makeId(idPrefix, ['bike', kind, 'rest', String(i).padStart(2,'0')]), type: 'interval_rest', duration_s: rest });
+      }
+      continue;
+    }
     // Bike SS single blocks: bike_ss_1x45min, bike_ss_1x60min
     m = t.match(/^bike_ss_1x(\d+)min$/i);
     if (m) { out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: parseInt(m[1],10)*60, target: '{sweetspot_power}' }); continue; }
@@ -245,6 +275,21 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       for (let i=1;i<=reps;i+=1) out.push({ id: makeId(idPrefix, ['swim',kind,String(i).padStart(2,'0')]), type: typeMap[kind], label, distance_yd: ydEach, authored_unit: 'yd', equipment: equip, rest_s: rest });
       continue;
     }
+    // swim threshold/interval new: swim_(threshold|interval)_<reps>x<dist>(yd|m)_r<rest>
+    m = t.match(/^swim_(threshold|interval)_(\d+)x(\d+)(yd|m)_r(\d+)$/i);
+    if (m) {
+      const kind = m[1].toLowerCase();
+      const reps = parseInt(m[2],10);
+      const each = parseInt(m[3],10);
+      const unit = (m[4]||'yd').toLowerCase();
+      const rest = parseInt(m[5],10);
+      const ydEach = unit==='m' ? Math.round(each/0.9144/25)*25 : Math.round(each/25)*25;
+      const label = kind==='threshold' ? 'Threshold' : 'Interval';
+      for (let i=1;i<=reps;i+=1) {
+        out.push({ id: makeId(idPrefix, ['swim', kind, String(i).padStart(2,'0')]), type: 'swim_aerobic', label, distance_yd: ydEach, authored_unit: 'yd', rest_s: rest });
+      }
+      continue;
+    }
     // swim pull/kick legacy like swim_pull_2x100yd (anchor at end to avoid swallowing modern tokens)
     m = t.match(/^swim_(pull|kick)_(\d+)x(\d+)(yd|m)$/i);
     if (m) {
@@ -293,9 +338,16 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       const reps = repsTxt === 'amrap' ? 'AMRAP' : parseInt(repsTxt, 10);
       const pct = m[5] ? `${parseInt(m[5],10)}%1RM` : undefined;
       const rest = m[6] ? parseInt(m[6], 10) : undefined;
+      // Heuristic per-set work duration to improve total time estimates
+      const exLower = exercise.toLowerCase();
+      const isCompound = /(squat|deadlift|bench|ohp|overhead|press|row)/.test(exLower);
+      const perRepSec = isCompound ? 4 : 3;
+      const repsNum = typeof reps === 'number' ? reps : 8; // default for AMRAP
+      const work_s = Math.max(5, repsNum * perRepSec);
       for (let sIdx=1; sIdx<=sets; sIdx+=1) {
-        out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'set', String(sIdx).padStart(2,'0')]), type: 'strength_work', exercise, set: sIdx, reps, intensity: pct, rest_s: rest, duration_s: 0 } as any);
-        if (typeof rest === 'number' && rest>0) {
+        out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'set', String(sIdx).padStart(2,'0')]), type: 'strength_work', exercise, set: sIdx, reps, intensity: pct, rest_s: rest, duration_s: work_s } as any);
+        // Insert rest only BETWEEN sets (omit after last)
+        if (sIdx < sets && typeof rest === 'number' && rest>0) {
           out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'rest', String(sIdx).padStart(2,'0')]), type: 'strength_rest', rest_s: rest, duration_s: rest } as any);
         }
       }
