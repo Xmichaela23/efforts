@@ -21,27 +21,50 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Minimal in-place renderer using structured JSON only
   const ws: any = (workout as any).workout_structure;
-  const pn: any = (workout as any)?.baselines || {};
+  const pn: any = (workout as any)?.baselines || (workout as any)?.performanceNumbers || {};
   const lines: string[] = [];
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
   const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
   const easy = String(pn?.easyPace || '').trim() || undefined;
+  const hints: any = (workout as any)?.export_hints || {};
+  const tolQual: number = typeof hints?.pace_tolerance_quality === 'number' ? hints.pace_tolerance_quality : 0.04;
+  const tolEasy: number = typeof hints?.pace_tolerance_easy === 'number' ? hints.pace_tolerance_easy : 0.06;
+  const buildPaceWithRange = (pTxt?: string, tol: number = tolQual): string => {
+    if (!pTxt) return '';
+    const m = String(pTxt).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+    if (!m) return ` @ ${pTxt}`;
+    const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+    const unit = m[3].toLowerCase();
+    const loS = Math.round(sec * (1 - tol));
+    const hiS = Math.round(sec * (1 + tol));
+    const lo = `${Math.floor(loS/60)}:${String(loS%60).padStart(2,'0')}/${unit}`;
+    const hi = `${Math.floor(hiS/60)}:${String(hiS%60).padStart(2,'0')}/${unit}`;
+    return ` @ ${Math.floor(sec/60)}:${String(sec%60).padStart(2,'0')}/${unit} (${lo}–${hi})`;
+  };
   const type = String(ws?.type||'').toLowerCase();
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
   for (const seg of struct) {
     const k = String(seg?.type||'').toLowerCase();
     if (k==='warmup' || k==='cooldown') {
       const dist = String(seg?.distance||'');
-      if (dist) { const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd`); }
-      const s = toSec(String(seg?.duration||'')); if (s>0) lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${easy?` @ ${easy}`:''}`);
+      if (dist) {
+        const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
+        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${easy?buildPaceWithRange(easy, tolEasy):''}`);
+      }
+      const s = toSec(String(seg?.duration||''));
+      if (s>0) lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${easy?buildPaceWithRange(easy, tolEasy):''}`);
       continue;
     }
     if ((type==='interval_session') || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
       const reps = Number(seg?.repetitions)||0; const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
       const distTxt = String(work?.distance||''); const restS = toSec(String(rec?.duration||''));
-      let paceTxt = work?.target_pace; if (typeof paceTxt==='string' && /^user\./i.test(paceTxt)) { const key = paceTxt.replace(/^user\./i,''); paceTxt = pn[key] || paceTxt; }
+      let paceTxt = work?.target_pace;
+      if (typeof paceTxt==='string' && /^user\./i.test(paceTxt)) { const key = paceTxt.replace(/^user\./i,''); paceTxt = pn[key] || paceTxt; }
       const label = /mi\b/i.test(distTxt) ? `${parseFloat(distTxt)} mi` : /m\b/i.test(distTxt) ? `${distTxt}` : (work?.duration? `${Math.floor(toSec(String(work.duration))/60)} min` : 'interval');
-      for (let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${label}${paceTxt?` @ ${paceTxt}`:''}`); if (r<reps-1 && restS>0) lines.push(`Rest ${mmss(restS)}${easy?` @ ${easy}`:''}`); }
+      for (let r=0;r<Math.max(1,reps);r+=1){
+        lines.push(`1 × ${label}${paceTxt?buildPaceWithRange(String(paceTxt), tolQual):''}`);
+        if (r<reps-1 && restS>0) lines.push(`Rest ${mmss(restS)}${easy?buildPaceWithRange(easy, tolEasy):''}`);
+      }
       continue;
     }
     if (type==='tempo_session' && k==='main_set') {
