@@ -196,9 +196,11 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
           }
         } catch {}
 
-        // Friendly copy: prefer server-rendered, else author text with baseline tokens resolved
-        const storedText = (workout as any).rendered_description;
-        if (typeof storedText === 'string' && storedText.trim().length > 0) {
+        // Friendly copy: if we already have v3 computed steps, ignore rendered_description
+        // to avoid collapsing step detail. Only use rendered text when tokens/computed are absent.
+        const hasV3 = Array.isArray((workout as any)?.computed?.steps) && (workout as any).computed.steps.length>0;
+        const storedText = hasV3 ? '' : (workout as any).rendered_description;
+        if (!hasV3 && typeof storedText === 'string' && storedText.trim().length > 0) {
           setFriendlyDesc(storedText);
         } else {
           const raw = workout.description || '';

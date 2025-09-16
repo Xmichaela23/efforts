@@ -1157,7 +1157,8 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
-      rendered_description: rendered,
+      // If we successfully computed steps, clear rendered_description so UI uses rich steps
+      rendered_description: (computedStepsV3 && computedStepsV3.length) ? null : rendered,
       computed: { normalization_version: 'v3', steps: (computedStepsV3 && computedStepsV3.length ? computedStepsV3 : undefined), total_duration_seconds: totalDurSeconds },
       primary_target_type: (computedTargets as any).primary_target_type,
       pace_value: (computedTargets as any).pace_value,
@@ -1169,7 +1170,10 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       equipment: (computedTargets as any).equipment || null,
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
-      intervals: (buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers) || intervalsFromNorm),
+      // Always generate per-rep intervals from computed V3 when available; else use token/normalized fallback
+      intervals: (computedStepsV3 && computedStepsV3.length)
+        ? buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers)
+        : intervalsFromNorm,
       strength_exercises: (Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined) || strengthFromTokens(s.steps_preset),
     });
   }
