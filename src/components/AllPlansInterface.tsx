@@ -789,12 +789,25 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const stepsPreset = (s as any).steps_preset as string[] | undefined;
               const estFromSteps = estimateMinutesFromSteps(stepsPreset);
               const estFromIntervals = estimateMinutesFromIntervals(stepsPreset, description);
-              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : (estFromIntervals || estFromSteps || estimateMinutesFromDescription(description) || extractMinutesFromText(rawDesc) || 0);
+              // Structured normalization (preferred)
+              const hasStructured = (s as any).workout_structure && typeof (s as any).workout_structure === 'object';
+              let structuredSummary: string | undefined;
+              let structuredMinutes = 0;
+              try {
+                if (hasStructured) {
+                  const res = normalizeStructuredSession(s, bl || {} as any);
+                  structuredSummary = res.friendlySummary || undefined;
+                  structuredMinutes = res.durationMinutes || 0;
+                }
+              } catch {}
+              const duration = (typeof s.duration === 'number' && Number.isFinite(s.duration))
+                ? s.duration
+                : (structuredMinutes || estFromIntervals || estFromSteps || estimateMinutesFromDescription(description) || extractMinutesFromText(rawDesc) || 0);
               const base = {
                 id: s.id || `${pd.id}-w${w}-${idx}`,
                 name,
                 type: mappedType || 'run',
-                description: [description, stepsSummary.length ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
+                description: [structuredSummary || description, (!structuredSummary && stepsSummary.length) ? `(${stepsSummary.join(' • ')})` : ''].filter(Boolean).join(' '),
                 duration,
                 intensity: typeof s.intensity === 'string' ? s.intensity : undefined,
                 day: s.day,
@@ -1726,10 +1739,30 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
             {(() => {
               const byWeekNotes: any = (selectedPlanDetail as any)?.notes_by_week || {};
-              const headerText: string = Array.isArray(byWeekNotes?.[selectedWeek]) ? (byWeekNotes?.[selectedWeek]?.[0] || '') : (currentWeekData?.header || '');
-              return headerText ? (
-                <div className="px-1 pb-3 text-sm text-gray-700">{headerText}</div>
-              ) : null;
+              const weeklySummaries: any = (selectedPlanDetail as any)?.weekly_summaries || {};
+              const ws: any = weeklySummaries?.[selectedWeek] || {};
+              const headerText: string = ws?.focus || (Array.isArray(byWeekNotes?.[selectedWeek]) ? (byWeekNotes?.[selectedWeek]?.[0] || '') : (currentWeekData?.header || ''));
+              const hours = typeof ws?.estimated_hours === 'number' ? ws.estimated_hours : undefined;
+              const hard = typeof ws?.hard_sessions === 'number' ? ws.hard_sessions : undefined;
+              const keys: string[] = Array.isArray(ws?.key_workouts) ? ws.key_workouts.slice(0, 3) : [];
+              return (
+                <div className="px-1 pb-3 text-sm text-gray-700">
+                  {headerText && (<div className="mb-1">{headerText}</div>)}
+                  {(hours != null || hard != null || keys.length) && (
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                      {hours != null && (
+                        <span className="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200">~{hours} h</span>
+                      )}
+                      {hard != null && (
+                        <span className="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200">Hard × {hard}</span>
+                      )}
+                      {keys.map((k, i) => (
+                        <span key={i} className="px-2 py-0.5 rounded bg-gray-50 border border-gray-200">{k}</span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
             })()}
 
             {currentWeekData && !weekLoading && (
@@ -1764,11 +1797,25 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                         {(() => {
                                           const secRaw = (workout as any)?.computed?.total_duration_seconds as any;
                                           const secNum = typeof secRaw === 'number' ? secRaw : (typeof secRaw === 'string' ? parseInt(secRaw, 10) : NaN);
-                                          const min = Number.isFinite(secNum) && secNum > 0
-                                            ? Math.round(secNum / 60)
-                                            : (typeof workout.duration === 'number' ? workout.duration : null);
-                                          return (typeof min === 'number')
-                                            ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(min)}</span>)
+                                          let minutes: number | null = null;
+                                          if (Number.isFinite(secNum) && secNum > 0) minutes = Math.round(secNum / 60);
+                                          else if (typeof workout.duration === 'number') minutes = workout.duration;
+                                          else {
+                                            try {
+                                              const pn = (baselines as any)?.performanceNumbers || {};
+                                              const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+                                              if (stepsPreset.length) {
+                                                const res = normalizePlannedSession(
+                                                  { ...workout, steps_preset: stepsPreset },
+                                                  { performanceNumbers: pn },
+                                                  (workout as any).export_hints || {}
+                                                );
+                                                if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
+                                              }
+                                            } catch {}
+                                          }
+                                          return (typeof minutes === 'number')
+                                            ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>)
                                             : null;
                                         })()}
                                       </div>
@@ -1794,10 +1841,26 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           <div className="font-medium flex items-center gap-2">
                                             <span>{(()=>{ const t=(workout.type||''); const nm=(workout.name||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
                                             {(() => {
-                                              const sec = workout?.computed?.total_duration_seconds;
-                                              const min = (typeof sec === 'number' && sec > 0) ? Math.round(sec/60) : (typeof workout.duration === 'number' ? workout.duration : null);
-                                              return (typeof min === 'number') ? (
-                                                <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(min)}</span>
+                                              const sec = (workout as any)?.computed?.total_duration_seconds;
+                                              let minutes: number | null = null;
+                                              if (typeof sec === 'number' && sec > 0) minutes = Math.round(sec/60);
+                                              else if (typeof (workout as any).duration === 'number') minutes = (workout as any).duration;
+                                              else {
+                                                try {
+                                                  const pn = (baselines as any)?.performanceNumbers || {};
+                                                  const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+                                                  if (stepsPreset.length) {
+                                                    const res = normalizePlannedSession(
+                                                      { ...workout, steps_preset: stepsPreset },
+                                                      { performanceNumbers: pn },
+                                                      (workout as any).export_hints || {}
+                                                    );
+                                                    if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
+                                                  }
+                                                } catch {}
+                                              }
+                                              return (typeof minutes === 'number') ? (
+                                                <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>
                                               ) : null;
                                             })()}
                                             <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500">Optional</span>

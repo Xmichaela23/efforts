@@ -1668,6 +1668,34 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
 
   return (
     <div className="w-full space-y-4">
+      {(() => {
+        try {
+          const di = (workout as any)?.daily_instructions || (workout as any)?.plan_daily_instructions || (workout as any)?.plan?.daily_instructions || null;
+          const disc = String((workout as any)?.type || '').toLowerCase();
+          if (di && typeof di === 'object') {
+            const byDisc = (di as any)[disc];
+            const gen = (di as any).general;
+            const notes = byDisc || gen;
+            if (notes && typeof notes === 'object') {
+              const lines: string[] = [];
+              for (const [k,v] of Object.entries(notes)) {
+                const key = String(k).replace(/_/g,' ');
+                const val = String(v);
+                lines.push(`${key[0].toUpperCase()+key.slice(1)}: ${val}`);
+              }
+              if (lines.length) {
+                return (
+                  <div className="p-3 rounded-md border border-gray-200 bg-gray-50">
+                    <div className="text-xs font-medium text-gray-700 mb-1">Guidance</div>
+                    <div className="text-xs text-gray-700 whitespace-pre-line">{lines.join('\n')}</div>
+                  </div>
+                );
+              }
+            }
+          }
+        } catch {}
+        return null;
+      })()}
       {showHeader && (
         <div className="pb-3">
           <div className="flex items-center justify-between">
@@ -1678,6 +1706,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               <div>
                 <h3 className="text-lg font-semibold">
                   {(() => {
+                    const st = String((workout as any)?.workout_structure?.title || (workout as any)?.title || '').trim();
+                    if (st) return st;
                     const n = String(workout.name || '').trim();
                     if (n) return n;
                     return `${getWorkoutTypeLabel(workout.type)} — ${deriveFocus()}`;
@@ -1707,6 +1737,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold">
             {(() => {
+              const st = String((workout as any)?.workout_structure?.title || (workout as any)?.title || '').trim();
+              if (st) return st;
               const focus = deriveFocus();
               return focus && focus !== 'Planned'
                 ? `${getWorkoutTypeLabel(workout.type)} — ${focus}`

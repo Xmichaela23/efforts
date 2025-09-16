@@ -312,6 +312,67 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     }
   }
 
+  // Bike tempo blocks (single block, minutes)
+  const btempo = tokenStr.match(/bike_tempo_(\d+)min/gi);
+  if (btempo) {
+    let sum = 0;
+    btempo.forEach((m) => {
+      const mm = m.match(/(\d+)min/i);
+      if (mm) sum += parseInt(mm[1], 10);
+    });
+    if (sum > 0) {
+      totalMin += sum;
+      summaryParts.push(`Tempo ${sum} min`);
+    }
+  }
+
+  // Bike recovery blocks (single block, minutes)
+  const brec = tokenStr.match(/bike_recovery_(\d+)min/gi);
+  if (brec) {
+    let sum = 0;
+    brec.forEach((m) => {
+      const mm = m.match(/(\d+)min/i);
+      if (mm) sum += parseInt(mm[1], 10);
+    });
+    if (sum > 0) {
+      totalMin += sum;
+      summaryParts.push(`Recovery ${sum} min (Z1)`);
+    }
+  }
+
+  // Helper to parse bike rest tokens: R3min or r180 → seconds
+  const parseBikeRest = (rMin?: string, rSec?: string): number => {
+    if (rMin) return parseInt(rMin, 10) * 60;
+    if (rSec) return parseInt(rSec, 10);
+    return 0;
+  };
+
+  // Bike neuromuscular power: bike_neuro_6x15s_R3min or _r180
+  {
+    const m = tokenStr.match(/bike_neuro_(\d+)x(\d+)s(?:_(?:R(\d+)min|r(\d+)))?/i);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const secsEach = parseInt(m[2], 10);
+      const restSec = parseBikeRest(m[3], m[4]);
+      const totalSecs = reps * secsEach + Math.max(0, reps - 1) * restSec;
+      totalMin += Math.round(totalSecs / 60);
+      summaryParts.push(`${reps} × ${secsEach}s neuromuscular${restSec ? ` with ${mmss(restSec)} easy` : ''}`);
+    }
+  }
+
+  // Bike anaerobic capacity: bike_anaerobic_6x45s_R3min or _r180
+  {
+    const m = tokenStr.match(/bike_anaerobic_(\d+)x(\d+)s(?:_(?:R(\d+)min|r(\d+)))?/i);
+    if (m) {
+      const reps = parseInt(m[1], 10);
+      const secsEach = parseInt(m[2], 10);
+      const restSec = parseBikeRest(m[3], m[4]);
+      const totalSecs = reps * secsEach + Math.max(0, reps - 1) * restSec;
+      totalMin += Math.round(totalSecs / 60);
+      summaryParts.push(`${reps} × ${secsEach}s anaerobic${restSec ? ` with ${mmss(restSec)} easy` : ''}`);
+    }
+  }
+
   // Long run blocks (e.g., longrun_150min_...)
   const lrun = tokenStr.match(/longrun_(\d+)min/i);
   if (lrun) {
@@ -378,7 +439,7 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
           if (/warmup/i.test(s)) wuDist += dist; else cdDist += dist;
           return;
         }
-        // Drills with reps×dist: swim_drills_4x50yd_* or 2x100yd variants
+        // Drills with reps×dist (plural, name-last): swim_drills_4x50yd_catchup
         m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9]+)/i);
         if (m) {
           const reps = parseInt(m[1], 10);
@@ -389,6 +450,19 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
           let restEach = 15; // seconds between 50s
           if (/singlearm/.test(drillName)) restEach = 20;
           if (/scullfront/.test(drillName)) restEach = distEach >= 100 ? 15 : 15;
+          restSeconds += Math.max(0, reps - 1) * restEach;
+          return;
+        }
+        // Drills alias (singular, name-first): swim_drill_catchup_4x50yd_r15
+        m = s.match(/swim_drill_([a-z0-9]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+        if (m) {
+          const name = m[1];
+          const reps = parseInt(m[2], 10);
+          const distEach = parseInt(m[3], 10);
+          const unit = m[4];
+          const r = m[5] ? parseInt(m[5], 10) : undefined;
+          addDistance(reps * distEach, unit);
+          const restEach = typeof r === 'number' ? r : (/singlearm/.test(name) ? 20 : 15);
           restSeconds += Math.max(0, reps - 1) * restEach;
           return;
         }
@@ -517,6 +591,62 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     totalMin += mins;
     summaryParts.push(`Strength ${mins} min`);
   }
+
+  // Strength token summaries from st_* authoring language (grouped lines)
+  try {
+    const pnAny: any = (baselines as any)?.performanceNumbers || {};
+    const pickOneRm = (name: string): number | undefined => {
+      const n = name.toLowerCase();
+      if (n.includes('dead')) return pnAny?.deadlift;
+      if (n.includes('bench')) return pnAny?.bench;
+      if (n.includes('squat')) return pnAny?.squat;
+      if (n.includes('ohp') || n.includes('overhead') || (n.includes('press') && !n.includes('bench'))) return pnAny?.overheadPress1RM || pnAny?.overhead || pnAny?.ohp;
+      if (n.includes('row')) return typeof pnAny?.bench === 'number' ? Math.round(pnAny.bench * 0.90) : undefined;
+      return pnAny?.squat;
+    };
+    const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
+    const addLine = (s: string) => { if (s && !summaryParts.includes(s)) summaryParts.push(s); };
+
+    steps.forEach((t) => {
+      const s = String(t).toLowerCase();
+      // Warmup/Cooldown tokens: st_wu_5, st_cool_5
+      let m = s.match(/^st_(?:wu|cool)_(\d+)/i);
+      if (m) { addLine(`${/wu/i.test(s) ? 'Warm‑up' : 'Cool‑down'} ${m[1]} min`); return; }
+
+      // Main lifts: st_main_<name>_<sets>x<reps>_@pct<percent>_rest<sec>
+      m = s.match(/^st_main_([a-z0-9_]+)_(\d+)x(\d+|amrap)(?:_@pct(\d+))?(?:_rest(\d+))?/i);
+      if (m) {
+        const rawName = m[1].replace(/_/g, ' ');
+        const sets = parseInt(m[2], 10);
+        const reps = m[3].toUpperCase() === 'AMRAP' ? 'AMRAP' : m[3];
+        const pct = m[4] ? parseInt(m[4], 10) : undefined;
+        const orm = pct ? pickOneRm(rawName) : undefined;
+        const load = (typeof orm === 'number' && typeof pct === 'number') ? `${round5(orm * (pct/100))} lb` : undefined;
+        addLine(`${rawName} ${sets}×${reps}${load ? ` @ ${load}` : (pct ? ` @ ${pct}%` : '')}`.trim());
+        return;
+      }
+
+      // Accessories/Core: st_acc_* or st_core_* formats
+      m = s.match(/^st_(?:acc|core)_([a-z0-9_]+)_(\d+)x(\d+|amrap)(?:_@pct(\d+))?(?:_rest(\d+))?/i);
+      if (m) {
+        const rawName = m[1].replace(/_/g, ' ');
+        const sets = parseInt(m[2], 10);
+        const reps = m[3].toUpperCase() === 'AMRAP' ? 'AMRAP' : m[3];
+        const pct = m[4] ? parseInt(m[4], 10) : undefined;
+        const orm = pct ? pickOneRm(rawName) : undefined;
+        const load = (typeof orm === 'number' && typeof pct === 'number') ? `${round5(orm * (pct/100))} lb` : undefined;
+        addLine(`${rawName} ${sets}×${reps}${load ? ` @ ${load}` : (pct ? ` @ ${pct}%` : '')}`.trim());
+        return;
+      }
+
+      // Shorthand tokens (e.g., row_4x6_8)
+      m = s.match(/^row_(\d+)x(\d+)(?:_(\d+))?/i);
+      if (m) {
+        addLine(`Row ${parseInt(m[1],10)}×${m[2]}`);
+        return;
+      }
+    });
+  } catch {}
 
   // Strength derived duration from description when no explicit minutes token
   if (!strengthMain && String(session?.discipline || '').toLowerCase() === 'strength') {
@@ -684,4 +814,133 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
   };
 }
 
+
+// Structured normalizer for `workout_structure`
+export function normalizeStructuredSession(session: any, baselines: Baselines): { friendlySummary: string; durationMinutes: number; stepLines?: string[] } {
+  const ws = (session && (session.workout_structure || session.workout)) || null;
+  if (!ws || typeof ws !== 'object') return { friendlySummary: '', durationMinutes: 0 };
+
+  const pn: any = (baselines as any)?.performanceNumbers || {};
+  const toSec = (v?: string): number => {
+    if (!v || typeof v !== 'string') return 0;
+    const m1 = v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60;
+    const m2 = v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10);
+    return 0;
+  };
+  const mm = (n: number) => Math.max(0, Math.round(n/60));
+  const ydToYd = (v: string): number => { const n = parseInt(v.replace(/\D/g,'')||'0',10); return n; };
+  const mToYd = (v: string): number => { const n = parseInt(v.replace(/\D/g,'')||'0',10); return Math.round(n/0.9144); };
+  const resolvePace = (ref: any): string | null => {
+    if (!ref) return null;
+    if (typeof ref === 'string') {
+      if (/user\./i.test(ref)) {
+        const key = ref.replace(/^user\./i,'');
+        return pn[key] || null;
+      }
+      return ref;
+    }
+    if (ref && typeof ref === 'object' && typeof ref.baseline === 'string') {
+      const key = String(ref.baseline).replace(/^user\./i,'');
+      return pn[key] || null;
+    }
+    return null;
+  };
+
+  const lines: string[] = [];
+  let totalSec = 0;
+  const push = (s?: string) => { if (s && s.trim()) lines.push(s.trim()); };
+
+  const type = String(ws.type || '').toLowerCase();
+  const struct: any[] = Array.isArray(ws.structure) ? ws.structure : [];
+
+  for (const seg of struct) {
+    const kind = String(seg?.type || '').toLowerCase();
+    if (kind === 'warmup' || kind === 'cooldown') {
+      const sec = toSec(seg.duration);
+      totalSec += sec;
+      push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min`);
+      continue;
+    }
+    if (type === 'strength_session') {
+      const name = String(seg?.exercise || '').replace(/_/g,' ');
+      if (!name) continue;
+      const sets = Number(seg?.sets) || 0;
+      const repsTxt = (typeof seg?.reps === 'string' ? seg.reps.toUpperCase() : String(seg?.reps || '')) || '';
+      const pct = (seg?.load && seg.load.type === 'percentage') ? Number(seg.load.percentage) : undefined;
+      const baselineKey = (seg?.load && typeof seg.load.baseline === 'string') ? seg.load.baseline.replace(/^user\./i,'') : '';
+      const orm = (baselineKey && typeof pn[baselineKey] === 'number') ? pn[baselineKey] as number : undefined;
+      const est = (typeof orm === 'number' && typeof pct === 'number') ? Math.max(5, Math.round((orm*(pct/100))/5)*5) : undefined;
+      const restS = toSec(String(seg?.rest||''));
+      totalSec += Math.max(0, sets-1)*restS; // add rests; work time estimation omitted for simplicity
+      push(`${name} ${Math.max(1,sets)}×${repsTxt || '?'}${(typeof est==='number')?` @ ${est} lb`:(typeof pct==='number'?` @ ${pct}%`: '')}`.trim());
+      continue;
+    }
+    if (type === 'swim_session') {
+      if (kind === 'drill_set') {
+        const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||'');
+        const yd = /yd/i.test(dist) ? ydToYd(dist) : mToYd(dist);
+        totalSec += Math.max(0, reps-1)*toSec(String(seg?.rest||''));
+        push(`Drill ${String(seg?.drill_type||'').replace(/_/g,' ')} ${reps}×${yd} yd${seg?.rest?` @ :${toSec(String(seg.rest))/60|0}r`:''}`);
+        continue;
+      }
+      if (kind === 'main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) {
+        const reps = Number(seg?.repetitions)||0; const dist = String(seg?.distance||'');
+        const yd = /yd/i.test(dist) ? ydToYd(dist) : mToYd(dist);
+        totalSec += Math.max(0, reps-1)*toSec(String(seg?.rest||''));
+        push(`${reps}×${yd} yd aerobic${seg?.rest?` @ :${toSec(String(seg.rest))/60|0}r`:''}`);
+        continue;
+      }
+      if (kind === 'cooldown' || kind === 'warmup') continue; // handled above
+    }
+    if (type === 'interval_session' || (kind === 'main_set' && seg?.set_type === 'intervals')) {
+      const reps = Number(seg?.repetitions)||0;
+      const work = seg?.work_segment||{};
+      const rec = seg?.recovery_segment||{};
+      const distTxt = String(work?.distance||'');
+      const pace = resolvePace(work?.target_pace) || resolvePace(work?.pace) || null;
+      const restS = toSec(String(rec?.duration||''));
+      totalSec += Math.max(0, reps-1)*restS;
+      if (/mi\b/i.test(distTxt)) push(`${reps} × ${parseFloat(distTxt)} mi${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog`:''}`);
+      else if (/m\b/i.test(distTxt)) push(`${reps} × ${distTxt}${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog`:''}`);
+      else if (/s|min/i.test(String(work?.duration||''))) {
+        const ws = toSec(String(work?.duration));
+        totalSec += reps*ws;
+        push(`${reps} × ${mm(ws)} min${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog`:''}`);
+      }
+      continue;
+    }
+    if (type === 'tempo_session' && kind === 'main_set') {
+      const durS = toSec(String(seg?.work_segment?.duration||''));
+      totalSec += durS;
+      const p = seg?.work_segment?.target_pace;
+      let pTxt = '';
+      if (p && typeof p === 'object' && p.baseline) {
+        const base = resolvePace({ baseline: p.baseline });
+        const mod = String(p.modifier||'');
+        pTxt = base ? `${base}${mod?` ${mod}`:''}` : '';
+      } else {
+        const base = resolvePace(p); if (base) pTxt = base;
+      }
+      push(`Tempo ${mm(durS)} min${pTxt?` @ ${pTxt}`:''}`);
+      continue;
+    }
+    if (type === 'bike_intervals' && kind === 'main_set') {
+      const reps = Number(seg?.repetitions)||0;
+      const work = seg?.work_segment||{};
+      const rec = seg?.recovery_segment||{};
+      const ws = toSec(String(work?.duration||''));
+      totalSec += reps*ws + Math.max(0, reps-1)*toSec(String(rec?.duration||''));
+      const rng = work?.target_power?.range || '';
+      push(`${reps} × ${mm(ws)} min${rng?` @ ${rng}`:''}`);
+      continue;
+    }
+    if (type === 'endurance_session' && (kind === 'main_effort' || kind==='main')) {
+      const s = toSec(String(seg?.duration||'')); totalSec += s; push(`Endurance ${mm(s)} min`); continue;
+    }
+  }
+
+  if (!totalSec && typeof ws.total_duration_estimate === 'string') totalSec = toSec(ws.total_duration_estimate);
+  const friendly = lines.join(' • ');
+  return { friendlySummary: friendly, durationMinutes: mm(totalSec), stepLines: lines };
+}
 
