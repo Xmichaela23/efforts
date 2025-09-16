@@ -872,7 +872,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       // Bike sets e.g., bike_vo2_6x3min_R3min, bike_thr_4x8min_R5min, bike_ss_2x20min_R6min
       steps.forEach((tok)=>{
         const s = tok.toLowerCase();
-        let m = s.match(/^bike_(vo2|thr|ss)_(\d+)x(\d+)(min)(?:_(r\d+|R\d+min))?$/i);
+        let m = s.match(/^bike_(vo2|thr|ss)_(\d+)x(\d+)(min)(?:_(r\d+|r\d+min))?$/i);
         if (m) {
           const kind = (m[1]||'').toLowerCase();
           const reps=parseInt(m[2],10); const each=parseInt(m[3],10)*60; const restSec=parseRestSec(s);
@@ -890,7 +890,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           return;
         }
         // Neuromuscular and Anaerobic e.g., bike_neuro_8x30s_R300s, bike_anaerobic_6x60s_R4min
-        m = s.match(/^bike_(neuro|anaerobic)_(\d+)x(\d+)(s|min)(?:_(r\d+|R\d+min))?$/i);
+        m = s.match(/^bike_(neuro|anaerobic)_(\d+)x(\d+)(s|min)(?:_(r\d+|r\d+min))?$/i);
         if (m) {
           const reps = parseInt(m[2],10);
           const dur = parseInt(m[3],10) * (m[4].toLowerCase()==='min'?60:1);

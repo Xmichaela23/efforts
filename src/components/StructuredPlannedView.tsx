@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import React from 'react';
+import { Button } from '@/components/ui/button';
+import { Download, Watch } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 type StructuredPlannedViewProps = {
   workout: any;
@@ -20,7 +22,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     );
   }
 
-  // Minimal in-place renderer using structured JSON only
+  // Structured-only renderer
   const ws: any = (workout as any).workout_structure;
   const { loadUserBaselines } = useAppContext?.() || ({} as any);
   const [ctxPN, setCtxPN] = useState<any | null>(null);
@@ -162,8 +164,66 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const name=String(seg?.exercise||'').replace(/_/g,' '); const sets=Number(seg?.sets)||0; const reps=String(seg?.reps||'').toUpperCase(); const pct=Number(seg?.load?.percentage)||0; const baseKey=String(seg?.load?.baseline||'').replace(/^user\./i,''); const orm=pn[baseKey]; const load = (typeof orm==='number'&&pct>0)? `${Math.max(5, Math.round((orm*(pct/100))/5)*5)} lb` : (pct?`${pct}%`:undefined); for(let r=0;r<Math.max(1,sets);r+=1){ lines.push(`${name} 1 × ${reps}${load?` @ ${load}`:''}`); if (r<sets-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue;
     }
   }
+  // Removed all token fallback paths: structured JSON is the single source of truth
+
   const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
   const durationMin = est>0 ? Math.floor(est/60) : undefined;
+
+  const handleGarminExport = async () => {
+    try {
+      // Check if workout has intervals for Garmin export
+      const intervals = (workout as any)?.intervals;
+      if (!intervals || !Array.isArray(intervals) || intervals.length === 0) {
+        alert('Workout needs to be materialized with intervals for Garmin export. Please ensure the workout has been processed.');
+        return;
+      }
+
+      // Call the Garmin export function
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert('Please log in to export to Garmin');
+        return;
+      }
+
+      const { data: result, error } = await supabase.functions.invoke('send-workout-to-garmin', {
+        body: {
+          workoutId: workout.id,
+          userId: user.id
+        }
+      });
+
+      if (error) {
+        alert(`Failed to send to Garmin: ${error.message}`);
+      } else if (result?.success) {
+        alert('Workout sent to Garmin successfully!');
+      } else {
+        alert(`Failed to send to Garmin: ${result?.error || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Garmin export error:', error);
+      alert('Failed to export to Garmin');
+    }
+  };
+
+  const handleDownloadWorkout = () => {
+    // Create a simple workout file for download
+    const workoutData = {
+      name: ws?.title || 'Workout',
+      duration: ws?.total_duration_estimate,
+      steps: lines,
+      type: (workout as any)?.type || 'run'
+    };
+
+    const blob = new Blob([JSON.stringify(workoutData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${(ws?.title || 'workout').replace(/\s+/g, '_')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="space-y-3">
@@ -177,6 +237,30 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         <ul className="list-none space-y-1">
           {(lines.length?lines:["No structured steps found."]).map((ln, i)=>(<li key={i} className="text-sm text-gray-800">{ln}</li>))}
         </ul>
+      </div>
+      
+      {/* Export buttons */}
+      <div className="pt-3 border-t border-gray-200">
+        <div className="flex gap-2">
+          <Button 
+            onClick={handleGarminExport}
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Watch className="h-4 w-4" />
+            Send to Garmin
+          </Button>
+          
+          <Button 
+            onClick={handleDownloadWorkout}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Download
+          </Button>
+        </div>
       </div>
     </div>
   );
