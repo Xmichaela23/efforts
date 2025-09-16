@@ -619,7 +619,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
             const { expand } = await import('@/services/plans/expander');
             const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
             const atomic: any[] = expand(stepsPresetArr || [], (workout as any).main, (workout as any).tags);
-            const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
+            const resolved: any[] = resolveTargets(atomic as any, (pn || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
             if (Array.isArray(resolved) && resolved.length) {
               setStepLines(flattenSteps(resolved));
               try {
@@ -642,7 +642,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               const { expand } = await import('@/services/plans/expander');
               const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
               const atomic: any[] = expand(stepsPresetArr || [], (workout as any).main, (workout as any).tags);
-              const resolved: any[] = resolveTargets(atomic as any, (perfNumbers || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
+              const resolved: any[] = resolveTargets(atomic as any, (pn || {}), ((workout as any).export_hints || {}), String((workout as any).type||'').toLowerCase());
               if (Array.isArray(resolved) && resolved.length) {
                 const flat = flattenSteps(resolved);
                 setStepLines(dedupeLines(flat));
@@ -686,7 +686,7 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
               return;
             }
           }
-          const perfObj = (perfNumbers || {});
+          const perfObj = (pn || {});
           const tokenLines = interpretTokensPerRep(
             (Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : ([] as string[])),
             String((workout as any).type || ''),
@@ -1412,7 +1412,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
   const interpretTokensPerRep = (stepsPreset: string[], discipline: string, exportHints: any, perf: any): string[] => {
     if (!Array.isArray(stepsPreset) || stepsPreset.length===0) return [];
     const out: string[] = [];
-    const type = String(discipline||'').toLowerCase();
+    let type = String(discipline||'').toLowerCase();
+    if (type === 'bike') type = 'ride';
     const tolEasy = typeof exportHints?.pace_tolerance_easy==='number' ? exportHints.pace_tolerance_easy : 0.06;
     const tolQual = typeof exportHints?.pace_tolerance_quality==='number' ? exportHints.pace_tolerance_quality : 0.04;
     const fivek = String(perf?.fiveK_pace || perf?.fiveKPace || perf?.fiveK || '').trim() || undefined;
