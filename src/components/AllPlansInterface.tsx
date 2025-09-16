@@ -397,6 +397,27 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     } catch { return []; }
   };
 
+  // Hook-safe renderer for weekly step lines
+  const WeeklyLines: React.FC<{ workout: any }> = ({ workout }) => {
+    const [lines, setLines] = useState<string[] | null>(null);
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const arr = await buildWeeklyStepLines(workout);
+          if (!cancelled) setLines(arr);
+        } catch {
+          if (!cancelled) setLines(null);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [workout?.id, baselines]);
+    if (Array.isArray(lines) && lines.length) {
+      return (<span className="whitespace-pre-line">{lines.join('\n')}</span>);
+    }
+    return (<>{buildWeeklySubtitle(workout)}</>);
+  };
+
   // Calculate current week based on plan start date and today's date
   const calculateCurrentWeek = async (planId: string): Promise<number> => {
     try {
@@ -1784,18 +1805,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                             : null;
                                         })()}
                                       </div>
-                                      <div className="text-sm text-gray-600 mt-1">
-                                        {(() => {
-                                          // Render per-step lines; fallback to summary
-                                          const key = `${workout.id}:lines`;
-                                          const [lines, setLines] = useState<string[] | null>(null);
-                                          useEffect(() => { let cancelled=false; (async ()=>{ try{ const arr = await buildWeeklyStepLines(workout); if(!cancelled) setLines(arr); } catch { setLines(null); }})(); return ()=>{cancelled=true;}; }, [workout?.id, baselines]);
-                                          if (Array.isArray(lines) && lines.length) return (
-                                            <span className="whitespace-pre-line">{lines.join('\n')}</span>
-                                          );
-                                          return buildWeeklySubtitle(workout);
-                                        })()}
-                                      </div>
+                                      <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
