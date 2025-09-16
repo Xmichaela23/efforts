@@ -511,6 +511,12 @@ const PRESET_MAP: Record<string, Step[]> = {
       { kind: "recovery", ctrl: "time", val: 6 * 60, intensity: "easy", label: "easy" }
     ]}
   ],
+  "bike_ss_2x15min_R5min": [
+    { kind: "repeat", times: 2, of: [
+      { kind: "work", ctrl: "time", val: 15 * 60, intensity: "target", label: "SS" },
+      { kind: "recovery", ctrl: "time", val: 5 * 60, intensity: "easy", label: "easy" }
+    ]}
+  ],
   "bike_ss_2x22min_R6min": [
     { kind: "repeat", times: 2, of: [
       { kind: "work", ctrl: "time", val: 22 * 60, intensity: "target", label: "SS" },

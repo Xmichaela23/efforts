@@ -1563,11 +1563,13 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
     const pushOne = (lab: string, meters?: number, seconds?: number) => {
       const isRest = /rest|recovery/i.test(lab);
       if (typeof seconds === 'number' && seconds>0) {
+        // For rest, never annotate pace; render explicitly as rest
+        if (isRest) { out.push(`1 × ${mmss(seconds)} rest`); return; }
         if (type==='run'){
-          const base = parsePace(isRest ? (easy||fivek) : (fivek||easy));
-          if (base){ const tol = isRest?tolEasy:tolQual; const lo=`${mmss(base.sec*(1-tol))}/${base.unit}`; const hi=`${mmss(base.sec*(1+tol))}/${base.unit}`; out.push(`1 × ${mmss(seconds)} @ ${mmss(base.sec)}/${base.unit} (${lo}–${hi})`); return; }
+          const base = parsePace(fivek || easy);
+          if (base){ const tol = tolQual; const lo=`${mmss(base.sec*(1-tol))}/${base.unit}`; const hi=`${mmss(base.sec*(1+tol))}/${base.unit}`; out.push(`1 × ${mmss(seconds)} @ ${mmss(base.sec)}/${base.unit} (${lo}–${hi})`); return; }
         }
-        out.push(`1 × ${mmss(seconds)}${isRest?' rest':''}`); return;
+        out.push(`1 × ${mmss(seconds)}`); return;
       }
       if (typeof meters === 'number' && meters>0) {
         if (type==='run'){

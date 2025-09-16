@@ -583,12 +583,14 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       const tokenStr = steps.join(' ').toLowerCase();
       const addRest = (sec: number, pushIfLast = true) => { if (sec>0) out.push({ effortLabel: 'rest', duration: sec }); };
       const parseRestSec = (s: string): number => {
-        // supports ..._R2min, ..._r120, and bare R2min/r120 anywhere in token
-        const mMin = s.match(/_r(\d+)(?:min)?\b/i) && !/_r\d+s\b/i.test(s) ? null : null; // placeholder
-        const mRmin = s.match(/_R(\d+)min/i);
-        const mrSec = s.match(/_r(\d+)(?![a-z])/i);
-        if (mRmin) return parseInt(mRmin[1],10)*60;
-        if (mrSec) return parseInt(mrSec[1],10);
+        // Accept minutes or seconds in a variety of token styles:
+        //   _R5min, _r5min, _R300s, _r300, and ensure we don't swallow other suffixes
+        const mMin = s.match(/_(?:r|R)(\d+)\s*min\b/i);
+        if (mMin) return parseInt(mMin[1], 10) * 60;
+        const mSecWithS = s.match(/_(?:r|R)(\d+)s\b/i);
+        if (mSecWithS) return parseInt(mSecWithS[1], 10);
+        const mSecBare = s.match(/_(?:r|R)(\d+)(?![a-z])/i);
+        if (mSecBare) return parseInt(mSecBare[1], 10);
         return 0;
       };
 
