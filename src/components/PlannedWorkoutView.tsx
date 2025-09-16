@@ -541,7 +541,9 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
                 const t = String(txt||'').toLowerCase();
                 if (t.includes('dead')) return 'deadlift';
                 if (t.includes('bench')) return 'bench';
-                if (t.includes('ohp') || t.includes('overhead') || t.includes('press')) return 'overhead';
+                if (t.includes('ohp') || t.includes('overhead') || (t.includes('press') && !t.includes('bench'))) return 'overhead';
+                if (t.includes('lateral raise')) return 'overhead';
+                if (t.includes('row')) return 'bench';
                 return 'squat';
               };
               const parsePct = (intensity?: string): number | undefined => {
@@ -1117,8 +1119,8 @@ const PlannedWorkoutView: React.FC<PlannedWorkoutViewProps> = ({
         const isCoolV3 = kind === 'cooldown' || kind === 'swim_cooldown';
         const typeLower = String((workout as any).type||'').toLowerCase();
         const isSwim = typeLower === 'swim';
-        // Standalone V3 rest (e.g., swim_rest_rNN): render "Rest mm:ss" and return
-        if (isRestV3 && isSwim) {
+        // Standalone V3 rest (any discipline): render "Rest mm:ss" and return
+        if (isRestV3) {
           const sec = typeof seg?.duration_s === 'number' ? seg.duration_s : (seg as any)?.rest_s;
           if (typeof sec === 'number' && sec>0) {
             const rmm = Math.floor(sec/60); const rss = sec%60;
