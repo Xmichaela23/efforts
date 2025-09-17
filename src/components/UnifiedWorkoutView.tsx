@@ -472,6 +472,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       try {
                         const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
                         setLinkedPlanned(data || null);
+                        // Immediately compute server summary so Summary tab reflects latest alignment
+                        try {
+                          await supabase.functions.invoke('compute-workout-summary', {
+                            body: { workout_id: String((workout as any)?.id) }
+                          });
+                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                        } catch {}
                       } catch {}
                     }}
                   />

@@ -358,15 +358,17 @@ Deno.serve(async (req) => {
       console.log(`[compute-summary:${COMPUTED_VERSION}] wid=${w.id} user=${w.user_id} sport=${sport} samples=${sampleCount} rows=${rows.length} laps=${laps.length} plannedSteps=${plannedStepsDbg}`);
     } catch {}
 
-    // Movement gate: skip initial non-movement (WU contamination)
-    let startIdx = 0;
-    while (startIdx + 1 < rows.length) {
-      const a = rows[startIdx], b = rows[startIdx+1];
-      const dt = (b.t - a.t); const dd = (b.d - a.d);
-      if ((a.v && a.v >= 0.5) || (dd >= 10) || (dt >= 5)) break;
-      startIdx += 1;
+    // Movement gate: skip initial non-movement, but ONLY when no planned link
+    if (!w.planned_id) {
+      let startIdx = 0;
+      while (startIdx + 1 < rows.length) {
+        const a = rows[startIdx], b = rows[startIdx+1];
+        const dt = (b.t - a.t); const dd = (b.d - a.d);
+        if ((a.v && a.v >= 0.5) || (dd >= 10) || (dt >= 5)) break;
+        startIdx += 1;
+      }
+      if (startIdx > 0) rows = rows.slice(startIdx);
     }
-    if (startIdx > 0) rows = rows.slice(startIdx);
 
     // Planned steps (prefer computed.steps)
     const plannedSteps: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps
@@ -442,7 +444,11 @@ Deno.serve(async (req) => {
         planned_step_id: (st?.id ?? null),
         kind: st?.type || st?.kind || null,
         role: (sport === 'swim' && role === 'recovery') ? 'rest' : role,
-        planned: { duration_s: deriveSecondsFromPlannedStep(st), distance_m: deriveMetersFromPlannedStep(st) },
+        planned: {
+          duration_s: deriveSecondsFromPlannedStep(st),
+          distance_m: deriveMetersFromPlannedStep(st),
+          target_pace_s_per_mi: derivePlannedPaceSecPerMi(st)
+        },
         executed: {
           duration_s: Math.round(segSec),
           distance_m: Math.round(segMeters),
@@ -740,6 +746,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Enforce monotonic, non-overlapping windows; ensure cooldown consumes remainder
+    if (infos.length) {
+      for (let i=0;i<infos.length;i+=1) {
+        const prevEnd = i>0 ? (infos[i-1].endIdx ?? infos[i-1].startIdx) : infos[i].startIdx;
+        if (i>0 && infos[i].startIdx < prevEnd) infos[i].startIdx = prevEnd;
+        if (infos[i].endIdx != null && infos[i].endIdx <= infos[i].startIdx) {
+          infos[i].endIdx = Math.min(rows.length-1, infos[i].startIdx + 1);
+        }
+      }
+      // force last to end of file
+      const last = infos[infos.length-1];
+      if (last) last.endIdx = rows.length - 1;
+    }
+
     // Materialize intervals
     const poolLenM: number | null = (() => {
       try {
@@ -859,7 +879,11 @@ Deno.serve(async (req) => {
         planned_step_id: st?.id ?? null,
         kind: st?.type || st?.kind || null,
         role: info.role || (info.measured ? 'work' : null),
-        planned: { duration_s: deriveSecondsFromPlannedStep(st), distance_m: deriveMetersFromPlannedStep(st) },
+        planned: {
+          duration_s: deriveSecondsFromPlannedStep(st),
+          distance_m: deriveMetersFromPlannedStep(st),
+          target_pace_s_per_mi: derivePlannedPaceSecPerMi(st)
+        },
         executed: {
           duration_s: segSec != null ? Math.round(segSec) : null,
           distance_m: segSec != null ? Math.round(segMetersMeasured) : null,

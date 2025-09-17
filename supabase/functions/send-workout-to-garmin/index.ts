@@ -162,7 +162,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   let stepId = 1
   // Use computed per-rep targets when available to guarantee PACE ranges per interval
   const computedSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : []
-  let workRepIdx = 0
+  // Build per-type index lists so we can map computed targets by step intensity
+  const byTypeIdx: { work: number[]; rest: number[]; warm: number[]; cool: number[] } = { work: [], rest: [], warm: [], cool: [] }
+  try {
+    computedSteps.forEach((x: any, i: number) => {
+      const t = String(x?.type || '').toLowerCase()
+      if (t === 'warmup') byTypeIdx.warm.push(i)
+      else if (t === 'cooldown') byTypeIdx.cool.push(i)
+      else if (t === 'interval_rest' || /rest/.test(t)) byTypeIdx.rest.push(i)
+      else byTypeIdx.work.push(i)
+    })
+  } catch {}
+  const ptr: Record<'work'|'rest'|'warm'|'cool', number> = { work: 0, rest: 0, warm: 0, cool: 0 }
 
   const secPerMiToPaceStr = (sec: number): string => {
     const m = Math.floor(sec / 60)
@@ -173,18 +184,17 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
 
   const applyComputedTargetIfMissing = (step: GarminStep, isRest: boolean) => {
     try {
-      // Allow applying targets on REST/RECOVERY steps as well (for easy jog guidance)
-      // Advance pointer to next computed WORK rep (skip warmup/cooldown/rest)
-      const isWork = (x: any) => {
-        const t = String(x?.type || '').toLowerCase()
-        // Only treat real work reps as work; skip warmup/cooldown/rest
-        if (t === 'interval_rest' || /rest/.test(t)) return false
-        if (t === 'warmup' || t === 'cooldown') return false
-        return true
-      }
-      let cs = computedSteps?.[workRepIdx]
-      while (cs && !isWork(cs)) { workRepIdx += 1; cs = computedSteps?.[workRepIdx] }
-      if (!cs) { workRepIdx += 1; return }
+      // Choose bucket by current step intensity
+      let bucket: 'work'|'rest'|'warm'|'cool' = 'work'
+      const upper = String(step.intensity || '').toUpperCase()
+      if (upper === 'WARMUP') bucket = 'warm'
+      else if (upper === 'COOLDOWN') bucket = 'cool'
+      else if (upper === 'REST' || upper === 'RECOVERY') bucket = 'rest'
+      const list = byTypeIdx[bucket]
+      const i = list?.[ptr[bucket] ?? 0]
+      const cs = (typeof i === 'number') ? computedSteps[i] : undefined
+      if (typeof i === 'number') ptr[bucket] = (ptr[bucket] ?? 0) + 1
+      if (!cs) { return }
       // Only apply when step has no explicit target
       const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
       if (hasTarget) return
@@ -242,7 +252,6 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           }
         }
       }
-      workRepIdx += 1
     } catch {}
   }
 
@@ -265,6 +274,11 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   // Carry-forward last known SPEED range for RUNNING steps without explicit targets (non-rest)
   let lastSpeedLow: number | null = null
   let lastSpeedHigh: number | null = null
+  // Track easy/jog targets for REST from previous rests or warmup
+  let lastRestLow: number | null = null
+  let lastRestHigh: number | null = null
+  let lastWarmLow: number | null = null
+  let lastWarmHigh: number | null = null
 
   // Attempt 0: Build intervals directly from structured JSON (no DB dependence on materializer)
   const intervalsFromStructured = (() => {
@@ -492,7 +506,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           // Try to apply computed per-rep target if none attached
           applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
           normalizeTargetBounds(step)
-          // Update or carry-forward SPEED targets for RUNNING (work steps only)
+          // Update or carry-forward SPEED targets for RUNNING
           if (sport === 'RUNNING') {
             const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'
             if (isWorkStep) {
@@ -503,6 +517,24 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
                 step.targetType = 'SPEED'
                 step.targetValueLow = lastSpeedLow
                 step.targetValueHigh = lastSpeedHigh
+              }
+            } else if (step.intensity === 'REST' || step.intensity === 'RECOVERY') {
+              if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+                lastRestLow = Number((step as any).targetValueLow)
+                lastRestHigh = Number((step as any).targetValueHigh)
+              } else if (lastRestLow != null && lastRestHigh != null) {
+                step.targetType = 'SPEED'
+                step.targetValueLow = lastRestLow
+                step.targetValueHigh = lastRestHigh
+              } else if (lastWarmLow != null && lastWarmHigh != null) {
+                step.targetType = 'SPEED'
+                step.targetValueLow = lastWarmLow
+                step.targetValueHigh = lastWarmHigh
+              }
+            } else if (step.intensity === 'WARMUP') {
+              if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+                lastWarmLow = Number((step as any).targetValueLow)
+                lastWarmHigh = Number((step as any).targetValueHigh)
               }
             }
           }
@@ -545,6 +577,24 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           step.targetType = 'SPEED'
           step.targetValueLow = lastSpeedLow
           step.targetValueHigh = lastSpeedHigh
+        }
+      } else if (step.intensity === 'REST' || step.intensity === 'RECOVERY') {
+        if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+          lastRestLow = Number((step as any).targetValueLow)
+          lastRestHigh = Number((step as any).targetValueHigh)
+        } else if (lastRestLow != null && lastRestHigh != null) {
+          step.targetType = 'SPEED'
+          step.targetValueLow = lastRestLow
+          step.targetValueHigh = lastRestHigh
+        } else if (lastWarmLow != null && lastWarmHigh != null) {
+          step.targetType = 'SPEED'
+          step.targetValueLow = lastWarmLow
+          step.targetValueHigh = lastWarmHigh
+        }
+      } else if (step.intensity === 'WARMUP') {
+        if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+          lastWarmLow = Number((step as any).targetValueLow)
+          lastWarmHigh = Number((step as any).targetValueHigh)
         }
       }
     }
