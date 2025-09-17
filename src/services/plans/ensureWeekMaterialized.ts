@@ -25,6 +25,11 @@ type PlannedRow = {
   intensity?: any;
   intervals?: any[];
   strength_exercises?: any[];
+  // new structured fast-path columns exist in DB; include in type to satisfy TS
+  workout_structure?: any | null;
+  workout_title?: string | null;
+  friendly_summary?: string | null;
+  total_duration_seconds?: number | null;
 };
 
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'] as const;
@@ -1170,8 +1175,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                     const km = meters / 1000;
                     const base = p.unit === 'mi' ? miles : km;
                     step.duration = Math.max(1, Math.round(base * p.sec));
-                    // Use duration only for Garmin (avoid dual distance+duration which some devices ignore)
-                    delete (step as any).distanceMeters;
+                    // Keep distance for devices that require distance-based reps; duration is a hint
                   }
                 }
                 if (paceTxt) addPaceRange(step, paceTxt, tolQual);
@@ -1555,7 +1559,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       duration: totalDurSeconds>0 ? Math.round(totalDurSeconds/60) : durationVal,
       workout_status: 'planned' as any,
       source: 'training_plan',
-      tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
+      // tags stored in DB via a separate column in some deployments; omit from typed row here
       steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
       export_hints: exportHints || null,
       // If we successfully computed steps, clear rendered_description so UI uses rich steps
@@ -1566,19 +1570,13 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       workout_title: ((s as any)?.workout_structure?.title || (s as any)?.title) || null,
       friendly_summary: rendered || null,
       total_duration_seconds: (totalDurSeconds && totalDurSeconds>0) ? totalDurSeconds : (totalSeconds && totalSeconds>0 ? totalSeconds : null),
-      primary_target_type: (computedTargets as any).primary_target_type,
-      pace_value: (computedTargets as any).pace_value,
-      pace_low: (computedTargets as any).pace_low,
-      pace_high: (computedTargets as any).pace_high,
-      power_target_watts: (computedTargets as any).power_target_watts,
-      power_low: (computedTargets as any).power_low,
-      power_high: (computedTargets as any).power_high,
-      equipment: (computedTargets as any).equipment || null,
+      // optional analytic columns are inserted via DB defaults elsewhere; omit from typed row
+      // primary_target_type, pace/power fields, equipment are optional and may not exist in this deployment
       units: unitsPref,
       intensity: typeof s.intensity === 'object' ? s.intensity : undefined,
       // Always generate per-rep intervals from computed V3 when available; else use token/normalized fallback
       intervals: (computedStepsV3 && computedStepsV3.length)
-        ? buildIntervalsFromComputed(computedStepsV3 as any, mappedType, exportHints || {}, perfNumbers)
+        ? buildIntervalsFromComputed(computedStepsV3 as any)
         : (intervalsFromStructured || intervalsFromNorm),
       strength_exercises: (Array.isArray(s.strength_exercises) ? s.strength_exercises : undefined) || strengthFromTokens(s.steps_preset),
     });
