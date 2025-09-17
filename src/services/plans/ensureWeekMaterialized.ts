@@ -121,7 +121,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         return out;
       };
 
-        // Bridge helper: synthesize minimal workout_structure from tokens for existing rows
+        // Bridge helper: synthesize structured workout from tokens for existing rows (all disciplines)
         const buildStructuredFromTokens = (row: any): any | null => {
           try {
             const steps: string[] = Array.isArray(row?.steps_preset) ? (row.steps_preset as any[]).map((t:any)=>String(t)) : [];
@@ -149,7 +149,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 return { type:'endurance_session', total_duration_estimate: dur, structure: [ { type:'main_effort', duration: dur, target_pace:'user.easyPace', intensity:'aerobic_base' } ] };
               }
             }
-            // BIKE
+            // BIKE (endurance + SS/THR/VO2)
             if (disc==='ride' || disc==='bike') {
               const endu = m(/^bike_endurance_(\d+)min(?:_z(\d)(?:-(\d))?)?/i);
               if (endu) {
@@ -157,6 +157,15 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 const z = endu[2]? parseInt(endu[2],10) : 2; const range = z===1? '60-65%' : '65-75%';
                 return { type:'endurance_session', total_duration_estimate: dur, structure:[ { type:'main_effort', duration: dur, target_power:{ zone:'endurance', baseline:'user.ftp', range }, intensity:'aerobic_base' } ] };
               }
+              const buildBikeSet = (label:'sweet_spot_intervals'|'threshold_intervals'|'vo2_intervals', mm:RegExpMatchArray|undefined) => {
+                if (!mm) return null; const reps=toInt(mm[1]); const work=mins(toInt(mm[2])); const rest=mm[3]? `${mm[3]}min` : undefined;
+                return { type:'bike_intervals', total_duration_estimate: work, structure:[ { type:'warmup', duration:'15min', intensity:'easy_with_openers' }, { type:'main_set', set_type:label, repetitions: reps, work_segment:{ duration: work, target_power:{ baseline:'user.ftp', range: label==='sweet_spot_intervals'?'85-95%': label==='threshold_intervals'?'95-105%':'105-120%' } }, recovery_segment: rest? { duration: rest, intensity:'easy_spin' } : undefined }, { type:'cooldown', duration:'10min', intensity:'easy' } ] };
+              };
+              const ss = m(/^bike_ss_(\d+)x(\d+)min_(?:r(\d+)min)/i);
+              const thr = m(/^bike_thr_(\d+)x(\d+)min_(?:r(\d+)min)/i);
+              const vo2 = m(/^bike_vo2_(\d+)x(\d+)(?:min|s)_(?:r(\d+)(?:min|s))/i);
+              const built = buildBikeSet('sweet_spot_intervals', ss) || buildBikeSet('threshold_intervals', thr) || buildBikeSet('vo2_intervals', vo2);
+              if (built) return built;
             }
             // BRICK
             if (disc==='brick') {
@@ -168,7 +177,31 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 return { type:'brick_session', total_duration_estimate: mins(toInt(bd)+toInt(rd)), structure:[ { type:'bike_segment', duration: bd, target_power:{ baseline:'user.ftp', zone:'endurance', range: /z1/i.test(bike)?'60-65%':'65-75%' } }, { type:'transition', duration:'2min' }, { type:'run_segment', duration: rd, target_pace: /tempo_/.test(run.toLowerCase())? { baseline:'user.fiveK_pace', modifier:'+45s/mile' } : 'user.easyPace' } ] };
               }
             }
-            // SWIM and STRENGTH skipped in upgrade path (usually already fine without structured)
+            // SWIM (WU/CD, drills, aerobic)
+            if (disc==='swim') {
+              const wu = m(/^swim_warmup_(\d+)(yd|m)/i);
+              const cd = m(/^swim_cooldown_(\d+)(yd|m)/i);
+              const drill = m(/^swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+              const aero = m(/^swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+              const ws: any = { type:'swim_session', total_duration_estimate: '30min', structure: [] as any[] };
+              if (wu) ws.structure.push({ type:'warmup', distance: `${wu[1]}${wu[2]}`, intensity:'easy' });
+              if (drill) ws.structure.push({ type:'drill_set', drill_type: drill[1], repetitions: toInt(drill[2]), distance: `${drill[3]}${drill[4]}`, rest: drill[5]? `${drill[5]}s` : '15s' });
+              if (aero) ws.structure.push({ type:'main_set', set_type:'aerobic_intervals', repetitions: toInt(aero[1]), distance: `${aero[2]}${aero[3]}`, rest: aero[4]? `${aero[4]}s` : '15s' });
+              if (cd) ws.structure.push({ type:'cooldown', distance: `${cd[1]}${cd[2]}`, intensity:'easy' });
+              if (ws.structure.length) return ws;
+            }
+            // STRENGTH (main and accessory with %)
+            if (disc==='strength') {
+              const ws: any = { type:'strength_session', total_duration_estimate: '45min', structure: [] as any[] };
+              steps.forEach(t=>{
+                let mm = t.toLowerCase().match(/^st_wu_(\d+)/i); if (mm) { ws.structure.push({ type:'warmup', duration: `${mm[1]}min` }); return; }
+                mm = t.toLowerCase().match(/^st_main_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?(?:_rest(\d+))?/i);
+                if (mm) { const ex=mm[1]; const sets=toInt(mm[2]); const reps=toInt(mm[3]); const pct= mm[4]? toInt(mm[4]) : undefined; const rest = mm[5]? `${mm[5]}s` : undefined; const base = /bench/.test(ex)?'user.bench':/squat/.test(ex)?'user.squat':/deadlift/.test(ex)?'user.deadlift':'user.overheadPress1RM'; ws.structure.push({ type:'main_lift', exercise: ex, sets, reps, load: pct? { type:'percentage', baseline: base, percentage: pct } : undefined, rest }); return; }
+                mm = t.toLowerCase().match(/^st_acc_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?(?:_rest(\d+))?/i);
+                if (mm) { const ex=mm[1]; const sets=toInt(mm[2]); const reps=toInt(mm[3]); const pct= mm[4]? toInt(mm[4]) : undefined; const rest = mm[5]? `${mm[5]}s` : undefined; const base = /row/.test(ex)?'user.bench':'user.overheadPress1RM'; ws.structure.push({ type:'accessory', exercise: ex, sets, reps, load: pct? { type:'percentage', baseline: base, percentage: pct } : undefined, rest }); return; }
+              });
+              if (ws.structure.length) return ws;
+            }
             return null;
           } catch { return null; }
         };
