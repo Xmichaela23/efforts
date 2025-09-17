@@ -820,9 +820,8 @@ Deno.serve(async (req) => {
       if (info.role === 'work') {
         const plannedMetersForThis = deriveMetersFromPlannedStep(st);
         if (plannedMetersForThis && plannedMetersForThis > 0) {
-          const plannedSecPerMi = derivePlannedPaceSecPerMi(st);
-          const plannedMps = plannedSecPerMi ? (1609.34 / plannedSecPerMi) : null;
-          const floorMps = plannedMps ? plannedMps * 0.80 : 2.0; // ~8:04/mi default floor
+          // Simplified stationary threshold across sports
+          const floorMps = 0.5;
           while (sIdx < eIdx && (!(rows[sIdx].v > 0) || rows[sIdx].v < floorMps)) sIdx++;
           while (eIdx > sIdx && (!(rows[eIdx].v > 0) || rows[eIdx].v < floorMps)) eIdx--;
         }
@@ -896,6 +895,19 @@ Deno.serve(async (req) => {
         sample_idx_start: sIdx,
         sample_idx_end: eIdx
       });
+      // Debug log per step
+      try {
+        console.log('[summary-step]', {
+          stepIdx: outIntervals.length-1,
+          window: `${sIdx}-${eIdx}`,
+          plannedM: deriveMetersFromPlannedStep(st),
+          actualM: Math.round(segMetersMeasured),
+          plannedS: deriveSecondsFromPlannedStep(st),
+          actualS: segSec,
+          role: info.role,
+          pass: outIntervals[outIntervals.length-1].pass_state
+        });
+      } catch {}
     }
 
     // Overall rollups (optional)
