@@ -1162,6 +1162,18 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                 const step: any = { effortLabel: 'interval' };
                 if (typeof meters === 'number') step.distanceMeters = meters;
                 if (!meters && durS>0) step.duration = durS;
+                // For distance-based run reps, compute duration from pace so Garmin can estimate total time
+                if (typeof meters === 'number' && !step.duration && paceTxt) {
+                  const p = parsePace(paceTxt);
+                  if (p.sec && p.unit) {
+                    const miles = meters / 1609.34;
+                    const km = meters / 1000;
+                    const base = p.unit === 'mi' ? miles : km;
+                    step.duration = Math.max(1, Math.round(base * p.sec));
+                    // Use duration only for Garmin (avoid dual distance+duration which some devices ignore)
+                    delete (step as any).distanceMeters;
+                  }
+                }
                 if (paceTxt) addPaceRange(step, paceTxt, tolQual);
                 out.push(step);
                 if (r<reps-1 && restS>0) {
