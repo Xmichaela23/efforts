@@ -282,6 +282,95 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           }
         } catch {}
 
+        // If structured exists but intervals have no real work reps, synthesize intervals from workout_structure
+        try {
+          const hasAnyWork = (arr: any[] | undefined): boolean => {
+            if (!Array.isArray(arr)) return false;
+            return arr.some((it) => {
+              const lab = String((it?.effortLabel || '')).toLowerCase();
+              return !(lab.includes('warm up') || lab.includes('cool down') || /rest|recovery/.test(lab));
+            });
+          };
+          const ws: any = row?.workout_structure;
+          const intervalsArr: any[] | undefined = Array.isArray(row?.intervals) ? row.intervals : undefined;
+          const needsSynthesis = !!ws && (!intervalsArr || !hasAnyWork(intervalsArr));
+          if (needsSynthesis) {
+            const toSec = (v?: string): number => {
+              if (!v || typeof v !== 'string') return 0;
+              const m1 = v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60;
+              const m2 = v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10);
+              return 0;
+            };
+            const toMeters = (val: number, unit?: string) => {
+              const u = String(unit||'').toLowerCase();
+              if (u==='m') return Math.floor(val);
+              if (u==='yd') return Math.floor(val*0.9144);
+              if (u==='mi') return Math.floor(val*1609.34);
+              if (u==='km') return Math.floor(val*1000);
+              return Math.floor(val||0);
+            };
+            const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+            const addPace = (step:any, paceTxt?: string, tol = 0.05) => {
+              const m = String(paceTxt||'').trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i);
+              if (!m) return;
+              const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+              const unit = m[3].toLowerCase();
+              step.paceTarget = `${mmss(sec)}/${unit}`;
+              step.pace_range = { lower: Math.round(sec*(1-tol)), upper: Math.round(sec*(1+tol)), unit };
+            };
+            const resolvePace = (ref: any): string | undefined => {
+              if (!ref) return undefined;
+              if (typeof ref === 'string') {
+                if (/^user\./i.test(ref)) {
+                  const key = ref.replace(/^user\./i,'');
+                  const txt = (perfNumbersUpgrade as any)?.[key];
+                  return typeof txt === 'string' ? txt : undefined;
+                }
+                return ref;
+              }
+              if (ref && typeof ref === 'object' && typeof ref.baseline === 'string') {
+                const key = String(ref.baseline).replace(/^user\./i,'');
+                const txt = (perfNumbersUpgrade as any)?.[key];
+                if (typeof txt === 'string') {
+                  const mod = String(ref.modifier||'').trim();
+                  return mod ? `${txt} ${mod}` : txt;
+                }
+              }
+              return undefined;
+            };
+            const out: any[] = [];
+            const disc = String(row?.type||'').toLowerCase();
+            const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+            for (const seg of struct) {
+              const k = String(seg?.type||'').toLowerCase();
+              if (k==='warmup') { const d=toSec(String(seg?.duration||'')); if(d>0){ const st:any={effortLabel:'warm up', duration:d}; if(disc==='run') addPace(st, (perfNumbersUpgrade as any)?.easyPace, 0.06); out.push(st);} continue; }
+              if (k==='cooldown') { const d=toSec(String(seg?.duration||'')); if(d>0){ const st:any={effortLabel:'cool down', duration:d}; if(disc==='run') addPace(st, (perfNumbersUpgrade as any)?.easyPace, 0.06); out.push(st);} continue; }
+              if (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals') {
+                const reps = Math.max(1, Number(seg?.repetitions)||0);
+                const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
+                const distTxt = String(work?.distance||'');
+                let meters: number | undefined = undefined;
+                const dm = distTxt.match(/(\d+(?:\.\d+)?)\s*(m|mi|km|yd)/i);
+                if (dm) meters = toMeters(parseFloat(dm[1]), dm[2]);
+                const durS = toSec(String(work?.duration||''));
+                const restS = toSec(String(rec?.duration||''));
+                const paceTxt = disc==='run' ? resolvePace(work?.target_pace) : undefined;
+                const workStep: any = { effortLabel:'interval' };
+                if (typeof meters==='number' && meters>0) workStep.distanceMeters = meters;
+                if (!meters && durS>0) workStep.duration = durS;
+                if (paceTxt) addPace(workStep, paceTxt, 0.04);
+                const segs: any[] = [workStep];
+                if (restS>0) segs.push({ effortLabel:'rest', duration: restS });
+                if (reps>1) out.push({ effortLabel:'repeat', repeatCount: reps, segments: segs }); else out.push(...segs);
+                continue;
+              }
+            }
+            if (out.length) {
+              await supabase.from('planned_workouts').update({ intervals: out }).eq('id', row.id);
+            }
+          }
+        } catch {}
+
           // Bridge structured for existing rows if missing
           try {
             if (!row?.workout_structure) {

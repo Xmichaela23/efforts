@@ -77,10 +77,7 @@ serve(async (req) => {
       return json({ error: 'Workout not found' }, 404)
     }
 
-    // Strict: must have materialized intervals (no fallbacks)
-    if (!Array.isArray((workout as any).intervals) || (workout as any).intervals.length === 0) {
-      return json({ error: 'Workout is not materialized for Garmin (intervals missing)' }, 422)
-    }
+    // Do not early-return if intervals are missing; we can build from structured/computed below
 
     // Fetch user's Garmin tokens
     const { data: conn, error: connErr } = await supabase
@@ -95,6 +92,15 @@ serve(async (req) => {
     }
 
     const garminPayload = convertWorkoutToGarmin(workout)
+    try {
+      const firstSeg = (garminPayload as any)?.segments?.[0]
+      const steps = Array.isArray(firstSeg?.steps) ? firstSeg.steps : []
+      const speedSteps = steps.filter((s: any) => s?.targetType === 'SPEED' && s?.type === 'WorkoutStep')
+      console.log('SPEED steps for test:', speedSteps.map((s: any) => ({ stepId: s.stepId, targetValueLow: s.targetValueLow, targetValueHigh: s.targetValueHigh })))
+      if ((garminPayload as any)?.sport === 'RUNNING' && speedSteps.length === 0) {
+        console.log('RUNNING workout has no SPEED targets in steps (diagnostic)')
+      }
+    } catch {}
 
     let sendResult = await sendToGarmin(garminPayload, conn.access_token)
     if (!sendResult.success) {
@@ -151,6 +157,7 @@ function json(body: unknown, status = 200): Response {
 
 function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const sport = mapWorkoutType(workout.type)
+  const isRun = sport === 'RUNNING'
   const steps: GarminStep[] = []
   let stepId = 1
   // Use computed per-rep targets when available to guarantee PACE ranges per interval
@@ -167,7 +174,16 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const applyComputedTargetIfMissing = (step: GarminStep, isRest: boolean) => {
     try {
       if (isRest) return
-      const cs = computedSteps?.[workRepIdx]
+      // Advance pointer to next computed WORK rep (skip warmup/cooldown/rest)
+      const isWork = (x: any) => {
+        const t = String(x?.type || '').toLowerCase()
+        // Only treat real work reps as work; skip warmup/cooldown/rest
+        if (t === 'interval_rest' || /rest/.test(t)) return false
+        if (t === 'warmup' || t === 'cooldown') return false
+        return true
+      }
+      let cs = computedSteps?.[workRepIdx]
+      while (cs && !isWork(cs)) { workRepIdx += 1; cs = computedSteps?.[workRepIdx] }
       if (!cs) { workRepIdx += 1; return }
       // Only apply when step has no explicit target
       const hasTarget = step.targetType || step.targetValue != null || step.targetValueLow != null
@@ -178,11 +194,12 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         const range = cs?.pace_range as { lower?: number; upper?: number } | undefined
         // Convert pace (sec/mi) to speed (m/s)
         const toSpeed = (sec: number) => 1609.34 / sec
-        // Garmin expects SPEED target (m/s) for running targets
+        // Garmin run targets should use SPEED (m/s); Connect displays as Pace
         step.targetType = 'SPEED'
         if (range && typeof range.lower === 'number' && typeof range.upper === 'number') {
           step.targetValueLow = toSpeed(range.upper) // slower pace → lower speed
           step.targetValueHigh = toSpeed(range.lower) // faster pace → higher speed
+          delete (step as any).targetValue
         } else if (typeof secPerMi === 'number') {
           // Prefer a range: widen around the single pace based on intensity/duration
           const paceStr = secPerMiToPaceStr(secPerMi)
@@ -229,8 +246,99 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     } catch {}
   }
 
+  const normalizeTargetBounds = (step: GarminStep) => {
+    try {
+      const isSpeedLike = step.targetType === 'SPEED' || step.targetType === 'PACE'
+      const lo = (step as any).targetValueLow
+      const hi = (step as any).targetValueHigh
+      if (isSpeedLike && isFinite(lo as any) && isFinite(hi as any)) {
+        const low = Number(lo)
+        const high = Number(hi)
+        if (low > high) {
+          ;(step as any).targetValueLow = high
+          ;(step as any).targetValueHigh = low
+        }
+      }
+    } catch {}
+  }
+
+  // Carry-forward last known SPEED range for RUNNING steps without explicit targets (non-rest)
+  let lastSpeedLow: number | null = null
+  let lastSpeedHigh: number | null = null
+
+  // Attempt 0: Build intervals directly from structured JSON (no DB dependence on materializer)
+  const intervalsFromStructured = (() => {
+    try {
+      const ws: any = (workout as any)?.workout_structure
+      if (!ws || typeof ws !== 'object') return undefined
+      const out: any[] = []
+      const toSec = (v?: string): number => {
+        if (!v || typeof v !== 'string') return 0
+        const m1 = v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60
+        const m2 = v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10)
+        return 0
+      }
+      const toMeters = (val: number, unit?: string) => {
+        const u = String(unit||'').toLowerCase();
+        if (u==='m') return Math.floor(val)
+        if (u==='yd') return Math.floor(val*0.9144)
+        if (u==='mi') return Math.floor(val*1609.34)
+        if (u==='km') return Math.floor(val*1000)
+        return Math.floor(val||0)
+      }
+      const pushWU = (sec: number) => { if (sec>0) out.push({ effortLabel:'warm up', duration: sec }) }
+      const pushCD = (sec: number) => { if (sec>0) out.push({ effortLabel:'cool down', duration: sec }) }
+      const type = String(ws?.type||'').toLowerCase();
+      const disc = String((workout as any)?.type||'').toLowerCase();
+      const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : []
+      for (const seg of struct) {
+        const k = String(seg?.type||'').toLowerCase()
+        if (k==='warmup') { pushWU(toSec(String(seg?.duration||''))); continue }
+        if (k==='cooldown') { pushCD(toSec(String(seg?.duration||''))); continue }
+        if (type==='interval_session' || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
+          const reps = Math.max(1, Number(seg?.repetitions)||0)
+          const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{}
+          // distance format like "800m" or duration like "2min"
+          const distTxt = String(work?.distance||'')
+          let meters: number|undefined = undefined
+          const dm = distTxt.match(/(\d+(?:\.\d+)?)\s*(m|mi|km|yd)/i)
+          if (dm) meters = toMeters(parseFloat(dm[1]), dm[2])
+          const durS = toSec(String(work?.duration||''))
+          const restS = toSec(String(rec?.duration||''))
+          const workStep: any = { effortLabel: 'interval' }
+          if (typeof meters==='number' && meters>0) workStep.distanceMeters = meters
+          if (!meters && durS>0) workStep.duration = durS
+          const segs: any[] = [workStep]
+          if (restS>0) segs.push({ effortLabel:'rest', duration: restS })
+          if (reps>1) out.push({ effortLabel:'repeat', repeatCount: reps, segments: segs })
+          else out.push(...segs)
+          continue
+        }
+        if (type==='bike_intervals' && k==='main_set') {
+          const reps = Math.max(1, Number(seg?.repetitions)||0)
+          const wsS = toSec(String(seg?.work_segment?.duration||''))
+          const rsS = toSec(String(seg?.recovery_segment?.duration||''))
+          const workStep: any = { effortLabel:'interval' }
+          if (wsS>0) workStep.duration = wsS
+          const segs: any[] = [workStep]
+          if (rsS>0) segs.push({ effortLabel:'rest', duration: rsS })
+          if (reps>1) out.push({ effortLabel:'repeat', repeatCount: reps, segments: segs })
+          else out.push(...segs)
+          continue
+        }
+        if (type==='endurance_session' && (k==='main_effort' || k==='main')) {
+          const sec = toSec(String(seg?.duration||''))
+          if (sec>0) out.push({ effortLabel: (disc==='ride'?'endurance':'interval'), duration: sec })
+          continue
+        }
+      }
+      return out.length ? out : undefined
+    } catch { return undefined }
+  })()
+
   // Prefer locally built intervals from computed.steps (ensures rich labels/equipment/rest)
   const intervals = (() => {
+    if (Array.isArray(intervalsFromStructured) && intervalsFromStructured.length) return intervalsFromStructured
     try {
       const comp: any = (workout as any)?.computed || {}
       const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : []
@@ -372,6 +480,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           applyTargets(step, seg, interval)
           // Try to apply computed per-rep target if none attached
           applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
+          normalizeTargetBounds(step)
+          // Update or carry-forward SPEED targets for RUNNING
+          if (sport === 'RUNNING' && step.intensity !== 'REST' && step.intensity !== 'RECOVERY') {
+            if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+              lastSpeedLow = Number((step as any).targetValueLow)
+              lastSpeedHigh = Number((step as any).targetValueHigh)
+            } else if (lastSpeedLow != null && lastSpeedHigh != null) {
+              step.targetType = 'SPEED'
+              step.targetValueLow = lastSpeedLow
+              step.targetValueHigh = lastSpeedHigh
+            }
+          }
           steps.push(step)
           stepId += 1
         }
@@ -400,49 +520,31 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     }
     applyTargets(step, interval)
     applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
+    normalizeTargetBounds(step)
+    if (sport === 'RUNNING' && step.intensity !== 'REST' && step.intensity !== 'RECOVERY') {
+      if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+        lastSpeedLow = Number((step as any).targetValueLow)
+        lastSpeedHigh = Number((step as any).targetValueHigh)
+      } else if (lastSpeedLow != null && lastSpeedHigh != null) {
+        step.targetType = 'SPEED'
+        step.targetValueLow = lastSpeedLow
+        step.targetValueHigh = lastSpeedHigh
+      }
+    }
     steps.push(step)
     stepId += 1
   }
 
-  // Post-pass: convert RUN distance work steps to TIME using computed pace (keep SPEED targets for alerts)
-  if (sport === 'RUNNING') {
-    let workRepIdx = 0
-    const mid = (a: number, b: number) => (a + b) / 2
-    const mpsFromSecPerMi = (sec: number) => 1609.34 / Math.max(1, sec)
-    for (const s of steps) {
-      const isWork = s.intensity !== 'REST' && s.intensity !== 'RECOVERY'
-      if (s.durationType === 'DISTANCE' && isWork) {
-        let mps: number | undefined
-        const low = (s as any).targetValueLow
-        const high = (s as any).targetValueHigh
-        if (s.targetType === 'SPEED' && isFinite(low) && isFinite(high)) {
-          mps = mid(Number(low), Number(high))
-        } else {
-          const cs = computedSteps?.[workRepIdx]
-          if (cs?.pace_range?.lower && cs?.pace_range?.upper) {
-            mps = mpsFromSecPerMi(mid(Number(cs.pace_range.lower), Number(cs.pace_range.upper)))
-          } else if (typeof cs?.pace_sec_per_mi === 'number') {
-            mps = mpsFromSecPerMi(Number(cs.pace_sec_per_mi))
-          }
-        }
-        if (!mps) mps = mpsFromSecPerMi(570)
-        const meters = Math.max(1, s.durationValue || 0)
-        const secs = Math.round(meters / mps)
-        s.durationType = 'TIME'
-        s.durationValue = secs
-      }
-      if (isWork) workRepIdx += 1
-    }
-  }
+  // Keep RUN intervals distance-based when authored as distance. Devices support SPEED targets with DISTANCE duration.
 
-  // Validation: ensure RUN exports carry SPEED ranges for all work reps (optional via tag)
+  // Validation: ensure RUN exports carry SPEED (or PACE) ranges for all work reps (optional via tag)
   const requirePace = Array.isArray((workout as any)?.tags) && (workout as any).tags.includes('require_pace')
   if (sport === 'RUNNING' && requirePace) {
     const anyWorkNoTarget = steps.some((s) => (
       s.type === 'WorkoutStep' &&
       s.intensity !== 'REST' && s.intensity !== 'RECOVERY' &&
       (s.durationValue || 0) > 0 &&
-      !(s.targetType === 'SPEED' && s.targetValueLow != null && s.targetValueHigh != null)
+      !(((s.targetType === 'SPEED' || s.targetType === 'PACE') && s.targetValueLow != null && s.targetValueHigh != null))
     ));
     if (anyWorkNoTarget) {
       throw new Error('RUN_EXPORT_MISSING_TARGETS');
@@ -509,14 +611,27 @@ function parseTimeToSeconds(time: string): number {
 }
 
 function parsePaceToMetersPerSecond(pace: string): { value?: number; low?: number; high?: number } | null {
-  // Accepts formats like "7:00/mi", "4:30/km", "1:50/100m", range like "7:00-7:30/mi"
+  // Accept more human variants: en/em dash, "to", spaces, and unit aliases (min/mi, min/km)
   if (!pace) return null
-  const unitMatch = pace.includes('/mi') ? 'mi' : pace.includes('/km') ? 'km' : pace.includes('/100m') ? '100m' : null
+  let txt = String(pace).trim().toLowerCase()
+  // Normalize common variants
+  txt = txt.replace(/\s+/g, ' ')
+  txt = txt.replace(/min\s*\/\s*mi|minutes\s*\/\s*mile|min\s*\/\s*mile/g, '/mi')
+  txt = txt.replace(/min\s*\/\s*km|minutes\s*\/\s*kilometer|minutes\s*\/\s*kilometre|min\s*\/\s*kilometer|min\s*\/\s*km/g, '/km')
+  // Replace en dash/em dash and " to " with hyphen for ranges
+  txt = txt.replace(/[\u2012\u2013\u2014\u2212]/g, '-')
+  txt = txt.replace(/\s+to\s+/g, '-')
+  // Remove stray spaces around unit slash
+  txt = txt.replace(/\s*\/\s*/g, '/')
+
+  const unitMatch = txt.includes('/mi') ? 'mi' : txt.includes('/km') ? 'km' : txt.includes('/100m') ? '100m' : null
   if (!unitMatch) return null
 
-  const rangeSplit = pace.replace('/mi', '').replace('/km', '').replace('/100m', '').split('-')
+  const core = txt.replace('/mi', '').replace('/km', '').replace('/100m', '')
+  const parts = core.split('-').map(s => s.trim()).filter(Boolean)
+
   const parseOne = (p: string): number => {
-    const secs = parseTimeToSeconds(p.trim())
+    const secs = parseTimeToSeconds(p)
     if (secs <= 0) return 0
     if (unitMatch === 'mi') return 1609.34 / secs
     if (unitMatch === 'km') return 1000 / secs
@@ -524,15 +639,16 @@ function parsePaceToMetersPerSecond(pace: string): { value?: number; low?: numbe
     return 0
   }
 
-  if (rangeSplit.length === 2) {
-    const v1 = parseOne(rangeSplit[0])
-    const v2 = parseOne(rangeSplit[1])
+  if (parts.length === 2) {
+    const v1 = parseOne(parts[0])
+    const v2 = parseOne(parts[1])
     const low = Math.min(v1, v2)
     const high = Math.max(v1, v2)
     return { low, high }
   }
 
-  return { value: parseOne(rangeSplit[0]) }
+  if (parts.length === 1) return { value: parseOne(parts[0]) }
+  return null
 }
 
 function widenPaceToRangeMetersPerSecond(pace: string, intensity: string, opts?: { durationSec?: number; distanceMeters?: number }): { low: number; high: number } | null {
@@ -695,7 +811,7 @@ function estimateWorkoutSeconds(
     if (s.durationType === 'DISTANCE') {
       let mps: number | undefined;
       if (
-        s.targetType === 'SPEED' &&
+        (s.targetType === 'PACE' || s.targetType === 'SPEED') &&
         isFinite((s as any).targetValueLow) &&
         isFinite((s as any).targetValueHigh)
       ) {
