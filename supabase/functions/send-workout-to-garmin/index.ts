@@ -343,6 +343,17 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       const comp: any = (workout as any)?.computed || {}
       const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : []
       if (!steps.length) return Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
+      // If computed exists but contains no actionable work reps, fall back to stored intervals (authoring)
+      const hasWorkReps = steps.some((st: any) => {
+        const t = String(st?.type || '').toLowerCase()
+        if (t === 'warmup' || t === 'cooldown') return false
+        if (t === 'interval_rest' || /rest/.test(t)) return false
+        return true
+      })
+      if (!hasWorkReps) {
+        const fromDb = Array.isArray((workout as any).intervals) ? (workout as any).intervals : []
+        if (fromDb.length) return fromDb
+      }
       const out: any[] = []
       const typeLower = String((workout as any).type || '').toLowerCase()
       const isSwim = typeLower === 'swim'
