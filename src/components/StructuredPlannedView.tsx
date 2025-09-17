@@ -171,10 +171,35 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   const handleGarminExport = async () => {
     try {
-      // Check if workout has intervals for Garmin export
-      const intervals = (workout as any)?.intervals;
+      // Ensure the week is materialized before export (no user steps required)
+      try {
+        const d = new Date(String((workout as any)?.date || ''));
+        if (!isNaN(d.getTime())) {
+          const jsDow = d.getDay(); // 0..6 (Sun..Sat)
+          const daysFromMonday = (jsDow + 6) % 7; // Mon=0
+          const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - daysFromMonday);
+          const y = monday.getFullYear();
+          const m = String(monday.getMonth()+1).padStart(2,'0');
+          const dd = String(monday.getDate()).padStart(2,'0');
+          const weekStart = `${y}-${m}-${dd}`;
+          await (supabase.functions.invoke as any)('sweep-week', { body: { week_start: weekStart } });
+        }
+      } catch {}
+
+      // Re-fetch the planned row to get freshly built intervals
+      let freshIntervals: any[] | undefined = undefined;
+      try {
+        const { data } = await supabase
+          .from('planned_workouts')
+          .select('id, intervals')
+          .eq('id', (workout as any)?.id)
+          .single();
+        freshIntervals = Array.isArray((data as any)?.intervals) ? (data as any).intervals : undefined;
+      } catch {}
+
+      const intervals = freshIntervals || (workout as any)?.intervals;
       if (!intervals || !Array.isArray(intervals) || intervals.length === 0) {
-        alert('Workout needs to be materialized with intervals for Garmin export. Please ensure the workout has been processed.');
+        alert('Workout needs intervals before export. Open the Weekly view for this week once, then try again.');
         return;
       }
 
