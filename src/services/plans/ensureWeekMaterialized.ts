@@ -1403,6 +1403,70 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       } catch { return undefined; }
     })();
 
+    // If computed exists but has no work reps on initial insert, synthesize computed V3 from workout_structure (runs)
+    try {
+      const hasComputed = Array.isArray(computedStepsV3) && computedStepsV3.length>0;
+      const hasWork = hasComputed ? computedStepsV3!.some((st:any)=>{
+        const t = String(st?.type||'').toLowerCase();
+        if (t==='warmup' || t==='cooldown') return false;
+        if (t==='interval_rest' || /rest/.test(t)) return false;
+        return true;
+      }) : false;
+      const ws: any = (s as any)?.workout_structure;
+      if ((!hasComputed || !hasWork) && ws && typeof ws==='object') {
+        const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
+        const toMeters = (val: number, unit?: string) => { const u=String(unit||'').toLowerCase(); if(u==='m') return Math.floor(val); if(u==='yd') return Math.floor(val*0.9144); if(u==='mi') return Math.floor(val*1609.34); if(u==='km') return Math.floor(val*1000); return Math.floor(val||0); };
+        const parsePace = (txt?: string): { sec:number|null, unit?:'mi'|'km' } => { if(!txt) return {sec:null} as any; const m=String(txt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i); if(!m) return {sec:null} as any; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any }; };
+        const toSecPerMi = (sec:number, unit?: 'mi'|'km'): number => unit==='km' ? Math.round(sec * 1.60934) : sec;
+        const tolQual = (exportHints && typeof (exportHints as any).pace_tolerance_quality==='number') ? (exportHints as any).pace_tolerance_quality : 0.04;
+        const tolEasy = (exportHints && typeof (exportHints as any).pace_tolerance_easy==='number') ? (exportHints as any).pace_tolerance_easy : 0.06;
+        const resolvePace = (ref:any): string | undefined => {
+          if (!ref) return undefined;
+          if (typeof ref === 'string') {
+            if (/^user\./i.test(ref)) { const key = ref.replace(/^user\./i,''); const txt=(perfNumbers as any)?.[key]; return typeof txt==='string'? txt : undefined; }
+            return ref;
+          }
+          if (ref && typeof ref === 'object' && typeof ref.baseline === 'string') {
+            const key = String(ref.baseline).replace(/^user\./i,''); const txt=(perfNumbers as any)?.[key]; if (typeof txt==='string'){ const mod=String(ref.modifier||'').trim(); return mod? `${txt} ${mod}` : txt; }
+          }
+          return undefined;
+        };
+        const out: any[] = [];
+        const type = String(ws?.type||'').toLowerCase();
+        const disc = String(mappedType||'').toLowerCase();
+        const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+        const pushWU = (sec:number) => { if (sec>0) { const st:any={ type:'warmup', duration_s: sec }; if (disc==='run') { const ep = String((perfNumbers as any)?.easyPace||''); const pp = parsePace(ep); if (pp.sec) { const center = toSecPerMi(pp.sec, pp.unit); st.pace_range = { lower: Math.round(center*(1-tolEasy)), upper: Math.round(center*(1+tolEasy)) }; st.pace_sec_per_mi = center; } } out.push(st);} };
+        const pushCD = (sec:number) => { if (sec>0) { const st:any={ type:'cooldown', duration_s: sec }; if (disc==='run') { const ep = String((perfNumbers as any)?.easyPace||''); const pp = parsePace(ep); if (pp.sec) { const center = toSecPerMi(pp.sec, pp.unit); st.pace_range = { lower: Math.round(center*(1-tolEasy)), upper: Math.round(center*(1+tolEasy)) }; st.pace_sec_per_mi = center; } } out.push(st);} };
+        for (const seg of struct) {
+          const k = String(seg?.type||'').toLowerCase();
+          if (k==='warmup') { pushWU(toSec(String(seg?.duration||''))); continue; }
+          if (k==='cooldown') { pushCD(toSec(String(seg?.duration||''))); continue; }
+          if (type==='interval_session' && k==='main_set') {
+            const reps = Math.max(1, Number(seg?.repetitions)||0);
+            const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
+            const distTxt = String(work?.distance||'');
+            const dm = distTxt.match(/(\d+(?:\.\d+)?)\s*(m|mi|km|yd)/i);
+            const meters = dm ? toMeters(parseFloat(dm[1]), dm[2]) : undefined;
+            const durS = toSec(String(work?.duration||''));
+            const restS = toSec(String(rec?.duration||''));
+            const paceTxt = disc==='run' ? resolvePace(work?.target_pace) : undefined;
+            const addWork = () => {
+              const st:any = { type:'interval' };
+              if (typeof meters==='number' && meters>0) st.distance_m = meters; else if (durS>0) st.duration_s = durS; else st.duration_s = 1;
+              if (paceTxt) { const pp = parsePace(paceTxt); if (pp.sec){ const center = toSecPerMi(pp.sec, pp.unit); st.pace_range = { lower: Math.round(center*(1-tolQual)), upper: Math.round(center*(1+tolQual)) }; st.pace_sec_per_mi = center; } }
+              out.push(st);
+            };
+            for (let r=0;r<reps;r+=1){ addWork(); if (r<reps-1 && restS>0) out.push({ type:'interval_rest', duration_s: restS }); }
+            continue;
+          }
+          if (type==='endurance_session' && (k==='main_effort' || k==='main')) { const sec = toSec(String(seg?.duration||'')); if (sec>0){ const st:any={ type:'interval', duration_s: sec }; if (disc==='run'){ const ep=String((perfNumbers as any)?.easyPace||''); const pp=parsePace(ep); if (pp.sec){ const center=toSecPerMi(pp.sec, pp.unit); st.pace_range={lower:Math.round(center*(1-tolEasy)), upper:Math.round(center*(1+tolEasy))}; st.pace_sec_per_mi=center; } } out.push(st);} continue; }
+        }
+        if (out.length) {
+          computedStepsV3 = out;
+        }
+      }
+    } catch {}
+
     // Derive primary target columns and equipment list from computed steps
     const deriveTargetColumns = (steps: any[] | undefined, discipline: 'run'|'ride'|'swim'|'strength') => {
       const out: any = { primary_target_type: 'none' };
