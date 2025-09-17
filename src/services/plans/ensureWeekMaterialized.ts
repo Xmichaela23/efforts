@@ -1456,7 +1456,23 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               if (paceTxt) { const pp = parsePace(paceTxt); if (pp.sec){ const center = toSecPerMi(pp.sec, pp.unit); st.pace_range = { lower: Math.round(center*(1-tolQual)), upper: Math.round(center*(1+tolQual)) }; st.pace_sec_per_mi = center; } }
               out.push(st);
             };
-            for (let r=0;r<reps;r+=1){ addWork(); if (r<reps-1 && restS>0) out.push({ type:'interval_rest', duration_s: restS }); }
+                for (let r=0;r<reps;r+=1){
+                  addWork();
+                  if (r<reps-1 && restS>0) {
+                    const rest:any = { type:'interval_rest', duration_s: restS };
+                    // Assign easy pace on jog recoveries for RUNNING
+                    if (disc==='run') {
+                      const ep = String((perfNumbers as any)?.easyPace||'');
+                      const pp = parsePace(ep);
+                      if (pp.sec) {
+                        const center = toSecPerMi(pp.sec, pp.unit);
+                        rest.pace_range = { lower: Math.round(center*(1-tolEasy)), upper: Math.round(center*(1+tolEasy)) };
+                        rest.pace_sec_per_mi = center;
+                      }
+                    }
+                    out.push(rest);
+                  }
+                }
             continue;
           }
           if (type==='endurance_session' && (k==='main_effort' || k==='main')) { const sec = toSec(String(seg?.duration||'')); if (sec>0){ const st:any={ type:'interval', duration_s: sec }; if (disc==='run'){ const ep=String((perfNumbers as any)?.easyPace||''); const pp=parsePace(ep); if (pp.sec){ const center=toSecPerMi(pp.sec, pp.unit); st.pace_range={lower:Math.round(center*(1-tolEasy)), upper:Math.round(center*(1+tolEasy))}; st.pace_sec_per_mi=center; } } out.push(st);} continue; }

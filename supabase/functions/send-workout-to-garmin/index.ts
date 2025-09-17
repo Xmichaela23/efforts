@@ -173,7 +173,7 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
 
   const applyComputedTargetIfMissing = (step: GarminStep, isRest: boolean) => {
     try {
-      if (isRest) return
+      // Allow applying targets on REST/RECOVERY steps as well (for easy jog guidance)
       // Advance pointer to next computed WORK rep (skip warmup/cooldown/rest)
       const isWork = (x: any) => {
         const t = String(x?.type || '').toLowerCase()
@@ -492,15 +492,18 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
           // Try to apply computed per-rep target if none attached
           applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
           normalizeTargetBounds(step)
-          // Update or carry-forward SPEED targets for RUNNING
-          if (sport === 'RUNNING' && step.intensity !== 'REST' && step.intensity !== 'RECOVERY') {
-            if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
-              lastSpeedLow = Number((step as any).targetValueLow)
-              lastSpeedHigh = Number((step as any).targetValueHigh)
-            } else if (lastSpeedLow != null && lastSpeedHigh != null) {
-              step.targetType = 'SPEED'
-              step.targetValueLow = lastSpeedLow
-              step.targetValueHigh = lastSpeedHigh
+          // Update or carry-forward SPEED targets for RUNNING (work steps only)
+          if (sport === 'RUNNING') {
+            const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'
+            if (isWorkStep) {
+              if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+                lastSpeedLow = Number((step as any).targetValueLow)
+                lastSpeedHigh = Number((step as any).targetValueHigh)
+              } else if (lastSpeedLow != null && lastSpeedHigh != null) {
+                step.targetType = 'SPEED'
+                step.targetValueLow = lastSpeedLow
+                step.targetValueHigh = lastSpeedHigh
+              }
             }
           }
           steps.push(step)
@@ -532,14 +535,17 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     applyTargets(step, interval)
     applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
     normalizeTargetBounds(step)
-    if (sport === 'RUNNING' && step.intensity !== 'REST' && step.intensity !== 'RECOVERY') {
-      if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
-        lastSpeedLow = Number((step as any).targetValueLow)
-        lastSpeedHigh = Number((step as any).targetValueHigh)
-      } else if (lastSpeedLow != null && lastSpeedHigh != null) {
-        step.targetType = 'SPEED'
-        step.targetValueLow = lastSpeedLow
-        step.targetValueHigh = lastSpeedHigh
+    if (sport === 'RUNNING') {
+      const isWorkStep = step.intensity === 'INTERVAL' || step.intensity === 'ACTIVE'
+      if (isWorkStep) {
+        if (step.targetType === 'SPEED' && isFinite((step as any).targetValueLow) && isFinite((step as any).targetValueHigh)) {
+          lastSpeedLow = Number((step as any).targetValueLow)
+          lastSpeedHigh = Number((step as any).targetValueHigh)
+        } else if (lastSpeedLow != null && lastSpeedHigh != null) {
+          step.targetType = 'SPEED'
+          step.targetValueLow = lastSpeedLow
+          step.targetValueHigh = lastSpeedHigh
+        }
       }
     }
     steps.push(step)
