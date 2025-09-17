@@ -1157,47 +1157,41 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
             if (k==='warmup') { pushWU(toSec(String(seg?.duration||'')), disc); continue; }
             if (k==='cooldown') { pushCD(toSec(String(seg?.duration||'')), disc); continue; }
             if (type==='interval_session' || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
-              const reps = Number(seg?.repetitions)||0; const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
+              const reps = Math.max(1, Number(seg?.repetitions)||0);
+              const work = seg?.work_segment||{}; const rec = seg?.recovery_segment||{};
               const distTxt = String(work?.distance||'');
-              const restS = toSec(String(rec?.duration||''));
-              const paceTxt = disc==='run' ? resolvePace(work?.target_pace) : undefined;
               const meters = /m\b/i.test(distTxt) ? toMeters(parseFloat(distTxt), 'm') : undefined;
               const durS = toSec(String(work?.duration||''));
-              for (let r=0;r<Math.max(1,reps);r+=1) {
-                const step: any = { effortLabel: 'interval' };
-                if (typeof meters === 'number') step.distanceMeters = meters;
-                if (!meters && durS>0) step.duration = durS;
-                // For distance-based run reps, compute duration from pace so Garmin can estimate total time
-                if (typeof meters === 'number' && !step.duration && paceTxt) {
-                  const p = parsePace(paceTxt);
-                  if (p.sec && p.unit) {
-                    const miles = meters / 1609.34;
-                    const km = meters / 1000;
-                    const base = p.unit === 'mi' ? miles : km;
-                    step.duration = Math.max(1, Math.round(base * p.sec));
-                    // Keep distance for devices that require distance-based reps; duration is a hint
-                  }
-                }
-                if (paceTxt) addPaceRange(step, paceTxt, tolQual);
-                out.push(step);
-                if (r<reps-1 && restS>0) {
-                  const restStep: any = { effortLabel: 'rest', duration: restS };
-                  if (disc==='run' && (perfNumbers as any)?.easyPace) addPaceRange(restStep, (perfNumbers as any).easyPace, tolEasy);
-                  out.push(restStep);
-                }
+              const restS = toSec(String(rec?.duration||''));
+              const paceTxt = disc==='run' ? resolvePace(work?.target_pace) : undefined;
+              const workStep: any = { effortLabel: 'interval' };
+              if (typeof meters === 'number') workStep.distanceMeters = meters;
+              if (!meters && durS>0) workStep.duration = durS;
+              if (paceTxt) addPaceRange(workStep, paceTxt, tolQual);
+              const segs: any[] = [workStep];
+              if (restS>0) {
+                const restStep: any = { effortLabel: 'rest', duration: restS };
+                if (disc==='run' && (perfNumbers as any)?.easyPace) addPaceRange(restStep, (perfNumbers as any).easyPace, tolEasy);
+                segs.push(restStep);
+              }
+              if (reps > 1) {
+                out.push({ effortLabel: 'repeat', repeatCount: reps, segments: segs });
+              } else {
+                out.push(...segs);
               }
               continue;
             }
             if (type==='bike_intervals' && k==='main_set') {
-              const reps = Number(seg?.repetitions)||0; const wsS = toSec(String(seg?.work_segment?.duration||'')); const rsS = toSec(String(seg?.recovery_segment?.duration||''));
+              const reps = Math.max(1, Number(seg?.repetitions)||0);
+              const wsS = toSec(String(seg?.work_segment?.duration||''));
+              const rsS = toSec(String(seg?.recovery_segment?.duration||''));
               const rangeTxt: string | undefined = (()=>{ const rng = seg?.work_segment?.target_power?.range; return rng? String(rng) : undefined; })();
-              for (let r=0;r<Math.max(1,reps);r+=1){
-                const step: any = { effortLabel: 'interval' };
-                if (wsS>0) step.duration = wsS;
-                if (rangeTxt) addPowerRange(step, rangeTxt, (perfNumbers as any)?.ftp, tolSS);
-                out.push(step);
-                if (r<reps-1 && rsS>0) out.push({ effortLabel: 'rest', duration: rsS });
-              }
+              const workStep: any = { effortLabel: 'interval' };
+              if (wsS>0) workStep.duration = wsS;
+              if (rangeTxt) addPowerRange(workStep, rangeTxt, (perfNumbers as any)?.ftp, tolSS);
+              const segs: any[] = [workStep];
+              if (rsS>0) segs.push({ effortLabel: 'rest', duration: rsS });
+              if (reps > 1) out.push({ effortLabel: 'repeat', repeatCount: reps, segments: segs }); else out.push(...segs);
               continue;
             }
             if (type==='endurance_session' && (k==='main_effort' || k==='main')) {
