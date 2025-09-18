@@ -1065,10 +1065,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const deleteExercise = (exerciseId: string) => {
-    if (exercises.length === 1) {
-      setExercises([createEmptyExercise()]);
+    const remaining = exercises.filter(exercise => exercise.id !== exerciseId);
+    setExercises(remaining);
+    // If no exercises left, clear persisted draft
+    if (remaining.length === 0) {
+      clearSessionProgress();
     } else {
-      setExercises(exercises.filter(exercise => exercise.id !== exerciseId));
+      saveSessionProgress(remaining, attachedAddons, notesText, notesRpe);
     }
   };
 
@@ -1111,26 +1114,19 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
   // NEW: Delete individual set
   const deleteSet = (exerciseId: string, setIndex: number) => {
-    setExercises(exercises.map(exercise => {
+    const next = exercises.map(exercise => {
       if (exercise.id === exerciseId) {
         const newSets = exercise.sets.filter((_, index) => index !== setIndex);
-        // Ensure at least one set remains
-        if (newSets.length === 0) {
-          return {
-            ...exercise,
-            sets: [{
-              reps: 0,
-              weight: 0,
-              barType: 'standard',
-              rir: undefined,
-              completed: false
-            }]
-          };
-        }
         return { ...exercise, sets: newSets };
       }
       return exercise;
-    }));
+    }).filter(ex => ex.sets.length > 0); // drop empty exercises
+    setExercises(next);
+    if (next.length === 0) {
+      clearSessionProgress();
+    } else {
+      saveSessionProgress(next, attachedAddons, notesText, notesRpe);
+    }
   };
 
   const finalizeSave = async (extra?: { notes?: string; rpe?: number; mood?: 'positive'|'neutral'|'negative' }) => {
@@ -1635,15 +1631,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       >
                         {set.completed ? '✓ Done' : 'Done'}
                       </button>
-                      {exercise.sets.length > 1 && (
-                        <button
-                          onClick={() => deleteSet(exercise.id, setIndex)}
-                          className="text-gray-400 hover:text-red-600 h-8 w-8 flex items-center justify-center"
-                          aria-label="Delete set"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
+                      <button
+                        onClick={() => deleteSet(exercise.id, setIndex)}
+                        className="text-gray-400 hover:text-red-600 h-8 w-8 flex items-center justify-center"
+                        aria-label="Delete set"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                     <div className="flex items-center justify-between mt-0.5">
                       <button
