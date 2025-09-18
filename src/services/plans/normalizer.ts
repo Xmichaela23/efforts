@@ -860,6 +860,18 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
   const struct: any[] = Array.isArray(ws.structure) ? ws.structure : [];
   const parentDisc = String((session?.discipline || session?.type) || '').toLowerCase();
   const isRun = parentDisc === 'run';
+  const ftpNum: number | undefined = typeof (pn?.ftp) === 'number' ? pn.ftp : undefined;
+  const wattsForPctRange = (pctRange?: string): string | undefined => {
+    try {
+      if (!pctRange) return undefined;
+      const m = String(pctRange).match(/(\d{1,3})\s*[-–]\s*(\d{1,3})%/);
+      if (!m) return pctRange;
+      if (typeof ftpNum !== 'number' || !isFinite(ftpNum) || ftpNum <= 0) return `${m[1]}–${m[2]}%`;
+      const lo = Math.round((parseInt(m[1],10)/100) * ftpNum);
+      const hi = Math.round((parseInt(m[2],10)/100) * ftpNum);
+      return `${lo}–${hi} W`;
+    } catch { return pctRange; }
+  };
 
   // Brick session: iterate segments (bike_segment, run_segment, swim_segment, strength_segment, transition)
   if (type === 'brick_session') {
@@ -921,7 +933,12 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
         const sec = toSec(seg.duration);
         totalSec += sec;
         const easy = isRun ? (resolvePace('user.easyPace') || resolvePace({ baseline: 'user.easyPace' })) : null;
-        push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${easy?` @ ${easy}`:''}`);
+        if (parentDisc === 'ride' && typeof ftpNum === 'number' && isFinite(ftpNum)) {
+          const lo = Math.round(ftpNum*0.60); const hi = Math.round(ftpNum*0.65);
+          push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min @ ${lo}–${hi} W`);
+        } else {
+          push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${easy?` @ ${easy}`:''}`);
+        }
       }
       continue;
     }
@@ -1018,9 +1035,16 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
       const work = seg?.work_segment||{};
       const rec = seg?.recovery_segment||{};
       const ws = toSec(String(work?.duration||''));
-      totalSec += reps*ws + Math.max(0, reps-1)*toSec(String(rec?.duration||''));
-      const rng = work?.target_power?.range || '';
-      push(`${reps} × ${mm(ws)} min${rng?` @ ${rng}`:''}`);
+      const rs = toSec(String(rec?.duration||''));
+      totalSec += reps*ws + Math.max(0, reps-1)*rs;
+      const pct = work?.target_power?.range || '';
+      const workTxt = wattsForPctRange(String(pct)) || String(pct || '');
+      if (rs>0 && typeof ftpNum === 'number' && isFinite(ftpNum)) {
+        const lo = Math.round(ftpNum*0.60); const hi = Math.round(ftpNum*0.65);
+        push(`${reps} × ${mm(ws)} min${workTxt?` @ ${workTxt}`:''} with ${mm(rs)} min @ ${lo}–${hi} W`);
+      } else {
+        push(`${reps} × ${mm(ws)} min${workTxt?` @ ${workTxt}`:''}${rs?` with ${mm(rs)} min easy`:''}`);
+      }
       continue;
     }
     if (type === 'endurance_session' && (kind === 'main_effort' || kind==='main')) {
