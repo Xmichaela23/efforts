@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { X, Calendar, BarChart3, CheckCircle } from 'lucide-react';
 import CompletedTab from './CompletedTab';
+import StrengthLogger from './StrengthLogger';
 import AssociatePlannedDialog from './AssociatePlannedDialog';
 import MobileSummary from './MobileSummary';
 import WorkoutDetail from './WorkoutDetail';
@@ -39,6 +40,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const { deletePlannedWorkout, plannedWorkouts } = usePlannedWorkouts();
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
+  const [editingInline, setEditingInline] = useState(false);
   const [assocOpen, setAssocOpen] = useState(false);
   const [undoing, setUndoing] = useState(false);
   const [linkedPlanned, setLinkedPlanned] = useState<any | null>(null);
@@ -466,12 +468,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={()=>{
+                    onClick={()=> setEditingInline(true)}
+                  >Edit</Button>
+                )}
+                {onDelete && workout?.id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-red-600 hover:text-red-700"
+                    onClick={() => {
                       try {
-                        window.dispatchEvent(new CustomEvent('nav:open', { detail: { type: 'strength_logger', date: (workout as any)?.date } }));
+                        if (!confirm('Delete this workout?')) return;
+                        onDelete?.(String((workout as any).id));
                       } catch {}
                     }}
-                  >Edit</Button>
+                  >Delete</Button>
                 )}
                 {assocOpen && (
                   <AssociatePlannedDialog
@@ -495,6 +506,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     }}
                   />
                 )}
+              </div>
+            )}
+            {/* Inline Strength Logger editor */}
+            {editingInline && String((workout as any)?.type||'').toLowerCase()==='strength' && (
+              <div className="mb-4 border border-gray-200 rounded-md">
+                <StrengthLogger
+                  onClose={()=> setEditingInline(false)}
+                  scheduledWorkout={linkedPlanned || (isCompleted ? workout : undefined)}
+                  onWorkoutSaved={(saved)=>{
+                    setEditingInline(false);
+                    setActiveTab('summary');
+                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                  }}
+                  targetDate={(workout as any)?.date}
+                />
               </div>
             )}
             <MobileSummary 
