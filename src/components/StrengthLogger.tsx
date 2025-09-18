@@ -118,55 +118,7 @@ const PlateMath: React.FC<{
             </div>
           ))}
         </div>
-        {/* Planned workouts menu (separate) */}
-        {showPlannedMenu && (
-          <div className="relative">
-            <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="text-xs font-semibold text-gray-500">Strength (This week)</div>
-                <button 
-                  onClick={() => {
-                    clearSessionProgress();
-                    setExercises([createEmptyExercise()]);
-                    setAttachedAddons([]);
-                    setNotesText('');
-                    setNotesRpe('');
-                    setSourcePlannedName('');
-                    setSourcePlannedId(null);
-                    setSourcePlannedDate(null);
-                    setLockManualPrefill(false);
-                    setShowPlannedMenu(false);
-                  }}
-                  className="text-xs text-blue-600 hover:text-blue-800"
-                >
-                  Start Fresh
-                </button>
-              </div>
-              <div className="max-h-56 overflow-y-auto" onMouseDown={(e)=>e.preventDefault()}>
-                {(() => {
-                  const allStrength = (Array.isArray(plannedWorkouts)? plannedWorkouts: [])
-                    .filter(w=>String((w as any).type).toLowerCase()==='strength');
-                  const inWeek = allStrength.filter(w=> withinWeek(w.date, startOfWeek(getStrengthLoggerDateString())));
-                  const notCompleted = inWeek.filter(w=> String((w as any).workout_status||'').toLowerCase() !== 'completed');
-                  return notCompleted;
-                })()
-                  .sort((a:any,b:any)=> a.date.localeCompare(b.date))
-                  .map((w:any)=> (
-                    <button key={w.id} onClick={()=>{ 
-                      prefillFromPlanned(w); 
-                      setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); 
-                      setSourcePlannedId(w.id); 
-                      setSourcePlannedDate(w.date); 
-                      setShowPlannedMenu(false); 
-                    }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
-                      <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
-                      <span className="text-2xs px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">{String(w.workout_status||'planned')}</span>
-                    </button>
-                  ))}
-              </div>
-            </div>
-          </div>
-        )}
+        
       ) : (
         <span className="text-gray-500">Empty bar only</span>
       )}
@@ -1442,7 +1394,55 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
           <div className="flex items-center gap-2">
-            <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-md text-gray-700 hover:text-gray-900 border border-transparent hover:bg-gray-50">Pick planned</button>
+            <div className="relative">
+              <button onClick={()=>{ setShowPlannedMenu(v=>!v); setShowAddonsMenu(false); }} className="text-sm px-3 py-1.5 rounded-md text-gray-700 hover:text-gray-900 border border-transparent hover:bg-gray-50">Pick planned</button>
+              {showPlannedMenu && (
+                <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="text-xs font-semibold text-gray-500">Strength (This week)</div>
+                    <button 
+                      onClick={() => {
+                        clearSessionProgress();
+                        setExercises([createEmptyExercise()]);
+                        setAttachedAddons([]);
+                        setNotesText('');
+                        setNotesRpe('');
+                        setSourcePlannedName('');
+                        setSourcePlannedId(null);
+                        setSourcePlannedDate(null);
+                        setLockManualPrefill(false);
+                        setShowPlannedMenu(false);
+                      }}
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      Start Fresh
+                    </button>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto" onMouseDown={(e)=>e.preventDefault()}>
+                    {(() => {
+                      const allStrength = (Array.isArray(plannedWorkouts)? plannedWorkouts: [])
+                        .filter(w=>String((w as any).type).toLowerCase()==='strength');
+                      const inWeek = allStrength.filter(w=> withinWeek(w.date, startOfWeek(getStrengthLoggerDateString())));
+                      const notCompleted = inWeek.filter(w=> String((w as any).workout_status||'').toLowerCase() !== 'completed');
+                      return notCompleted;
+                    })()
+                      .sort((a:any,b:any)=> a.date.localeCompare(b.date))
+                      .map((w:any)=> (
+                        <button key={w.id} onClick={()=>{ 
+                          prefillFromPlanned(w); 
+                          setSourcePlannedName(`${weekdayShortFromYmd(w.date)} — ${w.name||'Strength'}`); 
+                          setSourcePlannedId(w.id); 
+                          setSourcePlannedDate(w.date); 
+                          setShowPlannedMenu(false); 
+                        }} className="w-full text-left px-2 py-1.5 rounded hover:bg-gray-50 text-sm flex items-center justify-between" type="button">
+                          <span>{weekdayShortFromYmd(w.date)} — {w.name||'Strength'}</span>
+                          <span className="text-2xs px-1.5 py-0.5 rounded border border-gray-200 text-gray-600">{String(w.workout_status||'planned')}</span>
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
             <div className="relative">
               <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core</button>
               {showAddonsMenu && (
