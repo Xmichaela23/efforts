@@ -133,7 +133,7 @@ const PlateMath: React.FC<{
 };
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
-  const { workouts, addWorkout } = useAppContext();
+  const { workouts, addWorkout, updateWorkout } = useAppContext();
   const { plannedWorkouts } = usePlannedWorkouts();
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
@@ -1307,14 +1307,17 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       } catch {}
     })();
 
-    // Use the app context to save and navigate with the DB-saved workout (has id)
+    // Save: update in place when editing an existing workout id; otherwise create new
     let saved: any = null;
     try {
-      console.log('🔍 Attempting to save workout with addWorkout...');
-      console.log('🔍 addWorkout function available:', typeof addWorkout);
-      console.log('🔍 completedWorkout data:', completedWorkout);
-      
-      saved = await addWorkout(completedWorkout);
+      const editingExisting = Boolean(scheduledWorkout?.id);
+      if (editingExisting) {
+        console.log('🔧 Updating existing workout:', scheduledWorkout?.id);
+        saved = await updateWorkout(String(scheduledWorkout?.id), completedWorkout as any);
+      } else {
+        console.log('🆕 Creating new completed workout');
+        saved = await addWorkout(completedWorkout);
+      }
       console.log('✅ Save successful, returned:', saved);
     } catch (e) {
       console.error('❌ Save failed with error:', e);

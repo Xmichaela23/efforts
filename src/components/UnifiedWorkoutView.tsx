@@ -513,10 +513,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               <div className="mb-4 border border-gray-200 rounded-md">
                 <StrengthLogger
                   onClose={()=> setEditingInline(false)}
-                  scheduledWorkout={linkedPlanned || (isCompleted ? workout : undefined)}
+                  scheduledWorkout={(isCompleted ? workout : (linkedPlanned || workout))}
                   onWorkoutSaved={(saved)=>{
                     setEditingInline(false);
                     setActiveTab('summary');
+                    try { (workout as any).id = (saved as any)?.id || (workout as any).id; } catch {}
+                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                     try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
                   }}
                   targetDate={(workout as any)?.date}
