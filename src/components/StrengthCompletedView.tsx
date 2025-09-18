@@ -172,8 +172,6 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           </div>
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-600">
-          <span>{workoutData.duration || 0} min</span>
-          <span>•</span>
           <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
         </div>
         

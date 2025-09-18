@@ -374,7 +374,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 return 'Planned';
               })()}
             </p>
-            {isCompleted && workout?.planned_id && (
+            {isCompleted && workout?.planned_id && String((workout as any)?.type || '').toLowerCase() !== 'strength' && (
               <div className="mt-1 inline-flex items-center gap-2 text-xs">
                 <span className="px-2 py-0.5 rounded-full bg-green-100 text-green-800 border border-green-200">
                   Auto-linked to plan
