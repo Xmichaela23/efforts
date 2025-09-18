@@ -1709,6 +1709,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               }
                                             } catch {}
                                           }
+                                          // Override: prefer deterministic authoring (steps_preset) duration for rides to avoid stale computed totals
+                                          try {
+                                            const pn = (baselines as any)?.performanceNumbers || {};
+                                            const isRide = String((workout as any)?.type || '').toLowerCase() === 'ride';
+                                            const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
+                                            if (isRide && stepsPreset.length) {
+                                              const res = normalizePlannedSession(
+                                                { ...workout, steps_preset: stepsPreset },
+                                                { performanceNumbers: pn },
+                                                (workout as any).export_hints || {}
+                                              );
+                                              if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
+                                            }
+                                          } catch {}
                                           return (typeof minutes === 'number')
                                             ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>)
                                             : null;
