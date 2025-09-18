@@ -1279,14 +1279,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
 
   const getWeeklyVolume = (week: any) => {
-    if (!week || !week.workouts) return 0;
+    if (!week || !Array.isArray(week.workouts)) return 0;
     return week.workouts
       .filter((w: any) => {
         const tags = Array.isArray(w?.tags) ? w.tags.map((t: string) => t.toLowerCase()) : [];
-        // Exclude optional until activated; activated rows have 'opt_active' and no 'optional'
         return !tags.includes('optional');
       })
-      .reduce((total: number, workout: any) => total + (workout.duration || 0), 0);
+      .reduce((total: number, w: any) => {
+        const sec = Number((w as any)?.computed?.total_duration_seconds);
+        const min = Number.isFinite(sec) && sec > 0 ? Math.round(sec / 60) : 0;
+        return total + min;
+      }, 0);
   };
 
   // Export selected plan to Markdown (all weeks)
