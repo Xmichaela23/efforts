@@ -1329,7 +1329,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Save: update in place when editing an existing workout id; otherwise create new
     let saved: any = null;
     try {
-      const editingExisting = Boolean(scheduledWorkout?.id);
+      const editingExisting = Boolean(scheduledWorkout?.id) && String((scheduledWorkout as any)?.workout_status||'').toLowerCase()==='completed';
       if (editingExisting) {
         console.log('🔧 Updating existing workout:', scheduledWorkout?.id);
         saved = await updateWorkout(String(scheduledWorkout?.id), completedWorkout as any);
@@ -1360,13 +1360,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const saveWorkout = () => {
-    // If user added notes or RPE, let them confirm in the modal; otherwise save immediately
-    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
-    if (hasMeta) {
-      setShowNotesModal(true);
-    } else {
-      finalizeSave();
-    }
+    // Always open Notes/RPE modal so user can add RPE/notes before saving
+    setShowNotesModal(true);
   };
 
   const handleInputChange = (value: string) => {
