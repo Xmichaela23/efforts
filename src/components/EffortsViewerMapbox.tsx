@@ -301,58 +301,6 @@ function EffortsViewerMapbox({
   const [pl, setPl] = useState(56); // left padding (space for Y labels)
   const pr = 8;                     // right padding (tight)
 
-  // ---------- Derive optional overlay series: power and cadence ----------
-  const seriesLen = normalizedSamples.length;
-  const resampleTo = (arr: (number | null | undefined)[], targetLen: number): (number | null)[] => {
-    if (!Array.isArray(arr) || !arr.length || !targetLen) return new Array(targetLen).fill(null);
-    const out = new Array(targetLen).fill(null) as (number | null)[];
-    for (let i = 0; i < targetLen; i++) {
-      const j = Math.floor((i / Math.max(1, targetLen - 1)) * (arr.length - 1));
-      const v = arr[j];
-      out[i] = (Number.isFinite(v as any) ? Number(v) : null);
-    }
-    return out;
-  };
-  const pickSamplesArray = (s: any): any[] => {
-    if (!s) return [];
-    if (Array.isArray(s?.samples)) return s.samples;
-    if (Array.isArray(s)) return s;
-    return [];
-  };
-  const rawSensor = pickSamplesArray(workoutData?.sensor_data) || pickSamplesArray(workoutData?.time_series_data);
-  const rawPower = (() => {
-    if (samples && (Array.isArray((samples as any).power_w) || Array.isArray((samples as any).power) || Array.isArray((samples as any).power_watts))) {
-      const s: any = samples;
-      return (s.power_w || s.power || s.power_watts) as (number | null | undefined)[];
-    }
-    if (rawSensor && rawSensor.length) {
-      return rawSensor.map((s: any) => s.power ?? s.watts ?? null);
-    }
-    return [] as (number | null | undefined)[];
-  })();
-  const normalizeRunCadence = (v: any) => {
-    let n = Number(v);
-    if (!Number.isFinite(n)) return null;
-    if (n < 10) n *= 60;     // steps/sec -> steps/min
-    if (n < 130) n *= 2;     // strides/min -> steps/min
-    return Math.round(n);
-  };
-  const rawCadence = (() => {
-    if (samples && (Array.isArray((samples as any).cadence_spm) || Array.isArray((samples as any).cadence_rpm) || Array.isArray((samples as any).cadence))) {
-      const s: any = samples;
-      return (s.cadence_spm || s.cadence_rpm || s.cadence) as (number | null | undefined)[];
-    }
-    if (rawSensor && rawSensor.length) {
-      if (String(workoutData?.type).toLowerCase() === 'ride') {
-        return rawSensor.map((s: any) => (s.bikeCadence ?? s.cadence ?? null)); // rpm
-      }
-      return rawSensor.map((s: any) => normalizeRunCadence(s.runCadence ?? s.cadence ?? s.strideRate ?? s.stride_cadence));
-    }
-    return [] as (number | null | undefined)[];
-  })();
-  const power_w = useMemo(() => resampleTo(rawPower, seriesLen).map(v => (Number.isFinite(v as any) ? Number(v) : null)), [rawPower, seriesLen]);
-  const cadence_val = useMemo(() => resampleTo(rawCadence, seriesLen).map(v => (Number.isFinite(v as any) ? Number(v) : null)), [rawCadence, seriesLen]);
-
   // cumulative positive gain (m), used for the InfoCard
   const cumGain_m = useMemo(() => {
     if (!normalizedSamples.length) return [0];
@@ -498,63 +446,41 @@ function EffortsViewerMapbox({
     return new Array(5).fill(0).map((_, i) => a + i * step);
   }, [yDomain]);
 
-  // ---------- Overlay series prep (pace/speed, HR, power, cadence, VAM, elevation area) ----------
-  const paceArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : null)), [normalizedSamples]);
-  const hrArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.hr_bpm as any) ? (s.hr_bpm as number) : null)), [normalizedSamples]);
-  const elevArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : null)), [normalizedSamples]);
-  const vamArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : null)), [normalizedSamples]);
-
-  const robustDomain = (arr: (number | null)[], opts?: { symmetric?: boolean; floorSpan?: number }) => {
-    const vals = (arr || []).filter(v => Number.isFinite(v as any)) as number[];
-    if (!vals.length) return [0, 1] as [number, number];
-    const sorted = vals.slice().sort((a, b) => a - b);
-    const p = (q: number) => sorted[Math.max(0, Math.min(sorted.length - 1, Math.floor((q / 100) * (sorted.length - 1))))];
-    if (opts?.symmetric) {
-      const abs = vals.map(v => Math.abs(v));
-      const sortedAbs = abs.slice().sort((a, b) => a - b);
-      const pAbs = (q: number) => sortedAbs[Math.max(0, Math.min(sortedAbs.length - 1, Math.floor((q / 100) * (sortedAbs.length - 1))))];
-      const span = Math.max(opts.floorSpan || 1, pAbs(90));
-      return [-span, span] as [number, number];
-    }
-    let lo = p(2), hi = p(98);
-    if (lo === hi) { lo -= 1; hi += 1; }
-    return [lo, hi] as [number, number];
-  };
-  const paceDom = useMemo(() => robustDomain(paceArr as any), [paceArr]);
-  const hrDom = useMemo(() => robustDomain(hrArr as any), [hrArr]);
-  const pwrDom = useMemo(() => robustDomain(power_w as any), [power_w]);
-  const cadDom = useMemo(() => robustDomain(cadence_val as any), [cadence_val]);
-  const vamDom = useMemo(() => robustDomain(vamArr as any, { symmetric: true, floorSpan: 450 }), [vamArr]);
-  const shouldShowVam = String(workoutData?.type).toLowerCase() === 'ride';
-
-  const buildPath = (arr: (number | null)[], dom: [number, number], opts?: { invert?: boolean }) => {
+  // Build path from smoothed metric
+  const linePath = useMemo(() => {
     if (normalizedSamples.length < 2) return "";
     const n = normalizedSamples.length;
+    // Optional guard: if total span very small, fallback to index spacing
     const useIndex = (distCalc.dN - distCalc.d0) < 5;
     const xFromIndex = (i: number) => pl + (i / Math.max(1, n - 1)) * (W - pl - pr);
-    let started = false;
-    let d = "";
-    for (let i = 0; i < n; i++) {
-      const v = arr[i];
-      if (!Number.isFinite(v as any)) continue;
+    const x0 = useIndex ? xFromIndex(0) : xFromDist(distCalc.distMono[0]);
+    const y0 = Number.isFinite(metricRaw[0]) ? (metricRaw[0] as number) : 0;
+    let d = `M ${x0} ${yFromValue(y0)}`;
+    for (let i = 1; i < n; i++) {
       const xv = useIndex ? xFromIndex(i) : xFromDist(distCalc.distMono[i]);
-      const a = dom[0], b = dom[1];
-      let t = (Number(v) - a) / (b - a || 1);
-      if (opts?.invert) t = 1 - t;
-      const yv = H - P - t * (H - P * 2);
-      if (!started) { d += `M ${xv} ${yv}`; started = true; } else { d += ` L ${xv} ${yv}`; }
+      const yv = Number.isFinite(metricRaw[i]) ? (metricRaw[i] as number) : 0;
+      d += ` L ${xv} ${yFromValue(yv)}`;
     }
+    
+    // Debug: log the actual data range being used
+    if (import.meta.env?.DEV) {
+      console.log('Chart debug:', {
+        samples: normalizedSamples.length,
+        dTotal,
+        firstDist: normalizedSamples[0]?.d_m,
+        lastDist: normalizedSamples[normalizedSamples.length - 1]?.d_m,
+        firstX: xFromDist(normalizedSamples[0].d_m),
+        lastX: xFromDist(normalizedSamples[normalizedSamples.length - 1].d_m),
+        chartWidth: W - P * 2
+      });
+    }
+    
     return d;
-  };
-  const pacePath = useMemo(() => buildPath(paceArr as any, paceDom, { invert: String(workoutData?.type).toLowerCase() !== 'ride' }), [paceArr, paceDom, workoutData, pl, pr, distCalc]);
-  const hrPath = useMemo(() => buildPath(hrArr as any, hrDom), [hrArr, hrDom, pl, pr, distCalc]);
-  const pwrPath = useMemo(() => buildPath(power_w as any, pwrDom), [power_w, pwrDom, pl, pr, distCalc]);
-  const cadPath = useMemo(() => buildPath(cadence_val as any, cadDom), [cadence_val, cadDom, pl, pr, distCalc]);
-  const vamPath = useMemo(() => shouldShowVam ? buildPath(vamArr as any, vamDom) : "", [vamArr, vamDom, shouldShowVam, pl, pr, distCalc]);
+  }, [normalizedSamples, metricRaw, yDomain, distCalc, pl, pr]);
 
   // Elevation fill
   const elevArea = useMemo(() => {
-    if (normalizedSamples.length < 2) return "";
+    if (tab !== "elev" || normalizedSamples.length < 2) return "";
     const n = normalizedSamples.length;
     let d = `M ${xFromDist(distCalc.distMono[0])} ${yFromValue(normalizedSamples[0].elev_m_sm ?? 0)}`;
     for (let i = 1; i < n; i++) d += ` L ${xFromDist(distCalc.distMono[i])} ${yFromValue(normalizedSamples[i].elev_m_sm ?? 0)}`;
@@ -644,8 +570,7 @@ function EffortsViewerMapbox({
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
-        {/* Current metric values */
-        }
+        {/* Current metric values */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
@@ -653,11 +578,7 @@ function EffortsViewerMapbox({
             active={tab==="pace"} 
           />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
-          {String(workoutData?.type).toLowerCase() === 'ride' && (
-            <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
-          )}
-          <Pill label="Power" value={(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
-          <Pill label="Cad"   value={(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
+          <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
           <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
           <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
         </div>
@@ -705,21 +626,10 @@ function EffortsViewerMapbox({
             </g>
           ))}
 
-          {/* elevation fill (always for context) */}
-          <path d={elevArea} fill="#e2f2ff" opacity={0.45} />
-          {/* overlay series */}
-          {/* Pace/Speed */}
-          <path d={pacePath} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          {/* HR */}
-          <path d={hrPath} fill="none" stroke="#ef4444" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          {/* Power */}
-          <path d={pwrPath} fill="none" stroke="#8b5cf6" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          {/* Cadence */}
-          <path d={cadPath} fill="none" stroke="#22c55e" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          {/* VAM (ride only) */}
-          {String(workoutData?.type).toLowerCase() === 'ride' && (
-            <path d={vamPath} fill="none" stroke="#f59e0b" strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round" />
-          )}
+          {/* elevation fill */}
+          {tab === "elev" && <path d={elevArea} fill="#e2f2ff" opacity={0.65} />}
+          {/* metric line (smoothed) */}
+          <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
 
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
@@ -727,10 +637,10 @@ function EffortsViewerMapbox({
         </svg>
       </div>
 
-      {/* Metric buttons (control Y-axis/labels). Hide VAM for non-ride. */}
+      {/* Metric buttons */}
       <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( (String(workoutData?.type).toLowerCase()==='ride' ? ["pace","bpm","vam","elev"] : ["pace","bpm","elev"]) as MetricTab[]).map((t) => (
+          {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}

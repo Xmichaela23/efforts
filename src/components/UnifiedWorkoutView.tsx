@@ -57,12 +57,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     const pid = (workout as any)?.planned_id as string | undefined;
     if (pid) {
       const planned = plannedWorkouts.find(p => p.id === pid);
-      try { console.log('🔍 Found linkedPlanned by planned_id in context:', {
+      console.log('🔍 Found linkedPlanned by planned_id in context:', {
         id: planned?.id,
         name: planned?.name,
-        hasStrengthExercises: !!(planned as any)?.strength_exercises,
-        countStrengthExercises: Array.isArray((planned as any)?.strength_exercises) ? (planned as any).strength_exercises.length : 0
-      }); } catch {}
+        hasStrengthExercises: !!planned?.strength_exercises,
+        strengthExercises: planned?.strength_exercises
+      });
       setLinkedPlanned(planned || null);
       return;
     }
@@ -82,12 +82,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         p.date === String((workout as any).date).slice(0,10) &&
         ['planned', 'in_progress'].includes(p.workout_status)
       );
-      try { console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
+      console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
         id: planned?.id,
         name: planned?.name,
-        hasStrengthExercises: !!(planned as any)?.strength_exercises,
-        countStrengthExercises: Array.isArray((planned as any)?.strength_exercises) ? (planned as any).strength_exercises.length : 0
-      }); } catch {}
+        hasStrengthExercises: !!planned?.strength_exercises,
+        strengthExercises: planned?.strength_exercises
+      });
       setLinkedPlanned(planned || null);
       return;
     }

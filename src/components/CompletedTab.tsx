@@ -1670,9 +1670,8 @@ const formatPace = (paceValue: any): string => {
       )}
      </div>
 
-      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
-      <div className="w-full">
-        {workoutType !== 'walk' && (
+     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
+     <div className="w-full">
        {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
        {(() => {
          const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
@@ -1785,7 +1784,6 @@ const formatPace = (paceValue: any): string => {
           </div>
         );
       })()}
-        )}
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mx-[-16px] px-3 py-2">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
@@ -1835,7 +1833,63 @@ const formatPace = (paceValue: any): string => {
         </div>
       )}
 
-      {/* Unified chart includes power/cadence overlays; separate chart removed */}
+      {/* SEPARATE Power/Cadence Chart - at the bottom */}
+      {(workoutType === 'run' || workoutType === 'ride') && (() => {
+        // Try multiple data sources for sensor data
+        let samples = [];
+        if (Array.isArray((hydrated||workoutData)?.sensor_data?.samples)) {
+          samples = (hydrated||workoutData).sensor_data.samples;
+        } else if (Array.isArray((hydrated||workoutData)?.sensor_data)) {
+          samples = (hydrated||workoutData).sensor_data;
+        } else if (Array.isArray((hydrated||workoutData)?.time_series_data)) {
+          samples = (hydrated||workoutData).time_series_data;
+        }
+        
+        if (samples.length > 0) {
+          // Extract power and cadence data
+          const powerData = samples
+            .map((s: any) => s.power || s.watts || null)
+            .filter((p: any) => p !== null && p !== undefined);
+          
+          // Normalize cadence data
+          const normalizeRunCadence = (v: any) => {
+            let n = Number(v);
+            if (!Number.isFinite(n)) return null;
+            if (n < 10) n *= 60;     // steps/sec -> steps/min
+            if (n < 130) n *= 2;     // strides/min -> steps/min
+            return Math.round(n);
+          };
+
+          const pickCadenceSample = (s: any, sport: 'run'|'ride'|'walk') => {
+            if (sport === 'ride') {
+              return s.bikeCadence ?? s.cadence ?? null;   // rpm
+            }
+            // run/walk
+            return normalizeRunCadence(
+              s.runCadence ?? s.cadence ?? s.strideRate ?? s.stride_cadence
+            );
+          };
+
+          const cadenceData = samples
+            .map(s => pickCadenceSample(s, workoutType === 'ride' ? 'ride' : 'run'))
+            .filter(v => v != null);
+          
+          // Only show if we have power or cadence data
+          if (powerData.length > 0 || cadenceData.length > 0) {
+
+            return (
+              <div className="mb-4">
+                <PowerCadenceChart 
+                  power={powerData}
+                  cadence={cadenceData}
+                  initial="PWR"
+                />
+              </div>
+            );
+          }
+        }
+        return null;
+      })()}
       {/* Zones histograms (minimal stacked bars) */}
       {((hydrated||workoutData)?.computed?.analysis?.zones) && (
         <div className="mx-[-16px] px-3 py-3 space-y-3">
