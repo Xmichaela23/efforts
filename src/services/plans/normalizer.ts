@@ -43,6 +43,9 @@ const parsePace = (p: string) => {
   return { seconds: sec(parseInt(m[1], 10), parseInt(m[2], 10)), unit: unit as 'mi' | 'km' };
 };
 
+// Reasonable fallback when swimmer baseline is unknown
+const DEFAULT_SWIM_PER100_SEC = 120; // 2:00 per 100 (yd or m)
+
 function resolvePaceToken(token: string, baselines: Baselines): string | null {
   const pn: any = baselines?.performanceNumbers || {};
   const fiveK_pace: string | undefined = pn.fiveK_pace || pn.fiveKPace;
@@ -402,18 +405,16 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (!m) return null;
       return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
     };
-    const per100Sec = parseMmss(sp100);
-    // If no swim baseline, do NOT fallback — leave duration unspecified
-    if (per100Sec != null) {
-      const segments = Math.max(1, Math.round(dist / 100));
-      const minutes = Math.round((segments * per100Sec) / 60);
-      totalMin += minutes;
-    }
+    let per100Sec = parseMmss(sp100);
+    if (per100Sec == null) per100Sec = DEFAULT_SWIM_PER100_SEC;
+    const segments = Math.max(1, Math.round(dist / 100));
+    const minutes = Math.round((segments * per100Sec) / 60);
+    totalMin += minutes;
     summaryParts.push(`Swim technique ${dist}${unit}`);
   }
 
   // General swim distance-based tokens (WU/CD, drills, pull, kick, aerobic)
-  // Compute duration from user swimPace100 baseline. No fallback if missing.
+  // Compute duration from user swimPace100 baseline; fallback to a reasonable default if missing.
   try {
     const pn: any = (baselines as any)?.performanceNumbers || {};
     const parseMmss = (v: any): number | null => {
@@ -423,7 +424,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (!m) return null;
       return parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
     };
-    const per100Sec = parseMmss(pn.swimPace100);
+    let per100Sec = parseMmss(pn.swimPace100);
+    if (per100Sec == null) per100Sec = DEFAULT_SWIM_PER100_SEC;
     if (per100Sec != null) {
       let swimDistance = 0;
       let unitSeen: 'yd' | 'm' = 'yd';

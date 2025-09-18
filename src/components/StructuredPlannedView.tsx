@@ -191,7 +191,41 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   // Removed all token fallback paths: structured JSON is the single source of truth
 
   const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
-  const durationMin = est>0 ? Math.floor(est/60) : undefined;
+  let durationMin = est>0 ? Math.floor(est/60) : undefined;
+  // Fallbacks: computed total → sum(computed.steps) → sum(intervals)
+  try {
+    if (durationMin == null) {
+      const comp: any = (workout as any)?.computed || {};
+      const ts = Number(comp?.total_duration_seconds);
+      if (Number.isFinite(ts) && ts>0) durationMin = Math.max(1, Math.round(ts/60));
+    }
+  } catch {}
+  try {
+    if (durationMin == null) {
+      const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      if (steps.length) {
+        const s = steps.reduce((a:number, st:any)=>a + (Number(st?.duration_s)||0), 0);
+        if (s>0) durationMin = Math.max(1, Math.round(s/60));
+      }
+    }
+  } catch {}
+  try {
+    if (durationMin == null) {
+      const intervals: any[] = Array.isArray((workout as any)?.intervals) ? (workout as any).intervals : [];
+      if (intervals.length) {
+        const sumIntervals = (arr: any[]): number => arr.reduce((acc: number, it: any) => {
+          if (Array.isArray(it?.segments) && Number(it?.repeatCount)>0) {
+            const segSum = it.segments.reduce((s:number, sg:any)=> s + (Number(sg?.duration)||0), 0);
+            // Guard: last rest often omitted in UI/Garmin; assume authoring omitted it
+            return acc + segSum * Number(it.repeatCount);
+          }
+          return acc + (Number(it?.duration)||0);
+        }, 0);
+        const totalSec = sumIntervals(intervals);
+        if (Number.isFinite(totalSec) && totalSec>0) durationMin = Math.max(1, Math.round(totalSec/60));
+      }
+    }
+  } catch {}
 
   const handleGarminExport = async () => {
     try {

@@ -1685,47 +1685,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                         {(() => {
                                           const secRaw = (workout as any)?.computed?.total_duration_seconds as any;
                                           const secNum = typeof secRaw === 'number' ? secRaw : (typeof secRaw === 'string' ? parseInt(secRaw, 10) : NaN);
-                                          let minutes: number | null = null;
-                                          if (Number.isFinite(secNum) && secNum > 0) minutes = Math.round(secNum / 60);
-                                          else if (typeof workout.duration === 'number') minutes = workout.duration;
-                                          else {
-                                            try {
-                                              const pn = (baselines as any)?.performanceNumbers || {};
-                                              const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                                              if (stepsPreset.length) {
-                                                const res = normalizePlannedSession(
-                                                  { ...workout, steps_preset: stepsPreset },
-                                                  { performanceNumbers: pn },
-                                                  (workout as any).export_hints || {}
-                                                );
-                                                if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
-                                              }
-                                              if (minutes == null) {
-                                                const structured = (workout as any)?.workout_structure;
-                                                if (structured && typeof structured === 'object') {
-                                                  const res2 = normalizeStructuredSession(workout, { performanceNumbers: pn });
-                                                  if (typeof res2?.durationMinutes === 'number' && res2.durationMinutes > 0) minutes = res2.durationMinutes;
-                                                }
-                                              }
-                                            } catch {}
+                                          if (Number.isFinite(secNum) && secNum > 0) {
+                                            const minutes = Math.round(Number(secNum) / 60);
+                                            return (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>);
                                           }
-                                          // Override: prefer deterministic authoring (steps_preset) duration for rides to avoid stale computed totals
-                                          try {
-                                            const pn = (baselines as any)?.performanceNumbers || {};
-                                            const isRide = String((workout as any)?.type || '').toLowerCase() === 'ride';
-                                            const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                                            if (isRide && stepsPreset.length) {
-                                              const res = normalizePlannedSession(
-                                                { ...workout, steps_preset: stepsPreset },
-                                                { performanceNumbers: pn },
-                                                (workout as any).export_hints || {}
-                                              );
-                                              if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
-                                            }
-                                          } catch {}
-                                          return (typeof minutes === 'number')
-                                            ? (<span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>)
-                                            : null;
+                                          return null;
                                         })()}
                                       </div>
                                       <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
