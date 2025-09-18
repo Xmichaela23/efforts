@@ -24,6 +24,8 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
     if (!workout?.date || workout?.type !== 'strength') return null;
     // Match on same date, prefer completed saved workout with strength_exercises
     const match = workouts.find(w => (w as any).date === workout.date && (w as any).type === 'strength' && ((w as any).workout_status === 'completed' || (w as any).status === 'completed')) || null;
+    // Fallback to the currently selected workout if it's already completed (immediate UX after save)
+    if (!match && (workout as any)?.workout_status === 'completed') return workout as any;
     return match;
   }, [workouts, workout]);
 
