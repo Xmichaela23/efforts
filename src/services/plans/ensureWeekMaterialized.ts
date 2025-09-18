@@ -273,6 +273,19 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           } else {
             throw new Error('Materialization failed: steps_preset missing on existing row');
           }
+        } else {
+          // Upgrade path: always refresh total based on current preset expansion to ensure duration accuracy
+          try {
+            if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
+              const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
+              const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type);
+              if (Array.isArray(resolved) && resolved.length>0) {
+                const total = totalDurationSeconds(resolved as any);
+                const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: total } as any;
+                await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
+              }
+            }
+          } catch {}
         }
         // Always ensure intervals carry targets when possible
         try {

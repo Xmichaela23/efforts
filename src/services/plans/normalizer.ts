@@ -656,8 +656,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     });
   } catch {}
 
-  // Strength derived duration from description when no explicit minutes token
-  if (!strengthMain && String(session?.discipline || '').toLowerCase() === 'strength') {
+  // Strength derived duration from tokens and description when no explicit minutes token
+  if (String(session?.discipline || '').toLowerCase() === 'strength') {
     const desc: string = String(session?.description || '');
     const exercises = desc.split(/;+/).map(s => s.trim()).filter(Boolean);
     let derivedSeconds = 0;
@@ -681,6 +681,23 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       if (s) return { sets: parseInt(s[1],10), reps: 8 }; // assume ~8 reps per AMRAP set
       return null;
     };
+    // If we have structured strength_exercises, use that first
+    try {
+      const ses: any[] = Array.isArray((session as any)?.strength_exercises) ? (session as any).strength_exercises : [];
+      if (ses.length) {
+        ses.forEach((sx: any, idx: number) => {
+          const sets = Number(sx?.sets)||0; const reps = Number(sx?.reps)||0;
+          const tempoPerRep = /squat|dead|bench|press|row/i.test(String(sx?.name||'')) ? 4 : 3;
+          const workSec = sets * reps * tempoPerRep;
+          // rest between sets; compounds default 150s, accessory 90s when not provided
+          const defaultRest = /squat|dead|bench|press|row/i.test(String(sx?.name||'')) ? 150 : 90;
+          const restEach = Number(sx?.rest_seconds) || defaultRest;
+          const restSec = Math.max(0, sets-1) * restEach;
+          derivedSeconds += workSec + restSec;
+        });
+      }
+    } catch {}
+
     exercises.forEach((ex) => {
       const sr = parseSetsReps(ex);
       if (!sr) return;
