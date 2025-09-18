@@ -665,8 +665,7 @@ function EffortsViewerMapbox({
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
-        {/* Current metric values */
-        }
+        {/* Current metric values */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
@@ -674,11 +673,11 @@ function EffortsViewerMapbox({
             active={tab==="pace"} 
           />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
+          <Pill label="Power" value={(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
+          <Pill label="Cad"   value={(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
           {String(workoutData?.type).toLowerCase() === 'ride' && (
             <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
           )}
-          <Pill label="Power" value={(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
-          <Pill label="Cad"   value={(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
           <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
           <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
         </div>
@@ -735,17 +734,20 @@ function EffortsViewerMapbox({
 
           {/* elevation fill (always for context) */}
           <path d={elevArea} fill="#e2f2ff" opacity={0.45} />
-          {/* overlay series */}
-          {/* Pace/Speed */}
-          <path d={pacePath} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          {/* HR */}
-          <path d={hrPath} fill="none" stroke="#ef4444" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          {/* Power */}
-          <path d={pwrPath} fill="none" stroke="#8b5cf6" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          {/* Cadence */}
-          <path d={cadPath} fill="none" stroke="#22c55e" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          {/* VAM (ride only) */}
-          {String(workoutData?.type).toLowerCase() === 'ride' && (
+          {/* overlay series - isolate to the selected tab only */}
+          {tab === 'pace' && (
+            <path d={pacePath} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          )}
+          {tab === 'bpm' && (
+            <path d={hrPath} fill="none" stroke="#ef4444" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+          )}
+          {tab === 'pwr' && (
+            <path d={pwrPath} fill="none" stroke="#8b5cf6" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+          )}
+          {tab === 'cad' && (
+            <path d={cadPath} fill="none" stroke="#22c55e" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+          )}
+          {tab === 'vam' && String(workoutData?.type).toLowerCase() === 'ride' && (
             <path d={vamPath} fill="none" stroke="#f59e0b" strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round" />
           )}
 

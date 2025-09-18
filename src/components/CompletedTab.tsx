@@ -1470,14 +1470,7 @@ const formatPace = (paceValue: any): string => {
           {(() => {
             const gain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain || 0;
             return gain > 150 ? (
-              <div className="px-2 py-1">
-                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                  {calculateVAM()}
-                </div>
-                <div className="text-xs text-[#666666] font-normal">
-                  <div className="font-medium">VAM</div>
-                </div>
-              </div>
+          {/* VAM removed for non-cycling workouts */}
             ) : null;
           })()}
 
