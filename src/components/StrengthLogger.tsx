@@ -161,6 +161,12 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   type AddonStep = { move: string; time_sec: number };
   type AttachedAddon = { token: string; name: string; duration_min: number; version: string; seconds: number; running: boolean; completed: boolean; sequence: AddonStep[]; expanded?: boolean };
   const [attachedAddons, setAttachedAddons] = useState<AttachedAddon[]>([]);
+  const [showWarmupChooser, setShowWarmupChooser] = useState(false);
+  const [warmupCatalogData, setWarmupCatalogData] = useState<any | null>(null);
+  const [warmupTagMap, setWarmupTagMap] = useState<any | null>(null);
+  const [warmupPolicy, setWarmupPolicy] = useState<any | null>(null);
+  const [selectedWarmupCategory, setSelectedWarmupCategory] = useState<string>('general');
+  const [selectedWarmupVariant, setSelectedWarmupVariant] = useState<string>('A');
   
   // Session persistence key based on target date - use consistent date format
   const getStrengthLoggerDateString = () => {
@@ -955,27 +961,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Catalog-driven warm-up for strength
     if (tokenBase === 'addon_strength_wu_5') {
       try {
-        const [catalogRes, mapRes, policyRes] = await Promise.all([
-          fetch('/warmup_catalog.json'),
-          fetch('/tag_category_map.json'),
-          fetch('/selection_policy.json')
-        ]);
-        const catalog = await catalogRes.json();
-        const tagMap = await mapRes.json();
-        const policy = await policyRes.json();
-        const tags = getActiveStrengthTags();
-        const category = pickCategoryFromTags(tags, tagMap.tag_category_map || {}, tagMap.tag_precedence || [], tagMap.fallback_category || 'general');
-        const variant = chooseVariant(catalog.warmups, category, policy);
-        const seqRaw: Array<{ move: string; time_sec: number }> = (catalog.warmups?.[category]?.[variant] || []) as any;
-        const seq = substituteEquipment(seqRaw, policy);
-        const seconds = Number(policy?.selection?.duration_sec || 300);
-        const newAddon = { token: `${tokenBase}.${category}.${variant}`, name: `Warm‑Up (5m) — ${category} ${variant}`, duration_min: Math.round(seconds/60), version: `${category}-${variant}`, seconds, running: false, completed: false, sequence: seq, expanded: true };
-        setAttachedAddons(prev => [...prev, newAddon]);
-        if (isInitialized) {
-          saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
+        // Load once
+        if (!warmupCatalogData || !warmupTagMap || !warmupPolicy) {
+          const [catalogRes, mapRes, policyRes] = await Promise.all([
+            fetch('/warmup_catalog.json'),
+            fetch('/tag_category_map.json'),
+            fetch('/selection_policy.json')
+          ]);
+          setWarmupCatalogData(await catalogRes.json());
+          setWarmupTagMap(await mapRes.json());
+          setWarmupPolicy(await policyRes.json());
         }
-        setShowWorkoutsMenu(false);
-        return;
+        // Open chooser with defaults
+        const tags = getActiveStrengthTags();
+        const category = pickCategoryFromTags(tags, (warmupTagMap?.tag_category_map) || {}, (warmupTagMap?.tag_precedence) || [], (warmupTagMap?.fallback_category) || 'general');
+        const firstVariant = Object.keys((warmupCatalogData?.warmups?.[category]) || { A: [] })[0] || 'A';
+        setSelectedWarmupCategory(category);
+        setSelectedWarmupVariant(firstVariant);
+        setShowWarmupChooser(true);
+        return; // Wait for user choice
       } catch (e) {
         console.warn('Warm‑up catalog load failed; falling back to default. Error:', e);
       }
@@ -991,6 +995,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
     }
     setShowWorkoutsMenu(false);
+  };
+
+  const attachChosenWarmup = () => {
+    try {
+      const catalog = warmupCatalogData; const policy = warmupPolicy;
+      const category = selectedWarmupCategory; const variant = selectedWarmupVariant;
+      const seqRaw: Array<{ move: string; time_sec: number }> = (catalog?.warmups?.[category]?.[variant] || []) as any;
+      const seq = substituteEquipment(seqRaw, policy);
+      const seconds = Number(policy?.selection?.duration_sec || 300);
+      const newAddon = { token: `addon_strength_wu_5.${category}.${variant}`, name: `Warm‑Up (5m) — ${category} ${variant}`, duration_min: Math.round(seconds/60), version: `${category}-${variant}`, seconds, running: false, completed: false, sequence: seq, expanded: true } as any;
+      setAttachedAddons(prev => [...prev, newAddon]);
+      if (isInitialized) {
+        saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
+      }
+      setShowWarmupChooser(false);
+      setShowWorkoutsMenu(false);
+    } catch {}
   };
 
   // Timezone-safe weekday/weekly helpers based on Y-M-D arithmetic (no TZ drift)
@@ -1455,6 +1476,32 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="mt-2 text-sm text-gray-600">Source: {sourcePlannedName}</div>
         )}
       </div>
+
+      {/* Warm‑up chooser modal */}
+      {showWarmupChooser && (
+        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+          <div className="absolute inset-0 bg-black/40" onClick={()=>setShowWarmupChooser(false)} />
+          <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-5 z-10 max-h-[80vh] overflow-auto">
+            <h3 className="text-base font-semibold mb-2">Choose Warm‑up (5m)</h3>
+            <div className="text-sm text-gray-600 mb-2">Category</div>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {['push','squat','hinge','pull','general','power'].map(cat => (
+                <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-1 rounded border text-sm ${selectedWarmupCategory===cat? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{cat}</button>
+              ))}
+            </div>
+            <div className="text-sm text-gray-600 mb-2">Variant</div>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {['A','B','C','D','E','F'].map(v => (
+                <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-1 rounded border text-sm ${selectedWarmupVariant===v? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{v}</button>
+              ))}
+            </div>
+            <div className="flex items-center justify-end gap-3">
+              <button onClick={()=>setShowWarmupChooser(false)} className="text-sm text-gray-700 hover:text-gray-900">Cancel</button>
+              <button onClick={attachChosenWarmup} className="text-sm px-3 py-1.5 rounded bg-gray-900 text-white">Attach</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content container with proper mobile scrolling */}
       <div className="space-y-2 w-full pb-3">
