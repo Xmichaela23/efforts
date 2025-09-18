@@ -673,7 +673,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                 onWorkoutSaved={(workout) => {
                   setShowStrengthLogger(false);
                   setSelectedWorkout(workout);
-                  setActiveTab('completed');
+                  setActiveTab('summary');
                 }}
                 targetDate={selectedDate}
               />
