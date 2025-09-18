@@ -1845,7 +1845,17 @@ const formatPace = (paceValue: any): string => {
                     <div key={`hrz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
                   ))}
                 </div>
-                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.hr.schema}</div>
+                <div className="text-xs text-[#666666] mt-1">{
+                  (()=>{
+                    try {
+                      const s = (hydrated||workoutData).computed.analysis.zones.hr.schema;
+                      if (typeof s === 'string') return s;
+                      if (Array.isArray(s)) return s.join(' / ');
+                      if (s && typeof s === 'object') return Object.keys(s).join(' / ');
+                    } catch {}
+                    return '';
+                  })()
+                }</div>
               </div>
             );
           })()}
@@ -1860,7 +1870,17 @@ const formatPace = (paceValue: any): string => {
                     <div key={`pcz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
                   ))}
                 </div>
-                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.pace.schema}</div>
+                <div className="text-xs text-[#666666] mt-1">{
+                  (()=>{
+                    try {
+                      const s = (hydrated||workoutData).computed.analysis.zones.pace.schema;
+                      if (typeof s === 'string') return s;
+                      if (Array.isArray(s)) return s.join(' / ');
+                      if (s && typeof s === 'object') return Object.keys(s).join(' / ');
+                    } catch {}
+                    return '';
+                  })()
+                }</div>
               </div>
             );
           })()}

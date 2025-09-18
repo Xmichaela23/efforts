@@ -541,11 +541,12 @@ function EffortsViewerMapbox({
     if (lo === hi) { lo -= 1; hi += 1; }
     return [lo, hi] as [number, number];
   };
-  const paceDom = useMemo(() => robustDomain(paceArr as any), [paceArr]);
-  const hrDom = useMemo(() => robustDomain(hrArr as any), [hrArr]);
-  const pwrDom = useMemo(() => robustDomain(power_w as any), [power_w]);
-  const cadDom = useMemo(() => robustDomain(cadence_val as any), [cadence_val]);
-  const vamDom = useMemo(() => robustDomain(vamArr as any, { symmetric: true, floorSpan: 450 }), [vamArr]);
+  const ensureNumericArray = (arr: (number|null)[]) => (Array.isArray(arr) ? arr.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : [] as number[]);
+  const paceDom = useMemo(() => robustDomain(ensureNumericArray(paceArr as any)), [paceArr]);
+  const hrDom = useMemo(() => robustDomain(ensureNumericArray(hrArr as any)), [hrArr]);
+  const pwrDom = useMemo(() => robustDomain(ensureNumericArray(power_w as any)), [power_w]);
+  const cadDom = useMemo(() => robustDomain(ensureNumericArray(cadence_val as any)), [cadence_val]);
+  const vamDom = useMemo(() => robustDomain(ensureNumericArray(vamArr as any), { symmetric: true, floorSpan: 450 }), [vamArr]);
   const shouldShowVam = String(workoutData?.type).toLowerCase() === 'ride';
 
   const buildPath = (arr: (number | null)[], dom: [number, number], opts?: { invert?: boolean }) => {
