@@ -1235,8 +1235,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const saveWorkout = () => {
-    // Open notes modal; user can save with or without notes
-    setShowNotesModal(true);
+    // If user added notes or RPE, let them confirm in the modal; otherwise save immediately
+    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
+    if (hasMeta) {
+      setShowNotesModal(true);
+    } else {
+      finalizeSave();
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -1766,7 +1771,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, e.target.value, notesRpe);
                   }
-                }} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Anything noteworthy…" />
+                }} rows={4} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="" />
               </div>
               <div>
                 <label className="text-sm text-gray-600">RPE (1–10)</label>
