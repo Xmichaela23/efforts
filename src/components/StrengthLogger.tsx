@@ -1285,9 +1285,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     console.log('✅ Validation passed - proceeding with save');
     console.log('✅ Valid exercises:', validExercises);
 
-    // FIXED: Use consistent PST timezone and move cross-day selections to TODAY
-    // If this log was sourced from a planned workout (via Workouts menu), always save to today
-    const workoutDate = sourcePlannedId ? getStrengthLoggerDateString() : (scheduledWorkout?.date || getStrengthLoggerDateString());
+    // Save to selected date when provided; otherwise fall back to scheduled or today
+    const workoutDate = (targetDate || scheduledWorkout?.date || getStrengthLoggerDateString());
     
     // 🔍 DEBUG: Log the exact date being used
     console.log('🔍 DEBUG - Date details:');
