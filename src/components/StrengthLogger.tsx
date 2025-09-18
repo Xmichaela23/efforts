@@ -244,11 +244,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   
   const addonCatalog: Record<string, { name: string; duration_min: number; variants: string[] }> = {
     'addon_strength_wu_5': { name: 'Warm‑Up (5m)', duration_min: 5, variants: ['v1','v2'] },
-    'addon_strength_wu_10': { name: 'Warm‑Up (10m)', duration_min: 10, variants: ['v1','v2'] },
     'addon_core_5': { name: 'Core (5m)', duration_min: 5, variants: ['v1','v2'] },
-    'addon_core_10': { name: 'Core (10m)', duration_min: 10, variants: ['v1','v2'] },
     'addon_mobility_5': { name: 'Mobility (5m)', duration_min: 5, variants: ['v1','v2'] },
-    'addon_mobility_10': { name: 'Mobility (10m)', duration_min: 10, variants: ['v1','v2'] },
   };
 
   // Full addon definitions including sequences
@@ -267,7 +264,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Inchworm Walkouts', time_sec: 60 },
       { move: 'Torso Twists (standing)', time_sec: 60 },
     ]},
-    'addon_strength_wu_10.v1': { name: 'Strength Warm-Up — 10 min (v1)', duration_min: 10, sequence: [
+    /* removed 10‑minute variants */
+    /* 'addon_strength_wu_10.v1': { name: 'Strength Warm-Up — 10 min (v1)', duration_min: 10, sequence: [
       { move: 'Jumping Jacks', time_sec: 60 },
       { move: 'Bodyweight Squats', time_sec: 60 },
       { move: 'Arm Circles', time_sec: 60 },
@@ -290,7 +288,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Hip Airplanes (hands on hips)', time_sec: 60 },
       { move: 'Plank to Down Dog', time_sec: 60 },
       { move: 'Glute Bridge March', time_sec: 60 },
-    ]},
+    ]}, */
     'addon_core_5.v1': { name: 'Core — 5 min (v1)', duration_min: 5, sequence: [
       { move: 'Crunch', time_sec: 60 },
       { move: 'Reverse Crunch', time_sec: 60 },
@@ -305,7 +303,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Side Plank (Left)', time_sec: 60 },
       { move: 'Side Plank (Right)', time_sec: 60 },
     ]},
-    'addon_core_10.v1': { name: 'Core — 10 min (v1)', duration_min: 10, sequence: [
+    /* 'addon_core_10.v1': { name: 'Core — 10 min (v1)', duration_min: 10, sequence: [
       { move: 'Crunch', time_sec: 60 },
       { move: 'Reverse Crunch', time_sec: 60 },
       { move: 'Bicycle Crunch', time_sec: 60 },
@@ -328,7 +326,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Reverse Crunch', time_sec: 60 },
       { move: 'Bicycle Crunch', time_sec: 60 },
       { move: 'Flutter Kicks', time_sec: 60 },
-    ]},
+    ]}, */
     'addon_mobility_5.v1': { name: 'Mobility — 5 min (v1)', duration_min: 5, sequence: [
       { move: 'Cat–Cow', time_sec: 60 },
       { move: 'Child’s Pose', time_sec: 60 },
@@ -343,7 +341,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
       { move: 'Arm Circles (slow)', time_sec: 60 },
     ]},
-    'addon_mobility_10.v1': { name: 'Mobility — 10 min (v1)', duration_min: 10, sequence: [
+    /* 'addon_mobility_10.v1': { name: 'Mobility — 10 min (v1)', duration_min: 10, sequence: [
       { move: 'Cat–Cow', time_sec: 60 },
       { move: 'Child’s Pose', time_sec: 60 },
       { move: 'Thread the Needle (Left)', time_sec: 60 },
@@ -366,7 +364,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       { move: 'Seated Forward Fold', time_sec: 60 },
       { move: 'Figure-4 Glute Stretch (each side 30s)', time_sec: 60 },
       { move: 'Seated Spinal Twist (each side 30s)', time_sec: 60 },
-    ]},
+    ]}, */
   };
 
   const getAddonDef = (base: string, version: string) => addonDefinitions[`${base}.${version}`];
@@ -1353,21 +1351,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     <div className="text-xs text-gray-600 px-1 mb-1">Warm‑Up</div>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
-                      <button onClick={()=>attachAddon('addon_strength_wu_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">10 min</button>
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-600 px-1 mb-1">Core</div>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
-                      <button onClick={()=>attachAddon('addon_core_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">10 min</button>
                     </div>
                   </div>
                   <div>
                     <div className="text-xs text-gray-600 px-1 mb-1">Mobility</div>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={()=>attachAddon('addon_mobility_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
-                      <button onClick={()=>attachAddon('addon_mobility_10')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">10 min</button>
                     </div>
                   </div>
                 </div>

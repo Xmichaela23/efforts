@@ -1,0 +1,80 @@
+{
+  "cue_schema": "1.0",
+  "selection": {
+    "duration_sec": 300,
+    "allow_user_choice": true,
+    "randomize_variant": true,
+    "avoid_repeat_last_n": 2,
+    "equipment_fallbacks": {
+      "requires_band": [
+        "Band pull-aparts",
+        "Band shoulder dislocations",
+        "Band chest flies",
+        "Band face pulls",
+        "Band high pulls",
+        "Arm circles with resistance",
+        "Banded external rotations",
+        "Band high rows",
+        "Band external rotations"
+      ],
+      "requires_wall": [
+        "Wall slides",
+        "Scapular wall slides",
+        "Wall angels",
+        "Wall handstand prep"
+      ],
+      "requires_space": [
+        "Bear crawl forward/back",
+        "Inchworm walkouts",
+        "Walking knee hugs",
+        "Monster walks",
+        "Walking lunges",
+        "Bear crawls"
+      ],
+      "requires_equipment": [
+        "PVC pipe shoulder pass-throughs",
+        "Medicine ball slams",
+        "Battle rope waves",
+        "Hang from bar"
+      ],
+      "bodyweight_alternatives": {
+        "Band pull-aparts": "Arm circles backward",
+        "Band shoulder dislocations": "Overhead arm circles",
+        "Band chest flies": "Push-up to T",
+        "Band face pulls": "Reverse fly arm circles",
+        "Band high pulls": "High knees to elbows",
+        "Arm circles with resistance": "Dynamic arm swings",
+        "Banded external rotations": "Arm circles",
+        "Band high rows": "Reverse fly circles",
+        "Band external rotations": "Shoulder rolls",
+        "Wall slides": "Standing arm slides",
+        "Scapular wall slides": "Shoulder blade squeezes",
+        "Wall angels": "Prone Y-T-W",
+        "Wall handstand prep": "Pike push-ups",
+        "Bear crawl forward/back": "Bear hold",
+        "Inchworm walkouts": "Standing forward fold to squat",
+        "Walking knee hugs": "Standing knee hugs",
+        "Monster walks": "Lateral lunges",
+        "Walking lunges": "Reverse lunges",
+        "Bear crawls": "Mountain climbers",
+        "PVC pipe shoulder pass-throughs": "Arm circles",
+        "Medicine ball slams": "Jump squats",
+        "Battle rope waves": "Arm swings dynamic",
+        "Hang from bar": "Inverted row holds"
+      }
+    }
+  },
+  "user_preferences": {
+    "save_preferred_variants": true,
+    "allow_custom_timing": true,
+    "show_form_cues": true,
+    "auto_advance_exercises": false
+  },
+  "progression": {
+    "track_consistency": true,
+    "suggest_progressions": false,
+    "adaptation_period_days": 14
+  }
+}
+
+

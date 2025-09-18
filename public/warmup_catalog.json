@@ -1,0 +1,229 @@
+{
+  "cue_schema": "1.0",
+  "warmups": {
+    "push": {
+      "A": [
+        {"move": "Band pull-aparts", "time_sec": 45},
+        {"move": "Arm circles forward/back", "time_sec": 45},
+        {"move": "Wall slides", "time_sec": 60},
+        {"move": "Incline push-ups", "time_sec": 90},
+        {"move": "Shoulder blade squeezes", "time_sec": 60}
+      ],
+      "B": [
+        {"move": "Band shoulder dislocations", "time_sec": 45},
+        {"move": "Scapular wall slides", "time_sec": 60},
+        {"move": "Pike push-ups", "time_sec": 75},
+        {"move": "Band chest flies", "time_sec": 75},
+        {"move": "Arm swings across chest", "time_sec": 45}
+      ],
+      "C": [
+        {"move": "Dynamic arm swings", "time_sec": 45},
+        {"move": "Inchworm walkouts", "time_sec": 75},
+        {"move": "Bear crawl forward/back", "time_sec": 60},
+        {"move": "Band face pulls", "time_sec": 75},
+        {"move": "Push-up to T", "time_sec": 45}
+      ],
+      "D": [
+        {"move": "Shoulder rolls forward/back", "time_sec": 40},
+        {"move": "Cross-body arm stretches", "time_sec": 50},
+        {"move": "Tricep overhead stretches", "time_sec": 50},
+        {"move": "Diamond push-ups", "time_sec": 80},
+        {"move": "Doorway chest stretch", "time_sec": 80}
+      ],
+      "E": [
+        {"move": "Band high pulls", "time_sec": 45},
+        {"move": "Arm circles with resistance", "time_sec": 45},
+        {"move": "Wall handstand prep", "time_sec": 60},
+        {"move": "Decline push-ups", "time_sec": 75},
+        {"move": "Reverse plank hold", "time_sec": 75}
+      ],
+      "F": [
+        {"move": "PVC pipe shoulder pass-throughs", "time_sec": 50},
+        {"move": "Banded external rotations", "time_sec": 60},
+        {"move": "Push-up plus holds", "time_sec": 70},
+        {"move": "Archer push-ups", "time_sec": 70},
+        {"move": "Overhead reach stretches", "time_sec": 50}
+      ]
+    },
+    "squat": {
+      "A": [
+        {"move": "Bodyweight squats", "time_sec": 60},
+        {"move": "Hip circles each direction", "time_sec": 45},
+        {"move": "Forward/back leg swings", "time_sec": 45},
+        {"move": "Glute bridges", "time_sec": 75},
+        {"move": "Ankle circles and calf raises", "time_sec": 75}
+      ],
+      "B": [
+        {"move": "Cossack squats", "time_sec": 75},
+        {"move": "90/90 hip stretch", "time_sec": 60},
+        {"move": "Lateral lunges", "time_sec": 60},
+        {"move": "Clamshells each side", "time_sec": 60},
+        {"move": "Deep squat hold", "time_sec": 45}
+      ],
+      "C": [
+        {"move": "Walking knee hugs", "time_sec": 60},
+        {"move": "World's greatest stretch", "time_sec": 75},
+        {"move": "Goblet squat holds", "time_sec": 60},
+        {"move": "Monster walks", "time_sec": 60},
+        {"move": "Jump squats", "time_sec": 45}
+      ],
+      "D": [
+        {"move": "Sumo squat pulses", "time_sec": 60},
+        {"move": "Hip flexor couch stretch", "time_sec": 70},
+        {"move": "Single-leg glute bridges", "time_sec": 70},
+        {"move": "Curtsy lunges", "time_sec": 60},
+        {"move": "Wall sit", "time_sec": 40}
+      ],
+      "E": [
+        {"move": "Prisoner squats", "time_sec": 60},
+        {"move": "Pigeon pose each side", "time_sec": 80},
+        {"move": "Step-ups", "time_sec": 70},
+        {"move": "Fire hydrants", "time_sec": 50},
+        {"move": "Pulsing squats", "time_sec": 40}
+      ],
+      "F": [
+        {"move": "Bulgarian split squats", "time_sec": 80},
+        {"move": "Frog stretches", "time_sec": 60},
+        {"move": "Single-leg RDL", "time_sec": 70},
+        {"move": "Lateral step-ups", "time_sec": 50},
+        {"move": "Squat to stand", "time_sec": 40}
+      ]
+    },
+    "hinge": {
+      "A": [
+        {"move": "Bodyweight good mornings", "time_sec": 60},
+        {"move": "Hip circles each direction", "time_sec": 45},
+        {"move": "Single-leg RDL balance", "time_sec": 60},
+        {"move": "Glute bridges", "time_sec": 75},
+        {"move": "Standing hip flexor stretch", "time_sec": 60}
+      ],
+      "B": [
+        {"move": "Cat-cow stretches", "time_sec": 60},
+        {"move": "Hip flexor couch stretch", "time_sec": 60},
+        {"move": "Romanian deadlift pattern", "time_sec": 75},
+        {"move": "Bird dogs each side", "time_sec": 60},
+        {"move": "Standing forward fold", "time_sec": 45}
+      ],
+      "C": [
+        {"move": "Front/back leg swings", "time_sec": 45},
+        {"move": "90/90 hip transitions", "time_sec": 75},
+        {"move": "Hip thrusts", "time_sec": 75},
+        {"move": "Dead bugs each side", "time_sec": 60},
+        {"move": "Scorpion stretches", "time_sec": 45}
+      ],
+      "D": [
+        {"move": "Hamstring sweeps", "time_sec": 60},
+        {"move": "Thoracic spine rotations", "time_sec": 50},
+        {"move": "Single-leg hip thrusts", "time_sec": 80},
+        {"move": "Knee rocks", "time_sec": 60},
+        {"move": "Seated forward fold", "time_sec": 50}
+      ],
+      "E": [
+        {"move": "Straight-leg deadlift", "time_sec": 70},
+        {"move": "Supine spinal twist", "time_sec": 60},
+        {"move": "Reverse plank", "time_sec": 60},
+        {"move": "Donkey kicks", "time_sec": 60},
+        {"move": "Standing figure-4", "time_sec": 50}
+      ],
+      "F": [
+        {"move": "Jefferson curls", "time_sec": 70},
+        {"move": "Bretzel stretch", "time_sec": 80},
+        {"move": "Marching hip thrusts", "time_sec": 60},
+        {"move": "Windmill stretch", "time_sec": 50},
+        {"move": "Prone press-ups", "time_sec": 40}
+      ]
+    },
+    "pull": {
+      "A": [
+        {"move": "Band pull-aparts", "time_sec": 60},
+        {"move": "Scapular shrugs", "time_sec": 45},
+        {"move": "Wall angels", "time_sec": 60},
+        {"move": "Prone Y-T-W", "time_sec": 75},
+        {"move": "Doorway lat stretch", "time_sec": 60}
+      ],
+      "B": [
+        {"move": "Band face pulls", "time_sec": 60},
+        {"move": "Reverse fly circles", "time_sec": 50},
+        {"move": "Prone reverse flies", "time_sec": 70},
+        {"move": "Scapular wall slides", "time_sec": 70},
+        {"move": "Overhead lat stretch", "time_sec": 50}
+      ],
+      "C": [
+        {"move": "High knees to elbows", "time_sec": 60},
+        {"move": "Band external rotations", "time_sec": 60},
+        {"move": "Prone swimmers", "time_sec": 60},
+        {"move": "Inverted row holds", "time_sec": 70},
+        {"move": "Cross-body lat stretch", "time_sec": 50}
+      ],
+      "D": [
+        {"move": "Band high rows", "time_sec": 60},
+        {"move": "Thoracic extensions", "time_sec": 55},
+        {"move": "Superman holds", "time_sec": 65},
+        {"move": "Hang from bar", "time_sec": 70},
+        {"move": "Doorway shoulder stretch", "time_sec": 50}
+      ]
+    },
+    "general": {
+      "A": [
+        {"move": "Jumping jacks", "time_sec": 60},
+        {"move": "Arm circles", "time_sec": 45},
+        {"move": "Bodyweight squats", "time_sec": 60},
+        {"move": "Push-up to downward dog", "time_sec": 75},
+        {"move": "High knees in place", "time_sec": 60}
+      ],
+      "B": [
+        {"move": "Light jogging in place", "time_sec": 60},
+        {"move": "Leg swings forward/back", "time_sec": 45},
+        {"move": "Torso twists", "time_sec": 45},
+        {"move": "Mountain climbers", "time_sec": 75},
+        {"move": "Shoulder rolls", "time_sec": 75}
+      ],
+      "C": [
+        {"move": "Butt kicks", "time_sec": 45},
+        {"move": "Walking lunges", "time_sec": 75},
+        {"move": "Arm swings across body", "time_sec": 45},
+        {"move": "Bear crawls", "time_sec": 60},
+        {"move": "Standing marches", "time_sec": 75}
+      ],
+      "D": [
+        {"move": "Star jumps", "time_sec": 60},
+        {"move": "Full-body circles", "time_sec": 50},
+        {"move": "Burpee walkouts", "time_sec": 80},
+        {"move": "Lateral shuffles", "time_sec": 60},
+        {"move": "Seal jacks", "time_sec": 50}
+      ],
+      "E": [
+        {"move": "Cross crawls", "time_sec": 50},
+        {"move": "Knee to opposite elbow", "time_sec": 60},
+        {"move": "Plank to downward dog", "time_sec": 70},
+        {"move": "Side lunges", "time_sec": 70},
+        {"move": "Arm crossovers", "time_sec": 50}
+      ]
+    },
+    "power": {
+      "A": [
+        {"move": "Arm swings dynamic", "time_sec": 45},
+        {"move": "Leg swings explosive", "time_sec": 50},
+        {"move": "Jump squats", "time_sec": 60},
+        {"move": "Explosive push-ups", "time_sec": 75},
+        {"move": "High knees rapid", "time_sec": 70}
+      ],
+      "B": [
+        {"move": "Medicine ball slams", "time_sec": 60},
+        {"move": "Plyometric lunges", "time_sec": 70},
+        {"move": "Clap push-ups", "time_sec": 60},
+        {"move": "Broad jump practice", "time_sec": 60},
+        {"move": "Battle rope waves", "time_sec": 50}
+      ],
+      "C": [
+        {"move": "Box step explosive", "time_sec": 60},
+        {"move": "Speed skaters", "time_sec": 70},
+        {"move": "Burpee broad jumps", "time_sec": 80},
+        {"move": "Plyo push-ups", "time_sec": 50},
+        {"move": "Tuck jumps", "time_sec": 40}
+      ]
+    }
+  }
+}
+
+
