@@ -490,6 +490,44 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const rows: any[] = [];
         const planExportHints: any = (planData as any)?.export_hints || (data as any)?.export_hints || null;
         
+        // Strength: build structured exercises from workout_structure for the logger
+        const strengthFromStructure = (ws?: any, perf?: any): any[] | undefined => {
+          try {
+            if (!ws || typeof ws !== 'object') return undefined;
+            const type = String(ws.type || '').toLowerCase();
+            const struct: any[] = Array.isArray(ws.structure) ? ws.structure : [];
+            if (type !== 'strength_session' || struct.length === 0) return undefined;
+            const out: any[] = [];
+            const round5 = (n:number) => Math.round(n/5)*5;
+            for (const seg of struct) {
+              const name = String(seg?.exercise || '').replace(/_/g,' ').trim();
+              if (!name) continue;
+              const sets = Number(seg?.sets) || 0;
+              const repsRaw = seg?.reps;
+              const reps = typeof repsRaw === 'number' ? repsRaw : (typeof repsRaw === 'string' ? parseInt(repsRaw.replace(/\D+/g,'')||'0',10) : undefined);
+              let weight: number | undefined;
+              const load = seg?.load;
+              if (load && typeof load === 'object') {
+                if (String(load.type||'').toLowerCase() === 'percentage') {
+                  const pct = Number(load.percentage);
+                  const baseKey = String(load.baseline||'').replace(/^user\./i,'');
+                  const orm = perf?.[baseKey];
+                  if (typeof orm === 'number' && isFinite(orm) && isFinite(pct)) {
+                    weight = round5(orm * (pct/100));
+                  }
+                } else if (String(load.type||'').toLowerCase() === 'absolute') {
+                  const val = Number((load as any).weight);
+                  if (isFinite(val) && val > 0) weight = val;
+                }
+              }
+              out.push({ name, sets: Math.max(1, sets), reps: (typeof reps === 'number' && reps>0) ? reps : undefined, weight });
+            }
+            return out.length ? out : undefined;
+          } catch {
+            return undefined;
+          }
+        };
+
         // Bake the entire plan first with user baselines
         let bakedPlan: any = null;
         if (userBaselines) {
@@ -718,7 +756,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
                 if (out.length) row.intervals = out;
               } catch {}
             }
-            if (Array.isArray(s.strength_exercises)) row.strength_exercises = s.strength_exercises;
+            if (Array.isArray(s.strength_exercises)) {
+              row.strength_exercises = s.strength_exercises;
+            } else if ((s as any)?.workout_structure) {
+              const perf = userBaselines?.performanceNumbers || {};
+              const ex = strengthFromStructure((s as any).workout_structure, perf);
+              if (ex && ex.length) row.strength_exercises = ex;
+            }
 
             rows.push(row);
           });
