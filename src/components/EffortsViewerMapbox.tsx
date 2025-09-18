@@ -669,17 +669,17 @@ function EffortsViewerMapbox({
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
-            value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
+            value={String(workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles))}  
             active={tab==="pace"} 
           />
-          <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
-          <Pill label="Power" value={(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
-          <Pill label="Cad"   value={(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
+          <Pill label="HR"    value={String(s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—")}   active={tab==="bpm"} />
+          <Pill label="Power" value={String(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
+          <Pill label="Cad"   value={String(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
           {String(workoutData?.type).toLowerCase() === 'ride' && (
-            <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
+            <Pill label="VAM"   value={String(fmtVAM(s?.vam_m_per_h ?? null, useFeet))}   active={tab==="vam"} />
           )}
-          <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
-          <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
+          <Pill label="Gain"  value={String(fmtAlt(gainNow_m, useFeet))}  active={tab==="elev"} />
+          <Pill label="Grade" value={String(fmtPct(s?.grade ?? null))} />
         </div>
         
         {/* Distance, time, and altitude on same line */}
@@ -720,14 +720,14 @@ function EffortsViewerMapbox({
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-                {
+                {String(
                   tab === "elev" ? fmtAlt(v, useFeet)
                   : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles))
                   : tab === "bpm" ? `${Math.round(v)}`
                   : tab === "pwr" ? `${Math.round(v)} W`
                   : tab === "cad" ? `${Math.round(v)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}`
                   : fmtVAM(v, useFeet)
-                }
+                )}
               </text>
             </g>
           ))}
