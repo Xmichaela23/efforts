@@ -90,6 +90,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const type = String(ws?.type||'').toLowerCase();
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
   const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
+  const isStrengthContext = (type === 'strength_session') || (parentDisc === 'strength');
   // Brick session: render stacked segments
   if (type==='brick_session') {
     let tIdx = 0;
@@ -121,10 +122,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const dist = String(seg?.distance||'');
       if (dist) {
         const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
-        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${easy?buildPaceWithRange(easy, tolEasy):''}`);
+        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${(!isStrengthContext && easy)?buildPaceWithRange(easy, tolEasy):''}`);
       }
       const s = toSec(String(seg?.duration||''));
-      if (s>0) lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${easy?buildPaceWithRange(easy, tolEasy):''}`);
+      if (s>0) lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${(!isStrengthContext && easy)?buildPaceWithRange(easy, tolEasy):''}`);
       continue;
     }
     if ((type==='interval_session') || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
