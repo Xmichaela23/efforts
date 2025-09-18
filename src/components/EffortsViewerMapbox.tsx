@@ -685,7 +685,7 @@ function EffortsViewerMapbox({
         
         {/* Distance, time, and altitude on same line */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
-          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {String(fmtAlt(altNow_m, useFeet))}</div>
           <div style={{ 
             fontWeight: 700, 
             fontSize: 18, 
@@ -693,7 +693,7 @@ function EffortsViewerMapbox({
             fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
             letterSpacing: "0.5px"
           }}>
-            {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
+            {String(fmtDist(s?.d_m ?? 0, useMiles))} · {String(fmtTime(s?.t_s ?? 0))}
           </div>
           <div style={{ width: "60px" }}></div> {/* Spacer to balance the layout */}
         </div>

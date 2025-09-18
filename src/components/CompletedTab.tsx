@@ -1783,17 +1783,17 @@ const formatPace = (paceValue: any): string => {
         )}
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mx-[-16px] px-3 py-2">
-          {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
+          {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events?.splits?.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">
               <div className="text-sm mb-1">Splits · km</div>
               <div className="space-y-1">
-                {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any) => (
-                  <div key={`km-${s.n}`} className="flex items-baseline justify-between text-sm">
-                    <div className="text-[#666666]">{s.n}</div>
+                {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any, i:number) => (
+                  <div key={`km-${i}`} className="flex items-baseline justify-between text-sm">
+                    <div className="text-[#666666]">{String(s?.n ?? i+1)}</div>
                     <div className="flex items-baseline gap-4">
-                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
-                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
-                      <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(s.avgPace_s_per_km/60)}:${String(Math.round(s.avgPace_s_per_km%60)).padStart(2,'0')}/km` : '—'}</div>
+                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{String(s.avgHr_bpm)} bpm</div>}
+                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{String(s.avgCadence_spm)} spm</div>}
+                      <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(Number(s.avgPace_s_per_km)/60)}:${String(Math.round(Number(s.avgPace_s_per_km)%60)).padStart(2,'0')}/km` : '—'}</div>
                     </div>
                   </div>
                 ))}
