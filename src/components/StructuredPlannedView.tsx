@@ -120,10 +120,18 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const dist = String(seg?.distance||'');
       if (dist) {
         const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
-        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${(!isStrengthContext && easy)?buildPaceWithRange(easy, tolEasy):''}`);
+        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
+        const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
+        const addPower = (parentDisc==='ride' && typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
+        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} 1 × ${yd} yd${addPace || addPower ? (addPace||addPower) : ''}`);
       }
       const s = toSec(String(seg?.duration||''));
-      if (s>0) lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${(!isStrengthContext && easy)?buildPaceWithRange(easy, tolEasy):''}`);
+      if (s>0) {
+        const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
+        const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
+        const addPower = (parentDisc==='ride' && typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
+        lines.push(`${k==='warmup'?'Warm‑up':'Cool‑down'} ${Math.floor(s/60)} min${addPace || addPower ? (addPace||addPower) : ''}`);
+      }
       continue;
     }
     if ((type==='interval_session') || (k==='main_set' && String(seg?.set_type||'').toLowerCase()==='intervals')) {
@@ -146,7 +154,24 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
     if (type==='bike_intervals' && k==='main_set') {
       const reps = Number(seg?.repetitions)||0; const wsS = toSec(String(seg?.work_segment?.duration||'')); const rsS = toSec(String(seg?.recovery_segment?.duration||''));
-      for (let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${Math.floor(wsS/60)} min${seg?.work_segment?.target_power?.range?` @ ${seg.work_segment.target_power.range}`:''}`); if (r<reps-1 && rsS>0) lines.push(`Rest ${Math.floor(rsS/60)} min`); }
+      const rangeTxt = String(seg?.work_segment?.target_power?.range||'');
+      const powerLabel = (()=>{
+        const m = rangeTxt.match(/(\d{1,3})\s*[-–]\s*(\d{1,3})%/);
+        if (m && typeof (pn as any)?.ftp === 'number' && isFinite((pn as any).ftp)) {
+          const lo = Math.round((pn as any).ftp * (parseInt(m[1],10)/100));
+          const hi = Math.round((pn as any).ftp * (parseInt(m[2],10)/100));
+          return ` @ ${lo}–${hi} W`;
+        }
+        return rangeTxt ? ` @ ${rangeTxt}` : '';
+      })();
+      for (let r=0;r<Math.max(1,reps);r+=1){
+        lines.push(`1 × ${Math.floor(wsS/60)} min${powerLabel}`);
+        if (r<reps-1 && rsS>0) {
+          const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
+          const restLabel = (typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
+          lines.push(`Rest ${Math.floor(rsS/60)} min${restLabel}`);
+        }
+      }
       continue;
     }
     if (type==='endurance_session' && (k==='main_effort' || k==='main')) {

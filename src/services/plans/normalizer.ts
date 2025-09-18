@@ -292,7 +292,13 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     const pr = powerRange(center, tol);
     totalMin += reps * tmin + rmin * Math.max(0, reps - 1);
     const centerW = Math.round(center);
-    summaryParts.push(`${reps} × ${tmin} min @ ${centerW} W (${pr[0]}–${pr[1]} W)${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
+    if (rmin && ftp) {
+      const lo = Math.round(ftp * 0.60);
+      const hi = Math.round(ftp * 0.65);
+      summaryParts.push(`${reps} × ${tmin} min @ ${centerW} W (${pr[0]}–${pr[1]} W) with ${mmss(rmin * 60)} @ ${lo}–${hi} W`);
+    } else {
+      summaryParts.push(`${reps} × ${tmin} min @ ${centerW} W (${pr[0]}–${pr[1]} W)${rmin ? ` with ${mmss(rmin * 60)} easy` : ''}`);
+    }
     primary = { type: 'power', value: centerW, range: pr };
   }
 
