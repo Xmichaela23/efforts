@@ -1468,7 +1468,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         )}
         {exercises.map((exercise, exerciseIndex) => (
           <div key={exercise.id} className="bg-white">
-            <div className="p-3">
+            <div className="p-2">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 relative">
                   <div className="flex items-center border border-gray-200 bg-white">
@@ -1535,9 +1535,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             </div>
 
             {(expandedExercises[exercise.id] !== false) && (
-              <div className="px-3 py-2">
+              <div className="px-3 py-1.5">
                 {exercise.sets.map((set, setIndex) => (
-                  <div key={setIndex} className="mb-1.5 last:mb-0">
+                  <div key={setIndex} className="mb-1 last:mb-0">
                     {/* Tiny rest timer above each set (tap to start/pause) */}
                     <div className="flex items-center gap-2 mb-0.5 ml-8 relative">
                       <button
@@ -1703,10 +1703,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     addSet(exercise.id);
                   }}
                   variant="ghost"
-                  className="w-full h-9 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-50 mt-0.5"
+                  className="w-full h-8 text-xs text-gray-600 hover:text-gray-800 hover:bg-gray-50 mt-0"
                   type="button"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-3.5 w-3.5 mr-2" />
                   Add Set
                 </Button>
               </div>
@@ -1715,7 +1715,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         ))}
 
         {/* Add new exercise input */}
-        <div className="relative bg-white px-3 pt-0.5 pb-0.5">
+        <div className="relative bg-white px-3 pt-0 pb-0">
           <div className="relative flex items-center border border-gray-200 bg-white rounded-md">
             <div className="pl-2 text-gray-400">
               <Search className="h-4 w-4" />
@@ -1725,23 +1725,23 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               value={currentExercise}
               onChange={(e) => handleInputChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              className="h-9 text-sm border-gray-300 pr-9"
+              className="h-8 text-sm border-gray-300 pr-9"
               style={{ fontSize: '16px' }}
             />
             {currentExercise && (
               <button
                 type="button"
                 onClick={handleAddClick}
-                className="absolute right-2 h-6 w-6 flex items-center justify-center text-gray-700 hover:text-gray-900"
+                className="absolute right-2 h-5 w-5 flex items-center justify-center text-gray-700 hover:text-gray-900"
                 aria-label="Add exercise"
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
           
           {showSuggestions && filteredExercises.length > 0 && (
-            <div className="absolute top-12 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
+            <div className="absolute top-10 left-3 right-3 bg-white border border-gray-200 shadow-lg z-50 max-h-64 overflow-y-auto">
               {filteredExercises.map((exercise, index) => (
                 <button
                   key={index}
