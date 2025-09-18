@@ -893,15 +893,101 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     return () => window.clearInterval(id);
   }, [attachedAddons]);
 
-  const attachAddon = (tokenBase: string) => {
+  const pickCategoryFromTags = (tags: string[] | undefined, tagMap: any, precedence: string[], fallback: string): string => {
+    const set = new Set<string>((tags || []).map(t => String(t)));
+    for (const key of precedence || []) {
+      if (set.has(key) && tagMap[key]) return String(tagMap[key]);
+    }
+    for (const t of Array.from(set)) {
+      if (tagMap[t]) return String(tagMap[t]);
+    }
+    return fallback || 'general';
+  };
+
+  const getActiveStrengthTags = (): string[] => {
+    try {
+      const sw: any = scheduledWorkout || null;
+      if (sw && Array.isArray(sw.tags)) return sw.tags.map(String);
+      const today = getStrengthLoggerDateString();
+      const plannedToday = (plannedWorkouts || []).find((w: any) => String(w?.date) === today && String(w?.type).toLowerCase()==='strength');
+      if (plannedToday && Array.isArray((plannedToday as any).tags)) return (plannedToday as any).tags.map(String);
+    } catch {}
+    return [];
+  };
+
+  const chooseVariant = (warmups: any, category: string, policy: any): string => {
+    const keys: string[] = Object.keys(warmups?.[category] || {});
+    if (keys.length === 0) return 'A';
+    try {
+      const recentKey = 'warmup:lastVariants';
+      const avoid = Number(policy?.selection?.avoid_repeat_last_n || 0);
+      const mem = JSON.parse(localStorage.getItem(recentKey) || '{}');
+      const recent: string[] = Array.isArray(mem[category]) ? mem[category] : [];
+      const candidates = keys.filter(k => avoid ? !recent.slice(-avoid).includes(k) : true);
+      const pick = (candidates.length ? candidates : keys)[Math.floor(Math.random()* (candidates.length ? candidates.length : keys.length))];
+      const next = [...recent, pick].slice(-Math.max(avoid, 5));
+      mem[category] = next; localStorage.setItem(recentKey, JSON.stringify(mem));
+      return pick;
+    } catch { return keys[0]; }
+  };
+
+  const substituteEquipment = (moves: Array<{ move: string; time_sec: number }>, policy: any): Array<{ move: string; time_sec: number } > => {
+    if (!policy || !policy.selection) return moves;
+    const bwAlt: Record<string, string> = policy.selection.equipment_fallbacks?.bodyweight_alternatives || {};
+    const requiresLists: string[][] = [
+      policy.selection.equipment_fallbacks?.requires_band || [],
+      policy.selection.equipment_fallbacks?.requires_wall || [],
+      policy.selection.equipment_fallbacks?.requires_equipment || []
+    ].filter(Boolean);
+    const requiresSet = new Set(requiresLists.flat().map(String));
+    return moves.map(step => {
+      const name = String(step.move);
+      if (requiresSet.has(name) && bwAlt[name]) {
+        return { move: String(bwAlt[name]), time_sec: step.time_sec };
+      }
+      return step;
+    });
+  };
+
+  const attachAddon = async (tokenBase: string) => {
     if (attachedAddons.length >= 2) return;
     const meta = addonCatalog[tokenBase]; if (!meta) return;
+    // Catalog-driven warm-up for strength
+    if (tokenBase === 'addon_strength_wu_5') {
+      try {
+        const [catalogRes, mapRes, policyRes] = await Promise.all([
+          fetch('/warmup_catalog.json'),
+          fetch('/tag_category_map.json'),
+          fetch('/selection_policy.json')
+        ]);
+        const catalog = await catalogRes.json();
+        const tagMap = await mapRes.json();
+        const policy = await policyRes.json();
+        const tags = getActiveStrengthTags();
+        const category = pickCategoryFromTags(tags, tagMap.tag_category_map || {}, tagMap.tag_precedence || [], tagMap.fallback_category || 'general');
+        const variant = chooseVariant(catalog.warmups, category, policy);
+        const seqRaw: Array<{ move: string; time_sec: number }> = (catalog.warmups?.[category]?.[variant] || []) as any;
+        const seq = substituteEquipment(seqRaw, policy);
+        const seconds = Number(policy?.selection?.duration_sec || 300);
+        const newAddon = { token: `${tokenBase}.${category}.${variant}`, name: `Warm‑Up (5m) — ${category} ${variant}`, duration_min: Math.round(seconds/60), version: `${category}-${variant}`, seconds, running: false, completed: false, sequence: seq, expanded: true };
+        setAttachedAddons(prev => [...prev, newAddon]);
+        if (isInitialized) {
+          saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
+        }
+        setShowWorkoutsMenu(false);
+        return;
+      } catch (e) {
+        console.warn('Warm‑up catalog load failed; falling back to default. Error:', e);
+      }
+    }
+
+    // Default path (core 5m)
     const versionList = meta.variants; const version = versionList[0];
     const seconds = meta.duration_min * 60;
     const def = getAddonDef(tokenBase, version);
-    const newAddon = { token: `${tokenBase}.${version}`, name: meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false, sequence: def?.sequence || [], expanded: true };
+    const newAddon = { token: `${tokenBase}.${version}`, name: def?.name || meta.name, duration_min: meta.duration_min, version, seconds, running: false, completed: false, sequence: def?.sequence || [], expanded: true };
     setAttachedAddons(prev => [...prev, newAddon]);
-    if (isInitialized && exercises.length > 0) {
+    if (isInitialized) {
       saveSessionProgress(exercises, [...attachedAddons, newAddon], notesText, notesRpe);
     }
     setShowWorkoutsMenu(false);
@@ -1286,7 +1372,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           </h1>
           {/* Clear Cache button removed per request */}
           <div className="relative">
-            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core • Mob</button>
+            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core</button>
             {showWorkoutsMenu && (
               <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
                 <div className="flex items-center justify-between mb-1.5">
@@ -1359,12 +1445,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                       <button onClick={()=>attachAddon('addon_core_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-xs text-gray-600 px-1 mb-1">Mobility</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={()=>attachAddon('addon_mobility_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
-                    </div>
-                  </div>
+                  {/* Mobility category removed per request */}
                 </div>
               </div>
             )}
