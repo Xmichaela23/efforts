@@ -35,19 +35,19 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
     return (
       <div className={`flex items-center gap-2 text-black ${className}`}>
         <span className="font-medium">
-          {weather.temperature}°F
+          {String(weather.temperature)}°F
         </span>
         <span className="text-gray-600">
-          {weather.condition}
+          {String(weather.condition ?? '')}
         </span>
-        {weather.humidity && (
+        {Number.isFinite(weather.humidity as any) && (
           <span className="text-gray-500 text-xs">
-            {weather.humidity}% humidity
+            {String(weather.humidity)}% humidity
           </span>
         )}
-        {weather.windSpeed > 0 && (
+        {Number.isFinite(weather.windSpeed as any) && weather.windSpeed > 0 && (
           <span className="text-gray-500 text-xs">
-            {weather.windSpeed} mph wind
+            {String(weather.windSpeed)} mph wind
           </span>
         )}
       </div>
@@ -58,7 +58,7 @@ const WeatherDisplay: React.FC<WeatherDisplayProps> = ({
     return (
       <div className={`flex items-center gap-1 text-sm ${className}`}>
         <span className="text-black">
-          {fallbackTemperature}°F
+          {String(fallbackTemperature)}°F
         </span>
       </div>
     );
