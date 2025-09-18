@@ -1056,6 +1056,9 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   const prefillFromPlanned = (row: any) => {
     try {
       console.log('🔧 prefillFromPlanned called with row:', row);
+      // Clear any saved session so planned prefill isn't overridden by restore
+      try { clearSessionProgress(); } catch {}
+      setLockManualPrefill(false);
       setLockManualPrefill(true);
       
       if (row?.computed?.steps && Array.isArray(row.computed.steps)){

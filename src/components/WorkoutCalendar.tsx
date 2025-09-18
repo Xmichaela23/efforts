@@ -334,13 +334,22 @@ export default function WorkoutCalendar({
 
     const deduped: CalendarEvent[] = [];
     for (const [day, list] of byDay.entries()) {
-      // Only de-dupe exact duplicates (same href). We no longer collapse planned vs completed
-      // so that planned remains visible until there is an explicit link (handled earlier).
-      const seen = new Set<string>();
+      // Collapse multiple COMPLETED entries of the same type on the same day (display only one)
+      // Keep all planned items visible (handled earlier via suppression rules).
+      const seenExact = new Set<string>();
+      const seenCompletedType = new Set<string>();
       for (const ev of list) {
-        const key = String(ev.href || '') || `${ev._sigType}|${ev._sigMiles}|${ev.label}`;
-        if (seen.has(key)) continue;
-        seen.add(key);
+        const exactKey = String(ev.href || '') || `${ev._sigType}|${ev._sigMiles}|${ev.label}`;
+        if (seenExact.has(exactKey)) continue;
+        seenExact.add(exactKey);
+
+        const isCompleted = /✓\s*$/.test(ev.label || '') || String((ev as any)?._src?.workout_status||'').toLowerCase()==='completed';
+        const typeKey = String(ev._sigType || '').toLowerCase();
+        if (isCompleted) {
+          const ctKey = `${day}|${typeKey}`;
+          if (seenCompletedType.has(ctKey)) continue; // already have a completed of this type for the day
+          seenCompletedType.add(ctKey);
+        }
         deduped.push({ date: day, label: ev.label, href: ev.href, provider: ev.provider });
       }
     }
