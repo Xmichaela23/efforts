@@ -362,6 +362,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       setShowSummary(false);
       setDateWorkouts([]);
       setCurrentWorkoutIndex(0);
+      // Ensure we leave the Unified view and return to dashboard
+      setSelectedWorkout(null);
+      setActiveTab('summary');
     } catch (error) {
       console.error('Error deleting workout:', error);
       alert('Error deleting workout. Please try again.');
