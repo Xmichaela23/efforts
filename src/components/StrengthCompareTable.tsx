@@ -68,8 +68,8 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
               {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-50 text-blue-700 border border-blue-200">completed only</span>)}
             </div>
             <div className="col-span-3 text-gray-600">{r.pSets}×{r.pReps}{r.pW?` @ ${r.pW} lb`:''} <span className="text-gray-400">({r.pVol.toLocaleString()} lb)</span></div>
-            <div className="col-span-3 text-gray-800">{r.cSets} sets{r.cRepsAvg?`, ${r.cRepsAvg} avg reps`:''}{r.cWAvg?`, ${r.cWAvg} lb avg`:''} <span className="text-gray-400">({r.cVol.toLocaleString()} lb)</span></div>
-            <div className="col-span-1 text-right text-gray-600">{r.cVol - r.pVol >=0 ? '+' : ''}{(r.cVol - r.pVol).toLocaleString()}</div>
+            <div className="col-span-3 text-gray-800">{r.cSets}×{r.cRepsAvg || 0}{r.cWAvg?` @ ${r.cWAvg} lb`:''} <span className="text-gray-400">({r.cVol.toLocaleString()} lb)</span></div>
+            <div className="col-span-1 text-right text-gray-600">{r.cVol - r.pVol >=0 ? '+' : ''}{(r.cVol - r.pVol).toLocaleString()} lb</div>
           </div>
         ))}
       </div>
@@ -77,7 +77,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
         <div className="col-span-5">Totals</div>
         <div className="col-span-3 text-gray-600">{totals.pSets} sets • {totals.pVol.toLocaleString()} lb</div>
         <div className="col-span-3 text-gray-800">{totals.cSets} sets • {totals.cVol.toLocaleString()} lb</div>
-        <div className="col-span-1 text-right text-gray-700">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()}</div>
+        <div className="col-span-1 text-right text-gray-700">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
       </div>
     </div>
   );
