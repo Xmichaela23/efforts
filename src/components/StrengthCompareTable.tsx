@@ -58,7 +58,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {rows.map((r: any, i)=> (
         <div key={i} className="space-y-2">
           <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
@@ -86,11 +86,14 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
               );
             })}
           </div>
-          <div className="grid grid-cols-12 text-xs border-t border-gray-100 pt-1">
-            <div className="col-span-7 text-gray-500">Planned volume</div>
-            <div className="col-span-5 text-right text-gray-600">{r.pVol.toLocaleString()} lb</div>
-            <div className="col-span-7 text-gray-700">Completed volume</div>
-            <div className="col-span-5 text-right text-gray-800">{r.cVol.toLocaleString()} lb</div>
+          <div className="text-xs border-t border-gray-100 pt-1 flex items-center justify-end gap-2">
+            <span className="text-gray-500">Vol:</span>
+            <span className="text-gray-600">{r.pVol.toLocaleString()} lb</span>
+            <span className="text-gray-400">→</span>
+            <span className="text-gray-800">{r.cVol.toLocaleString()} lb</span>
+            <span className={(r.cVol - r.pVol)>=0 ? 'text-green-600' : 'text-rose-600'}>
+              {(r.cVol - r.pVol >= 0 ? '+' : '-')}{Math.abs(r.cVol - r.pVol).toLocaleString()} lb
+            </span>
           </div>
         </div>
       ))}
