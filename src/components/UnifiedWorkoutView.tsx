@@ -431,12 +431,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-4">
             {isCompleted && (
-              <div className="mb-3 flex items-center gap-2">
+              <div className="mb-3 flex items-center gap-3">
                 {(!workout.planned_id && !linkedPlanned) ? (
-                  <Button variant="outline" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
+                  <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
                 ) : (
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
                     onClick={async()=>{
                       try {
@@ -460,6 +460,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                       } catch {}
                     }}
                   >Unattach</Button>
+                )}
+                {/* Edit (opens Strength Logger) */}
+                {String((workout as any)?.type||'').toLowerCase()==='strength' && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={()=>{
+                      try {
+                        window.dispatchEvent(new CustomEvent('nav:open', { detail: { type: 'strength_logger', date: (workout as any)?.date } }));
+                      } catch {}
+                    }}
+                  >Edit</Button>
                 )}
                 {assocOpen && (
                   <AssociatePlannedDialog
