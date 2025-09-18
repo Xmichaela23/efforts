@@ -1494,6 +1494,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             )}
           </div>
         </div>
+        </div>
         {sourcePlannedName && (
           <div className="mt-2 text-sm text-gray-600">Source: {sourcePlannedName}</div>
         )}
