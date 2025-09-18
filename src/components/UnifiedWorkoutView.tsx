@@ -533,6 +533,20 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="completed" className="flex-1 -mt-8 !mt-0">
             {isCompleted ? (
               <div className="h-full">
+                {onDelete && workout?.id && (
+                  <div className="p-4 flex items-center justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        try {
+                          if (!confirm('Delete this workout?')) return;
+                          onDelete?.(String((workout as any).id));
+                        } catch {}
+                      }}
+                    >Delete</Button>
+                  </div>
+                )}
                 {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                   <div className="p-4">
                     <CompletedTab 
