@@ -1391,10 +1391,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <h1 className="text-xl font-medium text-gray-700">
             {scheduledWorkout ? `Log: ${scheduledWorkout.name}` : 'Log Strength'}
           </h1>
-          {/* Clear Cache button removed per request */}
-          <div className="relative">
-            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core</button>
-            {showWorkoutsMenu && (
+          <div className="flex items-center gap-2">
+            <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 rounded-md text-gray-700 hover:text-gray-900 border border-transparent hover:bg-gray-50">Pick planned</button>
+            <div className="relative">
+              <button onClick={()=>setShowWorkoutsMenu(v=>!v)} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core</button>
+              {showWorkoutsMenu && (
               <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="text-xs font-semibold text-gray-500">Strength (This week)</div>
