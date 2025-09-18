@@ -1359,8 +1359,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
   };
 
   const saveWorkout = () => {
-    // Always open Notes/RPE modal so user can add RPE/notes before saving
-    setShowNotesModal(true);
+    // Open Notes/RPE modal only when user has entered meta; otherwise save immediately
+    const hasMeta = (typeof notesRpe === 'number') || (typeof notesText === 'string' && notesText.trim().length > 0);
+    if (hasMeta) {
+      setShowNotesModal(true);
+    } else {
+      finalizeSave();
+    }
   };
 
   const handleInputChange = (value: string) => {
@@ -1900,7 +1905,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
       {/* Notes Modal */}
       {showNotesModal && (
-        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
+        <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={()=>setShowNotesModal(false)} />
           <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-6 z-10 max-h-[80vh] overflow-auto" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}>
             <h3 className="text-lg font-semibold mb-3">How did it feel?</h3>
@@ -1922,7 +1927,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                   if (isInitialized && exercises.length > 0) {
                     saveSessionProgress(exercises, attachedAddons, notesText, newRpe);
                   }
-                }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center" placeholder="—" />
+                }} className="mt-1 w-full border border-gray-300 rounded-md p-2 text-sm text-center bg-white" placeholder="—" />
               </div>
             </div>
             <div className="mt-4 sticky bottom-0 bg-white pt-3">
