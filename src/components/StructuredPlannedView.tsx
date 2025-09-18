@@ -291,13 +291,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             return (
               <li key={i} className="text-sm text-gray-800 flex items-start justify-between">
                 <span>{ln}</span>
-                {i===0 && isStrengthContext && isPlannedRow && (
+                {i===0 && isPlannedRow && (
                   <div className="ml-3 flex items-center gap-3 text-xs">
-                    <button
-                      type="button"
-                      onClick={()=>{ try { window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: workout } })); } catch {} }}
-                      className="text-blue-600 hover:underline"
-                    >Go to workout</button>
                     <button
                       type="button"
                       onClick={handleGarminExport}
