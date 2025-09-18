@@ -93,6 +93,7 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
 
   const isCompleted = workoutStatus === 'completed';
   const hasNotes = workout.notes || workout.description;
+  const rpeValue = typeof workout?.rpe === 'number' ? workout.rpe : null;
 
   return (
     <div className="p-3 space-y-4" style={{listStyle: 'none', listStyleType: 'none'}}>
@@ -118,16 +119,21 @@ export default function WorkoutSummary({ workout, onClose, onDelete }: WorkoutSu
         <TabsContent value="summary" className="space-y-4 mt-4">
           {/* Strength side-by-side comparison */}
           {workout.type === 'strength' && (
-            <div className="space-y-4">
-              {workout.strength_exercises && (
-                <StrengthCompareTable
-                  planned={(workout.strength_exercises || []).map((ex: any)=>({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight }))}
-                  completed={completedStrengthForDay ? ((completedStrengthForDay as any).strength_exercises || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] })) : []}
-                />
+            <div className="space-y-2">
+              {(rpeValue != null) && (
+                <div className="text-sm text-gray-700">RPE: {rpeValue}</div>
               )}
-              {!completedStrengthForDay && (
-                <div className="text-sm text-gray-500">No completed strength data yet for this day.</div>
-              )}
+              <div className="space-y-4">
+                {workout.strength_exercises && (
+                  <StrengthCompareTable
+                    planned={(workout.strength_exercises || []).map((ex: any)=>({ name: ex.name, sets: ex.sets, reps: ex.reps, weight: ex.weight }))}
+                    completed={completedStrengthForDay ? ((completedStrengthForDay as any).strength_exercises || []).map((ex: any)=>({ name: ex.name, setsArray: Array.isArray(ex.sets)?ex.sets:[] })) : []}
+                  />
+                )}
+                {!completedStrengthForDay && (
+                  <div className="text-sm text-gray-500">No completed strength data yet for this day.</div>
+                )}
+              </div>
             </div>
           )}
           {/* Description */}

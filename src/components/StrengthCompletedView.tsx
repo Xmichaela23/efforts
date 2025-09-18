@@ -170,6 +170,16 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
             <Dumbbell className="h-5 w-5 text-gray-600" />
             <h1 className="text-xl font-semibold text-gray-900">{workoutData.name}</h1>
           </div>
+          {(typeof workoutData?.rpe === 'number' || (workoutData?.notes && String(workoutData.notes).trim().length > 0)) && (
+            <div className="flex items-center gap-4 text-sm text-gray-700">
+              {typeof workoutData?.rpe === 'number' && (
+                <div className="px-2 py-1 rounded bg-gray-100">RPE: {workoutData.rpe}</div>
+              )}
+              {workoutData?.notes && String(workoutData.notes).trim().length > 0 && (
+                <div className="hidden sm:block max-w-[360px] truncate" title={workoutData.notes}>Notes: {workoutData.notes}</div>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-4 text-sm text-gray-600">
           <span className="font-medium">{workoutStats.actual.volume.toLocaleString()} lbs total</span>
@@ -187,6 +197,14 @@ const StrengthCompletedView: React.FC<StrengthCompletedViewProps> = ({ workoutDa
           </div>
         )}
       </div>
+
+      {/* Notes (expanded block on mobile/smaller screens) */}
+      {workoutData?.notes && String(workoutData.notes).trim().length > 0 && (
+        <div className="p-3 bg-gray-50 rounded-md sm:hidden">
+          <div className="text-sm text-gray-900 font-medium mb-1">Notes</div>
+          <div className="text-sm text-gray-700 whitespace-pre-wrap">{workoutData.notes}</div>
+        </div>
+      )}
 
       {/* Exercises */}
       {showComparison && plannedWorkout ? (

@@ -1446,7 +1446,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
             <div className="relative">
               <button onClick={()=>{ setShowAddonsMenu(v=>!v); setShowPlannedMenu(false); }} className="text-sm px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50">Warm‑up • Core</button>
               {showAddonsMenu && (
-              <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
+              <div className="absolute right-0 mt-1.5 w-72 bg-white rounded-md shadow-xl z-50 p-2">
                 <div className="space-y-1">
                   <div>
                     <div className="text-xs text-gray-600 px-1 mb-1">Warm‑Up</div>
