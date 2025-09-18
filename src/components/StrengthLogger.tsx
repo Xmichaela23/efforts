@@ -705,18 +705,18 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
 
     // If no scheduled workout provided, do a FRESH check for selected date's planned workout
     if (!workoutToLoad) {
-      console.log('🔍 No scheduled workout, checking for today\'s planned workout...');
-      const todayDate = getStrengthLoggerDateString();
+      console.log('🔍 No scheduled workout, checking for selected date\'s planned workout...');
+      const selectedDate = targetDate || getStrengthLoggerDateString();
       
       // Prefer planned_workouts table
-      const todaysPlanned = (plannedWorkouts || []).filter(w => w.date === todayDate && w.type === 'strength' && w.workout_status === 'planned');
+      const todaysPlanned = (plannedWorkouts || []).filter(w => w.date === selectedDate && w.type === 'strength' && w.workout_status === 'planned');
       let todaysStrengthWorkouts = todaysPlanned;
 
       if (todaysStrengthWorkouts.length === 0) {
         // Fallback to any planned in workouts hub if present
         const currentWorkouts = workouts || [];
         todaysStrengthWorkouts = currentWorkouts.filter(workout => 
-          workout.date === todayDate && 
+          workout.date === selectedDate && 
           workout.type === 'strength' && 
           workout.workout_status === 'planned'
         );
@@ -797,7 +797,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     // Direct fetch as a safety net (does not overwrite if already filled)
     (async () => {
       try {
-        const date = getStrengthLoggerDateString();
+        const date = targetDate || getStrengthLoggerDateString();
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
         const { data } = await supabase
@@ -916,8 +916,8 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     try {
       const sw: any = scheduledWorkout || null;
       if (sw && Array.isArray(sw.tags)) return sw.tags.map(String);
-      const today = getStrengthLoggerDateString();
-      const plannedToday = (plannedWorkouts || []).find((w: any) => String(w?.date) === today && String(w?.type).toLowerCase()==='strength');
+      const selected = targetDate || getStrengthLoggerDateString();
+      const plannedToday = (plannedWorkouts || []).find((w: any) => String(w?.date) === selected && String(w?.type).toLowerCase()==='strength');
       if (plannedToday && Array.isArray((plannedToday as any).tags)) return (plannedToday as any).tags.map(String);
     } catch {}
     return [];
