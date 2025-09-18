@@ -1673,8 +1673,9 @@ const formatPace = (paceValue: any): string => {
       {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
       <div className="w-full">
         {workoutType !== 'walk' && (
-       {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
-       {(() => {
+          <>
+          {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
+          {(() => {
          const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
@@ -1771,8 +1772,8 @@ const formatPace = (paceValue: any): string => {
                }
              }
            }
-         } catch {}
-        return (
+        } catch {}
+       return (
           <div className="mt-1 mx-[-16px]">
             <EffortsViewerMapbox
               samples={samples as any}
@@ -1785,6 +1786,7 @@ const formatPace = (paceValue: any): string => {
           </div>
         );
       })()}
+          </>
         )}
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mx-[-16px] px-3 py-2">

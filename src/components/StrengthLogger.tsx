@@ -1320,11 +1320,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     console.log('🔍 Planned workouts debug:', {
                       total: plannedWorkouts?.length || 0,
                       strength: allStrength.length,
-                      inWeek: inWeek.length,
-                      notCompleted: notCompleted.length,
-                      allStrength: allStrength.map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status })),
-                      inWeek: inWeek.map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status })),
-                      notCompleted: notCompleted.map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status }))
+                      inWeek_count: inWeek.length,
+                      notCompleted_count: notCompleted.length,
+                      allStrength_sample: allStrength.slice(0,5).map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status })),
+                      inWeek_sample: inWeek.slice(0,5).map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status })),
+                      notCompleted_sample: notCompleted.slice(0,5).map(w => ({ id: w.id, name: w.name, date: w.date, status: w.workout_status }))
                     });
                     
                     return notCompleted;

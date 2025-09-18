@@ -23,7 +23,7 @@ type Split = {
   avgHr_bpm: number | null;
   gain_m: number; avgGrade: number | null;
 };
-type MetricTab = "pace" | "bpm" | "vam" | "elev";
+type MetricTab = "pace" | "bpm" | "pwr" | "cad" | "vam" | "elev";
 
 /** ---------- Small utils/formatters ---------- */
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -375,6 +375,16 @@ function EffortsViewerMapbox({
       if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
       return elev;
     }
+    if (tab === "pwr") {
+      const arr = power_w.map(v => (Number.isFinite(v as any) ? Number(v) : NaN));
+      const wins = winsorize(arr as number[], 5, 95);
+      return smoothWithOutlierHandling(wins, 5, 3).map(v => (Number.isFinite(v) ? v : NaN));
+    }
+    if (tab === "cad") {
+      const arr = cadence_val.map(v => (Number.isFinite(v as any) ? Number(v) : NaN));
+      const wins = winsorize(arr as number[], 5, 95);
+      return smoothWithOutlierHandling(wins, 5, 3).map(v => (Number.isFinite(v) ? v : NaN));
+    }
     // Pace - enhanced smoothing with outlier handling
     if (tab === "pace") {
       const pace = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
@@ -467,6 +477,10 @@ function EffortsViewerMapbox({
       lo = Math.floor(lo / 5) * 5; 
       hi = Math.ceil(hi / 5) * 5; 
     }
+    if (tab === "cad") {
+      lo = Math.floor(lo / 5) * 5;
+      hi = Math.ceil(hi / 5) * 5;
+    }
     
     // Minimal padding for better space utilization
     const pad = Math.max((hi - lo) * 0.02, 1); // At least 1 unit padding
@@ -499,7 +513,14 @@ function EffortsViewerMapbox({
   }, [yDomain]);
 
   // ---------- Overlay series prep (pace/speed, HR, power, cadence, VAM, elevation area) ----------
-  const paceArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : null)), [normalizedSamples]);
+  // Lightweight decimation: sample down long arrays to reduce render cost
+  const decimate = (arr: (number|null)[], target = 1200) => {
+    const n = arr.length; if (n <= target) return arr;
+    const step = n / target; const out: (number|null)[] = new Array(target);
+    for (let i = 0; i < target; i++) out[i] = arr[Math.floor(i * step)] ?? null;
+    return out;
+  };
+  const paceArr = useMemo(() => decimate(normalizedSamples.map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : null))), [normalizedSamples]);
   const hrArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.hr_bpm as any) ? (s.hr_bpm as number) : null)), [normalizedSamples]);
   const elevArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : null)), [normalizedSamples]);
   const vamArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : null)), [normalizedSamples]);
@@ -700,7 +721,14 @@ function EffortsViewerMapbox({
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles)) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
+                {
+                  tab === "elev" ? fmtAlt(v, useFeet)
+                  : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles))
+                  : tab === "bpm" ? `${Math.round(v)}`
+                  : tab === "pwr" ? `${Math.round(v)} W`
+                  : tab === "cad" ? `${Math.round(v)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}`
+                  : fmtVAM(v, useFeet)
+                }
               </text>
             </g>
           ))}
@@ -730,7 +758,7 @@ function EffortsViewerMapbox({
       {/* Metric buttons (control Y-axis/labels). Hide VAM for non-ride. */}
       <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( (String(workoutData?.type).toLowerCase()==='ride' ? ["pace","bpm","vam","elev"] : ["pace","bpm","elev"]) as MetricTab[]).map((t) => (
+          {( (String(workoutData?.type).toLowerCase()==='ride' ? ["pace","bpm","pwr","cad","vam","elev"] : ["pace","bpm","pwr","cad","elev"]) as MetricTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
