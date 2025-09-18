@@ -47,37 +47,56 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const cWAvg = Array.isArray(cSetsArr) ? avg(cSetsArr.map(s=>s.weight||0)) : 0;
     const cVol = Array.isArray(cSetsArr) ? calcVolume(cSetsArr) : 0;
     const status: 'matched'|'skipped'|'swapped' = p && c ? 'matched' : (p && !c ? 'skipped' : (!p && c ? 'swapped' : 'matched'));
-    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status } as any;
+    // Build 1:1 planned vs completed sets
+    const plannedSets: StrengthSet[] = Array.from({ length: Math.max(0, pSets) }, () => ({ reps: pReps, weight: pW }));
+    const completedSets: StrengthSet[] = cSetsArr;
+    const maxLen = Math.max(plannedSets.length, completedSets.length);
+    const pairs = Array.from({ length: maxLen }, (_, i) => ({ planned: plannedSets[i], completed: completedSets[i] }));
+    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
 
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-12 text-xs font-medium text-gray-500 border-b border-gray-200 pb-1">
-        <div className="col-span-5">Exercise</div>
-        <div className="col-span-3">Planned</div>
-        <div className="col-span-3">Completed</div>
-        <div className="col-span-1 text-right">Δ</div>
-      </div>
-      <div className="space-y-2">
-        {rows.map((r: any, i)=> (
-          <div key={i} className="grid grid-cols-12 text-sm">
-            <div className="col-span-5 text-gray-900 flex items-center gap-2">
-              <span>{r.name}</span>
-              {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-50 text-blue-700 border border-blue-200">completed only</span>)}
-            </div>
-            <div className="col-span-3 text-gray-600">{r.pSets}×{r.pReps}{r.pW?` @ ${r.pW} lb`:''} <span className="text-gray-400">({r.pVol.toLocaleString()} lb)</span></div>
-            <div className="col-span-3 text-gray-800">{r.cSets}×{r.cRepsAvg || 0}{r.cWAvg?` @ ${r.cWAvg} lb`:''} <span className="text-gray-400">({r.cVol.toLocaleString()} lb)</span></div>
-            <div className="col-span-1 text-right text-gray-600">{r.cVol - r.pVol >=0 ? '+' : ''}{(r.cVol - r.pVol).toLocaleString()} lb</div>
+    <div className="space-y-4">
+      {rows.map((r: any, i)=> (
+        <div key={i} className="space-y-2">
+          <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+            <span>{r.name}</span>
+            {r.status==='swapped' && (<span className="px-1.5 py-0.5 text-[11px] rounded bg-blue-50 text-blue-700 border border-blue-200">completed only</span>)}
           </div>
-        ))}
-      </div>
+          <div className="grid grid-cols-12 text-xs font-medium text-gray-500 border-b border-gray-200 pb-1">
+            <div className="col-span-2">Set</div>
+            <div className="col-span-5">Planned</div>
+            <div className="col-span-5">Completed</div>
+          </div>
+          <div className="space-y-1">
+            {r.pairs.map((pair: any, idx: number) => {
+              const p = pair.planned as StrengthSet | undefined;
+              const c = pair.completed as StrengthSet | undefined;
+              const fmt = (s?: StrengthSet) => s && (s.reps || s.weight)
+                ? `${s.reps || 0} @ ${s.weight || 0} lb`
+                : '—';
+              return (
+                <div key={idx} className="grid grid-cols-12 text-sm">
+                  <div className="col-span-2 text-gray-600">{idx+1}</div>
+                  <div className="col-span-5 text-gray-600">{fmt(p)}</div>
+                  <div className="col-span-5 text-gray-800">{fmt(c)}</div>
+                </div>
+              );
+            })}
+          </div>
+          <div className="grid grid-cols-12 text-xs border-t border-gray-100 pt-1">
+            <div className="col-span-7 text-gray-500">Planned volume</div>
+            <div className="col-span-5 text-right text-gray-600">{r.pVol.toLocaleString()} lb</div>
+            <div className="col-span-7 text-gray-700">Completed volume</div>
+            <div className="col-span-5 text-right text-gray-800">{r.cVol.toLocaleString()} lb</div>
+          </div>
+        </div>
+      ))}
       <div className="grid grid-cols-12 text-sm font-semibold border-t border-gray-200 pt-2">
-        <div className="col-span-5">Totals</div>
-        <div className="col-span-3 text-gray-600">{totals.pSets} sets • {totals.pVol.toLocaleString()} lb</div>
-        <div className="col-span-3 text-gray-800">{totals.cSets} sets • {totals.cVol.toLocaleString()} lb</div>
-        <div className="col-span-1 text-right text-gray-700">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
+        <div className="col-span-7">Totals</div>
+        <div className="col-span-5 text-right text-gray-700">{totals.cVol - totals.pVol >=0 ? '+' : ''}{(totals.cVol - totals.pVol).toLocaleString()} lb</div>
       </div>
     </div>
   );
