@@ -1084,9 +1084,25 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
         console.log('📊 Mapped strength exercises:', mapped);
         setExercises(mapped);
         console.log('✅ Set exercises from strength_exercises');
+        return;
       } else {
         console.log('⚠️ No strength_exercises found in row');
       }
+
+      // Fallback: parse from steps_preset / descriptions if available
+      try {
+        const stepsArr: string[] = Array.isArray((row as any).steps_preset) ? (row as any).steps_preset : [];
+        const viaTokens = parseStepsPreset(stepsArr);
+        const src = (row as any).rendered_description || (row as any).description || '';
+        const parsed = viaTokens.length>0 ? viaTokens : parseStrengthDescription(src);
+        const orOpts = extractOrOptions(src);
+        if (parsed.length > 0) {
+          console.log('📝 Parsed exercises from planned description/steps');
+          setExercises(parsed);
+          if (orOpts && orOpts.length > 1) setPendingOrOptions(orOpts);
+          return;
+        }
+      } catch {}
     } catch (error) {
       console.error('❌ Error in prefillFromPlanned:', error);
     }
