@@ -89,6 +89,15 @@ export function resolveTargets(steps: AtomicStep[], baselines: Baselines, export
         rs.target_high = `${hi} W`;
       }
     }
+  // Universal bike REST: default to Z1 60–65% of FTP if no explicit power target
+  if ((discipline === 'ride' || discipline === 'bike') && isRest && ftp && !rs.target_value && !rs.target_low && !rs.target_high) {
+    const lo = Math.round(ftp * 0.60);
+    const hi = Math.round(ftp * 0.65);
+    const center = Math.round((lo + hi) / 2);
+    rs.target_value = `${center} W`;
+    rs.target_low = `${lo} W`;
+    rs.target_high = `${hi} W`;
+  }
     // If no explicit target token, provide sensible defaults for runs
     if (discipline === 'run' && !rs.target_value && (isRest || isWarm || isCool || rs.type==='steady' || rs.type==='interval_work')) {
       const ptxt = isRest || isWarm || isCool ? (easy || fivek) : (fivek || easy);

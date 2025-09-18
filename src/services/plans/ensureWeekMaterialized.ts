@@ -1350,7 +1350,17 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               if (wsS>0) workStep.duration = wsS;
               if (rangeTxt) addPowerRange(workStep, rangeTxt, (perfNumbers as any)?.ftp, tolSS);
               const segs: any[] = [workStep];
-              if (rsS>0) segs.push({ effortLabel: 'rest', duration: rsS });
+              if (rsS>0) {
+                const restStep: any = { effortLabel: 'rest', duration: rsS };
+                // Universal bike rest: Z1 60–65% if FTP available
+                const ftpVal = (perfNumbers as any)?.ftp;
+                if (typeof ftpVal === 'number' && isFinite(ftpVal) && ftpVal>0) {
+                  const lo = Math.round(ftpVal * 0.60);
+                  const hi = Math.round(ftpVal * 0.65);
+                  restStep.power_range = { lower: lo, upper: hi };
+                }
+                segs.push(restStep);
+              }
               if (reps > 1) out.push({ effortLabel: 'repeat', repeatCount: reps, segments: segs }); else out.push(...segs);
               continue;
             }
