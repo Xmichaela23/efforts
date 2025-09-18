@@ -1416,7 +1416,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
               {showPlannedMenu && (
                 <div className="absolute right-0 mt-1.5 w-72 bg-white border border-gray-200 rounded-md shadow-xl z-50 p-2">
                   <div className="flex items-center justify-between mb-1.5">
-                    <div className="text-xs font-semibold text-gray-500">Strength (This week)</div>
+                    <div className="text-xs font-semibold text-gray-500">Strength (Next 14 days)</div>
                     <button 
                       onClick={() => {
                         clearSessionProgress();
@@ -1439,8 +1439,10 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     {(() => {
                       const allStrength = (Array.isArray(plannedWorkouts)? plannedWorkouts: [])
                         .filter(w=>String((w as any).type).toLowerCase()==='strength');
-                      const inWeek = allStrength.filter(w=> withinWeek(w.date, startOfWeek(getStrengthLoggerDateString())));
-                      const notCompleted = inWeek.filter(w=> String((w as any).workout_status||'').toLowerCase() !== 'completed');
+                      const today = getStrengthLoggerDateString();
+                      const next14 = addDaysYmd(today, 14);
+                      const upcoming = allStrength.filter(w=> w.date >= today && w.date <= next14);
+                      const notCompleted = upcoming.filter(w=> String((w as any).workout_status||'').toLowerCase() !== 'completed');
                       return notCompleted;
                     })()
                       .sort((a:any,b:any)=> a.date.localeCompare(b.date))
