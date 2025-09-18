@@ -1403,6 +1403,22 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                     ) : (
                       <span className="text-green-600 text-xs">✓ Done</span>
                     )}
+                    {/* Remove addon */}
+                    <button
+                      onClick={()=>{
+                        const updated = attachedAddons.filter((_,i)=> i!==idx);
+                        setAttachedAddons(updated);
+                        if (updated.length === 0 && exercises.length === 0) {
+                          clearSessionProgress();
+                        } else {
+                          saveSessionProgress(exercises, updated, notesText, notesRpe);
+                        }
+                      }}
+                      className="text-gray-400 hover:text-red-600 h-7 w-7 flex items-center justify-center"
+                      aria-label="Remove addon"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
                 </div>
                 {a.sequence && a.sequence.length>0 && (
