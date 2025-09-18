@@ -213,7 +213,7 @@ function EffortsViewerMapbox({
   const normalizedSamples: Sample[] = useMemo(() => {
     const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
     if (isSampleArray) return samples as Sample[];
-    const s = samples || {};
+    const s = samples && typeof samples === 'object' ? samples : {};
     const time_s: number[] = Array.isArray(s.time_s) ? s.time_s : (Array.isArray(s.time) ? s.time : []);
     const distance_m: number[] = Array.isArray(s.distance_m) ? s.distance_m : [];
     const elevation_m: (number|null)[] = Array.isArray(s.elevation_m) ? s.elevation_m : [];
@@ -769,7 +769,7 @@ function EffortsViewerMapbox({
                 padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
               }}
             >
-              {t.toUpperCase()}
+              {String(workoutData?.type).toLowerCase()==='ride' && t==='pace' ? 'SPEED' : t.toUpperCase()}
             </button>
           ))}
         </div>

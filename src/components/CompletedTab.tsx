@@ -1669,7 +1669,7 @@ const formatPace = (paceValue: any): string => {
           <>
           {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
           {(() => {
-         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
+        const series = ((hydrated||workoutData)?.computed?.analysis?.series && typeof (hydrated||workoutData)?.computed?.analysis?.series === 'object') ? (hydrated||workoutData).computed.analysis.series : null;
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
          const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
