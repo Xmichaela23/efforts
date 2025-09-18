@@ -69,6 +69,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
   const [dateWorkouts, setDateWorkouts] = useState<any[]>([]);
   const [currentWorkoutIndex, setCurrentWorkoutIndex] = useState(0);
   const [workoutBeingEdited, setWorkoutBeingEdited] = useState<any>(null);
+  // Pass a planned strength workout directly into the Strength Logger
+  const [loggerScheduledWorkout, setLoggerScheduledWorkout] = useState<any | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const providerFetchedRef = useRef<boolean>(false);
@@ -107,6 +109,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       }
     }
   }, [selectedWorkout?.id]);
+
+  // Open Strength Logger on demand from child views (e.g., Planned tab button)
+  useEffect(() => {
+    const handler = (ev: any) => {
+      try {
+        const planned = ev?.detail?.planned;
+        if (!planned) return;
+        // Ensure logger opens targeted to that planned row/date
+        setShowAllPlans(false);
+        setSelectedWorkout(null);
+        setLoggerScheduledWorkout(planned);
+        if (planned?.date) setSelectedDate(String(planned.date));
+        setShowStrengthLogger(true);
+      } catch {}
+    };
+    window.addEventListener('open:strengthLogger', handler as any);
+    return () => window.removeEventListener('open:strengthLogger', handler as any);
+  }, []);
 
   // Load provider data once per session when Completed tab is first opened
   useEffect(() => {
@@ -310,6 +330,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     setShowTrainingBaselines(false); // NEW: Reset training baselines
     setBuilderType('');
     setBuilderSourceContext('');
+    setLoggerScheduledWorkout(null);
     setSelectedWorkout(null);
     setWorkoutBeingEdited(null);
     setActiveTab('summary');
@@ -673,12 +694,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
             <div className="pt-4">
               <StrengthLogger 
                 onClose={handleBackToDashboard} 
+                scheduledWorkout={loggerScheduledWorkout || undefined}
                 onWorkoutSaved={(workout) => {
                   setShowStrengthLogger(false);
                   setSelectedWorkout(workout);
                   setActiveTab('summary');
+                  setLoggerScheduledWorkout(null);
                 }}
-                targetDate={selectedDate}
+                targetDate={(loggerScheduledWorkout as any)?.date || selectedDate}
               />
             </div>
           ) : showMobilityLogger ? (

@@ -428,6 +428,27 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
               showHeader={false}
             />
+            {(() => {
+              // Show inline launcher only for planned strength sessions (no card/frame)
+              const row = isCompleted ? (linkedPlanned || null) : workout;
+              const isPlanned = String((row as any)?.workout_status || '').toLowerCase() === 'planned';
+              const isStrength = String((row as any)?.type || '').toLowerCase() === 'strength';
+              if (!row || !isPlanned || !isStrength) return null;
+              return (
+                <div className="mt-3">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      try {
+                        const planned = (row as any);
+                        window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned } }));
+                      } catch {}
+                    }}
+                  >Go to workout</Button>
+                </div>
+              );
+            })()}
           </TabsContent>
 
           {/* Summary Tab */}
