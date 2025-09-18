@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '@/contexts/AppContext';
-import { Button } from '@/components/ui/button';
-import { Download, Watch } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 
 type StructuredPlannedViewProps = {
@@ -261,33 +259,34 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       )}
       <div className="p-1">
         <ul className="list-none space-y-1">
-          {(lines.length?lines:["No structured steps found."]).map((ln, i)=>(<li key={i} className="text-sm text-gray-800">{ln}</li>))}
+          {(lines.length?lines:["No structured steps found."]).map((ln, i)=>{
+            const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
+            const isStrengthContext = (String((workout as any)?.workout_structure?.type||'').toLowerCase()==='strength_session') || (parentDisc === 'strength');
+            const isPlannedRow = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
+            return (
+              <li key={i} className="text-sm text-gray-800 flex items-start justify-between">
+                <span>{ln}</span>
+                {i===0 && isStrengthContext && isPlannedRow && (
+                  <div className="ml-3 flex items-center gap-3 text-xs">
+                    <button
+                      type="button"
+                      onClick={()=>{ try { window.dispatchEvent(new CustomEvent('open:strengthLogger', { detail: { planned: workout } })); } catch {} }}
+                      className="text-blue-600 hover:underline"
+                    >Go to workout</button>
+                    <button
+                      type="button"
+                      onClick={handleGarminExport}
+                      className="text-gray-600 hover:underline"
+                    >Send to Garmin</button>
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </div>
       
-      {/* Export buttons */}
-      <div className="pt-3 border-t border-gray-200">
-        <div className="flex gap-2">
-          <Button 
-            onClick={handleGarminExport}
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Watch className="h-4 w-4" />
-            Send to Garmin
-          </Button>
-          
-          <Button 
-            onClick={handleDownloadWorkout}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Download
-          </Button>
-        </div>
-      </div>
+      {/* Export buttons removed per design: use inline text links above */}
     </div>
   );
 };
