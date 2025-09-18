@@ -1456,9 +1456,30 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
                 <div className="space-y-1">
                   <div>
                     <div className="text-xs text-gray-600 px-1 mb-1">Warm‑Up</div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
-                    </div>
+                    {!showWarmupChooser ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        <button onClick={()=>attachAddon('addon_strength_wu_5')} className="px-2 py-1.5 border rounded text-sm hover:bg-gray-50">5 min</button>
+                      </div>
+                    ) : (
+                      <div className="p-2 border rounded">
+                        <div className="text-xs text-gray-600 mb-1">Category</div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {['push','squat','hinge','pull','general','power'].map(cat => (
+                            <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-0.5 rounded border text-xs ${selectedWarmupCategory===cat? 'bg-gray-100 border-gray-400 text-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{cat}</button>
+                          ))}
+                        </div>
+                        <div className="text-xs text-gray-600 mb-1">Variant</div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {['A','B','C','D','E','F'].map(v => (
+                            <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-0.5 rounded border text-xs ${selectedWarmupVariant===v? 'bg-gray-100 border-gray-400 text-gray-800' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{v}</button>
+                          ))}
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <button onClick={()=>setShowWarmupChooser(false)} className="text-xs text-gray-700 hover:text-gray-900">Cancel</button>
+                          <button onClick={attachChosenWarmup} className="text-xs px-2 py-1 rounded bg-gray-900 text-white">Attach</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                   <div>
                     <div className="text-xs text-gray-600 px-1 mb-1">Core</div>
@@ -1476,32 +1497,6 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
           <div className="mt-2 text-sm text-gray-600">Source: {sourcePlannedName}</div>
         )}
       </div>
-
-      {/* Warm‑up chooser modal */}
-      {showWarmupChooser && (
-        <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={()=>setShowWarmupChooser(false)} />
-          <div className="relative w-full sm:w-[520px] bg-white rounded-t-2xl sm:rounded-xl shadow-2xl p-4 sm:p-5 z-10 max-h-[80vh] overflow-auto">
-            <h3 className="text-base font-semibold mb-2">Choose Warm‑up (5m)</h3>
-            <div className="text-sm text-gray-600 mb-2">Category</div>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {['push','squat','hinge','pull','general','power'].map(cat => (
-                <button key={cat} onClick={()=>setSelectedWarmupCategory(cat)} className={`px-2 py-1 rounded border text-sm ${selectedWarmupCategory===cat? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{cat}</button>
-              ))}
-            </div>
-            <div className="text-sm text-gray-600 mb-2">Variant</div>
-            <div className="flex flex-wrap gap-2 mb-4">
-              {['A','B','C','D','E','F'].map(v => (
-                <button key={v} onClick={()=>setSelectedWarmupVariant(v)} className={`px-2 py-1 rounded border text-sm ${selectedWarmupVariant===v? 'bg-gray-900 text-white border-gray-900' : 'border-gray-300 text-gray-700 hover:bg-gray-50'}`}>{v}</button>
-              ))}
-            </div>
-            <div className="flex items-center justify-end gap-3">
-              <button onClick={()=>setShowWarmupChooser(false)} className="text-sm text-gray-700 hover:text-gray-900">Cancel</button>
-              <button onClick={attachChosenWarmup} className="text-sm px-3 py-1.5 rounded bg-gray-900 text-white">Attach</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Main content container with proper mobile scrolling */}
       <div className="space-y-2 w-full pb-3">
