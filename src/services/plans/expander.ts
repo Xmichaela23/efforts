@@ -60,7 +60,10 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     for (let i=1;i<=r;i+=1){
       out.push({ id: makeId(idPrefix, ['rep', String(i).padStart(2,'0'), 'work']), type: 'interval_work', duration_s: workTime, distance_m: workDist, target: work.target });
       const last = i===r;
-      const omit = opts.override?.omit_last_rest && last;
+      // Default behavior: omit the trailing rest on the final rep unless explicitly overridden to include it
+      const defaultOmit = true;
+      const omitFlag = opts.override?.omit_last_rest;
+      const omit = (typeof omitFlag === 'boolean' ? omitFlag : defaultOmit) && last;
       if (!omit && (restTime || restDist)) out.push({ id: makeId(idPrefix, ['rep', String(i).padStart(2,'0'), 'rest']), type: 'interval_rest', duration_s: restTime, distance_m: restDist });
     }
   };

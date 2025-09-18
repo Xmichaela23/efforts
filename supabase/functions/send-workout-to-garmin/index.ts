@@ -483,6 +483,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     if (Array.isArray(interval?.segments) && interval?.repeatCount && interval.repeatCount > 0) {
       for (let r = 0; r < Number(interval.repeatCount); r += 1) {
         for (const seg of interval.segments) {
+          // Skip the trailing rest on the final repeat to avoid extra rest at the end
+          if (r === Number(interval.repeatCount) - 1 && String(seg?.effortLabel || '').toLowerCase() === 'rest') {
+            continue
+          }
           const sIntensity = mapEffortToIntensity(String((seg?.effortLabel ?? interval?.effortLabel) || '').trim())
           const sMeters = Number(seg?.distanceMeters)
           // For RUNNING distance steps, suppress duration to avoid confusing time on device
