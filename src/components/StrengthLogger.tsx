@@ -1262,8 +1262,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
     const workoutEndTime = new Date();
     const durationMinutes = Math.round((workoutEndTime.getTime() - workoutStartTime.getTime()) / (1000 * 60));
 
-    // Filter out exercises with no name or no sets
-    const validExercises = exercises.filter(ex => ex.name.trim() && ex.sets.length > 0);
+    // Done is mandatory: keep only sets marked completed; drop exercises with no completed sets
+    const validExercises = exercises
+      .filter(ex => ex.name.trim())
+      .map(ex => ({ ...ex, sets: ex.sets.filter(s => s.completed) }))
+      .filter(ex => ex.sets.length > 0);
 
     console.log('🔍 Exercise validation:');
     console.log('  - Total exercises:', exercises.length);
@@ -1303,7 +1306,7 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       type: 'strength' as const,
       date: workoutDate,
       description: validExercises
-        .map(ex => `${ex.name}: ${ex.sets.filter(s => s.reps > 0).length}/${ex.sets.length} sets`)
+        .map(ex => `${ex.name}: ${ex.sets.length} sets`)
         .join(', '),
       duration: durationMinutes,
       strength_exercises: validExercises,
