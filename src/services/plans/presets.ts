@@ -82,8 +82,12 @@ export const PRESETS: Record<string, Preset> = {
   bike_ss_2x20min_R6min: { kind: 'interval', reps: 2, work: { duration_s: 1200, target: '{sweetspot_power}' }, rest: { duration_s: 360 } },
   bike_ss_2x22min_R6min: { kind: 'interval', reps: 2, work: { duration_s: 1320, target: '{sweetspot_power}' }, rest: { duration_s: 360 } },
   bike_ss_2x25min_R6min: { kind: 'interval', reps: 2, work: { duration_s: 1500, target: '{sweetspot_power}' }, rest: { duration_s: 360 } },
+  // Added SS 12-min variants for future coverage
+  bike_ss_2x12min_R4min: { kind: 'interval', reps: 2, work: { duration_s: 720, target: '{sweetspot_power}' }, rest: { duration_s: 240 } },
+  bike_ss_2x12min_R5min: { kind: 'interval', reps: 2, work: { duration_s: 720, target: '{sweetspot_power}' }, rest: { duration_s: 300 } },
   // Added: commonly used SS set in plans
   bike_ss_3x12min_R4min: { kind: 'interval', reps: 3, work: { duration_s: 720, target: '{sweetspot_power}' }, rest: { duration_s: 240 } },
+  bike_ss_3x12min_R5min: { kind: 'interval', reps: 3, work: { duration_s: 720, target: '{sweetspot_power}' }, rest: { duration_s: 300 } },
   'bike_endurance_50min_Z1-2_cad85-95': { kind: 'steady', duration_s: 50 * 60, target: 'Z1-2' },
   bike_endurance_50min_Z1: { kind: 'steady', duration_s: 50 * 60, target: 'Z1' },
   bike_endurance_120min_Z2: { kind: 'steady', duration_s: 120 * 60, target: 'Z2' },
