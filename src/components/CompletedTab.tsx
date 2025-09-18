@@ -1470,7 +1470,14 @@ const formatPace = (paceValue: any): string => {
           {(() => {
             const gain = workoutData.elevation_gain || workoutData.metrics?.elevation_gain || 0;
             return gain > 150 ? (
-          {/* VAM removed for non-cycling workouts */}
+              <div className="px-2 py-1">
+                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+                  {calculateVAM()}
+                </div>
+                <div className="text-xs text-[#666666] font-normal">
+                  <div className="font-medium">VAM</div>
+                </div>
+              </div>
             ) : null;
           })()}
 
@@ -1666,10 +1673,9 @@ const formatPace = (paceValue: any): string => {
       {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
       <div className="w-full">
         {workoutType !== 'walk' && (
-          <>
-          {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
-          {(() => {
-        const series = ((hydrated||workoutData)?.computed?.analysis?.series && typeof (hydrated||workoutData)?.computed?.analysis?.series === 'object') ? (hydrated||workoutData).computed.analysis.series : null;
+       {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
+       {(() => {
+         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
          const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
@@ -1765,8 +1771,8 @@ const formatPace = (paceValue: any): string => {
                }
              }
            }
-        } catch {}
-       return (
+         } catch {}
+        return (
           <div className="mt-1 mx-[-16px]">
             <EffortsViewerMapbox
               samples={samples as any}
@@ -1779,21 +1785,20 @@ const formatPace = (paceValue: any): string => {
           </div>
         );
       })()}
-          </>
         )}
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mx-[-16px] px-3 py-2">
-          {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events?.splits?.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
+          {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
             <div className="mb-2">
               <div className="text-sm mb-1">Splits · km</div>
               <div className="space-y-1">
-                {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any, i:number) => (
-                  <div key={`km-${i}`} className="flex items-baseline justify-between text-sm">
-                    <div className="text-[#666666]">{String(s?.n ?? i+1)}</div>
+                {(hydrated||workoutData).computed.analysis.events.splits.km.map((s:any) => (
+                  <div key={`km-${s.n}`} className="flex items-baseline justify-between text-sm">
+                    <div className="text-[#666666]">{s.n}</div>
                     <div className="flex items-baseline gap-4">
-                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{String(s.avgHr_bpm)} bpm</div>}
-                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{String(s.avgCadence_spm)} spm</div>}
-                      <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(Number(s.avgPace_s_per_km)/60)}:${String(Math.round(Number(s.avgPace_s_per_km)%60)).padStart(2,'0')}/km` : '—'}</div>
+                      {typeof s.avgHr_bpm === 'number' && <div className="text-[#666666]">{s.avgHr_bpm} bpm</div>}
+                      {typeof s.avgCadence_spm === 'number' && <div className="text-[#666666]">{s.avgCadence_spm} spm</div>}
+                      <div className="font-mono">{s.avgPace_s_per_km != null ? `${Math.floor(s.avgPace_s_per_km/60)}:${String(Math.round(s.avgPace_s_per_km%60)).padStart(2,'0')}/km` : '—'}</div>
                     </div>
                   </div>
                 ))}
@@ -1845,17 +1850,7 @@ const formatPace = (paceValue: any): string => {
                     <div key={`hrz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
                   ))}
                 </div>
-                <div className="text-xs text-[#666666] mt-1">{
-                  (()=>{
-                    try {
-                      const s = (hydrated||workoutData).computed.analysis.zones.hr.schema;
-                      if (typeof s === 'string') return s;
-                      if (Array.isArray(s)) return s.join(' / ');
-                      if (s && typeof s === 'object') return Object.keys(s).join(' / ');
-                    } catch {}
-                    return '';
-                  })()
-                }</div>
+                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.hr.schema}</div>
               </div>
             );
           })()}
@@ -1870,17 +1865,7 @@ const formatPace = (paceValue: any): string => {
                     <div key={`pcz-${i}`} style={{ width: `${Math.max(0, (Number(b.t_s)||0) * 100 / total)}%` }} />
                   ))}
                 </div>
-                <div className="text-xs text-[#666666] mt-1">{
-                  (()=>{
-                    try {
-                      const s = (hydrated||workoutData).computed.analysis.zones.pace.schema;
-                      if (typeof s === 'string') return s;
-                      if (Array.isArray(s)) return s.join(' / ');
-                      if (s && typeof s === 'object') return Object.keys(s).join(' / ');
-                    } catch {}
-                    return '';
-                  })()
-                }</div>
+                <div className="text-xs text-[#666666] mt-1">{(hydrated||workoutData).computed.analysis.zones.pace.schema}</div>
               </div>
             );
           })()}

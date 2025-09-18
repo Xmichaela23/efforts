@@ -23,7 +23,7 @@ type Split = {
   avgHr_bpm: number | null;
   gain_m: number; avgGrade: number | null;
 };
-type MetricTab = "pace" | "bpm" | "pwr" | "cad" | "vam" | "elev";
+type MetricTab = "pace" | "bpm" | "vam" | "elev";
 
 /** ---------- Small utils/formatters ---------- */
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -213,7 +213,7 @@ function EffortsViewerMapbox({
   const normalizedSamples: Sample[] = useMemo(() => {
     const isSampleArray = Array.isArray(samples) && (samples.length === 0 || typeof samples[0]?.t_s === 'number');
     if (isSampleArray) return samples as Sample[];
-    const s = samples && typeof samples === 'object' ? samples : {};
+    const s = samples || {};
     const time_s: number[] = Array.isArray(s.time_s) ? s.time_s : (Array.isArray(s.time) ? s.time : []);
     const distance_m: number[] = Array.isArray(s.distance_m) ? s.distance_m : [];
     const elevation_m: (number|null)[] = Array.isArray(s.elevation_m) ? s.elevation_m : [];
@@ -375,16 +375,6 @@ function EffortsViewerMapbox({
       if (!finite.length || (Math.max(...finite) - Math.min(...finite) === 0)) return new Array(elev.length).fill(0);
       return elev;
     }
-    if (tab === "pwr") {
-      const arr = power_w.map(v => (Number.isFinite(v as any) ? Number(v) : NaN));
-      const wins = winsorize(arr as number[], 5, 95);
-      return smoothWithOutlierHandling(wins, 5, 3).map(v => (Number.isFinite(v) ? v : NaN));
-    }
-    if (tab === "cad") {
-      const arr = cadence_val.map(v => (Number.isFinite(v as any) ? Number(v) : NaN));
-      const wins = winsorize(arr as number[], 5, 95);
-      return smoothWithOutlierHandling(wins, 5, 3).map(v => (Number.isFinite(v) ? v : NaN));
-    }
     // Pace - enhanced smoothing with outlier handling
     if (tab === "pace") {
       const pace = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
@@ -477,10 +467,6 @@ function EffortsViewerMapbox({
       lo = Math.floor(lo / 5) * 5; 
       hi = Math.ceil(hi / 5) * 5; 
     }
-    if (tab === "cad") {
-      lo = Math.floor(lo / 5) * 5;
-      hi = Math.ceil(hi / 5) * 5;
-    }
     
     // Minimal padding for better space utilization
     const pad = Math.max((hi - lo) * 0.02, 1); // At least 1 unit padding
@@ -513,14 +499,7 @@ function EffortsViewerMapbox({
   }, [yDomain]);
 
   // ---------- Overlay series prep (pace/speed, HR, power, cadence, VAM, elevation area) ----------
-  // Lightweight decimation: sample down long arrays to reduce render cost
-  const decimate = (arr: (number|null)[], target = 1200) => {
-    const n = arr.length; if (n <= target) return arr;
-    const step = n / target; const out: (number|null)[] = new Array(target);
-    for (let i = 0; i < target; i++) out[i] = arr[Math.floor(i * step)] ?? null;
-    return out;
-  };
-  const paceArr = useMemo(() => decimate(normalizedSamples.map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : null))), [normalizedSamples]);
+  const paceArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : null)), [normalizedSamples]);
   const hrArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.hr_bpm as any) ? (s.hr_bpm as number) : null)), [normalizedSamples]);
   const elevArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : null)), [normalizedSamples]);
   const vamArr = useMemo(() => normalizedSamples.map(s => (Number.isFinite(s.vam_m_per_h as any) ? (s.vam_m_per_h as number) : null)), [normalizedSamples]);
@@ -541,12 +520,11 @@ function EffortsViewerMapbox({
     if (lo === hi) { lo -= 1; hi += 1; }
     return [lo, hi] as [number, number];
   };
-  const ensureNumericArray = (arr: (number|null)[]) => (Array.isArray(arr) ? arr.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : [] as number[]);
-  const paceDom = useMemo(() => robustDomain(ensureNumericArray(paceArr as any)), [paceArr]);
-  const hrDom = useMemo(() => robustDomain(ensureNumericArray(hrArr as any)), [hrArr]);
-  const pwrDom = useMemo(() => robustDomain(ensureNumericArray(power_w as any)), [power_w]);
-  const cadDom = useMemo(() => robustDomain(ensureNumericArray(cadence_val as any)), [cadence_val]);
-  const vamDom = useMemo(() => robustDomain(ensureNumericArray(vamArr as any), { symmetric: true, floorSpan: 450 }), [vamArr]);
+  const paceDom = useMemo(() => robustDomain(paceArr as any), [paceArr]);
+  const hrDom = useMemo(() => robustDomain(hrArr as any), [hrArr]);
+  const pwrDom = useMemo(() => robustDomain(power_w as any), [power_w]);
+  const cadDom = useMemo(() => robustDomain(cadence_val as any), [cadence_val]);
+  const vamDom = useMemo(() => robustDomain(vamArr as any, { symmetric: true, floorSpan: 450 }), [vamArr]);
   const shouldShowVam = String(workoutData?.type).toLowerCase() === 'ride';
 
   const buildPath = (arr: (number | null)[], dom: [number, number], opts?: { invert?: boolean }) => {
@@ -666,26 +644,27 @@ function EffortsViewerMapbox({
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
-        {/* Current metric values */}
+        {/* Current metric values */
+        }
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
-            value={String(workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles))}  
+            value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
             active={tab==="pace"} 
           />
-          <Pill label="HR"    value={String(s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—")}   active={tab==="bpm"} />
-          <Pill label="Power" value={String(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
-          <Pill label="Cad"   value={String(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
+          <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
           {String(workoutData?.type).toLowerCase() === 'ride' && (
-            <Pill label="VAM"   value={String(fmtVAM(s?.vam_m_per_h ?? null, useFeet))}   active={tab==="vam"} />
+            <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
           )}
-          <Pill label="Gain"  value={String(fmtAlt(gainNow_m, useFeet))}  active={tab==="elev"} />
-          <Pill label="Grade" value={String(fmtPct(s?.grade ?? null))} />
+          <Pill label="Power" value={(Number.isFinite((power_w[idx] as any)) ? `${Number(power_w[idx]).toFixed(0)} W` : '—')} />
+          <Pill label="Cad"   value={(Number.isFinite((cadence_val[idx] as any)) ? `${Number(cadence_val[idx]).toFixed(0)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}` : '—')} />
+          <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
+          <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
         </div>
         
         {/* Distance, time, and altitude on same line */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
-          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {String(fmtAlt(altNow_m, useFeet))}</div>
+          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
           <div style={{ 
             fontWeight: 700, 
             fontSize: 18, 
@@ -693,7 +672,7 @@ function EffortsViewerMapbox({
             fontFeatureSettings: '"tnum"', // Use tabular numbers for consistent spacing
             letterSpacing: "0.5px"
           }}>
-            {String(fmtDist(s?.d_m ?? 0, useMiles))} · {String(fmtTime(s?.t_s ?? 0))}
+            {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
           </div>
           <div style={{ width: "60px" }}></div> {/* Spacer to balance the layout */}
         </div>
@@ -721,34 +700,24 @@ function EffortsViewerMapbox({
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-                {String(
-                  tab === "elev" ? fmtAlt(v, useFeet)
-                  : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles))
-                  : tab === "bpm" ? `${Math.round(v)}`
-                  : tab === "pwr" ? `${Math.round(v)} W`
-                  : tab === "cad" ? `${Math.round(v)} ${String(workoutData?.type).toLowerCase()==='ride'?'rpm':'spm'}`
-                  : fmtVAM(v, useFeet)
-                )}
+                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles)) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
               </text>
             </g>
           ))}
 
           {/* elevation fill (always for context) */}
           <path d={elevArea} fill="#e2f2ff" opacity={0.45} />
-          {/* overlay series - isolate to the selected tab only */}
-          {tab === 'pace' && (
-            <path d={pacePath} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-          )}
-          {tab === 'bpm' && (
-            <path d={hrPath} fill="none" stroke="#ef4444" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          )}
-          {tab === 'pwr' && (
-            <path d={pwrPath} fill="none" stroke="#8b5cf6" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          )}
-          {tab === 'cad' && (
-            <path d={cadPath} fill="none" stroke="#22c55e" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
-          )}
-          {tab === 'vam' && String(workoutData?.type).toLowerCase() === 'ride' && (
+          {/* overlay series */}
+          {/* Pace/Speed */}
+          <path d={pacePath} fill="none" stroke="#0ea5e9" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {/* HR */}
+          <path d={hrPath} fill="none" stroke="#ef4444" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+          {/* Power */}
+          <path d={pwrPath} fill="none" stroke="#8b5cf6" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+          {/* Cadence */}
+          <path d={cadPath} fill="none" stroke="#22c55e" strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+          {/* VAM (ride only) */}
+          {String(workoutData?.type).toLowerCase() === 'ride' && (
             <path d={vamPath} fill="none" stroke="#f59e0b" strokeWidth={1.4} strokeLinejoin="round" strokeLinecap="round" />
           )}
 
@@ -761,7 +730,7 @@ function EffortsViewerMapbox({
       {/* Metric buttons (control Y-axis/labels). Hide VAM for non-ride. */}
       <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( (String(workoutData?.type).toLowerCase()==='ride' ? ["pace","bpm","pwr","cad","vam","elev"] : ["pace","bpm","pwr","cad","elev"]) as MetricTab[]).map((t) => (
+          {( (String(workoutData?.type).toLowerCase()==='ride' ? ["pace","bpm","vam","elev"] : ["pace","bpm","elev"]) as MetricTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -770,7 +739,7 @@ function EffortsViewerMapbox({
                 padding: "6px 2px", borderBottom: tab === t ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5
               }}
             >
-              {String(workoutData?.type).toLowerCase()==='ride' && t==='pace' ? 'SPEED' : t.toUpperCase()}
+              {t.toUpperCase()}
             </button>
           ))}
         </div>
