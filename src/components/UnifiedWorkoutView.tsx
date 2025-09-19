@@ -426,7 +426,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="planned" className="flex-1 p-4">
             <StructuredPlannedView 
               workout={isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)}
-              showHeader={false}
+              showHeader={String(((isCompleted ? (hydratedPlanned || linkedPlanned || workout) : (hydratedPlanned || workout)) as any)?.type||'').toLowerCase()==='swim'}
             />
             {(() => {
               // Show inline launcher only for planned strength sessions (no card/frame)

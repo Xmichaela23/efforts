@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
 import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
-import PlannedWorkoutView from './PlannedWorkoutView';
+// PlannedWorkoutView is deprecated; unified view replaces it
 import WorkoutSummaryView from './WorkoutSummaryView';
 import UnifiedWorkoutView from './UnifiedWorkoutView';
 // @ts-ignore
@@ -437,14 +437,25 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     }
     let planDetail = detailedPlans[planId as keyof typeof detailedPlans];
 
-    // Parse weeks if stored as JSON string
+    // Parse JSON-string fields persisted in plans row
     if (planDetail) {
+      const tryParse = (v: any) => { if (typeof v !== 'string') return v; try { return JSON.parse(v); } catch { return v; } };
       if (typeof planDetail.weeks === 'string') {
         try {
           planDetail.weeks = JSON.parse(planDetail.weeks);
         } catch (error) {
           console.error('Error parsing weeks JSON:', error);
         }
+      }
+      // Ensure weekly_summaries is an object even if stored as text
+      if (planDetail.weekly_summaries && typeof planDetail.weekly_summaries === 'string') {
+        planDetail.weekly_summaries = tryParse(planDetail.weekly_summaries);
+      }
+      if (planDetail.notes_by_week && typeof planDetail.notes_by_week === 'string') {
+        planDetail.notes_by_week = tryParse(planDetail.notes_by_week);
+      }
+      if (planDetail.template && typeof planDetail.template === 'string') {
+        planDetail.template = tryParse(planDetail.template);
       }
     }
 
@@ -1761,9 +1772,44 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                             }
                                           } catch {}
                                           const minutes = (typeof fromTokens === 'number' && (!fromComputed || fromTokens > fromComputed)) ? fromTokens : (fromComputed || null);
-                                          return (typeof minutes === 'number') ? (
-                                            <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>
-                                          ) : null;
+                                          // Compute yardage for swims (computed → tokens)
+                                          const yards: number | null = (() => {
+                                            const type = String((workout as any)?.type || '').toLowerCase();
+                                            if (type !== 'swim') return null;
+                                            try {
+                                              const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+                                              if (steps.length) {
+                                                const meters = steps.reduce((a:number, st:any)=> a + (Number(st?.distanceMeters)||0), 0);
+                                                const yd = Math.round(meters / 0.9144);
+                                                if (yd > 0) return yd;
+                                              }
+                                            } catch {}
+                                            try {
+                                              const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
+                                              if (!toks.length) return null;
+                                              const toYd = (n:number, unit:string)=> unit.toLowerCase()==='m' ? Math.round(n/0.9144) : n;
+                                              let sum = 0;
+                                              toks.forEach((t)=>{
+                                                const s = String(t).toLowerCase();
+                                                let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10), m[2]); return; }
+                                                m = s.match(/swim_drill_[a-z0-9_]+_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10)*parseInt(m[2],10), m[3]); return; }
+                                                m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10)*parseInt(m[2],10), m[3]); return; }
+                                                m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[2],10)*parseInt(m[3],10), m[4]); return; }
+                                                m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10)*parseInt(m[2],10), m[3]); return; }
+                                              });
+                                              return sum>0 ? sum : null;
+                                            } catch { return null; }
+                                          })();
+                                          return (
+                                            <span className="flex items-center gap-1">
+                                              {(typeof minutes === 'number') ? (
+                                                <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>
+                                              ) : null}
+                                              {(typeof yards === 'number') ? (
+                                                <span className="px-2 py-0.5 text-xs rounded bg-blue-50 border border-blue-200 text-blue-800">{yards} yd</span>
+                                              ) : null}
+                                            </span>
+                                          );
                                         })()}
                                       </div>
                                       <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
