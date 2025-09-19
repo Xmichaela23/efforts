@@ -60,12 +60,38 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if we already have weather data for this workout
+    // Prepare Supabase client (for workout caching and shared cache)
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     );
 
+    // 1) Shared cache by geo/day with TTL window
+    try {
+      const round = (n: number) => Math.round(n * 20) / 20; // ~0.05° buckets (~5.5km)
+      const rlat = round(latNum);
+      const rlng = round(lngNum);
+      const day = new Date(tsStr).toISOString().slice(0, 10);
+      const cacheKey = `${rlat}:${rlng}:${day}`;
+      const { data: cached } = await supabase
+        .from('weather_cache')
+        .select('weather,expires_at')
+        .eq('key', cacheKey)
+        .maybeSingle();
+      if (cached && cached.weather) {
+        const exp = cached.expires_at ? new Date(cached.expires_at) : null as any;
+        if (exp && exp.getTime() > Date.now()) {
+          return new Response(JSON.stringify({ weather: cached.weather }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
+          });
+        }
+      }
+      // carry cacheKey forward for write
+      (globalThis as any).__wx_cache_key = cacheKey;
+    } catch {}
+
+    // 2) Per-workout cache on workouts.weather_data (if provided)
     if (workout_id) {
       const { data: existing, error: existingErr } = await supabase
         .from('workouts')
@@ -99,6 +125,15 @@ Deno.serve(async (req) => {
         .update({ weather_data: weatherData })
         .eq('id', workout_id);
     }
+
+    // Write shared cache with 30-minute TTL (if table exists)
+    try {
+      const key = (globalThis as any).__wx_cache_key as string | undefined;
+      if (key) {
+        const expires = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+        await supabase.from('weather_cache').upsert({ key, lat: latNum, lng: lngNum, day: new Date(tsStr).toISOString().slice(0,10), weather: weatherData, expires_at: expires });
+      }
+    } catch {}
 
     return new Response(JSON.stringify({ 
       weather: weatherData 
