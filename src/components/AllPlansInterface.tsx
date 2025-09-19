@@ -1726,12 +1726,12 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               const hard = typeof ws?.hard_sessions === 'number' ? ws.hard_sessions : undefined;
               const keys: string[] = Array.isArray(ws?.key_workouts) ? ws.key_workouts.slice(0, 3) : [];
               const hasHeader = !!(focus || notes);
-              if (!hasHeader && !(hours != null || hard != null || keys.length)) return null;
+              if (!hasHeader && !(hours != null || hard != null || (keys.length > 0))) return null;
               return (
                 <div className="px-1 pb-3 text-sm text-gray-700">
                   {focus && (<div className="mb-1">{focus}</div>)}
                   {notes && (<div className="mb-1 text-gray-600">{notes}</div>)}
-                  {(hours != null || hard != null || keys.length) && (
+                  {(hours != null || hard != null || (keys.length > 0)) && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
                       {hours != null && (
                         <span className="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200">~{hours} h</span>
