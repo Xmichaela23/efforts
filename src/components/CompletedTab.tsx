@@ -56,6 +56,8 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   const [showAdvancedRunDyn, setShowAdvancedRunDyn] = useState(false);
   const [showPower, setShowPower] = useState(false);
   const [summaryFetched, setSummaryFetched] = useState(false);
+  const [plannedTokens, setPlannedTokens] = useState<string[] | null>(null);
+  const [plannedLabel, setPlannedLabel] = useState<string | null>(null);
   
   useEffect(() => {
     setHydrated(workoutData);
@@ -155,6 +157,31 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
       setPoolLengthMeters(null);
     } catch { setPoolLengthMeters(null); }
   }, [workoutType, workoutData?.id]);
+
+  // If this workout is linked to a planned row, fetch its tokens/label for display
+  useEffect(() => {
+    (async () => {
+      try {
+        const pid = (workoutData as any)?.planned_id;
+        if (!pid) { setPlannedTokens(null); setPlannedLabel(null); return; }
+        const { data } = await supabase
+          .from('planned_workouts')
+          .select('name, steps_preset, computed')
+          .eq('id', String(pid))
+          .maybeSingle();
+        if (!data) { setPlannedTokens(null); setPlannedLabel(null); return; }
+        const tokens = (() => {
+          try {
+            if (Array.isArray((data as any).steps_preset)) return (data as any).steps_preset.map((t:any)=> String(t));
+            if (typeof (data as any).steps_preset === 'string') { const arr = JSON.parse((data as any).steps_preset); return Array.isArray(arr) ? arr.map((t:any)=> String(t)) : null; }
+          } catch {}
+          return null;
+        })();
+        setPlannedTokens(tokens);
+        setPlannedLabel(((data as any)?.name || null));
+      } catch { setPlannedTokens(null); setPlannedLabel(null); }
+    })();
+  }, [workoutData?.planned_id]);
 
 
   // No debouncing needed - direct state management
@@ -314,6 +341,28 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
   try {
     const computedMeters = (w as any)?.computed?.overall?.distance_m;
     if (typeof computedMeters === 'number' && computedMeters > 0) return computedMeters / 1000;
+  } catch {}
+  // Swim: derive from lengths if present
+  try {
+    if (workoutType === 'swim') {
+      const lengths = Array.isArray((w as any)?.swim_data?.lengths) ? (w as any).swim_data.lengths : [];
+      if (lengths.length > 0) {
+        let meters = 0;
+        for (const len of lengths) {
+          const d = Number((len as any)?.distance_m ?? (len as any)?.distance);
+          if (Number.isFinite(d) && d > 0) meters += d;
+        }
+        if (meters > 0) return meters / 1000;
+        // Fallback: count * inferred pool length
+        const L = (() => {
+          const explicit = Number((w as any)?.pool_length);
+          if (Number.isFinite(explicit) && explicit > 0) return explicit;
+          const inf = inferPoolLengthMeters();
+          return Number.isFinite(inf as any) && (inf as any) > 0 ? (inf as number) : 0;
+        })();
+        if (L > 0) return (lengths.length * L) / 1000;
+      }
+    }
   } catch {}
   // Prefer explicit meters → km if present
   const meters = (w as any)?.distance_meters ?? (w as any)?.metrics?.distance_meters ?? (w as any)?.strava_data?.original_activity?.distance;
@@ -594,6 +643,14 @@ const formatPace = (paceValue: any): string => {
     const isRun = workoutType === 'run';
     const isBike = workoutType === 'ride';
     const isSwim = workoutType === 'swim';
+    // Detect pool vs open-water swims
+    const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
+      || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
+    const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
+    const openWaterHint = /open\s*water|ocean|ow\b/.test(providerStr);
+    const poolHint = /lap|pool/.test(providerStr);
+    const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
+    const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
     const isWalk = workoutType === 'walk';
     
     // Walking gets simplified metrics: time, distance, heart rate, calories, elevation
@@ -722,8 +779,10 @@ const formatPace = (paceValue: any): string => {
         ...baseMetrics.slice(3) // Elevation, Calories
       ];
     } else if (isSwim) {
+      // For pool swims, hide elevation; always show calories
+      const caloriesMetric = baseMetrics[4];
       return [
-        ...baseMetrics.slice(0, 3), // Distance, Duration, Heart Rate
+        ...baseMetrics.slice(0, 3),
         {
           label: 'Pace',
           value: (() => {
@@ -738,6 +797,13 @@ const formatPace = (paceValue: any): string => {
           unit: 'spm'
         },
         {
+          label: 'SWOLF',
+          value: (() => {
+            const v = computeSwolf();
+            return v != null ? safeNumber(v) : 'N/A';
+          })()
+        },
+        {
           label: 'Lengths',
           value: (() => {
             const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null);
@@ -748,7 +814,7 @@ const formatPace = (paceValue: any): string => {
           label: 'Pool',
           value: formatPoolLengthLabel()
         },
-        ...baseMetrics.slice(3) // Elevation, Calories
+        caloriesMetric
       ];
     }
 
@@ -815,6 +881,134 @@ const formatPace = (paceValue: any): string => {
       }
     }
     return label;
+  };
+
+  const formatMetersCompact = (m: number | null | undefined): string => {
+    const n = Number(m);
+    if (!Number.isFinite(n) || n <= 0) return '—';
+    if (n >= 1000) return `${Math.round(n/10)/100} km`;
+    return `${Math.round(n)} m`;
+  };
+
+  const getSwimLengths = (): Array<{ distance_m?: number; duration_s?: number; strokes?: number }> => {
+    try {
+      const arr = (hydrated as any)?.swim_data?.lengths || (workoutData as any)?.swim_data?.lengths;
+      if (Array.isArray(arr)) return arr as any[];
+    } catch {}
+    return [];
+  };
+
+  const computeAvgStrokeRate = (): number | null => {
+    const v = Number((workoutData as any)?.avg_swim_cadence ?? (workoutData as any)?.avg_cadence);
+    if (Number.isFinite(v) && v > 0) return Math.round(v);
+    try {
+      const samples = Array.isArray((hydrated as any)?.sensor_data?.samples)
+        ? (hydrated as any).sensor_data.samples : (Array.isArray((hydrated as any)?.sensor_data) ? (hydrated as any).sensor_data : []);
+      const vals = samples.map((s:any)=> Number(s.swimCadenceInStrokesPerMinute ?? s.cadence)).filter((n:number)=> Number.isFinite(n) && n>0);
+      if (vals.length) return Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length);
+    } catch {}
+    return null;
+  };
+
+  const computeAvgStrokesPerLength = (): number | null => {
+    try {
+      const nLengths = Number((workoutData as any)?.number_of_active_lengths);
+      const totalStrokes = Number((workoutData as any)?.strokes ?? (workoutData as any)?.metrics?.strokes);
+      if (Number.isFinite(nLengths) && nLengths>0 && Number.isFinite(totalStrokes) && totalStrokes>0) {
+        return Math.round((totalStrokes / nLengths) * 10) / 10;
+      }
+      const lengths = getSwimLengths();
+      const strokes = lengths.map((l:any)=> Number(l?.strokes ?? l?.stroke_count)).filter((n:number)=> Number.isFinite(n));
+      if (strokes.length && lengths.length) return Math.round((strokes.reduce((a:number,b:number)=>a+b,0) / lengths.length) * 10) / 10;
+    } catch {}
+    return null;
+  };
+
+  type DetectedSet = { label: string; distance_m: number; pace_per100_s: number | null; swolf?: number | null };
+  const detectSets = (): { summary: string[]; performance: DetectedSet[] } => {
+    const outSummary: string[] = [];
+    const outPerf: DetectedSet[] = [];
+    // Prefer laps if present
+    let laps: any[] = [];
+    try {
+      const raw = (hydrated as any)?.laps ?? (workoutData as any)?.laps;
+      if (typeof raw === 'string') { const j = JSON.parse(raw); if (Array.isArray(j)) laps = j; }
+      else if (Array.isArray(raw)) laps = raw;
+    } catch {}
+    if (laps.length > 0) {
+      const norm = laps.map((l:any)=>({
+        d: Number(l.totalDistanceInMeters ?? l.distanceInMeters ?? l.distance_m ?? l.distance ?? 0),
+        t: Number(l.durationInSeconds ?? l.duration_s ?? l.time ?? 0)
+      })).filter(x=> x.d>0 && x.t>0);
+      if (norm.length) {
+        // Identify repeats by most common lap distance
+        const counts: Record<string, number> = {};
+        for (const l of norm) { const key = String(Math.round(l.d/25)*25); counts[key] = (counts[key]||0)+1; }
+        const bestKey = Object.keys(counts).sort((a,b)=> counts[b]-counts[a])[0];
+        const mainD = Number(bestKey);
+        const main = norm.filter(l=> Math.abs(l.d - mainD) <= Math.max(10, mainD*0.05));
+        if (main.length>=3) {
+          const per100 = main.map(l=> (l.t/(l.d/100))).filter(Number.isFinite);
+          const avgPer100 = per100.length? (per100.reduce((a,b)=>a+b,0)/per100.length) : null;
+          const plusMinus = (()=>{
+            if (!per100.length || !avgPer100) return '±0s';
+            const dev = per100.reduce((a,b)=> a + Math.abs(b-avgPer100), 0)/per100.length;
+            return `±${Math.round(dev)}s`;
+          })();
+          outSummary.push(`Main: ${main.length}x${Math.round(mainD)}m - ${avgPer100?formatSwimPace(avgPer100):'—' } avg (${plusMinus} consistency)`);
+          let i=1; for (const l of main) {
+            const p100 = l.t/(l.d/100);
+            outPerf.push({ label: `${Math.round(mainD)}m #${i++}`, distance_m: l.d, pace_per100_s: p100, swolf: null });
+          }
+        }
+        // Warmup = first lap if longer/slow; Cooldown = last lap if short
+        const first = norm[0];
+        if (first) {
+          const p100 = first.t/(first.d/100); outSummary.unshift(`Warmup: ${Math.round(first.d)}m - ${formatSwimPace(p100)}`);
+        }
+        const last = norm[norm.length-1];
+        if (last && last!==first) {
+          const p100 = last.t/(last.d/100); outSummary.push(`Cooldown: ${Math.round(last.d)}m - ${formatSwimPace(p100)}`);
+        }
+        return { summary: outSummary, performance: outPerf };
+      }
+    }
+    // Fallback: lengths
+    const lengths = getSwimLengths();
+    if (lengths.length) {
+      const L = inferPoolLengthMeters() || 25;
+      const total = lengths.reduce((a:number,l:any)=> a + Number(l?.distance_m ?? L), 0);
+      const dur = lengths.reduce((a:number,l:any)=> a + Number(l?.duration_s ?? l?.duration ?? 0), 0);
+      if (total>0 && dur>0) {
+        const p100 = dur/(total/100);
+        outSummary.push(`Main: ${formatMetersCompact(total)} - ${formatSwimPace(p100)}`);
+      }
+    }
+    return { summary: outSummary, performance: outPerf };
+  };
+
+  // Compute SWOLF (avg seconds per length + avg strokes per length)
+  const computeSwolf = (): number | null => {
+    try {
+      const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
+      const dur = getDurationSeconds();
+      if (!nLengths || !dur) return null;
+      let totalStrokes: number | null = null;
+      const s1 = Number((workoutData as any)?.strokes ?? (workoutData as any)?.metrics?.strokes);
+      if (Number.isFinite(s1) && s1 > 0) totalStrokes = Number(s1);
+      if (totalStrokes == null && Array.isArray((workoutData as any)?.swim_data?.lengths)) {
+        const arr = (workoutData as any).swim_data.lengths as any[];
+        const sum = arr
+          .map((l:any)=> Number(l?.strokes ?? l?.stroke_count))
+          .filter((n:any)=> Number.isFinite(n))
+          .reduce((a:number,b:number)=> a + Number(b), 0);
+        if (sum > 0) totalStrokes = sum;
+      }
+      const avgSecPerLen = dur / nLengths;
+      const avgStrokesPerLen = totalStrokes != null ? (totalStrokes / nLengths) : null;
+      const swolf = avgStrokesPerLen != null ? Math.round(avgSecPerLen + avgStrokesPerLen) : null;
+      return Number.isFinite(swolf as any) ? (swolf as number) : null;
+    } catch { return null; }
   };
 
   const primaryMetrics = getPrimaryMetrics();
@@ -913,24 +1107,26 @@ const formatPace = (paceValue: any): string => {
          value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
        }
      ];
-   } else if (isSwim) {
-     return [
-       ...baseMetrics,
-       {
-         label: 'Max Pace',
-         value: formatSwimPace(workoutData.metrics?.max_pace || workoutData.max_pace),
-         unit: '/100m'
-       },
-       {
-         label: 'TSS',
-         value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
-       },
-       {
-         label: 'Intensity Factor',
-         value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
-       }
-     ];
-   }
+  } else if (isSwim) {
+    // Hide elevation-like advanced rows for pool; keep HR/Max Pace/TSS/IF
+    const baseForSwim = baseMetrics.filter(m => m.label !== 'Elevation');
+    return [
+      ...baseForSwim,
+      {
+        label: 'Max Pace',
+        value: formatSwimPace(workoutData.metrics?.max_pace || workoutData.max_pace),
+        unit: '/100m'
+      },
+      {
+        label: 'TSS',
+        value: workoutData.tss ? safeNumber(Math.round(workoutData.tss * 10) / 10) : 'N/A'
+      },
+      {
+        label: 'Intensity Factor',
+        value: workoutData.intensity_factor ? `${safeNumber(workoutData.intensity_factor)}%` : 'N/A'
+      }
+    ];
+  }
 
    return baseMetrics;
  };
@@ -1256,6 +1452,84 @@ const formatPace = (paceValue: any): string => {
        </div>
      )}
      
+    {/* 🧭 Swim Primary Metrics summary */}
+    {workoutType === 'swim' && (()=>{
+      const km = computeDistanceKm(hydrated||workoutData) || 0;
+      const distLabel = km ? `${useImperial ? (km*0.621371).toFixed(1)+' mi' : Math.round(km*1000)}m` : '—';
+      const timeTotal = formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
+      const moving = formatDuration((workoutData as any)?.total_timer_time ?? (workoutData as any)?.moving_time ?? (workoutData as any)?.elapsed_time);
+      const cals = workoutData.calories ? `${safeNumber(workoutData.calories)} calories` : '—';
+      const p100 = computeSwimAvgPaceSecPer100();
+      const pace = p100 ? `${formatSwimPace(p100)} ${isYardPool()===true?'/100yd':'/100m'}` : '—';
+      const hrAvg = workoutData.avg_heart_rate ? `${safeNumber(workoutData.avg_heart_rate)} avg HR` : '—';
+      const hrMax = workoutData.max_heart_rate ? ` (${safeNumber(workoutData.max_heart_rate)} max)` : '';
+      return (
+        <div className="grid grid-cols-2 gap-y-1 text-sm text-gray-800 mb-1">
+          <div className="font-medium">Pool Swim - {distLabel}</div>
+          <div className="text-right text-gray-600">{formatDate(workoutData.timestamp || workoutData.date)} {formatTime(workoutData.timestamp || workoutData.date)}</div>
+          <div>{timeTotal} total ({moving} moving)</div>
+          <div className="text-right">{cals}</div>
+          <div>{pace} avg pace</div>
+          <div className="text-right">{hrAvg}{hrMax}</div>
+        </div>
+      );
+    })()}
+
+    {/* 🏊 Swim-specific metrics grid */}
+    {workoutType === 'swim' && (()=>{
+      const pool = formatPoolLengthLabel();
+      const lengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
+      const strokes = Number((workoutData as any)?.strokes);
+      const swolf = computeSwolf();
+      const spl = computeAvgStrokesPerLength();
+      const sr = computeAvgStrokeRate();
+      return (
+        <div className="grid grid-cols-2 gap-1 text-sm mb-2">
+          <div>Pool: <span className="font-medium">{pool}</span></div>
+          <div className="text-right"><span className="font-medium">{lengths || '—'}</span> lengths</div>
+          <div>{Number.isFinite(strokes) ? `${strokes} total strokes` : '—'}</div>
+          <div className="text-right">SWOLF: <span className="font-medium">{swolf ?? '—'}</span></div>
+          <div>{spl != null ? `${spl} avg strokes/length` : '—'}</div>
+          <div className="text-right">{sr != null ? `${sr} avg stroke rate` : '—'}</div>
+        </div>
+      );
+    })()}
+
+    {/* 📋 Workout Structure Analysis */}
+    {workoutType === 'swim' && (()=>{
+      const detected = detectSets();
+      const hasAny = (detected.summary.length + detected.performance.length) > 0 || (plannedTokens && plannedTokens.length>0);
+      if (!hasAny) return null;
+      return (
+        <div className="border border-gray-100 rounded-md p-3 mb-2">
+          <div className="text-sm font-semibold mb-1">Workout Structure Analysis</div>
+          {plannedTokens && plannedTokens.length>0 && (
+            <div className="text-xs text-gray-700 mb-2">Planned: {plannedTokens.join(' + ')}</div>
+          )}
+          {detected.summary.length>0 && (
+            <div className="text-xs text-gray-800 space-y-1 mb-1">
+              {detected.summary.map((s, i)=> (
+                <div key={`sum-${i}`}>• {s}</div>
+              ))}
+            </div>
+          )}
+          {detected.performance.length>0 && (
+            <div className="text-xs text-gray-800 space-y-0.5">
+              {detected.performance.map((s, i)=> (
+                <div key={`perf-${i}`} className="flex items-center justify-between">
+                  <div>{s.label}</div>
+                  <div className="font-mono">
+                    {s.pace_per100_s != null ? `${formatSwimPace(s.pace_per100_s)}` : '—'}
+                    {s.swolf != null ? `  (SWOLF ${s.swolf})` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    })()}
+
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
      <div className="grid grid-cols-3 gap-1">
        {/* General metrics - Only for non-cycling workouts */}
@@ -1582,17 +1856,28 @@ const formatPace = (paceValue: any): string => {
         </div>
       )}
       
-      {/* Row 3: Elevation, Calories, Max HR - Only for non-cycling workouts */}
-      {workoutType !== 'ride' && (
+      {/* Row 3: Elevation, Calories, Max HR - Only for non-cycling workouts; hide Elevation for pool swims */}
+      {(() => {
+        const isSwim = workoutType === 'swim';
+        const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
+          || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
+        const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
+        const openWaterHint = /open\s*water|ocean|ow\b/.test(providerStr);
+        const poolHint = /lap|pool/.test(providerStr);
+        const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
+        const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
+        return workoutType !== 'ride' ? (
         <>
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
+          {!isPoolSwim && (
+            <div className="px-2 py-1">
+              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+                {formatElevation(workoutData.elevation_gain || workoutData.metrics?.elevation_gain)} ft
+              </div>
+              <div className="text-xs text-[#666666] font-normal">
+                <div className="font-medium">Climbed</div>
+              </div>
             </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Climbed</div>
-            </div>
-          </div>
+          )}
      
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1667,13 +1952,29 @@ const formatPace = (paceValue: any): string => {
              </div>
            </div>
         </>
-      )}
+        ) : null;
+      })()}
      </div>
 
-     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - FORCE PHYSICAL SEPARATION */}
+     {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - hidden for pool swims */}
      <div className="w-full">
        {/* Advanced synced viewer: Mapbox puck + interactive chart + splits */}
        {(() => {
+         const isSwim = workoutType === 'swim';
+         const hasLengths = Number((workoutData as any)?.number_of_active_lengths) > 0
+           || (Array.isArray((workoutData as any)?.swim_data?.lengths) && (workoutData as any).swim_data.lengths.length > 0);
+         const providerStr = String((workoutData as any)?.provider_sport || (workoutData as any)?.activity_type || (workoutData as any)?.name || '').toLowerCase();
+         const openWaterHint = /open\s*water|ocean|ow\b/.test(providerStr);
+         const poolHint = /lap|pool/.test(providerStr);
+         const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
+         const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
+         if (isPoolSwim) {
+           return (
+             <div className="mx-[-16px] px-3 py-2">
+               <div className="text-sm text-gray-600">No route data (pool swim)</div>
+             </div>
+           );
+         }
          const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
