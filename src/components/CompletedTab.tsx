@@ -925,6 +925,46 @@ const formatPace = (paceValue: any): string => {
   };
 
   type DetectedSet = { label: string; distance_m: number; pace_per100_s: number | null; swolf?: number | null };
+
+  // Build fixed-distance splits at 100m or 100yd based on pool
+  const buildHundredSplits = (): Array<{ idx: number; duration_s: number; swolf: number | null; unit: 'm' | 'yd' }> => {
+    try {
+      const lengths = getSwimLengths();
+      if (!lengths.length) return [];
+      const Lm = inferPoolLengthMeters() || 25; // default assumption
+      const isYd = isYardPool() === true;
+      const unitLenM = isYd ? 91.44 : 100;
+      const perSplit = Math.max(1, Math.round(unitLenM / Lm));
+      const splits: Array<{ idx: number; duration_s: number; swolf: number | null; unit: 'm' | 'yd' }> = [];
+      let idx = 1;
+      for (let i = 0; i < lengths.length; i += perSplit) {
+        const chunk = lengths.slice(i, i + perSplit);
+        if (chunk.length < perSplit) break; // require full chunk for a clean split
+        let dur = 0;
+        let strokesSum: number | null = 0;
+        let swolfSum: number | null = 0;
+        let swolfCount = 0;
+        for (const len of chunk) {
+          const t = Number((len as any)?.duration_s ?? (len as any)?.duration ?? 0);
+          dur += Number.isFinite(t) ? t : 0;
+          const st = Number((len as any)?.strokes ?? (len as any)?.stroke_count);
+          if (Number.isFinite(st)) strokesSum = (strokesSum as number) + st; else strokesSum = strokesSum;
+          // Per-length SWOLF when both are present
+          if (Number.isFinite(t) && Number.isFinite(st)) { swolfSum = (swolfSum as number) + (t + st); swolfCount += 1; }
+        }
+        let sw: number | null = null;
+        if (swolfCount > 0) sw = Math.round((swolfSum as number) / swolfCount);
+        else if (strokesSum != null && Number.isFinite(strokesSum as number) && chunk.length > 0) {
+          // Approximate: average strokes/length + avg seconds/length
+          const avgLen = dur / chunk.length;
+          const avgSt = (strokesSum as number) / chunk.length;
+          sw = Math.round(avgLen + avgSt);
+        }
+        splits.push({ idx: idx++, duration_s: Math.round(dur), swolf: sw, unit: isYd ? 'yd' : 'm' });
+      }
+      return splits;
+    } catch { return []; }
+  };
   const detectSets = (): { summary: string[]; performance: DetectedSet[] } => {
     const outSummary: string[] = [];
     const outPerf: DetectedSet[] = [];
@@ -1455,7 +1495,10 @@ const formatPace = (paceValue: any): string => {
     {/* 🧭 Swim Primary Metrics summary */}
     {workoutType === 'swim' && (()=>{
       const km = computeDistanceKm(hydrated||workoutData) || 0;
-      const distLabel = km ? `${useImperial ? (km*0.621371).toFixed(1)+' mi' : Math.round(km*1000)}m` : '—';
+      const yardPool = isYardPool();
+      const meters = Math.round(km*1000);
+      const yards = Math.round(meters / 0.9144);
+      const distLabel = km ? (yardPool === true ? `${yards} yd` : `${meters} m`) : '—';
       const timeTotal = formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
       const moving = formatDuration((workoutData as any)?.total_timer_time ?? (workoutData as any)?.moving_time ?? (workoutData as any)?.elapsed_time);
       const cals = workoutData.calories ? `${safeNumber(workoutData.calories)} calories` : '—';
@@ -1503,9 +1546,7 @@ const formatPace = (paceValue: any): string => {
       return (
         <div className="border border-gray-100 rounded-md p-3 mb-2">
           <div className="text-sm font-semibold mb-1">Workout Structure Analysis</div>
-          {plannedTokens && plannedTokens.length>0 && (
-            <div className="text-xs text-gray-700 mb-2">Planned: {plannedTokens.join(' + ')}</div>
-          )}
+          {/* Planned summary removed for Completed swim view */}
           {detected.summary.length>0 && (
             <div className="text-xs text-gray-800 space-y-1 mb-1">
               {detected.summary.map((s, i)=> (
@@ -1526,6 +1567,25 @@ const formatPace = (paceValue: any): string => {
               ))}
             </div>
           )}
+          {/* Fixed 100 splits */}
+          {(() => {
+            const hundred = buildHundredSplits();
+            if (!hundred.length) return null;
+            const label = hundred[0]?.unit === 'yd' ? '100yd' : '100m';
+            return (
+              <div className="mt-2">
+                <div className="text-xs text-gray-700 mb-1">{label} splits</div>
+                <div className="text-xs text-gray-800 space-y-0.5">
+                  {hundred.map(s => (
+                    <div key={`h-${s.idx}`} className="flex items-center justify-between">
+                      <div>{label} #{s.idx}</div>
+                      <div className="font-mono">{formatSwimPace(s.duration_s)}{s.swolf!=null?` (SWOLF ${s.swolf})`:''}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       );
     })()}
@@ -1621,7 +1681,7 @@ const formatPace = (paceValue: any): string => {
         </div>
       )}
 
-      {workoutType !== 'ride' && (
+      {workoutType !== 'ride' && workoutType !== 'swim' && (
       <div className="px-2 py-1">
         <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
           {(workoutType === 'run' || workoutType === 'walk')
