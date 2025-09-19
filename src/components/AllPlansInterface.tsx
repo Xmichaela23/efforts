@@ -476,22 +476,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     // Normalize new universal plan shape → legacy view expectations
     if (planDetail) {
       const pd: any = planDetail;
-
-      // Ensure weekly_summaries is present by merging from plans row/template if missing
-      try {
-        if (!pd.weekly_summaries) {
-          const { data: planRow } = await supabase
-            .from('plans')
-            .select('weekly_summaries, template')
-            .eq('id', planId)
-            .maybeSingle();
-          const tryParse = (v:any)=>{ if(typeof v!=='string') return v; try{return JSON.parse(v);}catch{return v;} };
-          const wsFromRow = tryParse(planRow?.weekly_summaries);
-          const wsFromTemplate = tryParse((planRow as any)?.template?.weekly_summaries);
-          if (wsFromRow) pd.weekly_summaries = wsFromRow;
-          else if (wsFromTemplate) pd.weekly_summaries = wsFromTemplate;
-        }
-      } catch {}
+      
+      // Removed legacy fallback fetch for weekly_summaries/template from plans.
+      // Weekly summaries should be provided via pd.config.weekly_summaries when present.
 
       // duration_weeks → duration
       if (!pd.duration && pd.duration_weeks) {
