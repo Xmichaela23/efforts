@@ -1493,7 +1493,7 @@ const formatPace = (paceValue: any): string => {
      )}
      
     {/* 🧭 Swim Primary Metrics summary */}
-    {workoutType === 'swim' && (()=>{
+   {false && (()=>{
       const km = computeDistanceKm(hydrated||workoutData) || 0;
       const yardPool = isYardPool();
       const meters = Math.round(km*1000);
@@ -1519,7 +1519,7 @@ const formatPace = (paceValue: any): string => {
     })()}
 
     {/* 🏊 Swim-specific metrics grid */}
-    {workoutType === 'swim' && (()=>{
+   {false && (()=>{
       const pool = formatPoolLengthLabel();
       const lengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
       const strokes = Number((workoutData as any)?.strokes);
@@ -1539,7 +1539,7 @@ const formatPace = (paceValue: any): string => {
     })()}
 
     {/* 📋 Workout Structure Analysis */}
-    {workoutType === 'swim' && (()=>{
+   {false && (()=>{
       const detected = detectSets();
       const hasAny = (detected.summary.length + detected.performance.length) > 0 || (plannedTokens && plannedTokens.length>0);
       if (!hasAny) return null;
@@ -1595,13 +1595,18 @@ const formatPace = (paceValue: any): string => {
        {/* General metrics - Only for non-cycling workouts */}
        {workoutType !== 'ride' && (
          <>
-           {/* Distance */}
+          {/* Distance */}
            <div className="px-2 py-1">
              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                {(() => {
                  const src = (hydrated || workoutData);
                  const km = (computeDistanceKm(src) ?? Number(src?.distance)) || 0;
-                 return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
+                if (workoutType === 'swim') {
+                  const meters = Math.round(km * 1000);
+                  if (!meters) return 'N/A';
+                  return (isYardPool() === true) ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
+                }
+                return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
                })()}
              </div>
              <div className="text-xs text-[#666666] font-normal">
@@ -1630,7 +1635,7 @@ const formatPace = (paceValue: any): string => {
            </div>
            
            {/* Avg Pace/Speed */}
-           {workoutType === 'run' || workoutType === 'walk' ? (
+          {workoutType === 'run' || workoutType === 'walk' ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
                  {formatPace(workoutData.metrics?.avg_pace || workoutData.avg_pace)}
@@ -1642,7 +1647,7 @@ const formatPace = (paceValue: any): string => {
            ) : workoutType === 'swim' ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                 {formatSwimPace(workoutData.avg_pace)}
+                {(() => { const s = computeSwimAvgPaceSecPer100(); return s ? formatSwimPace(s) : 'N/A'; })()}
                </div>
                <div className="text-xs text-[#666666] font-normal">
                  <div className="font-medium">Avg Pace</div>
@@ -1658,6 +1663,32 @@ const formatPace = (paceValue: any): string => {
                </div>
              </div>
            )}
+
+          {/* Swim-only cards: Lengths, Pool, SWOLF */}
+          {workoutType === 'swim' && (
+            <>
+              <div className="px-2 py-1">
+                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+                  {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? safeNumber(n) : 'N/A'; })()}
+                </div>
+                <div className="text-xs text-[#666666] font-normal">
+                  <div className="font-medium">Lengths</div>
+                </div>
+              </div>
+              <div className="px-2 py-1">
+                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatPoolLengthLabel()}</div>
+                <div className="text-xs text-[#666666] font-normal">
+                  <div className="font-medium">Pool</div>
+                </div>
+              </div>
+              <div className="px-2 py-1">
+                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{(() => { const s = computeSwolf(); return s != null ? safeNumber(s) : 'N/A'; })()}</div>
+                <div className="text-xs text-[#666666] font-normal">
+                  <div className="font-medium">SWOLF</div>
+                </div>
+              </div>
+            </>
+          )}
          </>
        )}
 
@@ -1928,6 +1959,7 @@ const formatPace = (paceValue: any): string => {
         const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
         return workoutType !== 'ride' ? (
         <>
+          {/* Hide climb for pool swim */}
           {!isPoolSwim && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
@@ -1968,7 +2000,7 @@ const formatPace = (paceValue: any): string => {
             </div>
           </div>
 
-          {/* Row 4: Max Cadence, VAM - Only for non-cycling workouts */}
+          {/* Row 4: Max Cadence; VAM hidden for swim */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
@@ -1992,15 +2024,16 @@ const formatPace = (paceValue: any): string => {
               <div className="font-medium">Max Cadence</div>
             </div>
           </div>
-           
-           <div className="px-2 py-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {calculateVAM()}
-             </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">VAM</div>
+          {!isPoolSwim && (
+            <div className="px-2 py-1">
+              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+                {calculateVAM()}
+              </div>
+              <div className="text-xs text-[#666666] font-normal">
+                <div className="font-medium">VAM</div>
+              </div>
             </div>
-           </div>
+          )}
            
            {/* Moving Time - Final metric for non-cycling workouts */}
            <div className="px-2 py-1">
@@ -2193,6 +2226,35 @@ const formatPace = (paceValue: any): string => {
           })()}
         </div>
       )}
+
+      {/* Swim 100m/yd splits list */}
+      {(() => {
+        if (workoutType !== 'swim') return null;
+        const hundred = buildHundredSplits();
+        if (!hundred.length) return null;
+        const unitLabel = hundred[0]?.unit === 'yd' ? '100yd' : '100m';
+        return (
+          <div className="mx-[-16px] px-3 py-2">
+            <div className="text-lg font-semibold mb-2">Splits ({unitLabel})</div>
+            <div className="grid grid-cols-4 gap-2 text-sm text-gray-600 mb-1">
+              <div className="font-medium">#</div>
+              <div className="font-medium">Time</div>
+              <div className="font-medium col-span-2">Pace</div>
+            </div>
+            <div className="space-y-1">
+              {hundred.map((s) => (
+                <div key={`hs-${s.idx}`} className="grid grid-cols-4 gap-2 items-center text-sm">
+                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.idx}</div>
+                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(s.duration_s)}</div>
+                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono col-span-2">
+                    {formatSwimPace(s.duration_s)}{s.swolf != null ? ` (SWOLF ${s.swolf})` : ''}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* SEPARATE Power/Cadence Chart - at the bottom */}
       {(workoutType === 'run' || workoutType === 'ride') && (() => {
