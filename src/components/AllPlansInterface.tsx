@@ -244,6 +244,58 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   const buildWeeklySubtitle = (workout: any): string | undefined => {
     try {
       const pn = (baselines as any)?.performanceNumbers || {};
+      // Swim: prefer a drill-aware summary using tokens or computed steps
+      try {
+        const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
+        if (disc === 'swim') {
+          const parts: string[] = [];
+          // 1) Try tokens (covers WU/CD/pull/kick/aerobic and named drills)
+          const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+          if (stepsTok.length) {
+            let wu: string | null = null, cd: string | null = null;
+            const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
+            stepsTok.forEach((t)=>{
+              const s = String(t).toLowerCase();
+              let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
+              if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
+              m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+              if (m) { const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r=m[5]?` @ :${parseInt(m[5],10)}r`:''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
+              m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
+              if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const name=m[4].replace(/_/g,' '); drills.push(`${name} ${reps}x${dist}`); return; }
+              m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+              if (m) { const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r=m[5]?` @ :${parseInt(m[5],10)}r`:''; (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}${r}`); return; }
+              m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+              if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const r=m[4]?` @ :${parseInt(m[4],10)}r`:''; aerobics.push(`${reps}x${dist}${r}`); return; }
+            });
+            if (wu) parts.push(wu);
+            if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
+            if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+            if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+            if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+            if (cd) parts.push(cd);
+            if (parts.length) return parts.join(' • ');
+          }
+          // 2) Fallback to computed steps: summarize drills present even if tokens missing in this view model
+          const compSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+          if (compSteps.length) {
+            const drillMap = new Map<string, { reps:number; eachYd?:number }>();
+            compSteps.forEach((st:any)=>{
+              const label = String((st?.label || st?.name || '')).trim();
+              const isDrill = String(st?.effortLabel||'').toLowerCase()==='drill' || String(st?.type||'').toLowerCase()==='drill';
+              if (!isDrill) return;
+              const yd = typeof st?.distanceMeters==='number' ? Math.round((st.distanceMeters||0)/0.9144) : undefined;
+              const key = label || 'drill';
+              const cur = drillMap.get(key) || { reps:0, eachYd: yd };
+              cur.reps += 1; if (yd && !cur.eachYd) cur.eachYd = yd; drillMap.set(key, cur);
+            });
+            if (drillMap.size) {
+              const drillParts = Array.from(drillMap.entries()).map(([name, v])=> name==='drill' ? `${v.reps}x${v.eachYd||''}` : `${name} ${v.reps}x${v.eachYd||''}`);
+              parts.push(`Drills: ${drillParts.join(', ')}`);
+              return parts.join(' • ');
+            }
+          }
+        }
+      } catch {}
       const structured = (workout as any)?.workout_structure;
       if (structured && typeof structured === 'object') {
         try {

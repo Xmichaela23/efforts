@@ -1345,6 +1345,36 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
               computedStepsV3 = [...before, ...newSteps, ...after] as any[];
             }
           }
+
+          // Ensure swim steps have duration_s using swimPace100 and surface rests between aerobic reps
+          const parseMmss = (v:any): number | null => { if (typeof v === 'number') return v; if (typeof v !== 'string') return null; const m=v.match(/(\d+):(\d{2})/); return m? (parseInt(m[1],10)*60+parseInt(m[2],10)) : null; };
+          let per100Sec: number = parseMmss((perfNumbers as any)?.swimPace100) ?? 120;
+          if (typeof (perfNumbers as any)?.swim_pace_per_100_sec === 'number') per100Sec = (perfNumbers as any).swim_pace_per_100_sec || per100Sec;
+          const tokenStr = toks.join(' ').toLowerCase();
+          const aeroRestMatch = tokenStr.match(/swim_aerobic_\d+x\d+(?:yd|m)_r(\d+)/i);
+          const aerobicRest = aeroRestMatch ? parseInt(aeroRestMatch[1],10) : 0;
+          let aerobicCount = 0;
+          try { aerobicCount = Array.isArray(computedStepsV3) ? (computedStepsV3 as any[]).filter(st=>/aerobic/i.test(String((st as any)?.label||'')) || /swim_aerobic/i.test(String((st as any)?.type||''))).length : 0; } catch {}
+          let aerobicSeen = 0;
+          const out: any[] = [];
+          (Array.isArray(computedStepsV3)?computedStepsV3:[]).forEach((st:any)=>{
+            const copy:any = { ...st };
+            const yd = typeof copy.distance_yd === 'number' ? copy.distance_yd : undefined;
+            const meters = typeof copy.distanceMeters === 'number' ? copy.distanceMeters : (typeof yd === 'number' ? Math.round(yd*0.9144) : undefined);
+            if ((typeof meters === 'number' && meters>0) && !(typeof copy.duration_s === 'number' && copy.duration_s>0)) {
+              const segments = Math.max(1, Math.round(meters/100));
+              copy.duration_s = Math.max(1, Math.round(segments * per100Sec));
+            }
+            // If rest_s present on drill, split out a rest step
+            if (typeof copy.rest_s === 'number' && copy.rest_s>0) {
+              const r = parseInt(copy.rest_s,10)||0; delete copy.rest_s; out.push(copy); if (r>0) out.push({ effortLabel:'rest', duration: r });
+            } else {
+              out.push(copy);
+            }
+            const isAerobic = /aerobic/i.test(String(copy?.label||'')) || /swim_aerobic/i.test(String(copy?.type||''));
+            if (isAerobic) { aerobicSeen += 1; if (aerobicRest>0 && aerobicSeen<aerobicCount) out.push({ effortLabel:'rest', duration: aerobicRest }); }
+          });
+          if (out.length) computedStepsV3 = out;
         }
       } catch {}
     } catch {}
