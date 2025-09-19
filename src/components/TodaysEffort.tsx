@@ -441,7 +441,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // (Reverted) no horizontal scroll state
 
   return (
-    <div className="w-full flex-shrink-0 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>
+    <div className="w-full flex-shrink-0 flex flex-col overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)', position:'relative'}}>
       {/* Header */}
       <div className="flex items-center justify-between mb-2 px-4 flex-shrink-0">
         <div className="flex items-center gap-2">
@@ -597,6 +597,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         )}
         </div>
       </div>
+      {/* Bottom fade overlay */}
+      <div style={{position:'absolute', left:0, right:0, bottom:0, height:24, pointerEvents:'none', background:'linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,1))'}} />
     </div>
   );
 };

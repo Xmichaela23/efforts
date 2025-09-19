@@ -12,7 +12,7 @@ function applyRuntimeLayoutOverrides() {
       style.id = styleId;
       style.textContent = `
       /* Pre-seed final targets to avoid first-paint jump */
-      :root { --todays-h: 12rem; --cal-cell-h: 150px; }
+      :root { --todays-h: 13rem; --cal-cell-h: 150px; }
       .mobile-tabbar {
         padding-top: 8px !important;
         padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px) !important;

@@ -31,7 +31,7 @@
     /* Deterministic layout variables (universal for PWA + browser) */
     --header-h: 64px; /* matches h-16 */
     --tabbar-h: 56px; /* matches h-14 */
-    --todays-h: 12rem; /* universal (approved) */
+    --todays-h: 13rem; /* universal (approved) */
     --cal-cell-h: 150px; /* pre-seed final target to avoid jump */
     /* Analytics tokens (mobile, minimal) */
     --series-pace: #3b82f6;
@@ -275,10 +275,10 @@
 /* Make PWA and browser blocks match the universal values to avoid divergence */
 @media (display-mode: standalone) {
   .mobile-tabbar { padding-top: 8px; padding-bottom: max(env(safe-area-inset-bottom) - 34px, 0px); height: calc(var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)); }
-  :root { --todays-h: 12rem; --cal-cell-h: 150px; }
+  :root { --todays-h: 13rem; --cal-cell-h: 150px; }
   .mobile-main-content { height: calc(100vh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); height: calc(100svh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); height: calc(100dvh - var(--header-h) - (var(--tabbar-h) + max(env(safe-area-inset-bottom) - 34px, 0px)) - env(safe-area-inset-top)); }
 }
 
 @media not all and (display-mode: standalone) {
-  :root { --todays-h: 12rem; --cal-cell-h: 150px; }
+  :root { --todays-h: 13rem; --cal-cell-h: 150px; }
 }
