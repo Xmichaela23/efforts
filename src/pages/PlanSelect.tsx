@@ -879,14 +879,14 @@ export default function PlanSelect() {
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
-        // Persist authored weekly_summaries directly on plans row
-        weekly_summaries: (libPlan?.template?.weekly_summaries ? JSON.parse(JSON.stringify(libPlan.template.weekly_summaries)) : null),
         // Preserve acceptance metadata; Week 1 anchor derived above
         config: { 
           source: 'catalog', 
           preferences: { longRunDay, longRideDay }, 
           catalog_id: libPlan.id, 
           user_selected_start_date: anchorMonday,
+          // Persist weekly_summaries within config so Weekly can read it consistently
+          ...(libPlan?.template?.weekly_summaries ? { weekly_summaries: JSON.parse(JSON.stringify(libPlan.template.weekly_summaries)) } : {}),
           // Persist authoring baselines metadata for runtime use
           ...(libPlan?.template?.baselines_required ? { baselines_required: libPlan.template.baselines_required } : {}),
           ...(typeof libPlan?.template?.units === 'string' ? { units: libPlan.template.units } : {}),

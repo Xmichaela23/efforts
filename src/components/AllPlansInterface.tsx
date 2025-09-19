@@ -1717,7 +1717,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             )}
 
             {(() => {
-              const weeklySummariesObj: any = (selectedPlanDetail as any)?.weekly_summaries || (selectedPlanDetail as any)?.template?.weekly_summaries || {};
+              const weeklySummariesObj: any = (selectedPlanDetail as any)?.config?.weekly_summaries || (selectedPlanDetail as any)?.weekly_summaries || (selectedPlanDetail as any)?.template?.weekly_summaries || {};
               const wsKey = String(selectedWeek);
               const ws: any = weeklySummariesObj?.[wsKey] || {};
               const focus: string | undefined = (typeof ws?.focus === 'string' && ws.focus.trim().length>0) ? ws.focus.trim() : undefined;
