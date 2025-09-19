@@ -1233,6 +1233,20 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       let resolved = resolveTargets(atomic as any, perfNumbers, exportHints || {}, mappedType) as any[];
       // Strict mode: do not auto-add swim warm-up/cool-down; use authored steps only
       if (Array.isArray(resolved) && resolved.length) computedStepsV3 = resolved as any[];
+      // Ensure run WU/CD minutes from tokens are reflected in computed totals
+      try {
+        if (mappedType === 'run' && Array.isArray(computedStepsV3) && computedStepsV3.length) {
+          const toks: string[] = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
+          const mm = (re: RegExp) => toks.map(t=>t.match(re)).find(Boolean) as RegExpMatchArray | undefined;
+          const toSec = (m?: RegExpMatchArray) => m ? parseInt(m[1],10)*60 : 0;
+          const wu = mm(/warm\s*-?\s*up.*?(\d{1,3})\s*min/);
+          const cd = mm(/cool\s*-?\s*down.*?(\d{1,3})\s*min/);
+          const hasWU = (computedStepsV3 as any[]).some(st => String((st as any)?.type||'').toLowerCase()==='warmup');
+          const hasCD = (computedStepsV3 as any[]).some(st => String((st as any)?.type||'').toLowerCase()==='cooldown');
+          if (wu && !hasWU) (computedStepsV3 as any[]).unshift({ type:'warmup', duration_s: toSec(wu) });
+          if (cd && !hasCD) (computedStepsV3 as any[]).push({ type:'cooldown', duration_s: toSec(cd) });
+        }
+      } catch {}
     } catch {}
 
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);

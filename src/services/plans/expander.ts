@@ -50,6 +50,8 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
   const opts = parseExpandTags(tags);
   const idPrefix = opts.idPrefix || 'step';
   const steps = Array.isArray(stepsPreset) ? stepsPreset : [];
+  // Track tokens handled by preset mappings to avoid double-expanding in the generic parsers below
+  const handled = new Set<string>();
 
   const pushInterval = (reps: number, work: {duration_s?:number; dist_m?:number; target?:string}, rest?: {duration_s?:number; dist_m?:number}) => {
     const r = Math.max(1, Number(opts.override?.reps || reps));
@@ -74,15 +76,19 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
     if ((preset as any).kind === 'steady') {
       const p = preset as any;
       out.push({ id: makeId(idPrefix, [token]), type: token.includes('cooldown')?'cooldown': token.includes('warmup')?'warmup':'steady', duration_s: p.duration_s, target: p.target });
+      handled.add(String(token).toLowerCase());
     } else if ((preset as any).kind === 'interval') {
       const p = preset as any;
       pushInterval(p.reps, { duration_s: p.work.duration_s, dist_m: p.work.dist_m, target: p.work.target }, p.rest);
+      handled.add(String(token).toLowerCase());
     } else if ((preset as any).kind === 'tempo') {
       const p = preset as any;
       out.push({ id: makeId(idPrefix, [token]), type: 'steady', distance_m: p.dist_m, target: p.target });
+      handled.add(String(token).toLowerCase());
     } else if ((preset as any).kind === 'longrun') {
       const p = preset as any;
       out.push({ id: makeId(idPrefix, [token]), type: 'steady', duration_s: p.duration_s, target: p.target });
+      handled.add(String(token).toLowerCase());
     } else if ((preset as any).exercise) {
       const s = preset as any;
       for (let set=1; set<=Number(s.sets||1); set+=1){
@@ -96,11 +102,13 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
           out.push({ id: makeId(idPrefix, [s.exercise, 'rest', String(set).padStart(2,'0')]), type: 'strength_rest', rest_s: s.rest_s, duration_s: s.rest_s } as any);
         }
       }
+      handled.add(String(token).toLowerCase());
     }
   }
 
   // Generic parsing for new deterministic tokens (run/bike)
   for (const token of steps) {
+    if (handled.has(String(token).toLowerCase())) continue; // avoid double-expansion
     const t = String(token).toLowerCase();
     // Run easy: run_easy_30min
     let m = t.match(/^run_easy_(\d{2,3})min$/i);
