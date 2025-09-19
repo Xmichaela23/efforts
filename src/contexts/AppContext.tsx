@@ -604,51 +604,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
             const durationVal = (typeof s.duration === 'number' && Number.isFinite(s.duration)) ? s.duration : 0;
 
-            // Normalize into friendly text and precise totals/ranges
+            // Normalize to a friendly text only; v3 hydration will compute totals/steps
             let rendered: string | undefined;
-            let totalSeconds: number | undefined;
-            let targetsSummary: any | undefined;
             try {
               const norm = normalizePlannedSession(s, { performanceNumbers: userBaselines?.performanceNumbers as any }, planExportHints || {});
               rendered = norm.friendlySummary || s.description || '';
-              totalSeconds = Math.max(0, Math.round((norm.durationMinutes || 0) * 60));
-              if (norm.primaryTarget) {
-                if (norm.primaryTarget.type === 'pace') {
-                  const range = norm.primaryTarget.range as [string, string] | undefined;
-                  targetsSummary = { pace: { value: norm.primaryTarget.value, range } };
-                } else if (norm.primaryTarget.type === 'power') {
-                  const range = norm.primaryTarget.range as [number, number] | undefined;
-                  targetsSummary = { power: { value: norm.primaryTarget.value, range } };
-                }
-              }
             } catch (e) {
-              // Fallbacks keep insertion robust; details can be computed later
               rendered = s.description || '';
-              totalSeconds = Math.max(0, Math.round(((typeof s.duration === 'number' ? s.duration : 0) || 0) * 60));
-              targetsSummary = undefined;
-            }
-
-            // Get computed data from the baked plan
-            let computedData: any = {
-              normalization_version: 'v2',
-              total_duration_seconds: totalSeconds,
-              targets_summary: targetsSummary || {},
-            };
-
-            if (bakedPlan && bakedPlan.sessions_by_week && bakedPlan.sessions_by_week[weekNum]) {
-              const bakedSession = bakedPlan.sessions_by_week[weekNum].find((bs: any) => 
-                bs.day === s.day && bs.discipline === s.discipline
-              );
-              
-              if (bakedSession && bakedSession.computed) {
-                computedData = {
-                  normalization_version: 'v2',
-                  total_duration_seconds: bakedSession.computed.total_seconds || totalSeconds,
-                  steps: bakedSession.computed.steps || [],
-                  total_hmmss: bakedSession.computed.total_hmmss || '0:00'
-                };
-                
-              }
             }
 
             // Derive a friendly title for device/UI consistency
@@ -688,9 +650,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               // New fields for deterministic rendering
               steps_preset: Array.isArray(s?.steps_preset) ? s.steps_preset : null,
               export_hints: planExportHints,
-              // Newly persisted rendering/computed helpers
+              // Newly persisted rendering helpers (computed set by v3 hydration immediately after insert)
               rendered_description: rendered,
-              computed: computedData,
+              computed: null,
               units: unitsPref,
               // Persist authored tags (optional/xor/opt_kind/etc.) for UI grouping/activation
               tags: Array.isArray(s?.tags) ? s.tags : (isOptional ? ['optional'] : []),
