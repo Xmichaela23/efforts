@@ -1247,6 +1247,25 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           if (cd && !hasCD) (computedStepsV3 as any[]).push({ type:'cooldown', duration_s: toSec(cd) });
         }
       } catch {}
+      // Post-process: for RUN, ensure distance-based steps have duration_s using available pace
+      try {
+        if (mappedType === 'run' && Array.isArray(computedStepsV3) && computedStepsV3.length) {
+          const parsePace = (txt?: string): { sec:number|null, unit?:'mi'|'km' } => { if(!txt) return {sec:null} as any; const m=String(txt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i); if(!m) return {sec:null} as any; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any }; };
+          const easyTxt = String((perfNumbers as any)?.easyPace || (perfNumbers as any)?.easy_pace || (perfNumbers as any)?.fiveK_pace || (perfNumbers as any)?.fiveKPace || '').trim();
+          for (const st of computedStepsV3 as any[]) {
+            const hasDist = typeof (st as any).distance_m === 'number' && (st as any).distance_m > 0;
+            const missingDur = !(typeof (st as any).duration_s === 'number' && (st as any).duration_s > 0);
+            if (hasDist && missingDur) {
+              const spm = typeof (st as any).pace_sec_per_mi === 'number' ? (st as any).pace_sec_per_mi : null;
+              const secPerMi = spm || (():number|undefined=>{ const p=parsePace(String((st as any).target_value||easyTxt)); return p.sec ? (p.unit==='mi'? p.sec : Math.round(p.sec*1.60934)) : undefined; })();
+              if (typeof secPerMi === 'number' && isFinite(secPerMi) && secPerMi>0) {
+                const miles = Number((st as any).distance_m) / 1609.34;
+                (st as any).duration_s = Math.max(1, Math.round(miles * secPerMi));
+              }
+            }
+          }
+        }
+      } catch {}
     } catch {}
 
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);
