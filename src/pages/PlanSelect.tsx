@@ -879,6 +879,8 @@ export default function PlanSelect() {
         current_week: 1,
         status: 'active',
         plan_type: 'catalog',
+        // Persist authored weekly_summaries directly on plans row
+        weekly_summaries: (libPlan?.template?.weekly_summaries ? JSON.parse(JSON.stringify(libPlan.template.weekly_summaries)) : null),
         // Preserve acceptance metadata; Week 1 anchor derived above
         config: { 
           source: 'catalog', 
@@ -1079,6 +1081,21 @@ export default function PlanSelect() {
                         <div className="text-sm font-medium">Week {wk}</div>
                         <div className="text-xs text-gray-600">{sess.length} sessions{mins>0?` • ${mins} min`:''}</div>
                       </div>
+                      {(() => {
+                        try {
+                          const wsObj: any = (libPlan as any)?.template?.weekly_summaries || {};
+                          const ws: any = wsObj?.[wk] || {};
+                          const focus: string | undefined = (typeof ws?.focus === 'string' && ws.focus.trim().length>0) ? ws.focus.trim() : undefined;
+                          const notes: string | undefined = (typeof ws?.notes === 'string' && ws.notes.trim().length>0) ? ws.notes.trim() : undefined;
+                          if (!focus && !notes) return null;
+                          return (
+                            <div className="mt-1 text-xs text-gray-700">
+                              {focus && (<div className="font-medium">{focus}</div>)}
+                              {notes && (<div className="text-gray-600">{notes}</div>)}
+                            </div>
+                          );
+                        } catch { return null; }
+                      })()}
                       <div className="mt-2 grid grid-cols-1 gap-1">
                         {sess.map((s: any, i: number) => {
                           const fallback = [s.discipline || s.type || '']
