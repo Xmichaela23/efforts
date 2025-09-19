@@ -125,31 +125,58 @@ async function fetchWeatherData(lat: number, lng: number, timestamp: string): Pr
 
   try {
     // Preferred: One Call 3.0 for current + daily (sunrise/sunset + highs)
-    const urlOneCall = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial&exclude=minutely,hourly,alerts`;
-    const resp = await fetch(urlOneCall);
-    if (!resp.ok) {
-      throw new Error(`Weather API error: ${resp.status}`);
+    // Use One Call v2.5 for broader key compatibility
+    const urlOneCall = `https://api.openweathermap.org/data/2.5/onecall?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial&exclude=minutely,hourly,alerts`;
+    try {
+      const resp = await fetch(urlOneCall);
+      if (resp.ok) {
+        const data = await resp.json();
+        const current = data.current || {};
+        const daily0 = Array.isArray(data.daily) && data.daily.length ? data.daily[0] : {};
+
+        const sunriseUnix = daily0?.sunrise || current?.sunrise;
+        const sunsetUnix = daily0?.sunset || current?.sunset;
+        const sunriseIso = sunriseUnix ? new Date(sunriseUnix * 1000).toISOString() : undefined;
+        const sunsetIso = sunsetUnix ? new Date(sunsetUnix * 1000).toISOString() : undefined;
+
+        return {
+          temperature: Math.round(current?.temp ?? 0),
+          condition: (current?.weather && current.weather[0]?.main) || '—',
+          humidity: Math.round(current?.humidity ?? 0),
+          windSpeed: Math.round(current?.wind_speed ?? 0),
+          windDirection: Math.round(current?.wind_deg ?? 0),
+          precipitation: (current?.rain?.['1h'] ?? current?.snow?.['1h'] ?? 0) as number,
+          sunrise: sunriseIso,
+          sunset: sunsetIso,
+          daily_high: daily0?.temp?.max != null ? Math.round(daily0.temp.max) : undefined,
+          daily_low: daily0?.temp?.min != null ? Math.round(daily0.temp.min) : undefined,
+          timestamp: timestamp
+        };
+      }
+    } catch (e) {
+      // fall through to simple endpoint
     }
-    const data = await resp.json();
-    const current = data.current || {};
-    const daily0 = Array.isArray(data.daily) && data.daily.length ? data.daily[0] : {};
 
-    const sunriseUnix = daily0?.sunrise || current?.sunrise;
-    const sunsetUnix = daily0?.sunset || current?.sunset;
-    const sunriseIso = sunriseUnix ? new Date(sunriseUnix * 1000).toISOString() : undefined;
-    const sunsetIso = sunsetUnix ? new Date(sunsetUnix * 1000).toISOString() : undefined;
-
+    // Fallback: current weather endpoint provides temp, condition, and sys.sunrise/sunset, main.temp_max/min
+    const urlCurrent = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial`;
+    const r2 = await fetch(urlCurrent);
+    if (!r2.ok) {
+      throw new Error(`Weather API error: ${r2.status}`);
+    }
+    const d2 = await r2.json();
+    const sr = d2?.sys?.sunrise ? new Date(d2.sys.sunrise * 1000).toISOString() : undefined;
+    const ss = d2?.sys?.sunset ? new Date(d2.sys.sunset * 1000).toISOString() : undefined;
     return {
-      temperature: Math.round(current?.temp ?? 0),
-      condition: (current?.weather && current.weather[0]?.main) || '—',
-      humidity: Math.round(current?.humidity ?? 0),
-      windSpeed: Math.round(current?.wind_speed ?? 0),
-      windDirection: Math.round(current?.wind_deg ?? 0),
-      precipitation: (current?.rain?.['1h'] ?? current?.snow?.['1h'] ?? 0) as number,
-      sunrise: sunriseIso,
-      sunset: sunsetIso,
-      daily_high: daily0?.temp?.max != null ? Math.round(daily0.temp.max) : undefined,
-      daily_low: daily0?.temp?.min != null ? Math.round(daily0.temp.min) : undefined,
+      temperature: Math.round(d2.main?.temp ?? 0),
+      condition: (d2.weather && d2.weather[0]?.main) || '—',
+      humidity: Math.round(d2.main?.humidity ?? 0),
+      windSpeed: Math.round(d2.wind?.speed ?? 0),
+      windDirection: Math.round(d2.wind?.deg ?? 0),
+      precipitation: (d2.rain?.['1h'] ?? d2.snow?.['1h'] ?? 0) as number,
+      sunrise: sr,
+      sunset: ss,
+      daily_high: d2.main?.temp_max != null ? Math.round(d2.main.temp_max) : undefined,
+      daily_low: d2.main?.temp_min != null ? Math.round(d2.main.temp_min) : undefined,
       timestamp: timestamp
     };
     
