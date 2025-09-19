@@ -1320,6 +1320,33 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           }
         }
       } catch {}
+      // Post-process: for SWIM, ensure drill steps from tokens are present in computed steps
+      try {
+        if (mappedType === 'swim') {
+          const toks: string[] = Array.isArray((s as any).steps_preset) ? (s as any).steps_preset.map((t:any)=>String(t)) : [];
+          const alreadyHasDrills = Array.isArray(computedStepsV3) && (computedStepsV3 as any[]).some(st => String((st as any)?.effortLabel||'').toLowerCase()==='drill' || String((st as any)?.type||'').toLowerCase()==='drill');
+          if (toks.length && !alreadyHasDrills) {
+            const newSteps: any[] = [];
+            // Build drill steps from tokens (both name-first and name-last forms)
+            const toMetersLocal = (n:number, unit:'yd'|'m'='yd') => unit==='m'? Math.floor(n): Math.floor(n*0.9144);
+            toks.forEach((t)=>{
+              const sTok = String(t).toLowerCase();
+              let m = sTok.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+              if (m){ const name=m[1]; const reps=parseInt(m[2],10); const each=parseInt(m[3],10); const u=(m[4]||'yd').toLowerCase() as any; const rest=m[5]?parseInt(m[5],10):15; for(let r=0;r<reps;r+=1){ newSteps.push({ effortLabel:'drill', label:`${name.replace(/_/g,' ')}`, distanceMeters: toMetersLocal(each, u) }); if (r<reps-1 && rest>0) newSteps.push({ effortLabel:'rest', duration: rest }); } return; }
+              m = sTok.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
+              if (m){ const reps=parseInt(m[1],10); const each=parseInt(m[2],10); const u=(m[3]||'yd').toLowerCase() as any; const name=m[4]; const rest = /singlearm/.test(name)?20:15; for(let r=0;r<reps;r+=1){ newSteps.push({ effortLabel:'drill', label:`${name.replace(/_/g,' ')}`, distanceMeters: toMetersLocal(each, u) }); if (r<reps-1 && rest>0) newSteps.push({ effortLabel:'rest', duration: rest }); } return; }
+            });
+            if (newSteps.length) {
+              // Insert drills after warmup if present, else at start
+              let insertAt = 0;
+              try { const idx = (computedStepsV3 as any[]).findIndex(st => String((st as any)?.effortLabel||'').toLowerCase()==='warm up' || String((st as any)?.type||'').toLowerCase()==='warmup'); insertAt = idx>=0 ? idx+1 : 0; } catch {}
+              const before = Array.isArray(computedStepsV3) ? (computedStepsV3 as any[]).slice(0, insertAt) : [];
+              const after = Array.isArray(computedStepsV3) ? (computedStepsV3 as any[]).slice(insertAt) : [];
+              computedStepsV3 = [...before, ...newSteps, ...after] as any[];
+            }
+          }
+        }
+      } catch {}
     } catch {}
 
     const intervalsFromNorm = buildIntervalsFromTokens(Array.isArray((s as any).steps_preset)?(s as any).steps_preset:undefined, mappedType);

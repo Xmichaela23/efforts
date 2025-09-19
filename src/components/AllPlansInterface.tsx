@@ -252,7 +252,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         } catch {}
       }
       const friendly = String((workout as any)?.friendly_summary || '').trim();
-      if (friendly) return friendly;
+      // If this is a swim with explicit drills in tokens, prefer token-derived subtitle over stored friendly text
+      try {
+        const discCheck = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
+        const stepsCheck: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
+        const hasDrills = discCheck==='swim' && stepsCheck.some(t=>/swim_drill[s]?_/i.test(t));
+        if (!hasDrills && friendly) return friendly;
+        // else fall through to drill-aware token summary below
+      } catch {}
+      if (friendly && !/swim/i.test(String((workout as any)?.type || (workout as any)?.discipline || ''))) return friendly;
       const desc = String((workout as any)?.description || '').trim();
       // Swim drill-aware fallback from tokens when no friendly summary exists
       try {
