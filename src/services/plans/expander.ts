@@ -14,6 +14,10 @@ export interface ExpandOptions {
 
 const makeId = (prefix: string, parts: (string|number|undefined)[]) => [prefix, ...parts.filter(Boolean)].join('-');
 
+// Strength overhead heuristics
+const STRENGTH_SETUP_PER_EXERCISE_S = 60; // one-time setup when exercise changes
+const STRENGTH_PER_SET_BUFFER_S = 12; // unrack/positioning before each set
+
 export function parseExpandTags(tags?: string[]|unknown): ExpandOptions {
   try {
     const arr: string[] = Array.isArray(tags) ? (tags as string[]) : [];
@@ -96,7 +100,11 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
         const exName = String(s.exercise || '').toLowerCase();
         const perRep = /(squat|deadlift|bench|ohp|press|row)/.test(exName) ? 4 : 3;
         const repsNum = typeof s.reps === 'number' ? s.reps : (String(s.reps||'').toLowerCase()==='amrap' ? 8 : parseInt(String(s.reps||'0'),10));
-        const work_s = Number.isFinite(repsNum) ? Math.max(5, repsNum * perRep) : undefined;
+        const work_s = Number.isFinite(repsNum) ? Math.max(5, repsNum * perRep + STRENGTH_PER_SET_BUFFER_S) : undefined;
+        // Insert per-exercise setup before first set
+        if (set === 1) {
+          out.push({ id: makeId(idPrefix, [s.exercise, 'setup']), type: 'strength_rest', rest_s: STRENGTH_SETUP_PER_EXERCISE_S, duration_s: STRENGTH_SETUP_PER_EXERCISE_S } as any);
+        }
         out.push({ id: makeId(idPrefix, [s.exercise, 'set', String(set).padStart(2,'0')]), type: 'strength_work', exercise: s.exercise, set, reps: s.reps, intensity: s.intensity, rest_s: s.rest_s, duration_s: work_s } as any);
         if (typeof s.rest_s === 'number' && s.rest_s>0) {
           out.push({ id: makeId(idPrefix, [s.exercise, 'rest', String(set).padStart(2,'0')]), type: 'strength_rest', rest_s: s.rest_s, duration_s: s.rest_s } as any);
@@ -354,8 +362,11 @@ export function expand(stepsPreset: string[]|null|undefined, swimMain?: string, 
       const isCompound = /(squat|deadlift|bench|ohp|overhead|press|row)/.test(exLower);
       const perRepSec = isCompound ? 4 : 3;
       const repsNum = typeof reps === 'number' ? reps : 8; // default for AMRAP
-      const work_s = Math.max(5, repsNum * perRepSec);
+      const work_s = Math.max(5, repsNum * perRepSec + STRENGTH_PER_SET_BUFFER_S);
       for (let sIdx=1; sIdx<=sets; sIdx+=1) {
+        if (sIdx === 1) {
+          out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'setup']), type: 'strength_rest', rest_s: STRENGTH_SETUP_PER_EXERCISE_S, duration_s: STRENGTH_SETUP_PER_EXERCISE_S } as any);
+        }
         out.push({ id: makeId(idPrefix, ['strength', group, exercise.replace(/\s+/g,'-'), 'set', String(sIdx).padStart(2,'0')]), type: 'strength_work', exercise, set: sIdx, reps, intensity: pct, rest_s: rest, duration_s: work_s } as any);
         // Insert rest only BETWEEN sets (omit after last)
         if (sIdx < sets && typeof rest === 'number' && rest>0) {

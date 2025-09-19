@@ -880,6 +880,16 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
   const parentDisc = String((session?.discipline || session?.type) || '').toLowerCase();
   const isRun = parentDisc === 'run';
   const ftpNum: number | undefined = typeof (pn?.ftp) === 'number' ? pn.ftp : undefined;
+  // Pace range helpers (default tolerances)
+  const parsePaceTxt = (p?: string): { sec: number; unit: 'mi'|'km' } | null => {
+    if (!p) return null; const m = String(p).match(/(\d+):(\d{2})\s*\/\s*(mi|km)/i); if (!m) return null; return { sec: parseInt(m[1],10)*60+parseInt(m[2],10), unit: m[3].toLowerCase() as any };
+  };
+  const mmssTxt = (s: number) => { const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+  const withPaceRange = (p?: string|null, tol: number = 0.04): string => {
+    const parsed = parsePaceTxt(p || undefined); if (!parsed) return p ? ` @ ${p}` : '';
+    const lo = Math.round(parsed.sec*(1-tol)); const hi = Math.round(parsed.sec*(1+tol));
+    return ` @ ${mmssTxt(parsed.sec)}/${parsed.unit} (${mmssTxt(lo)}/${parsed.unit}–${mmssTxt(hi)}/${parsed.unit})`;
+  };
   const wattsForPctRange = (pctRange?: string): string | undefined => {
     try {
       if (!pctRange) return undefined;
@@ -923,7 +933,7 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
       if (segType === 'run_segment') {
         const s = toSec(String(seg?.duration||'')); totalSec += s;
         const p = resolvePace(seg?.target_pace);
-        push(`Run ${mm(s)} min${p?` @ ${p}`:''}`);
+        push(`Run ${mm(s)} min${isRun?withPaceRange(p, 0.06):(p?` @ ${p}`:'')}`);
         continue;
       }
       if (segType === 'swim_segment') {
@@ -954,7 +964,7 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
           const lo = Math.round(ftpNum*0.60); const hi = Math.round(ftpNum*0.65);
           push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min @ ${lo}–${hi} W`);
         } else {
-          push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${easy?` @ ${easy}`:''}`);
+          push(`${kind === 'warmup' ? 'Warm‑up' : 'Cool‑down'} ${mm(sec)} min${isRun?withPaceRange(easy, 0.06):(easy?` @ ${easy}`:'')}`);
         }
       }
       continue;
@@ -1023,12 +1033,12 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
       }
       // build text
       const jogPace = isRun ? (resolvePace('user.easyPace') || resolvePace({ baseline: 'user.easyPace' })) : null;
-      if (/mi\b/i.test(distTxt)) push(`${reps} × ${parseFloat(distTxt)} mi${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog${jogPace?` @ ${jogPace}`:''}`:''}`);
-      else if (/m\b/i.test(distTxt)) push(`${reps} × ${distTxt}${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog${jogPace?` @ ${jogPace}`:''}`:''}`);
+      if (/mi\b/i.test(distTxt)) push(`${reps} × ${parseFloat(distTxt)} mi${isRun?withPaceRange(pace, 0.04):(pace?` @ ${pace}`:'')}${restS?` with ${mm(restS)} min jog${isRun?withPaceRange(jogPace, 0.06):(jogPace?` @ ${jogPace}`:'')}`:''}`);
+      else if (/m\b/i.test(distTxt)) push(`${reps} × ${distTxt}${isRun?withPaceRange(pace, 0.04):(pace?` @ ${pace}`:'')}${restS?` with ${mm(restS)} min jog${isRun?withPaceRange(jogPace, 0.06):(jogPace?` @ ${jogPace}`:'')}`:''}`);
       else if (/s|min/i.test(String(work?.duration||''))) {
         const ws = toSec(String(work?.duration));
         totalSec += reps*ws;
-        push(`${reps} × ${mm(ws)} min${pace?` @ ${pace}`:''}${restS?` with ${mm(restS)} min jog`:''}`);
+        push(`${reps} × ${mm(ws)} min${isRun?withPaceRange(pace, 0.04):(pace?` @ ${pace}`:'')}${restS?` with ${mm(restS)} min jog${isRun?withPaceRange(jogPace, 0.06):(jogPace?` @ ${jogPace}`:'')}`:''}`);
       }
       continue;
     }
@@ -1044,7 +1054,7 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
       } else {
         const base = resolvePace(p); if (base) pTxt = base;
       }
-      push(`Tempo ${mm(durS)} min${pTxt?` @ ${pTxt}`:''}`);
+      push(`Tempo ${mm(durS)} min${isRun?withPaceRange(pTxt, 0.04):(pTxt?` @ ${pTxt}`:'')}`);
       continue;
     }
     if (type === 'bike_intervals' && kind === 'main_set') {

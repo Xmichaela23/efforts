@@ -1534,6 +1534,32 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           if (type==='endurance_session' && (k==='main_effort' || k==='main')) { const sec = toSec(String(seg?.duration||'')); if (sec>0){ const st:any={ type:'interval', duration_s: sec }; if (disc==='run'){ const ep=String((perfNumbers as any)?.easyPace||''); const pp=parsePace(ep); if (pp.sec){ const center=toSecPerMi(pp.sec, pp.unit); st.pace_range={lower:Math.round(center*(1-tolEasy)), upper:Math.round(center*(1+tolEasy))}; st.pace_sec_per_mi=center; } } out.push(st);} continue; }
         }
         if (out.length) {
+          // Derive durations for RUN distance-based steps using available pace info
+          try {
+            if (disc === 'run') {
+              const easyTxt = String((perfNumbers as any)?.easyPace || (perfNumbers as any)?.easy_pace || (perfNumbers as any)?.fiveK_pace || (perfNumbers as any)?.fiveKPace || '').trim();
+              const toSecPerMiFromTxt = (txt?: string): number | undefined => {
+                if (!txt) return undefined; const m = String(txt).trim().match(/(\d+):(\d{2})\s*\/(mi|km)/i); if (!m) return undefined; const sec = parseInt(m[1],10)*60+parseInt(m[2],10); return (m[3].toLowerCase()==='mi')? sec : Math.round(sec*1.60934);
+              };
+              for (const st of out as any[]) {
+                if (typeof (st as any).distance_m === 'number' && (st as any).distance_m>0 && !(typeof (st as any).duration_s === 'number' && (st as any).duration_s>0)) {
+                  let secPerMi: number | undefined = undefined;
+                  if (typeof (st as any).pace_sec_per_mi === 'number') secPerMi = (st as any).pace_sec_per_mi;
+                  else if ((st as any).pace_range && typeof (st as any).pace_range.lower === 'number' && typeof (st as any).pace_range.upper === 'number') {
+                    const lo = (st as any).pace_range.lower; const hi = (st as any).pace_range.upper; secPerMi = Math.round((lo+hi)/2);
+                  } else if (typeof (st as any).paceTarget === 'string') {
+                    secPerMi = toSecPerMiFromTxt((st as any).paceTarget);
+                  }
+                  if (typeof secPerMi !== 'number' || !isFinite(secPerMi) || secPerMi<=0) {
+                    secPerMi = toSecPerMiFromTxt(easyTxt);
+                  }
+                  if (typeof secPerMi === 'number' && isFinite(secPerMi) && secPerMi>0) {
+                    const miles = Number((st as any).distance_m)/1609.34; (st as any).duration_s = Math.max(1, Math.round(miles * secPerMi));
+                  }
+                }
+              }
+            }
+          } catch {}
           computedStepsV3 = out;
         }
       }
@@ -1841,7 +1867,14 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
         if (parts.length) rendered = parts.join(' • ');
       } catch {}
     }
-    const totalDurSeconds = computedStepsV3 && computedStepsV3.length ? totalDurationSeconds(computedStepsV3 as any) : 0;
+    // Strength session buffer: add a small session-level overhead once per strength workout
+    let totalDurSeconds = computedStepsV3 && computedStepsV3.length ? totalDurationSeconds(computedStepsV3 as any) : 0;
+    try {
+      if (mappedType === 'strength' && totalDurSeconds > 0) {
+        const SESSION_BUFFER_S = 180; // 3 minutes setup/cleanup
+        totalDurSeconds += SESSION_BUFFER_S;
+      }
+    } catch {}
 
     // Ride-friendly rendered description: prefer power over pace for bikes
     if (mappedType === 'ride') {
