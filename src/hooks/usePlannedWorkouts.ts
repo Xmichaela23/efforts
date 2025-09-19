@@ -384,7 +384,7 @@ export const usePlannedWorkouts = () => {
 
 // Lightweight Today-only planned query for fast initial render
 export const usePlannedWorkoutsToday = (dateIso: string) => {
-  const [rows, setRows] = useState<Array<Pick<PlannedWorkout, 'id' | 'name' | 'type' | 'date' | 'workout_status'>>>([]);
+  const [rows, setRows] = useState<Array<any>>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -398,7 +398,21 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
         if (!user) { setRows([]); return; }
         const { data, error } = await supabase
           .from('planned_workouts')
-          .select('id,name,type,date,workout_status')
+          .select(`
+            id,
+            name,
+            type,
+            date,
+            workout_status,
+            description,
+            rendered_description,
+            tags,
+            steps_preset,
+            computed,
+            workout_structure,
+            workout_title,
+            export_hints
+          `)
           .eq('user_id', user.id)
           .eq('date', dateIso)
           .limit(50);
