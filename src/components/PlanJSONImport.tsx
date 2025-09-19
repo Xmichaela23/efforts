@@ -495,12 +495,19 @@ export default function PlanJSONImport({ onClose }: { onClose?: () => void }) {
                 {Object.keys(planPreview.sessions_by_week).sort((a,b)=>parseInt(a,10)-parseInt(b,10)).map(week => {
                   const sessions = (planPreview.sessions_by_week[week] || []).slice().sort(byDay);
                   const mins = sessions.reduce((t: number, s: any) => t + (typeof s.duration === 'number' ? s.duration : 0), 0);
+                  const ws = ((planPreview as any)?.weekly_summaries || {})[week] || {};
                   return (
                     <div key={week} className="border rounded p-2">
                       <div className="flex items-center justify-between">
                         <div className="text-sm font-medium">Week {week}</div>
                         <div className="text-xs text-gray-600">{sessions.length} sessions{mins>0?` • ${mins} min`:''}</div>
                       </div>
+                      {(ws?.focus || ws?.notes) && (
+                        <div className="mt-1 text-xs text-gray-700">
+                          {ws?.focus && (<div className="font-medium">{ws.focus}</div>)}
+                          {ws?.notes && (<div className="mt-0.5 text-gray-600">{ws.notes}</div>)}
+                        </div>
+                      )}
                       <div className="mt-2 grid grid-cols-1 gap-1">
                         {sessions.map((s: any, i: number) => {
                           const fallback = [s.discipline || s.type || '']
