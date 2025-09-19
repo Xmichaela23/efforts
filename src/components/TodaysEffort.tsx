@@ -88,31 +88,21 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [scrollRef, sentinelRef]);
 
   const dateWorkoutsMemo = useMemo(() => {
-    // Show only planned rows from planned_workouts; completed planned rows are hidden
+    // Include today's planned rows and all completed rows
     const plannedSource = (plannedToday || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
-    const allWorkouts = [...(workouts || []), ...plannedSource];
-    // Filter by date
-    const sameDate = allWorkouts.filter((w: any) => w.date === activeDate);
-    // De‑dupe by type/date: prefer completed workout over planned
-    const byKey = new Map<string, any>();
-    for (const w of sameDate) {
-      const key = `${String(w.type||'').toLowerCase()}|${w.date}`;
-      const isCompleted = String(w.workout_status||w.status||'').toLowerCase()==='completed';
-      // If this is a planned row that is incorrectly marked completed (no matching completed workout in state), coerce to planned
-      if (!isCompleted && Array.isArray((w as any).steps_preset)) {
-        (w as any).workout_status = 'planned';
-      }
-      const existing = byKey.get(key);
-      if (!existing) { byKey.set(key, w); continue; }
-      const existingCompleted = String(existing.workout_status||existing.status||'').toLowerCase()==='completed';
-      // Prefer completed over planned; if both completed (provider + DB), keep the DB one
-      if (isCompleted && !existingCompleted) { byKey.set(key, w); continue; }
-      if (isCompleted && existingCompleted) {
-        const preferExistingDb = !(String((w?.id||'')).startsWith('garmin_') || String((w?.id||'')).startsWith('strava_'));
-        if (preferExistingDb) byKey.set(key, w);
-      }
-    }
-    return Array.from(byKey.values());
+    const all = [...(workouts || []), ...plannedSource].filter((w:any)=> w.date === activeDate);
+    const completed = all.filter((w:any)=> String(w.workout_status||w.status||'').toLowerCase()==='completed');
+    const planned = all.filter((w:any)=> String(w.workout_status||w.status||'').toLowerCase()!=='completed');
+
+    // Build set of types that already have a completed workout for the date
+    const typeKey = (w:any)=> `${String(w.type||'').toLowerCase()}|${w.date}`;
+    const completedTypes = new Set(completed.map(typeKey));
+
+    // Keep planned only if there is no completed of the same type for the date
+    const plannedKept = planned.filter((w:any)=> !completedTypes.has(typeKey(w)));
+
+    // Return all completed (including multiples of same type) plus remaining planned
+    return [...completed, ...plannedKept];
   }, [workouts, plannedToday, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
