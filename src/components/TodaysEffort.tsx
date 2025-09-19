@@ -253,7 +253,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               abbreviation = exerciseName.split(' ').map(word => word[0]).join('').toUpperCase();
             }
             
-            return `${abbreviation} ${sets}s ${Math.round(avgReps)}r ${weightRange}`;
+            // Show only reps and weight range – omit set counts and any time tokens
+            return `${abbreviation} ${Math.round(avgReps)}r ${weightRange}`;
           });
           
           return exerciseSummaries.map((summary, index) => {
