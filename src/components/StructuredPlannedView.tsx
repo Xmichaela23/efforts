@@ -93,6 +93,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   // Prefer computed steps for swims so drills/rests render even without structured distance/duration
   let handledByComputed = false;
   let totalYdFromComputed: number | undefined = undefined;
+  let totalYdFromStruct: number | undefined = undefined;
   try {
     const compSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
     if (parentDisc === 'swim' && compSteps.length) {
@@ -153,6 +154,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const dist = String(seg?.distance||'');
       if (dist) {
         const yd = /yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144);
+        if (parentDisc==='swim' && Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd;
         const addPace = (!isStrengthContext && parentDisc==='run' && easy) ? buildPaceWithRange(easy, tolEasy) : '';
         const ftpNum = typeof (pn as any)?.ftp === 'number' ? (pn as any).ftp : undefined;
         const addPower = (parentDisc==='ride' && typeof ftpNum==='number' && isFinite(ftpNum)) ? ` @ ${Math.round(ftpNum*0.60)}–${Math.round(ftpNum*0.65)} W` : '';
@@ -214,8 +216,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       continue;
     }
     if (type==='swim_session') {
-      if (k==='drill_set') { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — drill ${String(seg?.drill_type||'').replace(/_/g,' ')}`); if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
-      if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
+      if (k==='drill_set') { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd — drill ${String(seg?.drill_type||'').replace(/_/g,' ')}`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
+      if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
     }
     if (type==='strength_session' && (k==='main_lift' || k==='accessory')) {
       const name=String(seg?.exercise||'').replace(/_/g,' '); const sets=Number(seg?.sets)||0; const reps=String(seg?.reps||'').toUpperCase(); const pct=Number(seg?.load?.percentage)||0; const baseKey=String(seg?.load?.baseline||'').replace(/^user\./i,''); const orm=pn[baseKey]; const load = (typeof orm==='number'&&pct>0)? `${Math.max(5, Math.round((orm*(pct/100))/5)*5)} lb` : (pct?`${pct}%`:undefined); for(let r=0;r<Math.max(1,sets);r+=1){ lines.push(`${name} 1 × ${reps}${load?` @ ${load}`:''}`); if (r<sets-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue;
@@ -368,7 +370,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold">{String(ws?.title || (workout as any)?.title || '') || 'Planned'}</div>
           <div className="text-sm text-gray-500 flex items-center gap-3">
-            {parentDisc==='swim' && typeof totalYdFromComputed==='number' && totalYdFromComputed>0 ? <span>{`${totalYdFromComputed} yd`}</span> : null}
+            {parentDisc==='swim' && ((typeof totalYdFromComputed==='number' && totalYdFromComputed>0) || (typeof totalYdFromStruct==='number' && totalYdFromStruct>0)) ? <span>{`${(totalYdFromComputed||0)+(totalYdFromStruct||0)} yd`}</span> : null}
             {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}
           </div>
         </div>
