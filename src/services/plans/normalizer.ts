@@ -143,72 +143,68 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       summaryParts.push(`Easy ${mins} min`);
     }
   }
-  // Intervals like interval_6x800m_5kpace_R2min
-  // Important: pace tag must stop at the next underscore so it doesn't swallow _r2min
-  const im = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_]+?)(?:_(plus\d+(?::\d{2})?))?(?:_r(\d+)(?:-(\d+))?(?:min)?)?/i);
-  if (im) {
-    const reps = parseInt(im[1], 10);
-    const per = parseFloat(im[2]);
-    const unit = im[3].toLowerCase();
-    const paceTag = im[4];
-    const plus = im[5];
-    const restA = im[6] ? parseInt(im[6], 10) : 0;
-    const restB = im[7] ? parseInt(im[7], 10) : restA;
-    let restEach = restA ? Math.round((restA + restB) / 2) : 0;
-    if (!restEach) {
-      // Fallback: detect rest minutes from the raw token when regex misses
-      const restAlt = tokenStr.match(/interval_[^\s]*?_r(\d+)(?:-(\d+))?min/i);
-      if (restAlt) {
-        const a = parseInt(restAlt[1], 10);
-        const b = restAlt[2] ? parseInt(restAlt[2], 10) : a;
-        restEach = Math.round((a + b) / 2);
-      }
-    }
+  // Intervals like interval_6x800m_5kpace_R2min (order of pace/rest may vary)
+  {
+    const base = tokenStr.match(/interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)/i);
+    if (base) {
+      const reps = parseInt(base[1], 10);
+      const per = parseFloat(base[2]);
+      const unit = base[3].toLowerCase();
+      // Extract pace tag anywhere in token string
+      const paceTag = /5kpace/i.test(tokenStr) ? '5kpace' : /10kpace/i.test(tokenStr) ? '10kpace' : /easypace/i.test(tokenStr) ? 'easypace' : '';
+      const plusTok = tokenStr.match(/_plus(\d+(?::\d{2})?)/i)?.[0] || '';
+      const rMatch = tokenStr.match(/_r(\d+)(?:-(\d+))?(?:min)?/i);
+      const restA = rMatch ? parseInt(rMatch[1], 10) : 0;
+      const restB = rMatch && rMatch[2] ? parseInt(rMatch[2], 10) : restA;
+      const restEach = restA ? Math.round((restA + restB) / 2) : 0;
 
-    let pace = resolvePaceToken(paceTag, baselines) || '';
-    pace = applyOffset(pace, plus || undefined);
-    const distMiles = unit === 'mi' ? per : per / 1609.34;
-    let workMin = 0;
-    let mainText = `${reps} × ${unit === 'mi' ? per : Math.round(per)} ${unit}`;
+      let pace = resolvePaceToken(paceTag, baselines) || '';
+      // Fallback to easy pace if specific tag missing to avoid zero work time
+      if (!pace) pace = resolvePaceToken('easypace', baselines) || '';
+      pace = applyOffset(pace, plusTok || undefined);
+      const distMiles = unit === 'mi' ? per : per / 1609.34;
+      let workMin = 0;
+      let mainText = `${reps} × ${unit === 'mi' ? per : Math.round(per)} ${unit}`;
 
-    // Fallback: parse explicit pace from description when baseline token is missing
-    const descPace = ((): { sec: number; unit: 'mi'|'km' } | null => {
-      const d = String(session?.description || '').toLowerCase();
-      const m = d.match(/@(\s*)?(\d+):(\d{2})\s*\/\s*(mi|km)/i);
-      if (!m) return null;
-      return { sec: parseInt(m[2],10)*60 + parseInt(m[3],10), unit: m[4].toLowerCase() as any };
-    })();
+      // Fallback: parse explicit pace from description when baseline token is missing
+      const descPace = ((): { sec: number; unit: 'mi'|'km' } | null => {
+        const d = String(session?.description || '').toLowerCase();
+        const m = d.match(/@(\s*)?(\d+):(\d{2})\s*\/\s*(mi|km)/i);
+        if (!m) return null;
+        return { sec: parseInt(m[2],10)*60 + parseInt(m[3],10), unit: m[4].toLowerCase() as any };
+      })();
 
-    if (pace) {
-      const parsed = parsePace(pace);
-      if (parsed) {
-        const rng = paceRange(pace, hQ);
-        const perMi = paceSecondsPerMile(parsed);
+      if (pace) {
+        const parsed = parsePace(pace);
+        if (parsed) {
+          const rng = paceRange(pace, hQ);
+          const perMi = paceSecondsPerMile(parsed);
+          workMin = (reps * distMiles * perMi) / 60;
+          mainText += ` @ ${mmss(parsed.seconds)}/${parsed.unit} (${rng[0]}–${rng[1]})`;
+          primary = { type: 'pace', value: pace, range: rng };
+        }
+      } else if (descPace) {
+        const rng = [ `${mmss(descPace.sec*(1-hQ))}/${descPace.unit}`, `${mmss(descPace.sec*(1+hQ))}/${descPace.unit}` ] as [string,string];
+        const perMi = descPace.unit === 'km' ? Math.round(descPace.sec * 1.60934) : descPace.sec;
         workMin = (reps * distMiles * perMi) / 60;
-        mainText += ` @ ${mmss(parsed.seconds)}/${parsed.unit} (${rng[0]}–${rng[1]})`;
-        primary = { type: 'pace', value: pace, range: rng };
+        mainText += ` @ ${mmss(descPace.sec)}/${descPace.unit} (${rng[0]}–${rng[1]})`;
+        primary = { type: 'pace', value: `${mmss(descPace.sec)}/${descPace.unit}`, range: rng };
       }
-    } else if (descPace) {
-      const rng = [ `${mmss(descPace.sec*(1-hQ))}/${descPace.unit}`, `${mmss(descPace.sec*(1+hQ))}/${descPace.unit}` ] as [string,string];
-      const perMi = descPace.unit === 'km' ? Math.round(descPace.sec * 1.60934) : descPace.sec;
-      workMin = (reps * distMiles * perMi) / 60;
-      mainText += ` @ ${mmss(descPace.sec)}/${descPace.unit} (${rng[0]}–${rng[1]})`;
-      primary = { type: 'pace', value: `${mmss(descPace.sec)}/${descPace.unit}`, range: rng };
-    }
 
-    const restMin = restEach * Math.max(0, reps - 1);
-    totalMin += Math.round(workMin + restMin);
-    if (restEach) {
-      const easy = resolvePaceToken('easypace', baselines);
-      if (easy) {
-        const p = parsePace(easy)!;
-        const rng = paceRange(easy, hE);
-        summaryParts.push(`${mainText} w ${restEach} min jog @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`);
+      const restMin = restEach * Math.max(0, reps - 1);
+      totalMin += Math.round(workMin + restMin);
+      if (restEach) {
+        const easy = resolvePaceToken('easypace', baselines);
+        if (easy) {
+          const p = parsePace(easy)!;
+          const rng = paceRange(easy, hE);
+          summaryParts.push(`${mainText} w ${restEach} min jog @ ${mmss(p.seconds)}/${p.unit} (${rng[0]}–${rng[1]})`);
+        } else {
+          summaryParts.push(`${mainText} w ${restEach} min jog`);
+        }
       } else {
-        summaryParts.push(`${mainText} w ${restEach} min jog`);
+        summaryParts.push(mainText);
       }
-    } else {
-      summaryParts.push(mainText);
     }
   }
 
