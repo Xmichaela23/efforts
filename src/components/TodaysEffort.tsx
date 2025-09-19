@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
 import { usePlannedWorkoutsToday } from '@/hooks/usePlannedWorkouts';
@@ -26,6 +26,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const [baselines, setBaselines] = useState<any | null>(null);
   const [dayLoc, setDayLoc] = useState<{ lat: number; lng: number } | null>(null);
   const [locTried, setLocTried] = useState(false);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const [showFade, setShowFade] = useState(true);
 
   // 🔧 FIXED: Use Pacific timezone for date calculations to avoid timezone issues
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
@@ -69,6 +72,20 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       });
     } catch {}
   }, [activeDate, today, dayLoc, locTried]);
+
+  // Toggle bottom fade only when not at bottom using IntersectionObserver sentinel
+  useEffect(() => {
+    const root = scrollRef.current;
+    const sentinel = sentinelRef.current;
+    if (!root || !sentinel) return;
+    const io = new IntersectionObserver((entries) => {
+      const entry = entries[0];
+      // If sentinel is visible within scroll container, we are at/near bottom → hide fade
+      setShowFade(!entry.isIntersecting);
+    }, { root, threshold: 1.0 });
+    io.observe(sentinel);
+    return () => { try { io.disconnect(); } catch {} };
+  }, [scrollRef, sentinelRef]);
 
   const dateWorkoutsMemo = useMemo(() => {
     // Show only planned rows from planned_workouts; completed planned rows are hidden
@@ -464,8 +481,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {/* Content area - scrolls vertically (reverted) */}
-      <div className="flex-1 overflow-auto overscroll-contain scrollbar-hide">
-        <div className="px-3 pb-2">
+      <div ref={scrollRef} className="flex-1 overflow-auto overscroll-contain scrollbar-hide">
+        <div className="px-3 pb-2" style={{ paddingBottom: 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
           <div className="flex items-center justify-center h-full px-4">
@@ -595,52 +612,57 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             </div>
           </div>
         )}
+          {/* Bottom sentinel to detect end-of-list */}
+          <div ref={sentinelRef} style={{ height: 1 }} />
         </div>
       </div>
-      {/* Bottom fade overlay (stronger) */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 0,
-          height: 40,
-          pointerEvents: 'none',
-          background:
-            'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 55%, rgba(255,255,255,1) 100%)',
-          boxShadow: 'inset 0 -10px 16px rgba(0,0,0,0.04)'
-        }}
-      />
-      {/* Subtle chevron hint */}
-      <div
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          bottom: 8,
-          display: 'flex',
-          justifyContent: 'center',
-          pointerEvents: 'none'
-        }}
-      >
-        <span
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            width: 22,
-            height: 22,
-            borderRadius: 9999,
-            background: 'rgba(255,255,255,0.9)',
-            color: 'rgba(0,0,0,0.38)',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
-          }}
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="6 9 12 15 18 9" />
-          </svg>
-        </span>
-      </div>
+      {/* Bottom fade overlay (shown only when not at bottom) */}
+      {showFade && (
+        <>
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              height: 40,
+              pointerEvents: 'none',
+              background:
+                'linear-gradient(to bottom, rgba(255,255,255,0) 0%, rgba(255,255,255,0.8) 55%, rgba(255,255,255,1) 100%)',
+              boxShadow: 'inset 0 -10px 16px rgba(0,0,0,0.04)'
+            }}
+          />
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 8,
+              display: 'flex',
+              justifyContent: 'center',
+              pointerEvents: 'none'
+            }}
+          >
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: 22,
+                height: 22,
+                borderRadius: 9999,
+                background: 'rgba(255,255,255,0.9)',
+                color: 'rgba(0,0,0,0.38)',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.08)'
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 };
