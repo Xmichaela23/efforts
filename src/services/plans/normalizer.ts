@@ -97,6 +97,16 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
     return Math.round((a + b) / 2);
   };
 
+  // Helpers to align pace units to distance units for time computations
+  const paceSecondsPerMile = (parsed: { seconds: number; unit: 'mi' | 'km' }): number => {
+    // Convert seconds per km to seconds per mi when needed
+    return parsed.unit === 'km' ? Math.round(parsed.seconds * 1.60934) : parsed.seconds;
+  };
+  const paceSecondsPerMeter = (parsed: { seconds: number; unit: 'mi' | 'km' }): number => {
+    // Convert to seconds per meter for distance in meters
+    return parsed.unit === 'km' ? (parsed.seconds / 1000) : (parsed.seconds / 1609.34);
+  };
+
   // Warmup / Cooldown (include easy pace where available for RUN only)
   steps.forEach((t) => {
     const lower = t.toLowerCase();
@@ -173,13 +183,15 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       const parsed = parsePace(pace);
       if (parsed) {
         const rng = paceRange(pace, hQ);
-        workMin = (reps * distMiles * parsed.seconds) / 60;
+        const perMi = paceSecondsPerMile(parsed);
+        workMin = (reps * distMiles * perMi) / 60;
         mainText += ` @ ${mmss(parsed.seconds)}/${parsed.unit} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: pace, range: rng };
       }
     } else if (descPace) {
       const rng = [ `${mmss(descPace.sec*(1-hQ))}/${descPace.unit}`, `${mmss(descPace.sec*(1+hQ))}/${descPace.unit}` ] as [string,string];
-      workMin = (reps * distMiles * descPace.sec) / 60;
+      const perMi = descPace.unit === 'km' ? Math.round(descPace.sec * 1.60934) : descPace.sec;
+      workMin = (reps * distMiles * perMi) / 60;
       mainText += ` @ ${mmss(descPace.sec)}/${descPace.unit} (${rng[0]}–${rng[1]})`;
       primary = { type: 'pace', value: `${mmss(descPace.sec)}/${descPace.unit}`, range: rng };
     }
@@ -216,7 +228,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       const parsed = parsePace(pace);
       if (parsed) {
         const rng = paceRange(pace, hQ);
-        totalMin += Math.round(reps * (dist * parsed.seconds) / 60) + rmin * Math.max(0, reps - 1);
+        const perMi = paceSecondsPerMile(parsed);
+        totalMin += Math.round(reps * (dist * perMi) / 60) + rmin * Math.max(0, reps - 1);
         mainText += ` @ ${pace} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: pace, range: rng };
       }
@@ -228,7 +241,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         const secv = parseInt(m[2],10)*60 + parseInt(m[3],10);
         const unit = m[4].toLowerCase();
         const rng = [ `${mmss(secv*(1-hQ))}/${unit}`, `${mmss(secv*(1+hQ))}/${unit}` ] as [string,string];
-        totalMin += Math.round(reps * (dist * secv) / 60) + rmin * Math.max(0, reps - 1);
+        const perMi = unit === 'km' ? Math.round(secv * 1.60934) : secv;
+        totalMin += Math.round(reps * (dist * perMi) / 60) + rmin * Math.max(0, reps - 1);
         mainText += ` @ ${mmss(secv)}/${unit} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: `${mmss(secv)}/${unit}`, range: rng };
       } else {
@@ -262,7 +276,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       const parsed = parsePace(pace);
       if (parsed) {
         const rng = paceRange(pace, hQ);
-        totalMin += Math.round((dist * parsed.seconds) / 60);
+        const perMi = paceSecondsPerMile(parsed);
+        totalMin += Math.round((dist * perMi) / 60);
         text += ` @ ${mmss(parsed.seconds)}/${parsed.unit} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: pace, range: rng };
       }
@@ -274,7 +289,8 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
         const secv = parseInt(m[2],10)*60 + parseInt(m[3],10);
         const unit = m[4].toLowerCase();
         const rng = [ `${mmss(secv*(1-hQ))}/${unit}`, `${mmss(secv*(1+hQ))}/${unit}` ] as [string,string];
-        totalMin += Math.round((dist * secv) / 60);
+        const perMi = unit === 'km' ? Math.round(secv * 1.60934) : secv;
+        totalMin += Math.round((dist * perMi) / 60);
         text += ` @ ${mmss(secv)}/${unit} (${rng[0]}–${rng[1]})`;
         primary = { type: 'pace', value: `${mmss(secv)}/${unit}`, range: rng };
       }
