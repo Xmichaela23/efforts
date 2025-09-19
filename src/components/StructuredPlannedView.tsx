@@ -89,8 +89,41 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
   const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
   const isStrengthContext = (type === 'strength_session') || (parentDisc === 'strength');
+
+  // Prefer computed steps for swims so drills/rests render even without structured distance/duration
+  let handledByComputed = false;
+  let totalYdFromComputed: number | undefined = undefined;
+  try {
+    const compSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+    if (parentDisc === 'swim' && compSteps.length) {
+      const fmt = (sec:number)=>{ const x=Math.max(1,Math.round(Number(sec)||0)); const m=Math.floor(x/60); const s=x%60; return `${m}:${String(s).padStart(2,'0')}`; };
+      let totalYd = 0;
+      compSteps.forEach((st:any)=>{
+        const label = String(st?.label||'').trim();
+        const eff = String(st?.effortLabel||'').toLowerCase();
+        const typ = String(st?.type||'').toLowerCase();
+        const yd = (():number=>{
+          if (typeof st?.distance_yd === 'number') return st.distance_yd;
+          if (typeof st?.distanceMeters === 'number') return Math.round(st.distanceMeters/0.9144);
+          return 0;
+        })();
+        if (yd>0) totalYd += yd;
+        if (eff === 'rest' || /rest/i.test(label)) { const sec = Number(st?.duration||st?.duration_s||0); lines.push(sec>0?`Rest ${fmt(sec)}`:'Rest'); return; }
+        if (typ === 'warmup' || /warm\s*-?\s*up/i.test(label)) { lines.push(`Warm-up 1 × ${yd} yd`); return; }
+        if (typ === 'cooldown' || /cool\s*-?\s*down/i.test(label)) { lines.push(`Cool-down 1 × ${yd} yd`); return; }
+        if (eff === 'drill' || typ === 'drill' || /drill/i.test(label)) {
+          const name = label.replace(/^drill\s*[—-]?\s*/i,'').trim() || 'drill';
+          lines.push(`1 × ${yd} yd — drill ${name}`); return;
+        }
+        if (/aerobic/i.test(label) || /swim_aerobic/i.test(typ)) { lines.push(`1 × ${yd} yd aerobic`); return; }
+        if (yd>0) { lines.push(`1 × ${yd} yd`); return; }
+      });
+      totalYdFromComputed = totalYd;
+      handledByComputed = lines.length > 0;
+    }
+  } catch {}
   // Brick session: render stacked segments
-  if (type==='brick_session') {
+  if (!handledByComputed && type==='brick_session') {
     let tIdx = 0;
     for (const seg of struct) {
       const k = String(seg?.type||'').toLowerCase();
@@ -114,7 +147,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       if (k==='strength_segment') { const s = toSec(String(seg?.duration||'')); lines.push(`Strength 1 × ${Math.floor(s/60)} min`); continue; }
     }
   }
-  for (const seg of struct) {
+  for (const seg of (handledByComputed?[]:struct)) {
     const k = String(seg?.type||'').toLowerCase();
     if (k==='warmup' || k==='cooldown') {
       const dist = String(seg?.distance||'');
@@ -320,7 +353,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       {showHeader && (
         <div className="flex items-center justify-between">
           <div className="text-base font-semibold">{String(ws?.title || (workout as any)?.title || '') || 'Planned'}</div>
-          <div className="text-sm text-gray-500">{typeof durationMin==='number'?`${durationMin} min`:''}</div>
+          <div className="text-sm text-gray-500 flex items-center gap-3">
+            {parentDisc==='swim' && typeof totalYdFromComputed==='number' && totalYdFromComputed>0 ? <span>{`${totalYdFromComputed} yd`}</span> : null}
+            {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}
+          </div>
         </div>
       )}
       <div className="p-1">
