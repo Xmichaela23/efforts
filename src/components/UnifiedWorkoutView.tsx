@@ -196,7 +196,15 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   }, [activeTab, workout?.id, linkedPlanned?.id]);
 
   const getWorkoutType = () => {
-    // Handle Garmin activity types FIRST (more reliable than stored type)
+    // Trust explicit stored type first (prevents misclassification when provider field is missing/ambiguous)
+    const storedType = String((workout as any)?.type || '').toLowerCase();
+    if (storedType === 'swim') return 'swim';
+    if (storedType === 'run') return 'run';
+    if (storedType === 'ride') return 'ride';
+    if (storedType === 'strength') return 'strength';
+    if (storedType === 'walk') return 'walk';
+
+    // Otherwise, handle Garmin/Strava provider types
     if (workout.activity_type || (workout as any)?.provider_sport) {
       const raw = (workout.activity_type || (workout as any).provider_sport || '').toLowerCase();
       
@@ -217,13 +225,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       }
     }
     
-    // Check stored type (for manually created workouts)
-    if (workout.type === 'run') return 'run';
-    if (workout.type === 'ride') return 'ride';
-    if (workout.type === 'swim') return 'swim';
-    if (workout.type === 'strength') return 'strength';
-    if (workout.type === 'walk') return 'walk';
-    
+    // Legacy/manual fallbacks
     // Fallback logic for legacy names (only if no activity_type match)
     if (workout.name?.toLowerCase().includes('walk')) {
       return 'walk';
