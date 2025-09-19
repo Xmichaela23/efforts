@@ -266,7 +266,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           // STRICT: Only compute from tokens with targets; if tokens absent, surface failure
             if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
               const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
-              let resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type) as any[];
+              let resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, String(row.type||'').toLowerCase()) as any[];
               // Post-process RUN: inject WU/CD from tokens and fill duration for distance-only steps
               try {
                 if (String(row.type||'').toLowerCase()==='run' && Array.isArray(resolved) && resolved.length) {
@@ -304,7 +304,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           try {
             if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
               const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
-              let resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type) as any[];
+              let resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, String(row.type||'').toLowerCase()) as any[];
               // RUN post-process as above (WU/CD + distance duration)
               try {
                 if (String(row.type||'').toLowerCase()==='run' && Array.isArray(resolved) && resolved.length) {
