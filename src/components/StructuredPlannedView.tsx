@@ -190,9 +190,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   }
   // Removed all token fallback paths: structured JSON is the single source of truth
 
-  const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
-  let durationMin = est>0 ? Math.floor(est/60) : undefined;
-  // Fallbacks: computed total → sum(computed.steps) → sum(intervals)
+  // Prefer computed totals; only fall back when no computed totals exist
+  let durationMin: number | undefined = undefined;
+  // Fallbacks: computed total → sum(computed.steps) → sum(intervals) → structured estimate (last resort)
   try {
     if (durationMin == null) {
       const comp: any = (workout as any)?.computed || {};
@@ -224,6 +224,13 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const totalSec = sumIntervals(intervals);
         if (Number.isFinite(totalSec) && totalSec>0) durationMin = Math.max(1, Math.round(totalSec/60));
       }
+    }
+  } catch {}
+  // Final last-resort fallback: structured estimate only if no computed-based duration could be derived
+  try {
+    if (durationMin == null) {
+      const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
+      if (est>0) durationMin = Math.floor(est/60);
     }
   } catch {}
 

@@ -933,9 +933,7 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
         const s = toSec(String(seg?.duration||'')); totalSec += s; push(`Strength ${mm(s)} min`); continue;
       }
     }
-    if (typeof ws.total_duration_estimate === 'string') {
-      const est = toSec(ws.total_duration_estimate); if (est > 0) totalSec = Math.max(totalSec, est);
-    }
+    // Do not inflate totals from ws.total_duration_estimate; rely on structured segments only
     const friendly = lines.join(' • ');
     return { friendlySummary: friendly, durationMinutes: mm(totalSec), stepLines: lines };
   }
@@ -1071,11 +1069,7 @@ export function normalizeStructuredSession(session: any, baselines: Baselines): 
     }
   }
 
-  // Duration: prefer a meaningful estimate over rest-only accumulation
-  if (typeof ws.total_duration_estimate === 'string') {
-    const est = toSec(ws.total_duration_estimate);
-    if (est > 0) totalSec = Math.max(totalSec, est);
-  }
+  // Do not inflate totals from ws.total_duration_estimate; rely on structured segments only
   const friendly = lines.join(' • ');
   return { friendlySummary: friendly, durationMinutes: mm(totalSec), stepLines: lines };
 }

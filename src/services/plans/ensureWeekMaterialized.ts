@@ -465,7 +465,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
                   workout_structure: bridged,
                   workout_title: bridged?.title || null,
                   friendly_summary: (sr?.friendlySummary || row.rendered_description || row.description || '').trim() || null,
-                  total_duration_seconds: Math.max(Number(row.total_duration_seconds||0), Math.round((sr?.durationMinutes||0)*60)) || null,
+                  // Do not override total_duration_seconds from structured estimates; computed is source of truth
                 }).eq('id', row.id);
               }
             }
