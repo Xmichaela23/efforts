@@ -266,8 +266,34 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           // STRICT: Only compute from tokens with targets; if tokens absent, surface failure
             if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
               const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
-              const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type);
-            if (!Array.isArray(resolved) || resolved.length === 0) throw new Error('Materialization failed: no resolvable steps');
+              let resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type) as any[];
+              // Post-process RUN: inject WU/CD from tokens and fill duration for distance-only steps
+              try {
+                if (String(row.type||'').toLowerCase()==='run' && Array.isArray(resolved) && resolved.length) {
+                  const toks: string[] = Array.isArray(row?.steps_preset) ? (row.steps_preset as any[]).map((t:any)=>String(t).toLowerCase()) : [];
+                  const m = (re: RegExp) => toks.map(t=>t.match(re)).find(Boolean) as RegExpMatchArray | undefined;
+                  const toSec = (mm?: RegExpMatchArray) => mm ? parseInt(mm[1],10)*60 : 0;
+                  const wu = m(/warm\s*-?\s*up.*?(\d{1,3})\s*min/);
+                  const cd = m(/cool\s*-?\s*down.*?(\d{1,3})\s*min/);
+                  const hasWU = resolved.some(st => String((st as any)?.type||'').toLowerCase()==='warmup');
+                  const hasCD = resolved.some(st => String((st as any)?.type||'').toLowerCase()==='cooldown');
+                  if (wu && !hasWU) resolved = [{ type:'warmup', duration_s: toSec(wu) } as any, ...resolved];
+                  if (cd && !hasCD) resolved = [...resolved, { type:'cooldown', duration_s: toSec(cd) } as any];
+                  const easyTxt = String((perfNumbersUpgrade as any)?.easyPace || (perfNumbersUpgrade as any)?.easy_pace || (perfNumbersUpgrade as any)?.fiveK_pace || (perfNumbersUpgrade as any)?.fiveKPace || '').trim();
+                  const toSecPerMiFromTxt = (txt?: string): number | undefined => { if(!txt) return undefined; const x=String(txt).match(/(\d+):(\d{2})\s*\/(mi|km)/i); if(!x) return undefined; const sec=parseInt(x[1],10)*60+parseInt(x[2],10); return x[3].toLowerCase()==='mi'? sec : Math.round(sec*1.60934); };
+                  for (const st of resolved as any[]) {
+                    const hasDist = typeof (st as any).distance_m === 'number' && (st as any).distance_m>0;
+                    const missingDur = !(typeof (st as any).duration_s === 'number' && (st as any).duration_s>0);
+                    if (hasDist && missingDur) {
+                      let secPerMi: number | undefined = typeof (st as any).pace_sec_per_mi === 'number' ? (st as any).pace_sec_per_mi : undefined;
+                      if (typeof secPerMi !== 'number') secPerMi = toSecPerMiFromTxt(String((st as any).target_value||easyTxt));
+                      if (typeof secPerMi === 'number' && isFinite(secPerMi) && secPerMi>0) {
+                        const miles = Number((st as any).distance_m)/1609.34; (st as any).duration_s = Math.max(1, Math.round(miles * secPerMi));
+                      }
+                    }
+                  }
+                }
+              } catch {}
               const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: totalDurationSeconds(resolved as any) } as any;
               await supabase.from('planned_workouts').update({ computed: nextComputed }).eq('id', row.id);
           } else {
@@ -278,7 +304,34 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
           try {
             if (Array.isArray(row?.steps_preset) && (row.steps_preset as any[]).length>0) {
               const atomic = expand((row.steps_preset as any[]) || [], undefined, row.tags as any);
-              const resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type);
+              let resolved = resolveTargets(atomic as any, perfNumbersUpgrade, row.export_hints || {}, row.type) as any[];
+              // RUN post-process as above (WU/CD + distance duration)
+              try {
+                if (String(row.type||'').toLowerCase()==='run' && Array.isArray(resolved) && resolved.length) {
+                  const toks: string[] = Array.isArray(row?.steps_preset) ? (row.steps_preset as any[]).map((t:any)=>String(t).toLowerCase()) : [];
+                  const m = (re: RegExp) => toks.map(t=>t.match(re)).find(Boolean) as RegExpMatchArray | undefined;
+                  const toSec = (mm?: RegExpMatchArray) => mm ? parseInt(mm[1],10)*60 : 0;
+                  const wu = m(/warm\s*-?\s*up.*?(\d{1,3})\s*min/);
+                  const cd = m(/cool\s*-?\s*down.*?(\d{1,3})\s*min/);
+                  const hasWU = resolved.some(st => String((st as any)?.type||'').toLowerCase()==='warmup');
+                  const hasCD = resolved.some(st => String((st as any)?.type||'').toLowerCase()==='cooldown');
+                  if (wu && !hasWU) resolved = [{ type:'warmup', duration_s: toSec(wu) } as any, ...resolved];
+                  if (cd && !hasCD) resolved = [...resolved, { type:'cooldown', duration_s: toSec(cd) } as any];
+                  const easyTxt = String((perfNumbersUpgrade as any)?.easyPace || (perfNumbersUpgrade as any)?.easy_pace || (perfNumbersUpgrade as any)?.fiveK_pace || (perfNumbersUpgrade as any)?.fiveKPace || '').trim();
+                  const toSecPerMiFromTxt = (txt?: string): number | undefined => { if(!txt) return undefined; const x=String(txt).match(/(\d+):(\d{2})\s*\/(mi|km)/i); if(!x) return undefined; const sec=parseInt(x[1],10)*60+parseInt(x[2],10); return x[3].toLowerCase()==='mi'? sec : Math.round(sec*1.60934); };
+                  for (const st of resolved as any[]) {
+                    const hasDist = typeof (st as any).distance_m === 'number' && (st as any).distance_m>0;
+                    const missingDur = !(typeof (st as any).duration_s === 'number' && (st as any).duration_s>0);
+                    if (hasDist && missingDur) {
+                      let secPerMi: number | undefined = typeof (st as any).pace_sec_per_mi === 'number' ? (st as any).pace_sec_per_mi : undefined;
+                      if (typeof secPerMi !== 'number') secPerMi = toSecPerMiFromTxt(String((st as any).target_value||easyTxt));
+                      if (typeof secPerMi === 'number' && isFinite(secPerMi) && secPerMi>0) {
+                        const miles = Number((st as any).distance_m)/1609.34; (st as any).duration_s = Math.max(1, Math.round(miles * secPerMi));
+                      }
+                    }
+                  }
+                }
+              } catch {}
               if (Array.isArray(resolved) && resolved.length>0) {
                 const total = totalDurationSeconds(resolved as any);
                 const nextComputed = { normalization_version: 'v3', steps: resolved, total_duration_seconds: total } as any;
