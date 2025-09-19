@@ -254,6 +254,39 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       const friendly = String((workout as any)?.friendly_summary || '').trim();
       if (friendly) return friendly;
       const desc = String((workout as any)?.description || '').trim();
+      // Swim drill-aware fallback from tokens when no friendly summary exists
+      try {
+        const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
+        const steps: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+        if (disc === 'swim' && steps.length) {
+          const parts: string[] = [];
+          let wu: string | null = null, cd: string | null = null;
+          const drills: string[] = [];
+          const pulls: string[] = [];
+          const kicks: string[] = [];
+          const aerobics: string[] = [];
+          steps.forEach((t: string) => {
+            const s = t.toLowerCase();
+            let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
+            if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if (/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
+            m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+            if (m) { const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r = m[5]?` @ :${parseInt(m[5],10)}r`:''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
+            m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
+            if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const name=m[4].replace(/_/g,' '); drills.push(`${name} ${reps}x${dist}`); return; }
+            m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+            if (m) { const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const r=m[5]?` @ :${parseInt(m[5],10)}r`:''; if(m[1]==='pull') pulls.push(`${reps}x${dist}${r}`); else kicks.push(`${reps}x${dist}${r}`); return; }
+            m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+            if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const r=m[4]?` @ :${parseInt(m[4],10)}r`:''; aerobics.push(`${reps}x${dist}${r}`); return; }
+          });
+          if (wu) parts.push(wu);
+          if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
+          if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+          if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+          if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+          if (cd) parts.push(cd);
+          if (parts.length) return parts.join(' • ');
+        }
+      } catch {}
       return desc || undefined;
     } catch { return undefined; }
   };
