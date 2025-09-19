@@ -153,10 +153,12 @@ export function normalizePlannedSession(session: any, baselines: Baselines, hint
       // Extract pace tag anywhere in token string
       const paceTag = /5kpace/i.test(tokenStr) ? '5kpace' : /10kpace/i.test(tokenStr) ? '10kpace' : /easypace/i.test(tokenStr) ? 'easypace' : '';
       const plusTok = tokenStr.match(/_plus(\d+(?::\d{2})?)/i)?.[0] || '';
-      const rMatch = tokenStr.match(/_r(\d+)(?:-(\d+))?(?:min)?/i);
-      const restA = rMatch ? parseInt(rMatch[1], 10) : 0;
-      const restB = rMatch && rMatch[2] ? parseInt(rMatch[2], 10) : restA;
-      const restEach = restA ? Math.round((restA + restB) / 2) : 0;
+      // Rest can be in minutes (r2min) or seconds (r90s). Support ranges (r60-90s) as well.
+      const rMatch = tokenStr.match(/_r(\d+)(?:-(\d+))?(min|s)?/i);
+      const rA = rMatch ? parseInt(rMatch[1], 10) : 0;
+      const rB = rMatch && rMatch[2] ? parseInt(rMatch[2], 10) : rA;
+      const rUnit = (rMatch && rMatch[3] ? rMatch[3].toLowerCase() : 'min');
+      const restEach = rA ? (rUnit === 's' ? Math.round(((rA + rB) / 2) / 60) : Math.round((rA + rB) / 2)) : 0;
 
       let pace = resolvePaceToken(paceTag, baselines) || '';
       // Fallback to easy pace if specific tag missing to avoid zero work time
