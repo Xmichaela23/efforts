@@ -479,16 +479,13 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
           <span className="text-sm font-medium text-foreground">
             {formatDisplayDate(activeDate)}
           </span>
-          {/* Show effort count inline */}
-          {displayWorkouts.length > 0 && (
-            <span className="text-xs text-muted-foreground">
-              · {displayWorkouts.length} effort{displayWorkouts.length !== 1 ? 's' : ''}
-            </span>
-          )}
+          {/* Effort count removed for space */}
           {/* Weather chip (explicit-location only) */}
           {weather && (
             <span className="text-xs text-muted-foreground">
               · {Math.round(weather.temperature)}°F {weather.condition}
+              {typeof weather.daily_high === 'number' ? ` • High ${Math.round(weather.daily_high)}°` : ''}
+              {weather.sunrise && weather.sunset ? (()=>{ try { const fmt=(iso:string)=>{ const d=new Date(iso); return d.toLocaleTimeString([], { hour:'numeric', minute:'2-digit' }).replace(/\s?AM|\s?PM/i, m=> m.trim().toLowerCase()); }; return ` • ${fmt(weather.sunrise)}/${fmt(weather.sunset)}`; } catch { return '';} })() : ''}
             </span>
           )}
         </div>

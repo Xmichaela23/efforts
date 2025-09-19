@@ -7,6 +7,10 @@ interface WeatherData {
   windSpeed: number;
   windDirection: number;
   precipitation: number;
+  sunrise?: string;
+  sunset?: string;
+  daily_high?: number;
+  daily_low?: number;
   timestamp: string;
 }
 
@@ -120,28 +124,32 @@ async function fetchWeatherData(lat: number, lng: number, timestamp: string): Pr
   }
 
   try {
-    // Convert timestamp to Unix timestamp for historical data
-    const workoutDate = new Date(timestamp);
-    const unixTimestamp = Math.floor(workoutDate.getTime() / 1000);
-    
-    // For historical data, we need to use the One Call API 3.0
-    // For now, let's use current weather as a fallback
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial`;
-    
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error(`Weather API error: ${response.status}`);
+    // Preferred: One Call 3.0 for current + daily (sunrise/sunset + highs)
+    const urlOneCall = `https://api.openweathermap.org/data/3.0/onecall?lat=${lat}&lon=${lng}&appid=${apiKey}&units=imperial&exclude=minutely,hourly,alerts`;
+    const resp = await fetch(urlOneCall);
+    if (!resp.ok) {
+      throw new Error(`Weather API error: ${resp.status}`);
     }
-    
-    const data = await response.json();
-    
+    const data = await resp.json();
+    const current = data.current || {};
+    const daily0 = Array.isArray(data.daily) && data.daily.length ? data.daily[0] : {};
+
+    const sunriseUnix = daily0?.sunrise || current?.sunrise;
+    const sunsetUnix = daily0?.sunset || current?.sunset;
+    const sunriseIso = sunriseUnix ? new Date(sunriseUnix * 1000).toISOString() : undefined;
+    const sunsetIso = sunsetUnix ? new Date(sunsetUnix * 1000).toISOString() : undefined;
+
     return {
-      temperature: Math.round(data.main.temp),
-      condition: data.weather[0].main,
-      humidity: data.main.humidity,
-      windSpeed: Math.round(data.wind.speed),
-      windDirection: data.wind.deg || 0,
-      precipitation: data.rain?.['1h'] || data.snow?.['1h'] || 0,
+      temperature: Math.round(current?.temp ?? 0),
+      condition: (current?.weather && current.weather[0]?.main) || '—',
+      humidity: Math.round(current?.humidity ?? 0),
+      windSpeed: Math.round(current?.wind_speed ?? 0),
+      windDirection: Math.round(current?.wind_deg ?? 0),
+      precipitation: (current?.rain?.['1h'] ?? current?.snow?.['1h'] ?? 0) as number,
+      sunrise: sunriseIso,
+      sunset: sunsetIso,
+      daily_high: daily0?.temp?.max != null ? Math.round(daily0.temp.max) : undefined,
+      daily_low: daily0?.temp?.min != null ? Math.round(daily0.temp.min) : undefined,
       timestamp: timestamp
     };
     

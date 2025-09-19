@@ -8,6 +8,10 @@ interface WeatherData {
   windSpeed: number;
   windDirection: number;
   precipitation: number;
+  sunrise?: string;
+  sunset?: string;
+  daily_high?: number;
+  daily_low?: number;
   timestamp: string;
 }
 
