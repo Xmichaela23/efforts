@@ -1053,10 +1053,11 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
       });
       // Add warm-up at the start later; cooldown will be appended at the end
 
-      // Interval blocks e.g., interval_6x800m_5kpace_R2min or ..._r120
+      // Interval blocks e.g., interval_6x800m_5kpace_R2min or ..._r120 / r90s
       steps.forEach((tok) => {
         const s = tok.toLowerCase();
-        const m = s.match(/^interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?(?:_(r\d+|R\d+min))?$/i);
+        // Relax: don't anchor to end so trailing rest tokens like r90s or R2min are allowed; rest is parsed separately.
+        const m = s.match(/^interval_(\d+)x(\d+(?:\.\d+)?)(m|mi)_([^_\s]+)(?:_(plus\d+(?::\d{2})?))?/i);
         if (!m) return;
         const reps = parseInt(m[1],10);
         const each = parseFloat(m[2]);
