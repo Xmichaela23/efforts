@@ -1701,16 +1701,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             )}
 
             {(() => {
-              const byWeekNotes: any = (selectedPlanDetail as any)?.notes_by_week || {};
-              const weeklySummaries: any = (selectedPlanDetail as any)?.weekly_summaries || {};
-              const ws: any = weeklySummaries?.[selectedWeek] || {};
-              const headerText: string = ws?.focus || (Array.isArray(byWeekNotes?.[selectedWeek]) ? (byWeekNotes?.[selectedWeek]?.[0] || '') : (currentWeekData?.header || ''));
+              const weeklySummariesObj: any = (selectedPlanDetail as any)?.weekly_summaries || (selectedPlanDetail as any)?.template?.weekly_summaries || {};
+              const wsKey = String(selectedWeek);
+              const ws: any = weeklySummariesObj?.[wsKey] || {};
+              const focus: string | undefined = (typeof ws?.focus === 'string' && ws.focus.trim().length>0) ? ws.focus.trim() : undefined;
+              const notes: string | undefined = (typeof ws?.notes === 'string' && ws.notes.trim().length>0) ? ws.notes.trim() : undefined;
               const hours = typeof ws?.estimated_hours === 'number' ? ws.estimated_hours : undefined;
               const hard = typeof ws?.hard_sessions === 'number' ? ws.hard_sessions : undefined;
               const keys: string[] = Array.isArray(ws?.key_workouts) ? ws.key_workouts.slice(0, 3) : [];
+              const hasHeader = !!(focus || notes);
+              if (!hasHeader && !(hours != null || hard != null || keys.length)) return null;
               return (
                 <div className="px-1 pb-3 text-sm text-gray-700">
-                  {headerText && (<div className="mb-1">{headerText}</div>)}
+                  {focus && (<div className="mb-1">{focus}</div>)}
+                  {notes && (<div className="mb-1 text-gray-600">{notes}</div>)}
                   {(hours != null || hard != null || keys.length) && (
                     <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
                       {hours != null && (
