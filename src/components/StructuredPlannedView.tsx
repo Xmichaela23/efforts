@@ -267,6 +267,20 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   } catch {}
 
+  // Pick a per-session summary for display in Planned view
+  const sessionSummary: string | undefined = (() => {
+    const w: any = workout as any;
+    const candidates: Array<any> = [
+      w?.summary,
+      w?.session_summary,
+      ws?.summary,
+      w?.description,
+      ws?.description
+    ];
+    const txt = candidates.find((v) => typeof v === 'string' && String(v).trim().length>0);
+    return txt ? String(txt).trim() : undefined;
+  })();
+
   const handleGarminExport = async () => {
     try {
       // Ensure the week is materialized before export (no user steps required)
@@ -357,6 +371,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
             {parentDisc==='swim' && typeof totalYdFromComputed==='number' && totalYdFromComputed>0 ? <span>{`${totalYdFromComputed} yd`}</span> : null}
             {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}
           </div>
+        </div>
+      )}
+      {sessionSummary && (
+        <div className="text-sm text-gray-600 leading-snug">
+          {sessionSummary}
         </div>
       )}
       <div className="p-1">
