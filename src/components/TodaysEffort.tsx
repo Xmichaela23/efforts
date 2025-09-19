@@ -221,40 +221,53 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         if (exercises.length > 0) {
           // Create exercise summaries with abbreviations
           const exerciseSummaries = exercises.map(ex => {
-            const exerciseName = ex.name || '';
+            const exerciseName = (ex.name || '').trim();
+            const lower = exerciseName.toLowerCase();
             const sets = ex.sets?.length || 0;
-            const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / sets || 0;
-            
-            // Get weight range from all sets
+            const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / (sets || 1);
+
+            // Compute weight range across sets
             let weightRange = '0lbs';
-            if (ex.sets && ex.sets.length > 0) {
-              const weights = ex.sets.map(set => set.weight || 0).filter(w => w > 0);
+            if (Array.isArray(ex.sets) && ex.sets.length > 0) {
+              const weights = ex.sets.map((s:any)=> Number(s?.weight || 0)).filter((w:number)=> isFinite(w) && w>0);
               if (weights.length > 0) {
                 const minWeight = Math.min(...weights);
                 const maxWeight = Math.max(...weights);
-                if (minWeight === maxWeight) {
-                  weightRange = `${minWeight}lbs`;
-                } else {
-                  weightRange = `${minWeight}-${maxWeight}lbs`;
-                }
+                weightRange = (minWeight === maxWeight) ? `${minWeight}lbs` : `${minWeight}-${maxWeight}lbs`;
+              } else {
+                weightRange = '—';
               }
             }
-            
-            // Create exercise abbreviation
-            let abbreviation = '';
-            if (exerciseName.toLowerCase().includes('overhead press')) abbreviation = 'OHP';
-            else if (exerciseName.toLowerCase().includes('bench press')) abbreviation = 'BP';
-            else if (exerciseName.toLowerCase().includes('deadlift')) abbreviation = 'DL';
-            else if (exerciseName.toLowerCase().includes('squat')) abbreviation = 'SQ';
-            else if (exerciseName.toLowerCase().includes('row')) abbreviation = 'ROW';
-            else if (exerciseName.toLowerCase().includes('curl')) abbreviation = 'CURL';
-            else {
-              // Take first letter of each word
-              abbreviation = exerciseName.split(' ').map(word => word[0]).join('').toUpperCase();
-            }
-            
-            // Show set count plus reps and weight range – still omit any time tokens
-            return `${abbreviation} ${sets}s ${Math.round(avgReps)}r ${weightRange}`;
+
+            // Abbreviation map
+            const abbrevFor = (): string => {
+              const has = (s: string) => lower.includes(s);
+              if (has('ohp') || has('overhead press') || has('shoulder press')) return 'OHP';
+              if (has('bench press') || has('flat bench')) return 'BP';
+              if (has('incline bench')) return 'IBP';
+              if (has('deadlift') || has('dead lift')) return has('romanian') || has('rdl') ? 'RDL' : 'DL';
+              if (has('front squat')) return 'FSQ';
+              if (has('goblet squat')) return 'GSQ';
+              if (has('squat')) return 'SQ';
+              if (has('bent over row') || has('barbell row') || has('row')) return 'ROW';
+              if (has('pull-up') || has('pull up')) return 'PU';
+              if (has('chin-up') || has('chin up')) return 'CU';
+              if (has('lat pulldown') || has('lat pull-down') || has('pulldown')) return 'LPD';
+              if (has('face pull')) return 'FP';
+              if (has('lateral raise') || has('lat raise')) return 'LR';
+              if (has('hip thrust')) return 'HT';
+              if (has('lunge')) return 'LNG';
+              if (has('dip')) return 'DIP';
+              if (has('curl')) return 'CURL';
+              // Multi-word fallback: initials
+              const words = exerciseName.split(/\s+/).filter(Boolean);
+              if (words.length >= 2) return words.map(w => w[0]).join('').toUpperCase().slice(0,4);
+              // Single-word fallback: first 3 letters
+              return exerciseName.slice(0,3).toUpperCase();
+            };
+
+            const abbreviation = abbrevFor();
+            return `${abbreviation} ${sets}s ${Math.round(avgReps||0)}r ${weightRange}`.trim();
           });
           
           return exerciseSummaries.map((summary, index) => {
