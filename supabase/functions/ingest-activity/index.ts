@@ -338,6 +338,28 @@ function computeComputedFromActivity(activity: any): any | null {
       }
     }
 
+    // Build 100m splits from cumulative distance (meters)
+    const splits100 = (() => {
+      try {
+        const rows: Array<{ n: number; duration_s: number }> = [];
+        let nextThreshold = 100; // meters
+        let lastT = normalized[0]?.t || 0;
+        let n = 1;
+        for (let i = 1; i < normalized.length; i += 1) {
+          const dNow = Number(normalized[i].d || 0);
+          const tNow = Number(normalized[i].t || i);
+          if (dNow >= nextThreshold) {
+            const dur = Math.max(1, Math.round(tNow - lastT));
+            rows.push({ n, duration_s: dur });
+            n += 1;
+            lastT = tNow;
+            nextThreshold += 100;
+          }
+        }
+        return rows.length ? { unit: 'm', rows } : null;
+      } catch { return null; }
+    })();
+
     const computed = {
       intervals,
       overall: {
@@ -349,6 +371,11 @@ function computeComputedFromActivity(activity: any): any | null {
         avg_cadence_spm: cadStats.avg,
         max_cadence_spm: cadStats.max,
       },
+      analysis: {
+        events: {
+          splits_100: splits100
+        }
+      }
     };
     return computed;
   } catch {

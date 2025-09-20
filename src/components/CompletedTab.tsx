@@ -107,9 +107,7 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
     })();
   }, [hydrated, workoutData, analysisInvoked]);
   
-  // Dev hydration: if workout lacks samples but has a garmin_activity_id,
-  // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
-  useEffect(() => { /* no-op: workouts is canonical */ }, [workoutData]);
+  // Canonical data comes from workouts only; no external hydration fetch here
   
   // No need to initialize localSelectedMetric here - it's handled in the sub-component
 
@@ -823,18 +821,49 @@ const formatPace = (paceValue: any): string => {
 
   // ----- Swim helpers -----
   const getDurationSeconds = (): number | null => {
-    const t = Number(
-      workoutData.total_timer_time ??
-      workoutData.moving_time ??
-      workoutData.elapsed_time ??
-      (typeof workoutData.duration === 'number' ? workoutData.duration * 60 : null)
+    const raw = (
+      (workoutData as any)?.total_timer_time ??
+      (workoutData as any)?.moving_time ??
+      (workoutData as any)?.elapsed_time ??
+      null
     );
-    return Number.isFinite(t) && t > 0 ? t : null;
+    let t = Number(raw);
+    if (!Number.isFinite(t) || t <= 0) {
+      const durMin = Number((workoutData as any)?.duration);
+      return Number.isFinite(durMin) && durMin > 0 ? Math.round(durMin * 60) : null;
+    }
+    // Normalize: workouts store times in minutes; if the value looks like minutes, convert to seconds
+    const durMin = Number((workoutData as any)?.duration);
+    if (Number.isFinite(durMin) && durMin > 0) {
+      // If raw time is small (likely minutes) and close to duration, treat as minutes
+      if (t <= Math.max(59, durMin + 5)) t = t * 60;
+    } else if (t < 60) {
+      // Defensive: treat tiny values as minutes
+      t = t * 60;
+    }
+    return Math.round(t);
   };
 
   const getDistanceMeters = (): number | null => {
-    const km = computeDistanceKm(workoutData);
-    if (km != null && Number.isFinite(km) && km > 0) return km * 1000;
+    // 1) Explicit distance (km)
+    const dk = Number((workoutData as any)?.distance);
+    if (Number.isFinite(dk) && dk > 0) return Math.round(dk * 1000);
+    // 2) Computed overall (meters)
+    try { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); if (Number.isFinite(cm) && cm > 0) return Math.round(cm); } catch {}
+    // 3) Sum lengths
+    try {
+      const lengths = getSwimLengths();
+      if (lengths.length) {
+        const sum = lengths.reduce((a:number,l:any)=> a + Number(l?.distance_m ?? l?.distance ?? 0), 0);
+        if (Number.isFinite(sum) && sum > 0) return Math.round(sum);
+      }
+    } catch {}
+    // 4) lengths count × pool length
+    try {
+      const n = Number((workoutData as any)?.number_of_active_lengths);
+      const L = inferPoolLengthMeters();
+      if (Number.isFinite(n) && n > 0 && Number.isFinite(L as any) && (L as any) > 0) return Math.round(n * (L as number));
+    } catch {}
     return null;
   };
 
@@ -929,8 +958,8 @@ const formatPace = (paceValue: any): string => {
     const v = Number((workoutData as any)?.avg_swim_cadence ?? (workoutData as any)?.avg_cadence);
     if (Number.isFinite(v) && v > 0) return Math.round(v);
     try {
-      const samples = Array.isArray((hydrated as any)?.sensor_data?.samples)
-        ? (hydrated as any).sensor_data.samples : (Array.isArray((hydrated as any)?.sensor_data) ? (hydrated as any).sensor_data : []);
+      const samples = Array.isArray((workoutData as any)?.sensor_data?.samples)
+        ? (workoutData as any).sensor_data.samples : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
       const vals = samples.map((s:any)=> Number(s.swimCadenceInStrokesPerMinute ?? s.cadence)).filter((n:number)=> Number.isFinite(n) && n>0);
       if (vals.length) return Math.round(vals.reduce((a:number,b:number)=>a+b,0)/vals.length);
     } catch {}
