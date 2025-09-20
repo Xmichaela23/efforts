@@ -827,27 +827,29 @@ const formatPace = (paceValue: any): string => {
       const move = Number(comp?.computed?.overall?.duration_s_moving);
       if (Number.isFinite(move) && move > 0) return Math.round(move);
     } catch {}
-    const raw = (
-      (workoutData as any)?.total_timer_time ??
-      (workoutData as any)?.moving_time ??
-      (workoutData as any)?.elapsed_time ??
-      null
-    );
-    let t = Number(raw);
-    if (!Number.isFinite(t) || t <= 0) {
-      const durMin = Number((workoutData as any)?.duration);
-      return Number.isFinite(durMin) && durMin > 0 ? Math.round(durMin * 60) : null;
-    }
-    // Normalize: workouts store times in minutes; if the value looks like minutes, convert to seconds
-    const durMin = Number((workoutData as any)?.duration);
-    if (Number.isFinite(durMin) && durMin > 0) {
-      // If raw time is small (likely minutes) and close to duration, treat as minutes
-      if (t <= Math.max(59, durMin + 5)) t = t * 60;
-    } else if (t < 60) {
-      // Defensive: treat tiny values as minutes
-      t = t * 60;
-    }
-    return Math.round(t);
+    // Next, derive from samples if present
+    try {
+      const rawSamples = (hydrated || workoutData) as any;
+      const samples = Array.isArray(rawSamples?.sensor_data?.samples)
+        ? rawSamples.sensor_data.samples
+        : (Array.isArray(rawSamples?.sensor_data) ? rawSamples.sensor_data : []);
+      if (Array.isArray(samples) && samples.length > 1) {
+        const first: any = samples[0];
+        const last: any = samples[samples.length - 1];
+        // Prefer timer duration from last sample
+        const lastTimer = Number(last?.timerDurationInSeconds ?? last?.timerDuration);
+        if (Number.isFinite(lastTimer) && lastTimer > 0) return Math.round(lastTimer);
+        // Next prefer clock duration from last sample
+        const lastClock = Number(last?.clockDurationInSeconds ?? last?.clockDuration);
+        if (Number.isFinite(lastClock) && lastClock > 0) return Math.round(lastClock);
+        // Finally, use timestamps (elapsed)
+        const firstT = Number(first?.startTimeInSeconds ?? first?.timestamp ?? NaN);
+        const lastT = Number(last?.startTimeInSeconds ?? last?.timestamp ?? NaN);
+        if (Number.isFinite(firstT) && Number.isFinite(lastT) && lastT > firstT) return Math.round(lastT - firstT);
+      }
+    } catch {}
+    // Do not fall back to ambiguous minute-based fields; avoid bad paces
+    return null;
   };
 
   const getDistanceMeters = (): number | null => {
@@ -856,6 +858,17 @@ const formatPace = (paceValue: any): string => {
     if (Number.isFinite(dk) && dk > 0) return Math.round(dk * 1000);
     // 2) Computed overall (meters)
     try { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); if (Number.isFinite(cm) && cm > 0) return Math.round(cm); } catch {}
+    // 2b) From samples
+    try {
+      const rawSamples = (hydrated || workoutData) as any;
+      const samples = Array.isArray(rawSamples?.sensor_data?.samples)
+        ? rawSamples.sensor_data.samples
+        : (Array.isArray(rawSamples?.sensor_data) ? rawSamples.sensor_data : []);
+      if (samples.length > 1) {
+        const last = Number(samples[samples.length - 1]?.totalDistanceInMeters ?? samples[samples.length - 1]?.distanceInMeters);
+        if (Number.isFinite(last) && last > 0) return Math.round(last);
+      }
+    } catch {}
     // 3) Sum lengths
     try {
       const lengths = getSwimLengths();
