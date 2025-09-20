@@ -821,6 +821,14 @@ const formatPace = (paceValue: any): string => {
 
   // ----- Swim helpers -----
   const getDurationSeconds = (): number | null => {
+    // In development, avoid fallbacks: use only server-computed moving seconds
+    try {
+      if (import.meta.env?.DEV) {
+        const compDev = (hydrated || workoutData) as any;
+        const mvDev = Number(compDev?.computed?.overall?.duration_s_moving);
+        return (Number.isFinite(mvDev) && mvDev > 0) ? Math.round(mvDev) : null;
+      }
+    } catch {}
     // Build best sample-based candidate first
     let sampleCandidate: number | null = null;
     try {
@@ -885,6 +893,8 @@ const formatPace = (paceValue: any): string => {
   };
 
   const getDistanceMeters = (): number | null => {
+    // In development, avoid fallbacks: use only server-computed distance
+    try { if (import.meta.env?.DEV) { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); return Number.isFinite(cm) && cm > 0 ? Math.round(cm) : null; } } catch {}
     // 1) Computed overall (meters) — canonical for swims when available
     try { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); if (Number.isFinite(cm) && cm > 0) return Math.round(cm); } catch {}
     // 2) From samples
@@ -1498,37 +1508,20 @@ const formatPace = (paceValue: any): string => {
    return gapPace;
  };
 
- const formatMovingTime = () => {
-   if (import.meta.env?.DEV) console.log('🔍 formatMovingTime checking:', {
-     total_timer_time: workoutData.metrics?.total_timer_time,
-     moving_time: workoutData.moving_time,
-     elapsed_time: workoutData.elapsed_time
-   });
-   
-   // 🔧 GARMIN DATA EXTRACTION: Try all possible moving time sources
-   const timerTime = workoutData.metrics?.total_timer_time || 
-                    workoutData.total_timer_time || 
-                    workoutData.timer_time;
-   const movingTime = workoutData.moving_time || 
-                     workoutData.metrics?.moving_time;
-   const elapsedTime = workoutData.elapsed_time || 
-                      workoutData.metrics?.elapsed_time || 
-                      workoutData.metrics?.total_elapsed_time;
-   
-   // Use total_timer_time from FIT file - this is the actual moving time
-   if (timerTime) {
-     if (import.meta.env?.DEV) console.log('🔍 formatMovingTime using total_timer_time');
-     return formatDuration(timerTime);
-   } else if (movingTime) {
-     if (import.meta.env?.DEV) console.log('🔍 formatMovingTime using moving_time');
-     return formatDuration(movingTime);
-   } else if (elapsedTime) {
-     if (import.meta.env?.DEV) console.log('🔍 formatMovingTime using elapsed_time');
-     return formatDuration(elapsedTime);
-   }
-   if (import.meta.env?.DEV) console.log('🔍 formatMovingTime returning N/A');
-   return 'N/A';
- };
+const formatMovingTime = () => {
+  // Prefer our unified swim-aware resolver
+  const s = getDurationSeconds();
+  if (Number.isFinite(s as any) && (s as number) > 0) return formatDuration(s as number);
+  // Fallback: legacy fields
+  const raw = (workoutData as any)?.metrics?.total_timer_time
+    ?? (workoutData as any)?.total_timer_time
+    ?? (workoutData as any)?.moving_time
+    ?? (workoutData as any)?.metrics?.moving_time
+    ?? (workoutData as any)?.elapsed_time
+    ?? (workoutData as any)?.metrics?.elapsed_time
+    ?? null;
+  return formatDuration(raw);
+};
 
  const trainingMetrics = [
    {
@@ -2172,20 +2165,20 @@ const formatPace = (paceValue: any): string => {
          const poolHint = /lap|pool/.test(providerStr);
          const hasGps = Array.isArray((workoutData as any)?.gps_track) && (workoutData as any).gps_track.length > 10;
          const isPoolSwim = isSwim && (hasLengths || poolHint || (!openWaterHint && !hasGps));
-         if (isPoolSwim) {
+        if (isPoolSwim) {
            return (
              <div className="mx-[-16px] px-3 py-2">
                <div className="text-sm text-gray-600">No route data (pool swim)</div>
              </div>
            );
          }
-         const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
+        const series = (hydrated||workoutData)?.computed?.analysis?.series || null;
          const time_s = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
          const distance_m = Array.isArray(series?.distance_m) ? series.distance_m : [];
          const elev = Array.isArray(series?.elevation_m) ? series.elevation_m : [];
          const pace = Array.isArray(series?.pace_s_per_km) ? series.pace_s_per_km : [];
          const hr = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
-         if (!Array.isArray(distance_m) || distance_m.length < 2) return null;
+        if (!Array.isArray(distance_m) || distance_m.length < 2) return null;
          const len = Math.min(distance_m.length, time_s.length || distance_m.length);
          const samples = (()=>{
            const out:any[] = [];
@@ -2341,7 +2334,7 @@ const formatPace = (paceValue: any): string => {
       {/* Swim 100m/yd splits list */}
       {(() => {
         if (workoutType !== 'swim') return null;
-        // Prefer server-computed splits saved at ingest
+        // Dev: only trust server-computed splits
         const comp = (hydrated || workoutData) as any;
         const comp100 = comp?.computed?.analysis?.events?.splits_100;
         if (comp100 && Array.isArray(comp100.rows) && comp100.rows.length) {
@@ -2365,27 +2358,7 @@ const formatPace = (paceValue: any): string => {
             </div>
           );
         }
-        // Fallback: build from lengths if present
-        const hundred = buildHundredSplits();
-        if (!hundred.length) return null;
-        const unitLabel = hundred[0]?.unit === 'yd' ? '100yd' : '100m';
-        return (
-          <div className="mx-[-16px] px-3 py-2">
-            <div className="text-lg font-semibold mb-2">Splits ({unitLabel})</div>
-            <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-1">
-              <div className="font-medium">#</div>
-              <div className="font-medium">Pace</div>
-            </div>
-            <div className="space-y-1">
-              {hundred.map((s) => (
-                <div key={`hs-${s.idx}`} className="grid grid-cols-2 gap-2 items-center text-sm">
-                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.idx}</div>
-                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(s.duration_s)}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
+        return null;
       })()}
 
       {/* SEPARATE Power/Cadence Chart - at the bottom */}
