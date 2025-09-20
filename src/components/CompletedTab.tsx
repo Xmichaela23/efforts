@@ -821,13 +821,8 @@ const formatPace = (paceValue: any): string => {
 
   // ----- Swim helpers -----
   const getDurationSeconds = (): number | null => {
-    // Prefer server-computed moving time when available (derived from samples)
-    try {
-      const comp = (hydrated || workoutData) as any;
-      const move = Number(comp?.computed?.overall?.duration_s_moving);
-      if (Number.isFinite(move) && move > 0) return Math.round(move);
-    } catch {}
-    // Next, derive from samples if present
+    // Build best sample-based candidate first
+    let sampleCandidate: number | null = null;
     try {
       const rawSamples = (hydrated || workoutData) as any;
       const samples = Array.isArray(rawSamples?.sensor_data?.samples)
@@ -836,29 +831,62 @@ const formatPace = (paceValue: any): string => {
       if (Array.isArray(samples) && samples.length > 1) {
         const first: any = samples[0];
         const last: any = samples[samples.length - 1];
-        // Prefer timer duration from last sample
         const lastTimer = Number(last?.timerDurationInSeconds ?? last?.timerDuration);
-        if (Number.isFinite(lastTimer) && lastTimer > 0) return Math.round(lastTimer);
-        // Next prefer clock duration from last sample
-        const lastClock = Number(last?.clockDurationInSeconds ?? last?.clockDuration);
-        if (Number.isFinite(lastClock) && lastClock > 0) return Math.round(lastClock);
-        // Finally, use timestamps (elapsed)
-        const firstT = Number(first?.startTimeInSeconds ?? first?.timestamp ?? NaN);
-        const lastT = Number(last?.startTimeInSeconds ?? last?.timestamp ?? NaN);
-        if (Number.isFinite(firstT) && Number.isFinite(lastT) && lastT > firstT) return Math.round(lastT - firstT);
+        if (Number.isFinite(lastTimer) && lastTimer > 0) sampleCandidate = Math.round(lastTimer);
+        if (sampleCandidate == null) {
+          const lastClock = Number(last?.clockDurationInSeconds ?? last?.clockDuration);
+          if (Number.isFinite(lastClock) && lastClock > 0) sampleCandidate = Math.round(lastClock);
+        }
+        if (sampleCandidate == null) {
+          let moving = 0;
+          let prevDist = Number(first?.totalDistanceInMeters ?? first?.distanceInMeters ?? NaN);
+          for (let i = 1; i < samples.length; i += 1) {
+            const a: any = samples[i - 1];
+            const b: any = samples[i];
+            const tA = Number(a?.startTimeInSeconds ?? a?.timestamp ?? a?.clockDurationInSeconds ?? a?.timerDurationInSeconds ?? (i - 1));
+            const tB = Number(b?.startTimeInSeconds ?? b?.timestamp ?? b?.clockDurationInSeconds ?? b?.timerDurationInSeconds ?? i);
+            const dt = Math.min(60, Math.max(0, tB - tA));
+            if (!dt) continue;
+            const cadA = Number(a?.swimCadenceInStrokesPerMinute ?? a?.swimCadence ?? a?.cadence);
+            const cadB = Number(b?.swimCadenceInStrokesPerMinute ?? b?.swimCadence ?? b?.cadence);
+            const distB = Number(b?.totalDistanceInMeters ?? b?.distanceInMeters ?? NaN);
+            const dDist = Number.isFinite(prevDist) && Number.isFinite(distB) ? (distB - prevDist) : NaN;
+            prevDist = Number.isFinite(distB) ? distB : prevDist;
+            const active = (Number.isFinite(dDist) && dDist > 0.05) || (Number.isFinite(cadA) && cadA > 0) || (Number.isFinite(cadB) && cadB > 0);
+            if (active) moving += dt;
+          }
+          if (moving > 0) sampleCandidate = Math.round(moving);
+        }
+        if (sampleCandidate == null) {
+          const firstT = Number(first?.startTimeInSeconds ?? first?.timestamp ?? NaN);
+          const lastT = Number(last?.startTimeInSeconds ?? last?.timestamp ?? NaN);
+          if (Number.isFinite(firstT) && Number.isFinite(lastT) && lastT > firstT) sampleCandidate = Math.round(lastT - firstT);
+        }
       }
     } catch {}
-    // Do not fall back to ambiguous minute-based fields; avoid bad paces
+
+    // Compare against stored computed moving time; if computed looks like elapsed, prefer samples
+    let computedCandidate: number | null = null;
+    try {
+      const comp = (hydrated || workoutData) as any;
+      const move = Number(comp?.computed?.overall?.duration_s_moving);
+      if (Number.isFinite(move) && move > 0) computedCandidate = Math.round(move);
+    } catch {}
+
+    // Heuristic: if both exist and computed >> sample (e.g., equals overall duration), use sample
+    if (computedCandidate != null && sampleCandidate != null) {
+      if (computedCandidate > sampleCandidate * 1.1) return sampleCandidate;
+      return computedCandidate;
+    }
+    if (computedCandidate != null) return computedCandidate;
+    if (sampleCandidate != null) return sampleCandidate;
     return null;
   };
 
   const getDistanceMeters = (): number | null => {
-    // 1) Explicit distance (km)
-    const dk = Number((workoutData as any)?.distance);
-    if (Number.isFinite(dk) && dk > 0) return Math.round(dk * 1000);
-    // 2) Computed overall (meters)
+    // 1) Computed overall (meters) — canonical for swims when available
     try { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); if (Number.isFinite(cm) && cm > 0) return Math.round(cm); } catch {}
-    // 2b) From samples
+    // 2) From samples
     try {
       const rawSamples = (hydrated || workoutData) as any;
       const samples = Array.isArray(rawSamples?.sensor_data?.samples)
@@ -869,7 +897,10 @@ const formatPace = (paceValue: any): string => {
         if (Number.isFinite(last) && last > 0) return Math.round(last);
       }
     } catch {}
-    // 3) Sum lengths
+    // 3) Explicit distance (km)
+    const dk = Number((workoutData as any)?.distance);
+    if (Number.isFinite(dk) && dk > 0) return Math.round(dk * 1000);
+    // 4) Sum lengths
     try {
       const lengths = getSwimLengths();
       if (lengths.length) {
@@ -877,7 +908,7 @@ const formatPace = (paceValue: any): string => {
         if (Number.isFinite(sum) && sum > 0) return Math.round(sum);
       }
     } catch {}
-    // 4) lengths count × pool length
+    // 5) lengths count × pool length
     try {
       const n = Number((workoutData as any)?.number_of_active_lengths);
       const L = inferPoolLengthMeters();
@@ -1176,8 +1207,8 @@ const formatPace = (paceValue: any): string => {
          : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'),
        unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
      },
-     {
-       label: 'Max Cadence',
+    {
+      label: workoutType === 'swim' ? 'Max stroke rate' : 'Max Cadence',
        value: (() => {
          const v = (
            workoutData.max_cadence ??
@@ -1192,7 +1223,7 @@ const formatPace = (paceValue: any): string => {
          const n = typeof v === 'string' ? parseFloat(v) : (v as number);
          return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
        })(),
-       unit: isRun ? 'spm' : 'rpm'
+      unit: workoutType === 'swim' ? 'spm' : (isRun ? 'spm' : 'rpm')
      }
    ];
 
@@ -1893,7 +1924,7 @@ const formatPace = (paceValue: any): string => {
             </div>
           </div>
 
-          {/* Avg Cadence */}
+      {/* Avg Cadence / Stroke rate */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
@@ -1906,7 +1937,7 @@ const formatPace = (paceValue: any): string => {
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Avg Cadence</div>
+              <div className="font-medium">Avg {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
             </div>
           </div>
 
@@ -1956,7 +1987,7 @@ const formatPace = (paceValue: any): string => {
 
           {/* Removed duplicate Max Speed row previously here */}
 
-          {/* Max Cadence */}
+          {/* Max Cadence / Stroke rate */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
@@ -1977,7 +2008,7 @@ const formatPace = (paceValue: any): string => {
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Max Cadence</div>
+              <div className="font-medium">Max {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
             </div>
           </div>
 
@@ -2021,7 +2052,7 @@ const formatPace = (paceValue: any): string => {
             })()}
           </div>
           <div className="text-xs text-[#666666] font-normal">
-            <div className="font-medium">Avg Cadence</div>
+            <div className="font-medium">Avg {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
           </div>
         </div>
       )}
@@ -2100,7 +2131,7 @@ const formatPace = (paceValue: any): string => {
               })()}
             </div>
             <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Max Cadence</div>
+              <div className="font-medium">Max {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
             </div>
           </div>
           {!isPoolSwim && (
