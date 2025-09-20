@@ -839,11 +839,37 @@ const formatPace = (paceValue: any): string => {
   };
 
   const inferPoolLengthMeters = (): number | null => {
+    // 1) Explicit per-workout override/state
     const explicit = Number(poolLengthMeters ?? (workoutData as any).pool_length);
     if (Number.isFinite(explicit) && explicit > 0) return explicit;
+    // 2) Planned setting (if present on hydratedPlanned) – look for pool_length_m or tokens like 25m/25yd
+    try {
+      const planned: any = (workoutData as any)?.planned || (hydrated as any)?.planned || null;
+      const pl = Number((planned as any)?.pool_length_m);
+      if (Number.isFinite(pl) && pl > 0) return pl;
+      const tokens: string[] = Array.isArray((planned as any)?.steps_preset) ? (planned as any).steps_preset.map((t:any)=>String(t)) : [];
+      const joined = tokens.join(' ').toLowerCase();
+      const m = joined.match(/\b(25|33(?:\.33)?|50)\s*m\b/);
+      if (m) return Number(m[1]);
+      const y = joined.match(/\b(25|50)\s*yd\b/);
+      if (y) return Number(y[1]) * 0.9144;
+    } catch {}
+    // 3) User baselines preference
+    try {
+      const pn = (window as any)?.__APP_BASELINES__?.performanceNumbers || {};
+      const bLen = Number(pn?.swim_pool_length_m ?? pn?.swimPoolLengthM);
+      if (Number.isFinite(bLen) && bLen > 0) return bLen;
+    } catch {}
+    // 4) Infer from lengths when distance is available
     const distM = getDistanceMeters();
     const nLengths = Number((workoutData as any)?.number_of_active_lengths) || (Array.isArray((workoutData as any)?.swim_data?.lengths) ? (workoutData as any).swim_data.lengths.length : 0);
     if (distM && nLengths > 0) return distM / nLengths;
+    // 5) Local default
+    try {
+      const defStr = typeof window !== 'undefined' ? window.localStorage.getItem('pool_length_default_m') : null;
+      const def = defStr ? Number(defStr) : NaN;
+      if (Number.isFinite(def) && def > 0) return def;
+    } catch {}
     return null;
   };
 
@@ -851,6 +877,7 @@ const formatPace = (paceValue: any): string => {
     const L = inferPoolLengthMeters();
     if (!L) return null;
     if (Math.abs(L - 22.86) <= 0.6) return true; // 25y
+    if (Math.abs(L - 45.72) <= 1.2) return true; // 50y
     if (Math.abs(L - 25) <= 0.8 || Math.abs(L - 50) <= 1.2 || Math.abs(L - 33.33) <= 1.0) return false;
     return null;
   };
@@ -927,7 +954,7 @@ const formatPace = (paceValue: any): string => {
   type DetectedSet = { label: string; distance_m: number; pace_per100_s: number | null; swolf?: number | null };
 
   // Build fixed-distance splits at 100m or 100yd based on pool
-  const buildHundredSplits = (): Array<{ idx: number; duration_s: number; swolf: number | null; unit: 'm' | 'yd' }> => {
+  const buildHundredSplits = (): Array<{ idx: number; duration_s: number; swolf: number | null; avg_hr: number | null; unit: 'm' | 'yd' }> => {
     try {
       const lengths = getSwimLengths();
       if (!lengths.length) return [];
@@ -935,7 +962,7 @@ const formatPace = (paceValue: any): string => {
       const isYd = isYardPool() === true;
       const unitLenM = isYd ? 91.44 : 100;
       const perSplit = Math.max(1, Math.round(unitLenM / Lm));
-      const splits: Array<{ idx: number; duration_s: number; swolf: number | null; unit: 'm' | 'yd' }> = [];
+      const splits: Array<{ idx: number; duration_s: number; swolf: number | null; avg_hr: number | null; unit: 'm' | 'yd' }> = [];
       let idx = 1;
       for (let i = 0; i < lengths.length; i += perSplit) {
         const chunk = lengths.slice(i, i + perSplit);
@@ -944,6 +971,7 @@ const formatPace = (paceValue: any): string => {
         let strokesSum: number | null = 0;
         let swolfSum: number | null = 0;
         let swolfCount = 0;
+        const hrVals: number[] = [];
         for (const len of chunk) {
           const t = Number((len as any)?.duration_s ?? (len as any)?.duration ?? 0);
           dur += Number.isFinite(t) ? t : 0;
@@ -951,6 +979,8 @@ const formatPace = (paceValue: any): string => {
           if (Number.isFinite(st)) strokesSum = (strokesSum as number) + st; else strokesSum = strokesSum;
           // Per-length SWOLF when both are present
           if (Number.isFinite(t) && Number.isFinite(st)) { swolfSum = (swolfSum as number) + (t + st); swolfCount += 1; }
+          const hr = Number((len as any)?.avg_heart_rate ?? (len as any)?.hr_bpm);
+          if (Number.isFinite(hr) && hr > 40 && hr < 230) hrVals.push(Math.round(hr));
         }
         let sw: number | null = null;
         if (swolfCount > 0) sw = Math.round((swolfSum as number) / swolfCount);
@@ -960,7 +990,8 @@ const formatPace = (paceValue: any): string => {
           const avgSt = (strokesSum as number) / chunk.length;
           sw = Math.round(avgLen + avgSt);
         }
-        splits.push({ idx: idx++, duration_s: Math.round(dur), swolf: sw, unit: isYd ? 'yd' : 'm' });
+        const avgHr = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
+        splits.push({ idx: idx++, duration_s: Math.round(dur), swolf: sw, avg_hr: avgHr, unit: isYd ? 'yd' : 'm' });
       }
       return splits;
     } catch { return []; }
@@ -2238,17 +2269,17 @@ const formatPace = (paceValue: any): string => {
             <div className="text-lg font-semibold mb-2">Splits ({unitLabel})</div>
             <div className="grid grid-cols-4 gap-2 text-sm text-gray-600 mb-1">
               <div className="font-medium">#</div>
-              <div className="font-medium">Time</div>
-              <div className="font-medium col-span-2">Pace</div>
+              <div className="font-medium">Pace</div>
+              <div className="font-medium">HR</div>
+              <div className="font-medium">SWOLF</div>
             </div>
             <div className="space-y-1">
               {hundred.map((s) => (
                 <div key={`hs-${s.idx}`} className="grid grid-cols-4 gap-2 items-center text-sm">
                   <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.idx}</div>
                   <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(s.duration_s)}</div>
-                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono col-span-2">
-                    {formatSwimPace(s.duration_s)}{s.swolf != null ? ` (SWOLF ${s.swolf})` : ''}
-                  </div>
+                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.avg_hr != null ? `${s.avg_hr} bpm` : '—'}</div>
+                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.swolf != null ? s.swolf : '—'}</div>
                 </div>
               ))}
             </div>
