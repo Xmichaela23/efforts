@@ -821,6 +821,12 @@ const formatPace = (paceValue: any): string => {
 
   // ----- Swim helpers -----
   const getDurationSeconds = (): number | null => {
+    // Prefer server-computed moving time when available (derived from samples)
+    try {
+      const comp = (hydrated || workoutData) as any;
+      const move = Number(comp?.computed?.overall?.duration_s_moving);
+      if (Number.isFinite(move) && move > 0) return Math.round(move);
+    } catch {}
     const raw = (
       (workoutData as any)?.total_timer_time ??
       (workoutData as any)?.moving_time ??
