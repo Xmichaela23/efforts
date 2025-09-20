@@ -278,7 +278,32 @@ function computeComputedFromActivity(activity: any): any | null {
       const v1 = (typeof b.v === 'number' && b.v >= 0.3) ? b.v : null;
       if (dt && (v0 != null || v1 != null)) movingSec += dt;
     }
-    const totalMeters = Math.max(0, (normalized[normalized.length - 1].d || 0) - (normalized[0].d || 0));
+    let totalMeters = Math.max(0, (normalized[normalized.length - 1].d || 0) - (normalized[0].d || 0));
+    // Fallbacks when swim samples are present but values are null (common for pool swims)
+    if (!(movingSec > 0)) {
+      const mFallback = Number(
+        (activity?.summary?.timerDurationInSeconds)
+        ?? (activity?.summary?.movingDurationInSeconds)
+        ?? (activity?.summary?.durationInSeconds)
+        ?? (activity?.duration_seconds)
+      );
+      if (Number.isFinite(mFallback) && mFallback > 0) movingSec = Math.round(mFallback);
+    }
+    if (!(totalMeters > 0)) {
+      const dFallback = Number(
+        (activity?.summary?.totalDistanceInMeters)
+        ?? (activity?.summary?.distanceInMeters)
+        ?? (activity?.distance_meters)
+      );
+      if (Number.isFinite(dFallback) && dFallback > 0) totalMeters = Math.round(dFallback);
+    }
+    // Derive moving seconds from Garmin average pace when timer/moving is missing
+    if (!(movingSec > 0)) {
+      const avgPaceMinPerKm = Number(activity?.summary?.averagePaceInMinutesPerKilometer);
+      if (Number.isFinite(avgPaceMinPerKm) && avgPaceMinPerKm > 0 && totalMeters > 0) {
+        movingSec = Math.round((totalMeters / 1000) * avgPaceMinPerKm * 60);
+      }
+    }
     const overallPaceSecPerMi = (movingSec > 0 && totalMeters > 0)
       ? (movingSec) / ((totalMeters / 1000) * 0.621371)
       : null;

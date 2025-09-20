@@ -893,9 +893,14 @@ const formatPace = (paceValue: any): string => {
   };
 
   const getDistanceMeters = (): number | null => {
-    // In development, avoid fallbacks: use only server-computed distance
-    try { if (import.meta.env?.DEV) { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); return Number.isFinite(cm) && cm > 0 ? Math.round(cm) : null; } } catch {}
-    // 1) Computed overall (meters) — canonical for swims when available
+    // Swims: only trust server-computed distance
+    if (workoutType === 'swim') {
+      try {
+        const cm = Number((workoutData as any)?.computed?.overall?.distance_m);
+        return Number.isFinite(cm) && cm > 0 ? Math.round(cm) : null;
+      } catch { return null; }
+    }
+    // Non-swim: computed is preferred; then samples; then explicit km
     try { const cm = Number((workoutData as any)?.computed?.overall?.distance_m); if (Number.isFinite(cm) && cm > 0) return Math.round(cm); } catch {}
     // 2) From samples
     try {
@@ -1721,7 +1726,13 @@ const formatMovingTime = () => {
            {/* Duration */}
            <div className="px-2 py-1">
              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-               {formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration)}
+              {(() => {
+                if (workoutType === 'swim') {
+                  const s = getDurationSeconds();
+                  return s ? formatDuration(s) : 'N/A';
+                }
+                return formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
+              })()}
              </div>
              <div className="text-xs text-[#666666] font-normal">
                <div className="font-medium">Duration</div>
