@@ -2290,25 +2290,46 @@ const formatPace = (paceValue: any): string => {
       {/* Swim 100m/yd splits list */}
       {(() => {
         if (workoutType !== 'swim') return null;
+        // Prefer server-computed splits saved at ingest
+        const comp = (hydrated || workoutData) as any;
+        const comp100 = comp?.computed?.analysis?.events?.splits_100;
+        if (comp100 && Array.isArray(comp100.rows) && comp100.rows.length) {
+          const rows = comp100.rows as Array<{ n: number; duration_s: number }>;
+          const unitLabel = comp100.unit === 'yd' ? '100yd' : '100m';
+          return (
+            <div className="mx-[-16px] px-3 py-2">
+              <div className="text-lg font-semibold mb-2">Splits ({unitLabel})</div>
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-1">
+                <div className="font-medium">#</div>
+                <div className="font-medium">Pace</div>
+              </div>
+              <div className="space-y-1">
+                {rows.map((r) => (
+                  <div key={`cs-${r.n}`} className="grid grid-cols-2 gap-2 items-center text-sm">
+                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{r.n}</div>
+                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(r.duration_s)}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        }
+        // Fallback: build from lengths if present
         const hundred = buildHundredSplits();
         if (!hundred.length) return null;
         const unitLabel = hundred[0]?.unit === 'yd' ? '100yd' : '100m';
         return (
           <div className="mx-[-16px] px-3 py-2">
             <div className="text-lg font-semibold mb-2">Splits ({unitLabel})</div>
-            <div className="grid grid-cols-4 gap-2 text-sm text-gray-600 mb-1">
+            <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-1">
               <div className="font-medium">#</div>
               <div className="font-medium">Pace</div>
-              <div className="font-medium">HR</div>
-              <div className="font-medium">SWOLF</div>
             </div>
             <div className="space-y-1">
               {hundred.map((s) => (
-                <div key={`hs-${s.idx}`} className="grid grid-cols-4 gap-2 items-center text-sm">
+                <div key={`hs-${s.idx}`} className="grid grid-cols-2 gap-2 items-center text-sm">
                   <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.idx}</div>
                   <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(s.duration_s)}</div>
-                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.avg_hr != null ? `${s.avg_hr} bpm` : '—'}</div>
-                  <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{s.swolf != null ? s.swolf : '—'}</div>
                 </div>
               ))}
             </div>
