@@ -852,7 +852,8 @@ const formatPace = (paceValue: any): string => {
             const distB = Number(b?.totalDistanceInMeters ?? b?.distanceInMeters ?? NaN);
             const dDist = Number.isFinite(prevDist) && Number.isFinite(distB) ? (distB - prevDist) : NaN;
             prevDist = Number.isFinite(distB) ? distB : prevDist;
-            const active = (Number.isFinite(dDist) && dDist > 0.05) || (Number.isFinite(cadA) && cadA > 0) || (Number.isFinite(cadB) && cadB > 0);
+            // Only count as active if distance clearly increases or stroke rate is swimming-level
+            const active = (Number.isFinite(dDist) && dDist > 0.5) || (Number.isFinite(cadA) && cadA >= 10) || (Number.isFinite(cadB) && cadB >= 10);
             if (active) moving += dt;
           }
           if (moving > 0) sampleCandidate = Math.round(moving);
