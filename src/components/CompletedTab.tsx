@@ -1687,12 +1687,15 @@ const formatMovingTime = () => {
               <div className="mt-2">
                 <div className="text-xs text-gray-700 mb-1">{label} splits</div>
                 <div className="text-xs text-gray-800 space-y-0.5">
-                  {hundred.map(s => (
-                    <div key={`h-${s.idx}`} className="flex items-center justify-between">
-                      <div>{label} #{s.idx}</div>
-                      <div className="font-mono">{formatSwimPace(useImperial ? Math.round(s.duration_s * 0.9144) : s.duration_s)}{s.swolf!=null?` (SWOLF ${s.swolf})`:''}</div>
-                    </div>
-                  ))}
+                  {hundred.map(s => {
+                    const v = useImperial ? Math.round(s.duration_s * 0.9144) : s.duration_s;
+                    return (
+                      <div key={`h-${s.idx}`} className="flex items-center justify-between">
+                        <div>{label} #{s.idx}</div>
+                        <div className="font-mono">{formatSwimPace(v)}{s.swolf!=null?` (SWOLF ${s.swolf})`:''}</div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -2344,12 +2347,16 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {/* Swim 100m/yd splits list with HR */}
+      {/* Swim splits list with HR (prefer lengths-derived splits for accuracy) */}
       {(() => {
         if (workoutType !== 'swim') return null;
         const comp = (hydrated || workoutData) as any;
+        const fromLengths = (() => { try { return buildHundredSplits(); } catch { return []; } })();
         const comp100 = comp?.computed?.analysis?.events?.splits_100;
-        if (!comp100 || !Array.isArray(comp100.rows) || !comp100.rows.length) return null;
+        const rowsPref = (Array.isArray(fromLengths) && fromLengths.length)
+          ? fromLengths.map(r => ({ n: r.idx, duration_s: Number(r.duration_s) || 0 }))
+          : (Array.isArray(comp100?.rows) ? comp100.rows as Array<{ n:number; duration_s:number }> : []);
+        if (!rowsPref.length) return null;
 
         // Prepare HR series (optional)
         const series = comp?.computed?.analysis?.series || {};
@@ -2370,8 +2377,8 @@ const formatMovingTime = () => {
           } catch { return null; }
         };
 
-        const rows = comp100.rows as Array<{ n: number; duration_s: number }>;
-        const sourceUnit = String(comp100.unit || 'm');
+        const rows = rowsPref as Array<{ n: number; duration_s: number }>;
+        const sourceUnit = String((comp100 && comp100.unit) || 'm');
         const wantYd = useImperial;
         const unitLabel = wantYd ? '100yd' : '100m';
         let tCursor = 0;
