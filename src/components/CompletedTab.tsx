@@ -230,6 +230,11 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
                 const km = (computeDistanceKm(workoutData) ?? Number(workoutData.distance)) || 0;
+                if (workoutType === 'swim') {
+                  const meters = Math.round(km * 1000);
+                  if (!meters) return 'N/A';
+                  return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
+                }
                 return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
               })()}
             </div>

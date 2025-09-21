@@ -274,13 +274,25 @@ Deno.serve(async (req) => {
         const swim = parseJson((w as any).swim_data) || null;
         const lengths: Array<{ distance_m?: number; duration_s?: number }> = Array.isArray(swim?.lengths) ? swim.lengths : [];
         if (lengths.length) {
+          // If length durations don't sum to the actual moving time, normalize
+          let totalLenDur = 0;
+          for (const len of lengths) totalLenDur += Number(len?.duration_s ?? 0);
+          // Prefer previously computed moving duration if present; else from series
+          const prevComputed = parseJson((w as any).computed) || {};
+          const movingSecFromPrev = Number(prevComputed?.overall?.duration_s_moving ?? NaN);
+          const movingSecFromSeries = (hasRows && time_s.length) ? Number(time_s[time_s.length - 1]) : NaN;
+          const targetMovingSec = Number.isFinite(movingSecFromPrev) ? movingSecFromPrev : (Number.isFinite(movingSecFromSeries) ? movingSecFromSeries : totalLenDur);
+          const scale = (totalLenDur > 0 && Number.isFinite(targetMovingSec) && targetMovingSec > 0)
+            ? (targetMovingSec / totalLenDur)
+            : 1;
+
           let acc = 0;
           let bucket = 100; // meters
           let tAcc = 0;
           const rows100: Array<{ n:number; duration_s:number }> = [];
           for (const len of lengths) {
             const d = Number(len?.distance_m ?? 0);
-            const td = Number(len?.duration_s ?? 0);
+            const td = Math.max(0, Number(len?.duration_s ?? 0) * scale);
             acc += Number.isFinite(d) ? d : 0;
             tAcc += Number.isFinite(td) ? td : 0;
             while (acc >= bucket) {
