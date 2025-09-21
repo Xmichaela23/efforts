@@ -2342,34 +2342,63 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {/* Swim 100m/yd splits list */}
+      {/* Swim 100m/yd splits list with HR */}
       {(() => {
         if (workoutType !== 'swim') return null;
-        // Dev: only trust server-computed splits
         const comp = (hydrated || workoutData) as any;
         const comp100 = comp?.computed?.analysis?.events?.splits_100;
-        if (comp100 && Array.isArray(comp100.rows) && comp100.rows.length) {
-          const rows = comp100.rows as Array<{ n: number; duration_s: number }>;
-          const unitLabel = comp100.unit === 'yd' ? '100yd' : '100m';
-          return (
-            <div className="mx-[-16px] px-3 py-2">
-              <div className="text-lg font-semibold mb-2">Splits ({unitLabel})</div>
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-1">
-                <div className="font-medium">#</div>
-                <div className="font-medium">Pace</div>
-              </div>
-              <div className="space-y-1">
-                {rows.map((r) => (
-                  <div key={`cs-${r.n}`} className="grid grid-cols-2 gap-2 items-center text-sm">
+        if (!comp100 || !Array.isArray(comp100.rows) || !comp100.rows.length) return null;
+
+        // Prepare HR series (optional)
+        const series = comp?.computed?.analysis?.series || {};
+        const time_s: number[] = Array.isArray(series?.time_s) ? series.time_s : (Array.isArray(series?.time) ? series.time : []);
+        const hr_bpm: (number|null)[] = Array.isArray(series?.hr_bpm) ? series.hr_bpm : [];
+
+        const avgHrBetween = (t0: number, t1: number): number | null => {
+          try {
+            if (!time_s.length || !hr_bpm.length) return null;
+            const vals: number[] = [];
+            for (let i = 0; i < time_s.length; i++) {
+              const t = Number(time_s[i]);
+              const h = Number(hr_bpm[i]);
+              if (Number.isFinite(t) && t >= t0 && t <= t1 && Number.isFinite(h)) vals.push(h);
+            }
+            if (!vals.length) return null;
+            return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+          } catch { return null; }
+        };
+
+        const rows = comp100.rows as Array<{ n: number; duration_s: number }>;
+        const unitLabel = comp100.unit === 'yd' ? '100yd' : '100m';
+        let tCursor = 0;
+
+        return (
+          <div className="mx-[-16px] px-3 py-2">
+            <div className="text-lg font-semibold mb-2">Splits</div>
+            <div className="grid grid-cols-4 gap-2 text-sm text-gray-600 mb-1">
+              <div className="font-medium">#</div>
+              <div className="font-medium">Time</div>
+              <div className="font-medium">Pace</div>
+              <div className="font-medium">BPM</div>
+            </div>
+            <div className="space-y-1">
+              {rows.map((r) => {
+                const tStart = tCursor;
+                const tEnd = tCursor + (Number(r.duration_s) || 0);
+                tCursor = tEnd;
+                const hr = avgHrBetween(tStart, tEnd);
+                return (
+                  <div key={`cs-${r.n}`} className="grid grid-cols-4 gap-2 items-center text-sm">
                     <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{r.n}</div>
                     <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(r.duration_s)}</div>
+                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{`${formatSwimPace(r.duration_s)} / ${unitLabel}`}</div>
+                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{hr ?? '—'}</div>
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          );
-        }
-        return null;
+          </div>
+        );
       })()}
 
       {/* SEPARATE Power/Cadence Chart - at the bottom */}
