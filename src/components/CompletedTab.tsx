@@ -2369,7 +2369,8 @@ const formatMovingTime = () => {
         };
 
         const rows = comp100.rows as Array<{ n: number; duration_s: number }>;
-        const unitLabel = comp100.unit === 'yd' ? '100yd' : '100m';
+        // Render-time unit preference: Completed honors user setting
+        const unitLabel = useImperial ? '100yd' : '100m';
         let tCursor = 0;
 
         return (
@@ -2387,11 +2388,12 @@ const formatMovingTime = () => {
                 const tEnd = tCursor + (Number(r.duration_s) || 0);
                 tCursor = tEnd;
                 const hr = avgHrBetween(tStart, tEnd);
+                const dispSec = useImperial ? Math.round(Number(r.duration_s) * 0.9144) : Number(r.duration_s);
                 return (
                   <div key={`cs-${r.n}`} className="grid grid-cols-4 gap-2 items-center text-sm">
                     <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{r.n}</div>
-                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(r.duration_s)}</div>
-                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{`${formatSwimPace(r.duration_s)} / ${unitLabel}`}</div>
+                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{formatSwimPace(dispSec)}</div>
+                    <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{`${formatSwimPace(dispSec)} / ${unitLabel}`}</div>
                     <div className="px-2 py-1 rounded bg-slate-50 text-gray-900 font-mono">{hr ?? '—'}</div>
                   </div>
                 );

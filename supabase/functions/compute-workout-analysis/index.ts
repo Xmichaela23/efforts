@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
     // Load workout essentials
     const { data: w, error: wErr } = await supabase
       .from('workouts')
-      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp')
+      .select('id, user_id, type, source, strava_activity_id, garmin_activity_id, gps_track, sensor_data, laps, computed, date, timestamp, swim_data, pool_length')
       .eq('id', workout_id)
       .maybeSingle();
     if (wErr) throw wErr;
@@ -268,9 +268,39 @@ Deno.serve(async (req) => {
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
+    // --- Always compute base swim 100m splits from swim_data.lengths (canonical meters) ---
+    try {
+      if (String(w.type || '').toLowerCase().includes('swim')) {
+        const swim = parseJson((w as any).swim_data) || null;
+        const lengths: Array<{ distance_m?: number; duration_s?: number }> = Array.isArray(swim?.lengths) ? swim.lengths : [];
+        if (lengths.length) {
+          let acc = 0;
+          let bucket = 100; // meters
+          let tAcc = 0;
+          const rows100: Array<{ n:number; duration_s:number }> = [];
+          for (const len of lengths) {
+            const d = Number(len?.distance_m ?? 0);
+            const td = Number(len?.duration_s ?? 0);
+            acc += Number.isFinite(d) ? d : 0;
+            tAcc += Number.isFinite(td) ? td : 0;
+            while (acc >= bucket) {
+              rows100.push({ n: rows100.length + 1, duration_s: Math.max(1, Math.round(tAcc)) });
+              // Reset accumulator for the next bucket
+              tAcc = 0; // note: no proportional split without sub-length timing
+              bucket += 100;
+            }
+          }
+          if (rows100.length) {
+            analysis.events.splits_100 = { unit: 'm', rows: rows100 } as any;
+          }
+        }
+      }
+    } catch {}
+
     // Write under workouts.computed.analysis without clobbering existing computed
     const computed = (() => {
       const c = parseJson(w.computed) || {};
+      // Preserve any pre-existing non-analysis keys; replace analysis fully with the new one
       return { ...c, analysis };
     })();
 
