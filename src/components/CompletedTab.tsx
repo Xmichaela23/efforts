@@ -2353,9 +2353,17 @@ const formatMovingTime = () => {
         const comp = (hydrated || workoutData) as any;
         const fromLengths = (() => { try { return buildHundredSplits(); } catch { return []; } })();
         const comp100 = comp?.computed?.analysis?.events?.splits_100;
-        const rowsPref = (Array.isArray(fromLengths) && fromLengths.length)
+        let rowsPref = (Array.isArray(fromLengths) && fromLengths.length)
           ? fromLengths.map(r => ({ n: r.idx, duration_s: Number(r.duration_s) || 0 }))
           : (Array.isArray(comp100?.rows) ? comp100.rows as Array<{ n:number; duration_s:number }> : []);
+        // If lengths-derived splits show no variation (likely equalized durations), fall back to server rows
+        if (rowsPref.length >= 3) {
+          const min = rowsPref.reduce((m,r)=> Math.min(m, Number(r.duration_s)||0), Number.MAX_SAFE_INTEGER);
+          const max = rowsPref.reduce((m,r)=> Math.max(m, Number(r.duration_s)||0), 0);
+          if (max - min <= 1 && Array.isArray(comp100?.rows) && comp100.rows.length) {
+            rowsPref = comp100.rows as Array<{ n:number; duration_s:number }>;
+          }
+        }
         if (!rowsPref.length) return null;
 
         // Prepare HR series (optional)
