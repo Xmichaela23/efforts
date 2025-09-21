@@ -303,7 +303,10 @@ Deno.serve(async (req) => {
             }
           }
           if (rows100.length) {
-            analysis.events.splits_100 = { unit: 'm', rows: rows100 } as any;
+            // Preserve existing unit if present (e.g., set by ingest for yard pools)
+            const prevUnit = (analysis as any)?.events?.splits_100?.unit;
+            const unit = (prevUnit === 'yd' || prevUnit === 'm') ? prevUnit : 'm';
+            analysis.events.splits_100 = { unit, rows: rows100 } as any;
           }
         }
       }

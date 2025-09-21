@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useAppContext } from '@/contexts/AppContext';
 import { supabase } from '../lib/supabase';
 import StrengthCompareTable from './StrengthCompareTable';
 
@@ -261,6 +262,7 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
 };
 
 export default function MobileSummary({ planned, completed }: MobileSummaryProps) {
+  const { useImperial } = useAppContext();
   if (!planned) {
     return (
       <div className="text-sm text-gray-600">No planned session to compare.</div>
@@ -819,7 +821,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       })()}
       <div className="grid grid-cols-5 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned</div>
-        <div className="font-medium text-black">{isRideSport ? 'Executed Speed' : (isSwimSport ? 'Executed /100' : 'Executed Pace')}</div>
+        <div className="font-medium text-black">{isRideSport ? 'Executed Speed' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</div>
         <div className="font-medium text-black">Distance</div>
         <div className="font-medium text-black">Time</div>
         <div className="font-medium text-black">BPM</div>
@@ -852,9 +854,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                       ? per100m
                       : (Number.isFinite(d) && d>0 && Number.isFinite(t) && t>0 ? (t/(d/100)) : NaN);
                     if (Number.isFinite(use)) {
-                      const m = Math.floor((use as number)/60);
-                      const s = Math.round((use as number)%60);
-                      return <div>{m}:{String(s).padStart(2,'0')} /100m</div>;
+                      const v = useImperial ? Math.round((use as number) * 0.9144) : (use as number);
+                      const m = Math.floor(v/60);
+                      const s = Math.round(v%60);
+                      return <div>{m}:{String(s).padStart(2,'0')} {useImperial ? '/100yd' : '/100m'}</div>;
                     }
                   }
                   return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
@@ -871,7 +874,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
                   const distM = row?.executed?.distance_m as number | undefined;
                   if (typeof distM === 'number' && distM > 0) {
                     if (isSwimSport) {
-                      return <div>{Math.round(distM)} m</div>;
+                      return <div>{useImperial ? Math.round(distM/0.9144) + ' yd' : Math.round(distM) + ' m'}</div>;
                     }
                     if (isRideSport || /run|walk/i.test(sportType)) {
                       const mi = distM / 1609.34;

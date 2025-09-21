@@ -412,6 +412,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
+  // Initialize unit preference from user_baselines on first load
+  useEffect(() => {
+    (async () => {
+      try {
+        const b = await loadUserBaselines();
+        if (b && (b.units === 'metric' || b.units === 'imperial')) {
+          setUseImperial(b.units !== 'metric');
+        }
+      } catch {}
+    })();
+  }, []);
+
+  // Persist unit preference toggle back to user_baselines
+  const toggleUnitsPersist = async () => {
+    setUseImperial((prev) => {
+      const next = !prev;
+      (async () => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const units = next ? 'imperial' : 'metric';
+            // Upsert minimal record with new units
+            await supabase
+              .from('user_baselines')
+              .upsert({ user_id: user.id, units }, { onConflict: 'user_id' });
+          }
+        } catch {}
+      })();
+      return next;
+    });
+  };
+
   const loadPlans = async () => {
     try {
       setPlansLoading(true);
@@ -897,7 +929,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         deleteWorkout,
         loadProviderData,
         useImperial,
-        toggleUnits: () => setUseImperial(prev => !prev),
+        toggleUnits: toggleUnitsPersist,
         currentPlans,
         completedPlans,
         detailedPlans,

@@ -790,9 +790,11 @@ const formatPace = (paceValue: any): string => {
           label: 'Pace',
           value: (() => {
             const s = computeSwimAvgPaceSecPer100();
-            return s ? formatSwimPace(s) : 'N/A';
+            if (!s) return 'N/A';
+            const disp = useImperial ? Math.round(s * 0.9144) : s;
+            return formatSwimPace(disp);
           })(),
-          unit: (() => (isYardPool() === true ? '/100yd' : '/100m'))()
+          unit: useImperial ? '/100yd' : '/100m'
         },
         {
           label: 'Cadence',
@@ -998,15 +1000,10 @@ const formatPace = (paceValue: any): string => {
   const formatPoolLengthLabel = (): string => {
     const L = inferPoolLengthMeters();
     if (!L) return 'N/A';
-    const yardPool = isYardPool();
-    if (yardPool === true) return '25 yd';
+    if (useImperial) return `${Math.round(L / 0.9144)} yd`;
     const candidates = [25, 50, 33.33];
     let best = L; let label = `${Math.round(L)} m`;
-    for (const c of candidates) {
-      if (Math.abs(L - c) < Math.abs(best - (typeof best === 'number' ? best : c))) {
-        best = c; label = `${c} m`;
-      }
-    }
+    for (const c of candidates) { if (Math.abs(L - c) < Math.abs(best - (typeof best === 'number' ? best : c))) { best = c; label = `${c} m`; } }
     return label;
   };
 
@@ -1685,7 +1682,7 @@ const formatMovingTime = () => {
           {(() => {
             const hundred = buildHundredSplits();
             if (!hundred.length) return null;
-            const label = hundred[0]?.unit === 'yd' ? '100yd' : '100m';
+            const label = useImperial ? '100yd' : '100m';
             return (
               <div className="mt-2">
                 <div className="text-xs text-gray-700 mb-1">{label} splits</div>
@@ -1693,7 +1690,7 @@ const formatMovingTime = () => {
                   {hundred.map(s => (
                     <div key={`h-${s.idx}`} className="flex items-center justify-between">
                       <div>{label} #{s.idx}</div>
-                      <div className="font-mono">{formatSwimPace(s.duration_s)}{s.swolf!=null?` (SWOLF ${s.swolf})`:''}</div>
+                      <div className="font-mono">{formatSwimPace(useImperial ? Math.round(s.duration_s * 0.9144) : s.duration_s)}{s.swolf!=null?` (SWOLF ${s.swolf})`:''}</div>
                     </div>
                   ))}
                 </div>
@@ -1718,7 +1715,7 @@ const formatMovingTime = () => {
                 if (workoutType === 'swim') {
                   const meters = Math.round(km * 1000);
                   if (!meters) return 'N/A';
-                  return (isYardPool() === true) ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
+                  return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
                 }
                 return km ? `${formatDistance(km)} ${useImperial ? 'mi' : 'km'}` : 'N/A';
                })()}
@@ -1767,10 +1764,10 @@ const formatMovingTime = () => {
            ) : workoutType === 'swim' ? (
              <div className="px-2 py-1">
                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-                {(() => { const s = computeSwimAvgPaceSecPer100(); return s ? formatSwimPace(s) : 'N/A'; })()}
+                {(() => { const s = computeSwimAvgPaceSecPer100(); if (!s) return 'N/A'; const disp = useImperial ? Math.round(s*0.9144) : s; return formatSwimPace(disp); })()}
                </div>
                <div className="text-xs text-[#666666] font-normal">
-                 <div className="font-medium">Avg Pace</div>
+                 <div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div>
                </div>
              </div>
            ) : (
@@ -2374,8 +2371,9 @@ const formatMovingTime = () => {
         };
 
         const rows = comp100.rows as Array<{ n: number; duration_s: number }>;
-        // Render-time unit preference: Completed honors user setting
-        const unitLabel = useImperial ? '100yd' : '100m';
+        const sourceUnit = String(comp100.unit || 'm');
+        const wantYd = useImperial;
+        const unitLabel = wantYd ? '100yd' : '100m';
         let tCursor = 0;
 
         return (
@@ -2393,7 +2391,9 @@ const formatMovingTime = () => {
                 const tEnd = tCursor + (Number(r.duration_s) || 0);
                 tCursor = tEnd;
                 const hr = avgHrBetween(tStart, tEnd);
-                const dispSec = useImperial ? Math.round(Number(r.duration_s) * 0.9144) : Number(r.duration_s);
+                let dispSec = Number(r.duration_s);
+                if (wantYd && sourceUnit === 'm') dispSec = Math.round(dispSec * 0.9144);
+                if (!wantYd && sourceUnit === 'yd') dispSec = Math.round(dispSec / 0.9144);
                 return (
                   <div key={`cs-${r.n}`} className="grid grid-cols-4 gap-2 items-center text-sm">
                     <div className="px-2 py-1 rounded bg-slate-50 text-gray-900">{r.n}</div>
