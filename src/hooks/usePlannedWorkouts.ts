@@ -33,7 +33,7 @@ export const usePlannedWorkouts = () => {
 
       const { data, error } = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,rendered_description,units,source,workout_structure,workout_title,friendly_summary,total_duration_seconds,strength_exercises')
+        .select('id,name,type,date,description,duration,workout_status,training_plan_id,week_number,day_number,tags,rendered_description,units,source,workout_structure,workout_title,friendly_summary,total_duration_seconds,strength_exercises,pool_unit,pool_length_m')
         .eq('user_id', user.id)
         .gte('date', pastIso)
         .lte('date', futureIso)
@@ -149,6 +149,11 @@ export const usePlannedWorkouts = () => {
           friendly_summary: (workout as any).friendly_summary || null,
           // @ts-ignore
           total_duration_seconds: (workout as any).total_duration_seconds || null,
+          // Swim pool preference (nullable)
+          // @ts-ignore
+          pool_unit: (workout as any).pool_unit || null,
+          // @ts-ignore
+          pool_length_m: (workout as any).pool_length_m || null,
           // View hints (DB columns take precedence over tag-encoded hints)
           // @ts-ignore
           display_overrides: displayOverrides || displayOverridesFromTags || null,
@@ -206,7 +211,10 @@ export const usePlannedWorkouts = () => {
         training_plan_id: workoutData.training_plan_id,
         week_number: workoutData.week_number,
         day_number: workoutData.day_number,
-        user_id: user.id
+        user_id: user.id,
+        // Pass-through swim pool fields if provided by UI
+        pool_unit: (workoutData as any).pool_unit ?? null,
+        pool_length_m: (workoutData as any).pool_length_m ?? null
       };
 
       console.log('🔧 Saving planned workout:', toSave);
@@ -283,7 +291,10 @@ export const usePlannedWorkouts = () => {
         source: data.source,
         training_plan_id: data.training_plan_id,
         week_number: data.week_number,
-        day_number: data.day_number
+        day_number: data.day_number,
+        // expose swim pool fields on client state
+        pool_unit: (data as any).pool_unit || null,
+        pool_length_m: (data as any).pool_length_m || null
       };
 
       setPlannedWorkouts(prev => 

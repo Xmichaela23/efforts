@@ -204,7 +204,9 @@ async function postJsonWithRetry(url: string, body: unknown, headers: Record<str
         body: JSON.stringify(body)
       })
       const status = res.status
-      const text = await res.text()
+      // Read body from a clone so the original can still be consumed by callers
+      const clone = res.clone()
+      const text = await clone.text()
       lastText = text
       if (res.ok) return { ok: true, status, text, response: res }
       const retryable = status === 429 || (status >= 500 && status < 600)
@@ -557,10 +559,10 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             .replace(/kickboard/ig,'board')
             .replace(/\(optional\)/ig,'(opt)')
           // Include per-rep yards explicitly so users see "1 × 100 yd"
-          const yd = typeof (st as any)?.distance_yd === 'number' && (st as any).distance_yd > 0
+          const ydRaw = typeof (st as any)?.distance_yd === 'number' && (st as any).distance_yd > 0
             ? Math.max(25, Math.round((st as any).distance_yd / 25) * 25)
             : undefined
-          const yardText = yd ? `1 × ${yd} yd` : undefined
+          const yardText = ydRaw ? `1 × ${ydRaw} yd` : undefined
           const baseLab = label || 'Interval'
           label = [baseLab, yardText, abbr].filter(Boolean).join(' — ')
         }
@@ -801,18 +803,21 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
     }
   }
 
+  const estSecs = isSwimSport ? undefined : estimateWorkoutSeconds(workout, steps, computedSteps)
+  const segEstSecs = isSwimSport ? undefined : estimateWorkoutSeconds(workout, steps, computedSteps)
   return {
     workoutName: workout.name,
     sport,
-    ...(isSwimSport ? { poolLength: 25.0, poolLengthUnit: 'YARD' } : {}),
-    estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps, computedSteps),
+    // Let device pool setting govern units; Garmin will display step distances without conversion
+    ...(isSwimSport ? { poolLength: null as any, poolLengthUnit: null as any } : {}),
+    ...(typeof estSecs === 'number' ? { estimatedDurationInSecs: estSecs } : {}),
     segments: [
       {
         segmentOrder: 1,
         sport,
-        ...(isSwimSport ? { poolLength: 25.0, poolLengthUnit: 'YARD' } : {}),
+        ...(isSwimSport ? { poolLength: null as any, poolLengthUnit: null as any } : {}),
         steps,
-        estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps, computedSteps)
+        ...(typeof segEstSecs === 'number' ? { estimatedDurationInSecs: segEstSecs } : {})
       }
     ]
   }

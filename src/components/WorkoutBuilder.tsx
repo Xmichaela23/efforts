@@ -55,7 +55,10 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     date: getInitialDate(),
     description: '',
     userComments: '',
-    completedManually: false
+    completedManually: false,
+    // swim pool fields (nullable)
+    pool_unit: (existingWorkout as any)?.pool_unit || null as any,
+    pool_length_m: (existingWorkout as any)?.pool_length_m || null as any
   });
 
   const [runIntervals, setRunIntervals] = useState<RunInterval[]>([]);
@@ -103,7 +106,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
         date: existingWorkout.date,
         description: existingWorkout.description || '',
         userComments: existingWorkout.userComments || '',
-        completedManually: existingWorkout.completedManually || false
+        completedManually: existingWorkout.completedManually || false,
+        pool_unit: (existingWorkout as any)?.pool_unit || null,
+        pool_length_m: (existingWorkout as any)?.pool_length_m || null
       });
 
       if (existingWorkout.type === 'run' && existingWorkout.intervals) {
@@ -331,7 +336,9 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
                   formData.type === 'swim' ? swimIntervals : [],
         strength_exercises: formData.type === 'strength' ? strengthExercises : [],
         workout_status: 'planned' as const,
-        source: 'manual' as const
+        source: 'manual' as const,
+        // pass swim pool fields for swim workouts only
+        ...(formData.type === 'swim' ? { pool_unit: formData.pool_unit, pool_length_m: formData.pool_length_m } : {})
       };
 
       let savedWorkout: PlannedWorkout;
@@ -346,7 +353,8 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
           duration: Math.round(calculateTotalTime() / 60), // Convert seconds to minutes
           intervals: workoutData.intervals,
           strength_exercises: workoutData.strength_exercises,
-          workout_status: workoutData.workout_status
+          workout_status: workoutData.workout_status,
+          ...(workoutData.type === 'swim' ? { pool_unit: (workoutData as any).pool_unit, pool_length_m: (workoutData as any).pool_length_m } : {})
         };
         savedWorkout = await updatePlannedWorkout(currentWorkout.id, updateData);
       } else {
@@ -501,6 +509,34 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
             )}
             {formData.type === 'swim' && (
               <SwimIntervalBuilder intervals={swimIntervals} onChange={setSwimIntervals} isMetric={isMetric} />
+            )}
+            {formData.type === 'swim' && (
+              <div className="mt-4 border-t pt-3">
+                <Label className="text-sm font-medium text-muted-foreground mb-2 block">Pool setting</Label>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: 'yd', pool_length_m: 22.86 }))}
+                    className={`border rounded px-3 py-2 text-left ${formData.pool_unit==='yd' && Math.abs((formData.pool_length_m||0)-22.86)<0.01 ? 'border-black' : 'border-gray-300'}`}
+                  >25 Yard Pool</button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: 'm', pool_length_m: 25.0 }))}
+                    className={`border rounded px-3 py-2 text-left ${formData.pool_unit==='m' && Math.abs((formData.pool_length_m||0)-25.0)<0.01 ? 'border-black' : 'border-gray-300'}`}
+                  >25 Meter Pool</button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: 'm', pool_length_m: 50.0 }))}
+                    className={`border rounded px-3 py-2 text-left ${formData.pool_unit==='m' && Math.abs((formData.pool_length_m||0)-50.0)<0.01 ? 'border-black' : 'border-gray-300'}`}
+                  >50 Meter Pool</button>
+                  <button
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, pool_unit: null as any, pool_length_m: null as any }))}
+                    className={`border rounded px-3 py-2 text-left ${!formData.pool_unit ? 'border-black' : 'border-gray-300'}`}
+                  >Unspecified (device determines)</button>
+                </div>
+                <div className="text-xs text-muted-foreground mt-2">Preview: {formData.pool_unit==='yd' ? 'yards' : formData.pool_unit==='m' ? 'meters' : 'device default'} headers on device</div>
+              </div>
             )}
             {formData.type === 'strength' && (
               <StrengthExerciseBuilder exercises={strengthExercises} onChange={setStrengthExercises} />
