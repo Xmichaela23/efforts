@@ -135,6 +135,21 @@ export default function WorkoutBuilder({ onClose, initialType, existingWorkout, 
     }
   }, [initialType]);
 
+  // Default swim pool based on user units when creating a new swim
+  useEffect(() => {
+    if (!existingWorkout && formData.type === 'swim') {
+      setFormData(prev => {
+        // If user has not selected a pool yet (both null/undefined), apply default
+        if (prev.pool_unit == null && prev.pool_length_m == null) {
+          return useImperial
+            ? { ...prev, pool_unit: 'yd', pool_length_m: 22.86 }
+            : { ...prev, pool_unit: 'm', pool_length_m: 25.0 };
+        }
+        return prev;
+      });
+    }
+  }, [existingWorkout, formData.type, useImperial]);
+
   useEffect(() => {
     const autoDescription = generateWorkoutDescription();
     if (autoDescription && autoDescription !== formData.description) {

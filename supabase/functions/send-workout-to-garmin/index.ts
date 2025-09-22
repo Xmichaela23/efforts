@@ -805,17 +805,28 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
 
   const estSecs = isSwimSport ? undefined : estimateWorkoutSeconds(workout, steps, computedSteps)
   const segEstSecs = isSwimSport ? undefined : estimateWorkoutSeconds(workout, steps, computedSteps)
+  // Map pool setting from planned_workouts when present
+  const poolUnit: string | null = isSwimSport ? (String(((workout as any)?.pool_unit)||'').toLowerCase() || null) : null
+  const poolLenM: number | null = isSwimSport ? (Number((workout as any)?.pool_length_m) || null) : null
+  const poolFields = (() => {
+    if (!isSwimSport) return {}
+    if (!poolUnit) return { poolLength: null as any, poolLengthUnit: null as any }
+    if (poolUnit === 'yd') return { poolLength: 25.0, poolLengthUnit: 'YARD' }
+    // meters: choose 50 when >= 40m, else 25
+    const len = (typeof poolLenM === 'number' && isFinite(poolLenM)) ? poolLenM : 25.0
+    const meters = len >= 40 ? 50.0 : 25.0
+    return { poolLength: meters, poolLengthUnit: 'METER' }
+  })()
   return {
     workoutName: workout.name,
     sport,
-    // Let device pool setting govern units; Garmin will display step distances without conversion
-    ...(isSwimSport ? { poolLength: null as any, poolLengthUnit: null as any } : {}),
+    ...(isSwimSport ? poolFields : {}),
     ...(typeof estSecs === 'number' ? { estimatedDurationInSecs: estSecs } : {}),
     segments: [
       {
         segmentOrder: 1,
         sport,
-        ...(isSwimSport ? { poolLength: null as any, poolLengthUnit: null as any } : {}),
+        ...(isSwimSport ? poolFields : {}),
         steps,
         ...(typeof segEstSecs === 'number' ? { estimatedDurationInSecs: segEstSecs } : {})
       }
