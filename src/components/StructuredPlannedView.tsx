@@ -25,6 +25,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const { loadUserBaselines } = useAppContext?.() || ({} as any);
   const [ctxPN, setCtxPN] = useState<any | null>(null);
   const [savingPool, setSavingPool] = useState<boolean>(false);
+  const [autoDefaulted, setAutoDefaulted] = useState<boolean>(false);
   useEffect(() => {
     (async () => {
       try {
@@ -378,6 +379,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           .update(def as any)
           .eq('id', (workout as any)?.id);
         try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+        setAutoDefaulted(true);
       } catch {}
       finally { setSavingPool(false); }
     })();
@@ -435,12 +437,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         <div className="mt-2">
           <div className="text-xs text-gray-500 mb-1">Pool</div>
           <div className="flex flex-wrap gap-2 text-xs">
-            <button type="button" onClick={()=>setPool('yd', 22.86)} className={`border rounded px-2 py-1 ${poolUnit==='yd' && Math.abs((poolLenM||0)-22.86)<0.02 ? 'border-black' : 'border-gray-300'}`}>25 yd</button>
-            <button type="button" onClick={()=>setPool('m', 25.0)} className={`border rounded px-2 py-1 ${poolUnit==='m' && Math.abs((poolLenM||0)-25.0)<0.02 ? 'border-black' : 'border-gray-300'}`}>25 m</button>
-            <button type="button" onClick={()=>setPool('m', 50.0)} className={`border rounded px-2 py-1 ${poolUnit==='m' && Math.abs((poolLenM||0)-50.0)<0.02 ? 'border-black' : 'border-gray-300'}`}>50 m</button>
-            <button type="button" onClick={()=>setPool(null as any, null as any)} className={`border rounded px-2 py-1 ${!poolUnit ? 'border-black' : 'border-gray-300'}`}>Unspecified</button>
+            <button type="button" onClick={()=>setPool('yd', 22.86)} className={`rounded px-2 py-1 bg-gray-100 ${poolUnit==='yd' && Math.abs((poolLenM||0)-22.86)<0.02 ? 'bg-black text-white' : ''}`}>25 yd</button>
+            <button type="button" onClick={()=>setPool('m', 25.0)} className={`rounded px-2 py-1 bg-gray-100 ${poolUnit==='m' && Math.abs((poolLenM||0)-25.0)<0.02 ? 'bg-black text-white' : ''}`}>25 m</button>
+            <button type="button" onClick={()=>setPool('m', 50.0)} className={`rounded px-2 py-1 bg-gray-100 ${poolUnit==='m' && Math.abs((poolLenM||0)-50.0)<0.02 ? 'bg-black text-white' : ''}`}>50 m</button>
             {savingPool && <span className="text-gray-400">Saving…</span>}
           </div>
+          {!savingPool && autoDefaulted && (
+            <div className="text-[11px] text-gray-400 mt-1">Defaulted from your units; change if venue differs.</div>
+          )}
         </div>
       )}
       {sessionSummary && (
