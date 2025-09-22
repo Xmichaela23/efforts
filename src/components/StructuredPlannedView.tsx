@@ -332,8 +332,15 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       });
 
       if (error) {
-        const details = (error as any)?.context ? `\nDetails: ${(error as any).context}` : '';
-        alert(`Failed to send to Garmin: ${error.message}${details}`);
+        let detailsTxt = '';
+        try {
+          const ctx = (error as any)?.context;
+          if (ctx && typeof ctx.text === 'function') {
+            const txt = await ctx.text();
+            detailsTxt = `\nDetails: ${txt}`;
+          }
+        } catch {}
+        alert(`Failed to send to Garmin: ${error.message}${detailsTxt}`);
       } else if (result?.success) {
         alert('Workout sent to Garmin successfully!');
       } else {
