@@ -801,13 +801,7 @@ const formatPace = (paceValue: any): string => {
           value: workoutData.avg_cadence ? safeNumber(workoutData.avg_cadence) : 'N/A',
           unit: 'spm'
         },
-        {
-          label: 'SWOLF',
-          value: (() => {
-            const v = computeSwolf();
-            return v != null ? safeNumber(v) : 'N/A';
-          })()
-        },
+      // SWOLF removed per request
         {
           label: 'Lengths',
           value: (() => {
@@ -1048,10 +1042,10 @@ const formatPace = (paceValue: any): string => {
     return null;
   };
 
-  type DetectedSet = { label: string; distance_m: number; pace_per100_s: number | null; swolf?: number | null };
+  type DetectedSet = { label: string; distance_m: number; pace_per100_s: number | null };
 
   // Build fixed-distance splits at 100m or 100yd based on pool
-  const buildHundredSplits = (): Array<{ idx: number; duration_s: number; swolf: number | null; avg_hr: number | null; unit: 'm' | 'yd' }> => {
+  const buildHundredSplits = (): Array<{ idx: number; duration_s: number; avg_hr: number | null; unit: 'm' | 'yd' }> => {
     try {
       const lengths = getSwimLengths();
       if (!lengths.length) return [];
@@ -1059,36 +1053,24 @@ const formatPace = (paceValue: any): string => {
       const isYd = isYardPool() === true;
       const unitLenM = isYd ? 91.44 : 100;
       const perSplit = Math.max(1, Math.round(unitLenM / Lm));
-      const splits: Array<{ idx: number; duration_s: number; swolf: number | null; avg_hr: number | null; unit: 'm' | 'yd' }> = [];
+      const splits: Array<{ idx: number; duration_s: number; avg_hr: number | null; unit: 'm' | 'yd' }> = [];
       let idx = 1;
       for (let i = 0; i < lengths.length; i += perSplit) {
         const chunk = lengths.slice(i, i + perSplit);
         if (chunk.length < perSplit) break; // require full chunk for a clean split
         let dur = 0;
         let strokesSum: number | null = 0;
-        let swolfSum: number | null = 0;
-        let swolfCount = 0;
         const hrVals: number[] = [];
         for (const len of chunk) {
           const t = Number((len as any)?.duration_s ?? (len as any)?.duration ?? 0);
           dur += Number.isFinite(t) ? t : 0;
           const st = Number((len as any)?.strokes ?? (len as any)?.stroke_count);
           if (Number.isFinite(st)) strokesSum = (strokesSum as number) + st; else strokesSum = strokesSum;
-          // Per-length SWOLF when both are present
-          if (Number.isFinite(t) && Number.isFinite(st)) { swolfSum = (swolfSum as number) + (t + st); swolfCount += 1; }
           const hr = Number((len as any)?.avg_heart_rate ?? (len as any)?.hr_bpm);
           if (Number.isFinite(hr) && hr > 40 && hr < 230) hrVals.push(Math.round(hr));
         }
-        let sw: number | null = null;
-        if (swolfCount > 0) sw = Math.round((swolfSum as number) / swolfCount);
-        else if (strokesSum != null && Number.isFinite(strokesSum as number) && chunk.length > 0) {
-          // Approximate: average strokes/length + avg seconds/length
-          const avgLen = dur / chunk.length;
-          const avgSt = (strokesSum as number) / chunk.length;
-          sw = Math.round(avgLen + avgSt);
-        }
         const avgHr = hrVals.length ? Math.round(hrVals.reduce((a,b)=>a+b,0)/hrVals.length) : null;
-        splits.push({ idx: idx++, duration_s: Math.round(dur), swolf: sw, avg_hr: avgHr, unit: isYd ? 'yd' : 'm' });
+        splits.push({ idx: idx++, duration_s: Math.round(dur), avg_hr: avgHr, unit: isYd ? 'yd' : 'm' });
       }
       return splits;
     } catch { return []; }
@@ -1225,24 +1207,7 @@ const formatPace = (paceValue: any): string => {
          : (workoutData.max_speed ? formatMaxSpeed(workoutData.max_speed) : 'N/A'),
        unit: isRun ? (useImperial ? '/mi' : '/km') : (useImperial ? 'mph' : 'km/h')
      },
-    {
-      label: workoutType === 'swim' ? 'Max stroke rate' : 'Max Cadence',
-       value: (() => {
-         const v = (
-           workoutData.max_cadence ??
-           workoutData.metrics?.max_cadence ??
-           workoutData.max_running_cadence ??
-           workoutData.max_bike_cadence ??
-           workoutData.max_run_cadence ??
-           workoutData.metrics?.max_bike_cadence ??
-           workoutData.avg_cadence ??
-           workoutData.metrics?.avg_cadence
-         );
-         const n = typeof v === 'string' ? parseFloat(v) : (v as number);
-         return n != null && !isNaN(Number(n)) ? safeNumber(n) : 'N/A';
-       })(),
-      unit: workoutType === 'swim' ? 'spm' : (isRun ? 'spm' : 'rpm')
-     }
+    // Max cadence / stroke rate removed per request
    ];
 
    // Add discipline-specific metrics
@@ -1679,27 +1644,7 @@ const formatMovingTime = () => {
             </div>
           )}
           {/* Fixed 100 splits */}
-          {(() => {
-            const hundred = buildHundredSplits();
-            if (!hundred.length) return null;
-            const label = useImperial ? '100yd' : '100m';
-            return (
-              <div className="mt-2">
-                <div className="text-xs text-gray-700 mb-1">{label} splits</div>
-                <div className="text-xs text-gray-800 space-y-0.5">
-                  {hundred.map(s => {
-                    const v = useImperial ? Math.round(s.duration_s * 0.9144) : s.duration_s;
-                    return (
-                      <div key={`h-${s.idx}`} className="flex items-center justify-between">
-                        <div>{label} #{s.idx}</div>
-                        <div className="font-mono">{formatSwimPace(v)}{s.swolf!=null?` (SWOLF ${s.swolf})`:''}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
+          {(() => { return null; })()}
         </div>
       );
     })()}
@@ -1784,7 +1729,7 @@ const formatMovingTime = () => {
              </div>
            )}
 
-          {/* Swim-only cards: Lengths, Pool, SWOLF */}
+          {/* Swim-only cards: Lengths, Pool */}
           {workoutType === 'swim' && (
             <>
               <div className="px-2 py-1">
@@ -1802,10 +1747,7 @@ const formatMovingTime = () => {
                 </div>
               </div>
               <div className="px-2 py-1">
-                <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{(() => { const s = computeSwolf(); return s != null ? safeNumber(s) : 'N/A'; })()}</div>
-                <div className="text-xs text-[#666666] font-normal">
-                  <div className="font-medium">SWOLF</div>
-                </div>
+                {/* SWOLF removed */}
               </div>
             </>
           )}
@@ -1997,30 +1939,7 @@ const formatMovingTime = () => {
 
           {/* Removed duplicate Max Speed row previously here */}
 
-          {/* Max Cadence / Stroke rate */}
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {(() => {
-                const field = (
-                  workoutData.max_cadence ??
-                  workoutData.metrics?.max_cadence ??
-                  (workoutData as any)?.computed?.overall?.max_cadence_spm ??
-                  workoutData.max_bike_cadence ??
-                  workoutData.max_running_cadence
-                );
-                if (field != null) return safeNumber(field);
-                const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
-                const maxSensor = sensors
-                  .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
-                  .filter((n: any) => Number.isFinite(n))
-                  .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
-                return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
-              })()}
-            </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Max {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
-            </div>
-          </div>
+          {/* Max Cadence / Stroke rate removed */}
 
           {/* Max HR */}
           <div className="px-2 py-1">
@@ -2120,7 +2039,7 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 4: Max Cadence; VAM hidden for swim */}
+          {/* Row 4: Cadence removed; VAM hidden for swim */}
           <div className="px-2 py-1">
             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
               {(() => {
@@ -2347,24 +2266,21 @@ const formatMovingTime = () => {
         </div>
       )}
 
-      {/* Swim splits list with HR (prefer lengths-derived splits for accuracy) */}
+      {/* Swim splits list with HR – hide unless valid splits exist with variance */}
       {(() => {
         if (workoutType !== 'swim') return null;
         const comp = (hydrated || workoutData) as any;
-        const fromLengths = (() => { try { return buildHundredSplits(); } catch { return []; } })();
         const comp100 = comp?.computed?.analysis?.events?.splits_100;
-        let rowsPref = (Array.isArray(fromLengths) && fromLengths.length)
-          ? fromLengths.map(r => ({ n: r.idx, duration_s: Number(r.duration_s) || 0 }))
-          : (Array.isArray(comp100?.rows) ? comp100.rows as Array<{ n:number; duration_s:number }> : []);
-        // If lengths-derived splits show no variation (likely equalized durations), fall back to server rows
-        if (rowsPref.length >= 3) {
-          const min = rowsPref.reduce((m,r)=> Math.min(m, Number(r.duration_s)||0), Number.MAX_SAFE_INTEGER);
-          const max = rowsPref.reduce((m,r)=> Math.max(m, Number(r.duration_s)||0), 0);
-          if (max - min <= 1 && Array.isArray(comp100?.rows) && comp100.rows.length) {
-            rowsPref = comp100.rows as Array<{ n:number; duration_s:number }>;
-          }
-        }
+        const rowsPref = Array.isArray(comp100?.rows) ? comp100.rows as Array<{ n:number; duration_s:number }> : [];
         if (!rowsPref.length) return null;
+        // Hide if durations are essentially uniform
+        try {
+          if (rowsPref.length >= 3) {
+            const min = rowsPref.reduce((m,r)=> Math.min(m, Number(r.duration_s)||0), Number.POSITIVE_INFINITY);
+            const max = rowsPref.reduce((m,r)=> Math.max(m, Number(r.duration_s)||0), 0);
+            if ((max - min) <= 1) return null;
+          }
+        } catch {}
 
         // Prepare HR series (optional)
         const series = comp?.computed?.analysis?.series || {};

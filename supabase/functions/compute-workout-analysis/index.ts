@@ -268,45 +268,79 @@ Deno.serve(async (req) => {
       ui: { footnote: `Computed at ${ANALYSIS_VERSION}`, renderHints: { preferPace: sport === 'run' } }
     };
 
-    // --- Always compute base swim 100m splits from swim_data.lengths (canonical meters) ---
+    // --- Swim 100m splits: prefer series-derived buckets; fall back to lengths ---
     try {
       if (String(w.type || '').toLowerCase().includes('swim')) {
-        const swim = parseJson((w as any).swim_data) || null;
-        const lengths: Array<{ distance_m?: number; duration_s?: number }> = Array.isArray(swim?.lengths) ? swim.lengths : [];
-        if (lengths.length) {
-          // If length durations don't sum to the actual moving time, normalize
-          let totalLenDur = 0;
-          for (const len of lengths) totalLenDur += Number(len?.duration_s ?? 0);
-          // Prefer previously computed moving duration if present; else from series
-          const prevComputed = parseJson((w as any).computed) || {};
-          const movingSecFromPrev = Number(prevComputed?.overall?.duration_s_moving ?? NaN);
-          const movingSecFromSeries = (hasRows && time_s.length) ? Number(time_s[time_s.length - 1]) : NaN;
-          const targetMovingSec = Number.isFinite(movingSecFromPrev) ? movingSecFromPrev : (Number.isFinite(movingSecFromSeries) ? movingSecFromSeries : totalLenDur);
-          const scale = (totalLenDur > 0 && Number.isFinite(targetMovingSec) && targetMovingSec > 0)
-            ? (targetMovingSec / totalLenDur)
-            : 1;
-
-          let acc = 0;
-          let bucket = 100; // meters
-          let tAcc = 0;
-          const rows100: Array<{ n:number; duration_s:number }> = [];
-          for (const len of lengths) {
-            const d = Number(len?.distance_m ?? 0);
-            const td = Math.max(0, Number(len?.duration_s ?? 0) * scale);
-            acc += Number.isFinite(d) ? d : 0;
-            tAcc += Number.isFinite(td) ? td : 0;
-            while (acc >= bucket) {
-              rows100.push({ n: rows100.length + 1, duration_s: Math.max(1, Math.round(tAcc)) });
-              // Reset accumulator for the next bucket
-              tAcc = 0; // note: no proportional split without sub-length timing
-              bucket += 100;
+        let rows100Series: Array<{ n:number; duration_s:number }> = [];
+        // Prefer distance/time series when available for real variation
+        if (hasRows && distance_m.length > 1 && time_s.length === distance_m.length) {
+          let next = 100; // meters
+          let lastTCross = 0; // seconds since start
+          for (let i = 1; i < distance_m.length && next <= (distance_m[distance_m.length-1] || 0); i += 1) {
+            const dPrev = Number(distance_m[i-1] || 0);
+            const dCurr = Number(distance_m[i] || 0);
+            const tPrev = Number(time_s[i-1] || 0);
+            const tCurr = Number(time_s[i] || 0);
+            const dd = dCurr - dPrev;
+            const dt = tCurr - tPrev;
+            if (dd <= 0 || dt < 0) continue;
+            while (next <= dCurr) {
+              const frac = Math.max(0, Math.min(1, (next - dPrev) / dd));
+              const tCross = tPrev + frac * dt;
+              const dur = Math.max(1, Math.round(tCross - lastTCross));
+              rows100Series.push({ n: rows100Series.length + 1, duration_s: dur });
+              lastTCross = tCross;
+              next += 100;
             }
           }
-          if (rows100.length) {
-            // Preserve existing unit if present (e.g., set by ingest for yard pools)
-            const prevUnit = (analysis as any)?.events?.splits_100?.unit;
-            const unit = (prevUnit === 'yd' || prevUnit === 'm') ? prevUnit : 'm';
-            analysis.events.splits_100 = { unit, rows: rows100 } as any;
+        }
+
+        if (rows100Series.length) {
+          const prevUnit = (analysis as any)?.events?.splits_100?.unit;
+          const unit = (prevUnit === 'yd' || prevUnit === 'm') ? prevUnit : 'm';
+          analysis.events.splits_100 = { unit, rows: rows100Series } as any;
+        } else {
+          // Fallback: compute 100m splits from swim_data.lengths (canonical meters)
+          const swim = parseJson((w as any).swim_data) || null;
+          const lengths: Array<{ distance_m?: number; duration_s?: number }> = Array.isArray(swim?.lengths) ? swim.lengths : [];
+          if (lengths.length) {
+            // Validate: if durations are essentially identical, skip fallback to avoid perpetuating bad data
+            try {
+              const durs = lengths.map(l=> Number(l?.duration_s ?? NaN)).filter(n=> Number.isFinite(n));
+              if (durs.length >= 3) {
+                const min = durs.reduce((m,n)=> Math.min(m,n), Number.POSITIVE_INFINITY);
+                const max = durs.reduce((m,n)=> Math.max(m,n), 0);
+                if ((max - min) <= 1) {
+                  // All durations ~equal → do not set splits from lengths
+                  return;
+                }
+              }
+            } catch {}
+            let totalLenDur = 0;
+            for (const len of lengths) totalLenDur += Number(len?.duration_s ?? 0);
+            const prevComputed = parseJson((w as any).computed) || {};
+            const movingSecFromPrev = Number(prevComputed?.overall?.duration_s_moving ?? NaN);
+            const movingSecFromSeries = (hasRows && time_s.length) ? Number(time_s[time_s.length - 1]) : NaN;
+            const targetMovingSec = Number.isFinite(movingSecFromPrev) ? movingSecFromPrev : (Number.isFinite(movingSecFromSeries) ? movingSecFromSeries : totalLenDur);
+            const scale = (totalLenDur > 0 && Number.isFinite(targetMovingSec) && targetMovingSec > 0) ? (targetMovingSec / totalLenDur) : 1;
+
+            let acc = 0; let bucket = 100; let tAcc = 0;
+            const rows100: Array<{ n:number; duration_s:number }> = [];
+            for (const len of lengths) {
+              const d = Number(len?.distance_m ?? 0);
+              const td = Math.max(0, Number(len?.duration_s ?? 0) * scale);
+              acc += Number.isFinite(d) ? d : 0;
+              tAcc += Number.isFinite(td) ? td : 0;
+              while (acc >= bucket) {
+                rows100.push({ n: rows100.length + 1, duration_s: Math.max(1, Math.round(tAcc)) });
+                tAcc = 0; bucket += 100;
+              }
+            }
+            if (rows100.length) {
+              const prevUnit = (analysis as any)?.events?.splits_100?.unit;
+              const unit = (prevUnit === 'yd' || prevUnit === 'm') ? prevUnit : 'm';
+              analysis.events.splits_100 = { unit, rows: rows100 } as any;
+            }
           }
         }
       }
