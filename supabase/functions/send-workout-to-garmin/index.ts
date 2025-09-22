@@ -16,10 +16,14 @@ type PlannedWorkout = {
 type GarminWorkout = {
   workoutName: string
   sport: string
+  poolLength?: number
+  poolLengthUnit?: string
   estimatedDurationInSecs?: number
   segments: Array<{
     segmentOrder: number
     sport: string
+    poolLength?: number
+    poolLengthUnit?: string
     estimatedDurationInSecs?: number
     steps: GarminStep[]
   }>
@@ -41,6 +45,10 @@ type GarminStep = {
   targetValueType?: string
   exerciseName?: string
   weightValue?: number
+  weightDisplayUnit?: string
+  strokeType?: string
+  drillType?: string
+  equipmentType?: string
 }
 
 serve(async (req) => {
@@ -91,6 +99,9 @@ serve(async (req) => {
       return json({ error: 'Garmin connection not found' }, 400)
     }
 
+    // Ensure token is fresh (refresh if expired or near-expiry)
+    const accessToken = await ensureValidGarminAccessToken(supabase, userId, conn.access_token, conn.refresh_token, conn.expires_at)
+
     const garminPayload = convertWorkoutToGarmin(workout)
     try {
       const firstSeg = (garminPayload as any)?.segments?.[0]
@@ -102,7 +113,7 @@ serve(async (req) => {
       }
     } catch {}
 
-    let sendResult = await sendToGarmin(garminPayload, conn.access_token)
+    let sendResult = await sendToGarmin(garminPayload, accessToken)
     if (!sendResult.success) {
       // If validation guard triggered in convertWorkoutToGarmin
       if (String(sendResult.error||'').includes('RUN_EXPORT_MISSING_TARGETS')) {
@@ -117,8 +128,7 @@ serve(async (req) => {
       scheduleResult = await scheduleWorkoutOnDate({
         garminWorkoutId: sendResult.workoutId!,
         date: workout.date,
-        sport: mapWorkoutType(workout.type),
-        accessToken: conn.access_token
+        accessToken
       })
     }
 
@@ -155,9 +165,114 @@ function json(body: unknown, status = 200): Response {
   })
 }
 
+async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function computeRetryDelay(res: Response | null, attempt: number, baseMs: number, maxMs: number): number {
+  // Honor Retry-After if present (seconds or HTTP-date)
+  let delay = Math.min(maxMs, baseMs * Math.pow(2, attempt - 1))
+  const jitter = Math.floor(Math.random() * 250)
+  if (res) {
+    const ra = res.headers.get('Retry-After')
+    if (ra) {
+      if (/^\d+$/.test(ra)) {
+        delay = Math.max(delay, parseInt(ra, 10) * 1000)
+      } else {
+        const until = Date.parse(ra)
+        if (!Number.isNaN(until)) {
+          const ms = until - Date.now()
+          if (ms > 0) delay = Math.max(delay, ms)
+        }
+      }
+    }
+  }
+  return delay + jitter
+}
+
+async function postJsonWithRetry(url: string, body: unknown, headers: Record<string, string>, opts?: { attempts?: number; baseMs?: number; maxMs?: number }): Promise<{ ok: boolean; status: number; text: string; response?: Response }> {
+  const attempts = Math.max(1, opts?.attempts ?? 5)
+  const baseMs = Math.max(100, opts?.baseMs ?? 500)
+  const maxMs = Math.max(baseMs, opts?.maxMs ?? 8000)
+  let lastText = ''
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    let res: Response | null = null
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      })
+      const status = res.status
+      const text = await res.text()
+      lastText = text
+      if (res.ok) return { ok: true, status, text, response: res }
+      const retryable = status === 429 || (status >= 500 && status < 600)
+      if (!retryable || attempt === attempts) return { ok: false, status, text }
+      const delay = computeRetryDelay(res, attempt, baseMs, maxMs)
+      await sleep(delay)
+      continue
+    } catch (e: any) {
+      // Network/transport errors: retry unless last attempt
+      if (attempt === attempts) return { ok: false, status: 0, text: String(e?.message ?? e ?? lastText) }
+      const delay = computeRetryDelay(res, attempt, baseMs, maxMs)
+      await sleep(delay)
+    }
+  }
+  return { ok: false, status: 0, text: lastText }
+}
+
+async function refreshGarminToken(client: ReturnType<typeof createClient>, userId: string, refreshToken: string): Promise<{ access_token: string; refresh_token: string; expires_at: string } | null> {
+  try {
+    const clientId = Deno.env.get('GARMIN_CLIENT_ID') || ''
+    const clientSecret = Deno.env.get('GARMIN_CLIENT_SECRET') || ''
+    if (!clientId || !clientSecret) return null
+    const res = await fetch('https://diauth.garmin.com/di-oauth2-service/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        client_id: clientId,
+        client_secret: clientSecret,
+        refresh_token: refreshToken
+      })
+    })
+    if (!res.ok) return null
+    const json = await res.json()
+    const access_token = json?.access_token
+    const new_refresh = json?.refresh_token || refreshToken
+    const expires_in = Number(json?.expires_in || 0) * 1000
+    const expires_at = new Date(Date.now() + Math.max(60_000, expires_in || 0)).toISOString()
+    // Persist
+    await client
+      .from('user_connections')
+      .update({ access_token, refresh_token: new_refresh, expires_at })
+      .eq('user_id', userId)
+      .eq('provider', 'garmin')
+    return { access_token, refresh_token: new_refresh, expires_at }
+  } catch {
+    return null
+  }
+}
+
+async function ensureValidGarminAccessToken(client: ReturnType<typeof createClient>, userId: string, accessToken: string, refreshToken?: string | null, expiresAt?: string | null): Promise<string> {
+  try {
+    const now = Date.now()
+    const exp = expiresAt ? Date.parse(expiresAt) : 0
+    // Refresh if expired or within 5 minutes of expiry
+    if (exp && exp - now > 5 * 60 * 1000) return accessToken
+    if (!refreshToken) return accessToken
+    const upd = await refreshGarminToken(client, userId, refreshToken)
+    return upd?.access_token || accessToken
+  } catch {
+    return accessToken
+  }
+}
+
 function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const sport = mapWorkoutType(workout.type)
   const isRun = sport === 'RUNNING'
+  const isSwimSport = sport === 'LAP_SWIMMING'
   const steps: GarminStep[] = []
   let stepId = 1
   // Use computed per-rep targets when available to guarantee PACE ranges per interval
@@ -253,6 +368,37 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         }
       }
     } catch {}
+  }
+
+  const mapSwimEquipment = (raw?: string): string | undefined => {
+    if (!raw) return undefined
+    const t = raw.toLowerCase()
+    if (/(pull\s*buoy|buoy)/.test(t)) return 'SWIM_PULL_BUOY'
+    if (/kick\s*board|kickboard/.test(t)) return 'SWIM_KICKBOARD'
+    if (/paddles?/.test(t)) return 'SWIM_PADDLES'
+    if (/fins?/.test(t)) return 'SWIM_FINS'
+    if (/snorkel/.test(t)) return 'SWIM_SNORKEL'
+    return 'NONE'
+  }
+
+  const mapSwimStroke = (src?: string): string => {
+    const t = String(src || '').toLowerCase()
+    if (/free|fr(?:ee)?style/.test(t)) return 'FREESTYLE'
+    if (/back/.test(t)) return 'BACKSTROKE'
+    if (/breast/.test(t)) return 'BREASTSTROKE'
+    if (/butter|fly/.test(t)) return 'BUTTERFLY'
+    if (/im\b|individual medley|mixed/.test(t)) return 'IM'
+    if (/choice|open/.test(t)) return 'CHOICE'
+    return 'FREESTYLE'
+  }
+
+  const detectDrillType = (label?: string, cue?: string): string | undefined => {
+    const a = String(label || '').toLowerCase()
+    const b = String(cue || '').toLowerCase()
+    if (/\bkick\b/.test(a) || /\bkick\b/.test(b)) return 'KICK'
+    if (/\bpull\b/.test(a) || /\bpull\b/.test(b)) return 'PULL'
+    if (/\bdrill\b/.test(a) || /\bdrill\b/.test(b)) return 'DRILL'
+    return undefined
   }
 
   const normalizeTargetBounds = (step: GarminStep) => {
@@ -459,7 +605,12 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
         durationValue: Math.max(1, reps)
       }
       // Omit exerciseName mapping (Garmin expects enum/id). Keep the label in description.
-      if (weight > 0) step.weightValue = weight
+      if (weight > 0) {
+        // Convert provided pounds to kilograms for API value; set display to POUND
+        const kg = Math.round((weight * 0.45359237) * 10) / 10
+        step.weightValue = kg
+        step.weightDisplayUnit = 'POUND'
+      }
       steps.push(step)
       stepId += 1
       continue
@@ -507,6 +658,20 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             step.durationType = 'FIXED_REST'
           }
           applyTargets(step, seg, interval)
+          // Swim metadata: apply stroke/equipment/drill only for swim and non-rest steps
+          if (sport === 'LAP_SWIMMING' && !(step.intensity === 'REST' || step.intensity === 'RECOVERY')) {
+            const src = seg ?? {}
+            const labelTxt = String(src?.effortLabel || interval?.effortLabel || '')
+            const cueTxt = String((src as any)?.cue || '')
+            const equipTxt = String((src as any)?.equipment || '')
+            const strokeTxt = String((src as any)?.stroke || labelTxt)
+            const drill = detectDrillType(labelTxt, cueTxt)
+            const equip = mapSwimEquipment(equipTxt)
+            const stroke = mapSwimStroke(strokeTxt)
+            if (equip) step.equipmentType = equip
+            if (drill) step.drillType = drill
+            if (stroke) step.strokeType = stroke
+          }
           // Try to apply computed per-rep target if none attached
           applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
           normalizeTargetBounds(step)
@@ -569,6 +734,20 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       step.durationType = 'FIXED_REST'
     }
     applyTargets(step, interval)
+    // Swim metadata: apply stroke/equipment/drill only for swim and non-rest steps
+    if (sport === 'LAP_SWIMMING' && !(step.intensity === 'REST' || step.intensity === 'RECOVERY')) {
+      const src = interval ?? {}
+      const labelTxt = String(src?.effortLabel || '')
+      const cueTxt = String((src as any)?.cue || '')
+      const equipTxt = String((src as any)?.equipment || '')
+      const strokeTxt = String((src as any)?.stroke || labelTxt)
+      const drill = detectDrillType(labelTxt, cueTxt)
+      const equip = mapSwimEquipment(equipTxt)
+      const stroke = mapSwimStroke(strokeTxt)
+      if (equip) step.equipmentType = equip
+      if (drill) step.drillType = drill
+      if (stroke) step.strokeType = stroke
+    }
     applyComputedTargetIfMissing(step, step.intensity === 'REST' || step.intensity === 'RECOVERY')
     normalizeTargetBounds(step)
     if (sport === 'RUNNING') {
@@ -625,11 +804,13 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   return {
     workoutName: workout.name,
     sport,
+    ...(isSwimSport ? { poolLength: 25.0, poolLengthUnit: 'YARD' } : {}),
     estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps, computedSteps),
     segments: [
       {
         segmentOrder: 1,
         sport,
+        ...(isSwimSport ? { poolLength: 25.0, poolLengthUnit: 'YARD' } : {}),
         steps,
         estimatedDurationInSecs: estimateWorkoutSeconds(workout, steps, computedSteps)
       }
@@ -643,7 +824,7 @@ function mapWorkoutType(type: string): string {
     ride: 'CYCLING',
     swim: 'LAP_SWIMMING',
     strength: 'STRENGTH_TRAINING',
-    walk: 'WALKING'
+    walk: 'GENERIC'
   }
   return map[type] ?? 'RUNNING'
 }
@@ -905,48 +1086,42 @@ function estimateWorkoutSeconds(
 async function sendToGarmin(workout: GarminWorkout, accessToken: string): Promise<{ success: boolean; workoutId?: string; error?: string }> {
   try {
     const url = 'https://apis.garmin.com/workoutportal/workout/v2'
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
+    const { ok, status, text, response } = await postJsonWithRetry(
+      url,
+      workout,
+      {
         'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(workout)
-    })
-
-    if (!res.ok) {
-      const text = await res.text()
-      return { success: false, error: `Garmin API ${res.status}: ${text}` }
-    }
-    const json = await res.json()
+      { attempts: 5, baseMs: 500, maxMs: 8000 }
+    )
+    if (!ok) return { success: false, error: `Garmin API ${status}: ${text}` }
+    const json = await (response as Response).json()
     return { success: true, workoutId: json?.workoutId ?? json?.id }
   } catch (e: any) {
     return { success: false, error: e?.message ?? String(e) }
   }
 }
 
-async function scheduleWorkoutOnDate(params: { garminWorkoutId: string; date: string; sport: string; accessToken: string }): Promise<{ success: boolean; scheduleId?: string; error?: string }> {
+async function scheduleWorkoutOnDate(params: { garminWorkoutId: string; date: string; accessToken: string }): Promise<{ success: boolean; scheduleId?: string; error?: string }> {
   try {
     // Expect date as YYYY-MM-DD
     const body = {
       workoutId: params.garminWorkoutId,
-      date: params.date,
-      sport: params.sport
+      date: params.date
     }
     const url = 'https://apis.garmin.com/training-api/schedule/'
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
+    const { ok, status, text, response } = await postJsonWithRetry(
+      url,
+      body,
+      {
         'Authorization': `Bearer ${params.accessToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(body)
-    })
-    if (!res.ok) {
-      const text = await res.text()
-      return { success: false, error: `Schedule API ${res.status}: ${text}` }
-    }
-    const json = await res.json()
+      { attempts: 5, baseMs: 500, maxMs: 8000 }
+    )
+    if (!ok) return { success: false, error: `Schedule API ${status}: ${text}` }
+    const json = await (response as Response).json()
     return { success: true, scheduleId: json?.workoutScheduleId ?? json?.id }
   } catch (e: any) {
     return { success: false, error: e?.message ?? String(e) }

@@ -994,10 +994,13 @@ const formatPace = (paceValue: any): string => {
   const formatPoolLengthLabel = (): string => {
     const L = inferPoolLengthMeters();
     if (!L) return 'N/A';
-    if (useImperial) return `${Math.round(L / 0.9144)} yd`;
+    const yardPool = isYardPool();
+    if (yardPool === true) return `${Math.round(L / 0.9144)} yd`;
     const candidates = [25, 50, 33.33];
     let best = L; let label = `${Math.round(L)} m`;
-    for (const c of candidates) { if (Math.abs(L - c) < Math.abs(best - (typeof best === 'number' ? best : c))) { best = c; label = `${c} m`; } }
+    for (const c of candidates) {
+      if (Math.abs(L - c) < Math.abs(best - (typeof best === 'number' ? best : c))) { best = c; label = `${c} m`; }
+    }
     return label;
   };
 
