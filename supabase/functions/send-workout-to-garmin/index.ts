@@ -164,7 +164,17 @@ serve(async (req) => {
       })
       .eq('id', workoutId)
 
-    return json({ success: true, garminWorkoutId: sendResult.workoutId, scheduled: scheduleResult?.success ?? false, scheduleError: scheduleResult?.error })
+    const debugOut: any = {}
+    try {
+      const sportDbg = (garminPayload as any)?.sport
+      const rootLen = (garminPayload as any)?.poolLength
+      const rootUnit = (garminPayload as any)?.poolLengthUnit
+      const seg0 = (garminPayload as any)?.segments?.[0] || {}
+      debugOut.pool = { pool_unit: (workout as any)?.pool_unit ?? null, pool_length_m: (workout as any)?.pool_length_m ?? null }
+      debugOut.mapped = { sport: sportDbg, poolLength: rootLen ?? seg0?.poolLength ?? null, poolLengthUnit: rootUnit ?? seg0?.poolLengthUnit ?? null }
+    } catch {}
+
+    return json({ success: true, garminWorkoutId: sendResult.workoutId, scheduled: scheduleResult?.success ?? false, scheduleError: scheduleResult?.error, debug: debugOut })
   } catch (err: any) {
     return json({ error: 'Internal error', details: err?.message ?? String(err) }, 500)
   }

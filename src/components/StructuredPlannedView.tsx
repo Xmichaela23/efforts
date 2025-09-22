@@ -352,7 +352,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         } catch {}
         alert(`Failed to send to Garmin: ${error.message}${detailsTxt}`);
       } else if (result?.success) {
-        alert('Workout sent to Garmin successfully!');
+        const dbg = result?.debug?.mapped;
+        const dbgTxt = dbg ? `\nPool sent: ${dbg.poolLength ?? 'null'} ${dbg.poolLengthUnit ?? ''}` : '';
+        alert(`Workout sent to Garmin successfully!${dbgTxt}`);
       } else {
         alert(`Failed to send to Garmin: ${result?.error || 'Unknown error'}`);
       }
