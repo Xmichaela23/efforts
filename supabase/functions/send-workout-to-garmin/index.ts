@@ -102,6 +102,27 @@ serve(async (req) => {
     // Ensure token is fresh (refresh if expired or near-expiry)
     const accessToken = await ensureValidGarminAccessToken(supabase, userId, conn.access_token, conn.refresh_token, conn.expires_at)
 
+    // Fallback: if swim and no explicit pool fields on the planned row, default from user units
+    try {
+      const isSwim = String((workout as any)?.type || '').toLowerCase() === 'swim'
+      const hasPool = isSwim && ((workout as any)?.pool_unit || (workout as any)?.pool_length_m)
+      if (isSwim && !hasPool) {
+        const { data: ub } = await supabase
+          .from('user_baselines')
+          .select('units')
+          .eq('user_id', userId)
+          .single()
+        const pref = String(ub?.units || 'imperial').toLowerCase()
+        if (pref === 'imperial') {
+          ;(workout as any).pool_unit = 'yd'
+          ;(workout as any).pool_length_m = 22.86
+        } else if (pref === 'metric') {
+          ;(workout as any).pool_unit = 'm'
+          ;(workout as any).pool_length_m = 25.0
+        }
+      }
+    } catch {}
+
     const garminPayload = convertWorkoutToGarmin(workout)
     try {
       const firstSeg = (garminPayload as any)?.segments?.[0]

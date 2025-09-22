@@ -24,6 +24,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const ws: any = (workout as any).workout_structure;
   const { loadUserBaselines } = useAppContext?.() || ({} as any);
   const [ctxPN, setCtxPN] = useState<any | null>(null);
+  const [savingPool, setSavingPool] = useState<boolean>(false);
   useEffect(() => {
     (async () => {
       try {
@@ -35,6 +36,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     })();
   }, [loadUserBaselines, workout]);
   const pn: any = (workout as any)?.baselines || (workout as any)?.performanceNumbers || ctxPN || {};
+  const poolUnit: 'yd' | 'm' | null = ((workout as any)?.pool_unit ?? null) as any;
+  const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
   const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
@@ -227,7 +230,13 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Prefer computed totals; only fall back when no computed totals exist
   let durationMin: number | undefined = undefined;
-  // Fallbacks: computed total → sum(computed.steps) → sum(intervals) → structured estimate (last resort)
+  // Fallbacks: root total → computed total → sum(computed.steps) → sum(intervals) → structured estimate (last resort)
+  try {
+    if (durationMin == null) {
+      const ts = Number((workout as any)?.total_duration_seconds);
+      if (Number.isFinite(ts) && ts>0) durationMin = Math.max(1, Math.round(ts/60));
+    }
+  } catch {}
   try {
     if (durationMin == null) {
       const comp: any = (workout as any)?.computed || {};
@@ -352,6 +361,45 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
     }
   };
 
+  // Persist default pool setting based on user preference when missing
+  useEffect(() => {
+    (async () => {
+      try {
+        const isSwim = String((workout as any)?.type || '').toLowerCase() === 'swim';
+        if (!isSwim) return;
+        const missing = (poolUnit == null && poolLenM == null);
+        if (!missing) return;
+        const baselines = await loadUserBaselines?.();
+        const units = String(baselines?.units || 'imperial').toLowerCase();
+        const def = units === 'metric' ? { pool_unit: 'm', pool_length_m: 25.0 } : { pool_unit: 'yd', pool_length_m: 22.86 };
+        setSavingPool(true);
+        await supabase
+          .from('planned_workouts')
+          .update(def as any)
+          .eq('id', (workout as any)?.id);
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      } catch {}
+      finally { setSavingPool(false); }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(workout as any)?.id]);
+
+  const setPool = async (unit: 'yd' | 'm' | null, lengthM: number | null) => {
+    try {
+      setSavingPool(true);
+      await supabase
+        .from('planned_workouts')
+        .update({ pool_unit: unit, pool_length_m: lengthM } as any)
+        .eq('id', (workout as any)?.id);
+      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+    } catch (e) {
+      console.error('Failed to set pool:', e);
+      alert('Failed to update pool setting');
+    } finally {
+      setSavingPool(false);
+    }
+  };
+
   const handleDownloadWorkout = () => {
     // Create a simple workout file for download
     const workoutData = {
@@ -380,6 +428,18 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           <div className="text-sm text-gray-500 flex items-center gap-3">
             {parentDisc==='swim' && ((typeof totalYdFromComputed==='number' && totalYdFromComputed>0) || (typeof totalYdFromStruct==='number' && totalYdFromStruct>0)) ? <span>{`${(totalYdFromComputed||0)+(totalYdFromStruct||0)} yd`}</span> : null}
             {typeof durationMin==='number'?<span>{`${durationMin} min`}</span>:null}
+          </div>
+        </div>
+      )}
+      {String(parentDisc).toLowerCase()==='swim' && (
+        <div className="mt-2">
+          <div className="text-xs text-gray-500 mb-1">Pool</div>
+          <div className="flex flex-wrap gap-2 text-xs">
+            <button type="button" onClick={()=>setPool('yd', 22.86)} className={`border rounded px-2 py-1 ${poolUnit==='yd' && Math.abs((poolLenM||0)-22.86)<0.02 ? 'border-black' : 'border-gray-300'}`}>25 yd</button>
+            <button type="button" onClick={()=>setPool('m', 25.0)} className={`border rounded px-2 py-1 ${poolUnit==='m' && Math.abs((poolLenM||0)-25.0)<0.02 ? 'border-black' : 'border-gray-300'}`}>25 m</button>
+            <button type="button" onClick={()=>setPool('m', 50.0)} className={`border rounded px-2 py-1 ${poolUnit==='m' && Math.abs((poolLenM||0)-50.0)<0.02 ? 'border-black' : 'border-gray-300'}`}>50 m</button>
+            <button type="button" onClick={()=>setPool(null as any, null as any)} className={`border rounded px-2 py-1 ${!poolUnit ? 'border-black' : 'border-gray-300'}`}>Unspecified</button>
+            {savingPool && <span className="text-gray-400">Saving…</span>}
           </div>
         </div>
       )}
