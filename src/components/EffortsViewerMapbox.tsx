@@ -739,7 +739,7 @@ function EffortsViewerMapbox({
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
           <Pill
             label={tab==="elev"?"Net":"Gain"}
-            titleAttr={tab==="elev"?"Net elevation at cursor; subline shows cumulative gain":"Total elevation gain"}
+            titleAttr={tab==="elev"?"Net elevation at cursor; subline shows total gain":"Total elevation gain"}
             value={(() => {
               if (tab !== 'elev') return gainPillText;
               const e0 = normalizedSamples[0]?.elev_m_sm ?? 0;
@@ -751,7 +751,7 @@ function EffortsViewerMapbox({
               return useFeet ? `${sign}${abs} ft` : `${sign}${Math.round(abs)} m`;
             })()}
             subValue={tab==="elev"?(() => {
-              const gain = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
+              const gain = cumGain_m[cumGain_m.length - 1] ?? 0;
               const feet = gain * 3.28084;
               return useFeet ? `(+${Math.round(feet)} ft)` : `(+${Math.round(gain)} m)`;
             })():undefined}
