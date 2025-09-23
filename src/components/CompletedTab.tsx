@@ -291,7 +291,6 @@ const CompletedTab: React.FC<CompletedTabProps> = ({ workoutType, workoutData })
          <div className="text-gray-400 text-sm">This workout doesn't have GPS tracking data</div>
        </div>
      </div>
-     )}
    );
  }
 
