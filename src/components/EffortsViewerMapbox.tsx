@@ -758,6 +758,8 @@ function EffortsViewerMapbox({
       lo = Math.floor(lo / 5) * 5; 
       hi = Math.ceil(hi / 5) * 5; 
       if (hi - lo < 10) { hi = lo + 10; }
+      // Extra top headroom so high HR values don't appear clipped
+      hi += 3;
     }
     
     // Minimal padding (wider for pace to avoid hitting edges)
