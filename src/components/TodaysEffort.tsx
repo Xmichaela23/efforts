@@ -283,6 +283,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         }
         
         const isRun = workout.type === 'run' || workout.type === 'walk';
+        const isSwim = workout.type === 'swim';
         
                       // Handle pace/speed using transformed data from useWorkouts
               let paceSpeed = 'N/A';
@@ -291,7 +292,32 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               const durationMinutes = Number(workout.duration);
               const avgSpeedMps = Number(workout.avg_speed_mps);
               
-              if (isRun && distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
+              if (isSwim) {
+                // Average swim pace per 100 (meters by default; yards when pool length indicates yards)
+                const poolLenM = Number((workout as any)?.pool_length ?? (workout as any)?.metrics?.pool_length);
+                const yardPool = Number.isFinite(poolLenM) && (Math.abs(poolLenM - 22.86) <= 0.6 || Math.abs(poolLenM - 45.72) <= 1.2);
+                const distMeters = (() => {
+                  const m = Number((workout as any)?.metrics?.distance_meters ?? (workout as any)?.distance_meters);
+                  if (Number.isFinite(m) && m > 0) return m;
+                  const km = computeDistanceKm(workout);
+                  if (km && !isNaN(km)) return km * 1000;
+                  const yards = Number((workout as any)?.distance_yards);
+                  if (Number.isFinite(yards) && yards > 0) return yards * 0.9144;
+                  return null;
+                })();
+                const movingSeconds = (() => {
+                  const n = Number((workout as any)?.total_timer_time ?? (workout as any)?.moving_time ?? (workout as any)?.metrics?.total_timer_time ?? (workout as any)?.metrics?.moving_time);
+                  return Number.isFinite(n) && n > 0 ? n : null;
+                })();
+                if (distMeters && movingSeconds && distMeters > 0 && movingSeconds > 0) {
+                  const per100 = yardPool
+                    ? movingSeconds / ((distMeters / 0.9144) / 100)
+                    : movingSeconds / (distMeters / 100);
+                  const mm = Math.floor(per100 / 60);
+                  const ss = Math.round(per100 % 60);
+                  paceSpeed = `${mm}:${String(ss).padStart(2,'0')} ${yardPool ? '/100yd' : '/100m'}`;
+                }
+              } else if (isRun && distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
                 // Calculate pace from transformed distance/duration
                 const distanceMiles = distanceKm * 0.621371; // Convert km to miles
                 const paceMinPerMile = durationMinutes / distanceMiles;
