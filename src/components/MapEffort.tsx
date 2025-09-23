@@ -125,7 +125,7 @@ export default function MapEffort({
     });
 
     const onResize = () => {
-      map.resize();
+      // Avoid calling map.resize() from the map's own 'resize' event to prevent recursion
       if (savedCameraRef.current) {
         const { center, zoom } = savedCameraRef.current;
         try { map.jumpTo({ center, zoom }); } catch {}

@@ -438,15 +438,10 @@ function EffortsViewerMapbox({
 
   // Prefer provider-reported climbed (usually feet) to match session summary
   const gainPillText = useMemo(() => {
-    const providerGain = (workoutData as any)?.elevation_gain ?? (workoutData as any)?.metrics?.elevation_gain;
-    if (Number.isFinite(providerGain)) {
-      if (useFeet) return `${Math.round(Number(providerGain))} ft`;
-      return `${Math.round(Number(providerGain) * 0.3048)} m`;
-    }
-    // Fallback to derived cumulative gain
-    const g = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
+    // Show session total gain derived from the elevation series (no provider fallback)
+    const g = cumGain_m[cumGain_m.length - 1] ?? 0;
     return fmtAlt(g, useFeet);
-  }, [workoutData, cumGain_m, idx, useFeet]);
+  }, [cumGain_m, useFeet]);
 
   // Optional cadence/power series derived from sensor_data and resampled to chart times
   const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
@@ -742,7 +737,24 @@ function EffortsViewerMapbox({
           <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
-          <Pill label={tab==="elev"?"G/L":"Gain"} titleAttr={tab==="elev"?"Ascent / Descent (Net)":"Total elevation gain"} value={tab==="elev"?`${fmtAlt(gainNow_m, useFeet)} / ${fmtAlt((cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0), useFeet)}`:gainPillText} subValue={tab==="elev"?(() => { const net = (gainNow_m - (cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0)); const sign = net>0?'+':(net<0?'-':''); const abs = Math.abs(Math.round(net)); return `(${sign}${useFeet?`${abs} ft`:`${Math.round(abs)} m`})`; })():undefined} active={tab==="elev"} />
+          <Pill
+            label={tab==="elev"?"G/L":"Gain"}
+            titleAttr={tab==="elev"?"Net elevation change (top) and cumulative gain (bottom)":"Total elevation gain"}
+            value={(() => {
+              if (tab !== 'elev') return gainPillText;
+              const gain = gainNow_m;
+              const loss = (cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0);
+              const net = gain - loss; // positive = up, negative = down
+              const netAbs = Math.abs(Math.round(useFeet ? net*3.28084/3.28084 : net));
+              const sign = net > 0 ? '+' : (net < 0 ? '-' : '');
+              return useFeet ? `${sign}${netAbs} ft` : `${sign}${Math.round(netAbs)} m`;
+            })()}
+            subValue={tab==="elev"?(() => {
+              const gain = gainNow_m;
+              return useFeet ? `(+${Math.round(gain*3.28084/3.28084)} ft)` : `(+${Math.round(gain)} m)`;
+            })():undefined}
+            active={tab==="elev"}
+          />
         </div>
         
         {/* Distance, time, and altitude on same line */}

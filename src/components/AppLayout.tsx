@@ -136,6 +136,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
       return t === 'run' || t === 'ride' || t === 'swim' || t === 'walk';
     };
     if (
+      false && // disabled: avoid 406/500 noise and unnecessary fetch on Completed open
       activeTab === 'completed' &&
       typeof loadProviderData === 'function' &&
       !providerFetchedRef.current &&
