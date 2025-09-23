@@ -340,9 +340,12 @@ function EffortsViewerMapbox({
     const idxs = downsampleSeriesByDistance(distance_m, 2000, splitMeters);
     const out: Sample[] = [];
     let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
-    const a = 0.2; // elevation EMA factor
+    const a = 0.18; // elevation EMA factor (outdoor-friendly)
     // pace EMA (server-only)
     let paceEma: number | null = null; const ap = 0.25;
+    // Outdoor detection (GPS present) -> enable sanity checks
+    const isOutdoor = Array.isArray(trackLngLat) && trackLngLat.length >= 20;
+
     for (let k=0;k<idxs.length;k++){
       const i = idxs[k];
       const t = Number(time_s?.[i] ?? i) || 0;
@@ -352,11 +355,28 @@ function EffortsViewerMapbox({
       const es = (ema != null) ? ema : (e != null ? e : (lastE != null ? lastE : 0));
       let grade: number | null = null, vam: number | null = null;
       if (lastE != null && lastD != null && lastT != null){
-        const dd = Math.max(1, d - lastD);
+        const ddRaw = d - lastD;
+        const dtRaw = t - lastT;
+        const dd = Math.max(1, ddRaw);
         const dh = es - lastE;
-        const dt = Math.max(1, t - lastT);
-        grade = dh / dd;
-        vam = (dh/dt) * 3600;
+        const dt = Math.max(1, dtRaw);
+        // GPS sanity filters for single-step anomalies
+        if (isOutdoor) {
+          const instSpeed = dd / dt; // m/s
+          const instGrade = Math.abs(dh / dd);
+          const badSpeed = instSpeed > (workoutData?.type === 'ride' ? 18 : 7.5);
+          const badGrade = instGrade > 0.45 && dd < 30;
+          if (!badSpeed && !badGrade) {
+            grade = dh / dd;
+            vam = (dh/dt) * 3600;
+          } else {
+            grade = null;
+            vam = null;
+          }
+        } else {
+          grade = dh / dd;
+          vam = (dh/dt) * 3600;
+        }
       }
       // Only use server pace; no client derivation
       const paceVal: number | null = Number.isFinite(pace_s_per_km?.[i] as any) ? Number(pace_s_per_km[i]) : null;
@@ -372,7 +392,7 @@ function EffortsViewerMapbox({
       });
       lastE = es; lastD = d; lastT = t;
     }
-    // Compute robust, rolling-window grade and smooth it further to avoid jumpiness
+    // Compute robust, rolling-window grade and smooth it further to avoid jumpiness (outdoor tuned)
     try {
       const n = out.length; if (n >= 3) {
         const elev = out.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : 0);
@@ -386,7 +406,7 @@ function EffortsViewerMapbox({
           const dh = (elev[k2] - elev[j]);
           rawGrade[i] = clamp(dh / dd, -0.30, 0.30);
         }
-        const wins = winsorize(rawGrade, 2, 98);
+        const wins = winsorize(rawGrade, 2, 98); // outdoor: slightly tighter
         const sm = smoothWithOutlierHandling(wins, 9, 2.5);
         // Final calming EMA
         const emaAlpha = 0.2;
@@ -567,6 +587,9 @@ function EffortsViewerMapbox({
     return vals;
   }, [pwrSeriesRaw, targetTimes]);
 
+  // Outdoor detection (global)
+  const isOutdoorGlobal = useMemo(() => Array.isArray(trackLngLat) && trackLngLat.length >= 20, [trackLngLat]);
+
   // Which raw metric array are we plotting?
   const metricRaw: number[] = useMemo(() => {
     // Elevation (already EMA smoothed when building samples)
@@ -579,7 +602,20 @@ function EffortsViewerMapbox({
     // Pace - enhanced smoothing with outlier handling
     if (tab === "pace") {
       const pace = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
-      // Apply winsorizing first, then enhanced smoothing
+      if (isOutdoorGlobal) {
+        // Outdoor GPS: median to kill spikes, then moderate moving average
+        const med = medianFilter(pace as any, 5) as (number|null)[];
+        const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
+        const ma = movAvg(medNum.filter(Number.isFinite) as number[], 9);
+        // Reproject onto original length with NaN for invalids
+        const out: number[] = new Array(pace.length).fill(NaN);
+        // Simple mapping since movAvg preserves length when used directly
+        const maFull = movAvg(medNum.map(v => (Number.isFinite(v) ? (v as number) : 0)), 9);
+        for (let i = 0; i < out.length; i++) out[i] = Number.isFinite(maFull[i]) ? maFull[i] : NaN;
+        const wins = winsorize(out.map(v => (Number.isFinite(v) ? v : NaN)), 5, 95);
+        return wins.map(v => (Number.isFinite(v) ? v : NaN));
+      }
+      // Indoor: keep existing gentle smoothing
       const winsorized = winsorize(pace, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
@@ -593,12 +629,23 @@ function EffortsViewerMapbox({
     // Cadence (derive from normalizedSamples or sensor_data)
     if (tab === "cad") {
       const cad = cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
+      if (isOutdoorGlobal) {
+        // Light smoothing for cadence outdoor
+        const ma = movAvg(cad.filter(Number.isFinite) as number[], 5);
+        const maFull = movAvg(cad.map(v => (Number.isFinite(v) ? Number(v) : 0)), 5);
+        return maFull.map(v => (Number.isFinite(v) ? v : NaN));
+      }
       const wins = winsorize(cad as number[], 5, 95);
       return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Power (if present)
     if (tab === "pwr") {
       const pwr = pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
+      if (isOutdoorGlobal) {
+        // Keep power mostly raw; very light smoothing only
+        const ma = movAvg(pwr.map(v => (Number.isFinite(v) ? Number(v) : 0)), 3);
+        return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
+      }
       const wins = winsorize(pwr as number[], 5, 99);
       return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
@@ -611,12 +658,13 @@ function EffortsViewerMapbox({
     const vals = metricRaw.filter((v) => Number.isFinite(v)) as number[];
     if (!vals.length) return [0, 1];
     
-    // Apply additional winsorizing to domain calculation for even more robust percentiles
-    const winsorized = winsorize(vals, 2, 98); // Use 2nd-98th percentiles for domain
+    // Outdoor: use 10th-90th to avoid tails; Indoor keep tighter
+    const winsorized = isOutdoorGlobal ? winsorize(vals, 10, 90) : winsorize(vals, 2, 98);
     
     let lo: number, hi: number;
     // Use robust percentiles for better space usage
     lo = pct(winsorized, 2); hi = pct(winsorized, 98);
+    if (isOutdoorGlobal) { lo = pct(winsorized, 10); hi = pct(winsorized, 90); }
     // Specific ranges for cadence/power to avoid super-narrow domains
     if (tab === 'cad') {
       const minC = Math.min(...winsorized);
@@ -636,12 +684,18 @@ function EffortsViewerMapbox({
       }
     }
     
-    // Ensure minimum span
-    if (lo === hi) { 
-      const center = (lo + hi) / 2;
-      lo = center - 1; 
-      hi = center + 1; 
-    }
+    // Ensure minimum span by metric
+    const ensureMinSpan = (spanMin: number) => {
+      if ((hi - lo) < spanMin) {
+        const c = (lo + hi) / 2; lo = c - spanMin / 2; hi = c + spanMin / 2;
+      }
+    };
+    if (tab === 'pace' && workoutData?.type !== 'ride') ensureMinSpan(isOutdoorGlobal ? 45 : 30); // sec/mi or sec/km equivalent
+    if (tab === 'pace' && workoutData?.type === 'ride') ensureMinSpan(isOutdoorGlobal ? 3 : 2);   // mph/kmh equivalent spacing
+    if (tab === 'bpm') ensureMinSpan(10);
+    if (tab === 'pwr') ensureMinSpan(50);
+    if (tab === 'cad') ensureMinSpan(10);
+    if (tab === 'elev') ensureMinSpan(isOutdoorGlobal ? (useFeet ? 20/3.28084 : 6) : (useFeet ? 10/3.28084 : 3));
     
     // special handling:
     if (tab === "bpm") { 
@@ -649,10 +703,10 @@ function EffortsViewerMapbox({
       hi = Math.ceil(hi / 5) * 5; 
     }
     
-    // Minimal padding for better space utilization
-    const pad = Math.max((hi - lo) * 0.02, 1); // At least 1 unit padding
+    // Minimal padding
+    const pad = Math.max((hi - lo) * (isOutdoorGlobal ? 0.03 : 0.02), 1);
     return [lo - pad, hi + pad];
-  }, [metricRaw, tab]);
+  }, [metricRaw, tab, isOutdoorGlobal, useFeet, workoutData]);
 
   // Helpers to map to SVG - consistent domain [d0..dN] from monotonic distance
   const xFromDist = (d: number) => {
@@ -890,9 +944,19 @@ function EffortsViewerMapbox({
           ))}
 
           {/* elevation fill */}
-          {tab === "elev" && <path d={elevArea} fill="#e2f2ff" opacity={0.65} />}
+          {tab === "elev" && (
+            <>
+              <defs>
+                <linearGradient id="elevGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#e8f5ff" stopOpacity={0.75} />
+                  <stop offset="100%" stopColor="#dff0ff" stopOpacity={0.55} />
+                </linearGradient>
+              </defs>
+              <path d={elevArea} fill="url(#elevGrad)" opacity={1} />
+            </>
+          )}
           {/* metric line (smoothed) */}
-          <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          <path d={linePath} fill="none" stroke="#64748b" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" shapeRendering="geometricPrecision" paintOrder="stroke" />
 
           {/* cursor */}
           <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
