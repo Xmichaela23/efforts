@@ -10,21 +10,45 @@ export function resolvePlannedDurationMinutes(workout: any): number | null {
   try {
     if (!workout) return null;
 
-    // Only trust Weekly’s stored compute. Do NOT fabricate.
+    // 1) Root total from Weekly materialization (authoritative)
+    const rootTs = Number((workout as any)?.total_duration_seconds);
+    if (Number.isFinite(rootTs) && rootTs > 0) return Math.max(1, Math.round(rootTs / 60));
+
+    // 2) Computed totals from Weekly compute JSON
     const comp: any = (workout as any)?.computed || {};
     const tsA = Number(comp?.total_duration_seconds);
     const tsB = Number(comp?.total_seconds);
     const ts = Number.isFinite(tsA) && tsA > 0 ? tsA : (Number.isFinite(tsB) && tsB > 0 ? tsB : NaN);
     if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
 
-    // Optionally accept sum of computed steps.seconds (still from Weekly compute)
+    // 3) Sum of computed steps.seconds (still Weekly compute); no token/structure guesses
     const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
     if (steps.length) {
       const total = steps.reduce((a: number, st: any) => a + (Number(st?.seconds) || 0), 0);
       if (Number.isFinite(total) && total > 0) return Math.max(1, Math.round(total / 60));
     }
 
-    // If no computed totals, do not guess. Hide badge.
+    // 4) Sum of intervals (stored numeric durations), mirroring Weekly cell logic
+    try {
+      const intervals: any[] = Array.isArray((workout as any)?.intervals) ? (workout as any).intervals : [];
+      if (intervals.length) {
+        const totalSec = intervals.reduce((acc: number, it: any) => {
+          if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
+            const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
+            return acc + segSum * Number(it.repeatCount);
+          }
+          const d = Number(it?.duration);
+          return acc + (Number.isFinite(d) ? d : 0);
+        }, 0);
+        if (Number.isFinite(totalSec) && totalSec > 0) return Math.max(1, Math.round(totalSec / 60));
+      }
+    } catch {}
+
+    // 5) Last resort: explicit duration minutes field
+    const minsField = Number((workout as any)?.duration);
+    if (Number.isFinite(minsField) && minsField > 0) return Math.max(1, Math.round(minsField));
+
+    // If no totals anywhere, do not guess. Hide badge.
     return null;
   } catch { return null; }
 }
