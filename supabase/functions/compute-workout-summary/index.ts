@@ -24,7 +24,7 @@ function paceSecPerMiFromMetersSeconds(meters: number, sec: number) {
 
 // ---------- robust sample normalization ----------
 function normalizeSamples(samples: any[]) {
-  const out: Array<{ ts:number; t:number; v?:number; d?:number; hr?:number; elev?:number; cad?:number }> = [];
+  const out: Array<{ ts:number; t:number; v?:number; d?:number; hr?:number; elev?:number; cad?:number; p?:number }> = [];
   for (let i=0;i<samples.length;i+=1) {
     const s = samples[i] || {};
     const ts = Number(
@@ -91,7 +91,16 @@ function normalizeSamples(samples: any[]) {
                 (typeof s.avg_run_cadence === 'number' && s.avg_run_cadence) ||
                 undefined;
 
-    out.push({ ts: Number.isFinite(ts) ? ts : i, t: Number.isFinite(t) ? t : i, v, d, hr, elev, cad });
+    // power (watts) – accept common fields from providers
+    const p = (typeof s.powerInWatts === 'number' && s.powerInWatts) ||
+              (typeof s.power_in_watts === 'number' && s.power_in_watts) ||
+              (typeof s.power_watts === 'number' && s.power_watts) ||
+              (typeof s.instantaneousPower === 'number' && s.instantaneousPower) ||
+              (typeof s.inst_power === 'number' && s.inst_power) ||
+              (typeof s.power === 'number' && s.power) ||
+              undefined;
+
+    out.push({ ts: Number.isFinite(ts) ? ts : i, t: Number.isFinite(t) ? t : i, v, d, hr, elev, cad, p });
   }
 
   out.sort((a,b)=>(a.ts||0)-(b.ts||0));
@@ -410,10 +419,11 @@ Deno.serve(async (req) => {
       const pace = paceSecPerMiFromMetersSeconds(segMeters, segSec);
       const gap  = gapSecPerMi(rows, sIdx, eIdx);
       const role = stepRole(st);
-      const hrVals:number[] = [], cadVals:number[] = [];
+      const hrVals:number[] = [], cadVals:number[] = [], pVals:number[] = [];
       for (let j=sIdx;j<=eIdx;j++) {
         const h = rows[j].hr; if (typeof h === 'number' && h >= 50 && h <= 220) hrVals.push(h);
         const c = rows[j].cad; if (typeof c === 'number') cadVals.push(c);
+        const p = rows[j].p; if (typeof p === 'number' && p >= 0 && p < 2000) pVals.push(p);
       }
       // movement fraction
       const floor = ALIGN.idle_speed_mps;
@@ -456,6 +466,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: gap  != null ? Math.round(gap)  : null,
           avg_hr: hrVals.length ? Math.round(avg(hrVals)!) : null,
           avg_cadence_spm: cadVals.length ? Math.round(avg(cadVals)!) : null,
+          avg_power_w: (sport==='ride' && pVals.length) ? Math.round(avg(pVals)!) : null,
           provenance: 'lap',
           pct_moving: pctMoving,
           pace_uses_planned_distance: false
@@ -523,8 +534,9 @@ Deno.serve(async (req) => {
       const dur_s  = Math.max(1, endT - startT);
       const pace   = paceSecPerMiFromMetersSeconds(dist_m, dur_s);
       const gap    = gapSecPerMi(rows, sIdx, eIdx);
-      const hrVals:number[] = [], cadVals:number[] = [];
+      const hrVals:number[] = [], cadVals:number[] = [], pVals:number[] = [];
       for (let j=sIdx;j<=eIdx;j++) { const h = rows[j].hr; if (typeof h==='number' && h>=50 && h<=220) hrVals.push(h); const c = rows[j].cad; if (typeof c==='number') cadVals.push(c); }
+      for (let j=sIdx;j<=eIdx;j++) { const p = rows[j].p; if (typeof p==='number' && p>=0 && p<2000) pVals.push(p); }
       // movement fraction
       const floor = ALIGN.idle_speed_mps; let movingSec=0, totalSec=0;
       for (let j=sIdx;j<=eIdx;j++) { const dt = j ? Math.max(0,(rows[j].t??0)-(rows[j-1].t??0)) : 0; totalSec += dt; if ((rows[j].v??0)>floor) movingSec += dt; }
@@ -542,6 +554,7 @@ Deno.serve(async (req) => {
           gap_pace_s_per_mi: gap  != null ? Math.round(gap)  : null,
           avg_hr: hrVals.length ? Math.round(avg(hrVals)!) : null,
           avg_cadence_spm: cadVals.length ? Math.round(avg(cadVals)!) : null,
+          avg_power_w: (sport==='ride' && pVals.length) ? Math.round(avg(pVals)!) : null,
           provenance,
           pct_moving: pctMoving,
           pace_uses_planned_distance: false
@@ -870,9 +883,11 @@ Deno.serve(async (req) => {
       }
       const segHr = hrVals.length ? Math.round(avg(hrVals)!) : null;
 
-      // cadence (optional)
+      // cadence & power (optional)
       let cads: number[] = []; for (let j=sIdx;j<=eIdx;j+=1) { const c = rows[j].cad; if (typeof c === 'number' && Number.isFinite(c)) cads.push(c); }
+      let pw: number[] = []; for (let j=sIdx;j<=eIdx;j+=1) { const p = rows[j].p; if (typeof p === 'number' && Number.isFinite(p) && p >= 0 && p < 2000) pw.push(p); }
       const segCad = cads.length ? Math.round(avg(cads)!) : null;
+      const segPwr = (sport==='ride' && pw.length) ? Math.round(avg(pw)!) : null;
 
       outIntervals.push({
         planned_step_id: st?.id ?? null,
@@ -889,7 +904,8 @@ Deno.serve(async (req) => {
           avg_pace_s_per_mi: segPace != null ? Math.round(segPace) : null,
           gap_pace_s_per_mi: segGap != null ? Math.round(segGap) : null,
           avg_hr: segHr,
-          avg_cadence_spm: segCad
+          avg_cadence_spm: segCad,
+          avg_power_w: segPwr
         },
         pass_state: passStateFor(sport, info.role, deriveMetersFromPlannedStep(st), deriveSecondsFromPlannedStep(st), segMetersMeasured, segSec),
         sample_idx_start: sIdx,

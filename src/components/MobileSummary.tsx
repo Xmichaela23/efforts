@@ -356,8 +356,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
   const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
-  // Preserve authored order; no warmup/cooldown reordering to save space
-  const steps: any[] = plannedStepsBase;
+  // Show only authored work steps; preserve order
+  const steps: any[] = plannedStepsBase.filter(st => {
+    const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
+    return !(/cool|cd\b/.test(k) || /warm|wu\b/.test(k) || /rest|recover|recovery|jog|easy/.test(k));
+  });
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
@@ -446,6 +449,28 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       }
     } catch {}
     return '—';
+  };
+
+  // Planned label for rides (power) and runs (pace) with no fallbacks
+  const plannedLabelStrict = (st:any): string => {
+    if (isRideSport) {
+      const pr = (st as any)?.power_range;
+      const pw = Number((st as any)?.power_target_watts);
+      if (pr && typeof pr.lower === 'number' && typeof pr.upper === 'number' && pr.lower>0 && pr.upper>0) return `${Math.round(pr.lower)}–${Math.round(pr.upper)} W`;
+      if (Number.isFinite(pw) && pw>0) return `${Math.round(pw)} W`;
+      const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
+      if (/easy/.test(k)) return 'Easy';
+      return '—';
+    }
+    // run/walk
+    const p = Number((st as any)?.pace_sec_per_mi);
+    if (Number.isFinite(p) && p>0) return fmtPace(p);
+    const prng = Array.isArray((st as any)?.pace_range) ? (st as any).pace_range : null;
+    if (prng && prng.length===2) {
+      const lo = Number(prng[0]); const hi = Number(prng[1]);
+      if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) return `${fmtPace(lo).replace('/mi','')}–${fmtPace(hi)}`;
+    }
+    return plannedPaceFor(st);
   };
 
   const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
@@ -634,39 +659,15 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return { paceText: typeof fallback === 'string' ? fallback : (fallback?.text || '—'), hr: typeof fallback === 'string' ? null : (fallback?.hr ?? null), durationSec: Math.round(timeSec) };
   };
 
-  // -------- Server-computed interval matching --------
-  const roleOf = (st: any): 'warmup'|'cooldown'|'recovery'|'work' => {
-    const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
-    if (/cool|cd\b/.test(k)) return 'cooldown';
-    if (/warm|wu\b/.test(k)) return 'warmup';
-    if (/rest|recover|recovery|jog|easy/.test(k)) return 'recovery';
-    return 'work';
-  };
-  const matchedIdxByStep = useMemo(()=>{
-    if (!computedIntervals.length || !steps.length) return [] as number[];
-    const used = new Set<number>();
-    const out: number[] = [];
-    for (const st of steps) {
-      let found = -1;
-      const pid = (st as any)?.id ?? null;
-      if (pid) {
-        for (let i=0;i<computedIntervals.length;i++) {
-          if (used.has(i)) continue;
-          if (computedIntervals[i]?.planned_step_id && computedIntervals[i].planned_step_id === pid) { found = i; break; }
-        }
-      }
-      if (found === -1) {
-        const r = roleOf(st);
-        for (let i=0;i<computedIntervals.length;i++) {
-          if (used.has(i)) continue;
-          if (String(computedIntervals[i]?.role||'') === r) { found = i; break; }
-        }
-      }
-      if (found !== -1) used.add(found);
-      out.push(found);
+  // -------- Strict interval matching by planned_step_id only --------
+  const intervalByPlannedId = useMemo(() => {
+    const map = new Map<string, any>();
+    for (const it of computedIntervals) {
+      const pid = String((it as any)?.planned_step_id || '');
+      if (pid) map.set(pid, it);
     }
-    return out;
-  }, [computedIntervals, steps]);
+    return map;
+  }, [computedIntervals]);
 
   // -------- Strict mode: if workout is attached to a plan, do NOT render client fallback. --------
   const isAttachedToPlan = !!planned && !!(planned as any)?.id;
@@ -756,7 +757,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       })()}
       <div className="grid grid-cols-5 gap-4 text-xs text-gray-500">
         <div className="font-medium text-black">Planned</div>
-        <div className="font-medium text-black">{isRideSport ? 'Executed Speed' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</div>
+        <div className="font-medium text-black">{isRideSport ? 'Executed Watts' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</div>
         <div className="font-medium text-black">Distance</div>
         <div className="font-medium text-black">Time</div>
         <div className="font-medium text-black">BPM</div>
@@ -764,48 +765,26 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       <div className="mt-2 divide-y divide-gray-100">
         {steps.map((st, idx) => (
           <div key={idx} className="grid grid-cols-5 gap-4 py-2 text-sm">
-            <div className="text-gray-800">{plannedPaceFor(st)}</div>
+            <div className="text-gray-800">{plannedLabelStrict(st)}</div>
             <div className="text-gray-900">
               {(() => {
-                const hasComputed = computedIntervals && computedIntervals.length > 0;
-                if (hasServerComputed) {
-                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
-                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
-                  const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
-                  if (isRideSport) {
-                    if (typeof secPerMi === 'number' && isFinite(secPerMi) && secPerMi > 0) {
-                      const mph = 3600 / secPerMi; // convert pace to speed
-                      return <div>{mph.toFixed(1)} mph</div>;
-                    }
-                    return <div>—</div>;
-                  }
-                  if (isSwimSport) {
-                    // Derive per-100 pace from executed distance/time if provider did not compute it
-                    const d = Number(row?.executed?.distance_m);
-                    const t = Number(row?.executed?.duration_s);
-                    const per100m = Number(row?.executed?.avg_pace_per100m_s);
-                    const use = Number.isFinite(per100m) && per100m>0
-                      ? per100m
-                      : (Number.isFinite(d) && d>0 && Number.isFinite(t) && t>0 ? (t/(d/100)) : NaN);
-                    if (Number.isFinite(use)) {
-                      const v = useImperial ? Math.round((use as number) * 0.9144) : (use as number);
-                      const m = Math.floor(v/60);
-                      const s = Math.round(v%60);
-                      return <div>{m}:{String(s).padStart(2,'0')} {useImperial ? '/100yd' : '/100m'}</div>;
-                    }
-                  }
-                  return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
+                if (!hasServerComputed) return <div>—</div>;
+                const pid = String((st as any)?.id || '');
+                const row = pid ? intervalByPlannedId.get(pid) : null;
+                if (!row) return <div>—</div>;
+                if (isRideSport) {
+                  const pw = row?.executed?.avg_power_w as number | undefined;
+                  return <div>{typeof pw === 'number' ? `${Math.round(pw)} W` : '—'}</div>;
                 }
-                return <div>—</div>;
+                const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
+                return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
               })()}
             </div>
             <div className="text-gray-900">
               {(() => {
                 if (hasServerComputed) {
-                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
-                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
+                  const pid = String((st as any)?.id || '');
+                  const row = pid ? intervalByPlannedId.get(pid) : null;
                   const distM = row?.executed?.distance_m as number | undefined;
                   if (typeof distM === 'number' && distM > 0) {
                     if (isSwimSport) {
@@ -824,28 +803,20 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
             </div>
             <div className="text-gray-900">
               {(() => {
-                const hasComputed = computedIntervals && computedIntervals.length > 0;
-                if (hasServerComputed) {
-                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
-                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
-                  const dur = row?.executed?.duration_s;
-                  return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
-                }
-                return <div>—</div>;
+                if (!hasServerComputed) return <div>—</div>;
+                const pid = String((st as any)?.id || '');
+                const row = pid ? intervalByPlannedId.get(pid) : null;
+                const dur = row?.executed?.duration_s;
+                return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
               })()}
             </div>
             <div className="text-gray-900">
               {(() => {
-                const hasComputed = computedIntervals && computedIntervals.length > 0;
-                if (hasServerComputed) {
-                  const compIdx = (Array.isArray(matchedIdxByStep) ? matchedIdxByStep[idx] : -1);
-                  const fallbackIdx = Math.min(idx, computedIntervals.length - 1);
-                  const row = computedIntervals[(compIdx != null && compIdx >= 0) ? compIdx : fallbackIdx];
-                  const hr = row?.executed?.avg_hr;
-                  return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
-                }
-                return <div className="text-xs text-gray-700">—</div>;
+                if (!hasServerComputed) return <div className="text-xs text-gray-700">—</div>;
+                const pid = String((st as any)?.id || '');
+                const row = pid ? intervalByPlannedId.get(pid) : null;
+                const hr = row?.executed?.avg_hr;
+                return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
               })()}
             </div>
           </div>

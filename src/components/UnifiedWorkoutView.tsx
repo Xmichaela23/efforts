@@ -104,18 +104,68 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       try {
         const hasSteps = Array.isArray((linkedPlanned as any)?.computed?.steps) && (linkedPlanned as any).computed.steps.length>0;
         if (hasSteps) return;
-        // Materialize using plan/week from the planned row
-        const planId = (linkedPlanned as any)?.training_plan_id as string | undefined;
-        const weekNum = Number((linkedPlanned as any)?.week_number);
-        if (!planId || !Number.isFinite(weekNum) || weekNum < 1) return;
+        // First try in-place expansion from steps_preset (works for single workouts outside plan weeks)
         try {
+          const readStepsPresetLocal = (src: any): string[] | undefined => {
+            try {
+              if (Array.isArray(src)) return src as string[];
+              if (src && typeof src === 'object') return src as string[];
+              if (typeof src === 'string' && src.trim().length) {
+                const parsed = JSON.parse(src);
+                return Array.isArray(parsed) ? (parsed as string[]) : undefined;
+              }
+            } catch {}
+            return undefined;
+          };
+          // Refresh the latest planned row first
+          let row = linkedPlanned as any;
+          try {
+            const { data } = await supabase.from('planned_workouts').select('*').eq('id', String((linkedPlanned as any).id)).maybeSingle();
+            if (data) row = data;
+          } catch {}
+          let stepsPreset = readStepsPresetLocal((row as any)?.steps_preset);
+          const rowHasV3 = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0 && Number((row as any)?.computed?.total_duration_seconds) > 0; } catch { return false; }})();
+          const needsInlineHydrate = !rowHasV3 && Array.isArray(stepsPreset) && stepsPreset.length>0;
+          if (needsInlineHydrate) {
+            const { data: { user } } = await supabase.auth.getUser();
+            let baselines: any = {};
+            try {
+              const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user?.id || '').maybeSingle();
+              baselines = ub?.performance_numbers || {};
+            } catch {}
+            const { expand } = await import('@/services/plans/expander');
+            const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
+            const atomic: any[] = expand(stepsPreset || [], (row as any).main, (row as any).tags);
+            const resolved: any[] = resolveTargets(atomic as any, baselines, ((row as any).export_hints || {}), String((row as any).type||'').toLowerCase());
+            if (Array.isArray(resolved) && resolved.length) {
+              const total = totalDurationSeconds(resolved as any);
+              const update = { computed: { normalization_version: 'v3', steps: resolved, total_duration_seconds: total }, duration: Math.round(total/60) } as any;
+              await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
+              const authoritativeTotal = Number((row as any)?.total_duration_seconds);
+              const merged = { ...row, ...(Number.isFinite(authoritativeTotal) && authoritativeTotal>0 ? { total_duration_seconds: authoritativeTotal } : {}), ...update };
+              setLinkedPlanned(merged);
+              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              try {
+                if (isCompleted && (workout as any)?.id) {
+                  await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any).id) } });
+                  try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                }
+              } catch {}
+              return;
+            }
+          }
+        } catch {}
+
+        // Fallback: materialize by week context when available
+        try {
+          const planId = (linkedPlanned as any)?.training_plan_id as string | undefined;
+          const weekNum = Number((linkedPlanned as any)?.week_number);
+          if (!planId || !Number.isFinite(weekNum) || weekNum < 1) return;
           const mod = await import('@/services/plans/ensureWeekMaterialized');
           await mod.ensureWeekMaterialized(String(planId), Number(weekNum));
-          // Refetch this planned row to get computed.steps populated
           const { data } = await supabase.from('planned_workouts').select('*').eq('id', (linkedPlanned as any).id).single();
           setLinkedPlanned(data || null);
           try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-          // Recompute server summary now that steps are materialized
           try {
             if (isCompleted && (workout as any)?.id) {
               await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any).id) } });
