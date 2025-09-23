@@ -831,7 +831,7 @@ function EffortsViewerMapbox({
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 10 }}>
           <button
             onClick={() => setShowVam(v => !v)}
-            style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 10px', background: '#fff', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
+            style={{ border: 'none', background: 'transparent', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
             aria-pressed={showVam}
           >
             {showVam ? 'Hide VAM' : 'Show VAM'}

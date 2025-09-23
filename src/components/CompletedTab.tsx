@@ -7,7 +7,6 @@ import ActivityMap from './ActivityMap';
 import CleanElevationChart from './CleanElevationChart';
 import EffortsViewerMapbox from './EffortsViewerMapbox';
 import HRZoneChart from './HRZoneChart';
-import PowerCadenceChart from './PowerCadenceChart';
 import { useCompact } from '@/hooks/useCompact';
 import { supabase } from '../lib/supabase';
 
@@ -2401,19 +2400,7 @@ const formatMovingTime = () => {
             .map(s => pickCadenceSample(s, workoutType === 'ride' ? 'ride' : 'run'))
             .filter(v => v != null);
           
-          // Only show if we have power or cadence data
-          if (powerData.length > 0 || cadenceData.length > 0) {
-
-            return (
-              <div className="mb-4">
-                <PowerCadenceChart 
-                  power={powerData}
-                  cadence={cadenceData}
-                  initial="PWR"
-                />
-              </div>
-            );
-          }
+          // Old Power/Cadence chart removed (now integrated into main viewer tabs)
         }
         return null;
       })()}
