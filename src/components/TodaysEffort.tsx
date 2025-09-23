@@ -293,9 +293,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               const avgSpeedMps = Number(workout.avg_speed_mps);
               
               if (isSwim) {
-                // Average swim pace per 100 (meters by default; yards when pool length indicates yards)
-                const poolLenM = Number((workout as any)?.pool_length ?? (workout as any)?.metrics?.pool_length);
-                const yardPool = Number.isFinite(poolLenM) && (Math.abs(poolLenM - 22.86) <= 0.6 || Math.abs(poolLenM - 45.72) <= 1.2);
+                // Average swim pace per 100 based on user preference (yards if useImperial, else meters)
+                const preferYards = !!useImperial;
                 const distMeters = (() => {
                   const m = Number((workout as any)?.metrics?.distance_meters ?? (workout as any)?.distance_meters);
                   if (Number.isFinite(m) && m > 0) return m;
@@ -310,12 +309,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   return Number.isFinite(n) && n > 0 ? n : null;
                 })();
                 if (distMeters && movingSeconds && distMeters > 0 && movingSeconds > 0) {
-                  const per100 = yardPool
+                  const per100 = preferYards
                     ? movingSeconds / ((distMeters / 0.9144) / 100)
                     : movingSeconds / (distMeters / 100);
                   const mm = Math.floor(per100 / 60);
                   const ss = Math.round(per100 % 60);
-                  paceSpeed = `${mm}:${String(ss).padStart(2,'0')} ${yardPool ? '/100yd' : '/100m'}`;
+                  paceSpeed = `${mm}:${String(ss).padStart(2,'0')} ${preferYards ? '/100yd' : '/100m'}`;
                 }
               } else if (isRun && distanceKm && durationMinutes && distanceKm > 0 && durationMinutes > 0) {
                 // Calculate pace from transformed distance/duration
@@ -332,9 +331,11 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         
         const heartRate = workout.avg_heart_rate || workout.metrics?.avg_heart_rate;
         const hrDisplay = heartRate && heartRate > 0 ? `${Math.round(heartRate)} bpm` : 'N/A';
-        
         const elevation = workout.elevation_gain || workout.metrics?.elevation_gain;
         const elevationFt = elevation && elevation > 0 ? `${Math.round(elevation * 3.28084)} ft` : 'N/A';
+
+        // For swims, only show distance and average pace
+        if (isSwim) return [distance, paceSpeed];
         
         return [distance, paceSpeed, hrDisplay, elevationFt];
       }
