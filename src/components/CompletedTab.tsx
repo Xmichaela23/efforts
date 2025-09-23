@@ -2102,10 +2102,11 @@ const formatMovingTime = () => {
                <div className="font-medium">Moving Time</div>
              </div>
            </div>
-        </>
-        ) : null
+       </>
+       ) : null;
       })()}
      </div>
+     )}
 
      {/* GPS ROUTE MAP & ELEVATION PROFILE SECTION - hidden for pool swims */}
      <div className="w-full">
