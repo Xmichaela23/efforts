@@ -505,17 +505,14 @@ function EffortsViewerMapbox({
     }
     // Cadence (derive from normalizedSamples or sensor_data)
     if (tab === "cad") {
-      const cad = normalizedSamples.map((s:any) => {
-        const v = (s.cadence_spm ?? s.cadence_rpm ?? (s.hr_bpm != null ? NaN : NaN)) as any;
-        return Number.isFinite(v) ? Number(v) : NaN;
-      });
-      const wins = winsorize(cad, 5, 95);
+      const cad = cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
+      const wins = winsorize(cad as number[], 5, 95);
       return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Power (if present)
     if (tab === "pwr") {
-      const pwr = normalizedSamples.map((s:any) => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
-      const wins = winsorize(pwr, 5, 99);
+      const pwr = pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
+      const wins = winsorize(pwr as number[], 5, 99);
       return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
@@ -533,6 +530,24 @@ function EffortsViewerMapbox({
     let lo: number, hi: number;
     // Use robust percentiles for better space usage
     lo = pct(winsorized, 2); hi = pct(winsorized, 98);
+    // Specific ranges for cadence/power to avoid super-narrow domains
+    if (tab === 'cad') {
+      const minC = Math.min(...winsorized);
+      const maxC = Math.max(...winsorized);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || (hi - lo) < 10) {
+        const baseLo = Math.floor((minC || 0) / 10) * 10;
+        const baseHi = Math.ceil((maxC || 100) / 10) * 10;
+        lo = Math.min(baseLo, (workoutData?.type === 'ride' ? 40 : 60));
+        hi = Math.max(baseHi, (workoutData?.type === 'ride' ? 120 : 200));
+      }
+    }
+    if (tab === 'pwr') {
+      const minP = Math.min(...winsorized);
+      const maxP = Math.max(...winsorized);
+      if (!Number.isFinite(lo) || !Number.isFinite(hi) || (hi - lo) < 50) {
+        lo = 0; hi = Math.max(200, Math.ceil((maxP || 200) / 50) * 50);
+      }
+    }
     
     // Ensure minimum span
     if (lo === hi) { 
