@@ -293,25 +293,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
               const avgSpeedMps = Number(workout.avg_speed_mps);
               
               if (isSwim) {
-                // Average swim pace per 100 based on user preference (yards if useImperial, else meters)
-                const preferYards = !!useImperial;
-                const distMeters = (() => {
-                  const m = Number((workout as any)?.metrics?.distance_meters ?? (workout as any)?.distance_meters);
-                  if (Number.isFinite(m) && m > 0) return m;
-                  const km = computeDistanceKm(workout);
-                  if (km && !isNaN(km)) return km * 1000;
-                  const yards = Number((workout as any)?.distance_yards);
-                  if (Number.isFinite(yards) && yards > 0) return yards * 0.9144;
-                  return null;
-                })();
-                const movingSeconds = (() => {
-                  const n = Number((workout as any)?.total_timer_time ?? (workout as any)?.moving_time ?? (workout as any)?.metrics?.total_timer_time ?? (workout as any)?.metrics?.moving_time);
-                  return Number.isFinite(n) && n > 0 ? n : null;
-                })();
-                if (distMeters && movingSeconds && distMeters > 0 && movingSeconds > 0) {
+                // Single source of truth: use server-computed overall stats only
+                const comp = (workout as any)?.computed?.overall;
+                const distM = Number(comp?.distance_m);
+                const durS = Number(comp?.duration_s_moving);
+                if (Number.isFinite(distM) && distM > 0 && Number.isFinite(durS) && durS > 0) {
+                  const preferYards = !!useImperial;
                   const per100 = preferYards
-                    ? movingSeconds / ((distMeters / 0.9144) / 100)
-                    : movingSeconds / (distMeters / 100);
+                    ? durS / ((distM / 0.9144) / 100)
+                    : durS / (distM / 100);
                   const mm = Math.floor(per100 / 60);
                   const ss = Math.round(per100 % 60);
                   paceSpeed = `${mm}:${String(ss).padStart(2,'0')} ${preferYards ? '/100yd' : '/100m'}`;
