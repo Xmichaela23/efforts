@@ -286,8 +286,8 @@ function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
 }
 
 /** ---------- Tiny UI atoms ---------- */
-const Pill = ({ label, value, active=false }: { label: string; value: string | number; active?: boolean }) => (
-  <div style={{
+const Pill = ({ label, value, active=false, titleAttr }: { label: string; value: string | number; active?: boolean; titleAttr?: string }) => (
+  <div title={titleAttr || ''} style={{
     padding: "2px 0",
     borderRadius: 0,
     border: "none",
@@ -430,6 +430,55 @@ function EffortsViewerMapbox({
     }
     return g;
   }, [normalizedSamples]);
+
+  // Optional cadence/power series derived from sensor_data and resampled to chart times
+  const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
+  const cadSeriesRaw = useMemo(() => {
+    try {
+      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
+        ? (workoutData as any).sensor_data.samples
+        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
+      const times: number[] = []; const vals: number[] = [];
+      for (let i=0;i<sd.length;i++){
+        const s:any = sd[i]||{};
+        const t = Number(
+          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
+          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
+        );
+        const cad = (s.runCadence ?? s.cadence ?? s.bikeCadence);
+        if (Number.isFinite(t) && Number.isFinite(cad)) { times.push(Number(t)); vals.push(Number(cad)); }
+      }
+      return { times, vals };
+    } catch { return { times: [], vals: [] }; }
+  }, [workoutData]);
+  const pwrSeriesRaw = useMemo(() => {
+    try {
+      const sd = Array.isArray((workoutData as any)?.sensor_data?.samples)
+        ? (workoutData as any).sensor_data.samples
+        : (Array.isArray((workoutData as any)?.sensor_data) ? (workoutData as any).sensor_data : []);
+      const times: number[] = []; const vals: number[] = [];
+      for (let i=0;i<sd.length;i++){
+        const s:any = sd[i]||{};
+        const t = Number(
+          s.timerDurationInSeconds ?? s.clockDurationInSeconds ?? s.elapsedDurationInSeconds ?? s.sumDurationInSeconds ??
+          s.offsetInSeconds ?? s.startTimeInSeconds ?? s.elapsed_s ?? s.t ?? s.time ?? s.seconds ?? i
+        );
+        const pw = (s.power ?? s.power_w ?? s.watts);
+        if (Number.isFinite(t) && Number.isFinite(pw)) { times.push(Number(t)); vals.push(Number(pw)); }
+      }
+      return { times, vals };
+    } catch { return { times: [], vals: [] }; }
+  }, [workoutData]);
+  const cadSeries = useMemo(() => {
+    if (!targetTimes.length || !cadSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
+    const vals = resampleToGrid(cadSeriesRaw.times, cadSeriesRaw.vals, targetTimes);
+    return vals;
+  }, [cadSeriesRaw, targetTimes]);
+  const pwrSeries = useMemo(() => {
+    if (!targetTimes.length || !pwrSeriesRaw.times.length) return new Array(targetTimes.length).fill(NaN);
+    const vals = resampleToGrid(pwrSeriesRaw.times, pwrSeriesRaw.vals, targetTimes);
+    return vals;
+  }, [pwrSeriesRaw, targetTimes]);
 
   // Which raw metric array are we plotting?
   const metricRaw: number[] = useMemo(() => {
@@ -651,17 +700,17 @@ function EffortsViewerMapbox({
 
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
-        {/* Current metric values */}
+        {/* Current metric values aligned with tabs */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
             active={tab==="pace"} 
           />
-          <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
-          {/* VAM removed from main pills */}
-          <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
-          <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
+          <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
+          <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
+          <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
+          <Pill label="Ascent" titleAttr="Total elevation gain" value={fmtAlt(gainNow_m, useFeet)} active={tab==="elev"} />
         </div>
         
         {/* Distance, time, and altitude on same line */}
