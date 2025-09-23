@@ -184,7 +184,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 duration: Math.round(total/60)
               } as any;
               await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
-              setHydratedPlanned({ ...row, ...update });
+              // Preserve authoritative DB total_duration_seconds if present on row
+              const authoritativeTotal = Number((row as any)?.total_duration_seconds);
+              setHydratedPlanned({ ...row, ...(Number.isFinite(authoritativeTotal) && authoritativeTotal>0 ? { total_duration_seconds: authoritativeTotal } : {}), ...update });
               try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
               return;
             }
