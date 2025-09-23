@@ -701,8 +701,14 @@ function EffortsViewerMapbox({
       const pHi = isOutdoorGlobal ? 95 : 98;
       const pLowVal = pct(winsorized, pLo);
       const pHighVal = pct(winsorized, pHi);
-      lo = Math.min(Math.min(...vals), pLowVal);
-      hi = Math.max(Math.max(...vals), pHighVal);
+      // Include smoothed values and raw cursor-capable values to ensure full coverage
+      const rawPaces = normalizedSamples
+        .map(s => (Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN))
+        .filter(Number.isFinite) as number[];
+      const rawMin = rawPaces.length ? Math.min(...rawPaces) : Infinity;
+      const rawMax = rawPaces.length ? Math.max(...rawPaces) : -Infinity;
+      lo = Math.min(Math.min(...vals), pLowVal, rawMin);
+      hi = Math.max(Math.max(...vals), pHighVal, rawMax);
     } else {
       lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
       hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
@@ -732,7 +738,7 @@ function EffortsViewerMapbox({
         const c = (lo + hi) / 2; lo = c - spanMin / 2; hi = c + spanMin / 2;
       }
     };
-    if (tab === 'pace' && workoutData?.type !== 'ride') ensureMinSpan(isOutdoorGlobal ? 45 : 30); // sec/mi or sec/km equivalent
+    if (tab === 'pace' && workoutData?.type !== 'ride') ensureMinSpan(isOutdoorGlobal ? 60 : 45); // widen min span for pace to reduce clipping
     if (tab === 'pace' && workoutData?.type === 'ride') ensureMinSpan(isOutdoorGlobal ? 3 : 2);   // mph/kmh equivalent spacing
     if (tab === 'bpm') ensureMinSpan(10);
     if (tab === 'pwr') ensureMinSpan(50);
@@ -746,7 +752,7 @@ function EffortsViewerMapbox({
     }
     
     // Minimal padding (wider for pace to avoid hitting edges)
-    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.10 : 0.06) : (isOutdoorGlobal ? 0.03 : 0.02);
+    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.12 : 0.08) : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
     return [lo - pad, hi + pad];
   }, [metricRaw, tab, isOutdoorGlobal, useFeet, workoutData]);
