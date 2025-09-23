@@ -87,11 +87,14 @@ function derivePlannedCellLabel(w: any): string | null {
     const steps: string[] = Array.isArray(w.steps_preset) ? w.steps_preset : [];
     const txt = String(w.description || '').toLowerCase();
     const type = String(w.type || '').toLowerCase();
-    // Robust duration resolution: computed > sum(computed.steps) > sum(intervals) > duration field
+  // Robust duration resolution (authoritative, no legacy fallbacks):
+  // total_duration_seconds (row) > computed.total_duration_seconds > sum(computed.steps.seconds) > sum(intervals)
     const comp: any = w?.computed || {};
     let secs = 0;
+  const rootTs = Number((w as any)?.total_duration_seconds);
+  if (Number.isFinite(rootTs) && rootTs > 0) secs = rootTs;
     const ts = Number(comp?.total_duration_seconds);
-    if (Number.isFinite(ts) && ts > 0) secs = ts;
+  if (secs <= 0 && Number.isFinite(ts) && ts > 0) secs = ts;
     if (secs <= 0 && Array.isArray(comp?.steps) && comp.steps.length > 0) {
       try {
         secs = comp.steps.reduce((a: number, s: any) => a + (Number(s?.seconds) || 0), 0);
@@ -110,8 +113,7 @@ function derivePlannedCellLabel(w: any): string | null {
         if (Number.isFinite(sInt) && sInt > 0) secs = sInt;
       } catch {}
     }
-    if (secs <= 0 && typeof w.duration === 'number') secs = Math.max(0, Math.round(w.duration * 60));
-    const mins = secs > 0 ? Math.round(secs / 60) : (typeof w.duration === 'number' ? w.duration : 0);
+  const mins = secs > 0 ? Math.round(secs / 60) : 0;
     const durStr = mins > 0 ? `${mins}m` : '';
 
     const has = (pat: RegExp) => steps.some(s => pat.test(s)) || pat.test(txt);

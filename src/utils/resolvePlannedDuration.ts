@@ -9,13 +9,17 @@
 export function resolvePlannedDurationMinutes(workout: any): number | null {
   try {
     if (!workout) return null;
-    // Single source of truth: computed-only (no fallbacks)
-    // 1) computed total
+    // Single source of truth: authoritative stored totals only (no heuristic fallbacks)
+    // 1) Root stored total (materialized by Weekly)
+    const rootTs = Number((workout as any)?.total_duration_seconds);
+    if (Number.isFinite(rootTs) && rootTs > 0) return Math.max(1, Math.round(rootTs / 60));
+
+    // 2) computed total
     const comp: any = (workout as any)?.computed || {};
     const ts = Number(comp?.total_duration_seconds);
     if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
 
-    // 2) Sum of computed steps.seconds
+    // 3) Sum of computed steps.seconds
     const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
     if (steps.length) {
       const total = steps.reduce((a: number, st: any) => a + (Number(st?.seconds) || 0), 0);
