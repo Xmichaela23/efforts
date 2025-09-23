@@ -377,18 +377,27 @@ function EffortsViewerMapbox({
       const n = out.length; if (n >= 3) {
         const elev = out.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : 0);
         const dist = out.map(s => Number.isFinite(s.d_m as any) ? (s.d_m as number) : 0);
-        const windowPts = 5; // ~10-pt span
+        const windowPts = 9; // calmer: ~18-pt span
         const rawGrade: number[] = new Array(n).fill(0);
         for (let i = 0; i < n; i++) {
           const j = Math.max(0, i - windowPts);
           const k2 = Math.min(n - 1, i + windowPts);
-          const dd = Math.max(5, (dist[k2] - dist[j])); // ensure minimum distance to stabilize
+          const dd = Math.max(20, (dist[k2] - dist[j])); // require ≥20 m span to reduce noise
           const dh = (elev[k2] - elev[j]);
           rawGrade[i] = clamp(dh / dd, -0.30, 0.30);
         }
         const wins = winsorize(rawGrade, 2, 98);
-        const sm = smoothWithOutlierHandling(wins, 7, 2.5);
-        for (let i = 0; i < n; i++) out[i].grade = clamp(Number.isFinite(sm[i]) ? sm[i] : rawGrade[i], -0.30, 0.30);
+        const sm = smoothWithOutlierHandling(wins, 9, 2.5);
+        // Final calming EMA
+        const emaAlpha = 0.2;
+        let ema: number | null = null;
+        const finalG: number[] = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+          const v = Number.isFinite(sm[i]) ? (sm[i] as number) : rawGrade[i];
+          ema = ema == null ? v : (emaAlpha * v + (1 - emaAlpha) * ema);
+          finalG[i] = clamp(ema, -0.30, 0.30);
+        }
+        for (let i = 0; i < n; i++) out[i].grade = finalG[i];
       }
     } catch {}
     return out;
