@@ -741,6 +741,13 @@ function EffortsViewerMapbox({
     if (tab === 'pace' && workoutData?.type !== 'ride') ensureMinSpan(isOutdoorGlobal ? 60 : 45); // widen min span for pace to reduce clipping
     if (tab === 'pace' && workoutData?.type === 'ride') ensureMinSpan(isOutdoorGlobal ? 3 : 2);   // mph/kmh equivalent spacing
     if (tab === 'bpm') ensureMinSpan(10);
+    // Ensure BPM domain fully covers visible data
+    if (tab === 'bpm') {
+      const minVal = Math.min(...vals);
+      const maxVal = Math.max(...vals);
+      lo = Math.min(lo, minVal);
+      hi = Math.max(hi, maxVal);
+    }
     if (tab === 'pwr') ensureMinSpan(50);
     if (tab === 'cad') ensureMinSpan(10);
     if (tab === 'elev') ensureMinSpan(isOutdoorGlobal ? (useFeet ? 20/3.28084 : 6) : (useFeet ? 10/3.28084 : 3));
@@ -752,7 +759,9 @@ function EffortsViewerMapbox({
     }
     
     // Minimal padding (wider for pace to avoid hitting edges)
-    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.12 : 0.08) : (isOutdoorGlobal ? 0.03 : 0.02);
+    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.12 : 0.08)
+                    : (tab === 'bpm') ? 0.06
+                    : (isOutdoorGlobal ? 0.03 : 0.02);
     const pad = Math.max((hi - lo) * padFrac, 1);
     return [lo - pad, hi + pad];
   }, [metricRaw, tab, isOutdoorGlobal, useFeet, workoutData]);
