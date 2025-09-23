@@ -252,8 +252,14 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const paceTxt = String((pn?.swimPace100 || pn?.swim_pace_100 || '') as any).trim();
       const mmss = paceTxt.match(/(\d+):(\d{2})$/);
       const pacePer100 = mmss ? (parseInt(mmss[1],10)*60 + parseInt(mmss[2],10)) : NaN;
+      // Determine units preference: use planned row's units if present; fallback to 'imperial'
+      const unitsPref = String((workout as any)?.units || 'imperial').toLowerCase();
       if (yards > 0 && Number.isFinite(pacePer100)) {
-        const sec = Math.round((yards/100) * pacePer100) + Math.max(0, Math.round(restSec));
+        // Convert authored distance into user's unit before applying baseline pace
+        const distanceHundreds = unitsPref === 'metric'
+          ? (Math.round(yards * 0.9144) / 100) // meters/100
+          : (yards / 100); // yards/100
+        const sec = Math.round(distanceHundreds * pacePer100) + Math.max(0, Math.round(restSec));
         durationMin = Math.max(1, Math.round(sec/60));
       }
     }
