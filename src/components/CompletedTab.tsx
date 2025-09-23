@@ -1573,7 +1573,99 @@ const formatMovingTime = () => {
     })()}
 
      {/* 🏠 ALL METRICS - 3-column grid with tighter spacing */}
-     <div className="grid grid-cols-3 gap-1">
+     {workoutType === 'swim' ? (
+       <div className="grid grid-cols-3 gap-1">
+         {/* Distance */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => {
+               const src = (hydrated || workoutData);
+               const km = (computeDistanceKm(src) ?? Number((src as any)?.distance)) || 0;
+               const meters = Math.round(km * 1000);
+               if (!meters) return 'N/A';
+               return useImperial ? `${Math.round(meters / 0.9144)} yd` : `${meters} m`;
+             })()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Distance</div></div>
+         </div>
+
+         {/* Moving Time */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatMovingTime()}</div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Moving Time</div></div>
+         </div>
+
+         {/* Avg Pace /100 */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => { const s = computeSwimAvgPaceSecPer100(); if (!s) return 'N/A'; const disp = useImperial ? Math.round(s*0.9144) : s; return formatSwimPace(disp); })()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg Pace {useImperial ? '/100yd' : '/100m'}</div></div>
+         </div>
+
+         {/* Duration (Elapsed) */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => {
+               const s = (workoutData as any)?.metrics?.total_elapsed_time
+                     ?? (workoutData as any)?.total_elapsed_time
+                     ?? (workoutData as any)?.elapsed_time
+                     ?? (workoutData as any)?.metrics?.elapsed_time
+                     ?? (typeof (workoutData as any)?.duration === 'number' ? (workoutData as any).duration * 60 : null);
+               return Number.isFinite(Number(s)) && Number(s) > 0 ? formatDuration(Number(s)) : 'N/A';
+             })()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Duration</div></div>
+         </div>
+
+         {/* Avg HR */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.avg_heart_rate ? safeNumber(workoutData.avg_heart_rate) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg HR</div></div>
+         </div>
+
+         {/* Lengths */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => { const n = (workoutData as any)?.number_of_active_lengths ?? ((workoutData as any)?.swim_data?.lengths ? (workoutData as any).swim_data.lengths.length : null); return n != null ? safeNumber(n) : 'N/A'; })()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Lengths</div></div>
+         </div>
+
+         {/* Avg stroke rate */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => { const v = computeAvgStrokeRate(); return v != null ? safeNumber(v) : 'N/A'; })()}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Avg stroke rate</div></div>
+         </div>
+
+         {/* Pool length */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>{formatPoolLengthLabel()}</div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Pool</div></div>
+         </div>
+
+         {/* Max HR */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.max_heart_rate ? safeNumber(workoutData.max_heart_rate) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Max HR</div></div>
+         </div>
+
+         {/* Calories */}
+         <div className="px-2 py-1">
+           <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {workoutData.calories ? safeNumber(workoutData.calories) : 'N/A'}
+           </div>
+           <div className="text-xs text-[#666666] font-normal"><div className="font-medium">Calories</div></div>
+         </div>
+       </div>
+     ) : (
+       <div className="grid grid-cols-3 gap-1">
        {/* General metrics - Only for non-cycling workouts */}
        {workoutType !== 'ride' && (
          <>
