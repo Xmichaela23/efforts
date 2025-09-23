@@ -805,7 +805,10 @@ const computeWorkout = (
 
     // SWIM handling (if discipline is swim)
     if (ctx?.discipline === "swim") {
-      const base100 = baselines.swim_pace_per_100_sec ?? null;
+      // Use baseline if present; otherwise leave unknown so UI can reflect missing baseline
+      const base100 = (typeof baselines.swim_pace_per_100_sec === 'number' && isFinite(baselines.swim_pace_per_100_sec))
+        ? baselines.swim_pace_per_100_sec
+        : null;
       const unit = ctx.swim_unit ?? "yd";
       const add = intensity === "easy" ? SWIM_EASY_ADD_PER100_SEC : 0;
 
@@ -829,7 +832,7 @@ const computeWorkout = (
         if (base100 != null) {
           sec = Math.round(hundreds * (base100 + add));
         } else {
-          // if no swim baseline, leave 0 to signal "unknown"
+          // keep 0 to signal unknown duration when baseline is missing
           sec = 0;
         }
         return {

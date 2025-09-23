@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { normalizePlannedSession, Baselines as NormalizerBaselines, ExportHints } from '@/services/plans/normalizer';
 import { normalizeStructuredSession } from '@/services/plans/normalizer';
+import { resolvePlannedDurationMinutes } from '@/utils/resolvePlannedDuration';
+import { supabase } from '@/lib/supabase';
 
 type Baselines = NormalizerBaselines | Record<string, any> | null | undefined;
 
@@ -49,22 +51,19 @@ function getTitle(workout: any): string {
 }
 
 function computeMinutes(workout: any, baselines?: Baselines, exportHints?: ExportHints): number | null {
+  // Prefer canonical resolver to avoid recomputation
+  const resolved = resolvePlannedDurationMinutes(workout);
+  if (typeof resolved === 'number') return resolved;
+  // Fallback: token-based normalization if needed (legacy)
   try {
-    const secRaw = (workout as any)?.computed?.total_duration_seconds as any;
-    const secNum = typeof secRaw === 'number' ? secRaw : (typeof secRaw === 'string' ? parseInt(secRaw, 10) : NaN);
-    let fromComputed: number | null = (Number.isFinite(secNum) && secNum > 0) ? Math.round(Number(secNum) / 60) : null;
-    let fromTokens: number | null = null;
     const pn = (baselines as any)?.performanceNumbers || {};
     const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
     if (stepsPreset.length) {
-      try {
-        const res = normalizePlannedSession({ ...workout, steps_preset: stepsPreset }, { performanceNumbers: pn } as any, (exportHints || (workout as any).export_hints || {}) as any);
-        if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) fromTokens = res.durationMinutes;
-      } catch {}
+      const res = normalizePlannedSession({ ...workout, steps_preset: stepsPreset }, { performanceNumbers: pn } as any, (exportHints || (workout as any).export_hints || {}) as any);
+      if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) return res.durationMinutes;
     }
-    const minutes = (typeof fromTokens === 'number' && (!fromComputed || fromTokens > fromComputed)) ? fromTokens : (fromComputed || null);
-    return minutes;
-  } catch { return null; }
+  } catch {}
+  return null;
 }
 
 function computeSwimYards(workout: any): number | null {
@@ -149,6 +148,64 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const title = getTitle(workout);
   const lines = buildWeeklySubtitle(workout, baselines) || '';
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
+
+  // Lazy hydrate missing totals on access (lightweight: no heavy token parsing)
+  useEffect(() => {
+    (async () => {
+      try {
+        const isPlanned = String((workout as any)?.workout_status || '').toLowerCase() === 'planned';
+        const id = (workout as any)?.id;
+        if (!isPlanned || !id) return;
+
+        const comp = (workout as any)?.computed || {};
+        const existing = Number(comp?.total_duration_seconds) || Number((workout as any)?.total_duration_seconds) || 0;
+        if (existing > 0) return;
+
+        // Derive a safe, quick total (seconds) from current fields
+        const pickSeconds = (st: any): number => {
+          const candidates = [st?.seconds, st?.duration_s, st?.duration, st?.duration_sec, st?.durationSeconds, st?.timeSeconds, st?.time_sec];
+          for (const v of candidates) { const n = Number(v); if (Number.isFinite(n) && n > 0) return n; }
+          return 0;
+        };
+        let sec = 0;
+        try {
+          const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+          if (steps.length) sec = steps.reduce((a: number, st: any) => a + pickSeconds(st), 0);
+        } catch {}
+        if (sec <= 0) {
+          try {
+            const intervals: any[] = Array.isArray((workout as any)?.intervals) ? (workout as any).intervals : [];
+            if (intervals.length) {
+              const total = intervals.reduce((acc: number, it: any) => {
+                if (Array.isArray(it?.segments) && Number(it?.repeatCount) > 0) {
+                  const segSum = it.segments.reduce((s: number, sg: any) => s + (Number(sg?.duration) || 0), 0);
+                  return acc + segSum * Number(it.repeatCount);
+                }
+                const d = Number(it?.duration);
+                return acc + (Number.isFinite(d) ? d : 0);
+              }, 0);
+              sec = total;
+            }
+          } catch {}
+        }
+        if (sec <= 0) {
+          const m = Number((workout as any)?.duration);
+          if (Number.isFinite(m) && m > 0) sec = Math.round(m * 60);
+        }
+        if (sec <= 0) return;
+
+        // Persist back minimal totals; keep existing computed.steps if present
+        const newComputed = { ...(comp || {}), total_duration_seconds: sec } as any;
+        await supabase.from('planned_workouts').update({
+          computed: newComputed,
+          total_duration_seconds: sec,
+          duration: Math.max(1, Math.round(sec / 60))
+        } as any).eq('id', String(id));
+        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      } catch {}
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(workout as any)?.id]);
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="flex-1">
