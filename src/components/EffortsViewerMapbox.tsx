@@ -762,9 +762,9 @@ function EffortsViewerMapbox({
     const [a, b] = yDomain; 
     let t = (v - a) / (b - a || 1);
     
-    // For cycling speed, invert the Y-axis since we're displaying speed but using pace data
-    if (workoutData?.type === 'ride' && tab === 'pace') {
-      t = 1 - t; // Invert the Y-axis
+    // For PACE: invert the Y-axis so faster (lower time) appears higher
+    if (tab === 'pace') {
+      t = 1 - t;
     }
     
     return H - P - t * (H - P * 2);
