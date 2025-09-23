@@ -418,17 +418,19 @@ function EffortsViewerMapbox({
   const [pl, setPl] = useState(56); // left padding (space for Y labels)
   const pr = 8;                     // right padding (tight)
 
-  // cumulative positive gain (m), used for the InfoCard
-  const cumGain_m = useMemo(() => {
-    if (!normalizedSamples.length) return [0];
-    const g = [0];
+  // cumulative positive gain (m) and loss (m), used for the InfoCard
+  const { cumGain_m, cumLoss_m } = useMemo(() => {
+    if (!normalizedSamples.length) return { cumGain_m: [0], cumLoss_m: [0] };
+    const g: number[] = [0];
+    const l: number[] = [0];
     for (let i = 1; i < normalizedSamples.length; i++) {
       const e1 = normalizedSamples[i].elev_m_sm ?? normalizedSamples[i - 1].elev_m_sm ?? 0;
       const e0 = normalizedSamples[i - 1].elev_m_sm ?? e1;
       const dh = e1 - e0;
       g[i] = g[i - 1] + (dh > 0 ? dh : 0);
+      l[i] = l[i - 1] + (dh < 0 ? -dh : 0);
     }
-    return g;
+    return { cumGain_m: g, cumLoss_m: l };
   }, [normalizedSamples]);
 
   // Optional cadence/power series derived from sensor_data and resampled to chart times
@@ -725,7 +727,12 @@ function EffortsViewerMapbox({
           <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
-          <Pill label="Ascent" titleAttr="Total elevation gain" value={fmtAlt(gainNow_m, useFeet)} active={tab==="elev"} />
+          <Pill
+            label="G/L"
+            titleAttr="Ascent / Descent (Net)"
+            value={`${fmtAlt(gainNow_m, useFeet)} / ${fmtAlt(cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0, useFeet)} (${(() => { const net = (gainNow_m - (cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0)); const sign = net > 0 ? '+' : (net < 0 ? '-' : ''); return `${sign}${Math.abs(Math.round(useFeet ? net*3.28084/3.28084 : net))}`; })()})`}
+            active={tab==="elev"}
+          />
         </div>
         
         {/* Distance, time, and altitude on same line */}
