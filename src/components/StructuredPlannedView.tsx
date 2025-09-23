@@ -263,21 +263,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
 
   // Duration: Match app-wide badges by preferring structured estimate first
   let durationMin: number | undefined = undefined;
-  // 1) Structured estimate (e.g., "0h 37" sources)
-  try {
-    if (durationMin == null) {
-      const est = parseEstimateToSeconds(ws?.total_duration_estimate);
-      if (est>0) durationMin = Math.floor(est/60);
-    }
-  } catch {}
-  // 2) Planned/computed totals
-  // Order: root total → computed total → sum(computed.steps) → sum(intervals)
-  try {
-    if (durationMin == null) {
-      const ts = Number((workout as any)?.total_duration_seconds);
-      if (Number.isFinite(ts) && ts>0) durationMin = Math.max(1, Math.round(ts/60));
-    }
-  } catch {}
+  // 1) Prefer computed totals first (matches Today)
   try {
     if (durationMin == null) {
       const comp: any = (workout as any)?.computed || {};
@@ -285,6 +271,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       if (Number.isFinite(ts) && ts>0) durationMin = Math.max(1, Math.round(ts/60));
     }
   } catch {}
+  // 2) Sum of computed steps
   try {
     if (durationMin == null) {
       const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
@@ -292,6 +279,21 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const s = steps.reduce((a:number, st:any)=>a + (Number(st?.duration_s)||0), 0);
         if (s>0) durationMin = Math.max(1, Math.round(s/60));
       }
+    }
+  } catch {}
+  // 3) Structured estimate (e.g., "0h 37")
+  try {
+    if (durationMin == null) {
+      const est = parseEstimateToSeconds(ws?.total_duration_estimate);
+      if (est>0) durationMin = Math.floor(est/60);
+    }
+  } catch {}
+  // 4) Planned/computed totals
+  // Order: root total → sum(intervals)
+  try {
+    if (durationMin == null) {
+      const ts = Number((workout as any)?.total_duration_seconds);
+      if (Number.isFinite(ts) && ts>0) durationMin = Math.max(1, Math.round(ts/60));
     }
   } catch {}
   try {
@@ -311,6 +313,11 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       }
     }
   } catch {}
+  // 5) Fallback to stored minutes if present
+  if (durationMin == null) {
+    const mins = Number((workout as any)?.duration);
+    if (Number.isFinite(mins) && mins>0) durationMin = Math.max(1, Math.round(mins));
+  }
 
   // Pick a per-session summary for display in Planned view
   const sessionSummary: string | undefined = (() => {
