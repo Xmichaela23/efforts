@@ -1489,51 +1489,7 @@ const formatMovingTime = () => {
   <div className="space-y-2 px-2 pt-0 pb-2" style={{fontFamily: 'Inter, sans-serif'}}>
      
      
-     {/* 🏠 SWIM SETTINGS (Pool length editor) */}
-     {workoutType === 'swim' && (
-       <div className="flex items-center justify-between mb-2">
-         <div className="text-sm text-gray-600">Pool length</div>
-         {!editingPool ? (
-           <div className="flex items-center gap-2">
-             <div className="text-sm font-medium">{formatPoolLengthLabel()}</div>
-             <button className="text-xs underline text-gray-600 hover:text-black" onClick={()=>setEditingPool(true)}>Edit</button>
-           </div>
-         ) : (
-           <div className="flex items-center gap-2">
-             <select
-               className="border rounded px-2 py-1 text-sm"
-               value={(poolLengthMeters ?? inferPoolLengthMeters() ?? 25).toString()}
-               onChange={(e)=> setPoolLengthMeters(Number(e.target.value))}
-             >
-               <option value="22.86">25 yd</option>
-               <option value="25">25 m</option>
-               <option value="33.33">33.33 m</option>
-               <option value="50">50 m</option>
-             </select>
-             <label className="flex items-center gap-1 text-xs text-gray-600">
-               <input type="checkbox" checked={rememberDefault} onChange={(e)=> setRememberDefault(e.target.checked)} />
-               Remember as default
-             </label>
-             <button
-               className="text-xs px-2 py-1 rounded bg-black text-white"
-               onClick={async()=>{
-                 try {
-                   const m = Number(poolLengthMeters ?? inferPoolLengthMeters() ?? 25);
-                   if (Number.isFinite(m) && m > 0) {
-                     await updateWorkout?.(workoutData.id, { pool_length: m });
-                     if (rememberDefault && typeof window !== 'undefined') {
-                       try { window.localStorage.setItem('pool_length_default_m', String(m)); } catch {}
-                     }
-                   }
-                 } catch {}
-                 setEditingPool(false);
-               }}
-             >Save</button>
-             <button className="text-xs underline text-gray-600 hover:text-black" onClick={()=> setEditingPool(false)}>Cancel</button>
-           </div>
-         )}
-       </div>
-     )}
+    {/* Pool length editor removed here; shown as its own card below */}
      
     {/* 🧭 Swim Primary Metrics summary */}
    {false && (()=>{

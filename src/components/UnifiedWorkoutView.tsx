@@ -389,23 +389,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             )}
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => {
-            try {
-              if (origin === 'today') {
-                window.dispatchEvent(new CustomEvent('nav:back:today'));
-              } else if (origin === 'weekly') {
-                window.dispatchEvent(new CustomEvent('nav:back:weekly'));
-              }
-            } catch {}
-            onClose();
-          }}
-          className="h-8 w-8 p-0"
-        >
-          <X className="h-4 w-4" />
-        </Button>
+        {/* Close X removed per product decision; back handled by native nav */}
       </div>
 
       {/* Tabs */}
@@ -560,20 +544,8 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           <TabsContent value="completed" className="flex-1 -mt-8 !mt-0">
             {isCompleted ? (
               <div className="h-full">
-                {onDelete && workout?.id && (
-                  <div className="p-4 flex items-center justify-end">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        try {
-                          if (!confirm('Delete this workout?')) return;
-                          onDelete?.(String((workout as any).id));
-                        } catch {}
-                      }}
-                    >Delete</Button>
-                  </div>
-                )}
+                {/* Delete control removed per product decision */}
+                {/* Delete control removed per product decision */}
                 {(workout.type === 'endurance' || workout.type === 'ride' || workout.type === 'run' || workout.type === 'swim' || workout.type === 'walk') ? (
                   <div className="p-4">
                     <CompletedTab 
