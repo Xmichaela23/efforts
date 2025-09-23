@@ -286,7 +286,7 @@ function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
 }
 
 /** ---------- Tiny UI atoms ---------- */
-const Pill = ({ label, value, subValue, active=false, titleAttr }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string }) => (
+const Pill = ({ label, value, subValue, active=false, titleAttr, width }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string; width?: number }) => (
   <div title={titleAttr || ''} style={{
     padding: "2px 0",
     borderRadius: 0,
@@ -295,14 +295,14 @@ const Pill = ({ label, value, subValue, active=false, titleAttr }: { label: stri
     display: "flex",
     flexDirection: "column",
     gap: 1,
-    width: "54px",
+    width: `${width ?? 54}px`,
     textAlign: "center",
     overflow: "hidden"
   }}>
     <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{label}</span>
     <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
     {subValue ? (
-      <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{subValue}</span>
+      <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>{subValue}</span>
     ) : null}
   </div>
 );
@@ -745,18 +745,19 @@ function EffortsViewerMapbox({
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
         {/* Current metric values aligned with tabs */}
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 6, marginBottom: 8, padding: "0 8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
             active={tab==="pace"} 
+            width={54}
           />
-          <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
-          <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
-          <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
+          <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} width={54} />
+          <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} width={54} />
+          <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} width={54} />
           <Pill
             label={tab==="elev"?"Grade":"Gain"}
-            titleAttr={tab==="elev"?"Grade at cursor; subline shows total gain and loss":"Total elevation gain"}
+            titleAttr={tab==="elev"?"Grade at cursor":"Total elevation gain"}
             value={(() => {
               if (tab !== 'elev') return gainPillText;
               const i = Math.min(idx, Math.max(0, normalizedSamples.length - 1));
@@ -770,21 +771,13 @@ function EffortsViewerMapbox({
               }
               return fmtPct(g);
             })()}
-            subValue={tab==="elev"?(() => {
-              const gain = totalGain_m;
-              const loss = totalLoss_m;
-              if (useFeet) {
-                const gft = Math.round(gain * 3.28084);
-                const lft = Math.round(loss * 3.28084);
-                return `(+${gft} / -${lft} ft)`;
-              }
-              return `(+${Math.round(gain)} / -${Math.round(loss)} m)`;
-            })():undefined}
+            subValue={tab==="elev"?undefined:undefined}
             active={tab==="elev"}
+            width={tab==="elev" ? 110 : 54}
           />
         </div>
         
-        {/* Distance, time, and altitude on same line */}
+        {/* Distance, time, altitude (left) and final totals (right) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, padding: "0 8px" }}>
           <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500 }}>Alt {fmtAlt(altNow_m, useFeet)}</div>
           <div style={{ 
@@ -796,7 +789,18 @@ function EffortsViewerMapbox({
           }}>
             {fmtDist(s?.d_m ?? 0, useMiles)} · {fmtTime(s?.t_s ?? 0)}
           </div>
-          <div style={{ width: "60px" }}></div> {/* Spacer to balance the layout */}
+          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>
+            {(() => {
+              const gainNow = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
+              const lossNow = cumLoss_m[Math.min(idx, cumLoss_m.length - 1)] ?? 0;
+              if (useFeet) {
+                const gft = Math.round(gainNow * 3.28084);
+                const lft = Math.round(lossNow * 3.28084);
+                return `+${gft} / -${lft} ft`;
+              }
+              return `+${Math.round(gainNow)} / -${Math.round(lossNow)} m`;
+            })()}
+          </div>
         </div>
       </div>
 
