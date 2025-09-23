@@ -664,7 +664,7 @@ function EffortsViewerMapbox({
         if (bb) maxLabelX = Math.max(maxLabelX, bb.x + bb.width);
       });
       // Add 8px gap after longest label, clamp to sane bounds
-      const desiredPl = Math.min(Math.max(Math.ceil(maxLabelX) + 8, 44), 80);
+      const desiredPl = Math.min(Math.max(Math.ceil(maxLabelX) + 8, 50), 100);
       if (Number.isFinite(desiredPl) && desiredPl !== pl) setPl(desiredPl);
     } catch {}
   });
@@ -738,20 +738,22 @@ function EffortsViewerMapbox({
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
           <Pill
-            label={tab==="elev"?"G/L":"Gain"}
-            titleAttr={tab==="elev"?"Net elevation change (top) and cumulative gain (bottom)":"Total elevation gain"}
+            label={tab==="elev"?"Net":"Gain"}
+            titleAttr={tab==="elev"?"Net elevation at cursor; subline shows cumulative gain":"Total elevation gain"}
             value={(() => {
               if (tab !== 'elev') return gainPillText;
-              const gain = gainNow_m;
-              const loss = (cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0);
-              const net = gain - loss; // positive = up, negative = down
-              const netAbs = Math.abs(Math.round(useFeet ? net*3.28084/3.28084 : net));
+              const e0 = normalizedSamples[0]?.elev_m_sm ?? 0;
+              const eC = normalizedSamples[Math.min(idx, normalizedSamples.length-1)]?.elev_m_sm ?? e0;
+              const net = eC - e0; // meters
+              const feet = net * 3.28084;
               const sign = net > 0 ? '+' : (net < 0 ? '-' : '');
-              return useFeet ? `${sign}${netAbs} ft` : `${sign}${Math.round(netAbs)} m`;
+              const abs = Math.abs(Math.round(useFeet ? feet : net));
+              return useFeet ? `${sign}${abs} ft` : `${sign}${Math.round(abs)} m`;
             })()}
             subValue={tab==="elev"?(() => {
-              const gain = gainNow_m;
-              return useFeet ? `(+${Math.round(gain*3.28084/3.28084)} ft)` : `(+${Math.round(gain)} m)`;
+              const gain = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
+              const feet = gain * 3.28084;
+              return useFeet ? `(+${Math.round(feet)} ft)` : `(+${Math.round(gain)} m)`;
             })():undefined}
             active={tab==="elev"}
           />
