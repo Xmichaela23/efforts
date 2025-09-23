@@ -23,7 +23,7 @@ type Split = {
   avgHr_bpm: number | null;
   gain_m: number; avgGrade: number | null;
 };
-type MetricTab = "pace" | "bpm" | "elev";
+type MetricTab = "pace" | "bpm" | "cad" | "pwr" | "elev";
 
 /** ---------- Small utils/formatters ---------- */
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -237,6 +237,19 @@ function medianFilter(arr: (number|null)[], w: number): (number|null)[] {
   return out;
 }
 
+// ---------- Sensor resampling helpers (map irregular sensor samples to chart grid) ----------
+function resampleToGrid(sensorTimes: number[], sensorValues: number[], targetTimes: number[]): number[] {
+  if (!sensorTimes.length || !targetTimes.length) return new Array(targetTimes.length).fill(NaN);
+  const out = new Array(targetTimes.length).fill(NaN);
+  let j = 0;
+  for (let i = 0; i < targetTimes.length; i++) {
+    const t = targetTimes[i];
+    while (j + 1 < sensorTimes.length && Math.abs(sensorTimes[j + 1] - t) <= Math.abs(sensorTimes[j] - t)) j++;
+    out[i] = sensorValues[j];
+  }
+  return out;
+}
+
 /** ---------- Splits ---------- */
 function buildSplit(samples: Sample[], s: number, e: number): Split {
   const S = samples[s], E = samples[e];
@@ -440,6 +453,21 @@ function EffortsViewerMapbox({
       // Apply winsorizing first, then enhanced smoothing
       const winsorized = winsorize(hr, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
+    }
+    // Cadence (derive from normalizedSamples or sensor_data)
+    if (tab === "cad") {
+      const cad = normalizedSamples.map((s:any) => {
+        const v = (s.cadence_spm ?? s.cadence_rpm ?? (s.hr_bpm != null ? NaN : NaN)) as any;
+        return Number.isFinite(v) ? Number(v) : NaN;
+      });
+      const wins = winsorize(cad, 5, 95);
+      return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? v : NaN));
+    }
+    // Power (if present)
+    if (tab === "pwr") {
+      const pwr = normalizedSamples.map((s:any) => Number.isFinite(s.power_w as any) ? Number(s.power_w) : NaN);
+      const wins = winsorize(pwr, 5, 99);
+      return smoothWithOutlierHandling(wins, 5, 2.0).map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
     }
     // Default fallback (shouldn't be reached)
     return [];
@@ -693,7 +721,7 @@ function EffortsViewerMapbox({
       {/* Metric buttons */}
       <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( ["pace", "bpm", "elev"] as MetricTab[]).map((t) => (
+          {( ["pace", "bpm", "cad", "pwr", "elev"] as MetricTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
