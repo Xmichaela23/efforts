@@ -23,7 +23,7 @@ type Split = {
   avgHr_bpm: number | null;
   gain_m: number; avgGrade: number | null;
 };
-type MetricTab = "pace" | "bpm" | "vam" | "elev";
+type MetricTab = "pace" | "bpm" | "elev";
 
 /** ---------- Small utils/formatters ---------- */
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
@@ -56,6 +56,105 @@ const fmtPct = (x: number | null) => (x == null || !Number.isFinite(x) ? "—" :
 const fmtVAM = (mPerH: number | null, useFeet = true) => (mPerH == null || !Number.isFinite(mPerH) ? "—" : useFeet ? `${Math.round(mPerH * 3.28084)} ft/h` : `${Math.round(mPerH)} m/h`);
 
 /** ---------- Geometry helpers removed (handled in MapEffort) ---------- */
+/** ---------- Downsampling helpers (chart + map) ---------- */
+// Evenly sample indices to a maximum count, preserving provided mustKeep indices
+function evenSampleIndices(length: number, maxPoints: number, mustKeep: Set<number> = new Set<number>()) {
+  if (length <= maxPoints) return Array.from(new Set([0, length - 1, ...Array.from(mustKeep)])).sort((a, b) => a - b);
+  const base: number[] = [];
+  const step = (length - 1) / (maxPoints - 1);
+  for (let i = 0; i < maxPoints; i++) base.push(Math.round(i * step));
+  const merged = new Set<number>([...base, ...mustKeep]);
+  const arr = Array.from(merged).sort((a, b) => a - b);
+  // If merged exceeds maxPoints, thin uniformly
+  if (arr.length > maxPoints) {
+    const s = arr.length / maxPoints;
+    const out: number[] = [];
+    for (let i = 0; i < maxPoints; i++) out.push(arr[Math.min(arr.length - 1, Math.round(i * s))]);
+    return Array.from(new Set(out)).sort((a, b) => a - b);
+  }
+  return arr;
+}
+
+// Simple distance-based downsampling for chart series using cumulative distance
+function downsampleSeriesByDistance(distance_m: number[], targetMax: number, splitMeters: number) {
+  const n = distance_m.length;
+  if (n <= targetMax) return Array.from({ length: n }, (_, i) => i);
+  const keep = new Set<number>();
+  keep.add(0); keep.add(n - 1);
+  if (splitMeters > 0) {
+    let nextMark = splitMeters;
+    for (let i = 1; i < n - 1; i++) {
+      const d = distance_m[i] ?? 0;
+      if (d >= nextMark - 1 && d <= nextMark + 1) { // within ~1m of split
+        keep.add(i);
+        nextMark += splitMeters;
+      } else if (d > nextMark + splitMeters) {
+        // If we skipped a mark due to sparse points, approximate nearest
+        keep.add(i);
+        nextMark = Math.ceil(d / splitMeters) * splitMeters;
+      }
+    }
+  }
+  return evenSampleIndices(n, targetMax, keep);
+}
+
+// Map polyline downsampling using Douglas–Peucker in meters (approx Web Mercator)
+type XY = { x: number; y: number };
+function toXY(points: [number, number][]): XY[] {
+  if (!points.length) return [];
+  const lat0 = points[0][1] * Math.PI / 180;
+  const mPerDegX = 111320 * Math.cos(lat0);
+  const mPerDegY = 110540;
+  const x0 = points[0][0] * mPerDegX;
+  const y0 = points[0][1] * mPerDegY;
+  return points.map(([lng, lat]) => ({ x: lng * mPerDegX - x0, y: lat * mPerDegY - y0 }));
+}
+function pointSegDist(p: XY, a: XY, b: XY): number {
+  const vx = b.x - a.x, vy = b.y - a.y;
+  const wx = p.x - a.x, wy = p.y - a.y;
+  const c1 = vx * wx + vy * wy;
+  if (c1 <= 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const c2 = vx * vx + vy * vy;
+  if (c2 <= 0) return Math.hypot(p.x - a.x, p.y - a.y);
+  const t = Math.min(1, Math.max(0, c1 / c2));
+  const proj = { x: a.x + t * vx, y: a.y + t * vy };
+  return Math.hypot(p.x - proj.x, p.y - proj.y);
+}
+function douglasPeuckerIndicesXY(pts: XY[], eps: number): number[] {
+  const n = pts.length;
+  if (n <= 2) return [0, n - 1];
+  const stack: Array<{ s: number; e: number }> = [{ s: 0, e: n - 1 }];
+  const keep = new Uint8Array(n); keep[0] = 1; keep[n - 1] = 1;
+  while (stack.length) {
+    const { s, e } = stack.pop() as { s: number; e: number };
+    const a = pts[s], b = pts[e];
+    let idx = -1, maxD = 0;
+    for (let i = s + 1; i < e; i++) {
+      const d = pointSegDist(pts[i], a, b);
+      if (d > maxD) { maxD = d; idx = i; }
+    }
+    if (idx !== -1 && maxD > eps) {
+      keep[idx] = 1;
+      stack.push({ s, e: idx });
+      stack.push({ s: idx, e });
+    }
+  }
+  const out: number[] = [];
+  for (let i = 0; i < n; i++) if (keep[i]) out.push(i);
+  return out;
+}
+function downsampleTrackLngLat(points: [number, number][], epsilonMeters = 7, maxPoints = 2000) {
+  const n = points.length;
+  if (n <= maxPoints) return points;
+  const xy = toXY(points);
+  const keepIdx = douglasPeuckerIndicesXY(xy, epsilonMeters);
+  let reduced = keepIdx.map(i => points[i]);
+  if (reduced.length > maxPoints) {
+    const idxs = evenSampleIndices(reduced.length, maxPoints);
+    reduced = idxs.map(i => reduced[i]);
+  }
+  return reduced;
+}
 
 /** ---------- Basic smoothing & robust domain helpers ---------- */
 const movAvg = (arr: number[], w = 5) => {
@@ -220,12 +319,16 @@ function EffortsViewerMapbox({
     const pace_s_per_km: (number|null)[] = Array.isArray(s.pace_s_per_km) ? s.pace_s_per_km : [];
     const hr_bpm: (number|null)[] = Array.isArray(s.hr_bpm) ? s.hr_bpm : [];
     const len = Math.min(distance_m.length, time_s.length || distance_m.length);
+    // Downsample indices to ~2000 pts while preserving 1 km/1 mi split boundaries
+    const splitMeters = useMiles ? 1609.34 : 1000;
+    const idxs = downsampleSeriesByDistance(distance_m, 2000, splitMeters);
     const out: Sample[] = [];
     let ema: number | null = null, lastE: number | null = null, lastD: number | null = null, lastT: number | null = null;
     const a = 0.2; // elevation EMA factor
     // pace EMA (server-only)
     let paceEma: number | null = null; const ap = 0.25;
-    for (let i=0;i<len;i++){
+    for (let k=0;k<idxs.length;k++){
+      const i = idxs[k];
       const t = Number(time_s?.[i] ?? i) || 0;
       const d = Number(distance_m?.[i] ?? 0) || 0;
       const e = typeof elevation_m?.[i] === 'number' ? Number(elevation_m[i]) : null;
@@ -254,9 +357,10 @@ function EffortsViewerMapbox({
       lastE = es; lastD = d; lastT = t;
     }
     return out;
-  }, [samples]);
+  }, [samples, useMiles]);
 
   const [tab, setTab] = useState<MetricTab>("pace");
+  const [showVam, setShowVam] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
   const [theme, setTheme] = useState<'streets' | 'hybrid'>(() => {
@@ -337,49 +441,8 @@ function EffortsViewerMapbox({
       const winsorized = winsorize(hr, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
-    // VAM: compute over window, moving-only, stabilized
-    // prerequisites
-    const n = normalizedSamples.length;
-    const elev = normalizedSamples.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
-    const dist = distCalc.distMono; // monotonic distance
-    const time = normalizedSamples.map(s => Number.isFinite(s.t_s as any) ? (s.t_s as number) : NaN);
-    const windowSec = 7; // 7-11s works well
-    const out = new Array(n).fill(NaN) as number[];
-    for (let i = 0; i < n; i++) {
-      const t1 = time[i]; if (!Number.isFinite(t1)) continue;
-      // find j where time[j] ~ t1 - windowSec
-      let j = i;
-      while (j > 0 && Number.isFinite(time[j - 1]) && (t1 - (time[j - 1] as number)) < windowSec) j--;
-      const dt = (t1 - (time[j] ?? t1));
-      const dd = (dist[i] - (dist[j] ?? dist[i]));
-      const de = (elev[i] - (elev[j] ?? elev[i]));
-      const speed = dt > 0 ? dd / dt : 0; // m/s
-      if (!(dt >= 3 && dd >= 5 && speed >= 0.5)) continue; // moving-only
-      // stabilized grade, clamp +/-30%
-      const grade = clamp((dd > 0 ? de / dd : 0), -0.30, 0.30);
-      const vam_m_per_h = grade * speed * 3600; // m/h
-      out[i] = vam_m_per_h;
-    }
-    // median then MA with enhanced outlier handling
-    const med = medianFilter(out, 11) as (number|null)[];
-    const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
-    
-    // Apply winsorizing for VAM (symmetric domain)
-    const winsorized = winsorize(medNum, 5, 95);
-    const smooth = smoothWithOutlierHandling(winsorized, 7, 2.0);
-    
-    // Enhanced outlier clamping for VAM
-    for (let i = 0; i < smooth.length; i++) {
-      const v = smooth[i];
-      if (!Number.isFinite(v)) continue;
-      // More aggressive clamping for VAM outliers
-      if (Math.abs(v as number) > 10000) { // >10,000 ft/h → null
-        smooth[i] = NaN;
-      } else if (Math.abs(v as number) > 3000) { // >3000 m/h clamp to reasonable max
-        smooth[i] = v > 0 ? 3000 : -3000;
-      }
-    }
-    return smooth;
+    // Default fallback (shouldn't be reached)
+    return [];
   }, [normalizedSamples, tab, distCalc]);
 
   // Enhanced domain calculation with robust percentiles and outlier handling
@@ -391,17 +454,8 @@ function EffortsViewerMapbox({
     const winsorized = winsorize(vals, 2, 98); // Use 2nd-98th percentiles for domain
     
     let lo: number, hi: number;
-    // VAM: symmetric domain using abs-percentile
-    if (tab === "vam") {
-      const abs = winsorized.map(v => Math.abs(v));
-      const P = pct(abs, 90); // P90 abs
-      const floor = 450; // m/h minimum span (~1500 ft/h)
-      const span = Math.max(P, floor);
-      lo = -span; hi = span;
-    } else {
-      // Use more robust percentiles for better space usage
-      lo = pct(winsorized, 2); hi = pct(winsorized, 98);
-    }
+    // Use robust percentiles for better space usage
+    lo = pct(winsorized, 2); hi = pct(winsorized, 98);
     
     // Ensure minimum span
     if (lo === hi) { 
@@ -557,11 +611,10 @@ function EffortsViewerMapbox({
       <MapEffort
         trackLngLat={useMemo(() => {
           try {
-            // Deep-stable memo: only change if content changes
-            const key = JSON.stringify(trackLngLat);
-            return (JSON.parse(key) as [number, number][]);
+            const raw = Array.isArray(trackLngLat) ? trackLngLat : [];
+            return downsampleTrackLngLat(raw, 7, 2000);
           } catch { return Array.isArray(trackLngLat) ? trackLngLat : []; }
-        }, [JSON.stringify(trackLngLat)]) as any}
+        }, [trackLngLat]) as any}
         cursorDist_m={distNow}
         totalDist_m={dTotal}
         theme={theme}
@@ -578,7 +631,7 @@ function EffortsViewerMapbox({
             active={tab==="pace"} 
           />
           <Pill label="HR"    value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"}   active={tab==="bpm"} />
-          <Pill label="VAM"   value={fmtVAM(s?.vam_m_per_h ?? null, useFeet)}   active={tab==="vam"} />
+          {/* VAM removed from main pills */}
           <Pill label="Gain"  value={fmtAlt(gainNow_m, useFeet)}  active={tab==="elev"} />
           <Pill label="Grade" value={fmtPct(s?.grade ?? null)} />
         </div>
@@ -621,7 +674,7 @@ function EffortsViewerMapbox({
             <g key={i}>
               <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
               <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
-                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles)) : tab === "bpm" ? `${Math.round(v)}` : fmtVAM(v, useFeet)}
+                {tab === "elev" ? fmtAlt(v, useFeet) : tab === "pace" ? (workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles)) : `${Math.round(v)}`}
               </text>
             </g>
           ))}
@@ -640,7 +693,7 @@ function EffortsViewerMapbox({
       {/* Metric buttons */}
       <div style={{ marginTop: 8, padding: "0 6px" }}>
         <div style={{ display: "flex", gap: 16, fontWeight: 700 }}>
-          {( ["pace", "bpm", "vam", "elev"] as MetricTab[]).map((t) => (
+          {( ["pace", "bpm", "elev"] as MetricTab[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -652,8 +705,28 @@ function EffortsViewerMapbox({
               {t.toUpperCase()}
             </button>
           ))}
+          <button
+            onClick={() => setShowVam(v => !v)}
+            style={{ border: "none", background: "transparent", color: showVam ? "#0f172a" : "#64748b", cursor: "pointer",
+                     padding: "6px 2px", borderBottom: showVam ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5 }}
+            aria-pressed={showVam}
+          >
+            VAM
+          </button>
         </div>
       </div>
+
+      {/* Optional VAM chart (lazy) */}
+      {showVam && (
+        <VamChart
+          samples={normalizedSamples}
+          distMono={distCalc.distMono}
+          d0={distCalc.d0}
+          dN={distCalc.dN}
+          idx={idx}
+          useFeet={useFeet}
+        />
+      )}
 
       {/* Splits */}
       <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>
@@ -692,3 +765,116 @@ function EffortsViewerMapbox({
 /* duplicate marker cleanup */
 
 export default React.memo(EffortsViewerMapbox);
+
+/** ------------ Separate, toggleable VAM chart (lazy-computed) ------------ */
+function VamChart({
+  samples,
+  distMono,
+  d0,
+  dN,
+  idx,
+  useFeet,
+}: {
+  samples: any[];
+  distMono: number[];
+  d0: number;
+  dN: number;
+  idx: number;
+  useFeet: boolean;
+}) {
+  const W = 700, H = 200; const P = 20; const pl = 56; const pr = 8;
+  const xFromDist = (d: number) => {
+    const range = Math.max(1, dN - d0);
+    const ratio = (d - d0) / range;
+    return pl + ratio * (W - pl - pr);
+  };
+
+  // Compute VAM only when this chart is mounted
+  const vam: number[] = React.useMemo(() => {
+    const n = samples.length;
+    if (n < 2) return [];
+    const elev = samples.map((s:any) => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : NaN);
+    const time = samples.map((s:any) => Number.isFinite(s.t_s as any) ? (s.t_s as number) : NaN);
+    const out = new Array(n).fill(NaN) as number[];
+    const windowSec = 7;
+    for (let i = 0; i < n; i++) {
+      const t1 = time[i]; if (!Number.isFinite(t1)) continue;
+      let j = i; while (j > 0 && Number.isFinite(time[j - 1]) && (t1 - (time[j - 1] as number)) < windowSec) j--;
+      const dt = (t1 - (time[j] ?? t1));
+      const dd = (distMono[i] - (distMono[j] ?? distMono[i]));
+      const de = (elev[i] - (elev[j] ?? elev[i]));
+      const speed = dt > 0 ? dd / dt : 0;
+      if (!(dt >= 3 && dd >= 5 && speed >= 0.5)) continue;
+      const grade = clamp((dd > 0 ? de / dd : 0), -0.30, 0.30);
+      const vam_m_per_h = grade * speed * 3600;
+      out[i] = vam_m_per_h;
+    }
+    const med = medianFilter(out, 11) as (number|null)[];
+    const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
+    const wins = winsorize(medNum, 5, 95);
+    const smooth = smoothWithOutlierHandling(wins, 7, 2.0);
+    for (let i = 0; i < smooth.length; i++) {
+      const v = smooth[i]; if (!Number.isFinite(v)) continue;
+      if (Math.abs(v as number) > 10000) smooth[i] = NaN; else if (Math.abs(v as number) > 3000) smooth[i] = v > 0 ? 3000 : -3000;
+    }
+    return smooth;
+  }, [samples, distMono, d0, dN]);
+
+  const yDomain = React.useMemo<[number, number]>(() => {
+    const vals = vam.filter((v) => Number.isFinite(v)) as number[];
+    if (!vals.length) return [-1, 1];
+    const abs = winsorize(vals.map(v => Math.abs(v)), 2, 98);
+    const P90 = pct(abs, 90);
+    const floor = 450; // m/h minimum span
+    const span = Math.max(P90, floor);
+    return [-span, span];
+  }, [vam]);
+
+  const yFromValue = (v: number) => {
+    const [a, b] = yDomain; const t = (v - a) / (b - a || 1);
+    return H - P - t * (H - P * 2);
+  };
+
+  const linePath = React.useMemo(() => {
+    const n = vam.length; if (n < 2) return "";
+    let d = `M ${xFromDist(distMono[0] ?? d0)} ${yFromValue(Number.isFinite(vam[0]) ? (vam[0] as number) : 0)}`;
+    for (let i = 1; i < n; i++) {
+      d += ` L ${xFromDist(distMono[i] ?? d0)} ${yFromValue(Number.isFinite(vam[i]) ? (vam[i] as number) : 0)}`;
+    }
+    return d;
+  }, [vam, distMono, d0, dN, yDomain]);
+
+  const yTicks = React.useMemo(() => {
+    const [a, b] = yDomain; const step = (b - a) / 4;
+    return new Array(5).fill(0).map((_, i) => a + i * step);
+  }, [yDomain]);
+
+  const cx = xFromDist(distMono[idx] ?? d0);
+  const cy = yFromValue(Number.isFinite(vam[Math.min(idx, vam.length - 1)]) ? (vam[Math.min(idx, vam.length - 1)] as number) : 0);
+
+  return (
+    <div style={{ marginTop: 12 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: '0 6px 6px 6px' }}>
+        <div style={{ fontWeight: 700, color: '#0f172a' }}>VAM</div>
+        <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600 }}>{fmtVAM(Number.isFinite(vam[idx] as any) ? (vam[idx] as number) : null, useFeet)}</div>
+      </div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} style={{ display: 'block', borderRadius: 12, background: '#fff', border: '1px solid #eef2f7' }}>
+        {[0, 1, 2, 3, 4].map((i) => {
+          const x = pl + i * ((W - pl - pr) / 4);
+          return <line key={i} x1={x} x2={x} y1={P} y2={H - P} stroke="#eef2f7" strokeDasharray="4 4" />;
+        })}
+        {yTicks.map((v, i) => (
+          <g key={i}>
+            <line x1={pl} x2={W - pr} y1={yFromValue(v)} y2={yFromValue(v)} stroke="#f3f6fb" />
+            <text x={pl - 8} y={yFromValue(v) - 4} fill="#94a3b8" fontSize={16} fontWeight={700} textAnchor="end">
+              {fmtVAM(v, useFeet)}
+            </text>
+          </g>
+        ))}
+        <path d={linePath} fill="none" stroke="#94a3b8" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+        <line x1={cx} x2={cx} y1={P} y2={H - P} stroke="#0ea5e9" strokeWidth={1.5} />
+        <circle cx={cx} cy={cy} r={5} fill="#0ea5e9" stroke="#fff" strokeWidth={2} />
+      </svg>
+    </div>
+  );
+}
