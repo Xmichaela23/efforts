@@ -372,6 +372,25 @@ function EffortsViewerMapbox({
       });
       lastE = es; lastD = d; lastT = t;
     }
+    // Compute robust, rolling-window grade and smooth it further to avoid jumpiness
+    try {
+      const n = out.length; if (n >= 3) {
+        const elev = out.map(s => Number.isFinite(s.elev_m_sm as any) ? (s.elev_m_sm as number) : 0);
+        const dist = out.map(s => Number.isFinite(s.d_m as any) ? (s.d_m as number) : 0);
+        const windowPts = 5; // ~10-pt span
+        const rawGrade: number[] = new Array(n).fill(0);
+        for (let i = 0; i < n; i++) {
+          const j = Math.max(0, i - windowPts);
+          const k2 = Math.min(n - 1, i + windowPts);
+          const dd = Math.max(5, (dist[k2] - dist[j])); // ensure minimum distance to stabilize
+          const dh = (elev[k2] - elev[j]);
+          rawGrade[i] = clamp(dh / dd, -0.30, 0.30);
+        }
+        const wins = winsorize(rawGrade, 2, 98);
+        const sm = smoothWithOutlierHandling(wins, 7, 2.5);
+        for (let i = 0; i < n; i++) out[i].grade = clamp(Number.isFinite(sm[i]) ? sm[i] : rawGrade[i], -0.30, 0.30);
+      }
+    } catch {}
     return out;
   }, [samples, useMiles]);
 
@@ -414,6 +433,11 @@ function EffortsViewerMapbox({
   // Map rendering moved to MapEffort component (use dN for total)
   const dTotal = distCalc.dN;
   const distNow = distCalc.distMono[idx] ?? distCalc.d0;
+  const atEnd = useMemo(() => {
+    const nearEndByIdx = idx >= (normalizedSamples.length - 2);
+    const nearEndByDist = Math.abs((dTotal ?? 0) - (distNow ?? 0)) <= 25; // within 25 m of finish
+    return nearEndByIdx || nearEndByDist;
+  }, [idx, normalizedSamples.length, dTotal, distNow]);
 
   /** ----- Chart prep ----- */
   const W = 700, H = 260;           // overall SVG size (in SVG units)
@@ -816,8 +840,8 @@ function EffortsViewerMapbox({
           </div>
           <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>
             {(() => {
-              const gainNow = sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0;
-              const lossNow = sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0;
+              const gainNow = atEnd ? (Number.isFinite(totalGain_m) ? totalGain_m : (sigGain_m[sigGain_m.length - 1] ?? 0)) : (sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0);
+              const lossNow = atEnd ? (Number.isFinite(totalLoss_m) ? totalLoss_m : (sigLoss_m[sigLoss_m.length - 1] ?? 0)) : (sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0);
               if (useFeet) {
                 const gft = Math.round(gainNow * 3.28084);
                 const lft = Math.round(lossNow * 3.28084);
