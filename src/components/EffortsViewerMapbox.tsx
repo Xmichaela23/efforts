@@ -360,7 +360,7 @@ function EffortsViewerMapbox({
   }, [samples, useMiles]);
 
   const [tab, setTab] = useState<MetricTab>("pace");
-  const [showVam, setShowVam] = useState(true);
+  const [showVam, setShowVam] = useState(false);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
   const [theme, setTheme] = useState<'streets' | 'hybrid'>(() => {
@@ -707,10 +707,9 @@ function EffortsViewerMapbox({
           ))}
         </div>
 
-  {/* Standalone VAM section (toggle below main chart) */}
+  {/* Standalone VAM section at the bottom (default OFF, no frame) */}
   <div style={{ marginTop: 12, padding: "0 6px" }}>
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-      <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 16 }}>VAM</div>
+    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 6 }}>
       <button
         onClick={() => setShowVam(v => !v)}
         style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 10px', background: '#fff', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
