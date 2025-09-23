@@ -2103,7 +2103,7 @@ const formatMovingTime = () => {
              </div>
            </div>
         </>
-        ) : null;
+        ) : null
       })()}
      </div>
 
