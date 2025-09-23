@@ -705,28 +705,32 @@ function EffortsViewerMapbox({
               {t.toUpperCase()}
             </button>
           ))}
-          <button
-            onClick={() => setShowVam(v => !v)}
-            style={{ border: "none", background: "transparent", color: showVam ? "#0f172a" : "#64748b", cursor: "pointer",
-                     padding: "6px 2px", borderBottom: showVam ? "2px solid #0ea5e9" : "2px solid transparent", letterSpacing: 0.5 }}
-            aria-pressed={showVam}
-          >
-            VAM
-          </button>
         </div>
-      </div>
 
-      {/* Optional VAM chart (lazy) */}
-      {showVam && (
-        <VamChart
-          samples={normalizedSamples}
-          distMono={distCalc.distMono}
-          d0={distCalc.d0}
-          dN={distCalc.dN}
-          idx={idx}
-          useFeet={useFeet}
-        />
-      )}
+  {/* Standalone VAM section (toggle below main chart) */}
+  <div style={{ marginTop: 12, padding: "0 6px" }}>
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+      <div style={{ fontWeight: 700, color: "#0f172a" }}>VAM</div>
+      <button
+        onClick={() => setShowVam(v => !v)}
+        style={{ border: 'none', background: 'transparent', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
+        aria-pressed={showVam}
+      >
+        {showVam ? 'Hide' : 'Show'}
+      </button>
+    </div>
+    {showVam && (
+      <VamChart
+        samples={normalizedSamples}
+        distMono={distCalc.distMono}
+        d0={distCalc.d0}
+        dN={distCalc.dN}
+        idx={idx}
+        useFeet={useFeet}
+      />
+    )}
+  </div>
+      </div>
 
       {/* Splits */}
       <div style={{ marginTop: 14, borderTop: "1px solid #e2e8f0", paddingTop: 10 }}>

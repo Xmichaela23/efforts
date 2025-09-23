@@ -2237,6 +2237,7 @@ const formatMovingTime = () => {
           </div>
         );
       })()}
+
       {(hydrated||workoutData)?.computed?.analysis?.events?.splits && (
         <div className="mx-[-16px] px-3 py-2">
           {!useImperial && Array.isArray((hydrated||workoutData).computed.analysis.events.splits.km) && (hydrated||workoutData).computed.analysis.events.splits.km.length > 0 && (
