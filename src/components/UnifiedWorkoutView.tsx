@@ -115,6 +115,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           const { data } = await supabase.from('planned_workouts').select('*').eq('id', (linkedPlanned as any).id).single();
           setLinkedPlanned(data || null);
           try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+          // Recompute server summary now that steps are materialized
+          try {
+            if (isCompleted && (workout as any)?.id) {
+              await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any).id) } });
+              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+            }
+          } catch {}
         } catch {}
       } catch {}
     };

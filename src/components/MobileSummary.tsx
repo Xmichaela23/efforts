@@ -356,18 +356,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
   const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
-  // Order for display: Warm‑up first, Cool‑down last, others keep authored order
-  const steps: any[] = (() => {
-    const withIdx = plannedStepsBase.map((st, i) => ({ st, i }));
-    const weight = (st:any) => {
-      const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
-      if (/cool|cd/.test(k)) return 2;
-      if (/warm|wu/.test(k)) return 0;
-      return 1;
-    };
-    withIdx.sort((a,b)=> (weight(a.st) - weight(b.st)) || (a.i - b.i));
-    return withIdx.map(x=>x.st);
-  })();
+  // Preserve authored order; no warmup/cooldown reordering to save space
+  const steps: any[] = plannedStepsBase;
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
@@ -392,13 +382,6 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       const isWarm = /warm|wu/.test(kindStr);
       const isCool = /cool|cd/.test(kindStr);
       const isRest = /rest|recover|recovery|jog/.test(kindStr);
-      if (isWarm) return 'Warm‑up';
-      if (isCool) return 'Cool‑down';
-      if (isRest) {
-        if (type === 'swim') return 'Rest';
-        if (type === 'ride' || type === 'bike' || type === 'cycling') return 'Easy';
-        return 'Jog';
-      }
       // Rides: prefer power targets if present
       if (isRideSport) {
         const pr = (st as any)?.power_range;
