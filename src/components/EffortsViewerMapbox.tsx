@@ -436,6 +436,31 @@ function EffortsViewerMapbox({
     return { cumGain_m: g, cumLoss_m: l };
   }, [normalizedSamples]);
 
+  // Direction-aware, thresholded cumulative gain/loss (ignore tiny bumps/noise)
+  // Counts only significant elevation changes: at least ~1.5 m (≈5 ft) over ≥ 20 m
+  const { sigGain_m, sigLoss_m } = useMemo(() => {
+    if (!normalizedSamples.length) return { sigGain_m: [0], sigLoss_m: [0] };
+    const MIN_ELEV_M = 1.5;   // ~5 ft
+    const MIN_DIST_M = 20;    // segment distance threshold
+    const gain: number[] = [0];
+    const loss: number[] = [0];
+    let cumG = 0, cumL = 0;
+    let anchorE = (normalizedSamples[0].elev_m_sm ?? 0) as number;
+    let anchorD = (normalizedSamples[0].d_m ?? 0) as number;
+    for (let i = 1; i < normalizedSamples.length; i++) {
+      const e = (normalizedSamples[i].elev_m_sm ?? anchorE) as number;
+      const d = (normalizedSamples[i].d_m ?? anchorD) as number;
+      const dh = e - anchorE;
+      const dd = d - anchorD;
+      if (dd >= MIN_DIST_M && Math.abs(dh) >= MIN_ELEV_M) {
+        if (dh > 0) cumG += dh; else cumL += -dh;
+        anchorE = e; anchorD = d;
+      }
+      gain[i] = cumG; loss[i] = cumL;
+    }
+    return { sigGain_m: gain, sigLoss_m: loss };
+  }, [normalizedSamples]);
+
   // Prefer provider-reported total elevation gain when present, else fallback to series-derived
   const totalGain_m = useMemo(() => {
     const provider = Number.isFinite(workoutData?.elevation_gain)
@@ -791,8 +816,8 @@ function EffortsViewerMapbox({
           </div>
           <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 500, whiteSpace: "nowrap" }}>
             {(() => {
-              const gainNow = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
-              const lossNow = cumLoss_m[Math.min(idx, cumLoss_m.length - 1)] ?? 0;
+              const gainNow = sigGain_m[Math.min(idx, sigGain_m.length - 1)] ?? 0;
+              const lossNow = sigLoss_m[Math.min(idx, sigLoss_m.length - 1)] ?? 0;
               if (useFeet) {
                 const gft = Math.round(gainNow * 3.28084);
                 const lft = Math.round(lossNow * 3.28084);
