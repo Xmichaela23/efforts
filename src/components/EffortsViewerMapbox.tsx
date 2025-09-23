@@ -624,11 +624,25 @@ function EffortsViewerMapbox({
       if (tab === "pace") {
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
       if (isOutdoorGlobal) {
-        // Outdoor GPS: median(5) -> nanAwareMovAvg(11) -> winsorize(10,90)
+        // Outdoor GPS: strong smoothing for pace
+        // median(5) -> nanAwareMA(21) -> nanAwareMA(21) -> winsorize(5,95) -> final EMA (alpha 0.2)
         const med = medianFilter(raw as any, 5) as (number|null)[];
-        const ma = nanAwareMovAvg(med, 11);
-        const wins = winsorize(ma.map(v => (Number.isFinite(v) ? v : NaN)), 10, 90);
-        return wins.map(v => (Number.isFinite(v) ? v : NaN));
+        const ma1 = nanAwareMovAvg(med, 21);
+        const ma2 = nanAwareMovAvg(ma1 as any, 21);
+        const wins = winsorize(ma2.map(v => (Number.isFinite(v) ? v : NaN)), 5, 95);
+        // Final low-pass EMA
+        const out: number[] = new Array(wins.length).fill(NaN);
+        let ema: number | null = null; const alpha = 0.2;
+        for (let i = 0; i < wins.length; i++) {
+          const v = Number.isFinite(wins[i]) ? (wins[i] as number) : NaN;
+          if (Number.isFinite(v)) {
+            ema = ema == null ? (v as number) : (alpha * (v as number) + (1 - alpha) * (ema as number));
+            out[i] = ema as number;
+          } else {
+            out[i] = (ema as any);
+          }
+        }
+        return out.map(v => (Number.isFinite(v) ? v : NaN));
       }
       // Indoor: keep existing gentle smoothing
       const winsorized = winsorize(raw, 5, 95);
@@ -674,13 +688,25 @@ function EffortsViewerMapbox({
     const vals = metricRaw.filter((v) => Number.isFinite(v)) as number[];
     if (!vals.length) return [0, 1];
     
-    // Outdoor: use 10th-90th to avoid tails; Indoor keep tighter
-    const winsorized = isOutdoorGlobal ? winsorize(vals, 10, 90) : winsorize(vals, 2, 98);
+    // Outdoor: prefer wider coverage for pace to avoid clipping; otherwise robust winsorize
+    const usePaceWide = (tab === 'pace');
+    const winsorized = isOutdoorGlobal
+      ? (usePaceWide ? winsorize(vals, 5, 95) : winsorize(vals, 10, 90))
+      : winsorize(vals, 2, 98);
     
     let lo: number, hi: number;
-    // Use robust percentiles for better space usage
-    lo = pct(winsorized, 2); hi = pct(winsorized, 98);
-    if (isOutdoorGlobal) { lo = pct(winsorized, 10); hi = pct(winsorized, 90); }
+    // Use robust percentiles, but ensure full data range is visible (no clipping)
+    if (tab === 'pace') {
+      const pLo = isOutdoorGlobal ? 5 : 2;
+      const pHi = isOutdoorGlobal ? 95 : 98;
+      const pLowVal = pct(winsorized, pLo);
+      const pHighVal = pct(winsorized, pHi);
+      lo = Math.min(Math.min(...vals), pLowVal);
+      hi = Math.max(Math.max(...vals), pHighVal);
+    } else {
+      lo = pct(winsorized, isOutdoorGlobal ? 10 : 2);
+      hi = pct(winsorized, isOutdoorGlobal ? 90 : 98);
+    }
     // Specific ranges for cadence/power to avoid super-narrow domains
     if (tab === 'cad') {
       const minC = Math.min(...winsorized);
@@ -719,8 +745,9 @@ function EffortsViewerMapbox({
       hi = Math.ceil(hi / 5) * 5; 
     }
     
-    // Minimal padding
-    const pad = Math.max((hi - lo) * (isOutdoorGlobal ? 0.03 : 0.02), 1);
+    // Minimal padding (wider for pace to avoid hitting edges)
+    const padFrac = (tab === 'pace') ? (isOutdoorGlobal ? 0.10 : 0.06) : (isOutdoorGlobal ? 0.03 : 0.02);
+    const pad = Math.max((hi - lo) * padFrac, 1);
     return [lo - pad, hi + pad];
   }, [metricRaw, tab, isOutdoorGlobal, useFeet, workoutData]);
 
