@@ -12,7 +12,10 @@ export function resolvePlannedDurationMinutes(workout: any): number | null {
 
     // 1) computed total
     try {
-      const ts = Number((workout as any)?.computed?.total_duration_seconds);
+      const comp: any = (workout as any)?.computed || {};
+      const tsA = Number(comp?.total_duration_seconds);
+      const tsB = Number(comp?.total_seconds);
+      const ts = Number.isFinite(tsA) && tsA > 0 ? tsA : (Number.isFinite(tsB) && tsB > 0 ? tsB : NaN);
       if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
     } catch {}
 
