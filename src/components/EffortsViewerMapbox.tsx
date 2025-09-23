@@ -172,6 +172,23 @@ const movAvg = (arr: number[], w = 5) => {
   return out;
 };
 
+// NaN-aware moving average: averages only valid values in the window; returns NaN if none valid
+function nanAwareMovAvg(arr: (number|null|undefined)[], w = 5): number[] {
+  if (arr.length === 0 || w <= 1) return arr.map(v => (Number.isFinite(v as any) ? Number(v) : NaN));
+  const half = Math.floor(w / 2);
+  const out: number[] = new Array(arr.length).fill(NaN);
+  for (let i = 0; i < arr.length; i++) {
+    let s = 0, n = 0;
+    for (let k = -half; k <= half; k++) {
+      const j = i + k;
+      const v = arr[j];
+      if (j >= 0 && j < arr.length && Number.isFinite(v as any)) { s += Number(v); n++; }
+    }
+    out[i] = n ? s / n : NaN;
+  }
+  return out;
+}
+
 // Enhanced smoothing with outlier detection and clamping
 const smoothWithOutlierHandling = (arr: number[], windowSize = 7, outlierThreshold = 3) => {
   if (arr.length === 0) return arr.slice();
@@ -588,7 +605,11 @@ function EffortsViewerMapbox({
   }, [pwrSeriesRaw, targetTimes]);
 
   // Outdoor detection (global)
-  const isOutdoorGlobal = useMemo(() => Array.isArray(trackLngLat) && trackLngLat.length >= 20, [trackLngLat]);
+  const isOutdoorGlobal = useMemo(() => {
+    const hasGpsTrack = Array.isArray(trackLngLat) && trackLngLat.length > 0;
+    const hasGpsInWorkout = Array.isArray(workoutData?.gps_track) && workoutData.gps_track.length > 0;
+    return !!(hasGpsTrack || hasGpsInWorkout);
+  }, [trackLngLat, workoutData]);
 
   // Which raw metric array are we plotting?
   const metricRaw: number[] = useMemo(() => {
@@ -600,23 +621,17 @@ function EffortsViewerMapbox({
       return elev;
     }
     // Pace - enhanced smoothing with outlier handling
-    if (tab === "pace") {
-      const pace = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
+      if (tab === "pace") {
+      const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
       if (isOutdoorGlobal) {
-        // Outdoor GPS: median to kill spikes, then moderate moving average
-        const med = medianFilter(pace as any, 5) as (number|null)[];
-        const medNum = med.map(v => (Number.isFinite(v as any) ? (v as number) : NaN));
-        const ma = movAvg(medNum.filter(Number.isFinite) as number[], 9);
-        // Reproject onto original length with NaN for invalids
-        const out: number[] = new Array(pace.length).fill(NaN);
-        // Simple mapping since movAvg preserves length when used directly
-        const maFull = movAvg(medNum.map(v => (Number.isFinite(v) ? (v as number) : 0)), 9);
-        for (let i = 0; i < out.length; i++) out[i] = Number.isFinite(maFull[i]) ? maFull[i] : NaN;
-        const wins = winsorize(out.map(v => (Number.isFinite(v) ? v : NaN)), 5, 95);
+        // Outdoor GPS: median(5) -> nanAwareMovAvg(11) -> winsorize(10,90)
+        const med = medianFilter(raw as any, 5) as (number|null)[];
+        const ma = nanAwareMovAvg(med, 11);
+        const wins = winsorize(ma.map(v => (Number.isFinite(v) ? v : NaN)), 10, 90);
         return wins.map(v => (Number.isFinite(v) ? v : NaN));
       }
       // Indoor: keep existing gentle smoothing
-      const winsorized = winsorize(pace, 5, 95);
+      const winsorized = winsorize(raw, 5, 95);
       return smoothWithOutlierHandling(winsorized, 7, 2.5).map(v => (Number.isFinite(v) ? v : NaN));
     }
     // Heart rate - enhanced smoothing with outlier handling
@@ -630,9 +645,9 @@ function EffortsViewerMapbox({
     if (tab === "cad") {
       const cad = cadSeries && cadSeries.length ? cadSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
       if (isOutdoorGlobal) {
-        // Light smoothing for cadence outdoor
-        const ma = movAvg(cad.filter(Number.isFinite) as number[], 5);
-        const maFull = movAvg(cad.map(v => (Number.isFinite(v) ? Number(v) : 0)), 5);
+        // Remove impossible cadence outliers (< 40 or > 220) and smooth lightly
+        const clamped = cad.map(v => (Number.isFinite(v) && v >= 40 && v <= 220 ? v : NaN));
+        const maFull = nanAwareMovAvg(clamped, 5);
         return maFull.map(v => (Number.isFinite(v) ? v : NaN));
       }
       const wins = winsorize(cad as number[], 5, 95);
@@ -642,8 +657,9 @@ function EffortsViewerMapbox({
     if (tab === "pwr") {
       const pwr = pwrSeries && pwrSeries.length ? pwrSeries.map(v => (Number.isFinite(v as any) ? Number(v) : NaN)) : new Array(normalizedSamples.length).fill(NaN);
       if (isOutdoorGlobal) {
-        // Keep power mostly raw; very light smoothing only
-        const ma = movAvg(pwr.map(v => (Number.isFinite(v) ? Number(v) : 0)), 3);
+        // Light smoothing; remove zeros and impossible spikes (< 50 or > 2000)
+        const cleaned = pwr.map(v => (Number.isFinite(v) && v >= 50 && v <= 2000 ? v : NaN));
+        const ma = nanAwareMovAvg(cleaned, 5);
         return ma.map(v => (Number.isFinite(v) ? Math.max(0, v) : NaN));
       }
       const wins = winsorize(pwr as number[], 5, 99);
