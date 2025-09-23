@@ -436,12 +436,29 @@ function EffortsViewerMapbox({
     return { cumGain_m: g, cumLoss_m: l };
   }, [normalizedSamples]);
 
-  // Prefer provider-reported climbed (usually feet) to match session summary
-  const gainPillText = useMemo(() => {
-    // Show session total gain derived from the elevation series (no provider fallback)
-    const g = cumGain_m[cumGain_m.length - 1] ?? 0;
-    return fmtAlt(g, useFeet);
-  }, [cumGain_m, useFeet]);
+  // Prefer provider-reported total elevation gain when present, else fallback to series-derived
+  const totalGain_m = useMemo(() => {
+    const provider = Number.isFinite(workoutData?.elevation_gain)
+      ? Number(workoutData.elevation_gain)
+      : Number.isFinite(workoutData?.metrics?.elevation_gain)
+        ? Number(workoutData.metrics.elevation_gain)
+        : null;
+    const derived = cumGain_m[cumGain_m.length - 1] ?? 0;
+    return Number.isFinite(provider as any) ? (provider as number) : derived;
+  }, [workoutData, cumGain_m]);
+
+  const totalLoss_m = useMemo(() => {
+    const provider = Number.isFinite(workoutData?.elevation_loss)
+      ? Number(workoutData.elevation_loss)
+      : Number.isFinite(workoutData?.metrics?.elevation_loss)
+        ? Number(workoutData.metrics.elevation_loss)
+        : null;
+    const derived = cumLoss_m[cumLoss_m.length - 1] ?? 0;
+    return Number.isFinite(provider as any) ? (provider as number) : derived;
+  }, [workoutData, cumLoss_m]);
+
+  // Show total gain as the value on the Elevation pill when not on ELEV tab
+  const gainPillText = useMemo(() => fmtAlt(totalGain_m, useFeet), [totalGain_m, useFeet]);
 
   // Optional cadence/power series derived from sensor_data and resampled to chart times
   const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
@@ -738,22 +755,30 @@ function EffortsViewerMapbox({
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
           <Pill
-            label={tab==="elev"?"Net":"Gain"}
-            titleAttr={tab==="elev"?"Net elevation at cursor; subline shows total gain":"Total elevation gain"}
+            label={tab==="elev"?"Grade":"Gain"}
+            titleAttr={tab==="elev"?"Grade at cursor; subline shows total gain and loss":"Total elevation gain"}
             value={(() => {
               if (tab !== 'elev') return gainPillText;
-              const e0 = normalizedSamples[0]?.elev_m_sm ?? 0;
-              const eC = normalizedSamples[Math.min(idx, normalizedSamples.length-1)]?.elev_m_sm ?? e0;
-              const net = eC - e0; // meters
-              const feet = net * 3.28084;
-              const sign = net > 0 ? '+' : (net < 0 ? '-' : '');
-              const abs = Math.abs(Math.round(useFeet ? feet : net));
-              return useFeet ? `${sign}${abs} ft` : `${sign}${Math.round(abs)} m`;
+              const i = Math.min(idx, Math.max(0, normalizedSamples.length - 1));
+              const sNow = normalizedSamples[i];
+              let g = Number(sNow?.grade);
+              if (!Number.isFinite(g)) {
+                const prev = normalizedSamples[Math.max(0, i - 1)] || sNow;
+                const dd = Math.max(1, (sNow?.d_m ?? 0) - (prev?.d_m ?? (sNow?.d_m ?? 0)));
+                const dh = (sNow?.elev_m_sm ?? 0) - (prev?.elev_m_sm ?? (sNow?.elev_m_sm ?? 0));
+                g = dh / dd;
+              }
+              return fmtPct(g);
             })()}
             subValue={tab==="elev"?(() => {
-              const gain = cumGain_m[cumGain_m.length - 1] ?? 0;
-              const feet = gain * 3.28084;
-              return useFeet ? `(+${Math.round(feet)} ft)` : `(+${Math.round(gain)} m)`;
+              const gain = totalGain_m;
+              const loss = totalLoss_m;
+              if (useFeet) {
+                const gft = Math.round(gain * 3.28084);
+                const lft = Math.round(loss * 3.28084);
+                return `(+${gft} / -${lft} ft)`;
+              }
+              return `(+${Math.round(gain)} / -${Math.round(loss)} m)`;
             })():undefined}
             active={tab==="elev"}
           />
