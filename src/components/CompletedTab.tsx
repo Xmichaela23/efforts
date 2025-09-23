@@ -1640,21 +1640,26 @@ const formatMovingTime = () => {
              </div>
            </div>
 
-           {/* Duration */}
-           <div className="px-2 py-1">
-             <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {(() => {
-                if (workoutType === 'swim') {
-                  const s = getDurationSeconds();
-                  return s ? formatDuration(s) : 'N/A';
-                }
-                return formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
-              })()}
-             </div>
-             <div className="text-xs text-[#666666] font-normal">
-               <div className="font-medium">Duration</div>
-             </div>
-           </div>
+          {/* Duration */}
+          <div className="px-2 py-1">
+            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+             {(() => {
+               if (workoutType === 'swim') {
+                 // Duration (elapsed) must use explicit elapsed fields; do not use moving-time resolver
+                 const s = (workoutData as any)?.metrics?.total_elapsed_time
+                       ?? (workoutData as any)?.total_elapsed_time
+                       ?? (workoutData as any)?.elapsed_time
+                       ?? (workoutData as any)?.metrics?.elapsed_time
+                       ?? (typeof (workoutData as any)?.duration === 'number' ? (workoutData as any).duration * 60 : null);
+                 return Number.isFinite(Number(s)) && Number(s) > 0 ? formatDuration(Number(s)) : 'N/A';
+               }
+               return formatDuration((workoutData as any)?.total_elapsed_time ?? (workoutData as any)?.elapsed_time ?? workoutData.duration);
+             })()}
+            </div>
+            <div className="text-xs text-[#666666] font-normal">
+              <div className="font-medium">Duration</div>
+            </div>
+          </div>
            
            {/* Avg HR */}
            <div className="px-2 py-1">
