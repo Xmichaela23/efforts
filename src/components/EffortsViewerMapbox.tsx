@@ -625,14 +625,14 @@ function EffortsViewerMapbox({
       const raw = normalizedSamples.map(s => Number.isFinite(s.pace_s_per_km as any) ? (s.pace_s_per_km as number) : NaN);
       if (isOutdoorGlobal) {
         // Outdoor GPS: strong smoothing for pace
-        // median(5) -> nanAwareMA(21) -> nanAwareMA(21) -> winsorize(5,95) -> final EMA (alpha 0.2)
+        // median(5) -> nanAwareMA(17) -> nanAwareMA(17) -> winsorize(5,95) -> final EMA (alpha 0.25)
         const med = medianFilter(raw as any, 5) as (number|null)[];
-        const ma1 = nanAwareMovAvg(med, 21);
-        const ma2 = nanAwareMovAvg(ma1 as any, 21);
+        const ma1 = nanAwareMovAvg(med, 17);
+        const ma2 = nanAwareMovAvg(ma1 as any, 17);
         const wins = winsorize(ma2.map(v => (Number.isFinite(v) ? v : NaN)), 5, 95);
         // Final low-pass EMA
         const out: number[] = new Array(wins.length).fill(NaN);
-        let ema: number | null = null; const alpha = 0.2;
+        let ema: number | null = null; const alpha = 0.25;
         for (let i = 0; i < wins.length; i++) {
           const v = Number.isFinite(wins[i]) ? (wins[i] as number) : NaN;
           if (Number.isFinite(v)) {
@@ -909,7 +909,15 @@ function EffortsViewerMapbox({
         <div style={{ display: "flex", justifyContent: "space-between", gap: 4, marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
-            value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
+            value={(() => {
+              // Use the plotted, smoothed value for pace to match the chart
+              if (tab === 'pace') {
+                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? (metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                return workoutData?.type === 'ride' ? fmtSpeed(v, useMiles) : fmtPace(v, useMiles);
+              }
+              // Fallback when not on pace tab
+              return workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles);
+            })()}  
             active={tab==="pace"} 
             width={54}
           />
