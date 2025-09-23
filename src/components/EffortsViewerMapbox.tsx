@@ -433,6 +433,18 @@ function EffortsViewerMapbox({
     return { cumGain_m: g, cumLoss_m: l };
   }, [normalizedSamples]);
 
+  // Prefer provider-reported climbed (usually feet) to match session summary
+  const gainPillText = useMemo(() => {
+    const providerGain = (workoutData as any)?.elevation_gain ?? (workoutData as any)?.metrics?.elevation_gain;
+    if (Number.isFinite(providerGain)) {
+      if (useFeet) return `${Math.round(Number(providerGain))} ft`;
+      return `${Math.round(Number(providerGain) * 0.3048)} m`;
+    }
+    // Fallback to derived cumulative gain
+    const g = cumGain_m[Math.min(idx, cumGain_m.length - 1)] ?? 0;
+    return fmtAlt(g, useFeet);
+  }, [workoutData, cumGain_m, idx, useFeet]);
+
   // Optional cadence/power series derived from sensor_data and resampled to chart times
   const targetTimes = useMemo(() => normalizedSamples.map(s => Number(s.t_s) || 0), [normalizedSamples]);
   const cadSeriesRaw = useMemo(() => {
@@ -727,7 +739,7 @@ function EffortsViewerMapbox({
           <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
-          <Pill label="Gain" titleAttr="Total elevation gain" value={fmtAlt(gainNow_m, useFeet)} active={tab==="elev"} />
+          <Pill label="Gain" titleAttr="Total elevation gain" value={gainPillText} active={tab==="elev"} />
         </div>
         
         {/* Distance, time, and altitude on same line */}
