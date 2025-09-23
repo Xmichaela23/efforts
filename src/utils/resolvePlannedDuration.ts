@@ -9,26 +9,20 @@
 export function resolvePlannedDurationMinutes(workout: any): number | null {
   try {
     if (!workout) return null;
-
-    // 1) Root total from Weekly materialization (authoritative)
-    const rootTs = Number((workout as any)?.total_duration_seconds);
-    if (Number.isFinite(rootTs) && rootTs > 0) return Math.max(1, Math.round(rootTs / 60));
-
-    // 2) Computed totals from Weekly compute JSON
+    // Match Weekly exactly: computed.total_duration_seconds → sum(computed.steps.seconds) → sum(intervals.duration) → duration field
+    // 1) computed total
     const comp: any = (workout as any)?.computed || {};
-    const tsA = Number(comp?.total_duration_seconds);
-    const tsB = Number(comp?.total_seconds);
-    const ts = Number.isFinite(tsA) && tsA > 0 ? tsA : (Number.isFinite(tsB) && tsB > 0 ? tsB : NaN);
+    const ts = Number(comp?.total_duration_seconds);
     if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
 
-    // 3) Sum of computed steps.seconds (still Weekly compute); no token/structure guesses
+    // 2) Sum of computed steps.seconds
     const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
     if (steps.length) {
       const total = steps.reduce((a: number, st: any) => a + (Number(st?.seconds) || 0), 0);
       if (Number.isFinite(total) && total > 0) return Math.max(1, Math.round(total / 60));
     }
 
-    // 4) Sum of intervals (stored numeric durations), mirroring Weekly cell logic
+    // 3) Sum of intervals (stored numeric durations)
     try {
       const intervals: any[] = Array.isArray((workout as any)?.intervals) ? (workout as any).intervals : [];
       if (intervals.length) {
@@ -44,7 +38,7 @@ export function resolvePlannedDurationMinutes(workout: any): number | null {
       }
     } catch {}
 
-    // 5) Last resort: explicit duration minutes field
+    // 4) Last resort: explicit duration minutes field
     const minsField = Number((workout as any)?.duration);
     if (Number.isFinite(minsField) && minsField > 0) return Math.max(1, Math.round(minsField));
 
