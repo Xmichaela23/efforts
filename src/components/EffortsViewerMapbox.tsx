@@ -727,12 +727,7 @@ function EffortsViewerMapbox({
           <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
-          <Pill
-            label="G/L"
-            titleAttr="Ascent / Descent (Net)"
-            value={`${fmtAlt(gainNow_m, useFeet)} / ${fmtAlt(cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0, useFeet)} (${(() => { const net = (gainNow_m - (cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0)); const sign = net > 0 ? '+' : (net < 0 ? '-' : ''); return `${sign}${Math.abs(Math.round(useFeet ? net*3.28084/3.28084 : net))}`; })()})`}
-            active={tab==="elev"}
-          />
+          <Pill label="Gain" titleAttr="Total elevation gain" value={fmtAlt(gainNow_m, useFeet)} active={tab==="elev"} />
         </div>
         
         {/* Distance, time, and altitude on same line */}
