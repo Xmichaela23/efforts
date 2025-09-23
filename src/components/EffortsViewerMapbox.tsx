@@ -286,7 +286,7 @@ function computeSplits(samples: Sample[], metersPerSplit: number): Split[] {
 }
 
 /** ---------- Tiny UI atoms ---------- */
-const Pill = ({ label, value, active=false, titleAttr }: { label: string; value: string | number; active?: boolean; titleAttr?: string }) => (
+const Pill = ({ label, value, subValue, active=false, titleAttr }: { label: string; value: string | number; subValue?: string; active?: boolean; titleAttr?: string }) => (
   <div title={titleAttr || ''} style={{
     padding: "2px 0",
     borderRadius: 0,
@@ -294,13 +294,16 @@ const Pill = ({ label, value, active=false, titleAttr }: { label: string; value:
     background: "transparent",
     display: "flex",
     flexDirection: "column",
-    gap: 2,
-    width: "60px", // Fixed width for each pill
+    gap: 1,
+    width: "54px",
     textAlign: "center",
     overflow: "hidden"
   }}>
-    <span style={{ fontSize: 11, color: "#64748b", fontWeight: 600 }}>{label}</span>
-    <span style={{ fontSize: 13, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
+    <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600 }}>{label}</span>
+    <span style={{ fontSize: 12, fontWeight: 700, color: active ? "#0284c7" : "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</span>
+    {subValue ? (
+      <span style={{ fontSize: 10, color: "#64748b", fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{subValue}</span>
+    ) : null}
   </div>
 );
 
@@ -730,7 +733,7 @@ function EffortsViewerMapbox({
       {/* Data pills above chart */}
       <div style={{ marginTop: 16, padding: "0 6px" }}>
         {/* Current metric values aligned with tabs */}
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, padding: "0 8px" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 6, marginBottom: 8, padding: "0 8px" }}>
           <Pill 
             label={workoutData?.type === 'ride' ? 'Speed' : 'Pace'}  
             value={workoutData?.type === 'ride' ? fmtSpeed(s?.pace_s_per_km ?? null, useMiles) : fmtPace(s?.pace_s_per_km ?? null, useMiles)}  
@@ -739,7 +742,7 @@ function EffortsViewerMapbox({
           <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} />
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} />
-          <Pill label="Gain" titleAttr="Total elevation gain" value={gainPillText} active={tab==="elev"} />
+          <Pill label={tab==="elev"?"G/L":"Gain"} titleAttr={tab==="elev"?"Ascent / Descent (Net)":"Total elevation gain"} value={tab==="elev"?`${fmtAlt(gainNow_m, useFeet)} / ${fmtAlt((cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0), useFeet)}`:gainPillText} subValue={tab==="elev"?(() => { const net = (gainNow_m - (cumLoss_m[Math.min(idx, cumLoss_m.length-1)] ?? 0)); const sign = net>0?'+':(net<0?'-':''); const abs = Math.abs(Math.round(net)); return `(${sign}${useFeet?`${abs} ft`:`${Math.round(abs)} m`})`; })():undefined} active={tab==="elev"} />
         </div>
         
         {/* Distance, time, and altitude on same line */}
