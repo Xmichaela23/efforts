@@ -229,9 +229,36 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   }
   // Removed all token fallback paths: structured JSON is the single source of truth
 
-  // Prefer computed totals; only fall back when no computed totals exist
+  // Prefer user baseline estimate for swims (matches app-wide sources), then fall back to plan totals
   let durationMin: number | undefined = undefined;
-  // Fallbacks: root total → computed total → sum(computed.steps) → sum(intervals) → structured estimate (last resort)
+  try {
+    const isSwim = String((workout as any)?.type || '').toLowerCase() === 'swim';
+    if (isSwim) {
+      // Derive total yards from computed/structured tallies already built above
+      let yards = 0;
+      const a = Number(totalYdFromComputed || 0) + Number(totalYdFromStruct || 0);
+      if (a > 0) yards = a;
+      // Sum explicit rests from computed steps when present
+      let restSec = 0;
+      try {
+        const comp: any = (workout as any)?.computed || {};
+        const steps: any[] = Array.isArray(comp?.steps) ? comp.steps : [];
+        for (const st of steps) {
+          const t = String(st?.type || '').toLowerCase();
+          if (t === 'interval_rest' || /rest/.test(t)) restSec += Number(st?.duration_s || st?.rest_s || 0);
+        }
+      } catch {}
+      // Parse user baseline swim pace per 100 (expects mm:ss)
+      const paceTxt = String((pn?.swimPace100 || pn?.swim_pace_100 || '') as any).trim();
+      const mmss = paceTxt.match(/(\d+):(\d{2})$/);
+      const pacePer100 = mmss ? (parseInt(mmss[1],10)*60 + parseInt(mmss[2],10)) : NaN;
+      if (yards > 0 && Number.isFinite(pacePer100)) {
+        const sec = Math.round((yards/100) * pacePer100) + Math.max(0, Math.round(restSec));
+        durationMin = Math.max(1, Math.round(sec/60));
+      }
+    }
+  } catch {}
+  // Order: root total → computed total → structured estimate → sum(computed.steps) → sum(intervals)
   try {
     if (durationMin == null) {
       const ts = Number((workout as any)?.total_duration_seconds);
@@ -243,6 +270,13 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const comp: any = (workout as any)?.computed || {};
       const ts = Number(comp?.total_duration_seconds);
       if (Number.isFinite(ts) && ts>0) durationMin = Math.max(1, Math.round(ts/60));
+    }
+  } catch {}
+  // Prefer the authored structured estimate next for consistency with other views
+  try {
+    if (durationMin == null) {
+      const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
+      if (est>0) durationMin = Math.floor(est/60);
     }
   } catch {}
   try {
@@ -269,13 +303,6 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         const totalSec = sumIntervals(intervals);
         if (Number.isFinite(totalSec) && totalSec>0) durationMin = Math.max(1, Math.round(totalSec/60));
       }
-    }
-  } catch {}
-  // Final last-resort fallback: structured estimate only if no computed-based duration could be derived
-  try {
-    if (durationMin == null) {
-      const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
-      if (est>0) durationMin = Math.floor(est/60);
     }
   } catch {}
 

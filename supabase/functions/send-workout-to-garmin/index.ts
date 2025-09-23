@@ -306,6 +306,14 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
   const sport = mapWorkoutType(workout.type)
   const isRun = sport === 'RUNNING'
   const isSwimSport = sport === 'LAP_SWIMMING'
+  const poolUnitPref: 'yd' | 'm' | null = isSwimSport ? ((): any => {
+    const v = (workout as any)?.pool_unit
+    if (!v) return null
+    const t = String(v).toLowerCase()
+    if (t === 'yd' || t === 'y') return 'yd'
+    if (t === 'm' || t === 'meter' || t === 'metre') return 'm'
+    return null
+  })() : null
   const steps: GarminStep[] = []
   let stepId = 1
   // Use computed per-rep targets when available to guarantee PACE ranges per interval
@@ -685,7 +693,17 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
             intensity: sIntensity,
             description: String(((seg?.effortLabel ?? interval?.effortLabel) || '')).trim() || undefined,
             durationType: (Number.isFinite(sMeters) && sMeters > 0) ? 'DISTANCE' : 'TIME',
-            durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? Math.round(sMeters) : Math.floor(sSeconds)
+            durationValue: (Number.isFinite(sMeters) && sMeters > 0) ? ((): number => {
+              if (isSwimSport && poolUnitPref === 'yd') {
+                return Math.max(1, Math.round((sMeters as number) / 0.9144))
+              }
+              return Math.round(sMeters as number)
+            })() : Math.floor(sSeconds)
+          }
+          // Tag swim distance unit explicitly when pool is specified
+          if (step.durationType === 'DISTANCE' && isSwimSport) {
+            if (poolUnitPref === 'yd') step.durationValueType = 'YARD'
+            else if (poolUnitPref === 'm') step.durationValueType = 'METER'
           }
           if (sport === 'LAP_SWIMMING' && step.intensity === 'REST') {
             step.durationType = 'FIXED_REST'
@@ -761,7 +779,16 @@ function convertWorkoutToGarmin(workout: PlannedWorkout): GarminWorkout {
       intensity,
       description: String(interval?.effortLabel ?? '').trim() || undefined,
       durationType: (Number.isFinite(meters) && meters > 0) ? 'DISTANCE' : 'TIME',
-      durationValue: (Number.isFinite(meters) && meters > 0) ? Math.round(meters) : Math.floor(seconds)
+      durationValue: (Number.isFinite(meters) && meters > 0) ? ((): number => {
+        if (isSwimSport && poolUnitPref === 'yd') {
+          return Math.max(1, Math.round((meters as number) / 0.9144))
+        }
+        return Math.round(meters as number)
+      })() : Math.floor(seconds)
+    }
+    if (step.durationType === 'DISTANCE' && isSwimSport) {
+      if (poolUnitPref === 'yd') step.durationValueType = 'YARD'
+      else if (poolUnitPref === 'm') step.durationValueType = 'METER'
     }
     if (sport === 'LAP_SWIMMING' && step.intensity === 'REST') {
       step.durationType = 'FIXED_REST'
