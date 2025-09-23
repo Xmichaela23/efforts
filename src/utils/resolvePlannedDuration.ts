@@ -38,7 +38,40 @@ export function resolvePlannedDurationMinutes(workout: any): number | null {
       }
     } catch {}
 
-    // 3) intervals sum
+    // 3) structured duration estimate (workout_structure)
+    try {
+      const ws: any = (workout as any)?.workout_structure;
+      if (ws && typeof ws === 'object') {
+        // Prefer concrete time from structured segments
+        const toSec = (v?: string): number => {
+          if (!v || typeof v !== 'string') return 0;
+          const m1 = v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60;
+          const m2 = v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10);
+          return 0;
+        };
+        let total = 0;
+        const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+        for (const seg of struct) {
+          if (!seg || typeof seg !== 'object') continue;
+          const kind = String(seg?.type || '').toLowerCase();
+          if (kind === 'transition') { total += toSec(String(seg?.duration||'')); continue; }
+          if (kind.endsWith('_segment')) { total += toSec(String(seg?.duration||'')); continue; }
+          if (kind === 'warmup' || kind === 'cooldown') total += toSec(String(seg?.duration||''));
+          if (kind === 'intervals' || kind === 'main_set') {
+            const reps = Number(seg?.repetitions)||0;
+            const wsS = toSec(String(seg?.work_segment?.duration||''));
+            const rsS = toSec(String(seg?.recovery_segment?.duration||''));
+            if (reps > 0) total += reps*wsS + Math.max(0, reps-1)*rsS;
+          }
+          if (kind === 'tempo' || kind === 'main') {
+            total += toSec(String(seg?.work_segment?.duration||seg?.duration||''));
+          }
+        }
+        if (Number.isFinite(total) && total > 0) return Math.max(1, Math.round(total/60));
+      }
+    } catch {}
+
+    // 4) intervals sum
     try {
       const intervals: any[] = Array.isArray((workout as any)?.intervals) ? (workout as any).intervals : [];
       if (intervals.length) {
@@ -56,13 +89,13 @@ export function resolvePlannedDurationMinutes(workout: any): number | null {
       }
     } catch {}
 
-    // 4) root total seconds
+    // 5) root total seconds
     try {
       const ts = Number((workout as any)?.total_duration_seconds);
       if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
     } catch {}
 
-    // 5) stored minutes
+    // 6) stored minutes
     try {
       const mins = Number((workout as any)?.duration);
       if (Number.isFinite(mins) && mins > 0) return Math.max(1, Math.round(mins));

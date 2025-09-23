@@ -420,6 +420,9 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
             tags,
             steps_preset,
             computed,
+          total_duration_seconds,
+          duration,
+          intervals,
             workout_structure,
             workout_title,
             export_hints
