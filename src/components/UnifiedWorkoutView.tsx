@@ -82,7 +82,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       const planned = plannedWorkouts.find(p => 
         p.type === (workout as any).type && 
         p.date === String((workout as any).date).slice(0,10) &&
-        ['planned', 'in_progress'].includes(p.workout_status)
+        ['planned', 'in_progress', 'completed'].includes(p.workout_status)
       );
       console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
         id: planned?.id,
@@ -535,7 +535,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               </div>
             )}
             <MobileSummary 
-              planned={isCompleted ? (linkedPlanned || null) : workout} 
+              planned={isCompleted ? (hydratedPlanned || linkedPlanned || null) : (hydratedPlanned || workout)} 
               completed={isCompleted ? workout : null} 
             />
           </TabsContent>

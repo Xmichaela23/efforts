@@ -312,64 +312,14 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return null;
   })();
 
-  // Dev hydration: if completed lacks samples but we have a garmin_activity_id,
-  // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
+  // Completed data used for computations (assumed present in development/clean data)
   const [hydratedCompleted, setHydratedCompleted] = useState<any>(completed);
-  const [allowHydrate, setAllowHydrate] = useState<boolean>(false);
 
   useEffect(() => {
     setHydratedCompleted(completed);
   }, [completed]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const hydrate = async () => {
-      try {
-        const c = completed as any;
-        if (!c) return;
-        if (!allowHydrate) return; // gate behind user action
-        // Dev-only guard: only hydrate from garmin_activities in development
-        const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env && (((import.meta as any).env.DEV) || ((import.meta as any).env.MODE === 'development'));
-        if (!isDev) return;
-        const hasSamples = !!(Array.isArray(c?.sensor_data?.samples) && c.sensor_data.samples.length > 3)
-          || !!(Array.isArray(c?.sensor_data) && c.sensor_data.length > 3)
-          || !!(Array.isArray(c?.gps_track) && c.gps_track.length > 3)
-          || !!(Array.isArray(c?.swim_data?.lengths) && c.swim_data.lengths.length > 0);
-        const garminId = String(c?.garmin_activity_id || '').trim();
-        if (hasSamples || !garminId) return;
-
-        const { data, error } = await supabase
-          .from('garmin_activities')
-          .select('gps_track,sensor_data,swim_data,avg_heart_rate,max_heart_rate,avg_speed_mps,max_speed_mps,avg_power,max_power,avg_run_cadence,max_run_cadence,avg_bike_cadence,max_bike_cadence,pool_length,number_of_active_lengths,distance_meters,duration_seconds,active_kilocalories,steps')
-          .eq('garmin_activity_id', garminId)
-          .single();
-        if (error || !data) return;
-
-        const merged = { ...c };
-        if (!merged.sensor_data && data.sensor_data) merged.sensor_data = data.sensor_data;
-        if (!merged.gps_track && data.gps_track) merged.gps_track = data.gps_track;
-        if (!merged.swim_data && data.swim_data) merged.swim_data = data.swim_data;
-        // Fill common metrics if missing
-        merged.metrics = { ...(merged.metrics || {}) };
-        if (merged.avg_heart_rate == null && typeof data.avg_heart_rate === 'number') merged.avg_heart_rate = data.avg_heart_rate;
-        if (merged.max_heart_rate == null && typeof data.max_heart_rate === 'number') merged.max_heart_rate = data.max_heart_rate;
-        if (merged.avg_speed == null && typeof data.avg_speed_mps === 'number') merged.avg_speed = data.avg_speed_mps * 3.6; // kph
-        if (merged.metrics.avg_speed == null && typeof data.avg_speed_mps === 'number') merged.metrics.avg_speed = data.avg_speed_mps * 3.6;
-        if (merged.avg_power == null && typeof data.avg_power === 'number') merged.avg_power = data.avg_power;
-        if (merged.max_power == null && typeof data.max_power === 'number') merged.max_power = data.max_power;
-        if (merged.steps == null && typeof data.steps === 'number') merged.steps = data.steps;
-        if (merged.distance == null && typeof data.distance_meters === 'number') merged.distance = data.distance_meters / 1000; // km
-        if (merged.moving_time == null && typeof data.duration_seconds === 'number') merged.moving_time = data.duration_seconds;
-        if (merged.total_timer_time == null && typeof data.duration_seconds === 'number') merged.total_timer_time = data.duration_seconds;
-        if (merged.calories == null && typeof data.active_kilocalories === 'number') merged.calories = data.active_kilocalories;
-        if (merged.number_of_active_lengths == null && typeof data.number_of_active_lengths === 'number') merged.number_of_active_lengths = data.number_of_active_lengths;
-        if (merged.pool_length == null && typeof data.pool_length === 'number') merged.pool_length = data.pool_length;
-        if (!cancelled) setHydratedCompleted(merged);
-      } catch {}
-    };
-    hydrate();
-    return () => { cancelled = true; };
-  }, [completed, allowHydrate]);
+  // No interactive hydration path; assume data present during development
 
   // Strength uses compare table
   if (type === 'strength') {
@@ -811,17 +761,6 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   return (
     <div className="w-full">
-      {/* Optional details loader to avoid slow Supabase hydration on first paint */}
-      {!allowHydrate && (
-        <div className="mb-2">
-          <button
-            onClick={() => setAllowHydrate(true)}
-            className="px-2 py-1 text-xs font-semibold text-sky-700 border border-sky-200 rounded-md"
-          >
-            Load details
-          </button>
-        </div>
-      )}
       {(() => {
         const ver = completedComputed?.version || completedComputed?.computed_version || null;
         const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : (forceComputing ? 'computing…' : 'waiting for server');
