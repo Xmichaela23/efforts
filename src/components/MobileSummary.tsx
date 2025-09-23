@@ -315,6 +315,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   // Dev hydration: if completed lacks samples but we have a garmin_activity_id,
   // load rich fields (sensor_data, gps_track, swim_data) from garmin_activities
   const [hydratedCompleted, setHydratedCompleted] = useState<any>(completed);
+  const [allowHydrate, setAllowHydrate] = useState<boolean>(false);
 
   useEffect(() => {
     setHydratedCompleted(completed);
@@ -326,6 +327,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       try {
         const c = completed as any;
         if (!c) return;
+        if (!allowHydrate) return; // gate behind user action
         // Dev-only guard: only hydrate from garmin_activities in development
         const isDev = typeof import.meta !== 'undefined' && (import.meta as any).env && (((import.meta as any).env.DEV) || ((import.meta as any).env.MODE === 'development'));
         if (!isDev) return;
@@ -367,7 +369,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     };
     hydrate();
     return () => { cancelled = true; };
-  }, [completed]);
+  }, [completed, allowHydrate]);
 
   // Strength uses compare table
   if (type === 'strength') {
@@ -809,6 +811,17 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   return (
     <div className="w-full">
+      {/* Optional details loader to avoid slow Supabase hydration on first paint */}
+      {!allowHydrate && (
+        <div className="mb-2">
+          <button
+            onClick={() => setAllowHydrate(true)}
+            className="px-2 py-1 text-xs font-semibold text-sky-700 border border-sky-200 rounded-md"
+          >
+            Load details
+          </button>
+        </div>
+      )}
       {(() => {
         const ver = completedComputed?.version || completedComputed?.computed_version || null;
         const label = hasServerComputed ? `server-computed${ver ? ` (${ver})` : ''}` : (forceComputing ? 'computing…' : 'waiting for server');

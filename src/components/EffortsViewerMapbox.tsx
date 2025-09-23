@@ -360,7 +360,7 @@ function EffortsViewerMapbox({
   }, [samples, useMiles]);
 
   const [tab, setTab] = useState<MetricTab>("pace");
-  const [showVam, setShowVam] = useState(false);
+  const [showVam, setShowVam] = useState(true);
   const [idx, setIdx] = useState(0);
   const [locked, setLocked] = useState(false);
   const [theme, setTheme] = useState<'streets' | 'hybrid'>(() => {
@@ -710,13 +710,13 @@ function EffortsViewerMapbox({
   {/* Standalone VAM section (toggle below main chart) */}
   <div style={{ marginTop: 12, padding: "0 6px" }}>
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-      <div style={{ fontWeight: 700, color: "#0f172a" }}>VAM</div>
+      <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 16 }}>VAM</div>
       <button
         onClick={() => setShowVam(v => !v)}
-        style={{ border: 'none', background: 'transparent', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
+        style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '4px 10px', background: '#fff', color: showVam ? '#0f172a' : '#64748b', cursor: 'pointer', fontWeight: 700 }}
         aria-pressed={showVam}
       >
-        {showVam ? 'Hide' : 'Show'}
+        {showVam ? 'Hide VAM' : 'Show VAM'}
       </button>
     </div>
     {showVam && (
