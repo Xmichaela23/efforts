@@ -51,19 +51,9 @@ function getTitle(workout: any): string {
 }
 
 function computeMinutes(workout: any, baselines?: Baselines, exportHints?: ExportHints): number | null {
-  // Prefer canonical resolver to avoid recomputation
+  // Only trust Weekly's stored compute; do not fabricate
   const resolved = resolvePlannedDurationMinutes(workout);
-  if (typeof resolved === 'number') return resolved;
-  // Fallback: token-based normalization if needed (legacy)
-  try {
-    const pn = (baselines as any)?.performanceNumbers || {};
-    const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-    if (stepsPreset.length) {
-      const res = normalizePlannedSession({ ...workout, steps_preset: stepsPreset }, { performanceNumbers: pn } as any, (exportHints || (workout as any).export_hints || {}) as any);
-      if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) return res.durationMinutes;
-    }
-  } catch {}
-  return null;
+  return (typeof resolved === 'number') ? resolved : null;
 }
 
 function computeSwimYards(workout: any): number | null {
