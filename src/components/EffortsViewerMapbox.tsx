@@ -752,10 +752,12 @@ function EffortsViewerMapbox({
     if (tab === 'cad') ensureMinSpan(10);
     if (tab === 'elev') ensureMinSpan(isOutdoorGlobal ? (useFeet ? 20/3.28084 : 6) : (useFeet ? 10/3.28084 : 3));
     
-    // special handling:
+    // special handling (tick rounding)
     if (tab === "bpm") { 
+      // Round outward so ticks cover the series
       lo = Math.floor(lo / 5) * 5; 
       hi = Math.ceil(hi / 5) * 5; 
+      if (hi - lo < 10) { hi = lo + 10; }
     }
     
     // Minimal padding (wider for pace to avoid hitting edges)
@@ -930,7 +932,18 @@ function EffortsViewerMapbox({
             active={tab==="pace"} 
             width={54}
           />
-          <Pill label="HR" value={s?.hr_bpm != null ? `${s.hr_bpm} bpm` : "—"} active={tab==="bpm"} width={54} />
+          <Pill 
+            label="HR" 
+            value={(() => {
+              if (tab === 'bpm') {
+                const v = Number.isFinite(metricRaw[Math.min(idx, metricRaw.length - 1)]) ? Math.round(metricRaw[Math.min(idx, metricRaw.length - 1)] as number) : null;
+                return v != null ? `${v} bpm` : '—';
+              }
+              return s?.hr_bpm != null ? `${s.hr_bpm} bpm` : '—';
+            })()} 
+            active={tab==="bpm"} 
+            width={54} 
+          />
           <Pill label={workoutData?.type === 'ride' ? 'Cadence' : 'Cadence'} value={Number.isFinite(cadSeries[Math.min(idx, cadSeries.length-1)]) ? `${Math.round(cadSeries[Math.min(idx, cadSeries.length-1)])}${workoutData?.type==='ride'?' rpm':' spm'}` : '—'} active={tab==="cad"} width={54} />
           <Pill label="Power" value={Number.isFinite(pwrSeries[Math.min(idx, pwrSeries.length-1)]) ? `${Math.round(pwrSeries[Math.min(idx, pwrSeries.length-1)])} W` : '—'} active={tab==="pwr"} width={54} />
           <Pill
