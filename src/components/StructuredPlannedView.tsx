@@ -41,6 +41,38 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
+  const parseEstimateToSeconds = (val: any): number => {
+    try {
+      if (val == null) return 0;
+      if (typeof val === 'number' && isFinite(val)) {
+        // Treat numeric as minutes
+        return Math.max(0, Math.round(val)) * 60;
+      }
+      const txt = String(val).trim();
+      if (!txt) return 0;
+      // hh:mm:ss or mm:ss
+      let m = txt.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
+      if (m) {
+        const h = m[3] ? parseInt(m[1],10) : 0;
+        const mm = m[3] ? parseInt(m[2],10) : parseInt(m[1],10);
+        const ss = m[3] ? parseInt(m[3],10) : parseInt(m[2],10);
+        return h*3600 + mm*60 + ss;
+      }
+      // 0h 37 / 1h 05 / 1h05
+      m = txt.match(/^(\d+)\s*h\s*(\d{1,2})$/i);
+      if (m) {
+        const h = parseInt(m[1],10); const mm = parseInt(m[2],10);
+        return h*3600 + mm*60;
+      }
+      // 37 min, 37m
+      m = txt.match(/^(\d+)\s*(min|m)$/i);
+      if (m) return parseInt(m[1],10)*60;
+      // Fallback to existing min/sec tokens within string
+      const minToken = txt.match(/(\d+)\s*min/i); if (minToken) return parseInt(minToken[1],10)*60;
+      const secToken = txt.match(/(\d+)\s*s/i); if (secToken) return parseInt(secToken[1],10);
+    } catch {}
+    return 0;
+  };
   const mmss = (s:number)=>{ const x=Math.max(1,Math.round(s)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
   const easy = String(pn?.easyPace || '').trim() || undefined;
   const hints: any = (workout as any)?.export_hints || {};
@@ -234,7 +266,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   // 1) Structured estimate (e.g., "0h 37" sources)
   try {
     if (durationMin == null) {
-      const est = typeof ws?.total_duration_estimate==='string' ? toSec(ws.total_duration_estimate) : 0;
+      const est = parseEstimateToSeconds(ws?.total_duration_estimate);
       if (est>0) durationMin = Math.floor(est/60);
     }
   } catch {}
@@ -439,10 +471,22 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       {String(parentDisc).toLowerCase()==='swim' && (
         <div className="mt-2">
           <div className="text-xs text-gray-500 mb-1">Pool</div>
-          <div className="flex flex-wrap gap-2 text-xs">
-            <button type="button" onClick={()=>setPool('yd', 22.86)} className={`rounded px-3 py-1.5 border ${poolUnit==='yd' && Math.abs((poolLenM||0)-22.86)<0.02 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-neutral-100 text-neutral-800 border-neutral-200'}`}>25 yd</button>
-            <button type="button" onClick={()=>setPool('m', 25.0)} className={`rounded px-3 py-1.5 border ${poolUnit==='m' && Math.abs((poolLenM||0)-25.0)<0.02 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-neutral-100 text-neutral-800 border-neutral-200'}`}>25 m</button>
-            <button type="button" onClick={()=>setPool('m', 50.0)} className={`rounded px-3 py-1.5 border ${poolUnit==='m' && Math.abs((poolLenM||0)-50.0)<0.02 ? 'bg-neutral-900 text-white border-neutral-900' : 'bg-neutral-100 text-neutral-800 border-neutral-200'}`}>50 m</button>
+          <div className="flex flex-wrap gap-3 text-xs">
+            <button
+              type="button"
+              onClick={()=>setPool('yd', 22.86)}
+              className={`${poolUnit==='yd' && Math.abs((poolLenM||0)-22.86)<0.02 ? 'underline underline-offset-4 decoration-2 text-black' : 'text-gray-600 hover:text-black'}`}
+            >25 yd</button>
+            <button
+              type="button"
+              onClick={()=>setPool('m', 25.0)}
+              className={`${poolUnit==='m' && Math.abs((poolLenM||0)-25.0)<0.02 ? 'underline underline-offset-4 decoration-2 text-black' : 'text-gray-600 hover:text-black'}`}
+            >25 m</button>
+            <button
+              type="button"
+              onClick={()=>setPool('m', 50.0)}
+              className={`${poolUnit==='m' && Math.abs((poolLenM||0)-50.0)<0.02 ? 'underline underline-offset-4 decoration-2 text-black' : 'text-gray-600 hover:text-black'}`}
+            >50 m</button>
             {savingPool && <span className="text-gray-400">Saving…</span>}
           </div>
           {!savingPool && autoDefaulted && (
