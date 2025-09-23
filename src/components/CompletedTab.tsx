@@ -820,77 +820,41 @@ const formatPace = (paceValue: any): string => {
     return baseMetrics;
   };
 
-  // ----- Swim helpers -----
+  // ----- Moving time resolver (strict) -----
+  // Only use explicitly provided moving-time fields; do not infer from cadence or distance.
   const getDurationSeconds = (): number | null => {
-    // In development, avoid fallbacks: use only server-computed moving seconds
     try {
-      if (import.meta.env?.DEV) {
-        const compDev = (hydrated || workoutData) as any;
-        const mvDev = Number(compDev?.computed?.overall?.duration_s_moving);
-        return (Number.isFinite(mvDev) && mvDev > 0) ? Math.round(mvDev) : null;
-      }
-    } catch {}
-    // Build best sample-based candidate first
-    let sampleCandidate: number | null = null;
-    try {
-      const rawSamples = (hydrated || workoutData) as any;
-      const samples = Array.isArray(rawSamples?.sensor_data?.samples)
-        ? rawSamples.sensor_data.samples
-        : (Array.isArray(rawSamples?.sensor_data) ? rawSamples.sensor_data : []);
-      if (Array.isArray(samples) && samples.length > 1) {
-        const first: any = samples[0];
+      const src = (hydrated || workoutData) as any;
+
+      // 1) Server-computed moving seconds
+      const computed = Number(src?.computed?.overall?.duration_s_moving);
+      if (Number.isFinite(computed) && computed > 0) return Math.round(computed);
+
+      // 2) Sample-based explicit timer duration (device timer, not inferred)
+      const samples = Array.isArray(src?.sensor_data?.samples)
+        ? src.sensor_data.samples
+        : (Array.isArray(src?.sensor_data) ? src.sensor_data : []);
+      if (Array.isArray(samples) && samples.length > 0) {
         const last: any = samples[samples.length - 1];
-        const lastTimer = Number(last?.timerDurationInSeconds ?? last?.timerDuration);
-        if (Number.isFinite(lastTimer) && lastTimer > 0) sampleCandidate = Math.round(lastTimer);
-        if (sampleCandidate == null) {
-          const lastClock = Number(last?.clockDurationInSeconds ?? last?.clockDuration);
-          if (Number.isFinite(lastClock) && lastClock > 0) sampleCandidate = Math.round(lastClock);
-        }
-        if (sampleCandidate == null) {
-          let moving = 0;
-          let prevDist = Number(first?.totalDistanceInMeters ?? first?.distanceInMeters ?? NaN);
-          for (let i = 1; i < samples.length; i += 1) {
-            const a: any = samples[i - 1];
-            const b: any = samples[i];
-            const tA = Number(a?.startTimeInSeconds ?? a?.timestamp ?? a?.clockDurationInSeconds ?? a?.timerDurationInSeconds ?? (i - 1));
-            const tB = Number(b?.startTimeInSeconds ?? b?.timestamp ?? b?.clockDurationInSeconds ?? b?.timerDurationInSeconds ?? i);
-            const dt = Math.min(60, Math.max(0, tB - tA));
-            if (!dt) continue;
-            const cadA = Number(a?.swimCadenceInStrokesPerMinute ?? a?.swimCadence ?? a?.cadence);
-            const cadB = Number(b?.swimCadenceInStrokesPerMinute ?? b?.swimCadence ?? b?.cadence);
-            const distB = Number(b?.totalDistanceInMeters ?? b?.distanceInMeters ?? NaN);
-            const dDist = Number.isFinite(prevDist) && Number.isFinite(distB) ? (distB - prevDist) : NaN;
-            prevDist = Number.isFinite(distB) ? distB : prevDist;
-            // Only count as active if distance clearly increases or stroke rate is swimming-level
-            const active = (Number.isFinite(dDist) && dDist > 0.5) || (Number.isFinite(cadA) && cadA >= 10) || (Number.isFinite(cadB) && cadB >= 10);
-            if (active) moving += dt;
-          }
-          if (moving > 0) sampleCandidate = Math.round(moving);
-        }
-        if (sampleCandidate == null) {
-          const firstT = Number(first?.startTimeInSeconds ?? first?.timestamp ?? NaN);
-          const lastT = Number(last?.startTimeInSeconds ?? last?.timestamp ?? NaN);
-          if (Number.isFinite(firstT) && Number.isFinite(lastT) && lastT > firstT) sampleCandidate = Math.round(lastT - firstT);
-        }
+        const timer = Number(last?.timerDurationInSeconds ?? last?.timerDuration);
+        if (Number.isFinite(timer) && timer > 0) return Math.round(timer);
       }
-    } catch {}
 
-    // Compare against stored computed moving time; if computed looks like elapsed, prefer samples
-    let computedCandidate: number | null = null;
-    try {
-      const comp = (hydrated || workoutData) as any;
-      const move = Number(comp?.computed?.overall?.duration_s_moving);
-      if (Number.isFinite(move) && move > 0) computedCandidate = Math.round(move);
-    } catch {}
+      // 3) Provider moving-time fields
+      const candidates = [
+        (src as any)?.metrics?.total_timer_time,
+        (src as any)?.moving_time,
+        (src as any)?.metrics?.moving_time,
+      ];
+      for (const c of candidates) {
+        const n = Number(c);
+        if (Number.isFinite(n) && n > 0) return Math.round(n);
+      }
 
-    // Heuristic: if both exist and computed >> sample (e.g., equals overall duration), use sample
-    if (computedCandidate != null && sampleCandidate != null) {
-      if (computedCandidate > sampleCandidate * 1.1) return sampleCandidate;
-      return computedCandidate;
+      return null;
+    } catch {
+      return null;
     }
-    if (computedCandidate != null) return computedCandidate;
-    if (sampleCandidate != null) return sampleCandidate;
-    return null;
   };
 
   const getDistanceMeters = (): number | null => {
@@ -1749,9 +1713,6 @@ const formatMovingTime = () => {
                   <div className="font-medium">Pool</div>
                 </div>
               </div>
-              <div className="px-2 py-1">
-                {/* SWOLF removed */}
-              </div>
             </>
           )}
          </>
@@ -2042,30 +2003,32 @@ const formatMovingTime = () => {
             </div>
           </div>
 
-          {/* Row 4: Cadence removed; VAM hidden for swim */}
-          <div className="px-2 py-1">
-            <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
-              {(() => {
-                const field = (
-                  workoutData.max_cadence ??
-                  workoutData.metrics?.max_cadence ??
-                  (workoutData as any)?.computed?.overall?.max_cadence_spm ??
-                  workoutData.max_bike_cadence ??
-                  workoutData.max_running_cadence
-                );
-                if (field != null) return safeNumber(field);
-                const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
-                const maxSensor = sensors
-                  .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
-                  .filter((n: any) => Number.isFinite(n))
-                  .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
-                return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
-              })()}
+          {/* Row 4: Cadence card (hidden for swim); VAM hidden for pool swims */}
+          {workoutType !== 'swim' && (
+            <div className="px-2 py-1">
+              <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
+                {(() => {
+                  const field = (
+                    workoutData.max_cadence ??
+                    workoutData.metrics?.max_cadence ??
+                    (workoutData as any)?.computed?.overall?.max_cadence_spm ??
+                    workoutData.max_bike_cadence ??
+                    workoutData.max_running_cadence
+                  );
+                  if (field != null) return safeNumber(field);
+                  const sensors = Array.isArray(workoutData.sensor_data) ? workoutData.sensor_data : [];
+                  const maxSensor = sensors
+                    .map((s: any) => Number(s.cadence) || Number(s.bikeCadence) || Number(s.runCadence))
+                    .filter((n: any) => Number.isFinite(n))
+                    .reduce((m: number, n: number) => Math.max(m, n), -Infinity);
+                  return Number.isFinite(maxSensor) ? safeNumber(maxSensor) : 'N/A';
+                })()}
+              </div>
+              <div className="text-xs text-[#666666] font-normal">
+                <div className="font-medium">Max Cadence</div>
+              </div>
             </div>
-            <div className="text-xs text-[#666666] font-normal">
-              <div className="font-medium">Max {workoutType === 'swim' ? 'stroke rate' : 'Cadence'}</div>
-            </div>
-          </div>
+          )}
           {!isPoolSwim && (
             <div className="px-2 py-1">
               <div className="text-base font-semibold text-black mb-0.5" style={{fontFeatureSettings: '"tnum"'}}>
