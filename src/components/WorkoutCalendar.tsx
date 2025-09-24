@@ -189,8 +189,21 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { rows: plannedWeekRows } = usePlannedRange(fromISO, toISO);
-  const { rows: workoutsWeekRows } = useWorkoutsRange(fromISO, toISO);
+  const { rows: plannedWeekRows, loading: plannedLoading } = usePlannedRange(fromISO, toISO);
+  const { rows: workoutsWeekRows, loading: workoutsLoading } = useWorkoutsRange(fromISO, toISO);
+
+  // Debounced loading indicator to avoid flicker on fast responses
+  const [loadingDebounced, setLoadingDebounced] = useState(false);
+  const loadingWeekRaw = Boolean(plannedLoading || workoutsLoading);
+  useEffect(() => {
+    let t: any;
+    if (loadingWeekRaw) {
+      t = setTimeout(() => setLoadingDebounced(true), 180); // 180ms debounce
+    } else {
+      setLoadingDebounced(false);
+    }
+    return () => { if (t) clearTimeout(t); };
+  }, [loadingWeekRaw, fromISO, toISO]);
 
   // Ensure attach + compute sweep runs for the visible week (once per week in session)
   useEffect(() => {
@@ -547,7 +560,12 @@ export default function WorkoutCalendar({
         >
           ‹
         </button>
-        <h2 className="text-base font-medium">Week of {rangeLabel}</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-base font-medium">Week of {rangeLabel}</h2>
+          {loadingDebounced && (
+            <span role="status" aria-live="polite" className="text-[11px] text-gray-500">Loading week…</span>
+          )}
+        </div>
         <button
           aria-label="Next week"
           className="px-3 py-2 min-w-10 rounded hover:bg-zinc-100 active:bg-zinc-200"
@@ -584,14 +602,21 @@ export default function WorkoutCalendar({
 
               {/* Bottom area: Event labels anchored at bottom */}
               <div className="flex flex-col gap-1 items-start">
-                {items.length === 0 ? (
-                  <span className="text-xs text-gray-400">&nbsp;</span>
-                ) : (
+                {items.length > 0 && (
                   items.map((evt, i) => (
                     <span key={`${key}-${i}`} className="text-xs text-gray-700 bg-gray-100 px-1.5 py-0.5 rounded w-full text-center truncate">
                       {evt.label}
                     </span>
                   ))
+                )}
+                {items.length === 0 && loadingDebounced && (
+                  <>
+                    <span className="h-[18px] rounded w-full bg-gray-100" />
+                    <span className="h-[18px] rounded w-3/4 bg-gray-100" />
+                  </>
+                )}
+                {items.length === 0 && !loadingDebounced && (
+                  <span className="text-xs text-gray-400">&nbsp;</span>
                 )}
               </div>
             </button>
