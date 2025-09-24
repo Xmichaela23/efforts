@@ -299,6 +299,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   }, [planned?.id]);
 
   const type = String((effectivePlanned as any)?.type || '').toLowerCase();
+  const isRidePlanned = /ride|bike|cycling/.test(type);
   const tokens: string[] = Array.isArray((effectivePlanned as any)?.steps_preset) ? ((effectivePlanned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
   const tokensJoined = tokens.join(' ').toLowerCase();
   const defaultDurations = (() => {
@@ -388,21 +389,54 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     ? (effectivePlanned as any).computed.steps
     : [];
   // Derive compact pace-only rows from the same source the Planned tab renders
+  const [ftp, setFtp] = useState<number | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!isRidePlanned) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const { data } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', user.id).maybeSingle();
+        const f = Number((data as any)?.performance_numbers?.ftp);
+        if (Number.isFinite(f) && f>0) setFtp(f);
+      } catch {}
+    })();
+  }, [isRidePlanned]);
+
   const descPaceSteps: any[] = useMemo(() => {
     const txt = String((effectivePlanned as any)?.rendered_description || '');
     if (!txt) return [];
     const lines = txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
     const out: any[] = [];
     const paceRe = /(\d{1,2}):(\d{2})\s*\/mi/i;
+    const pctRe = /(\d{2,3})\s*[%]\s*(?:ftp)?/i;
+    const pctRangeRe = /(\d{2,3})\s*[-–]\s*(\d{2,3})\s*%\s*(?:ftp)?/i;
     for (const ln of lines) {
-      const m = ln.match(paceRe);
-      if (m) {
-        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-        out.push({ pace_sec_per_mi: sec });
+      if (isRidePlanned) {
+        let watts: number | null = null;
+        const r = ln.match(pctRangeRe);
+        if (r) {
+          const lo = parseInt(r[1],10); const hi = parseInt(r[2],10);
+          const mid = Math.round((lo+hi)/2);
+          if (ftp && ftp>0) watts = Math.round(ftp * (mid/100));
+        } else {
+          const m = ln.match(pctRe);
+          if (m) {
+            const p = parseInt(m[1],10);
+            if (ftp && ftp>0) watts = Math.round(ftp * (p/100));
+          }
+        }
+        out.push(watts && watts>0 ? { power_target_watts: watts } : {});
+      } else {
+        const m = ln.match(paceRe);
+        if (m) {
+          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+          out.push({ pace_sec_per_mi: sec });
+        }
       }
     }
     return out;
-  }, [ (effectivePlanned as any)?.rendered_description ]);
+  }, [ (effectivePlanned as any)?.rendered_description, isRidePlanned, ftp ]);
   // Prefer structured steps when present; otherwise prefill from description so the ledger is always populated
   const steps: any[] = plannedStepsBase.length >= 3 ? plannedStepsBase : descPaceSteps;
 
