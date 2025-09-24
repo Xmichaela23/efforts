@@ -270,7 +270,12 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   }
 
   const [effectivePlanned, setEffectivePlanned] = useState<any>(planned);
-  useEffect(() => { setEffectivePlanned(planned); }, [planned]);
+  // Only replace local planned when the id changes, not on every prop update
+  useEffect(() => {
+    const newId = String((planned as any)?.id || '');
+    const curId = String((effectivePlanned as any)?.id || '');
+    if (newId && newId !== curId) setEffectivePlanned(planned);
+  }, [planned?.id]);
   // Ensure we always render the full authored steps exactly like Planned tab
   useEffect(() => {
     (async () => {
