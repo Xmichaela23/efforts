@@ -356,12 +356,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
   const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
-  // Prefer showing only work steps when they exist; otherwise show all authored steps (ensures at least planned is visible)
-  const workOnly = plannedStepsBase.filter(st => {
-    const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
-    return !(/cool|cd\b/.test(k) || /warm|wu\b/.test(k) || /rest|recover|recovery|jog|easy/.test(k));
-  });
-  const steps: any[] = workOnly.length > 0 ? workOnly : plannedStepsBase;
+  // Show authored steps exactly as in Planned (no filtering or reordering)
+  const steps: any[] = plannedStepsBase;
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
