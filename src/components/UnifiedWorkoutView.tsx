@@ -58,15 +58,26 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     // 1) If workout already has planned_id, find it in the planned workouts context
     const pid = (workout as any)?.planned_id as string | undefined;
     if (pid) {
-      const planned = plannedWorkouts.find(p => p.id === pid);
-      console.log('🔍 Found linkedPlanned by planned_id in context:', {
-        id: planned?.id,
-        name: planned?.name,
-        hasStrengthExercises: !!planned?.strength_exercises,
-        strengthExercises: planned?.strength_exercises
-      });
-      setLinkedPlanned(planned || null);
-      return;
+      const planned = plannedWorkouts.find(p => p.id === pid) || null;
+      if (planned) {
+        console.log('🔍 Found linkedPlanned by planned_id in context:', {
+          id: planned?.id,
+          name: planned?.name,
+          hasStrengthExercises: !!planned?.strength_exercises,
+          strengthExercises: planned?.strength_exercises
+        });
+        setLinkedPlanned(planned);
+        return;
+      }
+      // Context may exclude completed rows → fetch directly by id to ensure Summary can render immediately
+      try {
+        const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
+        if (data) {
+          console.log('🔍 Hydrated linkedPlanned via direct fetch by planned_id');
+          setLinkedPlanned(data);
+          return;
+        }
+      } catch {}
     }
 
     // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
