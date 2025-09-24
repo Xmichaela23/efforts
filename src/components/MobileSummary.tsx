@@ -269,8 +269,32 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     );
   }
 
-  const type = String(planned.type || '').toLowerCase();
-  const tokens: string[] = Array.isArray((planned as any)?.steps_preset) ? ((planned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
+  const [effectivePlanned, setEffectivePlanned] = useState<any>(planned);
+  useEffect(() => { setEffectivePlanned(planned); }, [planned]);
+  // Ensure we always render the full authored steps exactly like Planned tab
+  useEffect(() => {
+    (async () => {
+      try {
+        const pid = String((planned as any)?.id || '');
+        if (!pid) return;
+        const currentLen = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps.length : 0;
+        // If the passed planned has few or no steps, fetch the row directly
+        if (!currentLen || currentLen < 3) {
+          const { data } = await supabase
+            .from('planned_workouts')
+            .select('id,type,computed,steps_preset')
+            .eq('id', pid)
+            .maybeSingle();
+          if (data && Array.isArray((data as any)?.computed?.steps) && (data as any).computed.steps.length >= currentLen) {
+            setEffectivePlanned((prev:any) => ({ ...(prev||planned), ...data }));
+          }
+        }
+      } catch {}
+    })();
+  }, [planned?.id]);
+
+  const type = String((effectivePlanned as any)?.type || '').toLowerCase();
+  const tokens: string[] = Array.isArray((effectivePlanned as any)?.steps_preset) ? ((effectivePlanned as any).steps_preset as any[]).map((t:any)=>String(t)) : [];
   const tokensJoined = tokens.join(' ').toLowerCase();
   const defaultDurations = (() => {
     const pickMin = (re: RegExp): number | null => {
@@ -355,7 +379,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
-  const plannedStepsBase: any[] = Array.isArray(planned?.computed?.steps) ? planned.computed.steps : (Array.isArray(planned?.intervals) ? planned.intervals : []);
+  const plannedStepsBase: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : (Array.isArray((effectivePlanned as any)?.intervals) ? (effectivePlanned as any).intervals : []);
   // Show authored steps exactly as in Planned (no filtering or reordering)
   const steps: any[] = plannedStepsBase;
 
