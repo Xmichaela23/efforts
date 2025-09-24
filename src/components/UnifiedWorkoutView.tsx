@@ -50,62 +50,64 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Resolve linked planned row for completed workouts
   useEffect(() => {
-    if (!isCompleted) { 
-      setLinkedPlanned(null); 
-      return; 
-    }
+    (async () => {
+      if (!isCompleted) { 
+        setLinkedPlanned(null); 
+        return; 
+      }
 
-    // 1) If workout already has planned_id, find it in the planned workouts context
-    const pid = (workout as any)?.planned_id as string | undefined;
-    if (pid) {
-      const planned = plannedWorkouts.find(p => p.id === pid) || null;
-      if (planned) {
-        console.log('🔍 Found linkedPlanned by planned_id in context:', {
+      // 1) If workout already has planned_id, find it in the planned workouts context
+      const pid = (workout as any)?.planned_id as string | undefined;
+      if (pid) {
+        const planned = plannedWorkouts.find(p => p.id === pid) || null;
+        if (planned) {
+          console.log('🔍 Found linkedPlanned by planned_id in context:', {
+            id: planned?.id,
+            name: planned?.name,
+            hasStrengthExercises: !!planned?.strength_exercises,
+            strengthExercises: planned?.strength_exercises
+          });
+          setLinkedPlanned(planned);
+          return;
+        }
+        // Context may exclude completed rows → fetch directly by id to ensure Summary can render immediately
+        try {
+          const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
+          if (data) {
+            console.log('🔍 Hydrated linkedPlanned via direct fetch by planned_id');
+            setLinkedPlanned(data);
+            return;
+          }
+        } catch {}
+      }
+
+      // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
+
+      // 3) Fallback: look for a same-day planned of same type in the context
+      //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
+      if (suppressRelinkUntil.current > Date.now()) {
+        setLinkedPlanned(null);
+        return;
+      }
+      
+      if ((workout as any).date && (workout as any).type) {
+        const planned = plannedWorkouts.find(p => 
+          p.type === (workout as any).type && 
+          p.date === String((workout as any).date).slice(0,10) &&
+          ['planned', 'in_progress', 'completed'].includes(p.workout_status)
+        );
+        console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
           id: planned?.id,
           name: planned?.name,
           hasStrengthExercises: !!planned?.strength_exercises,
           strengthExercises: planned?.strength_exercises
         });
-        setLinkedPlanned(planned);
+        setLinkedPlanned(planned || null);
         return;
       }
-      // Context may exclude completed rows → fetch directly by id to ensure Summary can render immediately
-      try {
-        const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
-        if (data) {
-          console.log('🔍 Hydrated linkedPlanned via direct fetch by planned_id');
-          setLinkedPlanned(data);
-          return;
-        }
-      } catch {}
-    }
 
-    // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
-
-    // 3) Fallback: look for a same-day planned of same type in the context
-    //    Skip this if we just explicitly unattached (to avoid immediate re-link UX)
-    if (suppressRelinkUntil.current > Date.now()) {
       setLinkedPlanned(null);
-      return;
-    }
-    
-    if ((workout as any).date && (workout as any).type) {
-      const planned = plannedWorkouts.find(p => 
-        p.type === (workout as any).type && 
-        p.date === String((workout as any).date).slice(0,10) &&
-        ['planned', 'in_progress', 'completed'].includes(p.workout_status)
-      );
-      console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
-        id: planned?.id,
-        name: planned?.name,
-        hasStrengthExercises: !!planned?.strength_exercises,
-        strengthExercises: planned?.strength_exercises
-      });
-      setLinkedPlanned(planned || null);
-      return;
-    }
-
-    setLinkedPlanned(null);
+    })();
   }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type, plannedWorkouts]);
 
   // Auto-materialize planned row if Summary is opened and computed steps are missing
