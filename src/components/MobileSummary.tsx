@@ -481,25 +481,37 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
 
   // Planned label for rides (power) and runs (pace) with no fallbacks
   const plannedLabelStrict = (st:any): string => {
-    if (st && typeof st.label === 'string' && st.label.trim().length) return String(st.label);
+    // No labels like Warm-up/Cool-down; show a single target metric only
     if (isRideSport) {
       const pr = (st as any)?.power_range;
       const pw = Number((st as any)?.power_target_watts);
-      if (pr && typeof pr.lower === 'number' && typeof pr.upper === 'number' && pr.lower>0 && pr.upper>0) return `${Math.round(pr.lower)}–${Math.round(pr.upper)} W`;
+      if (pr && typeof pr.lower === 'number' && typeof pr.upper === 'number' && pr.lower>0 && pr.upper>0) return `${Math.round((pr.lower+pr.upper)/2)} W`;
       if (Number.isFinite(pw) && pw>0) return `${Math.round(pw)} W`;
-      const k = String(st?.kind || st?.type || st?.name || '').toLowerCase();
-      if (/easy/.test(k)) return 'Easy';
       return '—';
     }
-    // run/walk
+    // run/walk → single pace only
     const p = Number((st as any)?.pace_sec_per_mi);
     if (Number.isFinite(p) && p>0) return fmtPace(p);
     const prng = Array.isArray((st as any)?.pace_range) ? (st as any).pace_range : null;
     if (prng && prng.length===2) {
       const lo = Number(prng[0]); const hi = Number(prng[1]);
-      if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) return `${fmtPace(lo).replace('/mi','')}–${fmtPace(hi)}`;
+      if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0) {
+        const mid = Math.round((lo + hi) / 2);
+        return fmtPace(mid);
+      }
     }
-    return plannedPaceFor(st);
+    // derive from distance + duration if present
+    try {
+      const meters = Number((st as any)?.distanceMeters ?? (st as any)?.distance_m ?? (st as any)?.m ?? (st as any)?.meters);
+      const sec = [ (st as any)?.seconds, (st as any)?.duration, (st as any)?.duration_sec, (st as any)?.durationSeconds, (st as any)?.time_sec, (st as any)?.timeSeconds ]
+        .map((v:any)=>Number(v)).find((n:number)=>Number.isFinite(n) && n>0) as number | undefined;
+      if (Number.isFinite(meters) && meters>0 && Number.isFinite(sec) && (sec as number)>0) {
+        const miles = meters/1609.34; if (miles>0) return fmtPace((sec as number)/miles);
+      }
+    } catch {}
+    const txt = String((st as any)?.pace || '').trim();
+    if (txt.includes('/mi')) return txt;
+    return '—';
   };
 
   const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
