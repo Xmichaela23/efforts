@@ -98,6 +98,11 @@ Deno.serve(async (req) => {
           return (Array.isArray(steps) && steps.length>0) || (Array.isArray(intervals) && intervals.length>0);
         } catch { return false; }
       })();
+      const stepCount = (() => { try { return Array.isArray((p as any)?.computed?.steps) ? (p as any).computed.steps.length : 0; } catch { return 0; } })();
+      // Ignore rows that look like WU/CD-only or otherwise underspecified
+      if (stepCount > 0 && stepCount < 3) {
+        continue;
+      }
       const totals = sumPlanned(p);
       let score = 0;
       // Optional deprioritization
@@ -131,6 +136,8 @@ Deno.serve(async (req) => {
 
       // Prefer plans that are materialized (have steps) and exact-day matches
       if (hasSteps) score += 1.0; else score -= 2.0; // strong penalty for non-materialized
+      // Prefer richer structured plans
+      score += Math.min(1.0, (stepCount||0) / 20);
 
       // Duration closeness (primary)
       let durPct: number | null = null;
@@ -174,8 +181,12 @@ Deno.serve(async (req) => {
       }
     } catch {}
     const nowHasSteps = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) && (best as any).computed.steps.length>0; } catch { return false; } })();
+    const nowStepCount = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) ? (best as any).computed.steps.length : 0; } catch { return 0; } })();
     if (!nowHasSteps) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_steps_after_materialize' }), { headers: { 'Content-Type': 'application/json' } });
+    }
+    if (nowStepCount < 3) {
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'too_few_steps' }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Link (allow re-attach if previously completed to a deleted/old workout)

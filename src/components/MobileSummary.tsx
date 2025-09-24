@@ -387,8 +387,24 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const plannedStepsBase: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps)
     ? (effectivePlanned as any).computed.steps
     : [];
-  // Show authored steps exactly as stored (no filtering, no fallbacks, no reordering)
-  const steps: any[] = plannedStepsBase;
+  // Derive compact pace-only rows from the same source the Planned tab renders
+  const descPaceSteps: any[] = useMemo(() => {
+    const txt = String((effectivePlanned as any)?.rendered_description || '');
+    if (!txt) return [];
+    const lines = txt.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+    const out: any[] = [];
+    const paceRe = /(\d{1,2}):(\d{2})\s*\/mi/i;
+    for (const ln of lines) {
+      const m = ln.match(paceRe);
+      if (m) {
+        const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+        out.push({ pace_sec_per_mi: sec });
+      }
+    }
+    return out;
+  }, [ (effectivePlanned as any)?.rendered_description ]);
+  // Prefer structured steps when present; otherwise prefill from description so the ledger is always populated
+  const steps: any[] = plannedStepsBase.length >= 3 ? plannedStepsBase : descPaceSteps;
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
