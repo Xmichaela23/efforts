@@ -835,14 +835,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch (fnErr) {
             console.warn('materialize-plan invoke failed (dev continue):', fnErr);
           }
-          // Immediately hydrate weeks to v3 computed totals so UI badges are accurate
-          try {
-            const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
-            const allWeekNums: number[] = Object.keys(sessionsByWeek).map(k=>parseInt(k,10)).filter(n=>Number.isFinite(n) && n>0).sort((a,b)=>a-b);
-            for (const wn of allWeekNums) {
-              try { await ensureWeekMaterialized(String(data?.id || insertPayload?.id), wn); } catch {}
-            }
-          } catch {}
+          // Disabled week bake to avoid duplicate planned rows
+          // Acceptance already inserts rows and materializes steps for the whole plan
         } else {
           console.warn('⚠️ No rows to insert - sessions_by_week may be empty or malformed');
         }
