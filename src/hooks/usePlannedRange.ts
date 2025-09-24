@@ -33,28 +33,49 @@ function writeStorage(key: string, rows: any[]) {
 export function usePlannedRange(fromISO: string, toISO: string) {
   const queryClient = useQueryClient();
 
-  const queryKeyBase = ['plannedRange', 'me', fromISO, toISO] as const;
+  // Track authenticated user id and respond to auth changes deterministically
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!mounted) return;
+        setUserId(user ? user.id : null);
+      } catch {}
+    })();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const nextId = session?.user?.id || null;
+      setUserId(nextId);
+      // Invalidate all plannedRange queries on auth changes so they refetch with new user context
+      queryClient.invalidateQueries({ queryKey: ['plannedRange'] });
+    });
+    return () => { mounted = false; subscription.unsubscribe(); };
+  }, []);
+
+  const queryKeyBase = ['plannedRange', 'me', userId, fromISO, toISO] as const;
 
   const query = useQuery({
     queryKey: queryKeyBase,
+    enabled: !!userId,
     queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [] as any[];
-      const key = cacheKey(user.id, fromISO, toISO);
+      if (!userId) return [] as any[];
+      const key = cacheKey(userId, fromISO, toISO);
       const mem = !CACHE_DISABLED ? memoryCache.get(key) : null;
       if (mem && Date.now() - mem.ts <= TTL_MS) return mem.rows;
       const [plannedRes, completedRes] = await Promise.all([
         supabase
           .from('planned_workouts')
           .select('id,name,type,date,workout_status,description,duration,week_number,day_number,training_plan_id,tags,computed,total_duration_seconds,intervals')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .gte('date', fromISO)
           .lte('date', toISO)
           .order('date', { ascending: true }),
         supabase
           .from('workouts')
           .select('id,date,type,name,computed,planned_id')
-          .eq('user_id', user.id)
+          .eq('user_id', userId)
           .gte('date', fromISO)
           .lte('date', toISO)
           .order('date', { ascending: true })
@@ -92,9 +113,8 @@ export function usePlannedRange(fromISO: string, toISO: string) {
   useEffect(() => {
     const handler = async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const k = cacheKey(user.id, fromISO, toISO);
+        if (userId) {
+          const k = cacheKey(userId, fromISO, toISO);
           memoryCache.delete(k);
           localStorage.removeItem(`plannedRange:${k}`);
           console.log('🗑️ Cleared plannedRange cache for:', k);
@@ -108,31 +128,31 @@ export function usePlannedRange(fromISO: string, toISO: string) {
       window.removeEventListener('planned:invalidate', handler);
       window.removeEventListener('workouts:invalidate', handler);
     };
-  }, [fromISO, toISO]);
+  }, [fromISO, toISO, userId]);
 
   useEffect(() => {
+    if (!userId) return;
     let channel: ReturnType<typeof supabase.channel> | null = null;
     let active = true;
     (async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user || !active) return;
+        if (!active) return;
         const invalidate = async () => {
           try {
-            const k = cacheKey(user.id, fromISO, toISO);
+            const k = cacheKey(userId, fromISO, toISO);
             memoryCache.delete(k);
             localStorage.removeItem(`plannedRange:${k}`);
           } catch {}
           queryClient.invalidateQueries({ queryKey: queryKeyBase });
         };
-        channel = supabase.channel(`planned-range-${user.id}`)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'planned_workouts', filter: `user_id=eq.${user.id}` }, async () => { await invalidate(); })
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${user.id}` }, async () => { await invalidate(); })
+        channel = supabase.channel(`planned-range-${userId}`)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'planned_workouts', filter: `user_id=eq.${userId}` }, async () => { await invalidate(); })
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'workouts', filter: `user_id=eq.${userId}` }, async () => { await invalidate(); })
           .subscribe();
       } catch {}
     })();
     return () => { active = false; try { channel?.unsubscribe(); } catch {} };
-  }, [fromISO, toISO]);
+  }, [fromISO, toISO, userId]);
 
   return { rows: query.data || [], loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
 }
