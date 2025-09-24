@@ -451,7 +451,7 @@ export default function WorkoutCalendar({
       const diffDays = Math.round((resolveDate(toDateOnlyString(tgtStart)).getTime() - resolveDate(startMondayISO).getTime()) / (1000 * 60 * 60 * 24));
       const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
 
-      // Cheap existence check to avoid unnecessary materialization
+      // Robust existence check to avoid duplicate materialization on weak count responses
       let needsMaterialize = false;
       try {
         const q = await supabase
@@ -459,9 +459,21 @@ export default function WorkoutCalendar({
           .select('id', { count: 'exact', head: true } as any)
           .eq('training_plan_id', planId)
           .eq('week_number', weekNumber);
-        const cnt = (q as any)?.count ?? 0;
-        needsMaterialize = !(Number.isFinite(cnt) && cnt > 0);
-      } catch { needsMaterialize = true; }
+        const cnt = (q as any)?.count;
+        if (typeof cnt === 'number') {
+          needsMaterialize = cnt === 0;
+        } else {
+          // Fallback probe without head: read one row to determine existence
+          const probe = await supabase
+            .from('planned_workouts')
+            .select('id')
+            .eq('training_plan_id', planId)
+            .eq('week_number', weekNumber)
+            .limit(1);
+          const rows = Array.isArray((probe as any)?.data) ? (probe as any).data : [];
+          needsMaterialize = rows.length === 0;
+        }
+      } catch { needsMaterialize = false; /* on error, do not materialize blindly */ }
 
       if (needsMaterialize) {
         try {
