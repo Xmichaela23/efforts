@@ -827,6 +827,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.error('Error materializing planned workouts:', pErr);
             throw pErr;
           }
+          // DEV: Guarantee structured steps exist immediately after acceptance
+          try {
+            await supabase.functions.invoke('materialize-plan', {
+              body: { plan_id: String(data?.id || insertPayload?.id) },
+            });
+          } catch (fnErr) {
+            console.warn('materialize-plan invoke failed (dev continue):', fnErr);
+          }
           // Immediately hydrate weeks to v3 computed totals so UI badges are accurate
           try {
             const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
