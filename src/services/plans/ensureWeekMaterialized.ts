@@ -2057,6 +2057,7 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
   if (rows.length === 0) return { inserted: 0 };
   // Idempotent insert: avoid duplicates if rows already exist
   // Prefer upsert when a unique constraint is available. If not, filter out rows that already exist.
+  let insertedCount = 0;
   try {
     // Probe existing keys for this week
     const { data: existingKeys } = await supabase
@@ -2067,16 +2068,16 @@ export async function ensureWeekMaterialized(planId: string, weekNumber: number)
     const keySet = new Set((existingKeys||[]).map((r:any)=> `${String(r.date)}|${String(r.type).toLowerCase()}|${String(r.day_number)}`));
     const filtered = rows.filter((r:any)=> !keySet.has(`${String(r.date)}|${String(r.type).toLowerCase()}|${String(r.day_number)}`));
     if (filtered.length) {
-      const { error: insErr } = await supabase.from('planned_workouts').insert(filtered as any);
-      if (insErr) throw insErr;
+      const { error } = await supabase.from('planned_workouts').insert(filtered as any);
+      if (error) throw error;
+      insertedCount += filtered.length;
     }
-  } catch (e) {
+  } catch (_e) {
     // As a last resort, attempt a blind insert; if it fails due to constraint, ignore
-    const { error: insErr } = await supabase.from('planned_workouts').insert(rows as any);
-    if (insErr) { /* swallow to keep idempotent */ }
+    const { error } = await supabase.from('planned_workouts').insert(rows as any);
+    if (!error) insertedCount += rows.length;
   }
-  if (insErr) throw insErr;
-  return { inserted: rows.length };
+  return { inserted: insertedCount };
 }
 
 
