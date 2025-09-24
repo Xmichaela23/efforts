@@ -379,16 +379,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
-  let plannedStepsBase: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : (Array.isArray((effectivePlanned as any)?.intervals) ? (effectivePlanned as any).intervals : []);
-  // Fallback: if DB steps are missing/short, derive rows from rendered_description so the ledger always lists authored steps
-  if (!Array.isArray(plannedStepsBase) || plannedStepsBase.length < 3) {
-    const text = String((effectivePlanned as any)?.rendered_description || '').trim();
-    const lines = text ? text.split(/\r?\n/).map(l=>l.trim()).filter(l=>l.length>0) : [];
-    if (lines.length >= (plannedStepsBase?.length||0)) {
-      plannedStepsBase = lines.map((ln, i) => ({ id: `txt-${i}`, label: ln }));
-    }
-  }
-  // Show authored steps exactly as in Planned (no filtering or reordering)
+  const plannedStepsBase: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps)
+    ? (effectivePlanned as any).computed.steps
+    : [];
+  // Show authored steps exactly as stored (no filtering, no fallbacks, no reordering)
   const steps: any[] = plannedStepsBase;
 
   // Build accumulated rows once for completed and advance a cursor across steps
