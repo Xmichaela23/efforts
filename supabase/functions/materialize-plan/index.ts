@@ -169,7 +169,9 @@ Deno.serve(async (req) => {
       try {
         const { steps, total_s } = expandTokensForRow(row, baselines);
         if (steps && steps.length) {
-          const update: any = { computed: { ...(row.computed||{}), steps, total_duration_seconds: total_s }, duration: Math.max(1, Math.round(total_s/60)) };
+          // Assign stable planned_index per step
+          const withIndex = steps.map((st:any, idx:number)=> ({ ...st, planned_index: idx }));
+          const update: any = { computed: { ...(row.computed||{}), steps: withIndex, total_duration_seconds: total_s }, duration: Math.max(1, Math.round(total_s/60)) };
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }

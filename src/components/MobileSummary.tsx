@@ -263,10 +263,11 @@ const completedValueForStep = (completed: any, plannedStep: any): CompletedDispl
 
 export default function MobileSummary({ planned, completed }: MobileSummaryProps) {
   const { useImperial } = useAppContext();
-  if (!planned) {
-    return (
-      <div className="text-sm text-gray-600">No planned session to compare.</div>
-    );
+  // Prefer server snapshot from completed.computed when available
+  const serverPlannedLight: any[] = Array.isArray((completed as any)?.computed?.planned_steps_light) ? (completed as any).computed.planned_steps_light : [];
+  const hasServerPlanned = serverPlannedLight.length > 0;
+  if (!planned && !hasServerPlanned) {
+    return (<div className="text-sm text-gray-600">No planned session to compare.</div>);
   }
 
   const [effectivePlanned, setEffectivePlanned] = useState<any>(planned);
@@ -385,9 +386,9 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
-  const plannedStepsBase: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps)
-    ? (effectivePlanned as any).computed.steps
-    : [];
+  const plannedStepsBase: any[] = hasServerPlanned
+    ? serverPlannedLight.map((s:any)=> ({ id: s.planned_step_id || undefined, planned_index: s.planned_index, distanceMeters: s.meters, duration: s.seconds }))
+    : (Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : []);
   // Derive compact pace-only rows from the same source the Planned tab renders
   const [ftp, setFtp] = useState<number | null>(null);
   useEffect(() => {
@@ -760,6 +761,15 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return map;
   }, [computedIntervals]);
 
+  const intervalByIndex = useMemo(() => {
+    const map = new Map<number, any>();
+    for (const it of computedIntervals) {
+      const idx = Number((it as any)?.planned_index);
+      if (Number.isFinite(idx)) map.set(idx, it);
+    }
+    return map;
+  }, [computedIntervals]);
+
   // -------- Strict mode: if workout is attached to a plan, do NOT render client fallback. --------
   const isAttachedToPlan = !!planned && !!(planned as any)?.id;
   const [computeInvoked, setComputeInvoked] = useState(false);
@@ -861,7 +871,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               {(() => {
                 if (!hasServerComputed) return <div>—</div>;
                 const pid = String((st as any)?.id || '');
-                const row = pid ? intervalByPlannedId.get(pid) : null;
+                let row = pid ? intervalByPlannedId.get(pid) : null;
+                if (!row) {
+                  const idx = Number((st as any)?.planned_index);
+                  if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
+                }
                 if (!row) return <div>—</div>;
                 if (isRideSport) {
                   const pw = row?.executed?.avg_power_w as number | undefined;
@@ -875,7 +889,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               {(() => {
                 if (hasServerComputed) {
                   const pid = String((st as any)?.id || '');
-                  const row = pid ? intervalByPlannedId.get(pid) : null;
+                  let row = pid ? intervalByPlannedId.get(pid) : null;
+                  if (!row) {
+                    const idx = Number((st as any)?.planned_index);
+                    if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
+                  }
                   const distM = row?.executed?.distance_m as number | undefined;
                   if (typeof distM === 'number' && distM > 0) {
                     if (isSwimSport) {
@@ -896,7 +914,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               {(() => {
                 if (!hasServerComputed) return <div>—</div>;
                 const pid = String((st as any)?.id || '');
-                const row = pid ? intervalByPlannedId.get(pid) : null;
+                let row = pid ? intervalByPlannedId.get(pid) : null;
+                if (!row) {
+                  const idx = Number((st as any)?.planned_index);
+                  if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
+                }
                 const dur = row?.executed?.duration_s;
                 return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
               })()}
@@ -905,7 +927,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               {(() => {
                 if (!hasServerComputed) return <div className="text-xs text-gray-700">—</div>;
                 const pid = String((st as any)?.id || '');
-                const row = pid ? intervalByPlannedId.get(pid) : null;
+                let row = pid ? intervalByPlannedId.get(pid) : null;
+                if (!row) {
+                  const idx = Number((st as any)?.planned_index);
+                  if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
+                }
                 const hr = row?.executed?.avg_hr;
                 return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
               })()}
