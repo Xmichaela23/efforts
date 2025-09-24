@@ -114,7 +114,24 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     const ensureMaterialized = async () => {
       try {
         const hasSteps = Array.isArray((linkedPlanned as any)?.computed?.steps) && (linkedPlanned as any).computed.steps.length>0;
-        if (hasSteps) return;
+        if (hasSteps) {
+          // Enforce stable IDs if missing and recompute once
+          try {
+            const steps: any[] = (linkedPlanned as any).computed.steps;
+            const needsIds = steps.some((st:any)=> !st?.id);
+            if (needsIds) {
+              const withIds = steps.map((st:any)=> ({ id: st?.id || (typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`), ...st }));
+              await supabase.from('planned_workouts').update({ computed: { ...(linkedPlanned as any).computed, steps: withIds } } as any).eq('id', String((linkedPlanned as any).id));
+              const { data } = await supabase.from('planned_workouts').select('*').eq('id', String((linkedPlanned as any).id)).maybeSingle();
+              if (data) setLinkedPlanned(data);
+              if (isCompleted && (workout as any)?.id) {
+                await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any).id) } });
+                try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+              }
+            }
+          } catch {}
+          return;
+        }
         // First try in-place expansion from steps_preset (works for single workouts outside plan weeks)
         try {
           const readStepsPresetLocal = (src: any): string[] | undefined => {
