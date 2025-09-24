@@ -45,6 +45,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   const [undoing, setUndoing] = useState(false);
   const [linkedPlanned, setLinkedPlanned] = useState<any | null>(null);
   const [hydratedPlanned, setHydratedPlanned] = useState<any | null>(null);
+  const recomputeGuardRef = useRef<Set<string>>(new Set());
   // Suppress auto re-link fallback briefly after an explicit Unattach
   const suppressRelinkUntil = useRef<number>(0);
 
@@ -240,6 +241,76 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       } catch {}
     })();
   }, [activeTab, isCompleted, linkedPlanned?.id, workout?.id]);
+
+  // Ensure Planned steps exist when viewing Summary: hydrate/materialize planned row if needed
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab !== 'summary') return;
+        const pid = String(((linkedPlanned as any)?.id || (workout as any)?.planned_id || ''));
+        if (!pid) return;
+        // Fetch latest planned row
+        const { data: row } = await supabase
+          .from('planned_workouts')
+          .select('id,type,computed,steps_preset,export_hints,tags,main')
+          .eq('id', pid)
+          .maybeSingle();
+        const hasSteps = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0; } catch { return false; }})();
+        if (hasSteps) { setHydratedPlanned(row as any); return; }
+        // Attempt server-side materialization for this planned row
+        try {
+          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
+        } catch {}
+        // Re-fetch and set if steps now exist
+        try {
+          const { data: row2 } = await supabase
+            .from('planned_workouts')
+            .select('id,type,computed,steps_preset,export_hints,tags,main')
+            .eq('id', pid)
+            .maybeSingle();
+          const hasSteps2 = (() => { try { return Array.isArray((row2 as any)?.computed?.steps) && (row2 as any).computed.steps.length>0; } catch { return false; }})();
+          if (hasSteps2) { setHydratedPlanned(row2 as any); try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {} }
+        } catch {}
+      } catch {}
+    })();
+  }, [activeTab, linkedPlanned?.id, (workout as any)?.planned_id]);
+
+  // Race fixer: after planned hydration, if executed intervals exist but lack planned_step_id mapping, re-run compute once
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab !== 'summary') return;
+        if (!isCompleted) return;
+        const wid = String((workout as any)?.id || '');
+        if (!wid) return;
+        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { return false; }})();
+        if (!hasPlannedSteps) return; // wait until planned steps are present
+
+        // Load latest intervals
+        let intervals: any[] = [];
+        try {
+          const local = (workout as any)?.computed;
+          if (local && Array.isArray(local?.intervals)) intervals = local.intervals;
+        } catch {}
+        if (!intervals || !intervals.length) {
+          const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
+          const cmp = (data as any)?.computed;
+          if (cmp && Array.isArray(cmp?.intervals)) intervals = cmp.intervals;
+        }
+        if (!intervals || !intervals.length) return; // nothing to recompute yet
+
+        const missingMapping = intervals.every((it:any)=> !it?.planned_step_id);
+        if (!missingMapping) return;
+
+        // Avoid repeated re-compute loops per workout id
+        if (recomputeGuardRef.current.has(wid)) return;
+        recomputeGuardRef.current.add(wid);
+
+        await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
+        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+      } catch {}
+    })();
+  }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
 
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
