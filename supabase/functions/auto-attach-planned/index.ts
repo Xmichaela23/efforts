@@ -155,9 +155,27 @@ Deno.serve(async (req) => {
 
     // Threshold to attach: accept if best is reasonably close on duration or distance
     const softMatch = (bestDurPct != null && bestDurPct <= 0.50) || (bestDistPct != null && bestDistPct <= 0.50);
-    // Do not attach to non-materialized candidates
-    if (!best || (!softMatch && bestScore < 0.5) || !(best as any)._hasSteps) {
+    if (!best || (!softMatch && bestScore < 0.5)) {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'score_too_low', bestScore }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
+    // Ensure candidate has computed.steps (server-side materialization for new plans)
+    try {
+      const hasSteps = Array.isArray((best as any)?.computed?.steps) && (best as any).computed.steps.length>0;
+      if (!hasSteps) {
+        const matUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
+        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
+        await fetch(matUrl, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: (best as any).id }) });
+        // refetch planned row
+        try {
+          const { data: refreshed } = await supabase.from('planned_workouts').select('id,computed,workout_status').eq('id', (best as any).id).maybeSingle();
+          if (refreshed) best = { ...best, ...refreshed } as any;
+        } catch {}
+      }
+    } catch {}
+    const nowHasSteps = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) && (best as any).computed.steps.length>0; } catch { return false; } })();
+    if (!nowHasSteps) {
+      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_steps_after_materialize' }), { headers: { 'Content-Type': 'application/json' } });
     }
 
     // Link (allow re-attach if previously completed to a deleted/old workout)

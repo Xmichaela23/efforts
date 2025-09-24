@@ -666,6 +666,65 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               return 'Session';
             })();
 
+            // Split brick sessions into separate planned rows (ride + run)
+            if ((s.discipline || s.type || '').toLowerCase() === 'brick') {
+              const tokens: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=>String(t)) : [];
+              const bikeTokens = tokens.filter(t => /^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)));
+              const runTokens = tokens.filter(t => !/^(warmup_bike|bike_|cooldown_bike)/i.test(String(t)));
+
+              const baseTags: string[] = Array.isArray(s?.tags) ? s.tags.slice() : [];
+              if (!baseTags.includes('brick')) baseTags.push('brick');
+
+              if (bikeTokens.length) {
+                rows.push({
+                  user_id: user?.id,
+                  training_plan_id: data.id,
+                  template_id: String(data.id),
+                  week_number: weekNum,
+                  day_number: dow,
+                  date,
+                  type: 'ride',
+                  name: s.name ? `${s.name} — Bike` : 'Ride',
+                  description: s.description || '',
+                  duration: durationVal,
+                  workout_status: 'planned',
+                  source: 'training_plan',
+                  steps_preset: bikeTokens,
+                  export_hints: planExportHints,
+                  rendered_description: rendered,
+                  computed: null,
+                  units: unitsPref,
+                  tags: baseTags,
+                });
+              }
+
+              if (runTokens.length) {
+                rows.push({
+                  user_id: user?.id,
+                  training_plan_id: data.id,
+                  template_id: String(data.id),
+                  week_number: weekNum,
+                  day_number: dow,
+                  date,
+                  type: 'run',
+                  name: s.name ? `${s.name} — Run` : 'Run',
+                  description: s.description || '',
+                  duration: durationVal,
+                  workout_status: 'planned',
+                  source: 'training_plan',
+                  steps_preset: runTokens,
+                  export_hints: planExportHints,
+                  rendered_description: rendered,
+                  computed: null,
+                  units: unitsPref,
+                  tags: baseTags,
+                });
+              }
+
+              // Skip single-row brick handling
+              return;
+            }
+
             const row: any = {
               user_id: user?.id,
               training_plan_id: data.id,
