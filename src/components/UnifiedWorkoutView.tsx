@@ -136,7 +136,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             const { expand } = await import('@/services/plans/expander');
             const { resolveTargets, totalDurationSeconds } = await import('@/services/plans/targets');
             const atomic: any[] = expand(stepsPreset || [], (row as any).main, (row as any).tags);
-            const resolved: any[] = resolveTargets(atomic as any, baselines, ((row as any).export_hints || {}), String((row as any).type||'').toLowerCase());
+            const resolved0: any[] = resolveTargets(atomic as any, baselines, ((row as any).export_hints || {}), String((row as any).type||'').toLowerCase());
+            // Guarantee stable IDs on all steps (required for server mapping)
+            const resolved: any[] = (resolved0 || []).map((st:any)=> ({ id: st?.id || (typeof crypto!=='undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`), ...st }));
             if (Array.isArray(resolved) && resolved.length) {
               const total = totalDurationSeconds(resolved as any);
               const update = { computed: { normalization_version: 'v3', steps: resolved, total_duration_seconds: total }, duration: Math.round(total/60) } as any;
