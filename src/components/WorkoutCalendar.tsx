@@ -212,6 +212,22 @@ export default function WorkoutCalendar({
     return () => { if (t) clearTimeout(t); };
   }, [loadingWeekRaw, fromISO, toISO]);
 
+  // Auto-materialize the visible week once on first load if empty and a plan exists
+  const [materializeTriedISO, setMaterializeTriedISO] = useState<string | null>(null);
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!currentPlans || currentPlans.length === 0) return;
+        if (!fromISO) return;
+        if (materializeTriedISO === fromISO) return;
+        const empty = !Array.isArray(plannedWeekRows) || plannedWeekRows.length === 0;
+        if (!empty) return;
+        setMaterializeTriedISO(fromISO);
+        await ensureWeekForDate(weekStart);
+      } catch {}
+    })();
+  }, [fromISO, weekStart.getTime(), Array.isArray(plannedWeekRows)?plannedWeekRows.length:0, currentPlans?.[0]?.id]);
+
   // Ensure attach + compute sweep runs for the visible week (once per week in session)
   useEffect(() => {
     (async () => {

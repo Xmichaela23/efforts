@@ -661,6 +661,20 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success:true, computed, mode:'snap-to-laps' }), { headers: { 'Content-Type':'application/json', 'Access-Control-Allow-Origin': '*' } });
     }
 
+    // Build lightweight planned snapshot with stable order
+    const plannedSnapshot = (() => {
+      const out: any[] = [];
+      for (let i=0;i<plannedSteps.length;i+=1) {
+        const st = plannedSteps[i];
+        const id = (st && st.id) ? String(st.id) : null;
+        const meters = deriveMetersFromPlannedStep(st) || null;
+        const seconds = deriveSecondsFromPlannedStep(st) || null;
+        const kind = String(st?.type || st?.kind || '').toLowerCase() || null;
+        out.push({ planned_index: i, planned_step_id: id, meters, seconds, kind });
+      }
+      return out;
+    })();
+
     // Build step windows
     let idx = 0;
     let cursorT = rows.length ? rows[0].t : 0;
@@ -934,6 +948,7 @@ Deno.serve(async (req) => {
     const computed = {
       version: COMPUTED_VERSION,
       intervals: outIntervals,
+      planned_steps_light: plannedSnapshot,
       overall: {
         duration_s_moving: overallSec,
         distance_m: Math.round(overallMeters),
