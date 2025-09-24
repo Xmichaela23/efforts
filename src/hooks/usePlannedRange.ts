@@ -64,45 +64,19 @@ export function usePlannedRange(fromISO: string, toISO: string) {
       const key = cacheKey(userId, fromISO, toISO);
       const mem = !CACHE_DISABLED ? memoryCache.get(key) : null;
       if (mem && Date.now() - mem.ts <= TTL_MS) return mem.rows;
-      const [plannedRes, completedRes] = await Promise.all([
-        supabase
-          .from('planned_workouts')
-          .select('id,name,type,date,workout_status,description,duration,week_number,day_number,training_plan_id,tags,computed,total_duration_seconds,intervals')
-          .eq('user_id', userId)
-          .gte('date', fromISO)
-          .lte('date', toISO)
-          .order('date', { ascending: true }),
-        supabase
-          .from('workouts')
-          .select('id,date,type,name,computed,planned_id')
-          .eq('user_id', userId)
-          .gte('date', fromISO)
-          .lte('date', toISO)
-          .order('date', { ascending: true })
-      ]);
+      const plannedRes = await supabase
+        .from('planned_workouts')
+        .select('id,name,type,date,workout_status,description,duration,week_number,day_number,training_plan_id,tags,computed,total_duration_seconds,intervals,source')
+        .eq('user_id', userId)
+        .gte('date', fromISO)
+        .lte('date', toISO)
+        .order('date', { ascending: true });
       if (plannedRes.error) throw plannedRes.error;
-      if (completedRes.error) throw completedRes.error;
       const plannedAll = Array.isArray(plannedRes.data) ? plannedRes.data : [];
-      const completedAll = Array.isArray(completedRes.data) ? completedRes.data : [];
-      const plannedActive = plannedAll; // Don't filter anything - show all planned workouts
-      const replaced = new Set<string>(completedAll.map((c:any)=>String(c.planned_id||'')).filter(Boolean));
-      const plannedFinal = plannedActive.filter((p:any)=> !replaced.has(String(p.id)));
-      const completedRows = completedAll.map((c:any)=>({
-        id: c.id,
-        name: c.name || 'Completed',
-        type: c.type,
-        date: c.date,
-        workout_status: 'completed',
-        computed: c.computed,
-        planned_id: c.planned_id
-      }));
-      const completedKeys = new Set(completedRows.map((c:any)=> `${String(c.date)}|${String(c.type||'').toLowerCase()}`));
-      const plannedSuppressed = plannedFinal.filter((p:any)=> !completedKeys.has(`${String(p.date)}|${String(p.type||'').toLowerCase()}`));
-      const merged = [...plannedSuppressed, ...completedRows].sort((a:any,b:any)=> String(a.date).localeCompare(String(b.date)));
-      const payload = { ts: Date.now(), rows: merged };
+      const payload = { ts: Date.now(), rows: plannedAll };
       memoryCache.set(key, payload);
-      writeStorage(key, merged);
-      return merged;
+      writeStorage(key, plannedAll);
+      return plannedAll;
     },
     staleTime: (import.meta.env?.DEV ? 5 : 60) * 60 * 1000,
     gcTime: 6 * 60 * 60 * 1000,
