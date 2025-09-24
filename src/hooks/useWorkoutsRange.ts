@@ -58,6 +58,9 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
       const k = key(userId, fromISO, toISO);
       const m = !CACHE_DISABLED ? mem.get(k) : null;
       if (m && Date.now() - m.ts <= TTL) return m.rows;
+      if (import.meta.env?.DEV) {
+        try { console.time?.(`⏱ workoutsRange query ${fromISO}→${toISO}`); } catch {}
+      }
       const { data, error } = await supabase
         .from('workouts')
         .select('id,type,date,distance,workout_status,planned_id')
@@ -65,8 +68,14 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
         .gte('date', fromISO)
         .lte('date', toISO)
         .order('date', { ascending: true });
+      if (import.meta.env?.DEV) {
+        try { console.timeEnd?.(`⏱ workoutsRange query ${fromISO}→${toISO}`); } catch {}
+      }
       if (error) throw error;
       const safe = Array.isArray(data) ? data : [];
+      if (import.meta.env?.DEV) {
+        try { console.log?.('workoutsRange rows:', safe.length); } catch {}
+      }
       const payload = { ts: Date.now(), rows: safe };
       mem.set(k, payload);
       write(k, safe);

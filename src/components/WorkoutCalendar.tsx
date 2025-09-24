@@ -211,7 +211,8 @@ export default function WorkoutCalendar({
       try {
         if (!fromISO || backfilledWeeks.has(fromISO)) return;
         backfilledWeeks.add(fromISO);
-        await supabase.functions.invoke('sweep-week', { body: { week_start: fromISO } });
+        // Fire-and-forget; do not block calendar rendering
+        supabase.functions.invoke('sweep-week', { body: { week_start: fromISO } }).catch(()=>{});
       } catch {}
     })();
   }, [fromISO]);

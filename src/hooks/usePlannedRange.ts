@@ -64,15 +64,24 @@ export function usePlannedRange(fromISO: string, toISO: string) {
       const key = cacheKey(userId, fromISO, toISO);
       const mem = !CACHE_DISABLED ? memoryCache.get(key) : null;
       if (mem && Date.now() - mem.ts <= TTL_MS) return mem.rows;
+      if (import.meta.env?.DEV) {
+        try { console.time?.(`⏱ plannedRange query ${fromISO}→${toISO}`); } catch {}
+      }
       const plannedRes = await supabase
         .from('planned_workouts')
-        .select('id,name,type,date,workout_status,description,duration,week_number,day_number,training_plan_id,tags,computed,total_duration_seconds,intervals,source')
+        .select('id,type,date,workout_status,total_duration_seconds,steps_preset,description,tags,training_plan_id')
         .eq('user_id', userId)
         .gte('date', fromISO)
         .lte('date', toISO)
         .order('date', { ascending: true });
+      if (import.meta.env?.DEV) {
+        try { console.timeEnd?.(`⏱ plannedRange query ${fromISO}→${toISO}`); } catch {}
+      }
       if (plannedRes.error) throw plannedRes.error;
       const plannedAll = Array.isArray(plannedRes.data) ? plannedRes.data : [];
+      if (import.meta.env?.DEV) {
+        try { console.log?.('plannedRange rows:', plannedAll.length); } catch {}
+      }
       const payload = { ts: Date.now(), rows: plannedAll };
       memoryCache.set(key, payload);
       writeStorage(key, plannedAll);
