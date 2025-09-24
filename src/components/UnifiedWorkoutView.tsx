@@ -312,6 +312,33 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     })();
   }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
 
+  // Ensure server snapshot exists: if planned steps exist but computed.planned_steps_light is missing, trigger compute once
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab !== 'summary') return;
+        if (!isCompleted) return;
+        const wid = String((workout as any)?.id || '');
+        if (!wid) return;
+        const hasPlannedSteps = (() => { try { return Array.isArray((hydratedPlanned as any)?.computed?.steps) && (hydratedPlanned as any).computed.steps.length>0; } catch { return false; }})();
+        if (!hasPlannedSteps) return;
+        // Check current computed snapshot
+        let plannedLight: any[] = [];
+        try {
+          const local = (workout as any)?.computed;
+          if (local && Array.isArray(local?.planned_steps_light)) plannedLight = local.planned_steps_light;
+        } catch {}
+        if (!plannedLight || !plannedLight.length) {
+          // Avoid double invoke using same guard
+          if (recomputeGuardRef.current.has(`snap-${wid}`)) return;
+          recomputeGuardRef.current.add(`snap-${wid}`);
+          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
+          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        }
+      } catch {}
+    })();
+  }, [activeTab, isCompleted, hydratedPlanned?.computed?.steps, workout?.id]);
+
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
     const desired = initialTab || (isCompleted ? 'completed' : 'planned');
