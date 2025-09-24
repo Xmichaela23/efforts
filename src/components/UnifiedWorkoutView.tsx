@@ -252,7 +252,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         // Fetch latest planned row
         const { data: row } = await supabase
           .from('planned_workouts')
-          .select('id,type,computed,steps_preset,export_hints,tags,main')
+          .select('id,type,computed,steps_preset,export_hints,tags')
           .eq('id', pid)
           .maybeSingle();
         const hasSteps = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0; } catch { return false; }})();
@@ -265,7 +265,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         try {
           const { data: row2 } = await supabase
             .from('planned_workouts')
-            .select('id,type,computed,steps_preset,export_hints,tags,main')
+            .select('id,type,computed,steps_preset,export_hints,tags')
             .eq('id', pid)
             .maybeSingle();
           const hasSteps2 = (() => { try { return Array.isArray((row2 as any)?.computed?.steps) && (row2 as any).computed.steps.length>0; } catch { return false; }})();

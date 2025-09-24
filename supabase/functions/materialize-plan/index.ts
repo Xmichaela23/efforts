@@ -125,7 +125,18 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
 }
 
 Deno.serve(async (req) => {
-  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  } as Record<string,string>;
+
+  // CORS preflight
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') return new Response('Method not allowed', { status: 405, headers: corsHeaders });
   try {
     const payload = await req.json();
     const planId: string | null = payload?.plan_id ?? null;
@@ -141,9 +152,9 @@ Deno.serve(async (req) => {
       const { data } = await supabase.from('planned_workouts').select('*').eq('training_plan_id', planId).order('date');
       rows = data || [];
     } else {
-      return new Response(JSON.stringify({ error:'plan_id or planned_workout_id required' }), { status:400, headers:{'Content-Type':'application/json'} });
+      return new Response(JSON.stringify({ error:'plan_id or planned_workout_id required' }), { status:400, headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
     }
-    if (!rows.length) return new Response(JSON.stringify({ success:true, materialized:0 }), { headers:{'Content-Type':'application/json'} });
+    if (!rows.length) return new Response(JSON.stringify({ success:true, materialized:0 }), { headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
 
     // Load baselines for user inferred from first row
     const userId = rows[0]?.user_id;
@@ -164,9 +175,9 @@ Deno.serve(async (req) => {
         }
       } catch {}
     }
-    return new Response(JSON.stringify({ success:true, materialized: count }), { headers:{'Content-Type':'application/json'} });
+    return new Response(JSON.stringify({ success:true, materialized: count }), { headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
   } catch (e) {
-    return new Response(JSON.stringify({ error:String(e) }), { status:500, headers:{'Content-Type':'application/json'} });
+    return new Response(JSON.stringify({ error:String(e) }), { status:500, headers:{ ...corsHeaders, 'Content-Type':'application/json'} });
   }
 });
 
