@@ -11,6 +11,13 @@ export type CalendarEvent = {
   href?: string;
   provider?: string;
 };
+// Background prefetcher: warms next/prev week caches without rendering
+function WeekPrefetcher({ fromISO, toISO }: { fromISO: string; toISO: string }) {
+  // These hooks are auth-gated; they will no-op until authenticated
+  usePlannedRange(fromISO, toISO);
+  useWorkoutsRange(fromISO, toISO);
+  return null;
+}
 
 interface WorkoutCalendarProps {
   onAddEffort: () => void;
@@ -382,12 +389,10 @@ export default function WorkoutCalendar({
 
   const handlePrevWeek = async (newRef: Date) => {
     setReferenceDate(newRef);
-    try { void ensureWeekForDate(newRef); } catch {}
   };
 
   const handleNextWeek = async (newRef: Date) => {
     setReferenceDate(newRef);
-    try { void ensureWeekForDate(newRef); } catch {}
   };
 
   // Helper: compute Week 1 start from an anchor row
@@ -489,6 +494,15 @@ export default function WorkoutCalendar({
   };
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
+
+  // Idle prefetch of neighbor weeks after current week settles
+  const [prefetchNeighbors, setPrefetchNeighbors] = useState(false);
+  useEffect(() => {
+    setPrefetchNeighbors(false);
+    if (loadingDebounced) return;
+    const t = setTimeout(() => setPrefetchNeighbors(true), 300);
+    return () => clearTimeout(t);
+  }, [fromISO, toISO, loadingDebounced]);
 
   // Map events by date (YYYY-MM-DD)
   const map = new Map<string, CalendarEvent[]>();
@@ -624,6 +638,21 @@ export default function WorkoutCalendar({
           );
         })}
       </div>
+      {/* Hidden background prefetchers */}
+      {prefetchNeighbors && (
+        <>
+          {(() => {
+            const prevStartISO = toDateOnlyString(addDays(weekStart, -7));
+            const prevEndISO = toDateOnlyString(addDays(weekStart, -1));
+            return <WeekPrefetcher fromISO={prevStartISO} toISO={prevEndISO} />;
+          })()}
+          {(() => {
+            const nextStartISO = toDateOnlyString(addDays(weekEnd, 1));
+            const nextEndISO = toDateOnlyString(addDays(weekEnd, 7));
+            return <WeekPrefetcher fromISO={nextStartISO} toISO={nextEndISO} />;
+          })()}
+        </>
+      )}
     </div>
   );
 }
