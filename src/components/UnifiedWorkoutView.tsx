@@ -179,6 +179,36 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     if (activeTab === 'summary') ensureMaterialized();
   }, [linkedPlanned, activeTab]);
 
+  // Auto-trigger server compute on Summary open when attached plan exists but intervals are missing or lack planned_step_id
+  useEffect(() => {
+    (async () => {
+      try {
+        if (activeTab !== 'summary') return;
+        if (!isCompleted) return;
+        const wid = String((workout as any)?.id || '');
+        const pid = String(((linkedPlanned as any)?.id || (workout as any)?.planned_id || ''));
+        if (!wid || !pid) return;
+
+        // Check existing computed intervals and mapping
+        let intervals: any[] = [];
+        try {
+          const local = (workout as any)?.computed;
+          if (local && Array.isArray(local?.intervals)) intervals = local.intervals;
+        } catch {}
+        if (!intervals || !intervals.length) {
+          const { data } = await supabase.from('workouts').select('computed').eq('id', wid).maybeSingle();
+          const cmp = (data as any)?.computed;
+          if (cmp && Array.isArray(cmp?.intervals)) intervals = cmp.intervals;
+        }
+        const needs = (!intervals || !intervals.length) || intervals.every((it:any)=> !it?.planned_step_id);
+        if (needs) {
+          await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: wid } });
+          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+        }
+      } catch {}
+    })();
+  }, [activeTab, isCompleted, linkedPlanned?.id, workout?.id]);
+
   // If caller asks for a specific tab or the workout status changes (planned↔completed), update tab
   useEffect(() => {
     const desired = initialTab || (isCompleted ? 'completed' : 'planned');
