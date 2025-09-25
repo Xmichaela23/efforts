@@ -67,32 +67,91 @@ function deriveStrengthExercises(tokens: string[], baselines: any): any[] {
       deadlift: typeof bn.deadlift === 'number' ? bn.deadlift : undefined,
       ohp: typeof bn.overheadPress1RM === 'number' ? bn.overheadPress1RM : (typeof bn.ohp==='number'?bn.ohp:undefined),
     }
+
+    const getAccessoryRatio = (movement: string): number => {
+      const m = movement.toLowerCase()
+      // Primary lifts default to 1.0
+      if (/bench|squat|deadlift|dead_lift|ohp|overhead/.test(m)) return 1.0
+      // Upper body pull (bench reference)
+      if (m==='barbell_row') return 0.90
+      if (/^t[_-]?bar[_-]?row$/.test(m)) return 0.80
+      if (m==='lat_pulldown') return 0.65
+      if (m==='chest_supported_row') return 0.85
+      if (m==='cable_row') return 0.70
+      // Hip dominant (deadlift reference)
+      if (/^hip[_-]?thrusts?$/.test(m)) return 0.80
+      if (m==='romanian_deadlift') return 0.70
+      if (m==='good_mornings') return 0.45
+      if (m==='single_leg_rdl') return 0.25
+      // Knee dominant (squat reference)
+      if (m==='bulgarian_split_squat') return 0.30
+      if (m==='walking_lunges') return 0.35
+      if (m==='goblet_squats') return 0.40
+      if (m==='step_ups') return 0.25
+      // Upper body push variants (bench reference)
+      if (m==='dips') return 0.90
+      if (m==='incline_bench') return 0.85
+      if (m==='close_grip_bench') return 0.90
+      return 1.0
+    }
+
+    const getPrimary1RM = (movement: string): number | undefined => {
+      const m = movement.toLowerCase()
+      if (/bench/.test(m)) return oneRM.bench
+      if (/squat/.test(m)) return oneRM.squat
+      if (/deadlift|dead_lift/.test(m)) return oneRM.deadlift
+      if (/ohp|overhead/.test(m)) return oneRM.ohp
+      // Accessory → map to primary reference the ratio expects
+      if (/barbell_row|t[_-]?bar[_-]?row|lat_pulldown|chest_supported_row|cable_row|dips|incline_bench|close_grip_bench/.test(m)) return oneRM.bench
+      if (/hip[_-]?thrust|romanian_deadlift|good_mornings|single_leg_rdl/.test(m)) return oneRM.deadlift
+      if (/bulgarian_split_squat|walking_lunges|goblet_squats|step_ups/.test(m)) return oneRM.squat
+      return undefined
+    }
+
+    const repScaleFor = (reps: number): number => {
+      if (!Number.isFinite(reps)) return 1
+      if (reps <= 6) return 1.05
+      if (reps <= 9) return 1.00
+      if (reps <= 12) return 0.95
+      if (reps <= 15) return 0.90
+      return 0.85
+    }
+
+    const defaultPctFor = (reps: number): number => {
+      if (!Number.isFinite(reps)) return 0.70
+      if (reps <= 5) return 0.825
+      if (reps <= 8) return 0.725
+      if (reps <= 12) return 0.675
+      return 0.60
+    }
+
     for (const t of tokens) {
       const s = String(t).toLowerCase()
-      // Standard pattern with numeric reps and optional @pct
+      // Numeric reps, optional @pct
       let m = s.match(/st_(?:main|acc)_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?/)
       if (m) {
-        const nameRaw = m[1]
+        const movement = m[1]
         const sets = parseInt(m[2],10)
         const reps = parseInt(m[3],10)
-        const pct = m[4] ? parseInt(m[4],10) : undefined
-        const name = nameRaw.replace(/_/g,' ')
-        let base: number | undefined
-        if (/bench/.test(nameRaw)) base = oneRM.bench
-        else if (/squat/.test(nameRaw)) base = oneRM.squat
-        else if (/deadlift|dead_lift/.test(nameRaw)) base = oneRM.deadlift
-        else if (/ohp|overhead/.test(nameRaw)) base = oneRM.ohp
-        const weight = (typeof base==='number' && typeof pct==='number') ? round5(base * (pct/100)) : undefined
-        out.push({ name, sets: Math.max(1,sets), reps, ...(weight?{ weight }:{}) })
+        const explicitPct = m[4] ? parseInt(m[4],10) : undefined
+        const displayName = movement.replace(/_/g,' ')
+
+        const base1RM = getPrimary1RM(movement)
+        if (!base1RM) { out.push({ name: displayName, sets: Math.max(1,sets), reps }); continue }
+        // If @pct is provided, interpret as percent of base (reference) 1RM directly → ignore accessory ratio
+        const ratio = (typeof explicitPct==='number') ? 1.0 : getAccessoryRatio(movement)
+        const repScale = repScaleFor(reps)
+        const pct = typeof explicitPct==='number' ? (explicitPct/100) : defaultPctFor(reps)
+        const working = base1RM * ratio * pct * repScale
+        out.push({ name: displayName, sets: Math.max(1,sets), reps, weight: round5(working) })
         continue
       }
-      // AMRAP chin-up variant: st_acc_chinup_3xamrap_rest105_rir2
+      // AMRAP chin-up variant: weight left undefined
       m = s.match(/st_(?:main|acc)_([a-z0-9_]*chin[-_]?up[s]?|chinups?)_(\d+)xamrap(?:_rest\d+)?(?:_rir\d+)?/)
       if (m) {
         const nameRaw = (m[1]||'chinup').replace(/_/g,' ')
         const sets = parseInt(m[2],10)
-        const name = nameRaw
-        out.push({ name, sets: Math.max(1,sets), reps: 'AMRAP' })
+        out.push({ name: nameRaw, sets: Math.max(1,sets), reps: 'AMRAP' })
         continue
       }
     }
