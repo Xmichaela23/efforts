@@ -242,6 +242,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
   }, []);
 
+  // Warm unified week cache after auth to reduce first calendar load latency
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!plansAuthReady) return;
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+        const today = new Date();
+        const day = today.getDay();
+        const diff = (day + 6) % 7; // Monday start
+        const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - diff);
+        const y = (d:Date)=> d.getFullYear();
+        const m = (d:Date)=> String(d.getMonth()+1).padStart(2,'0');
+        const d0 = (d:Date)=> String(d.getDate()).padStart(2,'0');
+        const fromISO = `${y(monday)}-${m(monday)}-${d0(monday)}`;
+        const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+6);
+        const toISO = `${y(sunday)}-${m(sunday)}-${d0(sunday)}`;
+        try { await supabase.functions.invoke('get-week', { body: { from: fromISO, to: toISO } }); } catch {}
+      } catch {}
+    })();
+  }, [plansAuthReady]);
+
   useEffect(() => {
     if (plansAuthReady) {
       loadPlans();
@@ -835,8 +857,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           } catch (fnErr) {
             console.warn('materialize-plan invoke failed (dev continue):', fnErr);
           }
-          // Disabled week bake to avoid duplicate planned rows
-          // Acceptance already inserts rows and materializes steps for the whole plan
+          // Pre-materialize Week 1 and warm unified cache for week 1
+          try {
+            const parts = String(startDate).split('-').map((x)=>parseInt(x,10));
+            const start = new Date(parts[0], (parts[1]||1)-1, parts[2]||1);
+            const day = start.getDay();
+            const diff = (day + 6) % 7; // Monday
+            const monday = new Date(start.getFullYear(), start.getMonth(), start.getDate() - diff);
+            const y = (d:Date)=> d.getFullYear();
+            const m = (d:Date)=> String(d.getMonth()+1).padStart(2,'0');
+            const d0 = (d:Date)=> String(d.getDate()).padStart(2,'0');
+            const wk1Start = `${y(monday)}-${m(monday)}-${d0(monday)}`;
+            const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate()+6);
+            const wk1End = `${y(sunday)}-${m(sunday)}-${d0(sunday)}`;
+            supabase.functions.invoke('sweep-week', { body: { week_start: wk1Start } }).catch(()=>{});
+            supabase.functions.invoke('get-week', { body: { from: wk1Start, to: wk1End } }).catch(()=>{});
+          } catch {}
         } else {
           console.warn('⚠️ No rows to insert - sessions_by_week may be empty or malformed');
         }

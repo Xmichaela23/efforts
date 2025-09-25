@@ -203,6 +203,8 @@ export default function WorkoutCalendar({
     date: it.date,
     type: it.type,
     workout_status: it.status || 'planned',
+    source: 'training_plan',
+    provider: 'workouts',
     // Map planned_data fields expected by label derivation
     computed: (it.planned && Array.isArray(it.planned.steps)) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : (it.planned || null),
     total_duration_seconds: it.planned?.total_duration_seconds || null,
@@ -273,7 +275,7 @@ export default function WorkoutCalendar({
     if (!unifiedLoading) setInitialLoadDone(true);
   }, [unifiedLoading]);
 
-  // Auto-materialize the visible week once on first load if the week is entirely empty and a plan exists
+  // Auto-materialize the visible week when an active plan exists but no planned rows are present for this week
   const [materializeTriedISO, setMaterializeTriedISO] = useState<string | null>(null);
   useEffect(() => {
     (async () => {
@@ -283,13 +285,13 @@ export default function WorkoutCalendar({
         if (materializeTriedISO === fromISO) return;
         // Only consider materialization when the unified query completed without errors
         if (unifiedLoading || unifiedError) return;
-        const emptyWeek = (!Array.isArray(unifiedItems) || unifiedItems.length === 0);
-        if (!emptyWeek) return;
+        const noPlannedThisWeek = !(Array.isArray(unifiedPlanned) && unifiedPlanned.length > 0);
+        if (!noPlannedThisWeek) return;
         setMaterializeTriedISO(fromISO);
         await ensureWeekForDate(weekStart);
       } catch {}
     })();
-  }, [fromISO, weekStart.getTime(), Array.isArray(unifiedItems)?unifiedItems.length:0, unifiedLoading, unifiedError, currentPlans?.[0]?.id]);
+  }, [fromISO, weekStart.getTime(), Array.isArray(unifiedPlanned)?unifiedPlanned.length:0, unifiedLoading, unifiedError, currentPlans?.[0]?.id]);
 
   // Ensure attach + compute sweep runs for the visible week (once per week in session)
   useEffect(() => {
@@ -395,8 +397,8 @@ export default function WorkoutCalendar({
       return true;
     });
 
-    // Build raw events with consistent labels (no collapsing; show all entries)
-    const raw = allFiltered
+    // Build raw events with consistent labels; collapse exact duplicates by (id) to prevent double materialize artifacts
+    const rawAll = allFiltered
       .filter((w: any) => {
         if (!w || !w.date) return false;
         const today = new Date().toLocaleDateString('en-CA');
@@ -427,7 +429,16 @@ export default function WorkoutCalendar({
         } as any;
       });
 
-    // Return raw list; we intentionally show all entries (no collapsing)
+    const seenIds = new Set<string>();
+    const raw = rawAll.filter((ev:any)=>{
+      const id = String((ev as any)?._src?.id || '');
+      if (!id) return true;
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
+    });
+
+    // Return raw list; we intentionally show all entries (except exact duplicates)
     return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider }));
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
