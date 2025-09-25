@@ -221,8 +221,9 @@ export default function WorkoutCalendar({
 
   // Debounced loading indicator to avoid flicker on fast responses
   const [loadingDebounced, setLoadingDebounced] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const hasItems = Array.isArray(unifiedItems) && unifiedItems.length>0;
-  const loadingWeekRaw = Boolean(unifiedLoading) && !hasItems;
+  const loadingWeekRaw = !initialLoadDone && Boolean(unifiedLoading) && !hasItems;
   useEffect(() => {
     let t: any;
     if (loadingWeekRaw) {
@@ -232,6 +233,11 @@ export default function WorkoutCalendar({
     }
     return () => { if (t) clearTimeout(t); };
   }, [loadingWeekRaw, fromISO, toISO]);
+
+  // Mark initial load complete once we have either data or a settled request
+  useEffect(() => {
+    if (!unifiedLoading) setInitialLoadDone(true);
+  }, [unifiedLoading]);
 
   // Auto-materialize the visible week once on first load if the week is entirely empty and a plan exists
   const [materializeTriedISO, setMaterializeTriedISO] = useState<string | null>(null);
