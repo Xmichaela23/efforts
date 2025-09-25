@@ -56,42 +56,8 @@ export function usePlannedRange(fromISO: string, toISO: string) {
 
   const queryKeyBase = ['plannedRange', 'me', userId, fromISO, toISO] as const;
 
-  const query = useQuery({
-    queryKey: queryKeyBase,
-    enabled: !!userId,
-    queryFn: async () => {
-      if (!userId) return [] as any[];
-      const key = cacheKey(userId, fromISO, toISO);
-      const mem = !CACHE_DISABLED ? memoryCache.get(key) : null;
-      if (mem && Date.now() - mem.ts <= TTL_MS) return mem.rows;
-      if (import.meta.env?.DEV) {
-        try { console.time?.(`⏱ plannedRange query ${fromISO}→${toISO}`); } catch {}
-      }
-      const plannedRes = await supabase
-        .from('planned_workouts')
-        .select('id,type,date,workout_status,total_duration_seconds,steps_preset,description,tags,training_plan_id')
-        .eq('user_id', userId)
-        .gte('date', fromISO)
-        .lte('date', toISO)
-        .order('date', { ascending: true });
-      if (import.meta.env?.DEV) {
-        try { console.timeEnd?.(`⏱ plannedRange query ${fromISO}→${toISO}`); } catch {}
-      }
-      if (plannedRes.error) throw plannedRes.error;
-      const plannedAll = Array.isArray(plannedRes.data) ? plannedRes.data : [];
-      if (import.meta.env?.DEV) {
-        try { console.log?.('plannedRange rows:', plannedAll.length); } catch {}
-      }
-      const payload = { ts: Date.now(), rows: plannedAll };
-      memoryCache.set(key, payload);
-      writeStorage(key, plannedAll);
-      return plannedAll;
-    },
-    staleTime: (import.meta.env?.DEV ? 5 : 60) * 60 * 1000,
-    gcTime: 6 * 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
-  });
+  // Deprecated: return empty; useWeekUnified should be used instead
+  const query = { data: [], isFetching: false, isPending: false, error: null } as any;
 
   useEffect(() => {
     const handler = async () => {
@@ -137,5 +103,5 @@ export function usePlannedRange(fromISO: string, toISO: string) {
     return () => { active = false; try { channel?.unsubscribe(); } catch {} };
   }, [fromISO, toISO, userId]);
 
-  return { rows: query.data || [], loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };
+  return { rows: [], loading: false, error: null } as any;
 }
