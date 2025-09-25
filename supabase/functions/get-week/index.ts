@@ -36,13 +36,12 @@ Deno.serve(async (req) => {
     // Derive user id from Authorization and use service role for efficient server filtering (bypass RLS but scope by user_id explicitly)
     const authH = req.headers.get('Authorization') || '';
     const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
-    const userId = (() => {
-      try { if (!token) return null; const payload = JSON.parse(atob(token.split('.')[1])); return payload?.sub || null; } catch { return null; }
-    })();
-    if (!userId) {
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const { data: userData, error: userErr } = await supabase.auth.getUser(token || undefined as any);
+    if (userErr || !userData?.user?.id) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+    const userId = userData.user.id as string;
 
     // Fetch unified workouts (new columns present but may be null)
     const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed';

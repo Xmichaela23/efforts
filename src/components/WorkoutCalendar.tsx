@@ -206,7 +206,7 @@ export default function WorkoutCalendar({
     description: it.planned?.description || null,
     tags: it.planned?.tags || null,
   }));
-  const unifiedWorkouts = unifiedItems.filter((it:any)=> String(it?.status||'').toLowerCase()==='completed' || !!it?.executed).map((it:any)=> ({
+  const unifiedWorkouts = unifiedItems.filter((it:any)=> String(it?.status||'').toLowerCase()==='completed' || !!(it?.executed && (it.executed.overall || (Array.isArray(it.executed.intervals)&&it.executed.intervals.length)))).map((it:any)=> ({
     id: it.id,
     date: it.date,
     type: it.type,
