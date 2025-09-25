@@ -1113,8 +1113,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           await supabase.from('planned_workouts').update({ day_number: nextDay }).eq('id', workout.id);
         }
       } catch {}
-      // Broadcast to other views (Today, Calendar) to refresh
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      // Remove global invalidation to avoid refresh storms
     } finally {
       setActivatingId(null);
     }
@@ -1182,7 +1181,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
           }
         }
       } catch {}
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      // Removed global invalidation
     } finally {
       setActivatingId(null);
     }
@@ -1273,7 +1272,6 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       } catch {}
       finally {
         setWeekLoading(false);
-        try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
       }
     })();
   }, [selectedPlanDetail?.id, selectedWeek]);
@@ -1288,8 +1286,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       // Let the materialize effect above run again naturally
       setTimeout(() => setWeekLoading(false), 0);
     };
-    window.addEventListener('nav:pullrefresh', onPull);
-    return () => window.removeEventListener('nav:pullrefresh', onPull);
+    // Remove global pullrefresh listener to reduce render storms
+    return () => {};
   }, [selectedPlanDetail?.id, selectedWeek]);
 
   // Force refresh control for current week
@@ -1299,8 +1297,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     weekCacheRef.current.delete(key);
     setWeekLoading(true);
     try {
-      // No-op: server auto-materializes; trigger unified refresh
-      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+      // No global invalidation here
     } finally {
       setWeekLoading(false);
     }
