@@ -135,6 +135,31 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       }
     }
   } catch {}
+
+  // If swim equipment likely exists in tokens but missing from computed, force re-materialize once
+  useEffect(() => {
+    (async () => {
+      try {
+        const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim';
+        if (!isSwim) return;
+        const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+        const missingEquip = v3.some((st:any)=> String(st?.kind||'').toLowerCase()==='drill' && !st?.equipment);
+        const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t).toLowerCase()) : [];
+        const tokensHaveEquip = toks.some(s=>/(?:_fins|_board|_snorkel|_buoy)\b/.test(s));
+        if (missingEquip && tokensHaveEquip && (workout as any)?.id) {
+          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: String((workout as any).id) } });
+          // Re-fetch latest computed
+          try {
+            const { data } = await supabase.from('planned_workouts').select('computed').eq('id', String((workout as any).id)).maybeSingle();
+            if (data?.computed?.steps) {
+              (workout as any).computed = data.computed;
+            }
+          } catch {}
+        }
+      } catch {}
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(workout as any)?.id]);
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
   const parseEstimateToSeconds = (val: any): number => {
     try {
