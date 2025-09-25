@@ -849,13 +849,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             console.error('Error materializing planned workouts:', pErr);
             throw pErr;
           }
-          // DEV: Guarantee structured steps exist immediately after acceptance
+          // Server: insert planned rows and materialize in one call
           try {
-            await supabase.functions.invoke('materialize-plan', {
-              body: { plan_id: String(data?.id || insertPayload?.id) },
+            await supabase.functions.invoke('activate-plan', {
+              body: { plan_id: String(data?.id || insertPayload?.id), start_date: startDate },
             });
           } catch (fnErr) {
-            console.warn('materialize-plan invoke failed (dev continue):', fnErr);
+            console.warn('activate-plan invoke failed (dev continue):', fnErr);
           }
           // Pre-materialize Week 1 and warm unified cache for week 1
           try {

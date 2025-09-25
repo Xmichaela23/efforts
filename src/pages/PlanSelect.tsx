@@ -955,8 +955,8 @@ export default function PlanSelect() {
       const planErr = (planInsert as any).error;
       if (planErr) throw planErr;
 
-      // Server-side materialization now; warm unified caches only
-      try { const { supabase } = await import('@/lib/supabase'); await supabase.functions.invoke('materialize-plan', { body: { plan_id: String(planRow.id) } }); } catch {}
+      // Activate plan server-side: insert planned rows and materialize steps
+      try { const { supabase } = await import('@/lib/supabase'); await supabase.functions.invoke('activate-plan', { body: { plan_id: String(planRow.id) } }); } catch {}
 
       try { await refreshPlans?.(); } catch {}
       navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });
