@@ -122,7 +122,8 @@ Deno.serve(async (req) => {
           description: p?.description || null,
           tags: p?.tags || null,
         } as any;
-        const it = { id: String(p.id), date: String(p.date), type: String(p.type).toLowerCase(), status: 'planned', planned, executed: null };
+        const pStatus = String(p?.workout_status||'').toLowerCase();
+        const it = { id: String(p.id), date: String(p.date), type: String(p.type).toLowerCase(), status: (pStatus||'planned'), planned, executed: null };
         items.push(it);
         byKey.set(key, it);
       }
