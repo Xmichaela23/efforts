@@ -1846,18 +1846,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                 <div className="px-1 pb-3 text-sm text-gray-700">
                   {focus && (<div className="mb-1">{focus}</div>)}
                   {notes && (<div className="mb-1 text-gray-600">{notes}</div>)}
-                  {(hours != null || hard != null || (keys.length > 0)) && (
-                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-                      {hours != null && (
-                        <span className="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200">~{hours} h</span>
-                      )}
-                      {hard != null && (
-                        <span className="px-2 py-0.5 rounded-full bg-gray-100 border border-gray-200">Hard × {hard}</span>
-                      )}
-                      {keys.map((k, i) => (
-                        <span key={i} className="px-2 py-0.5 rounded bg-gray-50 border border-gray-200">{k}</span>
-                      ))}
-                    </div>
+                  {false && (
+                    <div />
                   )}
                 </div>
               );
