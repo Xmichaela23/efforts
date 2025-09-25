@@ -139,7 +139,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   // Format rich workout display - different for planned vs completed
   const formatRichWorkoutDisplay = (workout: any) => {
     const discipline = getDisplaySport(workout);
-    const duration = workout.duration ? formatDuration(workout.duration) : 'N/A';
+    // Remove duration display for strength in Today's Efforts per product request
+    const duration = (workout.type === 'strength') ? '' : (workout.duration ? formatDuration(workout.duration) : '');
     const isCompleted = workout.workout_status === 'completed';
     
     // Get metrics/description based on workout status
