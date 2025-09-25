@@ -602,23 +602,18 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         }
       } catch {}
 
-      // Prefer materialized planned_workouts if present, so we honor actual scheduling and dates
+      // Prefer week-scoped planned_workouts only (on-demand materialization)
       try {
         const commonSelect = '*';
-        const { data: byLink, error: e1 } = await supabase
+        const wk = selectedWeek || 1;
+        await supabase.functions.invoke('get-week', { body: { from: 'week', to: 'week', plan_id: planId, week_number: wk } }).catch(()=>{});
+        const { data: mat, error: e1 } = await supabase
           .from('planned_workouts')
           .select(commonSelect)
           .eq('training_plan_id', planId)
-          .order('week_number', { ascending: true })
+          .eq('week_number', wk)
           .order('day_number', { ascending: true });
-        const { data: byTemplate, error: e2 } = await supabase
-          .from('planned_workouts')
-          .select(commonSelect)
-          .eq('template_id', planId)
-          .order('week_number', { ascending: true })
-          .order('day_number', { ascending: true });
-        const mat = ([] as any[]).concat(byLink || []).concat(byTemplate || []);
-        if (!e1 && !e2 && Array.isArray(mat) && mat.length > 0) {
+        if (!e1 && Array.isArray(mat) && mat.length > 0) {
           const numToDay = { 1:'Monday',2:'Tuesday',3:'Wednesday',4:'Thursday',5:'Friday',6:'Saturday',7:'Sunday' } as Record<number,string>;
           const byWeek: Record<number, any[]> = {};
           // Baseline helpers
@@ -729,13 +724,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             };
             byWeek[wk] = byWeek[wk] ? [...byWeek[wk], workout] : [workout];
           }
-          const weekNumbers = Object.keys(byWeek).map(n=>parseInt(n,10)).sort((a,b)=>a-b);
-          const weeksOut = weekNumbers.map(wn => ({
-            weekNumber: wn,
-            title: `Week ${wn}`,
-            focus: '',
-            workouts: byWeek[wn],
-          }));
+          const wn = wk;
+          const weeksOut = [{ weekNumber: wn, title: `Week ${wn}`, focus: '', workouts: byWeek[wn]||[] }];
           pd.weeks = weeksOut;
         }
       } catch (e) {
@@ -1232,13 +1222,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
 
         setWeekLoading(true);
         // Server-side handles materialization; warm unified cache only
-        const weekStart = (()=>{ const d = new Date(); const js = d.getDay(); const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((js + 6)%7)); return `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`; })();
-        await supabase.functions.invoke('get-week', { body: { from: weekStart, to: weekStart } });
+        const wk = selectedWeek || 1;
+        await supabase.functions.invoke('get-week', { body: { plan_id: selectedPlanDetail.id, week_number: wk } }).catch(()=>{});
         const { data: rows } = await supabase
           .from('planned_workouts')
           .select('*')
           .eq('training_plan_id', selectedPlanDetail.id)
-          .eq('week_number', selectedWeek)
+          .eq('week_number', wk)
           .order('day_number', { ascending: true });
         if (Array.isArray(rows)) {
           // Removed auto-rebake to avoid surprise writes in UI
