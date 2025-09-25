@@ -7,11 +7,33 @@
 
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
-type Baselines = { ftp?: number; fiveK_pace?: number; fiveKPace?: number; fiveK?: number; easyPace?: number; easy_pace?: number };
+type Baselines = { ftp?: number; fiveK_pace?: any; fiveKPace?: any; fiveK?: any; easyPace?: any; easy_pace?: any };
+
+function parsePaceToSecPerMi(v: any): number | null {
+  try {
+    if (v == null) return null;
+    if (typeof v === 'number' && v > 0) return v; // already sec/mi
+    const txt = String(v).trim();
+    if (!txt) return null;
+    // formats: mm:ss/mi or mm:ss /km
+    const m = txt.match(/(\d{1,2}):(\d{2})\s*\/(mi|km)/i);
+    if (m) {
+      const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+      const unit = m[3].toLowerCase();
+      if (unit === 'mi') return sec;
+      if (unit === 'km') return Math.round(sec * 1.60934);
+      return sec;
+    }
+    // plain mm:ss
+    const m2 = txt.match(/(\d{1,2}):(\d{2})/);
+    if (m2) return parseInt(m2[1],10)*60 + parseInt(m2[2],10);
+  } catch {}
+  return null;
+}
 
 function secPerMiFromBaseline(b: Baselines, which: 'fivek'|'easy'): number | null {
-  const s = which==='fivek' ? (b.fiveK_pace ?? b.fiveKPace ?? b.fiveK) : (b.easyPace ?? b.easy_pace);
-  return typeof s === 'number' && s > 0 ? s : null;
+  const raw = which==='fivek' ? (b.fiveK_pace ?? b.fiveKPace ?? b.fiveK) : (b.easyPace ?? b.easy_pace);
+  return parsePaceToSecPerMi(raw);
 }
 
 function parseIntSafe(s?: string | number | null): number | null { const n = typeof s === 'number' ? s : parseInt(String(s||''), 10); return Number.isFinite(n) ? n : null; }

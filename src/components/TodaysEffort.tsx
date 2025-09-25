@@ -552,9 +552,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       : 'bg-white border border-gray-200'
                   }`}
                 >
-                  {/* Planned: always show grouped description; execution view only on drill-in */}
+                  {/* Planned: show full steps from computed (v3) */}
                   {workout.workout_status === 'planned' ? (
-                    <PlannedWorkoutSummary workout={workout} baselines={baselines as any} />
+                    <div className="space-y-1">
+                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} />
+                      {Array.isArray((workout as any)?.computed?.steps) && (workout as any).computed.steps.length>0 && (
+                        <ul className="list-disc pl-5 text-xs text-gray-700">
+                          {((workout as any).computed.steps as any[]).map((st:any, idx:number)=>{
+                            const fmt=(s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+                            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) {
+                              const m = Math.round(st.distanceMeters); const p = st?.paceTarget?` @ ${st.paceTarget}`:''; return <li key={idx}>{`1 × ${m} m${p}`}</li>;
+                            }
+                            if (typeof st?.seconds==='number' && st.seconds>0) {
+                              const p = st?.paceTarget?` @ ${st.paceTarget}`:(st?.powerTarget?` @ ${st.powerTarget}`:''); return <li key={idx}>{`1 × ${fmt(st.seconds)}${p}`}</li>;
+                            }
+                            return <li key={idx}>1 × step</li>;
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   ) : (
                     <div className="space-y-1">
                       {/* Title and Duration Row */}

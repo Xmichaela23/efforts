@@ -352,15 +352,29 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     } catch { return undefined; }
   };
 
-  // Weekly grouped renderer: show grouped summary lines (not every rep)
+  // Weekly detailed renderer: render every step from server computed.v3
   const WeeklyLines: React.FC<{ workout: any }> = ({ workout }) => {
     try {
-      const txt = buildWeeklySubtitle(workout) || '';
-      // Split friendly summary at bullets into stacked lines
-      const parts = String(txt).split(/\s•\s/g).filter(Boolean);
-      if (parts.length > 1) {
-        return (<span className="whitespace-pre-line">{parts.join('\n')}</span>);
+      const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      if (steps.length) {
+        const fmt = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+        return (
+          <ul className="list-disc pl-5">
+            {steps.map((st:any, idx:number)=>{
+              if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) {
+                const m = Math.round(st.distanceMeters); const p = st?.paceTarget?` @ ${st.paceTarget}`:'';
+                return (<li key={idx}>{`1 × ${m} m${p}`}</li>);
+              }
+              if (typeof st?.seconds==='number' && st.seconds>0) {
+                const p = st?.paceTarget?` @ ${st.paceTarget}`:(st?.powerTarget?` @ ${st.powerTarget}`:'');
+                return (<li key={idx}>{`1 × ${fmt(st.seconds)}${p}`}</li>);
+              }
+              return (<li key={idx}>1 × step</li>);
+            })}
+          </ul>
+        );
       }
+      const txt = buildWeeklySubtitle(workout) || '';
       return (<span>{txt}</span>);
     } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
   };
