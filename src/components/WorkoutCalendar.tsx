@@ -424,18 +424,18 @@ export default function WorkoutCalendar({
     return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider }));
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
-  const handleDayClick = async (day: Date) => {
+  const handleDayClick = useCallback((day: Date) => {
     const dateStr = toDateOnlyString(day);
-    if (onDateSelect) onDateSelect(dateStr);
-  };
+    onDateSelect && onDateSelect(dateStr);
+  }, [onDateSelect]);
 
-  const handlePrevWeek = async (newRef: Date) => {
+  const handlePrevWeek = useCallback((newRef: Date) => {
     setReferenceDate(newRef);
-  };
+  }, []);
 
-  const handleNextWeek = async (newRef: Date) => {
+  const handleNextWeek = useCallback((newRef: Date) => {
     setReferenceDate(newRef);
-  };
+  }, []);
 
   // Helper: compute Week 1 start from an anchor row
   const computeWeek1Start = (anchorDate: string, anchorDayNumber: number | null) => {
