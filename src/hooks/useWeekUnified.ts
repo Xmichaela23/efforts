@@ -52,6 +52,14 @@ export function useWeekUnified(fromISO: string, toISO: string) {
 
   // In unified mode, rely on standard query invalidation from navigations;
   // avoid global event-based invalidation to prevent render loops on calendar.
+  // Allow targeted external refresh via `week:invalidate` (keepPreviousData prevents flicker)
+  useEffect(() => {
+    const handler = () => {
+      try { queryClient.invalidateQueries({ queryKey: ['weekUnified'] }); } catch {}
+    };
+    window.addEventListener('week:invalidate', handler);
+    return () => { window.removeEventListener('week:invalidate', handler); };
+  }, [queryClient]);
 
   const items: UnifiedItem[] = (query.data as any)?.items || [];
   return { items, loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };

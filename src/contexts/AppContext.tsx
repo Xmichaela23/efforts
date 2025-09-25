@@ -873,6 +873,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             supabase.functions.invoke('sweep-week', { body: { week_start: wk1Start } }).catch(()=>{});
             supabase.functions.invoke('get-week', { body: { from: wk1Start, to: wk1End } }).catch(()=>{});
           } catch {}
+          try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
         } else {
           console.warn('⚠️ No rows to insert - sessions_by_week may be empty or malformed');
         }

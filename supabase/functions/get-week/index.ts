@@ -103,8 +103,12 @@ Deno.serve(async (req) => {
           };
         }
       }
-      const status = w.status || (String(w?.legacy_status||'').toLowerCase() || (executed ? 'completed' : (planned ? 'planned' : null)));
-      return { id: w.id, date, type, status, planned, executed };
+      // Normalize status universally
+      const cmp = w?.computed || null;
+      const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall));
+      let status = String(w.status || w.legacy_status || '').toLowerCase();
+      if (!status) status = hasExecuted ? 'completed' : (planned ? 'planned' : null);
+      return { id: w.id, date, type, status, planned, executed, planned_id: w.planned_id || null };
     };
 
     const items = workouts.map(unify);
