@@ -52,10 +52,28 @@ function getTitle(workout: any): string {
 }
 
 function computeMinutes(workout: any, baselines?: Baselines, exportHints?: ExportHints): number | null {
-  // Single source: computed.total_duration_seconds → minutes
+  // Prefer recompute from computed.steps (client authoritative), then fall back
+  try {
+    const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+    if (steps.length > 0) {
+      const sumSec = steps.reduce((acc: number, st: any) => {
+        const s = Number(st?.seconds);
+        if (Number.isFinite(s) && s > 0) return acc + s;
+        const d = Number((st as any)?.durationSeconds);
+        if (Number.isFinite(d) && d > 0) return acc + d;
+        return acc;
+      }, 0);
+      if (sumSec > 0) return Math.max(1, Math.round(sumSec / 60));
+    }
+  } catch {}
   try {
     const ts = Number((workout as any)?.computed?.total_duration_seconds) || Number((workout as any)?.total_duration_seconds);
     if (Number.isFinite(ts) && ts > 0) return Math.max(1, Math.round(ts / 60));
+  } catch {}
+  try {
+    // Final fallback: derive from tokens/structure when present
+    const minutes = resolvePlannedDurationMinutes(workout as any, baselines as any, exportHints);
+    if (typeof minutes === 'number' && Number.isFinite(minutes) && minutes > 0) return Math.round(minutes);
   } catch {}
   return null;
 }
