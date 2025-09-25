@@ -576,8 +576,36 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         if (!isStrength) {
                           if (!expanded[String(workout.id)]) return null;
                           const type = String((workout as any)?.type||'').toLowerCase();
-                          // Endurance details from computed steps with ranges
+                          // Swim: use lightweight token summary to avoid heavy step expansion
+                          if (type==='swim') {
+                            try {
+                              const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+                              const lines: string[] = [];
+                              if (toks.length) {
+                                let wu: string | null = null, cd: string | null = null; const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
+                                toks.forEach((t)=>{
+                                  const s = String(t).toLowerCase();
+                                  let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `Warm‑up ${txt}`; else cd = `Cool‑down ${txt}`; return; }
+                                  m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const name=m[1].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[2],10)}x${parseInt(m[3],10)}`); return; }
+                                  m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { const name=m[4].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[1],10)}x${parseInt(m[2],10)}`); return; }
+                                  m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const kind=m[1]==='pull'?'Pull':'Kick'; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}`); return; }
+                                  m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); aerobics.push(`${reps}x${dist}`); return; }
+                                });
+                                if (wu) lines.push(`1 × ${wu}`);
+                                if (drills.length) lines.push(`Drills ${Array.from(new Set(drills)).join(', ')}`);
+                                if (pulls.length) lines.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+                                if (kicks.length) lines.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+                                if (aerobics.length) lines.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+                                if (cd) lines.push(`1 × ${cd}`);
+                                return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
+                              }
+                            } catch {}
+                          }
+                          // Endurance details from computed steps with ranges (guarded)
                           const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+                          if (steps.length > 1000) {
+                            return (<div className="text-xs text-gray-700">Details are long; showing summary only.</div>);
+                          }
                           if (!steps.length) return null;
                           const hints = (workout as any)?.export_hints || {};
                           const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
@@ -650,6 +678,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                               const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
                               const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
                               lines.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
+                              if (j <= i) { i += 1; continue; }
                               i = j; continue;
                             }
                             if (typeof st?.seconds==='number') { lines.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
