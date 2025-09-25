@@ -207,6 +207,10 @@ export default function WorkoutCalendar({
     // Pass-through fields used by label derivation and details
     steps_preset: (it as any)?.planned?.steps_preset ?? null,
     strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
+    export_hints: (it as any)?.planned?.export_hints ?? null,
+    workout_structure: (it as any)?.planned?.workout_structure ?? null,
+    friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
+    rendered_description: (it as any)?.planned?.rendered_description ?? null,
   }));
   const unifiedWorkouts = unifiedItems.map((it:any)=> ({
     id: it.id,

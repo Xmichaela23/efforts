@@ -112,12 +112,15 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         type: it.type,
         workout_status: 'planned',
         description: it.planned?.description || null,
-        rendered_description: it.planned?.description || null,
+        rendered_description: it.planned?.rendered_description || it.planned?.description || null,
         computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
         tags: it.planned?.tags || [],
         // Pass-through fields needed by renderers
         steps_preset: (it as any)?.planned?.steps_preset ?? null,
         strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
+        export_hints: (it as any)?.planned?.export_hints ?? null,
+        workout_structure: (it as any)?.planned?.workout_structure ?? null,
+        friendly_summary: (it as any)?.planned?.friendly_summary ?? null,
       }));
     // Build set of types that already have a completed workout for the date
     const typeKey = (w:any)=> `${String(w.type||'').toLowerCase()}|${w.date}`;
