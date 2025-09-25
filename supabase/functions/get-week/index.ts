@@ -87,14 +87,17 @@ Deno.serve(async (req) => {
           tags: p?.tags || null,
         };
       }
-      // executed
+      // executed (prioritize completed status)
       let executed = w.executed_data || null;
-      if (!executed) {
+      const legacyCompleted = String(w?.legacy_status||'').toLowerCase()==='completed';
+      if (!executed || legacyCompleted) {
         const cmp = w?.computed || null;
-        if (cmp) executed = {
-          intervals: Array.isArray(cmp?.intervals) ? cmp.intervals : null,
-          overall: cmp?.overall || null,
-        };
+        if (cmp && (legacyCompleted || Array.isArray(cmp?.intervals))) {
+          executed = {
+            intervals: Array.isArray(cmp?.intervals) ? cmp.intervals : null,
+            overall: cmp?.overall || null,
+          };
+        }
       }
       const status = w.status || (String(w?.legacy_status||'').toLowerCase() || (executed ? 'completed' : (planned ? 'planned' : null)));
       return { id: w.id, date, type, status, planned, executed };
