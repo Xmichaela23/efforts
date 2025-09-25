@@ -46,7 +46,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
     repairPlan,
   } = useAppContext();
   
-  const { plannedWorkouts } = usePlannedWorkouts();
+  // plannedWorkouts removed; unified get-week feeds views
 
   const [showBuilder, setShowBuilder] = useState(false);
   const [showStrengthLogger, setShowStrengthLogger] = useState(false);
@@ -762,7 +762,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ onLogout }) => {
                       currentPlans={currentPlans}
                       completedPlans={completedPlans}
                       workouts={workouts}
-                      plannedWorkouts={plannedWorkouts}
+                      plannedWorkouts={[]}
                     />
                   </div>
                 </div>

@@ -207,6 +207,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   focusWeek
 }) => {
   // Planned workouts are sourced via unified server paths now
+  const plannedWorkouts: any[] = [];
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');

@@ -892,10 +892,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to delete plans');
-      // Let database cascading or server functions handle cleanup of planned rows
-      const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', user.id);
-      if (error) throw error;
+      // Server function: delete planned rows and the plan atomically
+      const { error } = await supabase.functions.invoke('delete-plan', { body: { plan_id: String(planId) } }) as any;
+      if (error) throw error as any;
       await loadPlans();
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     } catch (error) {
       console.error('Error in deletePlan:', error);
       throw error;
