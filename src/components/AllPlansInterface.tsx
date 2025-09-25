@@ -625,9 +625,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
             return `${y}-${m}-${dd}`;
           } catch { return undefined; }
         })();
-        if (weekStartISO && weekEndISO) {
-          await supabase.functions.invoke('get-week', { body: { from: weekStartISO, to: weekEndISO } }).catch(()=>{});
-        }
+        // Skip invoking here to avoid load storms; Calendar/TodaysEffort already warms cache
         const { data: mat, error: e1 } = await supabase
           .from('planned_workouts')
           .select(commonSelect)
@@ -1253,9 +1251,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         const weekEndISO = (()=>{
           try { const s = weekStartISO ? new Date(weekStartISO) : new Date(); const e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+6); const y=e.getFullYear(), m=String(e.getMonth()+1).padStart(2,'0'), dd=String(e.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; } catch { return undefined; }
         })();
-        if (weekStartISO && weekEndISO) {
-          await supabase.functions.invoke('get-week', { body: { from: weekStartISO, to: weekEndISO } }).catch(()=>{});
-        }
+        // Skip invoking here to avoid load storms
         const { data: rows } = await supabase
           .from('planned_workouts')
           .select('*')
@@ -2041,8 +2037,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                           </div>
-                                          <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
-                                          <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
+                                          {/* Temporarily disable grouped weekly renderer to stabilize performance */}
+                                          {/* Temporarily disable grouped weekly renderer to stabilize performance */}
                                           {(() => {
                                             const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
                                             const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
