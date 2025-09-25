@@ -580,25 +580,29 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           if (type==='swim') {
                             try {
                               const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+                              if (!toks.length) return null;
+                              const preferYards = true; // authored units default to yards for this plan
+                              const yd = (n:number, unit:string)=> unit.toLowerCase()==='yd'? n : Math.round(n/0.9144);
                               const lines: string[] = [];
-                              if (toks.length) {
-                                let wu: string | null = null, cd: string | null = null; const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
-                                toks.forEach((t)=>{
-                                  const s = String(t).toLowerCase();
-                                  let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `Warm‑up ${txt}`; else cd = `Cool‑down ${txt}`; return; }
-                                  m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const name=m[1].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[2],10)}x${parseInt(m[3],10)}`); return; }
-                                  m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { const name=m[4].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[1],10)}x${parseInt(m[2],10)}`); return; }
-                                  m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const kind=m[1]==='pull'?'Pull':'Kick'; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}`); return; }
-                                  m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); aerobics.push(`${reps}x${dist}`); return; }
-                                });
-                                if (wu) lines.push(`1 × ${wu}`);
-                                if (drills.length) lines.push(`Drills ${Array.from(new Set(drills)).join(', ')}`);
-                                if (pulls.length) lines.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-                                if (kicks.length) lines.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-                                if (aerobics.length) lines.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-                                if (cd) lines.push(`1 × ${cd}`);
-                                return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
-                              }
+                              const pushWUCD = (m:RegExpMatchArray, warm:boolean)=>{
+                                const n = parseInt(m[1],10); const unit = String(m[2]||'yd'); const dist = preferYards? `${yd(n,unit)} yd` : `${n} ${unit}`;
+                                lines.push(`${warm?'Warm‑up':'Cool‑down'} ${dist}`);
+                              };
+                              const add = (label:string, reps:number, dist:number, unit:string)=>{
+                                const distance = preferYards? `${yd(dist,unit)} yd` : `${dist} ${unit}`;
+                                lines.push(`${label} ${reps}×${distance}`);
+                              };
+                              toks.forEach((t)=>{
+                                const s = String(t).toLowerCase();
+                                let m = s.match(/swim_warmup_(\d+)(yd|m)/i); if (m) { pushWUCD(m, true); return; }
+                                m = s.match(/swim_cooldown_(\d+)(yd|m)/i); if (m) { pushWUCD(m, false); return; }
+                                m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)/i); if (m) { add(m[1].replace(/_/g,' '), parseInt(m[2],10), parseInt(m[3],10), m[4]); return; }
+                                m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { add(m[4].replace(/_/g,' '), parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                                m = s.match(/swim_pull_(\d+)x(\d+)(yd|m)/i); if (m) { add('Pull', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                                m = s.match(/swim_kick_(\d+)x(\d+)(yd|m)/i); if (m) { add('Kick', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                                m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m) { add('Aerobic', parseInt(m[1],10), parseInt(m[2],10), m[3]); return; }
+                              });
+                              return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
                             } catch {}
                           }
                           // Endurance details from computed steps with ranges (guarded)
