@@ -258,7 +258,10 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             };
 
             const abbreviation = abbrevFor();
-            return `${abbreviation} ${sets}s ${Math.round(avgReps||0)}r ${weightRange}`.trim();
+            // Use clear notation: sets × reps @ weight (avoid 's'/'r' which look like seconds)
+            const reps = Math.round(avgReps || 0);
+            const weightTxt = weightRange && weightRange !== '—' ? ` @ ${weightRange}` : '';
+            return `${abbreviation} ${sets}×${reps}${weightTxt}`.trim();
           });
           
           return exerciseSummaries.map((summary, index) => {
