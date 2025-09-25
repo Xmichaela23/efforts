@@ -11,11 +11,7 @@ export type CalendarEvent = {
   href?: string;
   provider?: string;
 };
-// Background prefetcher: warms unified week cache without rendering
-function WeekPrefetcher({ fromISO, toISO }: { fromISO: string; toISO: string }) {
-  useWeekUnified(fromISO, toISO);
-  return null;
-}
+// Prefetcher removed to avoid extra fetches on cell click
 
 interface WorkoutCalendarProps {
   onAddEffort: () => void;
@@ -600,16 +596,7 @@ export default function WorkoutCalendar({
       {/* Hidden background prefetchers */}
       {prefetchNeighbors && (
         <>
-          {(() => {
-            const prevStartISO = toDateOnlyString(addDays(weekStart, -7));
-            const prevEndISO = toDateOnlyString(addDays(weekStart, -1));
-            return <WeekPrefetcher fromISO={prevStartISO} toISO={prevEndISO} />;
-          })()}
-          {(() => {
-            const nextStartISO = toDateOnlyString(addDays(weekEnd, 1));
-            const nextEndISO = toDateOnlyString(addDays(weekEnd, 7));
-            return <WeekPrefetcher fromISO={nextStartISO} toISO={nextEndISO} />;
-          })()}
+          {/* Prefetch disabled for performance */}
         </>
       )}
     </div>
