@@ -46,6 +46,12 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     enabled: !!dayLoc,
   });
 
+  // Expanded details toggle per workout (id → boolean)
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const toggleExpanded = (id: string) => {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   // If today and no location yet, ask once and use ephemeral location (no persistence)
   useEffect(() => {
     if (locTried) return;
@@ -555,11 +561,128 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                   {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
                   {workout.workout_status === 'planned' ? (
                     <div className="space-y-1">
-                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={true} />
+                      <div className="flex items-center justify-between">
+                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
+                        <button
+                          className="text-xs text-blue-600 hover:underline ml-2"
+                          onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); toggleExpanded(String(workout.id)); }}
+                        >
+                          {expanded[String(workout.id)] ? 'Hide details' : 'Show details'}
+                        </button>
+                      </div>
                       {(() => {
                         // Strength: render loads; all other types show summary-only for responsiveness
                         const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
-                        if (!isStrength) return null;
+                        if (!isStrength) {
+                          if (!expanded[String(workout.id)]) return null;
+                          const type = String((workout as any)?.type||'').toLowerCase();
+                          // Swim details from tokens for clarity
+                          if (type==='swim') {
+                            try {
+                              const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+                              const lines: string[] = [];
+                              if (toks.length) {
+                                let wu: string | null = null, cd: string | null = null; const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
+                                toks.forEach((t)=>{
+                                  const s = String(t).toLowerCase();
+                                  let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `Warm‑up ${txt}`; else cd = `Cool‑down ${txt}`; return; }
+                                  m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const name=m[1].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[2],10)}x${parseInt(m[3],10)}`); return; }
+                                  m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { const name=m[4].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[1],10)}x${parseInt(m[2],10)}`); return; }
+                                  m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const kind=m[1]==='pull'?'Pull':'Kick'; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}`); return; }
+                                  m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); aerobics.push(`${reps}x${dist}`); return; }
+                                });
+                                if (wu) lines.push(`1 × ${wu}`);
+                                if (drills.length) lines.push(`Drills ${Array.from(new Set(drills)).join(', ')}`);
+                                if (pulls.length) lines.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+                                if (kicks.length) lines.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+                                if (aerobics.length) lines.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+                                if (cd) lines.push(`1 × ${cd}`);
+                                return lines.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>) : null;
+                              }
+                            } catch {}
+                          }
+                          // Endurance details from computed steps with ranges
+                          const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+                          if (!steps.length) return null;
+                          const hints = (workout as any)?.export_hints || {};
+                          const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
+                          const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
+                          const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+                          const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+                            try {
+                              if (!paceTarget) return undefined;
+                              const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
+                              if (!m) return undefined;
+                              const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+                              const unit = m[3].toLowerCase();
+                              const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
+                              const lo = Math.round(sec*(1 - tol));
+                              const hi = Math.round(sec*(1 + tol));
+                              const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+                              return `${mmss(lo)}–${mmss(hi)}/${unit}`;
+                            } catch { return undefined; }
+                          };
+                          const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+                          const lines: string[] = [];
+                          let i = 0;
+                          const isWork = (x:any)=> String((x?.kind||'')).toLowerCase()==='work' || String((x?.kind||'')).toLowerCase()==='steady' || String((x?.kind||''))==='interval_work';
+                          const isRec = (x:any)=> String((x?.kind||'')).toLowerCase()==='recovery' || /rest/i.test(String(x?.label||''));
+                          while (i < steps.length) {
+                            const st:any = steps[i];
+                            const kind = String(st?.kind||'').toLowerCase();
+                            if (kind==='warmup' && typeof st?.seconds==='number') {
+                              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
+                              lines.push(`1 × Warm‑up ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+                              i += 1; continue;
+                            }
+                            if (kind==='cooldown' && typeof st?.seconds==='number') {
+                              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
+                              lines.push(`1 × Cool‑down ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+                              i += 1; continue;
+                            }
+                            if (isWork(st)) {
+                              const workLabel = (()=>{
+                                if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`;
+                                if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
+                                return 'interval';
+                              })();
+                              const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
+                              const workPower = powerStr(st);
+                              const next = steps[i+1];
+                              const hasRec = next && isRec(next);
+                              const restLabel = hasRec ? (()=>{
+                                if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
+                                if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
+                                return 'rest';
+                              })() : undefined;
+                              const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
+                              const restPower = hasRec ? powerStr(next) : undefined;
+                              let count = 0; let j = i;
+                              while (j < steps.length) {
+                                const a = steps[j]; const b = steps[j+1];
+                                if (!isWork(a)) break;
+                                const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
+                                const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
+                                const aPow = powerStr(a);
+                                const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
+                                const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
+                                const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
+                                const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
+                                const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);
+                                if (!sameWork || !sameRest) break;
+                                count += 1; j += hasRec ? 2 : 1;
+                              }
+                              const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
+                              const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
+                              lines.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
+                              i = j; continue;
+                            }
+                            if (typeof st?.seconds==='number') { lines.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
+                            if (typeof st?.distanceMeters==='number') { lines.push(`1 × ${Math.round(st.distanceMeters)} m`); i+=1; continue; }
+                            i += 1;
+                          }
+                          return (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
+                        }
                         const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
                         if (!ex.length) return null;
                         const items = ex.map((e:any, idx:number)=>{
