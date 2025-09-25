@@ -133,6 +133,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         // prefer baseline-estimated duration when available, else timed steps sum
         if (estTotal > 0) totalSecsFromSteps = Math.round(estTotal);
       }
+      // Mark that we handled with computed to avoid legacy fallbacks
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const handledByComputedFlag = true;
     }
   } catch {}
 
@@ -246,39 +249,10 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
   const isStrengthContext = (type === 'strength_session') || (parentDisc === 'strength');
 
-  // Prefer computed steps for swims so drills/rests render even without structured distance/duration
+  // Legacy swim fallback removed: rely on computed.v3 exclusively
   let handledByComputed = lines.length > 0;
   let totalYdFromComputed: number | undefined = undefined;
   let totalYdFromStruct: number | undefined = undefined;
-  try {
-    const compSteps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-    if (parentDisc === 'swim' && compSteps.length) {
-      const fmt = (sec:number)=>{ const x=Math.max(1,Math.round(Number(sec)||0)); const m=Math.floor(x/60); const s=x%60; return `${m}:${String(s).padStart(2,'0')}`; };
-      let totalYd = 0;
-      compSteps.forEach((st:any)=>{
-        const label = String(st?.label||'').trim();
-        const eff = String(st?.effortLabel||'').toLowerCase();
-        const typ = String(st?.type||'').toLowerCase();
-        const yd = (():number=>{
-          if (typeof st?.distance_yd === 'number') return st.distance_yd;
-          if (typeof st?.distanceMeters === 'number') return Math.round(st.distanceMeters/0.9144);
-          return 0;
-        })();
-        if (yd>0) totalYd += yd;
-        if (eff === 'rest' || /rest/i.test(label)) { const sec = Number(st?.duration||st?.duration_s||0); lines.push(sec>0?`Rest ${fmt(sec)}`:'Rest'); return; }
-        if (typ === 'warmup' || /warm\s*-?\s*up/i.test(label)) { lines.push(`Warm-up 1 × ${yd} yd`); return; }
-        if (typ === 'cooldown' || /cool\s*-?\s*down/i.test(label)) { lines.push(`Cool-down 1 × ${yd} yd`); return; }
-        if (eff === 'drill' || typ === 'drill' || /drill/i.test(label)) {
-          const name = label.replace(/^drill\s*[—-]?\s*/i,'').trim() || 'drill';
-          lines.push(`1 × ${yd} yd — drill ${name}`); return;
-        }
-        if (/aerobic/i.test(label) || /swim_aerobic/i.test(typ)) { lines.push(`1 × ${yd} yd aerobic`); return; }
-        if (yd>0) { lines.push(`1 × ${yd} yd`); return; }
-      });
-      totalYdFromComputed = totalYd;
-      handledByComputed = lines.length > 0;
-    }
-  } catch {}
   // Brick session: render stacked segments
   if (!handledByComputed && type==='brick_session') {
     let tIdx = 0;
