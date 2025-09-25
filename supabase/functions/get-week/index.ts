@@ -72,7 +72,7 @@ Deno.serve(async (req) => {
     }
 
     const unify = (w:any) => {
-      const date = String(w.date);
+      const date = String(w.date).slice(0,10);
       const type = String(w.type).toLowerCase();
       // planned
       let planned = w.planned_data || null;
@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
           rendered_description: (p as any)?.rendered_description ?? null,
         } as any;
         const pStatus = String(p?.workout_status||'').toLowerCase();
-        const it = { id: String(p.id), date: String(p.date), type: String(p.type).toLowerCase(), status: (pStatus||'planned'), planned, executed: null };
+        const it = { id: String(p.id), date: String(p.date).slice(0,10), type: String(p.type).toLowerCase(), status: (pStatus||'planned'), planned, executed: null };
         items.push(it);
         byKey.set(key, it);
       }

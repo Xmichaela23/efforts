@@ -180,6 +180,67 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
     }
     steps.push(...added);
   }
+  // Fallback: if no tokens yielded steps, try to expand from workout_structure when present
+  try {
+    if (steps.length === 0 && row?.workout_structure && typeof row.workout_structure === 'object') {
+      const ws: any = row.workout_structure;
+      const struct: any[] = Array.isArray(ws?.structure) ? ws.structure : [];
+      const toSec = (val?: string | number | null): number => {
+        if (typeof val === 'number' && isFinite(val) && val>0) return Math.round(val);
+        const txt = String(val||'').trim();
+        let m = txt.match(/(\d+)\s*min/i); if (m) return parseInt(m[1],10)*60;
+        m = txt.match(/(\d+)\s*s(ec)?\b/i); if (m) return parseInt(m[1],10);
+        m = txt.match(/^(\d{1,2}):(\d{2})$/); if (m) return parseInt(m[1],10)*60 + parseInt(m[2],10);
+        return 0;
+      };
+      const toMeters = (txt?: string | number | null): number => {
+        if (typeof txt === 'number' && isFinite(txt) && txt>0) return Math.round(txt);
+        const t = String(txt||'');
+        let m = t.match(/(\d+(?:\.\d+)?)\s*(yd|yard|yards)\b/i); if (m) return Math.round(parseFloat(m[1])*0.9144);
+        m = t.match(/(\d+(?:\.\d+)?)\s*m\b/i); if (m) return Math.round(parseFloat(m[1]));
+        m = t.match(/(\d+(?:\.\d+)?)\s*(mi|mile|miles)\b/i); if (m) return Math.round(parseFloat(m[1])*1609.34);
+        m = t.match(/(\d+(?:\.\d+)?)\s*km\b/i); if (m) return Math.round(parseFloat(m[1])*1000);
+        return 0;
+      };
+
+      for (const seg of struct) {
+        const kind = String(seg?.type||'').toLowerCase();
+        if (kind === 'warmup' || kind === 'cooldown') {
+          const dSec = toSec(seg?.duration);
+          const dM = toMeters(seg?.distance);
+          if (dM>0) steps.push({ id: uid(), kind: kind==='warmup'?'warmup':'cooldown', distance_m: dM });
+          else if (dSec>0) steps.push({ id: uid(), kind: kind==='warmup'?'warmup':'cooldown', duration_s: dSec });
+          continue;
+        }
+        if (kind === 'main_set' && String(seg?.set_type||'').toLowerCase()==='intervals') {
+          const reps = Number(seg?.repetitions)||1;
+          const work = seg?.work_segment || {};
+          const rec = seg?.recovery_segment || {};
+          const wSec = toSec(work?.duration);
+          const wM = toMeters(work?.distance);
+          const rSec = toSec(rec?.duration);
+          for (let r=0;r<Math.max(1,reps);r+=1) {
+            if (wM>0) steps.push({ id: uid(), kind: 'work', distance_m: wM });
+            else if (wSec>0) steps.push({ id: uid(), kind: 'work', duration_s: wSec });
+            if (r<reps-1 && rSec>0) steps.push({ id: uid(), kind: 'recovery', duration_s: rSec });
+          }
+          continue;
+        }
+        if (kind === 'main_set' && /aerobic/i.test(String(seg?.set_type||''))) {
+          const reps = Number(seg?.repetitions)||1; const dist = toMeters(seg?.distance);
+          for (let r=0;r<Math.max(1,reps);r+=1) {
+            if (dist>0) steps.push({ id: uid(), kind: 'work', distance_m: dist, label: 'aerobic' });
+          }
+          continue;
+        }
+        if (kind === 'main_effort' || kind === 'main') {
+          const dSec = toSec(seg?.duration); if (dSec>0) steps.push({ id: uid(), kind: 'work', duration_s: dSec });
+          const dM = toMeters(seg?.distance); if (dM>0) steps.push({ id: uid(), kind: 'work', distance_m: dM });
+          continue;
+        }
+      }
+    }
+  } catch {}
   const total_s = steps.reduce((s,st)=> s + (Number(st.duration_s)||0), 0);
   return { steps, total_s };
 }

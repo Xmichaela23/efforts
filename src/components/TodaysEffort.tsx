@@ -697,18 +697,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                           }
                           return (<ul className="list-disc pl-5 text-xs text-gray-700">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
                         }
-                        if (!expanded[String(workout.id)]) return null;
-                        const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
-                        if (!ex.length) return (<div className="text-xs text-gray-700">No exercises</div>);
-                        const items = ex.map((e:any, idx:number)=>{
-                          const sets = Math.max(1, Number(e?.sets)||1);
-                          const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-                          const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
-                          const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
-                          const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-                          return (<li key={idx}>{`${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`}</li>);
-                        });
-                        return items.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{items}</ul>) : null;
+                        // Avoid duplicate rendering: rely on PlannedWorkoutSummary to render strength details when expanded
+                        return null;
                       })()}
                     </div>
                   ) : (

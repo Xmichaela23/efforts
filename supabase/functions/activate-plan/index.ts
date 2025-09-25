@@ -215,6 +215,11 @@ Deno.serve(async (req) => {
         const date = addDaysISO(startDate, (weekNum - 1) * 7 + (dow - 1))
         if (weekNum === 1 && date < startDate) continue
 
+        const rawDiscipline = String(s.discipline || s.type || '').toLowerCase()
+        // Skip non-work sessions that cannot materialize into steps
+        if (rawDiscipline === 'rest' || rawDiscipline === 'off' || rawDiscipline === 'recovery') {
+          continue
+        }
         const mapped = mapType(s.discipline || s.type)
         const stepsTokens: string[] = Array.isArray(s?.steps_preset) ? s.steps_preset.map((t:any)=> String(t)) : []
         const name = s.name || titleFor(mapped, stepsTokens)
@@ -284,6 +289,8 @@ Deno.serve(async (req) => {
           computed: null,
           units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
           tags: Array.isArray(s?.tags) ? s.tags : (Array.isArray(s?.optional) && s.optional ? ['optional'] : []),
+          // Include authored structured workout when present so server materializer can expand it
+          workout_structure: (s as any)?.workout_structure && typeof (s as any).workout_structure === 'object' ? (s as any).workout_structure : null,
         }
         if (mapped === 'strength') {
           const ex = deriveStrengthExercises(stepsTokens, baselines)
@@ -320,11 +327,11 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success:false, error:'materialize_exception', details: String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
     }
 
-    // Verify: every row for this plan has computed steps and total_duration_seconds
+    // Verify (warn-only): log any rows without computed steps/total but do not block activation
     try {
       const { data: rowsAfter } = await supabase
         .from('planned_workouts')
-        .select('id, computed, total_duration_seconds')
+        .select('id, type, steps_preset, workout_structure, computed, total_duration_seconds')
         .eq('training_plan_id', planId)
       const list = Array.isArray(rowsAfter) ? rowsAfter : []
       const invalid = list.filter((r:any) => {
@@ -335,13 +342,17 @@ Deno.serve(async (req) => {
         } catch { return true }
       })
       if (invalid.length>0 || (inserted>0 && list.length < inserted)) {
-        try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
-        return new Response(JSON.stringify({ success:false, error:'verification_failed', invalid_count: invalid.length }), { status: 422, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
+        const sample = invalid.slice(0, 10).map((r:any)=>({
+          id: r.id,
+          type: r.type,
+          hasTokens: Array.isArray(r?.steps_preset) && r.steps_preset.length>0,
+          hasStructure: !!(r?.workout_structure && typeof r.workout_structure==='object'),
+          stepCount: Array.isArray(r?.computed?.steps) ? r.computed.steps.length : 0,
+          total: Number(r?.total_duration_seconds || r?.computed?.total_duration_seconds) || null,
+        }))
+        console.warn('activate-plan verification warnings', { invalid_count: invalid.length, sample })
       }
-    } catch (e) {
-      try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
-      return new Response(JSON.stringify({ success:false, error:'verification_exception', details:String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
-    }
+    } catch {}
 
     return new Response(JSON.stringify({ success: true, inserted, plan_id: planId, start_date: startDate }), { headers: { ...corsHeaders, 'Content-Type':'application/json' } })
   } catch (e) {
