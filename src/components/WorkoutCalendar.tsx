@@ -206,20 +206,11 @@ export default function WorkoutCalendar({
     description: it.planned?.description || null,
     tags: it.planned?.tags || null,
   }));
-  const unifiedWorkouts = unifiedItems.filter((it:any)=> {
-    const st = String(it?.status||'').toLowerCase();
-    if (st === 'completed') return true;
-    // Treat any item with executed metrics as completed for display
-    const ex = it?.executed || null;
-    if (!ex) return false;
-    const hasOverall = !!ex?.overall && (typeof ex.overall.distance_m === 'number' || typeof ex.overall.duration_s_moving === 'number');
-    const hasIntervals = Array.isArray(ex?.intervals) && ex.intervals.length>0;
-    return hasOverall || hasIntervals;
-  }).map((it:any)=> ({
+  const unifiedWorkouts = unifiedItems.map((it:any)=> ({
     id: it.id,
     date: it.date,
     type: it.type,
-    workout_status: 'completed',
+    workout_status: (String(it?.status||'').toLowerCase()==='completed') ? 'completed' : 'planned',
     // keep shape minimal; calendar only uses status, date, type, maybe planned_id
   }));
 
