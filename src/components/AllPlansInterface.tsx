@@ -732,17 +732,15 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         // fall back silently to sessions_by_week normalization
       }
 
-      // Always normalize sessions_by_week → weeks[].workouts[] expected by this view
+      // Only normalize the currently selected week from sessions_by_week to avoid heavy render
       if (pd.sessions_by_week) {
         try {
           const weeksOut: any[] = [];
           const sessionsByWeek = pd.sessions_by_week;
           const notesByWeek = pd.notes_by_week || {};
 
-          const weekNumbers = Object.keys(sessionsByWeek)
-            .map(n => parseInt(n, 10))
-            .filter(n => !Number.isNaN(n))
-            .sort((a, b) => a - b);
+          const wk = selectedWeek || 1;
+          const weekNumbers = [wk];
 
           for (const w of weekNumbers) {
             const sessions = sessionsByWeek[w] || [];
