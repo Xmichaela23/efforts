@@ -189,6 +189,22 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   const yards = computeSwimYards(workout);
   const title = getTitle(workout);
   const lines = suppressNotes ? (buildStructuredSubtitleOnly(workout, baselines) || '') : (buildWeeklySubtitle(workout, baselines) || '');
+  const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
+  const strengthItems: string[] = (() => {
+    if (!isStrength) return [];
+    try {
+      const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
+      if (!ex.length) return [];
+      return ex.map((e:any) => {
+        const sets = Math.max(1, Number(e?.sets)||1);
+        const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
+        const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
+        const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
+        const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+        return `${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`;
+      });
+    } catch { return []; }
+  })();
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
   return (
     <div className="flex items-start justify-between gap-3">
@@ -204,7 +220,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             ) : null}
           </span>
         </div>
-        {!hideLines && (
+        {!hideLines && !isStrength && (
           <div className="text-sm text-gray-600 mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">{stacked.join('\n')}</span>
@@ -212,6 +228,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
               <span>{lines}</span>
             )}
           </div>
+        )}
+        {!hideLines && isStrength && strengthItems.length>0 && (
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
+            {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
+          </ul>
         )}
       </div>
     </div>

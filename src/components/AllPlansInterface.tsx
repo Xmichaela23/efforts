@@ -1890,67 +1890,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 ) : (
                                   <div className="flex items-start justify-between gap-3">
                                     <div className="flex-1">
-                                      <div className="font-medium flex items-center gap-2">
-                                        <span>{(()=>{ const st=String((workout as any)?.workout_structure?.title || (workout as any)?.workout_title || '').trim(); if(st) return st; const nm=(workout.name||''); const t=(workout.type||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
-                                        {(() => {
-                                          // Prefer computed v3 totals when reliable; otherwise compute from tokens deterministically
-                                          const secRaw = (workout as any)?.computed?.total_duration_seconds as any;
-                                          const secNum = typeof secRaw === 'number' ? secRaw : (typeof secRaw === 'string' ? parseInt(secRaw, 10) : NaN);
-                                          let fromComputed: number | null = (Number.isFinite(secNum) && secNum > 0) ? Math.round(Number(secNum)/60) : null;
-                                          let fromTokens: number | null = null;
-                                          try {
-                                            const pn = (baselines as any)?.performanceNumbers || {};
-                                            const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                                            if (stepsPreset.length) {
-                                              const res = normalizePlannedSession({ ...workout, steps_preset: stepsPreset }, { performanceNumbers: pn }, (workout as any).export_hints || {});
-                                              if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) fromTokens = res.durationMinutes;
-                                            }
-                                          } catch {}
-                                          const minutes = (typeof fromTokens === 'number' && (!fromComputed || fromTokens > fromComputed)) ? fromTokens : (fromComputed || null);
-                                          // Compute yardage for swims (computed → tokens)
-                                          const yards: number | null = (() => {
-                                            const type = String((workout as any)?.type || '').toLowerCase();
-                                            if (type !== 'swim') return null;
-                                            try {
-                                              const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-                                              if (steps.length) {
-                                                const meters = steps.reduce((a:number, st:any)=> a + (Number(st?.distanceMeters)||0), 0);
-                                                const yd = Math.round(meters / 0.9144);
-                                                if (yd > 0) return yd;
-                                              }
-                                            } catch {}
-                                            try {
-                                              const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset : [];
-                                              if (!toks.length) return null;
-                                              const toYd = (n:number, unit:string)=> unit.toLowerCase()==='m' ? Math.round(n/0.9144) : n;
-                                              let sum = 0;
-                                              toks.forEach((t)=>{
-                                                const s = String(t).toLowerCase();
-                                                let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10), m[2]); return; }
-                                                m = s.match(/swim_drill_[a-z0-9_]+_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10)*parseInt(m[2],10), m[3]); return; }
-                                                m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10)*parseInt(m[2],10), m[3]); return; }
-                                                m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[2],10)*parseInt(m[3],10), m[4]); return; }
-                                                m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)/i); if (m){ sum += toYd(parseInt(m[1],10)*parseInt(m[2],10), m[3]); return; }
-                                              });
-                                              return sum>0 ? sum : null;
-                                            } catch { return null; }
-                                          })();
-                                          return (
-                                            <span className="flex items-center gap-1">
-                                              {(typeof minutes === 'number') ? (
-                                                <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>
-                                              ) : null}
-                                              {(typeof yards === 'number') ? (
-                                                <span className="px-2 py-0.5 text-xs rounded bg-blue-50 border border-blue-200 text-blue-800">{yards} yd</span>
-                                              ) : null}
-                                            </span>
-                                          );
-                                        })()}
-                                      </div>
-                                      {/* Reuse detailed summarizer for endurance + strength */}
-                                      <div className="mt-1">
-                                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} suppressNotes={true} />
-                                      </div>
+                                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} suppressNotes={true} />
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
