@@ -395,7 +395,7 @@ export default function WorkoutCalendar({
       return true;
     });
 
-    // Build raw events with consistent labels
+    // Build raw events with consistent labels (no collapsing; show all entries)
     const raw = allFiltered
       .filter((w: any) => {
         if (!w || !w.date) return false;
@@ -414,10 +414,11 @@ export default function WorkoutCalendar({
         const plannedLabel = derivePlannedCellLabel(w);
         const t = typeAbbrev(w.type || w.workout_type || w.activity_type || '');
         const labelBase = plannedLabel || [t, milesText].filter(Boolean).join(' ');
-        const isCompleted = w.workout_status === 'completed';
+        const isCompleted = String(w?.workout_status||'').toLowerCase()==='completed';
+        const isPlannedLinked = isCompleted && !!(w as any)?.planned_id;
         return {
           date: w.date,
-          label: `${labelBase}${isCompleted ? ' ✓' : ''}`,
+          label: `${labelBase}${isCompleted ? (isPlannedLinked ? ' P✓' : ' ✓') : ''}`,
           href: `#${w.id}`,
           provider: w.provider || deriveProvider(w),
           _sigType: t,
@@ -426,37 +427,8 @@ export default function WorkoutCalendar({
         } as any;
       });
 
-    // Dedupe: same day + type + ~same miles → keep a single entry
-    const byDay = new Map<string, any[]>();
-    for (const ev of raw) {
-      const key = String(ev.date);
-      if (!byDay.has(key)) byDay.set(key, []);
-      byDay.get(key)!.push(ev);
-    }
-
-    const deduped: CalendarEvent[] = [];
-    for (const [day, list] of byDay.entries()) {
-      // Collapse multiple COMPLETED entries of the same type on the same day (display only one)
-      // Keep all planned items visible (handled earlier via suppression rules).
-      const seenExact = new Set<string>();
-      const seenCompletedType = new Set<string>();
-      for (const ev of list) {
-        const exactKey = String(ev.href || '') || `${ev._sigType}|${ev._sigMiles}|${ev.label}`;
-        if (seenExact.has(exactKey)) continue;
-        seenExact.add(exactKey);
-
-        const isCompleted = /✓\s*$/.test(ev.label || '') || String((ev as any)?._src?.workout_status||'').toLowerCase()==='completed';
-        const typeKey = String(ev._sigType || '').toLowerCase();
-        if (isCompleted) {
-          const ctKey = `${day}|${typeKey}`;
-          if (seenCompletedType.has(ctKey)) continue; // already have a completed of this type for the day
-          seenCompletedType.add(ctKey);
-        }
-        deduped.push({ date: day, label: ev.label, href: ev.href, provider: ev.provider });
-      }
-    }
-
-    return deduped;
+    // Return raw list; we intentionally show all entries (no collapsing)
+    return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider }));
   }, [workouts, plannedWorkouts, plannedWeekRows, workoutsWeekRows, fromISO, toISO]);
 
   const handleDayClick = async (day: Date) => {
