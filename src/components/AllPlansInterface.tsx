@@ -606,7 +606,28 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
       try {
         const commonSelect = '*';
         const wk = selectedWeek || 1;
-        await supabase.functions.invoke('get-week', { body: { from: 'week', to: 'week', plan_id: planId, week_number: wk } }).catch(()=>{});
+        // Compute Monday–Sunday ISO window for selected week from the plan's Week 1 anchor
+        const weekStartISO = (()=>{
+          try {
+            const w1 = (pd.weeks && pd.weeks[0] && pd.weeks[0].workouts && pd.weeks[0].workouts[0] && pd.weeks[0].workouts[0].date) || null;
+            const ref = new Date(w1 || new Date());
+            const js = ref.getDay(); const mon = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate() - ((js + 6)%7));
+            const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + (wk-1)*7);
+            const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+            return `${y}-${m}-${dd}`;
+          } catch { return undefined; }
+        })();
+        const weekEndISO = (()=>{
+          try {
+            const s = weekStartISO ? new Date(weekStartISO) : new Date();
+            const e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+6);
+            const y=e.getFullYear(), m=String(e.getMonth()+1).padStart(2,'0'), dd=String(e.getDate()).padStart(2,'0');
+            return `${y}-${m}-${dd}`;
+          } catch { return undefined; }
+        })();
+        if (weekStartISO && weekEndISO) {
+          await supabase.functions.invoke('get-week', { body: { from: weekStartISO, to: weekEndISO } }).catch(()=>{});
+        }
         const { data: mat, error: e1 } = await supabase
           .from('planned_workouts')
           .select(commonSelect)
@@ -1221,7 +1242,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         setWeekLoading(true);
         // Server-side handles materialization; warm unified cache only
         const wk = selectedWeek || 1;
-        await supabase.functions.invoke('get-week', { body: { plan_id: selectedPlanDetail.id, week_number: wk } }).catch(()=>{});
+        const weekStartISO = (()=>{
+          try {
+            const today = new Date(); const js = today.getDay(); const mon = new Date(today.getFullYear(), today.getMonth(), today.getDate() - ((js + 6)%7));
+            const d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate() + (wk-1)*7);
+            const y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,'0'), dd=String(d.getDate()).padStart(2,'0');
+            return `${y}-${m}-${dd}`;
+          } catch { return undefined; }
+        })();
+        const weekEndISO = (()=>{
+          try { const s = weekStartISO ? new Date(weekStartISO) : new Date(); const e = new Date(s.getFullYear(), s.getMonth(), s.getDate()+6); const y=e.getFullYear(), m=String(e.getMonth()+1).padStart(2,'0'), dd=String(e.getDate()).padStart(2,'0'); return `${y}-${m}-${dd}`; } catch { return undefined; }
+        })();
+        if (weekStartISO && weekEndISO) {
+          await supabase.functions.invoke('get-week', { body: { from: weekStartISO, to: weekEndISO } }).catch(()=>{});
+        }
         const { data: rows } = await supabase
           .from('planned_workouts')
           .select('*')
