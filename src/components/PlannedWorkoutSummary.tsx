@@ -355,6 +355,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             )}
           </div>
         )}
+        {!hideLines && isStrength && (
+          <div className="text-sm text-gray-600 mt-1">
+            <span>{lines}</span>
+          </div>
+        )}
         {!hideLines && isStrength && strengthItems.length>0 && (
           <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
             {strengthItems.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
