@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+// Planned workouts hook deprecated; unified server paths are the source of truth
 import { useAppContext } from '@/contexts/AppContext';
 import { getDisciplineColor } from '@/lib/utils';
 // PlannedWorkoutView is deprecated; unified view replaces it
@@ -206,7 +206,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   focusPlanId,
   focusWeek
 }) => {
-  const { plannedWorkouts, loading: plannedLoading } = usePlannedWorkouts();
+  // Planned workouts are sourced via unified server paths now
   const { loadUserBaselines } = useAppContext();
   const [baselines, setBaselines] = useState<any>(null);
   const [currentView, setCurrentView] = useState<'list' | 'detail' | 'day'>(focusPlanId ? 'detail' : 'list');
@@ -1122,8 +1122,9 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
         }
 
         setWeekLoading(true);
-        const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
-        await ensureWeekMaterialized(String(selectedPlanDetail.id), Number(selectedWeek));
+        // Server-side handles materialization; warm unified cache only
+        const weekStart = (()=>{ const d = new Date(); const js = d.getDay(); const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((js + 6)%7)); return `${monday.getFullYear()}-${String(monday.getMonth()+1).padStart(2,'0')}-${String(monday.getDate()).padStart(2,'0')}`; })();
+        await supabase.functions.invoke('get-week', { body: { from: weekStart, to: weekStart } });
         const { data: rows } = await supabase
           .from('planned_workouts')
           .select('*')
@@ -1188,10 +1189,11 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     weekCacheRef.current.delete(key);
     setWeekLoading(true);
     try {
-      const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
-      await ensureWeekMaterialized(String(selectedPlanDetail.id), Number(selectedWeek));
-    } catch {}
-    setWeekLoading(false);
+      // No-op: server auto-materializes; trigger unified refresh
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
+    } finally {
+      setWeekLoading(false);
+    }
   };
 
   const handleWorkoutClick = (workout: any) => {

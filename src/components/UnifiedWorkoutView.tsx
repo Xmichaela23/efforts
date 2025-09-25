@@ -9,7 +9,8 @@ import MobileSummary from './MobileSummary';
 import WorkoutDetail from './WorkoutDetail';
 import StrengthCompletedView from './StrengthCompletedView';
 import StructuredPlannedView from './StructuredPlannedView';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+// Unified path only; remove legacy planned_workouts hooks
+import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { supabase } from '@/lib/supabase';
 
 interface UnifiedWorkoutViewProps {
@@ -37,7 +38,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     );
   }
 
-  const { deletePlannedWorkout, plannedWorkouts } = usePlannedWorkouts();
+  // plannedWorkouts context removed; rely on server unified data/routes
   const isCompleted = String(workout.workout_status || workout.status || '').toLowerCase() === 'completed';
   const [activeTab, setActiveTab] = useState<string>(initialTab || (isCompleted ? 'completed' : 'planned'));
   const [editingInline, setEditingInline] = useState(false);
@@ -49,6 +50,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
   // Suppress auto re-link fallback briefly after an explicit Unattach
   const suppressRelinkUntil = useRef<number>(0);
 
+  // Unified week data for the workout's date (single-day window)
+  const dateIso = String((workout as any)?.date || '').slice(0,10);
+  const { items: unifiedItems = [] } = useWeekUnified(dateIso, dateIso);
+
   // Resolve linked planned row for completed workouts
   useEffect(() => {
     (async () => {
@@ -57,29 +62,14 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         return; 
       }
 
-      // 1) If workout already has planned_id, find it in the planned workouts context
+      // 1) If workout already has planned_id, try to resolve from unified items
       const pid = (workout as any)?.planned_id as string | undefined;
       if (pid) {
-        const planned = plannedWorkouts.find(p => p.id === pid) || null;
-        if (planned) {
-          console.log('🔍 Found linkedPlanned by planned_id in context:', {
-            id: planned?.id,
-            name: planned?.name,
-            hasStrengthExercises: !!planned?.strength_exercises,
-            strengthExercises: planned?.strength_exercises
-          });
-          setLinkedPlanned(planned);
+        const fromUnified = (Array.isArray(unifiedItems)?unifiedItems:[]).find((it:any)=> String(it?.planned?.id||'') === String(pid));
+        if (fromUnified && fromUnified.planned) {
+          setLinkedPlanned({ id: fromUnified.planned.id, date: fromUnified.date, type: fromUnified.type, computed: fromUnified.planned.steps ? { steps: fromUnified.planned.steps, total_duration_seconds: fromUnified.planned.total_duration_seconds } : null, description: fromUnified.planned.description, tags: fromUnified.planned.tags, workout_status: 'planned' });
           return;
         }
-        // Context may exclude completed rows → fetch directly by id to ensure Summary can render immediately
-        try {
-          const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).maybeSingle();
-          if (data) {
-            console.log('🔍 Hydrated linkedPlanned via direct fetch by planned_id');
-            setLinkedPlanned(data);
-            return;
-          }
-        } catch {}
       }
 
       // 2) Skip legacy reverse-id path (completed_workout_id) – single-link model uses workouts.planned_id only
@@ -91,25 +81,18 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
         return;
       }
       
+      // 2) Fallback: same-day planned via unified feed
       if ((workout as any).date && (workout as any).type) {
-        const planned = plannedWorkouts.find(p => 
-          p.type === (workout as any).type && 
-          p.date === String((workout as any).date).slice(0,10) &&
-          ['planned', 'in_progress', 'completed'].includes(p.workout_status)
-        );
-        console.log('🔍 Found linkedPlanned by same-day fallback in context:', {
-          id: planned?.id,
-          name: planned?.name,
-          hasStrengthExercises: !!planned?.strength_exercises,
-          strengthExercises: planned?.strength_exercises
-        });
-        setLinkedPlanned(planned || null);
-        return;
+        const plannedUnified = (Array.isArray(unifiedItems)?unifiedItems:[]).find((it:any)=> String(it.date) === String((workout as any).date).slice(0,10) && String(it.type).toLowerCase() === String((workout as any).type).toLowerCase() && !!it.planned);
+        if (plannedUnified && plannedUnified.planned) {
+          setLinkedPlanned({ id: plannedUnified.planned.id, date: plannedUnified.date, type: plannedUnified.type, computed: plannedUnified.planned.steps ? { steps: plannedUnified.planned.steps, total_duration_seconds: plannedUnified.planned.total_duration_seconds } : null, description: plannedUnified.planned.description, tags: plannedUnified.planned.tags, workout_status: 'planned' });
+          return;
+        }
       }
 
       setLinkedPlanned(null);
     })();
-  }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type, plannedWorkouts]);
+  }, [isCompleted, workout?.id, (workout as any)?.planned_id, (workout as any)?.date, (workout as any)?.type]);
 
   // Auto-materialize planned row if Summary is opened and computed steps are missing
   useEffect(() => {
@@ -189,23 +172,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           }
         } catch {}
 
-        // Fallback: materialize by week context when available
-        try {
-          const planId = (linkedPlanned as any)?.training_plan_id as string | undefined;
-          const weekNum = Number((linkedPlanned as any)?.week_number);
-          if (!planId || !Number.isFinite(weekNum) || weekNum < 1) return;
-          const mod = await import('@/services/plans/ensureWeekMaterialized');
-          await mod.ensureWeekMaterialized(String(planId), Number(weekNum));
-          const { data } = await supabase.from('planned_workouts').select('*').eq('id', (linkedPlanned as any).id).single();
-          setLinkedPlanned(data || null);
-          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-          try {
-            if (isCompleted && (workout as any)?.id) {
-              await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any).id) } });
-              try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-            }
-          } catch {}
-        } catch {}
+        // Fallback removed: server now materializes; rely on materialize-plan when needed
       } catch {}
     };
     // When switching to Summary tab, try a materialize pass

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useWeather } from '@/hooks/useWeather';
 import { useAppContext } from '@/contexts/AppContext';
-import { usePlannedWorkoutsToday } from '@/hooks/usePlannedWorkouts';
+import { useWeekUnified } from '@/hooks/useWeekUnified';
 import { Calendar, Clock, Dumbbell } from 'lucide-react';
 import { getDisciplineColor } from '@/lib/utils';
 import { normalizePlannedSession } from '@/services/plans/normalizer';
@@ -34,8 +34,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
   const activeDate = selectedDate || today;
 
-  // Fast planned lookup for Today to avoid heavy payloads
-  const { plannedToday, loading: plannedTodayLoading } = usePlannedWorkoutsToday(activeDate);
+  // Unified single-source lookup for the active date
+  const { items: unifiedItems = [], loading: unifiedLoading } = useWeekUnified(activeDate, activeDate);
 
   // No persistence: we will use ephemeral geolocation below for today's weather
 
@@ -88,22 +88,34 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
   }, [scrollRef, sentinelRef]);
 
   const dateWorkoutsMemo = useMemo(() => {
-    // Include today's planned rows and all completed rows
-    const plannedSource = (plannedToday || []).filter((w:any)=> String(w.workout_status||'').toLowerCase()==='planned');
-    const all = [...(workouts || []), ...plannedSource].filter((w:any)=> w.date === activeDate);
-    const completed = all.filter((w:any)=> String(w.workout_status||w.status||'').toLowerCase()==='completed');
-    const planned = all.filter((w:any)=> String(w.workout_status||w.status||'').toLowerCase()!=='completed');
-
+    const items = Array.isArray(unifiedItems) ? unifiedItems : [];
+    const completed = items
+      .filter((it:any) => String(it?.status||'').toLowerCase()==='completed')
+      .map((it:any) => ({
+        id: it.id,
+        date: it.date,
+        type: it.type,
+        workout_status: 'completed',
+        computed: it.executed || null,
+      }));
+    const planned = items
+      .filter((it:any) => !!it?.planned && String(it?.status||'').toLowerCase()!=='completed')
+      .map((it:any) => ({
+        id: it.planned?.id || it.id,
+        date: it.date,
+        type: it.type,
+        workout_status: 'planned',
+        description: it.planned?.description || null,
+        rendered_description: it.planned?.description || null,
+        computed: (Array.isArray(it.planned?.steps) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null),
+        tags: it.planned?.tags || [],
+      }));
     // Build set of types that already have a completed workout for the date
     const typeKey = (w:any)=> `${String(w.type||'').toLowerCase()}|${w.date}`;
     const completedTypes = new Set(completed.map(typeKey));
-
-    // Keep planned only if there is no completed of the same type for the date
     const plannedKept = planned.filter((w:any)=> !completedTypes.has(typeKey(w)));
-
-    // Return all completed (including multiples of same type) plus remaining planned
     return [...completed, ...plannedKept];
-  }, [workouts, plannedToday, activeDate]);
+  }, [unifiedItems, activeDate]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {
@@ -343,8 +355,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       const t: string[] = Array.isArray(w?.tags) ? w.tags : [];
       const next = t.filter((x:string)=> x.toLowerCase() !== 'optional');
       await fetch('/api/activate-optional', { method: 'POST', body: JSON.stringify({ id: w.id, tags: next }) }).catch(()=>{});
-      try { const { supabase } = await import('@/lib/supabase'); await supabase.from('planned_workouts').update({ tags: next }).eq('id', w.id); } catch {}
-      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+      try { window.dispatchEvent(new CustomEvent('week:invalidate')); } catch {}
     } catch {}
   };
 
@@ -471,7 +482,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
 
 
 
-  const blockLoading = (loading && (!(workouts && workouts.length))) || (plannedTodayLoading && (!(plannedToday && plannedToday.length)));
+  const blockLoading = unifiedLoading && !Array.isArray(dateWorkoutsMemo) ? true : false;
   if (blockLoading) {
     return (
       <div className="w-full flex-shrink-0 flex items-center justify-center overflow-hidden" style={{fontFamily: 'Inter, sans-serif', height: 'var(--todays-h)'}}>

@@ -955,13 +955,8 @@ export default function PlanSelect() {
       const planErr = (planInsert as any).error;
       if (planErr) throw planErr;
 
-      // Strict: materialize Week 1 via the same baker used for later weeks
-      try {
-        const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
-        await ensureWeekMaterialized(String(planRow.id), 1);
-      } catch (e) {
-        throw new Error(`Failed to materialize Week 1: ${e instanceof Error ? e.message : String(e)}`);
-      }
+      // Server-side materialization now; warm unified caches only
+      try { const { supabase } = await import('@/lib/supabase'); await supabase.functions.invoke('materialize-plan', { body: { plan_id: String(planRow.id) } }); } catch {}
 
       try { await refreshPlans?.(); } catch {}
       navigate('/', { state: { openPlans: true, focusPlanId: planRow.id, focusWeek: 1 } });

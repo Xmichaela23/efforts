@@ -892,11 +892,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('User must be authenticated to delete plans');
-      // Remove planned rows for this plan first (both linked and any fallback rows tagged via template_id)
-      await supabase
-        .from('planned_workouts')
-        .delete()
-        .or(`training_plan_id.eq.${planId},template_id.eq.${planId}`);
+      // Let database cascading or server functions handle cleanup of planned rows
       const { error } = await supabase.from('plans').delete().eq('id', planId).eq('user_id', user.id);
       if (error) throw error;
       await loadPlans();
@@ -921,27 +917,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     await loadPlans();
   };
 
-  // Auto-materialize Week 1 when opening a plan that has sessions but no planned rows yet
-  useEffect(() => {
-    (async () => {
-      try {
-        const active = currentPlans && currentPlans[0];
-        if (!active) return;
-        const planId = String(active.id);
-        // Check if week 1 has any planned rows
-        const { data: rows } = await supabase
-          .from('planned_workouts')
-          .select('id')
-          .eq('training_plan_id', planId)
-          .eq('week_number', 1)
-          .limit(1);
-        const hasRows = Array.isArray(rows) && rows.length>0;
-        if (hasRows) return;
-        const { ensureWeekMaterialized } = await import('@/services/plans/ensureWeekMaterialized');
-        await ensureWeekMaterialized(planId, 1);
-      } catch {}
-    })();
-  }, [currentPlans?.[0]?.id]);
+  // Client-side week auto-materialization removed; server functions handle it
 
   // Repair a plan's planned_workouts: revert orphaned completions and restore authored dates
   const repairPlan = async (planId: string): Promise<{ repaired: number }> => {

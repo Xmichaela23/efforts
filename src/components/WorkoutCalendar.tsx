@@ -80,8 +80,6 @@ function deriveProvider(w: any): string {
   return 'workouts';
 }
 
-// Cache the computed Week 1 Monday anchor per plan to avoid repeated reads
-const planStartMondayCache = new Map<string, string>(); // planId -> ISO (YYYY-MM-DD)
 // Backfill guard to avoid repeated server calls per week
 const backfilledWeeks = new Set<string>();
 
@@ -275,23 +273,7 @@ export default function WorkoutCalendar({
     if (!unifiedLoading) setInitialLoadDone(true);
   }, [unifiedLoading]);
 
-  // Auto-materialize the visible week when an active plan exists but no planned rows are present for this week
-  const [materializeTriedISO, setMaterializeTriedISO] = useState<string | null>(null);
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!currentPlans || currentPlans.length === 0) return;
-        if (!fromISO) return;
-        if (materializeTriedISO === fromISO) return;
-        // Only consider materialization when the unified query completed without errors
-        if (unifiedLoading || unifiedError) return;
-        const noPlannedThisWeek = !(Array.isArray(unifiedPlanned) && unifiedPlanned.length > 0);
-        if (!noPlannedThisWeek) return;
-        setMaterializeTriedISO(fromISO);
-        await ensureWeekForDate(weekStart);
-      } catch {}
-    })();
-  }, [fromISO, weekStart.getTime(), Array.isArray(unifiedPlanned)?unifiedPlanned.length:0, unifiedLoading, unifiedError, currentPlans?.[0]?.id]);
+  // Materialization is server-side now; no client ensure-week
 
   // Ensure attach + compute sweep runs for the visible week (once per week in session)
   useEffect(() => {
@@ -448,8 +430,6 @@ export default function WorkoutCalendar({
 
   const handleDayClick = async (day: Date) => {
     const dateStr = toDateOnlyString(day);
-    // On any day click, ensure that week is materialized, then invalidate caches
-    try { void ensureWeekForDate(day); } catch {}
     if (onDateSelect) onDateSelect(dateStr);
   };
 
@@ -470,106 +450,7 @@ export default function WorkoutCalendar({
     return new Date(base.getFullYear(), base.getMonth(), base.getDate());
   };
 
-  // Ensure week materialized for a date based on active plan
-  const ensureWeekForDate = async (d: Date) => {
-    try {
-      const activePlan = Array.isArray(currentPlans) && currentPlans.length > 0 ? currentPlans[0] : null;
-      if (!activePlan || !activePlan.id) return;
-      const planId = String(activePlan.id);
-
-      // Resolve start Monday for Week 1 using cache → DB probe → plan config fallback
-      let startMondayISO = planStartMondayCache.get(planId) || '';
-      if (!startMondayISO) {
-        try {
-          const { data: w1 } = await supabase
-            .from('planned_workouts')
-            .select('date, day_number')
-            .eq('training_plan_id', planId)
-            .eq('week_number', 1)
-            .order('day_number', { ascending: true })
-            .limit(1);
-          if (Array.isArray(w1) && w1.length > 0) {
-            const anchor = w1[0] as any;
-            const w1Start = computeWeek1Start(String(anchor.date), Number(anchor.day_number));
-            startMondayISO = toDateOnlyString(w1Start);
-          }
-        } catch {}
-      }
-      if (!startMondayISO) {
-        try {
-          const { data: planRow } = await supabase
-            .from('plans')
-            .select('config')
-            .eq('id', planId)
-            .maybeSingle();
-          const sel = String((planRow as any)?.config?.user_selected_start_date || '').slice(0, 10);
-          if (sel) {
-            const parts = sel.split('-').map((x) => parseInt(x, 10));
-            const base = new Date(parts[0], (parts[1] || 1) - 1, parts[2] || 1);
-            startMondayISO = toDateOnlyString(startOfWeek(base));
-          }
-        } catch {}
-      }
-      if (!startMondayISO) startMondayISO = toDateOnlyString(startOfWeek(new Date()));
-      planStartMondayCache.set(planId, startMondayISO);
-
-      const tgtStart = startOfWeek(d);
-      const diffDays = Math.round((resolveDate(toDateOnlyString(tgtStart)).getTime() - resolveDate(startMondayISO).getTime()) / (1000 * 60 * 60 * 24));
-      const weekNumber = Math.max(1, Math.floor(diffDays / 7) + 1);
-
-      // Robust existence check to avoid duplicate materialization on weak count responses
-      let needsMaterialize = false;
-      try {
-        const q = await supabase
-          .from('planned_workouts')
-          .select('id', { count: 'exact', head: true } as any)
-          .eq('training_plan_id', planId)
-          .eq('week_number', weekNumber);
-        const cnt = (q as any)?.count;
-        if (typeof cnt === 'number') {
-          needsMaterialize = cnt === 0;
-        } else {
-          // Fallback probe without head: read one row to determine existence
-          const probe = await supabase
-            .from('planned_workouts')
-            .select('id')
-            .eq('training_plan_id', planId)
-            .eq('week_number', weekNumber)
-            .limit(1);
-          const rows = Array.isArray((probe as any)?.data) ? (probe as any).data : [];
-          needsMaterialize = rows.length === 0;
-        }
-      } catch { needsMaterialize = false; /* on error, do not materialize blindly */ }
-
-      if (needsMaterialize) {
-        try {
-          const mod = await import('@/services/plans/ensureWeekMaterialized');
-          await mod.ensureWeekMaterialized(planId, weekNumber);
-          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-        } catch {}
-      }
-
-      // Background pre-materialize neighbor weeks (only if missing)
-      const neighborWeeks = [weekNumber - 1, weekNumber + 1].filter((n) => n >= 1);
-      for (const nw of neighborWeeks) {
-        setTimeout(async () => {
-          try {
-            const q = await supabase
-              .from('planned_workouts')
-              .select('id', { count: 'exact', head: true } as any)
-              .eq('training_plan_id', planId)
-              .eq('week_number', nw);
-            const cnt = (q as any)?.count ?? 0;
-            if (!(Number.isFinite(cnt) && cnt > 0)) {
-              const mod = await import('@/services/plans/ensureWeekMaterialized');
-              await mod.ensureWeekMaterialized(planId, nw);
-              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-            }
-          } catch {}
-        }, 50);
-      }
-    } catch {}
-  };
+  // ensureWeekForDate removed
 
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
 
