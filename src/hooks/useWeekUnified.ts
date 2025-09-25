@@ -48,15 +48,8 @@ export function useWeekUnified(fromISO: string, toISO: string) {
     refetchOnReconnect: true,
   });
 
-  useEffect(() => {
-    const handler = () => { queryClient.invalidateQueries({ queryKey: queryKeyBase }); };
-    window.addEventListener('planned:invalidate', handler);
-    window.addEventListener('workouts:invalidate', handler);
-    return () => {
-      window.removeEventListener('planned:invalidate', handler);
-      window.removeEventListener('workouts:invalidate', handler);
-    };
-  }, [fromISO, toISO, userId]);
+  // In unified mode, rely on standard query invalidation from navigations;
+  // avoid global event-based invalidation to prevent render loops on calendar.
 
   const items: UnifiedItem[] = (query.data as any)?.items || [];
   return { items, loading: query.isFetching || query.isPending, error: (query.error as any)?.message || null };

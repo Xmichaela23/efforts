@@ -33,35 +33,40 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'from/to must be YYYY-MM-DD' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Use anon key and forward Authorization so RLS enforces user scope
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL')!,
-      Deno.env.get('SUPABASE_ANON_KEY')!,
-      {
-        global: { headers: { Authorization: req.headers.get('Authorization') || '' } },
-        auth: { persistSession: false, autoRefreshToken: false },
-      }
-    );
+    // Derive user id from Authorization and use service role for efficient server filtering (bypass RLS but scope by user_id explicitly)
+    const authH = req.headers.get('Authorization') || '';
+    const token = authH.startsWith('Bearer ') ? authH.slice(7) : null;
+    const userId = (() => {
+      try { if (!token) return null; const payload = JSON.parse(atob(token.split('.')[1])); return payload?.sub || null; } catch { return null; }
+    })();
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
 
     // Fetch unified workouts (new columns present but may be null)
     const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed';
     const { data: wkRaw, error: wkErr } = await supabase
       .from('workouts')
       .select(workoutSel)
+      .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISO)
       .order('date', { ascending: true });
-    if (wkErr) throw wkErr;
+    const errors: any[] = [];
+    if (wkErr) errors.push({ where: 'workouts', message: wkErr.message || String(wkErr) });
 
     const workouts = Array.isArray(wkRaw) ? wkRaw : [];
 
     // Transitional fill: for rows missing planned_data/executed_data, derive from legacy tables
     // 1) Preload planned rows for range keyed by (date|type)
-    const { data: plannedRows } = await supabase
+    const { data: plannedRows, error: pErr } = await supabase
       .from('planned_workouts')
       .select('id,date,type,workout_status,computed,steps_preset,description,tags,training_plan_id,total_duration_seconds')
+      .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISO);
+    if (pErr) errors.push({ where: 'planned_workouts', message: pErr.message || String(pErr) });
     const plannedByKey = new Map<string, any>();
     for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
       plannedByKey.set(`${String(p.date)}|${String(p.type).toLowerCase()}`, p);
@@ -124,6 +129,9 @@ Deno.serve(async (req) => {
       }
     }
 
+    if (errors.length) {
+      return new Response(JSON.stringify({ items, warnings: errors }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     return new Response(JSON.stringify({ items }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : String(e);
