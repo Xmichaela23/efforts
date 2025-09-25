@@ -10,6 +10,7 @@ interface PlannedWorkoutSummaryProps {
   baselines?: Baselines;
   exportHints?: ExportHints;
   hideLines?: boolean;
+  suppressNotes?: boolean;
 }
 
 const formatDuration = (minutes: number) => {
@@ -135,7 +136,51 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
   } catch { return undefined; }
 }
 
-export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines }) => {
+// Structured‑only variant: no coach notes fallback
+function buildStructuredSubtitleOnly(workout: any, baselines?: Baselines): string | undefined {
+  try {
+    const pn = (baselines as any)?.performanceNumbers || {};
+    const disc = String((workout as any)?.type || (workout as any)?.discipline || '').toLowerCase();
+    if (disc === 'swim') {
+      const parts: string[] = [];
+      const stepsTok: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t: any) => String(t)) : [];
+      if (stepsTok.length) {
+        let wu: string | null = null, cd: string | null = null;
+        const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
+        stepsTok.forEach((t) => {
+          const s = String(t).toLowerCase();
+          let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i);
+          if (m) { const txt = `${parseInt(m[1], 10)} ${m[2].toLowerCase()}`; if (/warmup/i.test(s)) wu = `WU ${txt}`; else cd = `CD ${txt}`; return; }
+          m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+          if (m) { const name = m[1].replace(/_/g, ' '); const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; drills.push(`${name} ${reps}x${dist}${r}`); return; }
+          m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i);
+          if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const name = m[4].replace(/_/g, ' '); drills.push(`${name} ${reps}x${dist}`); return; }
+          m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+          if (m) { const reps = parseInt(m[2], 10); const dist = parseInt(m[3], 10); const r = m[5] ? ` @ :${parseInt(m[5], 10)}r` : ''; (m[1] === 'pull' ? pulls : kicks).push(`${reps}x${dist}${r}`); return; }
+          m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i);
+          if (m) { const reps = parseInt(m[1], 10); const dist = parseInt(m[2], 10); const r = m[4] ? ` @ :${parseInt(m[4], 10)}r` : ''; aerobics.push(`${reps}x${dist}${r}`); return; }
+        });
+        if (wu) parts.push(wu);
+        if (drills.length) parts.push(`Drills: ${Array.from(new Set(drills)).join(', ')}`);
+        if (pulls.length) parts.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+        if (kicks.length) parts.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+        if (aerobics.length) parts.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+        if (cd) parts.push(cd);
+        if (parts.length) return parts.join(' • ');
+      }
+    }
+    const structured = (workout as any)?.workout_structure;
+    if (structured && typeof structured === 'object') {
+      try {
+        const res = normalizeStructuredSession(workout, { performanceNumbers: pn } as any);
+        if (res?.friendlySummary) return res.friendlySummary;
+      } catch {}
+    }
+    return undefined;
+  } catch { return undefined; }
+}
+
+export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines, suppressNotes }) => {
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
@@ -143,7 +188,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
   })();
   const yards = computeSwimYards(workout);
   const title = getTitle(workout);
-  const lines = buildWeeklySubtitle(workout, baselines) || '';
+  const lines = suppressNotes ? (buildStructuredSubtitleOnly(workout, baselines) || '') : (buildWeeklySubtitle(workout, baselines) || '');
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
   return (
     <div className="flex items-start justify-between gap-3">

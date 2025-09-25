@@ -1949,7 +1949,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                       </div>
                                       {/* Reuse detailed summarizer for endurance + strength */}
                                       <div className="mt-1">
-                                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} />
+                                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} suppressNotes={true} />
                                       </div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
