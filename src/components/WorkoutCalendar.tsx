@@ -193,7 +193,7 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { items: unifiedItems, loading: unifiedLoading } = useWeekUnified(fromISO, toISO);
+  const { items: unifiedItems, loading: unifiedLoading, error: unifiedError } = useWeekUnified(fromISO, toISO);
   // Adapt unified items → planned + workouts shapes expected below
   const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
     id: it.id,
@@ -240,13 +240,15 @@ export default function WorkoutCalendar({
         if (!currentPlans || currentPlans.length === 0) return;
         if (!fromISO) return;
         if (materializeTriedISO === fromISO) return;
+        // Only consider materialization when the unified query completed without errors
+        if (unifiedLoading || unifiedError) return;
         const emptyWeek = (!Array.isArray(unifiedItems) || unifiedItems.length === 0);
         if (!emptyWeek) return;
         setMaterializeTriedISO(fromISO);
         await ensureWeekForDate(weekStart);
       } catch {}
     })();
-  }, [fromISO, weekStart.getTime(), Array.isArray(unifiedItems)?unifiedItems.length:0, currentPlans?.[0]?.id]);
+  }, [fromISO, weekStart.getTime(), Array.isArray(unifiedItems)?unifiedItems.length:0, unifiedLoading, unifiedError, currentPlans?.[0]?.id]);
 
   // Ensure attach + compute sweep runs for the visible week (once per week in session)
   useEffect(() => {
