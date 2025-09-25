@@ -577,6 +577,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         </button>
                       </div>
                       {(() => {
+                        return null;
                         // Strength: render loads; all other types show summary-only for responsiveness
                         const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
                         if (!isStrength) {
