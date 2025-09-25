@@ -128,16 +128,54 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
     if (discipline==='run' || discipline==='walk') added = expandRunToken(tok, baselines);
     else if (discipline==='ride' || discipline==='bike' || discipline==='cycling') added = expandBikeToken(tok, baselines);
     else if (discipline==='swim') {
-      // rough expansion by time/distance if token encodes it
-      if (/\d+yd/.test(tok)) {
-        const m = tok.match(/(\d+)yd/); const yd = m?parseInt(m[1],10):0; const mtr = Math.round(yd*0.9144); steps.push({ id: uid(), kind:'work', distance_m: mtr });
-      } else if (/\d+min/.test(tok)) {
-        const sec = minutesTokenToSeconds(tok) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec });
-      } else { steps.push({ id: uid(), kind:'work', duration_s: 300 }); }
+      // Detailed swim expansion — one line per rep
+      const s = String(tok).toLowerCase();
+      const ydToM = (yd:number)=> Math.round(yd*0.9144);
+      const pushWUCD = (n:number, unit:string, warm:boolean) => {
+        const distM = unit==='yd'? ydToM(n) : n;
+        steps.push({ id: uid(), kind: warm?'warmup':'cooldown', distance_m: distM });
+      };
+      let m: RegExpMatchArray | null = null;
+      // Warmup/Cooldown distance tokens: swim_warmup_300yd_easy / swim_cooldown_200yd
+      m = s.match(/swim_(warmup|cooldown)_(\d+)(yd|m)/);
+      if (m) { pushWUCD(parseInt(m[2],10), m[3], m[1]==='warmup'); continue; }
+      // Drill: swim_drill_<name>_4x50yd(_r15)?(_fins|_board|_buoy|_snorkel)?
+      m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?(?:_(fins|board|buoy|snorkel))?/);
+      if (m) {
+        const name=m[1].replace(/_/g,' '); const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const rest=parseInt(m[5]||'0',10); const equip=m[6]||null;
+        const distM = unit==='yd'? ydToM(dist) : dist;
+        for(let i=0;i<reps;i++) { steps.push({ id: uid(), kind:'drill', distance_m: distM, label:`drill ${name}`, equipment: equip||undefined }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        continue;
+      }
+      // Aerobic sets: swim_aerobic_6x150yd(_r20)?
+      m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/);
+      if (m) {
+        const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); const unit=m[3]; const rest=parseInt(m[4]||'0',10); const distM = unit==='yd'? ydToM(dist) : dist;
+        for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:'aerobic' }); if(rest) steps.push({ id: uid(), kind:'recovery', duration_s: rest }); }
+        continue;
+      }
+      // Pull/Kick sets
+      m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)/);
+      if (m) { const kind=m[1]; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); const unit=m[4]; const distM=unit==='yd'? ydToM(dist):dist; const equip = kind==='pull'?'buoy':'board'; for(let i=0;i<reps;i++){ steps.push({ id: uid(), kind:'work', distance_m: distM, label:kind, equipment:equip }); } continue; }
+      // Fallback distance/time
+      if (/\d+yd/.test(s)) { const mm=s.match(/(\d+)yd/); const yd=mm?parseInt(mm[1],10):0; const mtr=ydToM(yd); steps.push({ id: uid(), kind:'work', distance_m: mtr }); continue; }
+      if (/\d+min/.test(s)) { const sec=minutesTokenToSeconds(s) ?? 600; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue; }
+      steps.push({ id: uid(), kind:'work', duration_s: 300 });
       continue;
     } else if (discipline==='strength') {
-      // strength planned comparison handled via strength_exercises elsewhere
-      // still create a placeholder step so duration totals compute
+      // Expand strength_exercises into steps if provided
+      const exs: any[] = Array.isArray((row as any)?.strength_exercises) ? (row as any).strength_exercises : [];
+      if (exs.length) {
+        for (const ex of exs) {
+          const name = String(ex?.name||'exercise');
+          const reps = (typeof ex?.reps==='number'? ex.reps : undefined);
+          const sets = (typeof ex?.sets==='number'? ex.sets : undefined);
+          const weight = (typeof ex?.weight==='number'? ex.weight : undefined);
+          steps.push({ id: uid(), kind:'strength', duration_s: 60, strength: { name, sets, reps, weight } });
+        }
+        continue;
+      }
+      // placeholder if no details
       const sec = 45*60; steps.push({ id: uid(), kind:'work', duration_s: sec }); continue;
     }
     steps.push(...added);
@@ -166,6 +204,9 @@ function toV3Step(st: any): any {
     out.powerTarget = `${Math.round((lo + up) / 2)} W`;
     out.powerRange = { lower: lo, upper: up };
   }
+  if (typeof st?.label === 'string') out.label = st.label;
+  if (st?.equipment) out.equipment = st.equipment;
+  if (st?.strength) out.strength = st.strength;
   if (typeof st?.planned_index === 'number') out.planned_index = st.planned_index;
   if (st?.kind) out.kind = st.kind;
   return out;

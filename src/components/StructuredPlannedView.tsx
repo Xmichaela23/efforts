@@ -46,24 +46,62 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   try {
     const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
     if (v3.length) {
-      const fmt = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+      const fmtDur = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+      const fmtDist = (m:number)=>{
+        const x = Math.max(1, Math.round(Number(m)||0));
+        // Swim distances respect pool unit; others keep meters for clarity
+        if (String((workout as any)?.type||'').toLowerCase()==='swim' && (poolUnit==='yd')) {
+          const yd = Math.round(x / 0.9144);
+          return `${yd} yd`;
+        }
+        return `${x} m`;
+      };
+      const niceKind = (k:string)=>{
+        const t = String(k||'').toLowerCase();
+        if (t==='warmup') return 'Warmup';
+        if (t==='cooldown') return 'Cooldown';
+        if (t==='recovery' || t==='rest' || t==='interval_rest') return 'Rest';
+        if (t==='drill') return 'Drill';
+        return '';
+      };
       v3.forEach((st:any)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
         const pTxt = typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
+        const powRange = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
-        let label = '1 × ';
-        if (typeof distM==='number' && distM>0) {
-          label += `${Math.round(distM)} m`;
-          if (pTxt) label += ` @ ${pTxt}`;
-        } else if (typeof secs==='number' && secs>0) {
-          label += `${fmt(secs)}`;
-          if (pTxt) label += ` @ ${pTxt}`;
-          if (!pTxt && pow) label += ` @ ${pow}`;
-        } else {
-          if (pTxt) label += `@ ${pTxt}`; else if (pow) label += `@ ${pow}`; else label += 'step';
+        const kind = niceKind(st?.kind);
+        const equip = (typeof st?.equipment==='string' && st.equipment) ? ` with ${st.equipment}` : '';
+
+        // Strength step formatting
+        if (st?.strength && typeof st.strength==='object') {
+          const nm = String(st.strength.name||'Strength');
+          const sets = Number(st.strength.sets||0);
+          const reps = Number(st.strength.reps||0);
+          const wt = Number(st.strength.weight||0);
+          const unit = (String((workout as any)?.units||'').toLowerCase()==='metric') ? ' kg' : ' lb';
+          const parts: string[] = [nm];
+          if (sets>0 && reps>0) parts.push(`${sets}×${reps}`);
+          if (wt>0) parts.push(`@ ${Math.round(wt)}${unit}`);
+          lines.push(parts.join(' '));
+          return;
         }
-        lines.push(label);
+
+        const pieces: string[] = [];
+        if (kind) pieces.push(kind);
+        if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
+        else if (typeof secs==='number' && secs>0) pieces.push(fmtDur(secs));
+        // Targets
+        if (pTxt) pieces.push(`@ ${pTxt}`);
+        else if (powRange) pieces.push(`@ ${powRange}`);
+        else if (pow) pieces.push(`@ ${pow}`);
+        // Drill/equipment labels
+        if (!pTxt && !powRange && !pow && typeof st?.label==='string' && st.label.trim()) {
+          // If drill label exists, prefer short label
+          pieces.push(st.label);
+        }
+        const ln = pieces.join(' ') + equip;
+        lines.push(ln || 'step');
       });
     }
   } catch {}
