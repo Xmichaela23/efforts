@@ -2,8 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 // import { generateWorkoutDisplay } from '../utils/workoutCodes';
 import { normalizeDistanceMiles, formatMilesShort, typeAbbrev } from '@/lib/utils';
-import { usePlannedRange } from '@/hooks/usePlannedRange';
-import { useWorkoutsRange } from '@/hooks/useWorkoutsRange';
+import { useWeekUnified } from '@/hooks/useWeekUnified';
 
 export type CalendarEvent = {
   date: string | Date;
@@ -196,8 +195,31 @@ export default function WorkoutCalendar({
   const weekEnd = addDays(weekStart, 6);
   const fromISO = toDateOnlyString(weekStart);
   const toISO = toDateOnlyString(weekEnd);
-  const { rows: plannedWeekRows, loading: plannedLoading } = usePlannedRange(fromISO, toISO);
-  const { rows: workoutsWeekRows, loading: workoutsLoading } = useWorkoutsRange(fromISO, toISO);
+  const { items: unifiedItems, loading: unifiedLoading } = useWeekUnified(fromISO, toISO);
+  // Adapt unified items → planned + workouts shapes expected below
+  const unifiedPlanned = unifiedItems.filter((it:any)=> !!it?.planned).map((it:any)=> ({
+    id: it.id,
+    date: it.date,
+    type: it.type,
+    workout_status: it.status || 'planned',
+    // Map planned_data fields expected by label derivation
+    computed: (it.planned && Array.isArray(it.planned.steps)) ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : (it.planned || null),
+    total_duration_seconds: it.planned?.total_duration_seconds || null,
+    description: it.planned?.description || null,
+    tags: it.planned?.tags || null,
+  }));
+  const unifiedWorkouts = unifiedItems.filter((it:any)=> String(it?.status||'').toLowerCase()==='completed' || !!it?.executed).map((it:any)=> ({
+    id: it.id,
+    date: it.date,
+    type: it.type,
+    workout_status: 'completed',
+    // keep shape minimal; calendar only uses status, date, type, maybe planned_id
+  }));
+
+  const plannedWeekRows = unifiedPlanned;
+  const workoutsWeekRows = unifiedWorkouts;
+  const plannedLoading = unifiedLoading;
+  const workoutsLoading = unifiedLoading;
 
   // Debounced loading indicator to avoid flicker on fast responses
   const [loadingDebounced, setLoadingDebounced] = useState(false);
