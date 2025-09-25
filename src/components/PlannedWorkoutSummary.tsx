@@ -56,11 +56,29 @@ function computeMinutes(workout: any, baselines?: Baselines, exportHints?: Expor
   try {
     const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
     if (steps.length > 0) {
+      const secPerMeterFromPace = (pace?: string): number | null => {
+        try {
+          if (!pace) return null;
+          const m = String(pace).match(/(\d+):(\d{2})\/(mi|km)/i);
+          if (!m) return null;
+          const sec = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+          const unit = m[3].toLowerCase();
+          const meters = unit === 'mi' ? 1609.34 : 1000;
+          return sec / meters;
+        } catch { return null; }
+      };
       const sumSec = steps.reduce((acc: number, st: any) => {
+        // Direct seconds
         const s = Number(st?.seconds);
         if (Number.isFinite(s) && s > 0) return acc + s;
         const d = Number((st as any)?.durationSeconds);
         if (Number.isFinite(d) && d > 0) return acc + d;
+        // Distance-based step with pace target → estimate
+        const meters = Number(st?.distanceMeters);
+        if (Number.isFinite(meters) && meters > 0) {
+          const spm = secPerMeterFromPace(typeof st?.paceTarget === 'string' ? st.paceTarget : undefined);
+          if (spm != null) return acc + meters * spm;
+        }
         return acc;
       }, 0);
       if (sumSec > 0) return Math.max(1, Math.round(sumSec / 60));
