@@ -1901,104 +1901,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 )}
                               </div>
                             ))}
-                            {groups[day].some((w:any)=>Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')) && (
+                            {groups[day].some((w:any)=>{ try { const tags = Array.isArray(w.tags)? w.tags : []; const lower = tags.map((t:string)=>String(t).toLowerCase()); return lower.includes('optional'); } catch { return false; } }) && (
                               <div className="mt-3">
                                 <div className="text-xs font-medium text-gray-700 mb-1">Optional</div>
                                 <div className="space-y-2">
-                                  {groups[day].filter((w:any)=>Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional')).map((workout:any, idx:number)=> (
-                                    <div key={workout.id || `opt-${day}-${idx}`} className="p-3 rounded border border-dashed">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="flex-1">
-                                          <div className="font-medium flex items-center gap-2">
-                                            <span>{(()=>{ const st=String((workout as any)?.workout_structure?.title || (workout as any)?.workout_title || '').trim(); if(st) return st; const t=(workout.type||''); const nm=(workout.name||''); const desc=(workout.rendered_description||workout.description||''); const tags=Array.isArray(workout.tags)?workout.tags.map((x:any)=>String(x).toLowerCase()):[]; const lower=String(desc).toLowerCase(); if(t==='ride'){ if(tags.includes('long_ride')) return 'Ride — Long Ride'; if(/vo2/.test(lower)) return 'Ride — VO2'; if(/threshold|thr_/.test(lower)) return 'Ride — Threshold'; if(/sweet\s*spot|\bss\b/.test(lower)) return 'Ride — Sweet Spot'; if(/recovery/.test(lower)) return 'Ride — Recovery'; if(/endurance|z2/.test(lower)) return 'Ride — Endurance'; return nm||'Ride'; } if(t==='run'){ if(tags.includes('long_run')) return 'Run — Long Run'; if(/tempo/.test(lower)) return 'Run — Tempo'; if(/(intervals?)/.test(lower) || /(\d+)\s*[x×]\s*(\d+)/.test(lower)) return 'Run — Intervals'; return nm||'Run'; } if(t==='swim'){ if(tags.includes('opt_kind:technique')||/drills|technique/.test(lower)) return 'Swim — Technique'; return nm||'Swim — Endurance'; } return nm||'Session'; })()}</span>
-                                            {(() => {
-                                              const sec = (workout as any)?.computed?.total_duration_seconds;
-                                              let minutes: number | null = null;
-                                              if (typeof sec === 'number' && sec > 0) minutes = Math.round(sec/60);
-                                              else if (typeof (workout as any).duration === 'number') minutes = (workout as any).duration;
-                                              else {
-                                                try {
-                                                  const pn = (baselines as any)?.performanceNumbers || {};
-                                                  const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                                              if (stepsPreset.length) {
-                                                const res = normalizePlannedSession(
-                                                  { ...workout, steps_preset: stepsPreset },
-                                                  { performanceNumbers: pn },
-                                                  (workout as any).export_hints || {}
-                                                );
-                                                if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
-                                              }
-                                              // Prefer server computed total (includes WU/CD)
-                                              const ts = Number((workout as any)?.computed?.total_duration_seconds);
-                                              if (Number.isFinite(ts) && ts>0) minutes = Math.max(minutes||0, Math.round(ts/60));
-                                                } catch {}
-                                              }
-                                              return (typeof minutes === 'number') ? (
-                                                <span className="px-2 py-0.5 text-xs rounded bg-gray-100 border border-gray-200 text-gray-800">{formatDuration(minutes)}</span>
-                                              ) : null;
-                                            })()}
-                                            <span className="ml-2 text-[10px] uppercase tracking-wide text-gray-500">Optional</span>
-                                            {(() => {
-                                              const tags: string[] = Array.isArray(workout?.tags) ? (workout.tags as any[]).map((t:any)=>String(t)) : [];
-                                              const lower = tags.map(t=>t.toLowerCase());
-                                              const optKindTag = tags.find(t => t.toLowerCase().startsWith('opt_kind:')) || '';
-                                              const optKind = optKindTag ? optKindTag.split(':')[1] : '';
-                                              const badges: string[] = [];
-                                              // opt_kind label
-                                              if (optKind) {
-                                                const label = optKind === 'choice' ? ''
-                                                  : optKind === 'intensity' ? 'Intensity'
-                                                  : optKind === 'recovery' ? 'Recovery'
-                                                  : optKind === 'technique' ? 'Technique'
-                                                  : optKind === 'long_endurance' ? 'Long endurance'
-                                                  : '';
-                                                if (label) badges.push(label);
-                                              }
-                                              // discipline-aware hints
-                                              if (lower.includes('bike_intensity') || lower.includes('hard_run')) badges.push('Quality');
-                                              return badges.length ? (
-                                                <span className="ml-1.5 flex flex-wrap gap-1">
-                                                  {badges.map((b, i) => (
-                                                    <span key={i} className="px-1.5 py-0.5 text-[10px] rounded bg-gray-100 border border-gray-200 text-gray-700">{b}</span>
-                                                  ))}
-                                                </span>
-                                              ) : null;
-                                            })()}
-                                          </div>
-                                          {/* Temporarily disable grouped weekly renderer to stabilize performance */}
-                                          {/* Temporarily disable grouped weekly renderer to stabilize performance */}
-                                          {(() => {
-                                            const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
-                                            const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
-                                            if (!isStrength || ex.length===0) return null;
-                                            const items = ex.map((e:any, idx:number)=>{
-                                              const sets = Math.max(1, Number(e?.sets)||1);
-                                              const reps = Math.max(1, Number(e?.reps||e?.rep)||1);
-                                              const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
-                                              const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-                                              return (<li key={idx}>{`${name} ${sets}×${reps}${wt?` — ${wt}`:''}`}</li>);
-                                            });
-                                            return items.length? (<ul className="list-disc pl-5 mt-1">{items}</ul>) : null;
-                                          })()}
-                                          {(() => {
-                                            const planUi: any = (selectedPlanDetail as any)?.ui_text || (selectedPlanDetail as any)?.template?.ui_text || {};
-                                            const copy = (planUi?.opt_kind_copy || {}) as Record<string,string>;
-                                            const fallback: Record<string,string> = {
-                                              choice: 'Alternate quality — maintains intensity',
-                                              recovery: 'Active recovery — supports adaptation',
-                                              technique: 'Technique focus — maintains efficiency',
-                                              long_endurance: 'Extended endurance — builds durability'
-                                            };
-                                            const tags: string[] = Array.isArray(workout?.tags) ? (workout.tags as any[]).map((t:any)=>String(t).toLowerCase()) : [];
-                                            const kind = (tags.find(t=>t.startsWith('opt_kind:'))||'').split(':')[1] || '';
-                                            const txt = (copy[kind] || fallback[kind] || '').trim();
-                                            return txt ? (<div className="text-xs text-gray-500 mt-1">{txt}</div>) : null;
-                                          })()}
-                                        </div>
-                                        {/* Simplify optional UI: hide Add to week control */}
+                                  {groups[day]
+                                    .filter((w:any)=>{ try { const tags = Array.isArray(w.tags)? w.tags : []; const lower = tags.map((t:string)=>String(t).toLowerCase()); return lower.includes('optional'); } catch { return false; } })
+                                    .map((workout:any, idx:number)=> (
+                                      <div key={workout.id || `opt-${day}-${idx}`} className="p-3 rounded border border-dashed">
+                                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} suppressNotes={true} />
                                       </div>
-                                    </div>
-                                  ))}
+                                    ))}
                                 </div>
                               </div>
                             )}

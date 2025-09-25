@@ -205,6 +205,96 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
       });
     } catch { return []; }
   })();
+
+  // Endurance detail lines from computed steps (no coach notes)
+  const enduranceLines: string[] = (() => {
+    try {
+      const t = String((workout as any)?.type||'').toLowerCase();
+      if (!(t==='run' || t==='ride' || t==='walk')) return [];
+      const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      if (!steps.length) return [];
+      const hints = (workout as any)?.export_hints || {};
+      const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
+      const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
+      const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+      const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+        try {
+          if (!paceTarget) return undefined;
+          const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
+          if (!m) return undefined;
+          const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+          const unit = m[3].toLowerCase();
+          const ease = String(kind||'').toLowerCase();
+          const tol = (ease==='recovery' || ease==='warmup' || ease==='cooldown') ? tolEasy : tolQual;
+          const lo = Math.round(sec*(1 - tol));
+          const hi = Math.round(sec*(1 + tol));
+          const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+          return `${mmss(lo)}–${mmss(hi)}/${unit}`;
+        } catch { return undefined; }
+      };
+      const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+      const out: string[] = [];
+      let i = 0;
+      const isWork = (x:any)=> String((x?.kind||'')).toLowerCase()==='work' || String((x?.kind||''))==='interval_work' || String((x?.kind||'')).toLowerCase()==='steady';
+      const isRec = (x:any)=> String((x?.kind||'')).toLowerCase()==='recovery' || /rest/i.test(String(x?.label||''));
+      while (i < steps.length) {
+        const st:any = steps[i];
+        const kind = String(st?.kind||'').toLowerCase();
+        if (kind==='warmup' && typeof st?.seconds==='number') {
+          const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
+          out.push(`WU ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+          i += 1; continue;
+        }
+        if (kind==='cooldown' && typeof st?.seconds==='number') {
+          const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
+          out.push(`CD ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+          i += 1; continue;
+        }
+        if (isWork(st)) {
+          const workLabel = (()=>{
+            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`;
+            if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
+            return 'interval';
+          })();
+          const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
+          const workPower = powerStr(st);
+          const next = steps[i+1];
+          const hasRec = next && isRec(next);
+          const restLabel = hasRec ? (()=>{
+            if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
+            if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
+            return 'rest';
+          })() : undefined;
+          const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
+          const restPower = hasRec ? powerStr(next) : undefined;
+          let count = 0; let j = i;
+          while (j < steps.length) {
+            const a = steps[j]; const b = steps[j+1];
+            if (!isWork(a)) break;
+            const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
+            const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
+            const aPow = powerStr(a);
+            const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
+            const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
+            const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
+            const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
+            const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);
+            if (!sameWork || !sameRest) break;
+            count += 1; j += hasRec ? 2 : 1;
+          }
+          const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
+          const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
+          out.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
+          if (j <= i) { i += 1; continue; }
+          i = j; continue;
+        }
+        if (typeof st?.seconds==='number') { out.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
+        if (typeof st?.distanceMeters==='number') { out.push(`1 × ${Math.round(st.distanceMeters)} m`); i+=1; continue; }
+        i += 1;
+      }
+      return out;
+    } catch { return []; }
+  })();
   const stacked = String(lines).split(/\s•\s/g).filter(Boolean);
   return (
     <div className="flex items-start justify-between gap-3">
@@ -222,10 +312,14 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
         </div>
         {!hideLines && !isStrength && (
           <div className="text-sm text-gray-600 mt-1">
-            {stacked.length > 1 ? (
-              <span className="whitespace-pre-line">{stacked.join('\n')}</span>
+            {enduranceLines.length > 0 ? (
+              <span className="whitespace-pre-line">{enduranceLines.join('\n')}</span>
             ) : (
-              <span>{lines}</span>
+              stacked.length > 1 ? (
+                <span className="whitespace-pre-line">{stacked.join('\n')}</span>
+              ) : (
+                <span>{lines}</span>
+              )
             )}
           </div>
         )}
