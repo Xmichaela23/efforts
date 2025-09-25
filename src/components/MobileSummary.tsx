@@ -277,27 +277,10 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     const curId = String((effectivePlanned as any)?.id || '');
     if (newId && newId !== curId) setEffectivePlanned(planned);
   }, [planned?.id]);
-  // Ensure we always render the full authored steps exactly like Planned tab
+  // No client hydration: trust server feed; keep prop as effective
   useEffect(() => {
-    (async () => {
-      try {
-        const pid = String((planned as any)?.id || '');
-        if (!pid) return;
-        const currentLen = Array.isArray((planned as any)?.computed?.steps) ? (planned as any).computed.steps.length : 0;
-        // If the passed planned has few or no steps, fetch the row directly
-        if (!currentLen || currentLen < 3) {
-          const { data } = await supabase
-            .from('planned_workouts')
-            .select('id,type,computed,steps_preset')
-            .eq('id', pid)
-            .maybeSingle();
-          if (data && Array.isArray((data as any)?.computed?.steps) && (data as any).computed.steps.length >= currentLen) {
-            setEffectivePlanned((prev:any) => ({ ...(prev||planned), ...data }));
-          }
-        }
-      } catch {}
-    })();
-  }, [planned?.id]);
+    setEffectivePlanned(planned);
+  }, [planned]);
 
   const type = String((effectivePlanned as any)?.type || '').toLowerCase();
   const isRidePlanned = /ride|bike|cycling/.test(type);

@@ -407,31 +407,26 @@ export const usePlannedWorkoutsToday = (dateIso: string) => {
         setError(null);
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) { setRows([]); return; }
-        const { data, error } = await supabase
-          .from('planned_workouts')
-          .select(`
-            id,
-            name,
-            type,
-            date,
-            workout_status,
-            description,
-            rendered_description,
-            tags,
-            steps_preset,
-            computed,
-          total_duration_seconds,
-          duration,
-          intervals,
-            workout_structure,
-            workout_title,
-            export_hints
-          `)
-          .eq('user_id', user.id)
-          .eq('date', dateIso)
-          .limit(50);
+        // Use unified server feed to guarantee identical shape as weekly
+        const { data, error } = await (supabase.functions.invoke as any)('get-week', { body: { from: dateIso, to: dateIso } });
         if (error) throw error;
-        if (!cancelled) setRows((data || []) as any);
+        const items: any[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
+        const plannedForDay = items.filter((it:any)=> !!it?.planned).map((it:any)=> ({
+          id: it.planned?.id,
+          date: it.date,
+          type: it.type,
+          workout_status: 'planned',
+          description: it.planned?.description || null,
+          rendered_description: it.planned?.rendered_description || null,
+          tags: it.planned?.tags || null,
+          steps_preset: it.planned?.steps_preset || null,
+          computed: it.planned?.steps ? { steps: it.planned.steps, total_duration_seconds: it.planned.total_duration_seconds } : null,
+          total_duration_seconds: it.planned?.total_duration_seconds || null,
+          workout_structure: null,
+          workout_title: null,
+          export_hints: null,
+        }));
+        if (!cancelled) setRows(plannedForDay as any);
       } catch (e:any) {
         if (!cancelled) setError(e?.message || 'Failed to load planned workouts');
       } finally {

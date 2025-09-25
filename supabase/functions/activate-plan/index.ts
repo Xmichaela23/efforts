@@ -304,12 +304,44 @@ Deno.serve(async (req) => {
     try {
       const baseUrl = Deno.env.get('SUPABASE_URL')
       const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY')
-      await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
+      const resp = await fetch(`${baseUrl}/functions/v1/materialize-plan`, {
         method: 'POST',
         headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key },
         body: JSON.stringify({ plan_id: planId })
       })
-    } catch {}
+      // If materialize function fails hard, abort activation
+      if (!resp.ok) {
+        // Best effort cleanup of inserted rows
+        try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
+        return new Response(JSON.stringify({ success:false, error:'materialize_failed' }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
+      }
+    } catch (e) {
+      try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
+      return new Response(JSON.stringify({ success:false, error:'materialize_exception', details: String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
+    }
+
+    // Verify: every row for this plan has computed steps and total_duration_seconds
+    try {
+      const { data: rowsAfter } = await supabase
+        .from('planned_workouts')
+        .select('id, computed, total_duration_seconds')
+        .eq('training_plan_id', planId)
+      const list = Array.isArray(rowsAfter) ? rowsAfter : []
+      const invalid = list.filter((r:any) => {
+        try {
+          const steps = Array.isArray((r as any)?.computed?.steps) ? (r as any).computed.steps : []
+          const total = Number((r as any)?.total_duration_seconds || (r as any)?.computed?.total_duration_seconds)
+          return !(steps.length>0 && Number.isFinite(total) && total>0)
+        } catch { return true }
+      })
+      if (invalid.length>0 || (inserted>0 && list.length < inserted)) {
+        try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
+        return new Response(JSON.stringify({ success:false, error:'verification_failed', invalid_count: invalid.length }), { status: 422, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
+      }
+    } catch (e) {
+      try { await supabase.from('planned_workouts').delete().eq('training_plan_id', planId) } catch {}
+      return new Response(JSON.stringify({ success:false, error:'verification_exception', details:String(e) }), { status: 500, headers: { ...corsHeaders, 'Content-Type':'application/json' } })
+    }
 
     return new Response(JSON.stringify({ success: true, inserted, plan_id: planId, start_date: startDate }), { headers: { ...corsHeaders, 'Content-Type':'application/json' } })
   } catch (e) {

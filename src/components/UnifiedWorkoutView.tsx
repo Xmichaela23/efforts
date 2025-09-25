@@ -209,35 +209,19 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     })();
   }, [activeTab, isCompleted, linkedPlanned?.id, workout?.id]);
 
-  // Ensure Planned steps exist when viewing Summary: hydrate/materialize planned row if needed
+  // Summary tab planned: read-only; no client materialization
   useEffect(() => {
     (async () => {
       try {
         if (activeTab !== 'summary') return;
         const pid = String(((linkedPlanned as any)?.id || (workout as any)?.planned_id || ''));
         if (!pid) return;
-        // Fetch latest planned row
         const { data: row } = await supabase
           .from('planned_workouts')
           .select('id,type,computed,steps_preset,export_hints,tags')
           .eq('id', pid)
           .maybeSingle();
-        const hasSteps = (() => { try { return Array.isArray((row as any)?.computed?.steps) && (row as any).computed.steps.length>0; } catch { return false; }})();
-        if (hasSteps) { setHydratedPlanned(row as any); return; }
-        // Attempt server-side materialization for this planned row
-        try {
-          await supabase.functions.invoke('materialize-plan', { body: { planned_workout_id: pid } });
-        } catch {}
-        // Re-fetch and set if steps now exist
-        try {
-          const { data: row2 } = await supabase
-            .from('planned_workouts')
-            .select('id,type,computed,steps_preset,export_hints,tags')
-            .eq('id', pid)
-            .maybeSingle();
-          const hasSteps2 = (() => { try { return Array.isArray((row2 as any)?.computed?.steps) && (row2 as any).computed.steps.length>0; } catch { return false; }})();
-          if (hasSteps2) { setHydratedPlanned(row2 as any); try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {} }
-        } catch {}
+        setHydratedPlanned(row as any);
       } catch {}
     })();
   }, [activeTab, linkedPlanned?.id, (workout as any)?.planned_id]);

@@ -166,27 +166,14 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, attached: false, reason: 'score_too_low', bestScore }), { headers: { 'Content-Type': 'application/json' } });
     }
 
-    // Ensure candidate has computed.steps (server-side materialization for new plans)
-    try {
-      const hasSteps = Array.isArray((best as any)?.computed?.steps) && (best as any).computed.steps.length>0;
-      if (!hasSteps) {
-        const matUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/materialize-plan`;
-        const key = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_ANON_KEY');
-        await fetch(matUrl, { method: 'POST', headers: { 'Content-Type':'application/json', 'Authorization':`Bearer ${key}`, 'apikey': key }, body: JSON.stringify({ planned_workout_id: (best as any).id }) });
-        // refetch planned row
-        try {
-          const { data: refreshed } = await supabase.from('planned_workouts').select('id,computed,workout_status').eq('id', (best as any).id).maybeSingle();
-          if (refreshed) best = { ...best, ...refreshed } as any;
-        } catch {}
-      }
-    } catch {}
+    // Do not attempt to materialize here; activation must guarantee steps
     const nowHasSteps = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) && (best as any).computed.steps.length>0; } catch { return false; } })();
     const nowStepCount = (()=>{ try { return Array.isArray((best as any)?.computed?.steps) ? (best as any).computed.steps.length : 0; } catch { return 0; } })();
     if (!nowHasSteps) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'no_steps_after_materialize' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_incomplete_missing_steps' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
     }
     if (nowStepCount < 3) {
-      return new Response(JSON.stringify({ success: true, attached: false, reason: 'too_few_steps' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ success: false, attached: false, reason: 'planned_incomplete_too_few_steps' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
     }
 
     // Link (allow re-attach if previously completed to a deleted/old workout)
