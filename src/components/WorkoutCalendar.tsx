@@ -10,11 +10,9 @@ export type CalendarEvent = {
   href?: string;
   provider?: string;
 };
-// Background prefetcher: warms next/prev week caches without rendering
+// Background prefetcher: warms unified week cache without rendering
 function WeekPrefetcher({ fromISO, toISO }: { fromISO: string; toISO: string }) {
-  // These hooks are auth-gated; they will no-op until authenticated
-  usePlannedRange(fromISO, toISO);
-  useWorkoutsRange(fromISO, toISO);
+  useWeekUnified(fromISO, toISO);
   return null;
 }
 
