@@ -204,6 +204,9 @@ export default function WorkoutCalendar({
     total_duration_seconds: it.planned?.total_duration_seconds || null,
     description: it.planned?.description || null,
     tags: it.planned?.tags || null,
+    // Pass-through fields used by label derivation and details
+    steps_preset: (it as any)?.planned?.steps_preset ?? null,
+    strength_exercises: (it as any)?.planned?.strength_exercises ?? null,
   }));
   const unifiedWorkouts = unifiedItems.map((it:any)=> ({
     id: it.id,

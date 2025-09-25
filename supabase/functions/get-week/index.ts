@@ -61,7 +61,7 @@ Deno.serve(async (req) => {
     // 1) Preload planned rows for range keyed by (date|type)
     const { data: plannedRows, error: pErr } = await supabase
       .from('planned_workouts')
-      .select('id,date,type,workout_status,computed,steps_preset,description,tags,training_plan_id,total_duration_seconds')
+      .select('id,date,type,workout_status,computed,steps_preset,strength_exercises,description,tags,training_plan_id,total_duration_seconds')
       .eq('user_id', userId)
       .gte('date', fromISO)
       .lte('date', toISO);
@@ -89,6 +89,8 @@ Deno.serve(async (req) => {
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
           description: p?.description || null,
           tags: p?.tags || null,
+          steps_preset: (p as any)?.steps_preset ?? null,
+          strength_exercises: (p as any)?.strength_exercises ?? null,
         };
       }
       // executed (prioritize completed status)
@@ -125,6 +127,8 @@ Deno.serve(async (req) => {
           total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
           description: p?.description || null,
           tags: p?.tags || null,
+          steps_preset: (p as any)?.steps_preset ?? null,
+          strength_exercises: (p as any)?.strength_exercises ?? null,
         } as any;
         const pStatus = String(p?.workout_status||'').toLowerCase();
         const it = { id: String(p.id), date: String(p.date), type: String(p.type).toLowerCase(), status: (pStatus||'planned'), planned, executed: null };
