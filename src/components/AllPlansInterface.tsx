@@ -2023,7 +2023,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                           </div>
-                                          {/* Coach summaries hidden in weekly planned view */}
+                                          <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
+                                          <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
                                           {(() => {
                                             const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
                                             const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
