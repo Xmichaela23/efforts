@@ -1879,7 +1879,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                         <div key={day} className="border border-gray-200 rounded">
                           <div className="px-3 py-2 text-sm font-medium">{day}</div>
                           <div className="px-3 pb-3 space-y-3">
-                            {groups[day].filter((w:any)=>!(Array.isArray(w.tags) && w.tags.map((t:string)=>t.toLowerCase()).includes('optional'))).map((workout: any, index: number) => (
+                            {groups[day].map((workout: any, index: number) => (
                               <div
                                 key={workout.id || `workout-${day}-${index}`}
                                 onClick={() => handleWorkoutClick(workout)}
@@ -1901,20 +1901,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                 )}
                               </div>
                             ))}
-                            {groups[day].some((w:any)=>{ try { const tags = Array.isArray(w.tags)? w.tags : []; const lower = tags.map((t:string)=>String(t).toLowerCase()); return lower.includes('optional'); } catch { return false; } }) && (
-                              <div className="mt-3">
-                                <div className="text-xs font-medium text-gray-700 mb-1">Optional</div>
-                                <div className="space-y-2">
-                                  {groups[day]
-                                    .filter((w:any)=>{ try { const tags = Array.isArray(w.tags)? w.tags : []; const lower = tags.map((t:string)=>String(t).toLowerCase()); return lower.includes('optional'); } catch { return false; } })
-                                    .map((workout:any, idx:number)=> (
-                                      <div key={workout.id || `opt-${day}-${idx}`} className="p-3 rounded border border-dashed">
-                                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} suppressNotes={true} />
-                                      </div>
-                                    ))}
-                                </div>
-                              </div>
-                            )}
+                            
                           </div>
                         </div>
                       ));
