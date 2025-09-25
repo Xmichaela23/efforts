@@ -215,7 +215,7 @@ export default function WorkoutCalendar({
     id: it.id,
     date: it.date,
     type: it.type,
-    workout_status: (String(it?.status||'').toLowerCase()==='completed') ? 'completed' : 'planned',
+    workout_status: (String(it?.status||'').toLowerCase()==='completed' || (it?.executed && ((it.executed.overall) || (Array.isArray(it.executed.intervals)&&it.executed.intervals.length>0)))) ? 'completed' : 'planned',
     // Provide distance in km if available from executed.overall so labels can render
     distance: (it?.executed?.overall?.distance_m && typeof it.executed.overall.distance_m === 'number')
       ? (it.executed.overall.distance_m / 1000)
@@ -429,14 +429,18 @@ export default function WorkoutCalendar({
         } as any;
       });
 
-    const seenIds = new Set<string>();
-    const raw = rawAll.filter((ev:any)=>{
+    // De-dupe by id with preference to completed over planned
+    const byId = new Map<string, any>();
+    for (const ev of rawAll) {
       const id = String((ev as any)?._src?.id || '');
-      if (!id) return true;
-      if (seenIds.has(id)) return false;
-      seenIds.add(id);
-      return true;
-    });
+      if (!id) { byId.set(`${ev.date}|${ev.label}|${Math.random()}`, ev); continue; }
+      const existing = byId.get(id);
+      if (!existing) { byId.set(id, ev); continue; }
+      const exCompleted = /✓\s*$/.test(String(existing.label||'')) || String((existing as any)?._src?.workout_status||'').toLowerCase()==='completed';
+      const curCompleted = /✓\s*$/.test(String(ev.label||'')) || String((ev as any)?._src?.workout_status||'').toLowerCase()==='completed';
+      if (curCompleted && !exCompleted) byId.set(id, ev);
+    }
+    const raw = Array.from(byId.values());
 
     // Return raw list; we intentionally show all entries (except exact duplicates)
     return raw.map(ev => ({ date: ev.date, label: ev.label, href: ev.href, provider: ev.provider }));
