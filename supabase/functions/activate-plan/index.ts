@@ -69,20 +69,32 @@ function deriveStrengthExercises(tokens: string[], baselines: any): any[] {
     }
     for (const t of tokens) {
       const s = String(t).toLowerCase()
-      const m = s.match(/st_(?:main|acc)_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?/)
-      if (!m) continue
-      const nameRaw = m[1]
-      const sets = parseInt(m[2],10)
-      const reps = parseInt(m[3],10)
-      const pct = m[4] ? parseInt(m[4],10) : undefined
-      const name = nameRaw.replace(/_/g,' ')
-      let base: number | undefined
-      if (/bench/.test(nameRaw)) base = oneRM.bench
-      else if (/squat/.test(nameRaw)) base = oneRM.squat
-      else if (/deadlift|dead_lift/.test(nameRaw)) base = oneRM.deadlift
-      else if (/ohp|overhead/.test(nameRaw)) base = oneRM.ohp
-      const weight = (typeof base==='number' && typeof pct==='number') ? round5(base * (pct/100)) : undefined
-      out.push({ name, sets: Math.max(1,sets), reps, ...(weight?{ weight }:{}) })
+      // Standard pattern with numeric reps and optional @pct
+      let m = s.match(/st_(?:main|acc)_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?/)
+      if (m) {
+        const nameRaw = m[1]
+        const sets = parseInt(m[2],10)
+        const reps = parseInt(m[3],10)
+        const pct = m[4] ? parseInt(m[4],10) : undefined
+        const name = nameRaw.replace(/_/g,' ')
+        let base: number | undefined
+        if (/bench/.test(nameRaw)) base = oneRM.bench
+        else if (/squat/.test(nameRaw)) base = oneRM.squat
+        else if (/deadlift|dead_lift/.test(nameRaw)) base = oneRM.deadlift
+        else if (/ohp|overhead/.test(nameRaw)) base = oneRM.ohp
+        const weight = (typeof base==='number' && typeof pct==='number') ? round5(base * (pct/100)) : undefined
+        out.push({ name, sets: Math.max(1,sets), reps, ...(weight?{ weight }:{}) })
+        continue
+      }
+      // AMRAP chin-up variant: st_acc_chinup_3xamrap_rest105_rir2
+      m = s.match(/st_(?:main|acc)_([a-z0-9_]*chin[-_]?up[s]?|chinups?)_(\d+)xamrap(?:_rest\d+)?(?:_rir\d+)?/)
+      if (m) {
+        const nameRaw = (m[1]||'chinup').replace(/_/g,' ')
+        const sets = parseInt(m[2],10)
+        const name = nameRaw
+        out.push({ name, sets: Math.max(1,sets), reps: 'AMRAP' })
+        continue
+      }
     }
     return out
   } catch { return [] }

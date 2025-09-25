@@ -9,6 +9,7 @@ interface PlannedWorkoutSummaryProps {
   workout: any;
   baselines?: Baselines;
   exportHints?: ExportHints;
+  hideLines?: boolean;
 }
 
 const formatDuration = (minutes: number) => {
@@ -134,7 +135,7 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
   } catch { return undefined; }
 }
 
-export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints }) => {
+export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints, hideLines }) => {
   const minutes = (()=>{
     const t = String((workout as any)?.type||'').toLowerCase();
     if (t==='strength') return null; // avoid misleading 45min placeholders
@@ -158,13 +159,15 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             ) : null}
           </span>
         </div>
-        <div className="text-sm text-gray-600 mt-1">
-          {stacked.length > 1 ? (
-            <span className="whitespace-pre-line">{stacked.join('\n')}</span>
-          ) : (
-            <span>{lines}</span>
-          )}
-        </div>
+        {!hideLines && (
+          <div className="text-sm text-gray-600 mt-1">
+            {stacked.length > 1 ? (
+              <span className="whitespace-pre-line">{stacked.join('\n')}</span>
+            ) : (
+              <span>{lines}</span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

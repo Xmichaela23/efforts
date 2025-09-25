@@ -552,24 +552,67 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                       : 'bg-white border border-gray-200'
                   }`}
                 >
-                  {/* Planned: show full steps from computed (v3) */}
+                  {/* Planned: grouped like weekly (no coach summary, no per-step bullets) */}
                   {workout.workout_status === 'planned' ? (
                     <div className="space-y-1">
-                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} />
-                      {Array.isArray((workout as any)?.computed?.steps) && (workout as any).computed.steps.length>0 && (
-                        <ul className="list-disc pl-5 text-xs text-gray-700">
-                          {((workout as any).computed.steps as any[]).map((st:any, idx:number)=>{
-                            const fmt=(s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-                            if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) {
-                              const m = Math.round(st.distanceMeters); const p = st?.paceTarget?` @ ${st.paceTarget}`:''; return <li key={idx}>{`1 × ${m} m${p}`}</li>;
-                            }
-                            if (typeof st?.seconds==='number' && st.seconds>0) {
-                              const p = st?.paceTarget?` @ ${st.paceTarget}`:(st?.powerTarget?` @ ${st.powerTarget}`:''); return <li key={idx}>{`1 × ${fmt(st.seconds)}${p}`}</li>;
-                            }
-                            return <li key={idx}>1 × step</li>;
-                          })}
-                        </ul>
-                      )}
+                      <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={true} />
+                      {(() => {
+                        // Strength: render loads; Endurance: render step ranges
+                        const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
+                        if (isStrength) {
+                          const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
+                          if (!ex.length) return null;
+                          const items = ex.map((e:any, idx:number)=>{
+                            const sets = Math.max(1, Number(e?.sets)||1);
+                            const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
+                            const repTxt = (typeof repsVal==='string') ? repsVal : `${Number(repsVal||0)}`;
+                            const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
+                            const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+                            return (<li key={idx}>{`${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`}</li>);
+                          });
+                          return items.length? (<ul className="list-disc pl-5 text-xs text-gray-700">{items}</ul>) : null;
+                        }
+                        const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+                        if (!steps.length) return null;
+                        const hints = (workout as any)?.export_hints || {};
+                        const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
+                        const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
+                        const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+                        const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+                          try {
+                            if (!paceTarget) return undefined;
+                            const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
+                            if (!m) return undefined;
+                            const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+                            const unit = m[3].toLowerCase();
+                            const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
+                            const lo = Math.round(sec*(1 - tol));
+                            const hi = Math.round(sec*(1 + tol));
+                            const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+                            return `${mmss(sec)}/${unit} (${mmss(lo)}–${mmss(hi)}/${unit})`;
+                          } catch { return paceTarget; }
+                        };
+                        return (
+                          <ul className="list-disc pl-5 text-xs text-gray-700">
+                            {steps.map((st:any, idx:number)=>{
+                              const isDist = typeof st?.distanceMeters==='number' && st.distanceMeters>0;
+                              const isTime = typeof st?.seconds==='number' && st.seconds>0;
+                              const power = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : (typeof st?.powerTarget==='string'? st.powerTarget : undefined);
+                              const pace = paceStrWithRange(typeof st?.paceTarget==='string' ? st.paceTarget : undefined, st?.kind);
+                              if (isDist) {
+                                const m = Math.round(st.distanceMeters);
+                                const add = pace ? ` @ ${pace}` : (power?` @ ${power}`:'');
+                                return (<li key={idx}>{`1 × ${m} m${add}`}</li>);
+                              }
+                              if (isTime) {
+                                const add = pace ? ` @ ${pace}` : (power?` @ ${power}`:'');
+                                return (<li key={idx}>{`1 × ${fmtTime(st.seconds)}${add}`}</li>);
+                              }
+                              return (<li key={idx}>1 × step</li>);
+                            })}
+                          </ul>
+                        );
+                      })()}
                     </div>
                   ) : (
                     <div className="space-y-1">

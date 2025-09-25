@@ -352,10 +352,51 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     } catch { return undefined; }
   };
 
-  // Weekly summary renderer: grouped session summary (no per-step bullets)
+  // Weekly renderer: show per-step lines with pace/power ranges when available
   const WeeklyLines: React.FC<{ workout: any }> = ({ workout }) => {
     try {
-      // Prefer structured summary or friendly strings; fall back to rendered/description
+      const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+      if (steps.length) {
+        const hints = (workout as any)?.export_hints || {};
+        const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
+        const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
+        const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+        const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+          try {
+            if (!paceTarget) return undefined;
+            const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
+            if (!m) return undefined;
+            const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+            const unit = m[3].toLowerCase();
+            const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
+            const lo = Math.round(sec*(1 - tol));
+            const hi = Math.round(sec*(1 + tol));
+            const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+            return `${mmss(sec)}/${unit} (${mmss(lo)}–${mmss(hi)}/${unit})`;
+          } catch { return paceTarget; }
+        };
+        return (
+          <ul className="list-disc pl-5">
+            {steps.map((st:any, idx:number)=>{
+              const isDist = typeof st?.distanceMeters==='number' && st.distanceMeters>0;
+              const isTime = typeof st?.seconds==='number' && st.seconds>0;
+              const power = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : (typeof st?.powerTarget==='string'? st.powerTarget : undefined);
+              const pace = paceStrWithRange(typeof st?.paceTarget==='string' ? st.paceTarget : undefined, st?.kind);
+              if (isDist) {
+                const m = Math.round(st.distanceMeters);
+                const add = pace ? ` @ ${pace}` : (power?` @ ${power}`:'');
+                return (<li key={idx}>{`1 × ${m} m${add}`}</li>);
+              }
+              if (isTime) {
+                const add = pace ? ` @ ${pace}` : (power?` @ ${power}`:'');
+                return (<li key={idx}>{`1 × ${fmtTime(st.seconds)}${add}`}</li>);
+              }
+              return (<li key={idx}>1 × step</li>);
+            })}
+          </ul>
+        );
+      }
+      // Fallback to description if no steps
       const txt = buildWeeklySubtitle(workout) || '';
       if (txt) return (<span>{txt}</span>);
       return (<span>{(workout as any).rendered_description || (workout as any).description}</span>);
@@ -1821,17 +1862,20 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           );
                                         })()}
                                       </div>
-                                      <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
+                                      {/* Coach summaries hidden in weekly planned view */}
+                                      
                                       {(() => {
                                         const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
                                         const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
                                         if (!isStrength || ex.length===0) return null;
                                         const items = ex.map((e:any, idx:number)=>{
                                           const sets = Math.max(1, Number(e?.sets)||1);
-                                          const reps = Math.max(1, Number(e?.reps||e?.rep)||1);
+                                          const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
+                                          const reps = (typeof repsVal==='string') ? repsVal : Number(repsVal||0);
                                           const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
                                           const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-                                          return (<li key={idx}>{`${name} ${sets}×${reps}${wt?` — ${wt}`:''}`}</li>);
+                                          const repTxt = (typeof reps==='string') ? reps : `${reps}`;
+                                          return (<li key={idx}>{`${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`}</li>);
                                         });
                                         return items.length? (<ul className="list-disc pl-5 mt-1">{items}</ul>) : null;
                                       })()}
@@ -1906,8 +1950,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                           </div>
-                                          {/* Planned weekly subtitle: grouped summary and strength loads */}
-                                          <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
+                                          {/* Coach summaries hidden in weekly planned view */}
                                           {(() => {
                                             const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
                                             const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
