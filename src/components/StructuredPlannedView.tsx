@@ -42,6 +42,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const poolUnit: 'yd' | 'm' | null = ((workout as any)?.pool_unit ?? null) as any;
   const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
+  let totalSecsFromSteps = 0;
   // Prefer server-computed v3 steps when present
   try {
     const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
@@ -64,14 +65,33 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         if (t==='drill') return 'Drill';
         return '';
       };
+      const isSwim = String((workout as any)?.type||'').toLowerCase()==='swim'
+      // Estimate total duration using baselines for distance steps (swim only)
+      let estTotal = 0;
+      const secPer100FromPN = (() => {
+        const num = (pn && typeof (pn as any)?.swim_pace_per_100_sec === 'number') ? (pn as any).swim_pace_per_100_sec : null;
+        if (typeof num === 'number' && isFinite(num) && num > 0) return num as number;
+        const txt = String((pn as any)?.swimPace100 || '').trim();
+        if (/^\d+:\d{2}$/.test(txt)) { const [mm, ss] = txt.split(':').map((t:string)=>parseInt(t,10)); return mm*60 + ss; }
+        return null;
+      })();
       v3.forEach((st:any)=>{
         const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
+        if (typeof secs==='number' && secs>0) totalSecsFromSteps += Math.max(1, Math.round(secs));
         const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
+        if (isSwim && typeof distM==='number' && distM>0 && typeof secPer100FromPN==='number') {
+          const sec = (poolUnit==='yd') ? ((distM/0.9144)/100)*secPer100FromPN : ((distM/100)*secPer100FromPN);
+          estTotal += sec;
+        }
         const pTxt = typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
         const powRange = (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
         const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
         const kind = niceKind(st?.kind);
-        const equip = (typeof st?.equipment==='string' && st.equipment) ? ` with ${st.equipment}` : '';
+        let equip = '';
+        if (typeof st?.equipment==='string') {
+          const e = String(st.equipment).trim();
+          if (e && e.toLowerCase()!=='none') equip = ` with ${e}`;
+        }
 
         // Strength step formatting
         if (st?.strength && typeof st.strength==='object') {
@@ -87,22 +107,32 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
           return;
         }
 
+        // Swim: prefer explicit count × distance with label/equipment
+        if (isSwim) {
+          const distTxt = (typeof distM==='number' && distM>0) ? fmtDist(distM) : undefined;
+          const baseLabel = (typeof st?.label==='string' && st.label.trim()) ? st.label.trim().replace(/^drill\s*/i,'Drill ') : (kind || '').trim();
+          const seg = [distTxt ? `1 × ${distTxt}` : (typeof secs==='number' && secs>0 ? `1 × ${fmtDur(secs)}` : undefined), baseLabel || undefined].filter(Boolean).join(' — ')
+          lines.push([seg, equip].filter(Boolean).join(''))
+          return;
+        }
+
         const pieces: string[] = [];
         if (kind) pieces.push(kind);
         if (typeof distM==='number' && distM>0) pieces.push(fmtDist(distM));
         else if (typeof secs==='number' && secs>0) pieces.push(fmtDur(secs));
-        // Targets
         if (pTxt) pieces.push(`@ ${pTxt}`);
         else if (powRange) pieces.push(`@ ${powRange}`);
         else if (pow) pieces.push(`@ ${pow}`);
-        // Drill/equipment labels
         if (!pTxt && !powRange && !pow && typeof st?.label==='string' && st.label.trim()) {
-          // If drill label exists, prefer short label
           pieces.push(st.label);
         }
         const ln = pieces.join(' ') + equip;
         lines.push(ln || 'step');
       });
+      if (isSwim) {
+        // prefer baseline-estimated duration when available, else timed steps sum
+        if (estTotal > 0) totalSecsFromSteps = Math.round(estTotal);
+      }
     }
   } catch {}
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
@@ -517,6 +547,9 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         </div>
       )}
       <div className="p-1">
+        {totalSecsFromSteps>0 && (
+          <div className="text-xs text-gray-600 mb-1">Total duration: {(() => { const m=Math.floor(totalSecsFromSteps/60); const s=totalSecsFromSteps%60; return `${m}:${String(s).padStart(2,'0')}`; })()}</div>
+        )}
         <ul className="list-none space-y-1">
           {(lines.length?lines:["No structured steps found."]).map((ln, i)=>{
             const parentDisc = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
