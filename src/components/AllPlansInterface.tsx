@@ -1952,14 +1952,17 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                                 try {
                                                   const pn = (baselines as any)?.performanceNumbers || {};
                                                   const stepsPreset: string[] = Array.isArray((workout as any).steps_preset) ? (workout as any).steps_preset : [];
-                                                  if (stepsPreset.length) {
-                                                    const res = normalizePlannedSession(
-                                                      { ...workout, steps_preset: stepsPreset },
-                                                      { performanceNumbers: pn },
-                                                      (workout as any).export_hints || {}
-                                                    );
-                                                    if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
-                                                  }
+                                              if (stepsPreset.length) {
+                                                const res = normalizePlannedSession(
+                                                  { ...workout, steps_preset: stepsPreset },
+                                                  { performanceNumbers: pn },
+                                                  (workout as any).export_hints || {}
+                                                );
+                                                if (typeof res?.durationMinutes === 'number' && res.durationMinutes > 0) minutes = res.durationMinutes;
+                                              }
+                                              // Prefer server computed total (includes WU/CD)
+                                              const ts = Number((workout as any)?.computed?.total_duration_seconds);
+                                              if (Number.isFinite(ts) && ts>0) minutes = Math.max(minutes||0, Math.round(ts/60));
                                                 } catch {}
                                               }
                                               return (typeof minutes === 'number') ? (
@@ -1975,7 +1978,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               const badges: string[] = [];
                                               // opt_kind label
                                               if (optKind) {
-                                                const label = optKind === 'choice' ? 'Choose one'
+                                                const label = optKind === 'choice' ? ''
                                                   : optKind === 'intensity' ? 'Intensity'
                                                   : optKind === 'recovery' ? 'Recovery'
                                                   : optKind === 'technique' ? 'Technique'
@@ -2023,9 +2026,7 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                             return txt ? (<div className="text-xs text-gray-500 mt-1">{txt}</div>) : null;
                                           })()}
                                         </div>
-                                        <Button size="sm" variant="outline" className="border-gray-300" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); activateOptional(workout);}}>
-                                          {activatingId===workout.id? 'Adding…':'Add to week'}
-                                        </Button>
+                                        {/* Simplify optional UI: hide Add to week control */}
                                       </div>
                                     </div>
                                   ))}
