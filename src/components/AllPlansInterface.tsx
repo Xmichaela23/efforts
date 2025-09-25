@@ -353,125 +353,124 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
   };
 
   // Weekly renderer: grouped summary lines (WU / repeats / CD) with pace/power ranges
-  const WeeklyLines: React.FC<{ workout: any }> = ({ workout }) => {
+  const WeeklyLines: React.FC<{ workout: any }> = React.memo(({ workout }) => {
     try {
-      // Swim: derive grouped tokens from steps_preset for clarity
       const disc = String((workout as any)?.type||'').toLowerCase();
-      if (disc === 'swim') {
-        try {
-          const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
-          if (toks.length) {
-            let wu: string | null = null, cd: string | null = null; const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
-            toks.forEach((t)=>{
-              const s = String(t).toLowerCase();
-              let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `Warm‑up ${txt}`; else cd = `Cool‑down ${txt}`; return; }
-              m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const name=m[1].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[2],10)}x${parseInt(m[3],10)}`); return; }
-              m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { const name=m[4].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[1],10)}x${parseInt(m[2],10)}`); return; }
-              m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const kind=m[1]==='pull'?'Pull':'Kick'; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}`); return; }
-              m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); aerobics.push(`${reps}x${dist}`); return; }
-            });
-            const lines: string[] = [];
-            if (wu) lines.push(`1 × ${wu}`);
-            if (drills.length) lines.push(`Drills ${Array.from(new Set(drills)).join(', ')}`);
-            if (pulls.length) lines.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
-            if (kicks.length) lines.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
-            if (aerobics.length) lines.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
-            if (cd) lines.push(`1 × ${cd}`);
-            if (lines.length) return (<ul className="list-disc pl-5">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
-          }
-        } catch {}
-      }
-      const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-      if (steps.length) {
-        const hints = (workout as any)?.export_hints || {};
-        const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
-        const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
-        const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-        const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+      const hints = (workout as any)?.export_hints || {};
+      const lines = React.useMemo(() => {
+        const out: string[] = [];
+        // Swim grouping from tokens
+        if (disc==='swim') {
           try {
-            if (!paceTarget) return undefined;
-            const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
-            if (!m) return undefined;
-            const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
-            const unit = m[3].toLowerCase();
-            const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
-            const lo = Math.round(sec*(1 - tol));
-            const hi = Math.round(sec*(1 + tol));
-            const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
-            return `${mmss(lo)}–${mmss(hi)}/${unit}`;
-          } catch { return undefined; }
-        };
-        const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
-
-        const lines: string[] = [];
-        let i = 0;
-        while (i < steps.length) {
-          const st:any = steps[i];
-          const kind = String(st?.kind||'').toLowerCase();
-          if (kind==='warmup' && typeof st?.seconds==='number') {
-            const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
-            lines.push(`1 × Warm‑up ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
-            i += 1; continue;
-          }
-          if (kind==='cooldown' && typeof st?.seconds==='number') {
-            const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
-            lines.push(`1 × Cool‑down ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
-            i += 1; continue;
-          }
-          // Group repeating [work,recovery]
-          const isWork = (x:any)=> String((x?.kind||'')).toLowerCase()==='work' || String((x?.kind||'')).toLowerCase()==='steady' || String((x?.kind||''))==='interval_work';
-          const isRec = (x:any)=> String((x?.kind||'')).toLowerCase()==='recovery' || /rest/i.test(String(x?.label||''));
-          if (isWork(st)) {
-            const workLabel = (()=>{
-              if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`;
-              if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
-              return 'interval';
-            })();
-            const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
-            const workPower = powerStr(st);
-            // Look ahead for repeating pattern with optional recovery
-            const next = steps[i+1];
-            const hasRec = next && isRec(next);
-            const restLabel = hasRec ? (()=>{
-              if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
-              if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
-              return 'rest';
-            })() : undefined;
-            const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
-            const restPower = hasRec ? powerStr(next) : undefined;
-            let count = 0; let j = i;
-            while (j < steps.length) {
-              const a = steps[j]; const b = steps[j+1];
-              if (!isWork(a)) break;
-              const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
-              const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
-              const aPow = powerStr(a);
-              const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
-              const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
-              const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
-              const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
-              const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);
-              if (!sameWork || !sameRest) break;
-              count += 1; j += hasRec ? 2 : 1;
+            const toks: string[] = Array.isArray((workout as any)?.steps_preset) ? (workout as any).steps_preset.map((t:any)=>String(t)) : [];
+            if (toks.length) {
+              let wu: string | null = null, cd: string | null = null; const drills: string[] = []; const pulls: string[] = []; const kicks: string[] = []; const aerobics: string[] = [];
+              toks.forEach((t)=>{
+                const s = String(t).toLowerCase();
+                let m = s.match(/swim_(?:warmup|cooldown)_(\d+)(yd|m)/i); if (m) { const txt = `${parseInt(m[1],10)} ${m[2].toLowerCase()}`; if(/warmup/i.test(s)) wu = `Warm‑up ${txt}`; else cd = `Cool‑down ${txt}`; return; }
+                m = s.match(/swim_drill_([a-z0-9_]+)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const name=m[1].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[2],10)}x${parseInt(m[3],10)}`); return; }
+                m = s.match(/swim_drills_(\d+)x(\d+)(yd|m)_([a-z0-9_]+)/i); if (m) { const name=m[4].replace(/_/g,' '); drills.push(`${name} ${parseInt(m[1],10)}x${parseInt(m[2],10)}`); return; }
+                m = s.match(/swim_(pull|kick)_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const kind=m[1]==='pull'?'Pull':'Kick'; const reps=parseInt(m[2],10); const dist=parseInt(m[3],10); (m[1]==='pull'?pulls:kicks).push(`${reps}x${dist}`); return; }
+                m = s.match(/swim_aerobic_(\d+)x(\d+)(yd|m)(?:_r(\d+))?/i); if (m) { const reps=parseInt(m[1],10); const dist=parseInt(m[2],10); aerobics.push(`${reps}x${dist}`); return; }
+              });
+              if (wu) out.push(`1 × ${wu}`);
+              if (drills.length) out.push(`Drills ${Array.from(new Set(drills)).join(', ')}`);
+              if (pulls.length) out.push(`Pull ${Array.from(new Set(pulls)).join(', ')}`);
+              if (kicks.length) out.push(`Kick ${Array.from(new Set(kicks)).join(', ')}`);
+              if (aerobics.length) out.push(`Aerobic ${Array.from(new Set(aerobics)).join(', ')}`);
+              if (cd) out.push(`1 × ${cd}`);
             }
-            const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
-            const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
-            lines.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
-            i = j; continue;
-          }
-          // Fallback single step
-          if (typeof st?.seconds==='number') { lines.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
-          if (typeof st?.distanceMeters==='number') { lines.push(`1 × ${Math.round(st.distanceMeters)} m`); i+=1; continue; }
-          i += 1;
+          } catch {}
         }
-        return (<ul className="list-disc pl-5">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
-      }
-      // Fallback to description if no steps
-      const txt = buildWeeklySubtitle(workout) || '';
-      if (txt) return (<span>{txt}</span>);
-      return (<span>{(workout as any).rendered_description || (workout as any).description}</span>);
+        const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+        if (steps.length) {
+          const tolQual: number = (typeof hints?.pace_tolerance_quality==='number' ? hints.pace_tolerance_quality : 0.04);
+          const tolEasy: number = (typeof hints?.pace_tolerance_easy==='number' ? hints.pace_tolerance_easy : 0.06);
+          const fmtTime = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+          const paceStrWithRange = (paceTarget?: string, kind?: string) => {
+            try {
+              if (!paceTarget) return undefined;
+              const m = String(paceTarget).match(/(\d+):(\d{2})\/(mi|km)/i);
+              if (!m) return undefined;
+              const sec = parseInt(m[1],10)*60 + parseInt(m[2],10);
+              const unit = m[3].toLowerCase();
+              const tol = (String(kind||'').toLowerCase()==='recovery' || String(kind||'').toLowerCase()==='warmup' || String(kind||'').toLowerCase()==='cooldown') ? tolEasy : tolQual;
+              const lo = Math.round(sec*(1 - tol));
+              const hi = Math.round(sec*(1 + tol));
+              const mmss = (n:number)=>{ const mm=Math.floor(n/60); const ss=n%60; return `${mm}:${String(ss).padStart(2,'0')}`; };
+              return `${mmss(lo)}–${mmss(hi)}/${unit}`;
+            } catch { return undefined; }
+          };
+          const powerStr = (st:any) => (st?.powerRange && typeof st.powerRange.lower==='number' && typeof st.powerRange.upper==='number') ? `${Math.round(st.powerRange.lower)}–${Math.round(st.powerRange.upper)} W` : undefined;
+          let i = 0;
+          while (i < steps.length) {
+            const st:any = steps[i];
+            const kind = String(st?.kind||'').toLowerCase();
+            if (kind==='warmup' && typeof st?.seconds==='number') {
+              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'warmup');
+              out.push(`1 × Warm‑up ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+              i += 1; continue;
+            }
+            if (kind==='cooldown' && typeof st?.seconds==='number') {
+              const pace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined,'cooldown');
+              out.push(`1 × Cool‑down ${fmtTime(st.seconds)}${pace?` (${pace})`:''}`);
+              i += 1; continue;
+            }
+            const isWork = (x:any)=> String((x?.kind||'')).toLowerCase()==='work' || String((x?.kind||'')).toLowerCase()==='steady' || String((x?.kind||''))==='interval_work';
+            const isRec = (x:any)=> String((x?.kind||'')).toLowerCase()==='recovery' || /rest/i.test(String(x?.label||''));
+            if (isWork(st)) {
+              const workLabel = (()=>{
+                if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) return `${Math.round(st.distanceMeters)} m`;
+                if (typeof st?.seconds==='number' && st.seconds>0) return fmtTime(st.seconds);
+                return 'interval';
+              })();
+              const workPace = paceStrWithRange(typeof st?.paceTarget==='string'?st.paceTarget:undefined, st?.kind);
+              const workPower = powerStr(st);
+              const next = steps[i+1];
+              const hasRec = next && isRec(next);
+              const restLabel = hasRec ? (()=>{
+                if (typeof next?.seconds==='number' && next.seconds>0) return fmtTime(next.seconds);
+                if (typeof next?.distanceMeters==='number' && next.distanceMeters>0) return `${Math.round(next.distanceMeters)} m`;
+                return 'rest';
+              })() : undefined;
+              const restPace = hasRec ? paceStrWithRange(typeof next?.paceTarget==='string'?next.paceTarget:undefined, 'recovery') : undefined;
+              const restPower = hasRec ? powerStr(next) : undefined;
+              let count = 0; let j = i;
+              while (j < steps.length) {
+                const a = steps[j]; const b = steps[j+1];
+                if (!isWork(a)) break;
+                const aLabel = (typeof a?.distanceMeters==='number' && a.distanceMeters>0) ? `${Math.round(a.distanceMeters)} m` : (typeof a?.seconds==='number' ? fmtTime(a.seconds) : 'interval');
+                const aPace = paceStrWithRange(typeof a?.paceTarget==='string'?a.paceTarget:undefined, a?.kind);
+                const aPow = powerStr(a);
+                const bLabel = (b && isRec(b)) ? ((typeof b?.seconds==='number' && b.seconds>0) ? fmtTime(b.seconds) : (typeof b?.distanceMeters==='number' && b.distanceMeters>0 ? `${Math.round(b.distanceMeters)} m` : 'rest')) : undefined;
+                const bPace = (b && isRec(b)) ? paceStrWithRange(typeof b?.paceTarget==='string'?b.paceTarget:undefined, 'recovery') : undefined;
+                const bPow = (b && isRec(b)) ? powerStr(b) : undefined;
+                const sameWork = (aLabel===workLabel) && (aPace===workPace) && (aPow===workPower);
+                const sameRest = (!hasRec && !b) || (!!hasRec && !!b && isRec(b) && bLabel===restLabel && bPace===restPace && bPow===restPower);
+                if (!sameWork || !sameRest) break;
+                count += 1; j += hasRec ? 2 : 1;
+              }
+              const workAnno = workPace ? ` (${workPace})` : (workPower?` (${workPower})`:'' );
+              const restAnno = hasRec ? (restPace ? ` ${restLabel} (${restPace})` : (restPower?` ${restLabel} (${restPower})` : ` ${restLabel}`)) : '';
+              out.push(`${count} × ${workLabel}${workAnno}${restAnno}`);
+              i = j; continue;
+            }
+            if (typeof st?.seconds==='number') { out.push(`1 × ${fmtTime(st.seconds)}`); i+=1; continue; }
+            if (typeof st?.distanceMeters==='number') { out.push(`1 × ${Math.round(st.distanceMeters)} m`); i+=1; continue; }
+            i += 1;
+          }
+        }
+        if (!out.length) {
+          const txt = buildWeeklySubtitle(workout) || '';
+          if (txt) out.push(txt);
+          else out.push(String((workout as any).rendered_description || (workout as any).description || ''));
+        }
+        return out;
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [disc, (workout as any)?.id, (workout as any)?.computed?.total_duration_seconds]);
+      return (<ul className="list-disc pl-5">{lines.map((ln,idx)=>(<li key={idx}>{ln}</li>))}</ul>);
     } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
-  };
+  });
 
   // Calculate current week based on plan start date and today's date
   const calculateCurrentWeek = async (planId: string): Promise<number> => {
