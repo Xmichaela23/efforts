@@ -223,6 +223,22 @@ export default function WorkoutCalendar({
     // keep shape minimal; calendar only uses status, date, type, maybe planned_id
   }));
 
+  // Dev-only diagnostics to verify unified feed → calendar mapping
+  if (import.meta.env?.DEV) {
+    try {
+      // eslint-disable-next-line no-console
+      console.debug('[calendar:unified]', {
+        fromISO,
+        toISO,
+        items: unifiedItems?.length || 0,
+        plannedCount: unifiedPlanned?.length || 0,
+        completedCount: unifiedWorkouts?.length || 0,
+        samplePlanned: unifiedPlanned?.[0] || null,
+        sampleCompleted: unifiedWorkouts?.[0] || null,
+      });
+    } catch {}
+  }
+
   const plannedWeekRows = unifiedPlanned;
   const workoutsWeekRows = unifiedWorkouts;
   const plannedLoading = unifiedLoading;
