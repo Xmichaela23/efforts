@@ -221,7 +221,7 @@ export default function WorkoutCalendar({
 
   // Debounced loading indicator to avoid flicker on fast responses
   const [loadingDebounced, setLoadingDebounced] = useState(false);
-  const loadingWeekRaw = Boolean(plannedLoading || workoutsLoading);
+  const loadingWeekRaw = Boolean(unifiedLoading);
   useEffect(() => {
     let t: any;
     if (loadingWeekRaw) {

@@ -105,6 +105,25 @@ Deno.serve(async (req) => {
 
     const items = workouts.map(unify);
 
+    // Include planned-only items (no workout row yet)
+    const byKey = new Map<string, any>();
+    for (const it of items) byKey.set(`${it.date}|${it.type}`, it);
+    for (const p of Array.isArray(plannedRows) ? plannedRows : []) {
+      const key = `${String(p.date)}|${String(p.type).toLowerCase()}`;
+      if (!byKey.has(key)) {
+        const planned = {
+          id: p.id,
+          steps: Array.isArray(p?.computed?.steps) ? p.computed.steps : null,
+          total_duration_seconds: Number(p?.total_duration_seconds) || Number(p?.computed?.total_duration_seconds) || null,
+          description: p?.description || null,
+          tags: p?.tags || null,
+        } as any;
+        const it = { id: String(p.id), date: String(p.date), type: String(p.type).toLowerCase(), status: 'planned', planned, executed: null };
+        items.push(it);
+        byKey.set(key, it);
+      }
+    }
+
     return new Response(JSON.stringify({ items }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (e) {
     const msg = (e && (e.message || e.msg)) ? (e.message || e.msg) : String(e);
