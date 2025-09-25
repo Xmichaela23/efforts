@@ -1,17 +1,13 @@
 import React from 'react';
-import { usePlannedWorkouts } from '@/hooks/usePlannedWorkouts';
+// Demo is deprecated; planned workouts now sourced via get-week
 import StructuredPlannedView from './StructuredPlannedView';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 const PlannedWorkoutDemo: React.FC = () => {
-  const { 
-    plannedWorkouts, 
-    loading, 
-    error, 
-    addPlannedWorkout, 
-    deletePlannedWorkout 
-  } = usePlannedWorkouts();
+  const plannedWorkouts: any[] = [] as any;
+  const loading = false; const error = null;
+  const addPlannedWorkout = async (_: any)=>{}; const deletePlannedWorkout = async (_: any)=>{};
 
   const createSampleWorkout = async () => {
     try {

@@ -12,17 +12,18 @@ type StructuredPlannedViewProps = {
 
 const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, showHeader = true, onEdit, onComplete }) => {
   const hasStructured = !!((workout as any)?.workout_structure && typeof (workout as any).workout_structure === 'object');
+  const hasComputedV3 = Array.isArray((workout as any)?.computed?.steps) && (workout as any).computed.steps.length > 0;
 
-  if (!hasStructured) {
+  if (!hasStructured && !hasComputedV3) {
     return (
       <div className="p-3">
-        <div className="text-sm text-gray-700">Workout needs migration to structured format.</div>
+        <div className="text-sm text-gray-700">No structured or computed steps available yet.</div>
       </div>
     );
   }
 
   // Structured-only renderer
-  const ws: any = (workout as any).workout_structure;
+  const ws: any = (workout as any).workout_structure || {};
   const { loadUserBaselines } = useAppContext?.() || ({} as any);
   const [ctxPN, setCtxPN] = useState<any | null>(null);
   const [savingPool, setSavingPool] = useState<boolean>(false);
@@ -41,6 +42,31 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const poolUnit: 'yd' | 'm' | null = ((workout as any)?.pool_unit ?? null) as any;
   const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
+  // Prefer server-computed v3 steps when present
+  try {
+    const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
+    if (v3.length) {
+      const fmt = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
+      v3.forEach((st:any)=>{
+        const secs = typeof st?.seconds==='number' ? st.seconds : undefined;
+        const distM = typeof st?.distanceMeters==='number' ? st.distanceMeters : undefined;
+        const pTxt = typeof st?.paceTarget==='string' ? st.paceTarget : undefined;
+        const pow = typeof st?.powerTarget==='string' ? st.powerTarget : undefined;
+        let label = '1 × ';
+        if (typeof distM==='number' && distM>0) {
+          label += `${Math.round(distM)} m`;
+          if (pTxt) label += ` @ ${pTxt}`;
+        } else if (typeof secs==='number' && secs>0) {
+          label += `${fmt(secs)}`;
+          if (pTxt) label += ` @ ${pTxt}`;
+          if (!pTxt && pow) label += ` @ ${pow}`;
+        } else {
+          if (pTxt) label += `@ ${pTxt}`; else if (pow) label += `@ ${pow}`; else label += 'step';
+        }
+        lines.push(label);
+      });
+    }
+  } catch {}
   const toSec = (v?: string): number => { if (!v || typeof v !== 'string') return 0; const m1=v.match(/(\d+)\s*min/i); if (m1) return parseInt(m1[1],10)*60; const m2=v.match(/(\d+)\s*s/i); if (m2) return parseInt(m2[1],10); return 0; };
   const parseEstimateToSeconds = (val: any): number => {
     try {
@@ -128,7 +154,7 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const isStrengthContext = (type === 'strength_session') || (parentDisc === 'strength');
 
   // Prefer computed steps for swims so drills/rests render even without structured distance/duration
-  let handledByComputed = false;
+  let handledByComputed = lines.length > 0;
   let totalYdFromComputed: number | undefined = undefined;
   let totalYdFromStruct: number | undefined = undefined;
   try {

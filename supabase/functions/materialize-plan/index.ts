@@ -124,6 +124,31 @@ function expandTokensForRow(row: any, baselines: Baselines): { steps: any[]; tot
   return { steps, total_s };
 }
 
+Deno.env.get; // keep Deno type active
+
+function mmss(sec: number): string {
+  const s = Math.max(1, Math.round(sec));
+  const m = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${m}:${String(ss).padStart(2,'0')}`;
+}
+
+function toV3Step(st: any): any {
+  const out: any = { id: st?.id || uid() };
+  if (typeof st?.duration_s === 'number') out.seconds = Math.max(1, Math.round(st.duration_s));
+  if (typeof st?.distance_m === 'number') out.distanceMeters = Math.max(1, Math.round(st.distance_m));
+  if (typeof st?.pace_sec_per_mi === 'number') out.paceTarget = `${mmss(st.pace_sec_per_mi)}/mi`;
+  if (st?.power_range && typeof st.power_range.lower === 'number' && typeof st.power_range.upper === 'number') {
+    const lo = Math.round(st.power_range.lower);
+    const up = Math.round(st.power_range.upper);
+    out.powerTarget = `${Math.round((lo + up) / 2)} W`;
+    out.powerRange = { lower: lo, upper: up };
+  }
+  if (typeof st?.planned_index === 'number') out.planned_index = st.planned_index;
+  if (st?.kind) out.kind = st.kind;
+  return out;
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -171,7 +196,8 @@ Deno.serve(async (req) => {
         if (steps && steps.length) {
           // Assign stable planned_index per step
           const withIndex = steps.map((st:any, idx:number)=> ({ ...st, planned_index: idx }));
-          const update: any = { computed: { ...(row.computed||{}), steps: withIndex, total_duration_seconds: total_s }, duration: Math.max(1, Math.round(total_s/60)) };
+          const v3 = withIndex.map(toV3Step);
+          const update: any = { computed: { normalization_version: 'v3', steps: v3, total_duration_seconds: total_s }, duration: Math.max(1, Math.round(total_s/60)) };
           await supabase.from('planned_workouts').update(update).eq('id', String(row.id));
           count += 1;
         }

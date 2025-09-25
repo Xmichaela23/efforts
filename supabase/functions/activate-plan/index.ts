@@ -56,6 +56,38 @@ function titleFor(type: string, tokens: string[]): string {
   return 'Session'
 }
 
+function round5(n:number){ return Math.max(5, Math.round(n/5)*5) }
+function deriveStrengthExercises(tokens: string[], baselines: any): any[] {
+  try {
+    const out: any[] = []
+    const bn = baselines || {}
+    const oneRM = {
+      bench: typeof bn.bench === 'number' ? bn.bench : (typeof bn.benchPress==='number'?bn.benchPress:undefined),
+      squat: typeof bn.squat === 'number' ? bn.squat : undefined,
+      deadlift: typeof bn.deadlift === 'number' ? bn.deadlift : undefined,
+      ohp: typeof bn.overheadPress1RM === 'number' ? bn.overheadPress1RM : (typeof bn.ohp==='number'?bn.ohp:undefined),
+    }
+    for (const t of tokens) {
+      const s = String(t).toLowerCase()
+      const m = s.match(/st_(?:main|acc)_([a-z0-9_]+)_(\d+)x(\d+)(?:_@pct(\d+))?/)
+      if (!m) continue
+      const nameRaw = m[1]
+      const sets = parseInt(m[2],10)
+      const reps = parseInt(m[3],10)
+      const pct = m[4] ? parseInt(m[4],10) : undefined
+      const name = nameRaw.replace(/_/g,' ')
+      let base: number | undefined
+      if (/bench/.test(nameRaw)) base = oneRM.bench
+      else if (/squat/.test(nameRaw)) base = oneRM.squat
+      else if (/deadlift|dead_lift/.test(nameRaw)) base = oneRM.deadlift
+      else if (/ohp|overhead/.test(nameRaw)) base = oneRM.ohp
+      const weight = (typeof base==='number' && typeof pct==='number') ? round5(base * (pct/100)) : undefined
+      out.push({ name, sets: Math.max(1,sets), reps, ...(weight?{ weight }:{}) })
+    }
+    return out
+  } catch { return [] }
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
@@ -97,6 +129,12 @@ Deno.serve(async (req) => {
     if (!startDate) startDate = computeNextMonday()
 
     const rows: any[] = []
+    // Load baselines for strength exercise loads
+    let baselines: any = {}
+    try {
+      const { data: ub } = await supabase.from('user_baselines').select('performance_numbers').eq('user_id', userId).maybeSingle()
+      baselines = (ub?.performance_numbers || {}) as any
+    } catch {}
 
     for (const wk of Object.keys(sessionsByWeek)) {
       const weekNum = parseInt(wk, 10)
@@ -157,7 +195,7 @@ Deno.serve(async (req) => {
           continue
         }
 
-        rows.push({
+        const baseRow: any = {
           user_id: userId,
           training_plan_id: planId,
           template_id: String(planId),
@@ -175,7 +213,12 @@ Deno.serve(async (req) => {
           computed: null,
           units: (plan.config?.units === 'metric' ? 'metric' : 'imperial'),
           tags: Array.isArray(s?.tags) ? s.tags : (Array.isArray(s?.optional) && s.optional ? ['optional'] : []),
-        })
+        }
+        if (mapped === 'strength') {
+          const ex = deriveStrengthExercises(stepsTokens, baselines)
+          if (ex && ex.length) baseRow.strength_exercises = ex
+        }
+        rows.push(baseRow)
       }
     }
 
