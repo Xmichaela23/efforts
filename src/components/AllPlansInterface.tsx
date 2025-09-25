@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ArrowLeft, Play, Pause, Edit, Trash2, Calendar, Clock, Target, Activity, Bike, Waves, Dumbbell, ChevronDown, Moon, ArrowUpDown, Send } from 'lucide-react';
+import PlannedWorkoutSummary from './PlannedWorkoutSummary';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 // Planned workouts hook deprecated; unified server paths are the source of truth
 import { useAppContext } from '@/contexts/AppContext';
@@ -1946,23 +1947,10 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                           );
                                         })()}
                                       </div>
-                                      {/* Coach summaries hidden in weekly planned view */}
-                                      
-                                      {(() => {
-                                        const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
-                                        const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
-                                        if (!isStrength || ex.length===0) return null;
-                                        const items = ex.map((e:any, idx:number)=>{
-                                          const sets = Math.max(1, Number(e?.sets)||1);
-                                          const repsVal:any = (():any=>{ const r=e?.reps||e?.rep; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
-                                          const reps = (typeof repsVal==='string') ? repsVal : Number(repsVal||0);
-                                          const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
-                                          const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
-                                          const repTxt = (typeof reps==='string') ? reps : `${reps}`;
-                                          return (<li key={idx}>{`${name} ${sets}×${repTxt}${wt?` — ${wt}`:''}`}</li>);
-                                        });
-                                        return items.length? (<ul className="list-disc pl-5 mt-1">{items}</ul>) : null;
-                                      })()}
+                                      {/* Reuse detailed summarizer for endurance + strength */}
+                                      <div className="mt-1">
+                                        <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={false} />
+                                      </div>
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
