@@ -42,10 +42,12 @@ export function useWeekUnified(fromISO: string, toISO: string) {
       const items: UnifiedItem[] = Array.isArray((data as any)?.items) ? (data as any).items : [];
       return { items };
     },
+    keepPreviousData: true,
+    retry: false,
     staleTime: (import.meta.env?.DEV ? 5 : 60) * 60 * 1000,
     gcTime: 6 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnReconnect: true,
+    refetchOnReconnect: false,
   });
 
   // In unified mode, rely on standard query invalidation from navigations;
