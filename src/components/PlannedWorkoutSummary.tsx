@@ -135,7 +135,11 @@ function buildWeeklySubtitle(workout: any, baselines?: Baselines): string | unde
 }
 
 export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ workout, baselines, exportHints }) => {
-  const minutes = computeMinutes(workout, baselines, exportHints);
+  const minutes = (()=>{
+    const t = String((workout as any)?.type||'').toLowerCase();
+    if (t==='strength') return null; // avoid misleading 45min placeholders
+    return computeMinutes(workout, baselines, exportHints);
+  })();
   const yards = computeSwimYards(workout);
   const title = getTitle(workout);
   const lines = buildWeeklySubtitle(workout, baselines) || '';

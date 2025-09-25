@@ -352,30 +352,13 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
     } catch { return undefined; }
   };
 
-  // Weekly detailed renderer: render every step from server computed.v3
+  // Weekly summary renderer: grouped session summary (no per-step bullets)
   const WeeklyLines: React.FC<{ workout: any }> = ({ workout }) => {
     try {
-      const steps: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
-      if (steps.length) {
-        const fmt = (s:number)=>{ const x=Math.max(1,Math.round(Number(s)||0)); const m=Math.floor(x/60); const ss=x%60; return `${m}:${String(ss).padStart(2,'0')}`; };
-        return (
-          <ul className="list-disc pl-5">
-            {steps.map((st:any, idx:number)=>{
-              if (typeof st?.distanceMeters==='number' && st.distanceMeters>0) {
-                const m = Math.round(st.distanceMeters); const p = st?.paceTarget?` @ ${st.paceTarget}`:'';
-                return (<li key={idx}>{`1 × ${m} m${p}`}</li>);
-              }
-              if (typeof st?.seconds==='number' && st.seconds>0) {
-                const p = st?.paceTarget?` @ ${st.paceTarget}`:(st?.powerTarget?` @ ${st.powerTarget}`:'');
-                return (<li key={idx}>{`1 × ${fmt(st.seconds)}${p}`}</li>);
-              }
-              return (<li key={idx}>1 × step</li>);
-            })}
-          </ul>
-        );
-      }
+      // Prefer structured summary or friendly strings; fall back to rendered/description
       const txt = buildWeeklySubtitle(workout) || '';
-      return (<span>{txt}</span>);
+      if (txt) return (<span>{txt}</span>);
+      return (<span>{(workout as any).rendered_description || (workout as any).description}</span>);
     } catch { return (<span>{(workout as any).rendered_description || (workout as any).description}</span>); }
   };
 
@@ -628,6 +611,8 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
               steps_preset: Array.isArray(stepsPresetParsed) ? stepsPresetParsed : null,
               export_hints: typeof exportHintsParsed === 'object' && exportHintsParsed ? exportHintsParsed : null,
               intervals: Array.isArray(intervalsParsed) ? intervalsParsed : null,
+              // Include server-derived strength exercises for grouped display
+              strength_exercises: Array.isArray((w as any).strength_exercises) ? (w as any).strength_exercises : undefined,
               display_overrides: displayOverrides,
               expand_spec: expandSpec,
               pace_annotation: paceAnnotation,
@@ -1837,6 +1822,19 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                         })()}
                                       </div>
                                       <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
+                                      {(() => {
+                                        const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
+                                        const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
+                                        if (!isStrength || ex.length===0) return null;
+                                        const items = ex.map((e:any, idx:number)=>{
+                                          const sets = Math.max(1, Number(e?.sets)||1);
+                                          const reps = Math.max(1, Number(e?.reps||e?.rep)||1);
+                                          const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
+                                          const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+                                          return (<li key={idx}>{`${name} ${sets}×${reps}${wt?` — ${wt}`:''}`}</li>);
+                                        });
+                                        return items.length? (<ul className="list-disc pl-5 mt-1">{items}</ul>) : null;
+                                      })()}
                                     </div>
                                     {Array.isArray(workout.tags) && workout.tags.map((t:string)=>t.toLowerCase()).includes('opt_active') && (
                                       <Button size="sm" variant="outline" disabled={activatingId===workout.id} onClick={(e)=>{e.stopPropagation(); deactivateOptional(workout);}}>
@@ -1908,8 +1906,21 @@ const AllPlansInterface: React.FC<AllPlansInterfaceProps> = ({
                                               ) : null;
                                             })()}
                                           </div>
-                                          {/* Planned weekly subtitle: grouped + targets per-step when available */}
+                                          {/* Planned weekly subtitle: grouped summary and strength loads */}
                                           <div className="text-sm text-gray-600 mt-1"><WeeklyLines workout={workout} /></div>
+                                          {(() => {
+                                            const isStrength = String((workout as any)?.type||'').toLowerCase()==='strength';
+                                            const ex: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
+                                            if (!isStrength || ex.length===0) return null;
+                                            const items = ex.map((e:any, idx:number)=>{
+                                              const sets = Math.max(1, Number(e?.sets)||1);
+                                              const reps = Math.max(1, Number(e?.reps||e?.rep)||1);
+                                              const wt = (typeof e?.weight==='number' && isFinite(e.weight)) ? `${Math.round(e.weight)} lb` : undefined;
+                                              const name = String(e?.name||'').replace(/_/g,' ').replace(/\s+/g,' ').trim();
+                                              return (<li key={idx}>{`${name} ${sets}×${reps}${wt?` — ${wt}`:''}`}</li>);
+                                            });
+                                            return items.length? (<ul className="list-disc pl-5 mt-1">{items}</ul>) : null;
+                                          })()}
                                           {(() => {
                                             const planUi: any = (selectedPlanDetail as any)?.ui_text || (selectedPlanDetail as any)?.template?.ui_text || {};
                                             const copy = (planUi?.opt_kind_copy || {}) as Record<string,string>;
