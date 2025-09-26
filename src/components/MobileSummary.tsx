@@ -956,7 +956,14 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
           </div>
         );
       })()}
-      <table className="w-full text-sm">
+      <table className="w-full text-sm table-fixed">
+        <colgroup>
+          <col className="w-[20%]" />
+          <col className="w-[18%]" />
+          <col className="w-[16%]" />
+          <col className="w-[14%]" />
+          <col className="w-[16%]" />
+        </colgroup>
         <thead>
           <tr className="border-b border-gray-200">
             <th className="px-2 py-3 text-left font-medium text-gray-600">Planned</th>
@@ -1010,25 +1017,30 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
               const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
             })();
 
-            const bpmCell = (() => {
-              if (!hasServerComputed || !row) return '—';
-              const hr = row?.executed?.avg_hr; return hr ? `${Math.round(hr)} bpm` : '—';
+            const hrVal = (() => {
+              if (!hasServerComputed || !row) return null as number | null;
+              const hr = row?.executed?.avg_hr; return (typeof hr === 'number' && hr > 0) ? Math.round(hr) : null;
             })();
 
             return (
               <tr key={idx} className="border-b border-gray-100">
                 <td className="px-2 py-2">
-                  <div className="flex items-center justify-between min-h-[2.5rem]">
-                    <span>{plannedLabel}</span>
+                  <div className="flex items-center justify-between w-full min-h-[2.5rem]">
+                    <span className="text-sm font-medium truncate pr-2">{plannedLabel}</span>
                     {pct != null && (
-                      <span className={`text-xs font-semibold ${getPercentageColor(pct)}`}>{pct}%</span>
+                      <span className={`text-xs font-semibold whitespace-nowrap ${getPercentageColor(pct)}`}>{pct}%</span>
                     )}
                   </div>
                 </td>
                 <td className="px-2 py-2 font-medium">{execCell}</td>
                 <td className="px-2 py-2">{distCell}</td>
                 <td className="px-2 py-2">{timeCell}</td>
-                <td className="px-2 py-2">{bpmCell}</td>
+                <td className="px-1 py-2 text-right">
+                  <div className="text-xs">
+                    {hrVal != null ? `${hrVal}` : '—'}
+                    <div className="text-gray-500">bpm</div>
+                  </div>
+                </td>
               </tr>
             );
           })}
