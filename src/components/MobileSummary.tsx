@@ -953,138 +953,102 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         return (
           <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
             <div>Source: {label}{computeError ? <span className="ml-2 text-red-600">{computeError}</span> : null}</div>
-            {/* Force compute button removed; rely on server compute and polling */}
           </div>
         );
       })()}
-      <div className="grid grid-cols-5 gap-4 text-xs text-gray-500">
-        <div className="font-medium text-black">Planned</div>
-        <div className="font-medium text-black">{isRideSport ? 'Executed Watts' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</div>
-        <div className="font-medium text-black">Distance</div>
-        <div className="font-medium text-black">Time</div>
-        <div className="font-medium text-black">BPM</div>
-      </div>
-      <div className="mt-2 divide-y divide-gray-100">
-        {steps.map((st, idx) => (
-          <div key={idx} className="grid grid-cols-5 gap-4 py-2 text-sm">
-            <div className="text-gray-800">
-              {(() => {
-                // Compute percentage badge inline with planned label
-                let row: any = null;
-                if (hasServerComputed) {
-                  const pid = String((st as any)?.id || '');
-                  row = pid ? intervalByPlannedId.get(pid) : null;
-                  if (!row) {
-                    const ix = Number((st as any)?.planned_index);
-                    if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
-                  }
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-200">
+            <th className="px-2 py-3 text-left font-medium text-gray-600">Planned</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600">{isRideSport ? 'Executed Watts' : (isSwimSport ? 'Executed /100 (pref)' : 'Executed Pace')}</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600">Distance</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600">Time</th>
+            <th className="px-2 py-3 text-left font-medium text-gray-600">BPM</th>
+          </tr>
+        </thead>
+        <tbody>
+          {steps.map((st, idx) => {
+            let row: any = null;
+            if (hasServerComputed) {
+              const pid = String((st as any)?.id || '');
+              row = pid ? intervalByPlannedId.get(pid) : null;
+              if (!row) {
+                const ix = Number((st as any)?.planned_index);
+                if (Number.isFinite(ix)) row = intervalByIndex.get(ix) || null;
+              }
+            }
+            const pct = (hasServerComputed && shouldShowPercentage(st)) ? calculateExecutionPercentage(st, row?.executed) : null;
+            const plannedLabel = plannedLabelStrict(st);
+
+            const execCell = (() => {
+              if (!hasServerComputed || !row) return '—';
+              if (isRideSport) {
+                const pw = row?.executed?.avg_power_w as number | undefined;
+                if (typeof pw === 'number' && Number.isFinite(pw)) return `${Math.round(pw)} W`;
+                const spd = row?.executed?.avg_speed_mps as number | undefined;
+                if (typeof spd === 'number' && Number.isFinite(spd) && spd > 0.2) {
+                  const mph = spd * 2.236936; return `${mph.toFixed(1)} mph`;
                 }
-                const pct = (hasServerComputed && shouldShowPercentage(st)) ? calculateExecutionPercentage(st, row?.executed) : null;
-                const label = plannedLabelStrict(st);
-                if (pct == null) return label;
-                return (
-                  <div className="flex items-center gap-3">
-                    <span>{label}</span>
-                    <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded border ${getPercentageColor(pct)} ${getPercentageBg(pct)} ${getPercentageBorder(pct)}`}>{pct}%</span>
+                return '—';
+              }
+              const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
+              return secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—';
+            })();
+
+            const distCell = (() => {
+              if (!hasServerComputed || !row) return '—';
+              const distM = row?.executed?.distance_m as number | undefined;
+              if (typeof distM === 'number' && distM > 0) {
+                if (isSwimSport) return useImperial ? `${Math.round(distM/0.9144)} yd` : `${Math.round(distM)} m`;
+                const mi = distM / 1609.34; return `${mi.toFixed(mi < 1 ? 2 : 1)} mi`;
+              }
+              return '—';
+            })();
+
+            const timeCell = (() => {
+              if (!hasServerComputed || !row) return '—';
+              const dur = row?.executed?.duration_s; return (typeof dur === 'number' && dur > 0) ? fmtTime(dur) : '—';
+            })();
+
+            const bpmCell = (() => {
+              if (!hasServerComputed || !row) return '—';
+              const hr = row?.executed?.avg_hr; return hr ? `${Math.round(hr)} bpm` : '—';
+            })();
+
+            return (
+              <tr key={idx} className="border-b border-gray-100">
+                <td className="px-2 py-2">
+                  <div className="flex items-center justify-between min-h-[2.5rem]">
+                    <span>{plannedLabel}</span>
+                    {pct != null && (
+                      <span className={`text-xs font-semibold ${getPercentageColor(pct)}`}>{pct}%</span>
+                    )}
                   </div>
-                );
-              })()}
-            </div>
-            <div className="text-gray-900">
-              {(() => {
-                if (!hasServerComputed) return <div>—</div>;
-                const pid = String((st as any)?.id || '');
-                let row = pid ? intervalByPlannedId.get(pid) : null;
-                if (!row) {
-                  const idx = Number((st as any)?.planned_index);
-                  if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
-                }
-                if (!row) return <div>—</div>;
-                if (isRideSport) {
-                  const pw = row?.executed?.avg_power_w as number | undefined;
-                  if (typeof pw === 'number' && Number.isFinite(pw)) {
-                    return <div>{`${Math.round(pw)} W`}</div>;
-                  }
-                  const spd = row?.executed?.avg_speed_mps as number | undefined;
-                  if (typeof spd === 'number' && Number.isFinite(spd) && spd > 0.2) {
-                    const mph = spd * 2.236936;
-                    return <div>{`${mph.toFixed(1)} mph`}</div>;
-                  }
-                  return <div>—</div>;
-                }
-                const secPerMi = row?.executed?.avg_pace_s_per_mi as number | undefined;
-                return <div>{secPerMi ? `${Math.floor(secPerMi/60)}:${String(Math.round(secPerMi%60)).padStart(2,'0')}/mi` : '—'}</div>;
-              })()}
-            </div>
-            <div className="text-gray-900">
-              {(() => {
-                if (hasServerComputed) {
-                  const pid = String((st as any)?.id || '');
-                  let row = pid ? intervalByPlannedId.get(pid) : null;
-                  if (!row) {
-                    const idx = Number((st as any)?.planned_index);
-                    if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
-                  }
-                  const distM = row?.executed?.distance_m as number | undefined;
-                  if (typeof distM === 'number' && distM > 0) {
-                    if (isSwimSport) {
-                      return <div>{useImperial ? Math.round(distM/0.9144) + ' yd' : Math.round(distM) + ' m'}</div>;
-                    }
-                    if (isRideSport || /run|walk/i.test(sportType)) {
-                      const mi = distM / 1609.34;
-                      return <div>{mi.toFixed(mi < 1 ? 2 : 1)} mi</div>;
-                    }
-                    const km = distM / 1000;
-                    return <div>{km.toFixed(km < 1 ? 2 : 1)} km</div>;
-                  }
-                }
-                return <div>—</div>;
-              })()}
-            </div>
-            <div className="text-gray-900">
-              {(() => {
-                if (!hasServerComputed) return <div>—</div>;
-                const pid = String((st as any)?.id || '');
-                let row = pid ? intervalByPlannedId.get(pid) : null;
-                if (!row) {
-                  const idx = Number((st as any)?.planned_index);
-                  if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
-                }
-                const dur = row?.executed?.duration_s;
-                return <div>{typeof dur === 'number' && dur > 0 ? fmtTime(dur) : '—'}</div>;
-              })()}
-            </div>
-            <div className="text-gray-900">
-              {(() => {
-                if (!hasServerComputed) return <div className="text-xs text-gray-700">—</div>;
-                const pid = String((st as any)?.id || '');
-                let row = pid ? intervalByPlannedId.get(pid) : null;
-                if (!row) {
-                  const idx = Number((st as any)?.planned_index);
-                  if (Number.isFinite(idx)) row = intervalByIndex.get(idx) || null;
-                }
-                const hr = row?.executed?.avg_hr;
-                return <div className="text-xs text-gray-700">{hr ? `${Math.round(hr)} bpm` : '—'}</div>;
-              })()}
+                </td>
+                <td className="px-2 py-2 font-medium">{execCell}</td>
+                <td className="px-2 py-2">{distCell}</td>
+                <td className="px-2 py-2">{timeCell}</td>
+                <td className="px-2 py-2">{bpmCell}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
+        <div className="py-2">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="text-gray-800">Add‑ons</div>
+            <div className="text-gray-900 space-y-1">
+              {completed.addons.map((a:any, idx:number)=> (
+                <div key={idx} className="flex items-center justify-between">
+                  <span>{a.token?.split('.')[0]?.replace(/_/g,' ') || a.name || 'Addon'}</span>
+                  <span className="text-gray-600">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-        {completed?.addons && Array.isArray(completed.addons) && completed.addons.length>0 && (
-          <div className="py-2">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="text-gray-800">Add‑ons</div>
-              <div className="text-gray-900 space-y-1">
-                {completed.addons.map((a:any, idx:number)=> (
-                  <div key={idx} className="flex items-center justify-between">
-                    <span>{a.token?.split('.')[0]?.replace(/_/g,' ') || a.name || 'Addon'}</span>
-                    <span className="text-gray-600">{a.completed? '✓ ' : ''}{a.duration_min||0}m</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
