@@ -558,9 +558,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
       {/* Header */}
       <div className="flex items-center justify-between p-1 border-b">
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-gray-100">
-            <Calendar className="h-4 w-4" />
-          </div>
+          <div className="p-2" />
           <div>
             <h2 className="font-semibold text-lg">
               {(() => {
@@ -708,7 +706,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               if (overallScore == null) return null;
               const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
               return (
-                <div className="px-1 pt-0 pb-1">
+                <div className="px-1 py-0">
                   <div className="flex flex-col items-center leading-tight">
                     <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
                     <span className="text-[12px] text-gray-700 font-medium truncate">{overallMethod}</span>
