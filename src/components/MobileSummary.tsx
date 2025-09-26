@@ -1022,15 +1022,23 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         const score = calculateExecutionScore(workoutType, plannedSteps, executedIntervals);
         if (!plannedSteps.length || !executedIntervals.length) return null;
         return (
-          <div className="px-4 mb-4">
-            <div className="p-4 bg-gray-50 rounded-lg">
-              <div className="flex justify-between items-center">
-                <div>
-                  <span className="text-sm font-medium text-gray-600">Overall Execution</span>
-                  <div className="text-xs text-gray-500 mt-0.5">{getExecutionMethodLabel(workoutType, plannedSteps)}</div>
+          <div className="space-y-4">
+            {/* Execution card inside existing padding structure */}
+            <div className="px-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">Overall Execution</span>
+                    <div className="text-xs text-gray-500 mt-0.5">{getExecutionMethodLabel(workoutType, plannedSteps)}</div>
+                  </div>
+                  <span className={`text-xl font-bold ${getPercentageColor(score || 0)}`}>{score ?? '—'}%</span>
                 </div>
-                <span className={`text-xl font-bold ${getPercentageColor(score || 0)}`}>{score ?? '—'}%</span>
               </div>
+            </div>
+
+            {/* Source line */}
+            <div className="px-4">
+              <div className="text-xs text-gray-500 mb-4">Source: server-computed {completedComputed?.version ? `(v${completedComputed.version})` : ''}</div>
             </div>
           </div>
         );

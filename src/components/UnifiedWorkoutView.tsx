@@ -645,78 +645,7 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-1">
-            {(() => {
-              // --- Overall execution score card (compact, sits just under tabs) ---
-              try {
-                const plannedRow: any = (hydratedPlanned || linkedPlanned || (isCompleted ? workout : null)) as any;
-                const plannedSteps: any[] = Array.isArray(plannedRow?.computed?.steps) ? plannedRow.computed.steps : [];
-                const executedIntervals: any[] = Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
-                if (!plannedSteps.length || !executedIntervals.length) return null;
-
-                const mapExecutedToPlanned = (ps: any[], exs: any[]) =>
-                  ps.map((st: any, i: number) => ({ planned: st, executed: exs.find((x:any)=> String(x?.planned_step_id||'')===String(st?.id||'')) || exs[i] }));
-
-                const hasVariedDurations = (()=>{
-                  const ds = plannedSteps.map((s:any)=> Number(s?.seconds||s?.duration||s?.duration_sec||s?.durationSeconds||0)).filter((d:number)=> Number.isFinite(d) && d>0);
-                  if (!ds.length) return false; const mx=Math.max(...ds), mn=Math.min(...ds); return mn>0 && mx/mn>2;
-                })();
-
-                const calculateExecutionPercentage = (planned: any, executed: any): number | null => {
-                  try {
-                    if (!executed) return null;
-                    const pr = planned?.power_range || planned?.powerRange || planned?.power?.range;
-                    const lo = Number(pr?.lower), hi = Number(pr?.upper);
-                    const ew = Number(executed?.avg_power_w ?? executed?.avg_watts ?? executed?.power);
-                    if (Number.isFinite(lo) && Number.isFinite(hi) && lo>0 && hi>0 && Number.isFinite(ew) && ew>0) {
-                      const mid=(lo+hi)/2; if (mid>0) return Math.round((ew/mid)*100);
-                    }
-                    const plannedSec = [planned?.seconds, planned?.duration, planned?.duration_sec, planned?.durationSeconds].map((v:any)=>Number(v)).find((n:number)=> Number.isFinite(n) && n>0) as number|undefined;
-                    const execSec = Number(executed?.duration_s);
-                    if (Number.isFinite(plannedSec) && Number.isFinite(execSec) && (plannedSec as number)>0 && execSec>0) return Math.round((execSec/(plannedSec as number))*100);
-                    const pMeters = Number(planned?.distanceMeters ?? planned?.distance_m ?? planned?.m ?? planned?.meters);
-                    const eMeters = Number(executed?.distance_m);
-                    if (Number.isFinite(pMeters) && pMeters>0 && Number.isFinite(eMeters) && eMeters>0) return Math.round((eMeters/pMeters)*100);
-                  } catch {}
-                  return null;
-                };
-
-                const pairs = mapExecutedToPlanned(plannedSteps, executedIntervals)
-                  .filter((p:any)=>{ const tp=String(p?.planned?.type||p?.planned?.kind||'').toLowerCase(); return !(tp.includes('rest')||tp.includes('recovery')); });
-                if (!pairs.length) return null;
-                const t = String((workout as any)?.type || plannedRow?.type || '').toLowerCase();
-                let totalWeighted = 0, totalWeight = 0;
-                for (const { planned, executed } of pairs) {
-                  const pct = calculateExecutionPercentage(planned, executed);
-                  if (pct == null) continue;
-                  let w = 1;
-                  if (t==='swim') w = Number(executed?.distance_m || planned?.distance_m || planned?.distanceMeters || 1) || 1;
-                  else if (t==='strength') { const reps=Number(executed?.reps||planned?.reps||1)||1; const sets=Number(executed?.sets||planned?.sets||1)||1; w = Math.max(1,reps*sets); }
-                  else w = Number(executed?.duration_s || planned?.seconds || planned?.duration || 60) || 60;
-                  totalWeighted += pct*w; totalWeight += w;
-                }
-                const score = totalWeight>0 ? Math.round(totalWeighted/totalWeight) : null;
-                const method = (()=>{
-                  if (t==='ride'||t==='bike'||t==='cycling') return hasVariedDurations ? 'Duration-weighted power adherence' : 'Average power adherence';
-                  if (t==='run'||t==='walk') return hasVariedDurations ? 'Duration-weighted pace adherence' : 'Average pace adherence';
-                  if (t==='swim') return 'Distance-weighted pace adherence';
-                  if (t==='strength') return 'Rep-weighted load adherence';
-                  return hasVariedDurations ? 'Duration-weighted adherence' : 'Average adherence';
-                })();
-                return (
-                  <div className="px-3 pt-2">
-                    <div className="p-3 bg-gray-50 rounded-md">
-                      <div className="flex justify-between items-center">
-                        <div>
-                          <span className="text-sm font-medium text-gray-600">Overall Execution</span>
-                          <div className="text-xs text-gray-500 mt-0.5">{method}</div>
-                        </div>
-                        <span className={`text-xl font-bold ${score!=null ? '' : 'text-gray-400'} ${score!=null ? '' : ''}`}>{score!=null ? `${score}%` : '—%'}</span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              } catch { return null; }
-            })()}
+            {/* Overall Execution card rendered inside MobileSummary to avoid duplication */}
             {isCompleted && (
               <div className="mb-0.5 flex items-center justify-between">
                 <div className="flex items-center gap-3">
