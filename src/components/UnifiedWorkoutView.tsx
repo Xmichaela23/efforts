@@ -415,11 +415,31 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
   // Generate a nice title from GPS location + activity type
   const generateWorkoutTitle = () => {
-    // Product decision: prefer the saved workout name if present
-    const explicitName = String((workout as any)?.name || '').trim();
-    if (explicitName) {
-      return explicitName;
+    // If this completed workout is attached to a planned row, prefer the planned title
+    const plannedRow: any = (hydratedPlanned || linkedPlanned) as any;
+    if (plannedRow && (plannedRow.id || (workout as any)?.planned_id)) {
+      const stTitle = String((plannedRow as any)?.workout_structure?.title || '').trim();
+      if (stTitle) return stTitle;
+      const t = String((plannedRow as any)?.type || '').toLowerCase();
+      const typeLabel = t === 'run' ? 'Run' : t === 'ride' ? 'Ride' : t === 'swim' ? 'Swim' : t === 'strength' ? 'Strength' : 'Session';
+      const raw = String((plannedRow as any)?.name || (plannedRow as any)?.rendered_description || (plannedRow as any)?.description || '').toLowerCase();
+      const focus = (() => {
+        if (/interval/.test(raw)) return 'Intervals';
+        if (/tempo/.test(raw)) return 'Tempo';
+        if (/long\s*run|long\s*ride|long\s*\d+\s*min/.test(raw)) return 'Long';
+        if (/vo2/.test(raw)) return 'VO2';
+        if (/threshold|thr\b/.test(raw)) return 'Threshold';
+        if (/sweet\s*spot|ss\b/.test(raw)) return 'Sweet Spot';
+        if (/endurance/.test(raw)) return 'Endurance';
+        if (/technique/.test(raw)) return 'Technique';
+        if (t === 'strength') return 'Strength';
+        return 'Planned';
+      })();
+      return `${typeLabel} — ${focus}`;
     }
+    // Otherwise, prefer the saved workout name if present
+    const explicitName = String((workout as any)?.name || '').trim();
+    if (explicitName) return explicitName;
     // Planned: standardize to "Type — Focus" for consistency across app
     if (workout.workout_status === 'planned') {
       const t = String(workout.type || '').toLowerCase();
