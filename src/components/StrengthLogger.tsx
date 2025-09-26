@@ -134,6 +134,8 @@ const PlateMath: React.FC<{
 
 export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSaved, targetDate }: StrengthLoggerProps) {
   const { workouts, addWorkout, updateWorkout } = useAppContext();
+  // Planned feed for reliable prefill
+  const { plannedWorkouts = [], refresh: refreshPlanned } = usePlannedWorkouts() as any;
   const [exercises, setExercises] = useState<LoggedExercise[]>([]);
   const [currentExercise, setCurrentExercise] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -707,8 +709,13 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       console.log('🔍 No scheduled workout, checking for selected date\'s planned workout...');
       const selectedDate = targetDate || getStrengthLoggerDateString();
       
-      // Prefer planned_workouts table
-      const todaysPlanned = (plannedWorkouts || []).filter(w => w.date === selectedDate && w.type === 'strength' && w.workout_status === 'planned');
+      // Prefer planned_workouts table (refresh once for good measure)
+      try { (refreshPlanned as any)?.(); } catch {}
+      const todaysPlanned = (plannedWorkouts || []).filter((w: any) => 
+        String(w?.date) === selectedDate && 
+        String(w?.type||'').toLowerCase() === 'strength' && 
+        String(w?.workout_status||'').toLowerCase() === 'planned'
+      );
       let todaysStrengthWorkouts = todaysPlanned;
 
       if (todaysStrengthWorkouts.length === 0) {
@@ -770,11 +777,11 @@ export default function StrengthLogger({ onClose, scheduledWorkout, onWorkoutSav
       }));
       
       setExercises(prePopulatedExercises);
-    } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof workoutToLoad.description === 'string')) {
+    } else if (workoutToLoad && ((workoutToLoad as any).steps_preset?.length > 0 || typeof (workoutToLoad as any).rendered_description === 'string' || typeof (workoutToLoad as any).description === 'string')) {
       // Fallback: parse rendered_description first, then description
       const stepsArr: string[] = Array.isArray((workoutToLoad as any).steps_preset) ? (workoutToLoad as any).steps_preset : [];
       const viaTokens = parseStepsPreset(stepsArr);
-      const src = (workoutToLoad as any).rendered_description || workoutToLoad.description || '';
+      const src = (workoutToLoad as any).rendered_description || (workoutToLoad as any).description || '';
       const parsed = viaTokens.length>0 ? viaTokens : parseStrengthDescription(src);
       const orOpts = extractOrOptions(src);
       if (parsed.length > 0) {

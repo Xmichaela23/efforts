@@ -44,6 +44,33 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
   const poolLenM: number | null = (typeof (workout as any)?.pool_length_m === 'number') ? (workout as any).pool_length_m : null;
   const lines: string[] = [];
   let totalSecsFromSteps = 0;
+  // Strength: if server provided structured strength_exercises, render aggregated lines (avoid per-set repetition)
+  try {
+    const parentDiscEarly = String((workout as any)?.discipline || (workout as any)?.type || '').toLowerCase();
+    if (parentDiscEarly === 'strength') {
+      const exArr: any[] = Array.isArray((workout as any)?.strength_exercises) ? (workout as any).strength_exercises : [];
+      if (exArr.length) {
+        for (const e of exArr) {
+          const name = String(e?.name || '').replace(/_/g, ' ').trim();
+          const setsNum = Math.max(1, Number(e?.sets) || (Array.isArray(e?.sets) ? e.sets.length : 0) || 1);
+          const repsVal: any = (() => {
+            const r = (e as any)?.reps;
+            if (typeof r === 'string') return r.toUpperCase();
+            if (typeof r === 'number') return Math.max(1, Math.round(r));
+            // if sets array provided, try average reps
+            if (Array.isArray((e as any)?.sets) && (e as any).sets.length) {
+              try { const avg = Math.round(((e as any).sets as any[]).reduce((a: number, s: any) => a + (Number(s?.reps) || 0), 0) / (e as any).sets.length); return Math.max(1, avg); } catch {}
+            }
+            return undefined;
+          })();
+          const repTxt = (typeof repsVal === 'string') ? repsVal : (Number.isFinite(repsVal) ? String(repsVal) : '');
+          const wtNum = (typeof (e as any)?.weight === 'number' && isFinite((e as any).weight)) ? Math.round((e as any).weight) : undefined;
+          const wtTxt = typeof wtNum === 'number' && wtNum > 0 ? ` @ ${wtNum} lb` : '';
+          lines.push(`${name} ${setsNum}×${repTxt}${wtTxt}`.trim());
+        }
+      }
+    }
+  } catch {}
   // Prefer server-computed v3 steps when present
   try {
     const v3: any[] = Array.isArray((workout as any)?.computed?.steps) ? (workout as any).computed.steps : [];
@@ -328,7 +355,16 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       if (k==='main_set' && String(seg?.set_type||'').toLowerCase().includes('aerobic')) { const reps=Number(seg?.repetitions)||0; const dist=String(seg?.distance||''); const yd=/yd/i.test(dist)?parseInt(dist,10):Math.round(parseInt(dist,10)/0.9144); for(let r=0;r<Math.max(1,reps);r+=1){ lines.push(`1 × ${yd} yd aerobic`); if (Number.isFinite(yd) && yd>0) totalYdFromStruct = (totalYdFromStruct||0) + yd; if (r<reps-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue; }
     }
     if (type==='strength_session' && (k==='main_lift' || k==='accessory')) {
-      const name=String(seg?.exercise||'').replace(/_/g,' '); const sets=Number(seg?.sets)||0; const reps=String(seg?.reps||'').toUpperCase(); const pct=Number(seg?.load?.percentage)||0; const baseKey=String(seg?.load?.baseline||'').replace(/^user\./i,''); const orm=pn[baseKey]; const load = (typeof orm==='number'&&pct>0)? `${Math.max(5, Math.round((orm*(pct/100))/5)*5)} lb` : (pct?`${pct}%`:undefined); for(let r=0;r<Math.max(1,sets);r+=1){ lines.push(`${name} 1 × ${reps}${load?` @ ${load}`:''}`); if (r<sets-1 && seg?.rest) lines.push(`Rest ${mmss(toSec(String(seg.rest)))}`);} continue;
+      // Aggregate into a single line per exercise to avoid repeated lines per set
+      const name = String(seg?.exercise||'').replace(/_/g,' ').trim();
+      const sets = Math.max(1, Number(seg?.sets)||0);
+      const repsTxt = String(seg?.reps||'').toUpperCase();
+      const pct = Number(seg?.load?.percentage)||0;
+      const baseKey = String(seg?.load?.baseline||'').replace(/^user\./i,'');
+      const orm = pn[baseKey];
+      const load = (typeof orm==='number'&&pct>0)? `${Math.max(5, Math.round((orm*(pct/100))/5)*5)} lb` : (pct?`${pct}%`:undefined);
+      lines.push(`${name} ${sets} × ${repsTxt}${load?` @ ${load}`:''}`);
+      continue;
     }
   }
   // Removed all token fallback paths: structured JSON is the single source of truth
