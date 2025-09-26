@@ -109,11 +109,17 @@ Deno.serve(async (req) => {
           };
         }
       }
-      // Always pass through strength_exercises for strength sessions
+      // Always pass through strength_exercises for strength sessions (normalize to array)
       if (!executed) executed = {};
-      if (Array.isArray((w as any)?.strength_exercises) && (w as any).strength_exercises.length > 0) {
-        executed.strength_exercises = (w as any).strength_exercises;
-      }
+      try {
+        const rawSE = (w as any)?.strength_exercises;
+        let se: any[] = [];
+        if (Array.isArray(rawSE)) se = rawSE as any[];
+        else if (typeof rawSE === 'string') {
+          try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {}
+        }
+        if (se && se.length) executed.strength_exercises = se;
+      } catch {}
       // Normalize status universally
       const cmp = w?.computed || null;
       const hasStrengthEx = Array.isArray((w as any)?.strength_exercises) && (w as any).strength_exercises.length>0;
