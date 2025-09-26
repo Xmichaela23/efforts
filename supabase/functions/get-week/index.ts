@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const userId = userData.user.id as string;
 
     // Fetch unified workouts (new columns present but may be null)
-    const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed,strength_exercises';
+    const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed,strength_exercises,completed_exercises';
     const { data: wkRaw, error: wkErr } = await supabase
       .from('workouts')
       .select(workoutSel)
@@ -115,10 +115,13 @@ Deno.serve(async (req) => {
         const rawSE = (w as any)?.strength_exercises;
         let se: any[] = [];
         if (Array.isArray(rawSE)) se = rawSE as any[];
-        else if (typeof rawSE === 'string') {
-          try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {}
-        }
+        else if (typeof rawSE === 'string') { try { const parsed = JSON.parse(rawSE); if (Array.isArray(parsed)) se = parsed; } catch {} }
         if (se && se.length) executed.strength_exercises = se;
+        const rawCE = (w as any)?.completed_exercises;
+        let ce: any[] = [];
+        if (Array.isArray(rawCE)) ce = rawCE as any[];
+        else if (typeof rawCE === 'string') { try { const parsed = JSON.parse(rawCE); if (Array.isArray(parsed)) ce = parsed; } catch {} }
+        if ((!executed.strength_exercises || !executed.strength_exercises.length) && ce && ce.length) executed.strength_exercises = ce;
       } catch {}
       // Normalize status universally
       const cmp = w?.computed || null;
@@ -126,6 +129,17 @@ Deno.serve(async (req) => {
       const hasExecuted = !!(cmp && ((Array.isArray(cmp?.intervals) && cmp.intervals.length>0) || cmp?.overall)) || hasStrengthEx;
       let status = String(w.status || w.legacy_status || '').toLowerCase();
       if (!status) status = hasExecuted ? 'completed' : (planned ? 'planned' : null);
+      try {
+        if (String(type)==='strength') {
+          const exLen = Array.isArray((executed as any)?.strength_exercises) ? (executed as any).strength_exercises.length : 0;
+          const seRaw = (w as any)?.strength_exercises;
+          const ceRaw = (w as any)?.completed_exercises;
+          const seLen = Array.isArray(seRaw) ? seRaw.length : (typeof seRaw === 'string' ? 'str' : 0);
+          const ceLen = Array.isArray(ceRaw) ? ceRaw.length : (typeof ceRaw === 'string' ? 'str' : 0);
+          // eslint-disable-next-line no-console
+          console.log('[get-week:strength]', { id: String(w.id), date, seLen, ceLen, exLen, status });
+        }
+      } catch {}
       return { id: w.id, date, type, status, planned, executed, planned_id: w.planned_id || null };
     };
 
