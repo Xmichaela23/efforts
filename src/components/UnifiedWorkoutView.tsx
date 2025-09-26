@@ -609,6 +609,48 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
             {/* Auto-linked badge removed per product decision */}
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          {isCompleted && (
+            (!workout.planned_id && !linkedPlanned) ? (
+              <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Attach</Button>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={async()=>{
+                  try {
+                    const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
+                    if (!pid) return;
+                    await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
+                    await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
+                    try { (workout as any).planned_id = null; } catch {}
+                    setLinkedPlanned(null);
+                    suppressRelinkUntil.current = Date.now() + 15000; // 15s
+                    try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+                    try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+                  } catch {}
+                }}
+              >Unattach</Button>
+            )
+          )}
+        </div>
+        {assocOpen && (
+          <AssociatePlannedDialog
+            workout={workout}
+            open={assocOpen}
+            onClose={()=>setAssocOpen(false)}
+            onAssociated={async(pid)=>{ 
+              try { (workout as any).planned_id = pid; } catch {}
+              try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
+              try {
+                const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
+                setLinkedPlanned(data || null);
+                await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
+                try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
+              } catch {}
+            }}
+          />
+        )}
         {/* Close X removed per product decision; back handled by native nav */}
       </div>
 
@@ -661,59 +703,12 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
 
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-0">
-            {/* Overall Execution card rendered inside MobileSummary to avoid duplication */}
-            {isCompleted && (
-              <div className="mb-1 flex items-center justify-end px-2">
-                <div className="flex items-center gap-2">
-                  {(!workout.planned_id && !linkedPlanned) ? (
-                    <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={async()=>{
-                        try {
-                          const pid = String((workout as any).planned_id || (linkedPlanned as any)?.id || '');
-                          if (!pid) return;
-                          await supabase.from('planned_workouts').update({ workout_status: 'planned', completed_workout_id: null }).eq('id', pid);
-                          await supabase.from('workouts').update({ planned_id: null }).eq('id', workout.id);
-                          try { (workout as any).planned_id = null; } catch {}
-                          setLinkedPlanned(null);
-                          suppressRelinkUntil.current = Date.now() + 15000; // 15s
-                          try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                          try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                        } catch {}
-                      }}
-                    >Unattach</Button>
-                  )}
-                  {String((workout as any)?.type||'').toLowerCase()==='strength' && (
-                    <Button variant="ghost" size="sm" onClick={()=> setEditingInline(true)}>Edit</Button>
-                  )}
-                </div>
-                {assocOpen && (
-                  <AssociatePlannedDialog
-                    workout={workout}
-                    open={assocOpen}
-                    onClose={()=>setAssocOpen(false)}
-                    onAssociated={async(pid)=>{ 
-                      try { (workout as any).planned_id = pid; } catch {}
-                      try { window.dispatchEvent(new CustomEvent('planned:invalidate')); } catch {}
-                      try {
-                        const { data } = await supabase.from('planned_workouts').select('*').eq('id', pid).single();
-                        setLinkedPlanned(data || null);
-                        await supabase.functions.invoke('compute-workout-summary', { body: { workout_id: String((workout as any)?.id) } });
-                        try { window.dispatchEvent(new CustomEvent('workouts:invalidate')); } catch {}
-                      } catch {}
-                    }}
-                  />
-                )}
-              </div>
-            )}
+            {/* Attach/Unattach moved to header to reduce padding */}
             {(() => {
               if (overallScore == null) return null;
               const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
               return (
-                <div className="px-1 py-0.5">
+                <div className="px-1 pt-0 pb-1">
                   <div className="flex flex-col items-center leading-tight">
                     <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
                     <span className="text-[12px] text-gray-700 font-medium truncate">{overallMethod}</span>
