@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
     const userId = userData.user.id as string;
 
     // Fetch unified workouts (new columns present but may be null)
-    const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed';
+    const workoutSel = 'id,user_id,date,type,workout_status as legacy_status,planned_data,executed_data,status,planned_id,computed,strength_exercises';
     const { data: wkRaw, error: wkErr } = await supabase
       .from('workouts')
       .select(workoutSel)
@@ -106,10 +106,13 @@ Deno.serve(async (req) => {
           executed = {
             intervals: Array.isArray(cmp?.intervals) ? cmp.intervals : null,
             overall: cmp?.overall || null,
-            // pass through strength exercises when present on workout row
-            strength_exercises: Array.isArray((w as any)?.strength_exercises) ? (w as any).strength_exercises : null,
           };
         }
+      }
+      // Always pass through strength_exercises for strength sessions
+      if (!executed) executed = {};
+      if (Array.isArray((w as any)?.strength_exercises) && (w as any).strength_exercises.length > 0) {
+        executed.strength_exercises = (w as any).strength_exercises;
       }
       // Normalize status universally
       const cmp = w?.computed || null;
