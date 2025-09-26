@@ -660,11 +660,11 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           </TabsContent>
 
           {/* Summary Tab */}
-          <TabsContent value="summary" className="flex-1 p-1">
+          <TabsContent value="summary" className="flex-1 p-0">
             {/* Overall Execution card rendered inside MobileSummary to avoid duplication */}
             {isCompleted && (
-              <div className="mb-0.5 flex items-center justify-between">
-                <div className="flex items-center gap-3">
+              <div className="mb-1 flex items-center justify-end px-2">
+                <div className="flex items-center gap-2">
                   {(!workout.planned_id && !linkedPlanned) ? (
                     <Button variant="ghost" size="sm" onClick={()=>setAssocOpen(true)}>Associate with planned…</Button>
                   ) : (
@@ -690,7 +690,6 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                     <Button variant="ghost" size="sm" onClick={()=> setEditingInline(true)}>Edit</Button>
                   )}
                 </div>
-                <div></div>
                 {assocOpen && (
                   <AssociatePlannedDialog
                     workout={workout}
@@ -714,9 +713,9 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
               if (overallScore == null) return null;
               const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
               return (
-                <div className="px-4">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-700 font-medium truncate pr-2">{overallMethod}</span>
+                <div className="px-2 py-1">
+                  <div className="flex items-baseline gap-2 text-xs">
+                    <span className="text-gray-700 font-medium truncate">{overallMethod}</span>
                     <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
                   </div>
                 </div>
