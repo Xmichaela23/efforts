@@ -652,9 +652,10 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
                 const executedIntervals: any[] = Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
                 if (!plannedSteps.length || !executedIntervals.length) return null;
 
-                const pairs = plannedSteps.map((st:any, i:number)=> ({ planned: st, executed: executedIntervals.find((x:any)=> String(x?.planned_step_id||'')===String(st?.id||'')) || executedIntervals[i] }))
+                const pairs = plannedSteps.map((st:any)=> ({ planned: st, executed: executedIntervals.find((x:any)=> String(x?.planned_step_id||'')===String(st?.id||'')) || executedIntervals.find((x:any)=> Number(x?.planned_index)===Number(st?.planned_index)) }))
                   .filter((p:any)=>{ const tp=String(p?.planned?.type||p?.planned?.kind||'').toLowerCase(); return !(tp.includes('rest')||tp.includes('recovery')); });
-                if (!pairs.length) return null;
+                // If no pairs matched by id or index, do not render a score
+                if (!pairs.length || pairs.every((p:any)=> !p.executed)) return null;
                 const t = String((workout as any)?.type || plannedRow?.type || '').toLowerCase();
                 const hasVariedDurations = (()=>{ const ds=plannedSteps.map((s:any)=> Number(s?.seconds||s?.duration||s?.duration_sec||s?.durationSeconds||0)).filter((d:number)=> Number.isFinite(d)&&d>0); if(!ds.length) return false; const mx=Math.max(...ds), mn=Math.min(...ds); return mn>0 && mx/mn>2; })();
                 const calcPct = (planned:any, executed:any): number | null => {
