@@ -666,6 +666,64 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return 'border-red-200';
   };
 
+  // ---------- Execution score (contextual) helpers ----------
+  const mapExecutedToPlanned = (plannedSteps: any[], executedIntervals: any[]) => {
+    return plannedSteps.map((plannedStep: any, idx: number) => {
+      let executedStep = executedIntervals.find((ex: any) => String(ex?.planned_step_id || '') === String(plannedStep?.id || ''));
+      if (!executedStep) executedStep = executedIntervals[idx];
+      return { planned: plannedStep, executed: executedStep };
+    });
+  };
+
+  const hasSignificantDurationVariation = (steps: any[]): boolean => {
+    try {
+      const durations = steps.map((s: any) => Number(s?.seconds || s?.duration || s?.duration_sec || s?.durationSeconds || 0)).filter((d: number) => Number.isFinite(d) && d > 0);
+      if (!durations.length) return false;
+      const max = Math.max(...durations);
+      const min = Math.min(...durations);
+      return min > 0 && max / min > 2;
+    } catch { return false; }
+  };
+
+  const getExecutionMethodLabel = (workoutType: string, steps: any[]) => {
+    const hasVariedDurations = hasSignificantDurationVariation(steps);
+    const t = String(workoutType || '').toLowerCase();
+    if (t === 'ride' || t === 'bike' || t === 'cycling') return hasVariedDurations ? 'Duration-weighted power adherence' : 'Average power adherence';
+    if (t === 'run' || t === 'walk') return hasVariedDurations ? 'Duration-weighted pace adherence' : 'Average pace adherence';
+    if (t === 'swim') return 'Distance-weighted pace adherence';
+    if (t === 'strength') return 'Rep-weighted load adherence';
+    return hasVariedDurations ? 'Duration-weighted adherence' : 'Average adherence';
+  };
+
+  const calculateExecutionScore = (workoutType: string, plannedSteps: any[], executedIntervals: any[]): number | null => {
+    try {
+      if (!Array.isArray(plannedSteps) || !plannedSteps.length || !Array.isArray(executedIntervals) || !executedIntervals.length) return null;
+      const pairs = mapExecutedToPlanned(plannedSteps, executedIntervals)
+        .filter((p:any)=>{ const tp = String(p?.planned?.type || p?.planned?.kind || '').toLowerCase(); return !(tp.includes('rest') || tp.includes('recovery')); });
+      if (!pairs.length) return null;
+      const t = String(workoutType || '').toLowerCase();
+      let totalWeighted = 0; let totalWeight = 0;
+      for (const { planned, executed } of pairs) {
+        if (!executed) continue;
+        const pct = calculateExecutionPercentage(planned, executed);
+        if (pct == null) continue;
+        let weight = 1;
+        if (t === 'swim') {
+          weight = Number(executed?.distance_m || planned?.distance_m || planned?.distanceMeters || 1) || 1;
+        } else if (t === 'strength') {
+          const reps = Number(executed?.reps || planned?.reps || 1) || 1;
+          const sets = Number(executed?.sets || planned?.sets || 1) || 1;
+          weight = Math.max(1, reps * sets);
+        } else {
+          weight = Number(executed?.duration_s || planned?.seconds || planned?.duration || planned?.duration_sec || planned?.durationSeconds || 60) || 60;
+        }
+        totalWeighted += pct * weight;
+        totalWeight += weight;
+      }
+      return totalWeight > 0 ? Math.round(totalWeighted / totalWeight) : null;
+    } catch { return null; }
+  };
+
   const renderCompletedFor = (st: any): { paceText: string; hr: number | null; durationSec?: number } | string => {
     if (!comp || rows.length < 2) return '—' as any;
     const isRunOrWalk = /run|walk/i.test(comp.type || '') || /running|walking/i.test(comp.activity_type || '');
@@ -953,6 +1011,27 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
         return (
           <div className="flex items-center justify-between text-[11px] text-gray-500 mb-2">
             <div>Source: {label}{computeError ? <span className="ml-2 text-red-600">{computeError}</span> : null}</div>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const plannedSteps = Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : [];
+        const executedIntervals = computedIntervals;
+        const workoutType = String((completed as any)?.type || (effectivePlanned as any)?.type || '').toLowerCase();
+        const score = calculateExecutionScore(workoutType, plannedSteps, executedIntervals);
+        if (!plannedSteps.length || !executedIntervals.length) return null;
+        return (
+          <div className="px-4 mb-4">
+            <div className="p-4 bg-gray-50 rounded-lg">
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-sm font-medium text-gray-600">Overall Execution</span>
+                  <div className="text-xs text-gray-500 mt-0.5">{getExecutionMethodLabel(workoutType, plannedSteps)}</div>
+                </div>
+                <span className={`text-xl font-bold ${getPercentageColor(score || 0)}`}>{score ?? '—'}%</span>
+              </div>
+            </div>
           </div>
         );
       })()}
