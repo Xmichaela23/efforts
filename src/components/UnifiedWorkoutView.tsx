@@ -538,6 +538,21 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
     }
   };
 
+  // --- Overall execution score inputs (computed once per render) ---
+  const plannedRowForScore: any = (hydratedPlanned || linkedPlanned || (isCompleted ? workout : null)) as any;
+  const computedStepsForScore: any[] = Array.isArray(plannedRowForScore?.computed?.steps) ? plannedRowForScore.computed.steps : [];
+  const lightStepsForScore: any[] = Array.isArray((workout as any)?.computed?.planned_steps_light)
+    ? (workout as any).computed.planned_steps_light.map((s:any)=> ({ id: s.planned_step_id, planned_index: s.planned_index, distanceMeters: s.meters, seconds: s.seconds }))
+    : [];
+  const plannedStepsForScore: any[] = computedStepsForScore.length ? computedStepsForScore : lightStepsForScore;
+  const executedIntervalsForScore: any[] = Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
+  const workoutTypeForScore = String((workout as any)?.type || plannedRowForScore?.type || '').toLowerCase();
+  const { score: overallScore, methodLabel: overallMethod } = useExecutionScore(
+    workoutTypeForScore,
+    plannedStepsForScore,
+    executedIntervalsForScore
+  );
+
   return (
     <div className="w-full h-full flex flex-col">
       {/* Header */}
@@ -647,23 +662,13 @@ const UnifiedWorkoutView: React.FC<UnifiedWorkoutViewProps> = ({
           {/* Summary Tab */}
           <TabsContent value="summary" className="flex-1 p-1">
             {(() => {
-              const plannedRow: any = (hydratedPlanned || linkedPlanned || (isCompleted ? workout : null)) as any;
-              const computedSteps: any[] = Array.isArray(plannedRow?.computed?.steps) ? plannedRow.computed.steps : [];
-              // Fallback to server snapshot on completed row to match per-row table behavior
-              const lightSteps: any[] = Array.isArray((workout as any)?.computed?.planned_steps_light)
-                ? (workout as any).computed.planned_steps_light.map((s:any)=> ({ id: s.planned_step_id, planned_index: s.planned_index, distanceMeters: s.meters, seconds: s.seconds }))
-                : [];
-              const plannedSteps: any[] = computedSteps.length ? computedSteps : lightSteps;
-              const executedIntervals: any[] = Array.isArray((workout as any)?.computed?.intervals) ? (workout as any).computed.intervals : [];
-              const t = String((workout as any)?.type || plannedRow?.type || '').toLowerCase();
-              const { score, methodLabel } = useExecutionScore(t, plannedSteps, executedIntervals);
-              if (score == null) return null;
-              const color = score>=90 && score<=110 ? 'text-green-600' : score>=80 && score<=120 ? 'text-yellow-600' : 'text-red-600';
+              if (overallScore == null) return null;
+              const color = overallScore>=90 && overallScore<=110 ? 'text-green-600' : overallScore>=80 && overallScore<=120 ? 'text-yellow-600' : 'text-red-600';
               return (
                 <div className="px-3 pt-1">
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-gray-500 truncate pr-2">{methodLabel}</span>
-                    <span className={`text-base font-semibold ${color}`}>{score}%</span>
+                    <span className="text-gray-500 truncate pr-2">{overallMethod}</span>
+                    <span className={`text-base font-semibold ${color}`}>{overallScore}%</span>
                   </div>
                 </div>
               );
