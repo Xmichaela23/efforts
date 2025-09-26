@@ -369,9 +369,13 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
   const completedComputed = (completed as any)?.computed || (hydratedCompleted as any)?.computed;
   const computedIntervals: any[] = Array.isArray(completedComputed?.intervals) ? completedComputed.intervals : [];
   const hasServerComputed = computedIntervals.length > 0;
-  const plannedStepsBase: any[] = hasServerPlanned
+  // Prefer full planned steps (same source as Planned tab) for labels; use server "light" only for alignment
+  const plannedStepsFull: any[] = Array.isArray((effectivePlanned as any)?.computed?.steps)
+    ? ((effectivePlanned as any).computed.steps as any[]).map((s:any, idx:number)=> ({ planned_index: (s as any)?.planned_index ?? idx, ...s }))
+    : [];
+  const plannedStepsLight: any[] = hasServerPlanned
     ? serverPlannedLight.map((s:any)=> ({ id: s.planned_step_id || undefined, planned_index: s.planned_index, distanceMeters: s.meters, duration: s.seconds }))
-    : (Array.isArray((effectivePlanned as any)?.computed?.steps) ? (effectivePlanned as any).computed.steps : []);
+    : [];
   // Derive compact pace-only rows from the same source the Planned tab renders
   const [ftp, setFtp] = useState<number | null>(null);
   useEffect(() => {
@@ -422,7 +426,8 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
     return out;
   }, [ (effectivePlanned as any)?.rendered_description, isRidePlanned, ftp ]);
   // Prefer structured steps when present; otherwise prefill from description so the ledger is always populated
-  const steps: any[] = plannedStepsBase.length >= 3 ? plannedStepsBase : descPaceSteps;
+  // Display steps come from full planned steps when available, else light, else description-derived
+  const steps: any[] = plannedStepsFull.length >= 3 ? plannedStepsFull : (plannedStepsLight.length >= 3 ? plannedStepsLight : descPaceSteps);
 
   // Build accumulated rows once for completed and advance a cursor across steps
   const comp = hydratedCompleted || completed;
@@ -524,6 +529,11 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       return '—';
     }
     // run/walk → single pace only
+    // Prefer explicit textual target first (e.g., "6:30/mi", "4:10/km")
+    const directTxt = (st as any)?.paceTarget || (st as any)?.target_pace || (st as any)?.pace;
+    if (typeof directTxt === 'string' && /\d+:\d{2}\s*\/(mi|km)/i.test(directTxt)) {
+      return String(directTxt).trim();
+    }
     const p = Number((st as any)?.pace_sec_per_mi);
     if (Number.isFinite(p) && p>0) return fmtPace(p);
     const prng = Array.isArray((st as any)?.pace_range) ? (st as any).pace_range : null;
@@ -544,7 +554,7 @@ export default function MobileSummary({ planned, completed }: MobileSummaryProps
       }
     } catch {}
     const txt = String((st as any)?.pace || '').trim();
-    if (txt.includes('/mi')) return txt;
+    if (/\d+:\d{2}\s*\/(mi|km)/i.test(txt)) return txt;
     return '—';
   };
 
