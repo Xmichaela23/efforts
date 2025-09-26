@@ -346,7 +346,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             ) : null}
           </span>
         </div>
-        {!isStrength && (
+        {!hideLines && !isStrength && (
           <div className="text-sm text-gray-600 mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">{stacked.join('\n')}</span>
