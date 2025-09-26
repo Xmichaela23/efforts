@@ -63,7 +63,7 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
       }
       const { data, error } = await supabase
         .from('workouts')
-        .select('id,type,date,distance,workout_status,planned_id')
+        .select('id,type,date,distance,workout_status,planned_id,strength_exercises,completed_exercises')
         .eq('user_id', userId)
         .gte('date', fromISO)
         .lte('date', toISO)
@@ -72,7 +72,11 @@ export function useWorkoutsRange(fromISO: string, toISO: string) {
         try { console.timeEnd?.(`⏱ workoutsRange query ${fromISO}→${toISO}`); } catch {}
       }
       if (error) throw error;
-      const safe = Array.isArray(data) ? data : [];
+      const safe = Array.isArray(data) ? data.map((w:any)=> ({
+        ...w,
+        strength_exercises: (()=>{ try { return typeof w.strength_exercises==='string' ? JSON.parse(w.strength_exercises) : w.strength_exercises; } catch { return w.strength_exercises; } })(),
+        completed_exercises: (()=>{ try { return typeof w.completed_exercises==='string' ? JSON.parse(w.completed_exercises) : w.completed_exercises; } catch { return w.completed_exercises; } })(),
+      })) : [];
       if (import.meta.env?.DEV) {
         try { console.log?.('workoutsRange rows:', safe.length); } catch {}
       }

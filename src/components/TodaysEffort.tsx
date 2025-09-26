@@ -153,7 +153,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
     const completedTypes = new Set(completed.map(typeKey));
     const plannedKept = planned.filter((w:any)=> !completedTypes.has(typeKey(w)));
     return [...completed, ...plannedKept];
-  }, [unifiedItems, activeDate]);
+  }, [unifiedItems, activeDate, workouts]);
 
   // FIXED: React to selectedDate prop changes properly
   useEffect(() => {

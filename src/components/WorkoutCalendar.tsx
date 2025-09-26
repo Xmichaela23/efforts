@@ -221,6 +221,8 @@ export default function WorkoutCalendar({
     distance: (it?.executed?.overall?.distance_m && typeof it.executed.overall.distance_m === 'number')
       ? (it.executed.overall.distance_m / 1000)
       : undefined,
+    // Pass sets for strength so Today can read via range context while unified stabilizes
+    strength_exercises: Array.isArray((it as any)?.executed?.strength_exercises) ? (it as any).executed.strength_exercises : undefined,
     // keep shape minimal; calendar only uses status, date, type, maybe planned_id
   }));
 
