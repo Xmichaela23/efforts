@@ -346,7 +346,7 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
             ) : null}
           </span>
         </div>
-        {!hideLines && !isStrength && (
+        {!isStrength && (
           <div className="text-sm text-gray-600 mt-1">
             {stacked.length > 1 ? (
               <span className="whitespace-pre-line">{stacked.join('\n')}</span>
@@ -354,6 +354,11 @@ export const PlannedWorkoutSummary: React.FC<PlannedWorkoutSummaryProps> = ({ wo
               <span>{lines}</span>
             )}
           </div>
+        )}
+        {!hideLines && !isStrength && enduranceLines.length>0 && (
+          <ul className="list-disc pl-5 mt-1 text-sm text-gray-700">
+            {enduranceLines.map((ln, idx)=> (<li key={idx}>{ln}</li>))}
+          </ul>
         )}
         {!hideLines && isStrength && (
           <div className="text-sm text-gray-600 mt-1">
