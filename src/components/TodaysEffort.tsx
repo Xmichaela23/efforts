@@ -526,7 +526,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       </div>
 
       {/* Content area - scrolls vertically (reverted) */}
-      <div ref={scrollRef} className="flex-1 overflow-auto overscroll-contain scrollbar-hide">
+      <div ref={scrollRef} className="flex-1 overflow-auto overscroll-auto scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' as any }}>
         <div className="px-3 pb-2" style={{ paddingBottom: 48 }}>
         {displayWorkouts.length === 0 ? (
           // Empty state
@@ -571,7 +571,25 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                         <PlannedWorkoutSummary workout={workout} baselines={baselines as any} hideLines={!expanded[String(workout.id)]} />
                         <button
                           className="text-xs text-blue-600 hover:underline ml-2"
-                          onClick={(e)=>{ e.preventDefault(); e.stopPropagation(); toggleExpanded(String(workout.id)); }}
+                          onClick={(e)=>{ 
+                            e.preventDefault(); e.stopPropagation(); 
+                            const key = String(workout.id);
+                            const willOpen = !expanded[key];
+                            toggleExpanded(key);
+                            if (willOpen) {
+                              try {
+                                const root = scrollRef.current;
+                                const btn = (e.currentTarget as HTMLElement);
+                                const card = btn.closest('button');
+                                if (root && card) {
+                                  // Align the card near the top after expansion for easier scrolling
+                                  const rootTop = root.getBoundingClientRect().top;
+                                  const cardTop = (card as HTMLElement).getBoundingClientRect().top;
+                                  root.scrollTo({ top: root.scrollTop + (cardTop - rootTop) - 12, behavior: 'smooth' });
+                                }
+                              } catch {}
+                            }
+                          }}
                         >
                           {expanded[String(workout.id)] ? 'Hide details' : 'Show details'}
                         </button>
