@@ -106,6 +106,8 @@ Deno.serve(async (req) => {
           executed = {
             intervals: Array.isArray(cmp?.intervals) ? cmp.intervals : null,
             overall: cmp?.overall || null,
+            // pass through strength exercises when present on workout row
+            strength_exercises: Array.isArray((w as any)?.strength_exercises) ? (w as any).strength_exercises : null,
           };
         }
       }

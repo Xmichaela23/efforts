@@ -103,6 +103,8 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
         type: it.type,
         workout_status: 'completed',
         computed: it.executed || null,
+        // expose strength_exercises from executed payload when present
+        strength_exercises: Array.isArray((it?.executed as any)?.strength_exercises) ? (it.executed as any).strength_exercises : ((it as any)?.strength_exercises || []),
       }));
     const planned = items
       .filter((it:any) => !!it?.planned && String(it?.status||'').toLowerCase()!=='completed')
@@ -231,7 +233,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
       if (workout.type === 'strength') {
         // Strength: show exercise abbreviations with their set/rep/weight info
         // Read from strength_exercises field which contains the actual workout data
-        const exercises = workout.strength_exercises || [];
+        const exercises = Array.isArray(workout.strength_exercises) ? workout.strength_exercises : (Array.isArray((workout as any)?.computed?.strength_exercises) ? (workout as any).computed.strength_exercises : []);
         
         if (exercises.length > 0) {
           // Create exercise summaries with abbreviations
@@ -242,7 +244,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             const avgReps = ex.sets?.reduce((total, set) => total + (set.reps || 0), 0) / (sets || 1);
 
             // Compute weight range across sets
-            let weightRange = '0lbs';
+            let weightRange = '';
             if (Array.isArray(ex.sets) && ex.sets.length > 0) {
               const weights = ex.sets.map((s:any)=> Number(s?.weight || 0)).filter((w:number)=> isFinite(w) && w>0);
               if (weights.length > 0) {
@@ -250,7 +252,7 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
                 const maxWeight = Math.max(...weights);
                 weightRange = (minWeight === maxWeight) ? `${minWeight}lbs` : `${minWeight}-${maxWeight}lbs`;
               } else {
-                weightRange = '—';
+                weightRange = '';
               }
             }
 
@@ -282,10 +284,9 @@ const TodaysEffort: React.FC<TodaysEffortProps> = ({
             };
 
             const abbreviation = abbrevFor();
-            // Use clear notation: sets × reps @ weight (avoid 's'/'r' which look like seconds)
             const reps = Math.round(avgReps || 0);
-            const weightTxt = weightRange && weightRange !== '—' ? ` @ ${weightRange}` : '';
-            return `${abbreviation} ${sets}×${reps}${weightTxt}`.trim();
+            const lead = weightRange ? `${weightRange} ${sets}×${reps}` : `${sets}×${reps}`;
+            return `${abbreviation} ${lead}`.trim();
           });
           
           return exerciseSummaries.map((summary, index) => {
