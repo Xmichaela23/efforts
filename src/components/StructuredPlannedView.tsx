@@ -54,7 +54,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
         preferStrengthLines = true;
         for (const e of exArr) {
           const name = String(e?.name || '').replace(/_/g, ' ').trim();
-          const isBw = /\b(dip|chin\-?up|pull\-?up|push\-?up|plank)\b/i.test(name);
+          const norm = name.toLowerCase().replace(/[\s-]/g,'');
+          const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(norm);
           const setsField: any = (e as any).sets;
           const baseWeight = (typeof (e as any)?.weight === 'number' && isFinite((e as any).weight)) ? Math.round((e as any).weight) : undefined;
           const baseReps = ((): number | string | undefined => { const r=(e as any)?.reps; if (typeof r==='string') return r.toUpperCase(); if (typeof r==='number') return Math.max(1, Math.round(r)); return undefined; })();
@@ -137,7 +138,8 @@ const StructuredPlannedView: React.FC<StructuredPlannedViewProps> = ({ workout, 
       const reps = Number(st.strength.reps||st.strength.repCount||0);
           const wt = Number(st.strength.weight||st.strength.load||0);
           const unit = (String((workout as any)?.units||'').toLowerCase()==='metric') ? ' kg' : ' lb';
-          const isBw = /\b(dip|chin\-?up|pull\-?up|push\-?up|plank)\b/i.test(nm);
+          const normNm = nm.toLowerCase().replace(/[\s-]/g,'');
+          const isBw = /^(?:.*(?:dip|chinup|pullup|pushup|plank).*)$/.test(normNm);
           const parts: string[] = [nm];
           if (sets>0 && reps>0) parts.push(`${sets}×${reps}`);
           if (wt>0 && !isBw) parts.push(`@ ${Math.round(wt)}${unit}`);

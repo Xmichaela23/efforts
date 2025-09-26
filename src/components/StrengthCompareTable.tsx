@@ -34,6 +34,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
   const rows = allKeys.map(k => {
     const p = plannedMap.get(k);
     const c = completedMap.get(k);
+    const isBodyweight = /dip|chin\-?ups?|pull\-?ups?|push\-?ups?|plank/.test(k);
     const pSets = (p?.sets || 0);
     const pReps = (p?.reps || 0);
     const pW = (p?.weight || 0);
@@ -52,7 +53,7 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
     const completedSets: StrengthSet[] = cSetsArr;
     const maxLen = Math.max(plannedSets.length, completedSets.length);
     const pairs = Array.from({ length: maxLen }, (_, i) => ({ planned: plannedSets[i], completed: completedSets[i] }));
-    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs } as any;
+    return { name: p?.name || c?.name || k, pSets, pReps, pW, pVol, cSets, cRepsAvg, cWAvg, cVol, status, pairs, isBodyweight } as any;
   });
 
   const totals = rows.reduce((acc, r)=>({ pVol: acc.pVol + r.pVol, cVol: acc.cVol + r.cVol, pSets: acc.pSets + r.pSets, cSets: acc.cSets + r.cSets }), { pVol:0, cVol:0, pSets:0, cSets:0 });
@@ -74,14 +75,17 @@ export default function StrengthCompareTable({ planned, completed }: { planned: 
             {r.pairs.map((pair: any, idx: number) => {
               const p = pair.planned as StrengthSet | undefined;
               const c = pair.completed as StrengthSet | undefined;
-              const fmt = (s?: StrengthSet) => s && (s.reps || s.weight)
-                ? `${s.reps || 0} @ ${s.weight || 0} lb`
-                : '—';
+              const fmt = (s?: StrengthSet, isBw?: boolean) => {
+                if (!s || (!s.reps && !s.weight)) return '—';
+                const repsTxt = String(s.reps || 0);
+                const showWt = !isBw && typeof s.weight === 'number' && s.weight > 0;
+                return showWt ? `${repsTxt} @ ${Math.round(s.weight as number)} lb` : repsTxt;
+              };
               return (
                 <div key={idx} className="grid grid-cols-12 text-sm">
                   <div className="col-span-2 text-gray-600">{idx+1}</div>
-                  <div className="col-span-5 text-gray-600">{fmt(p)}</div>
-                  <div className="col-span-5 text-gray-800">{fmt(c)}</div>
+                  <div className="col-span-5 text-gray-600">{fmt(p, r.isBodyweight)}</div>
+                  <div className="col-span-5 text-gray-800">{fmt(c, false)}</div>
                 </div>
               );
             })}
